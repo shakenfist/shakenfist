@@ -87,7 +87,27 @@ class NoSuchChannel(InstanceException):
 
 # Scheduler
 class SchedulerException(Exception):
-    ...
+    """A scheduling attempt which did not produce a placement.
+
+    ``stage`` names the point in the scheduling decision which refused,
+    so a caller can tell one refusal from another without parsing the
+    message. For the filter path it is the scheduler filter's name
+    (``sufficient_idle_cpu``, ``sufficient_free_disk`` and friends, set
+    by Scheduler._log_and_raise_on_error()); for a refusal by the
+    capacity guard it is ``capacity_guard``. It defaults to the empty
+    string so it is never absent -- a handler which finds it empty
+    should say ``unknown`` rather than fail, because failing to produce
+    a refusal is worse than producing a vague one.
+
+    The stage is an attribute and not a substring of the message
+    because the REST API publishes it as a machine-readable field
+    (PLAN-transient-capacity-refusals phase 4, D30). Nothing may
+    re-derive it by parsing str(exception).
+    """
+
+    def __init__(self, *args: Any, stage: str = '') -> None:
+        super().__init__(*args)
+        self.stage: str = stage
 
 
 class CandidateNodeNotFoundException(SchedulerException):

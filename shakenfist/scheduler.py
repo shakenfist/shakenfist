@@ -551,7 +551,11 @@ class Scheduler:
             message = f'No nodes remaining at scheduling stage {stage}'
             if detail:
                 message = f'{message}: {detail}'
-            raise exception_class(message)
+            # The stage rides on the exception as well as in the
+            # message, because the create path publishes it as a
+            # machine-readable field and must not parse the prose
+            # (PLAN-transient-capacity-refusals phase 4, D30).
+            raise exception_class(message, stage=stage)
 
         add_event_multi(
             EVENT_TYPE_AUDIT, related_objects,

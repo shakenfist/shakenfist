@@ -278,9 +278,15 @@ class NodeInstNetdescOp(BaseClusterOperation):
                     'reschedule failed, every candidate refused by capacity '
                     'guard',
                     extra={'candidates': candidates, 'denials': denials})
+                # Every candidate was refused by the capacity guard,
+                # which is the same fact the create path publishes as
+                # the capacity_guard stage. The message is unchanged;
+                # the stage is carried alongside it so no handler has
+                # to parse it back out (D30).
                 raise LowResourceException(
                     'No node had capacity for this instance, '
-                    f'{len(denials)} candidates refused it')
+                    f'{len(denials)} candidates refused it',
+                    stage='capacity_guard')
 
             # The artifact fetches minted at create time targeted the
             # original placement, so the redirect target's image cache has

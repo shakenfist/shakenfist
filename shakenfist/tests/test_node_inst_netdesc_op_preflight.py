@@ -271,6 +271,27 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
         mock_enqueue.assert_not_called()
         self.assertEqual([], inst.disk_fetch_calls)
 
+    def test_every_candidate_denied_carries_the_capacity_guard_stage(self):
+        # The preflight redirect's own exhaustion raise is the same fact
+        # the create path publishes as the capacity_guard stage, so it
+        # carries the stage too and no handler has to parse the message
+        # (PLAN-transient-capacity-refusals phase 4, D30). The abort is
+        # raised from inside the ``except LowResourceException`` suite,
+        # so the refusal is reachable as the abort's implicit context.
+        first = str(uuid4())
+        second = str(uuid4())
+        inst = FakeInstance('created', deny=[first, second])
+
+        _, _, raised = self._redirect(inst, [first, second])
+
+        self.assertIsNotNone(raised)
+        refusal = raised.__context__
+        self.assertIsInstance(refusal, exceptions.LowResourceException)
+        self.assertEqual('capacity_guard', refusal.stage)
+        self.assertEqual(
+            'No node had capacity for this instance, 2 candidates refused it',
+            str(refusal))
+
     def _redirect_raising(self, inst, exc, candidates=(), second=None):
         """As _redirect(), but choosing what the local placement raised.
 
