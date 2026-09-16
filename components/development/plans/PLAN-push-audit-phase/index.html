@@ -14518,8 +14518,8 @@ this repository's convention.</p>
 </tr>
 <tr>
 <td>4. Fleet backfill</td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td><code>fd0678c</code> (#113)</td>
 </tr>
 <tr>
 <td>5. Push audit</td>
@@ -15303,7 +15303,18 @@ other way from the first draft of this section:</p>
   could be recorded; and the remaining seven are <code>Complete</code> plans
   mentioning a push audit only in prose, which the carve-out
   exempts.</li>
-<li><strong>ryll needs nothing, not two.</strong> Its five carriers all already
+</ul>
+<p><strong>This measurement went stale the day after it was taken, and
+  step 4e caught it.</strong> <code>PLAN-differencing.md</code> landed on 2026-09-05
+  carrying a push audit phase, making instar a two-carrier
+  repository with one empty cell against a phase that had shipped.
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/560" title="GitHub Issue: shakenfist/instar #560">instar#560</a> filled it. Nothing was reconstructed: the pull request
+  was known and the cell had simply not been typed. The lesson is
+  the one decision 1 already states -- the in-scope set is derived
+  from each repository's own index at sweep time, never from this
+  table -- and 4e's brief said so, which is why the sweep found it
+  rather than trusting the line above.
+* <strong>ryll needs nothing, not two.</strong> Its five carriers all already
   carry a <code>Merged</code> column. The two plans the naming grep adds are
   <code>PLAN-web-frontend.md</code> and <code>PLAN-streaming-test-automation.md</code>,
   and neither belongs in the sweep --
@@ -15315,20 +15326,20 @@ other way from the first draft of this section:</p>
   audits that <em>ran</em> after phases 3 and 8, and its Status cells
   already carry per-phase commit SHAs. Sweeping it would add a
   column to a finished plan that already holds the information, to
-  satisfy a rule its status exempts it from.</li>
-<li><strong>kerbside needs nothing, and one of its two is a format gap
+  satisfy a rule its status exempts it from.
+* <strong>kerbside needs nothing, and one of its two is a format gap
   rather than a missing record.</strong> <code>PLAN-proxy-dev-releases.md</code> is
   <code>Complete</code>, carries the phase, and records every phase's landing
   pull request in its Status cells ("Complete (merged in PR #314,
   2026-08-16)") rather than in a <code>Merged</code> column. The information
-  phase 5 needs is there. Decision 8 declines to migrate the shape.</li>
-<li><strong>shakenfist is nineteen, not twenty-one and not twenty.</strong>
+  phase 5 needs is there. Decision 8 declines to migrate the shape.
+* <strong>shakenfist is nineteen, not twenty-one and not twenty.</strong>
   Twenty-one plans name the runbook; nineteen carry a phase, and
   <em>none</em> of the nineteen records a landing commit in any shape. The
   two the naming grep adds are <code>PLAN-netserv.md</code> (<code>Proposed</code>,
   unphased) and <code>PLAN-sql-pushdown-filtering.md</code> (<code>Complete</code>, no
-  audit phase).</li>
-<li><strong>development needs two, and two drafts of this section said it
+  audit phase).
+* <strong>development needs two, and two drafts of this section said it
   needed a different number.</strong> Ten of its plans name the runbook and
   eight carry a phase. Five of the eight record their ranges in a
   <code>Merged</code> column; a sixth, <code>PLAN-plan-template-blocks.md</code>, carries
@@ -15340,8 +15351,7 @@ other way from the first draft of this section:</p>
   regex that answers "no record" for "record in a shape I did not
   anticipate" is the silent-skip failure this plan's own risks
   section warns about, found in the section written to correct the
-  previous count.</li>
-</ul>
+  previous count.</p>
 <p>The correction to that draft then overshot in the opposite
   direction, and reported the repository as needing nothing. It
   asked which carriers have a <code>Merged</code> <em>record</em> and stopped there;
@@ -15424,10 +15434,13 @@ section's whole subject is the cost of counting with the wrong
 pattern, so it should not do it in its own supporting figures.)
 And shakenfist's <code>PLAN-TEMPLATE.md</code> carries eight blocks, all <code>v1</code>,
 and <em>not</em> <code>plan-push-audit-phase</code> at all, so step 4c
-installs the block there rather than refreshing it; the same is true
-of divergulent and occystrap. Only instar, ryll, kerbside,
-client-python-k3s and development embed it today, all at v2, and
-they are the set decision 3's bump restales.</p>
+installs the block there rather than refreshing it; the same is
+true of occystrap. <strong>It is not true of divergulent</strong>, which this
+section originally listed here: step 4d found the block already
+embedded at v2 and refreshed it, and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/divergulent/issues/109" title="GitHub Issue: shakenfist/divergulent #109">divergulent#109</a> records the
+check. So instar, ryll, kerbside, client-python-k3s, divergulent
+and development embed it today, all at v2, and they are the set
+decision 3's bump restales.</p>
 <p><strong>The check fails three plans, and one of them is this plan's own
 headline evidence.</strong> The criterion names each with the fix it needs:</p>
 <ul>
@@ -15653,21 +15666,21 @@ Future work with the criterion.</p>
 <td>high</td>
 <td>opus</td>
 <td>worktree</td>
-<td>Sweep shakenfist: the largest and the only one with check failures. Nineteen of its plans carry an audit phase and <em>none</em> of the nineteen records a landing commit in any shape; the twenty-one that name <code>PUSH-AUDIT.md</code> include two that carry no phase (<code>PLAN-netserv.md</code>, <code>Proposed</code> and unphased, and <code>PLAN-sql-pushdown-filtering.md</code>, <code>Complete</code> with no audit phase) and are out of scope by decision 1. For each of the nineteen, add a <code>Merged</code> column as the last column of the Execution table (last so a row omitting it still reaches <code>Status</code>, per the shared block) and fill it by reconstruction -- <code>gh pr list --state merged</code> plus <code>git rev-list --first-parent</code>, never a path-filtered <code>git log</code> alone, and say in each plan that the range was reconstructed. Where a phase's range is unrecoverable, say so and name the paths, rather than leaving the cell blank. Then fix the three failures the criterion names, with the fix it names: <code>PLAN-ci-cloud-sizing.md</code> gains a final push audit phase. It is measurably <em>outside</em> the nineteen today -- it does not name <code>PUSH-AUDIT.md</code> anywhere and carries no audit phase -- so appending the phase makes it the twentieth carrier, and its already-merged phases need ranges reconstructed as well. Twenty plans carry a <code>Merged</code> record when this step is done, not nineteen and not twenty-one; <code>PLAN-kerbside-vdi-tokens.md</code> has its audit phase moved after phase 11; <code>PLAN-queue-performance.md</code> gains a <em>new</em> final phase citing phase 8's completed audit as prior coverage of phases 1-8, and does not move phase 8 (decision 4). shakenfist's <code>PLAN-TEMPLATE.md</code> carries eight blocks, all at v1, and does not carry <code>plan-push-audit-phase</code> at all -- so <em>install</em> the v3 block there rather than refreshing it, which is also what <code>plan-template</code> is failing shakenfist for. List every reconstructed SHA in the pull request body and assert each is a merge commit (<code>git rev-list --merges -1 &lt;sha&gt;</code> returns it) or an explicit <code>first..last</code> range, since no criterion reads the <code>Merged</code> column and review is the only thing that will. shakenfist's pre-commit carries a "plan statuses and index arithmetic agree" hook -- run it, and reconcile any index phase counts the new phases change. One pull request. Commit subjects per plan group, not one commit per plan.</td>
+<td>Sweep shakenfist: the largest and the only one with check failures. Nineteen of its plans carry an audit phase and <em>none</em> of the nineteen records a landing commit in any shape; the twenty-one that name <code>PUSH-AUDIT.md</code> include two that carry no phase (<code>PLAN-netserv.md</code>, <code>Proposed</code> and unphased, and <code>PLAN-sql-pushdown-filtering.md</code>, <code>Complete</code> with no audit phase) and are out of scope by decision 1. For each of the nineteen, add a <code>Merged</code> column as the last column of the Execution table (last so a row omitting it still reaches <code>Status</code>, per the shared block) and fill it by reconstruction -- <code>gh pr list --state merged</code> plus <code>git rev-list --first-parent</code>, never a path-filtered <code>git log</code> alone, and say in each plan that the range was reconstructed. Where a phase's range is unrecoverable, say so and name the paths, rather than leaving the cell blank. Then fix the three failures the criterion names, with the fix it names: <code>PLAN-ci-cloud-sizing.md</code> gains a final push audit phase. It is measurably <em>outside</em> the nineteen today -- it does not name <code>PUSH-AUDIT.md</code> anywhere and carries no audit phase -- so appending the phase makes it the twentieth carrier, and its already-merged phases need ranges reconstructed as well. Twenty plans carry a <code>Merged</code> record when this step is done, not nineteen and not twenty-one; <code>PLAN-kerbside-vdi-tokens.md</code> has its audit phase moved after phase 11; <code>PLAN-queue-performance.md</code> gains a <em>new</em> final phase citing phase 8's completed audit as prior coverage of phases 1-8, and does not move phase 8 (decision 4). shakenfist's <code>PLAN-TEMPLATE.md</code> carries eight blocks, all at v1, and does not carry <code>plan-push-audit-phase</code> at all -- so <em>install</em> the v3 block there rather than refreshing it, which is also what <code>plan-template</code> is failing shakenfist for. List every reconstructed SHA in the pull request body and assert each is a merge commit (<code>git rev-list --merges -1 &lt;sha&gt;</code> returns it) or an explicit <code>first..last</code> range, since no criterion reads the <code>Merged</code> column and review is the only thing that will. shakenfist's pre-commit carries a "plan statuses and index arithmetic agree" hook -- run it, and reconcile any index phase counts the new phases change. One pull request. Commit subjects per plan group, not one commit per plan. <strong>Corrected by 4f after the step ran: it is twenty-one, and the sentence above rules out the right answer for the wrong reason.</strong> The nineteen were right when counted, but <code>PLAN-transient-capacity-refusals.md</code> acquired an audit phase between the survey and the sweep -- 4c gave it one on the branch, as it did <code>PLAN-ci-cloud-sizing.md</code> -- so twenty-one plans carry a <code>Merged</code> record and every one of them names <code>PUSH-AUDIT.md</code>. Both exclusions the brief names held: <code>PLAN-netserv.md</code> and <code>PLAN-sql-pushdown-filtering.md</code> are still correctly outside the set. Each of 4c, 4d and 4e found a count in its own brief that had not survived to its sweep, which is why decision 1 makes every sweep re-derive its set from the repository's own index rather than read it here.</td>
 </tr>
 <tr>
 <td>4d</td>
 <td>high</td>
 <td>opus</td>
 <td>worktree</td>
-<td>Sweep divergulent: three incomplete plans (<code>PLAN-published-cache.md</code>, <code>PLAN-release-1.0.md</code>, <code>PLAN-patch-classification.md</code>) that carry no push audit phase at all. Append the phase to each and extend its <code>index.md</code> row -- its index tracks phases as an inline <code>✓</code>/<code>◐</code> list in a <code>Phases</code> cell, so the phase is appended in the plan file and the cell extended, not added as a table row (decision 3 of phase 3). divergulent has no <code>PUSH-AUDIT.md</code>; per the shared block the phase is still carried, and it says the runbook does not exist yet and what was done instead. All three then name <code>PUSH-AUDIT.md</code>, so they join the backfill set: reconstruct a landing commit for each of their already-merged phases by the same rules as 4c, or say per phase that the range is unrecoverable and name the paths. <code>PLAN-curation-cli-ergonomics.md</code> has no phases the check can read -- leave it, and say in the pull request that it was left and why. Refresh the <code>plan-push-audit-phase</code> block to v3 in its <code>PLAN-TEMPLATE.md</code>. An earlier draft of this step called that an install, on the strength of <code>PLAN-plan-template-blocks.md</code>'s Migration section listing divergulent as outstanding; that entry was stale and is corrected in step 4b's pull request. <code>docs/audits/compliance.md</code> has divergulent <code>compliant</code> on <code>plan-template</code>, and <code>plan-push-audit-phase</code> is a required member of <code>PLAN_TEMPLATE_BLOCKS</code>, so the block is already there at v2 and this step bumps the version marker and the carve-out sentence. Re-check the compliance page before starting rather than trusting either statement. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/divergulent/issues/79" title="GitHub Issue: shakenfist/divergulent #79">divergulent#79</a> is therefore not this step's to close: it was the audit's missing-block issue and it is already closed, which is how the block got there. One pull request.</td>
+<td>Sweep divergulent: three incomplete plans (<code>PLAN-published-cache.md</code>, <code>PLAN-release-1.0.md</code>, <code>PLAN-patch-classification.md</code>) that carry no push audit phase at all. Append the phase to each and extend its <code>index.md</code> row -- its index tracks phases as an inline <code>✓</code>/<code>◐</code> list in a <code>Phases</code> cell, so the phase is appended in the plan file and the cell extended, not added as a table row (decision 3 of phase 3). divergulent has no <code>PUSH-AUDIT.md</code>; per the shared block the phase is still carried, and it says the runbook does not exist yet and what was done instead. <strong>That is false and step 4d did not follow it</strong>: divergulent has a 638-line <code>PUSH-AUDIT.md</code> at its root, landed in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/divergulent/issues/60" title="GitHub Issue: shakenfist/divergulent #60">divergulent#60</a> (<code>7b45c11</code>), and its <code>PLAN-TEMPLATE.md</code> already carries an "In this project" note saying so. Following this sentence would have written a falsehood into a plan, so the appended phase cites and runs the real runbook. Corrected here in 4f rather than silently, because the same sentence would otherwise be copied into the next repository a sweep decides has no runbook. All three then name <code>PUSH-AUDIT.md</code>, so they join the backfill set: reconstruct a landing commit for each of their already-merged phases by the same rules as 4c, or say per phase that the range is unrecoverable and name the paths. <code>PLAN-curation-cli-ergonomics.md</code> has no phases the check can read -- leave it, and say in the pull request that it was left and why. Refresh the <code>plan-push-audit-phase</code> block to v3 in its <code>PLAN-TEMPLATE.md</code>. An earlier draft of this step called that an install, on the strength of <code>PLAN-plan-template-blocks.md</code>'s Migration section listing divergulent as outstanding; that entry was stale and is corrected in step 4b's pull request. <code>docs/audits/compliance.md</code> has divergulent <code>compliant</code> on <code>plan-template</code>, and <code>plan-push-audit-phase</code> is a required member of <code>PLAN_TEMPLATE_BLOCKS</code>, so the block is already there at v2 and this step bumps the version marker and the carve-out sentence. Re-check the compliance page before starting rather than trusting either statement. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/divergulent/issues/79" title="GitHub Issue: shakenfist/divergulent #79">divergulent#79</a> is therefore not this step's to close: it was the audit's missing-block issue and it is already closed, which is how the block got there. One pull request. <strong>Corrected by 4f after the step ran: two of the three plans named above had moved</strong>, which 4d re-derived rather than assumed. <code>PLAN-published-cache.md</code> closed out in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/divergulent/issues/88" title="GitHub Issue: shakenfist/divergulent #88">divergulent#88</a> (<code>5288f4a</code>) and is <code>Complete</code> without the phase, so the carve-out leaves it alone; <code>PLAN-patch-classification.md</code> closed out in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/divergulent/issues/102" title="GitHub Issue: shakenfist/divergulent #102">divergulent#102</a> (<code>9f303be</code>), whose closeout added both the phase and a full <code>Merged</code> column, leaving one empty cell to fill. Only <code>PLAN-release-1.0.md</code> needed the phase appended and its ranges reconstructed.</td>
 </tr>
 <tr>
 <td>4e</td>
 <td>low</td>
 <td>sonnet</td>
 <td>worktree</td>
-<td>Refresh the v3 block in ryll, instar, kerbside and client-python-k3s, one pull request each. <strong>None of these needs a backfill</strong>, which is a correction to this section's first draft rather than a claim to take on trust -- verify it before concluding the step, by the test in decision 1 rather than by grepping for the runbook. ryll's five carriers all already have a <code>Merged</code> column; the two extra plans a naming grep flags (<code>PLAN-web-frontend.md</code>, <code>PLAN-streaming-test-automation.md</code>) carry no audit phase. instar's single carrier has a column; its <code>PLAN-release-v0.2.md</code> is <code>Complete</code> and <em>unphased</em>, and its other eight push-audit mentions are prose in <code>Complete</code> plans that must not be reopened (decision 1). kerbside's two carriers are covered, one by a column and one by Status-cell pull request numbers that decision 8 accepts as recorded. Leave ryll's ten <code>## Standalone plans</code> entries alone -- they are deliberately statusless and 4a makes them unjudgeable. If any repository turns out to need a backfill after all, do it here by 4c's rules and say in the pull request that this section was wrong. Commit subject: "Refresh the push audit block at v3."</td>
+<td>Refresh the v3 block in ryll, instar, kerbside and client-python-k3s, one pull request each. <strong>None of these needs a backfill</strong>, which is a correction to this section's first draft rather than a claim to take on trust -- verify it before concluding the step, by the test in decision 1 rather than by grepping for the runbook. ryll's five carriers all already have a <code>Merged</code> column; the two extra plans a naming grep flags (<code>PLAN-web-frontend.md</code>, <code>PLAN-streaming-test-automation.md</code>) carry no audit phase. instar's single carrier has a column; its <code>PLAN-release-v0.2.md</code> is <code>Complete</code> and <em>unphased</em>, and its other eight push-audit mentions are prose in <code>Complete</code> plans that must not be reopened (decision 1). kerbside's two carriers are covered, one by a column and one by Status-cell pull request numbers that decision 8 accepts as recorded. Leave ryll's ten <code>## Standalone plans</code> entries alone -- they are deliberately statusless and 4a makes them unjudgeable. If any repository turns out to need a backfill after all, do it here by 4c's rules and say in the pull request that this section was wrong. <strong>Corrected by 4f after the step ran: two of the four did need one</strong>, which is what verifying rather than trusting found. instar gained a second carrier, <code>PLAN-differencing.md</code>, the day after this section was measured, with one empty cell (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/560" title="GitHub Issue: shakenfist/instar #560">instar#560</a>); and client-python-k3s, which this section does not describe at all, had a stale phase 1 row in <code>library-api-and-collection.md</code> whose work had merged as <code>7fb29e5</code> (#55), filled by <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python-k3s/issues/57" title="GitHub Issue: shakenfist/client-python-k3s #57">client-python-k3s#57</a>. Neither was a reconstruction -- both pull requests were known and the cells had simply not been typed. Commit subject: "Refresh the push audit block at v3."</td>
 </tr>
 <tr>
 <td>4f</td>
@@ -15688,6 +15701,200 @@ second pull request here, once the last sweep has merged -- its
 whole job is to record what the fleet says afterwards, so it cannot
 ride with 4b ahead of the sweeps without inventing the verdicts it
 reports.</p>
+<h4 id="what-the-sweep-found">What the sweep found<a class="headerlink" href="#what-the-sweep-found" title="Permanent link">&para;</a></h4>
+<p>Re-run on 2026-09-14 over fresh default-branch clones of all
+twenty-one repositories the daily matrix audits, with <code>skillsaw</code>
+pinned at 0.18.0 as that workflow pins it. The clones are throwaway
+and shallow; nothing here was measured against a working tree.</p>
+<table>
+<thead>
+<tr>
+<th>Repository</th>
+<th>Expected</th>
+<th>Verdict</th>
+<th>What the criterion said</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>shakenfist</td>
+<td>pass</td>
+<td>pass</td>
+<td>18 incomplete plans end with a <code>PUSH-AUDIT.md</code> phase; 19 terminal-status not judged; <code>PLAN-netserv.md</code> has no readable phases</td>
+</tr>
+<tr>
+<td>ryll</td>
+<td>pass</td>
+<td>pass</td>
+<td>4 incomplete; 27 terminal-status; <code>PLAN-streaming-test-automation.md</code> unphased; 10 statusless, named</td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>pass</td>
+<td>pass</td>
+<td>1 incomplete; 8 terminal-status; <code>PLAN-use-case-docs.md</code> unphased</td>
+</tr>
+<tr>
+<td>divergulent</td>
+<td>pass</td>
+<td>pass</td>
+<td>1 incomplete; 7 terminal-status; <code>PLAN-curation-cli-ergonomics.md</code> unphased</td>
+</tr>
+<tr>
+<td>development</td>
+<td>pass</td>
+<td>pass</td>
+<td>8 incomplete; 4 terminal-status; <code>PLAN-stestr-testtools.md</code> unphased</td>
+</tr>
+<tr>
+<td>occystrap</td>
+<td>pass, two plans named statusless</td>
+<td>pass, seven named terminal-status</td>
+<td>7 terminal-status plan(s) not judged</td>
+</tr>
+<tr>
+<td>sfui</td>
+<td>N/A</td>
+<td>N/A</td>
+<td>No <code>docs/plans/index.md</code></td>
+</tr>
+<tr>
+<td>instar</td>
+<td>pass</td>
+<td><strong>fail</strong></td>
+<td><code>PLAN-differencing.md</code> ends with a push audit phase that never names <code>PUSH-AUDIT.md</code></td>
+</tr>
+</tbody>
+</table>
+<p>Ten of the other thirteen repositories are <code>not_applicable</code>, on the
+three grounds the criterion already reports: no
+<code>docs/plans/index.md</code> (actions, agent-python, clingwrap, cloudgood,
+hunkydory, kerbside-client, visual-digest-rust), an index linking no
+master plans (client-python-k3s, kerbside-patches), or a
+<code>REPO_OVERRIDES</code> scope that excludes this check (private-ci).
+<code>client-python</code> and <code>library-utilities</code> pass with one
+terminal-status plan each. The thirteenth, <code>uncalibrated-sextant</code>,
+fails; it is discussed below.</p>
+<p>Six of the eight expectations hold exactly. Two do not, and a
+ninth repository fails that no expectation covered. None of the
+three is a bug in 4a-4e.</p>
+<p><strong>occystrap passes, but no longer for decision 2's reason.</strong> The
+expectation was that its two linked plans would be named as
+statusless -- the whole observable outcome of 4a. Instead all seven
+of its plans are named as terminal-status. occystrap rewrote its
+index into a status table on 2026-09-10 (<code>7600cc6</code>, "Register
+every plan in the plan index."), registering every plan it had and
+marking all seven <code>Complete</code>. The bullet list decision 2 was written
+for is gone, so the statusless bucket is no longer exercised there
+at all. It is still exercised, by ryll's ten <code>## Standalone plans</code>
+entries, which the survey also predicted and which the table above
+confirms. Decision 2 is therefore still load-bearing, but its
+worked example has moved repositories. It changes no verdict
+anywhere in the fleet today: occystrap would pass without 4a now
+that all seven of its plans are terminal-status, and ryll passed
+before it, so the statusless bucket moves a details string and
+nothing else. 4a is preventative, which is the shape the Future
+work bullet about the statusless opt-out already describes.</p>
+<p><strong>instar fails, on a plan that did not exist when the survey ran.</strong>
+<code>PLAN-differencing.md</code> landed on 2026-09-05, the day after this
+section's measurement, and carries a push audit phase at phase 17
+that cites <code>PLAN-TEMPLATE.md</code> rather than naming <code>PUSH-AUDIT.md</code>,
+which is what the criterion reads. This is a gap in the survey, not
+a defect in 4e: step 4e's brief asked instar to refresh the block
+and verify that no backfill was needed, and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/560" title="GitHub Issue: shakenfist/instar #560">instar#560</a> did both --
+finding, and recording, a landing the survey had missed. Nothing
+asked it to add the runbook's name to a second carrier, and the
+daily workflow had already filed the failure as
+<a href="https://github.com/shakenfist/instar/issues/554">instar#554</a> on
+2026-09-06, five days before 4e merged. The fix is one sentence in
+instar's phase 17 and it belongs to instar.</p>
+<p><strong>uncalibrated-sextant fails, and was never in this phase's scope.</strong>
+Five of its five incomplete plans have no push audit phase at all,
+and it has no <code>PUSH-AUDIT.md</code> either. Both were filed by the daily
+workflow on 2026-09-04, as
+<a href="https://github.com/shakenfist/uncalibrated-sextant/issues/10">uncalibrated-sextant#10</a>
+and
+<a href="https://github.com/shakenfist/uncalibrated-sextant/issues/11">#11</a>,
+before this phase's survey was written. The survey enumerated the
+repositories it swept and this was not among them: the phase 2 and
+phase 3 tables reach eight repositories, and the fleet is
+twenty-one. That is a real hole in the survey rather than a
+regression, and it is recorded in Future work rather than fixed
+here, because appending a phase to five plans in a repository this
+phase never examined is a sweep, not a closeout.</p>
+<p><strong>The mechanical post-condition holds, with one row that has gone
+stale since the sweeps.</strong> No criterion reads the <code>Merged</code> column, so
+the claim that every landed phase records a range is checked by
+reading the tables directly. Reading only the tables that carry both
+a <code>Status</code> and a <code>Merged</code> column answers half of it, and the half it
+misses is the one the sweeps exist to fix: a plan whose Execution
+table never gained the column is skipped rather than named. So the
+scan has two buckets, over every master plan in every clone:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">TERMINAL</span> <span class="o">=</span> <span class="p">{</span><span class="s1">'complete'</span><span class="p">,</span> <span class="s1">'abandoned'</span><span class="p">,</span> <span class="s1">'superseded'</span><span class="p">}</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># A. rows of a table carrying both columns:</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="k">if</span> <span class="n">status</span> <span class="ow">in</span> <span class="n">TERMINAL</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">merged</span><span class="p">:</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span> <span class="n">plan</span><span class="p">,</span> <span class="n">lineno</span><span class="p">,</span> <span class="n">phase</span><span class="p">)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># B. plans carrying a push audit phase -- decision 1's in-scope</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1">#    test, taken from the criterion's own plan_phases() rather</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1">#    than re-implemented -- with no Status-and-Merged table:</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="k">if</span> <span class="n">carries_audit_phase</span><span class="p">(</span><span class="n">content</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">has_merged_column</span><span class="p">(</span><span class="n">plan</span><span class="p">):</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span> <span class="n">plan</span><span class="p">)</span>
+</code></pre></div>
+<p>Bucket A names exactly one row: instar's <code>PLAN-differencing.md</code>
+phase 4, which merged as
+<a href="https://github.com/shakenfist/instar/pull/563">instar#563</a>
+(<code>f981374</code>) on 2026-09-14, three days after 4e. instar's own plan
+says the column "is filled in as each phase lands, not reconstructed
+afterwards", so this is a one-day-old piece of that repository's
+housekeeping rather than a backfill this phase missed. It is in the
+same plan file as the failure above, so one instar change could
+close both -- an expectation rather than a fact, since <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/554" title="GitHub Issue: shakenfist/instar #554">instar#554</a> is
+filed against the phase wording alone and no criterion reads the
+column to notice the cell.</p>
+<p>Bucket B names six of the forty-four in-scope plans, and each was
+read rather than counted: every one records its landings in a shape
+decision 8 already accepts, not in no shape at all. This
+repository's <code>PLAN-code-review-tracking.md</code> and
+<code>PLAN-consistency-audits-v2.md</code> carry a <code>Phase</code>/<code>Merged</code> table with
+no status column beside it, which is why a scan keyed on both
+columns cannot see them; divergulent's <code>PLAN-release-1.0.md</code>
+records a <code>**Merged:**</code> line per phase section, and
+<code>PLAN-plan-template-blocks.md</code> the single aggregate one decision 8
+accepts; kerbside's <code>PLAN-proxy-dev-releases.md</code> carries
+its landings as Status-cell prose, which is the case the first
+Future work bullet leaves open; and shakenfist's
+<code>PLAN-agent-operation-dependencies.md</code> has the column with every
+cell an em-dash because none of its phases has landed yet. With
+both buckets run, every landed phase in the fleet records a range.</p>
+<p><strong>The snapshot diff moved nothing.</strong> <code>tools/audit-snapshot.sh</code> over
+the twenty-one clones before and after this step's edits reports no
+firm differences, which is the expected result: 4f edits one plan
+file in this repository and changes no check. The before/after pair
+is what catches a repository nobody expected to move, and none did.</p>
+<p><strong>The false claims are corrected at source, not only here</strong>, so a
+later reader does not trip over them. Each edit says that it is a
+correction and what it replaces:</p>
+<ul>
+<li>the backfill counts in the 4c, 4d and 4e briefs, all three of
+  which had moved between the survey and the sweep;</li>
+<li>the 4d brief's instruction to write that divergulent has no
+  <code>PUSH-AUDIT.md</code>, which it does -- following it would have put a
+  falsehood into another repository's plan;</li>
+<li>the claim that divergulent needed the block installed, when it
+  was already embedded at v2 and 4d refreshed it;</li>
+<li>the survey's "instar needs nothing" bullet, and the Future work
+  entry repeating the same per-repository figures;</li>
+<li>the Definition of done's occystrap and instar clauses, restated
+  to what was measured;</li>
+<li>the master Definition of done's claim that seven <code>Merged</code> cells
+  in this repository stand empty against landed phases, which step
+  4b and <code>PLAN-scope-coverage.md</code>'s own push audit had already
+  filled between them.</li>
+</ul>
+<p>The last of those was found by the review of 4f's own pull request
+rather than by the sweep, along with the second bucket of the
+post-condition scan above. Nothing further needs re-editing in a
+later step.</p>
 <h4 id="risks-and-mitigations_1">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations_1" title="Permanent link">&para;</a></h4>
 <ul>
 <li><strong>Reconstruction records the wrong commit.</strong> A path-filtered <code>git
@@ -15761,42 +15968,60 @@ reports.</p>
 <li>Every plan in scope returns <code>ok</code> from <code>plan_audit_phase_state</code>
   afterwards. This is the mechanical post-condition the two-part
   in-scope test reduces to, and it is what 4f asserts.</li>
-<li><code>plan-audit-phase</code> passes in shakenfist, ryll, instar, kerbside,
-  divergulent and development, and occystrap passes with both the
-  plans its index links -- <code>PLAN-info-check.md</code> and
-  <code>PLAN-quay-label-search.md</code> -- named as unjudged, which is the
-  whole observable outcome of 4a and of decision 2, the phase's most
-  contested. Only occystrap changes status and only ryll changes
-  details; the <code>tools/audit-snapshot.sh</code> before/after diff names
-  every repository that moved and why.</li>
-<li>Every SHA recorded by a sweep is a merge commit or an explicit
+<li><code>plan-audit-phase</code> passes in shakenfist, ryll, kerbside,
+  divergulent and development, and occystrap passes with the plans
+  its index links named as unjudged, which is the whole observable
+  outcome of 4a and of decision 2, the phase's most contested. The
+  <code>tools/audit-snapshot.sh</code> before/after diff names every repository
+  that moved and why.</li>
+</ul>
+<p><strong>Met in every repository except instar</strong>, which <em>What the sweep
+  found</em> records in full. Two clauses of this criterion as first
+  written turned out to describe a fleet that had moved: occystrap
+  is named as seven terminal-status plans rather than two
+  statusless ones, because it rewrote its index on 2026-09-10 and
+  the statusless bucket is now exercised by ryll instead; and
+  instar fails on a second carrier that appeared the day after the
+  survey. instar was swept, and its sweep did what its brief asked
+  -- 4e's <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/560" title="GitHub Issue: shakenfist/instar #560">instar#560</a> refreshed the block and filled the one
+  backfill cell the survey had missed. The failure is phase wording
+  in a different plan, already filed as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/554" title="GitHub Issue: shakenfist/instar #554">instar#554</a> and outside
+  every sweep step's brief. The criterion is restated above to what
+  was measured rather than left claiming a pass that is not there.</p>
+<p>4a's own before/after assertion -- only occystrap changes status
+  and only ryll changes details -- is not restated here because 4f
+  could not re-measure it: 4f's diff is a fresh before/after pair
+  around 4f, which moved nothing. It was measured across 4a's
+  commit alone, as 4a's brief required, and both predicted moves
+  are recorded in the body of
+  <a href="https://github.com/shakenfist/development/pull/113">#113</a>.
+* Every SHA recorded by a sweep is a merge commit or an explicit
   <code>first..last</code> range, listed in that sweep's pull request body so
-  the assertion can be re-run rather than taken on trust.</li>
-<li><code>PLAN-queue-performance.md</code> has a push audit phase after phase 11,
-  and phase 8's section is unchanged.</li>
-<li><code>templates/shared-blocks/plan-push-audit-phase.md</code> is v3, its
+  the assertion can be re-run rather than taken on trust.
+* <code>PLAN-queue-performance.md</code> has a push audit phase after phase 11,
+  and phase 8's section is unchanged.
+* <code>templates/shared-blocks/plan-push-audit-phase.md</code> is v3, its
   carve-out names <code>Complete</code>, <code>Abandoned</code> and <code>Superseded</code>, and no
-  other line of the block differs from v2.</li>
-<li>A plan the index links without recording a status -- a row with no
+  other line of the block differs from v2.
+* A plan the index links without recording a status -- a row with no
   status cell, but equally a prose or bullet-list link -- is named in
   the criterion's verdict and is not counted as a failure, and
   <code>scripts/tests/test_plans.py</code> covers the bullet-list shape occystrap
-  uses and the two-table shape ryll uses.</li>
-<li><code>docs/audits/plan-audit-phase.md</code> records that exclusion, and says
+  uses and the two-table shape ryll uses.
+* <code>docs/audits/plan-audit-phase.md</code> records that exclusion, and says
   that <code>plan-index</code> requires a table rather than a status column, so
-  a reader can see that the exclusion is an opt-out nothing detects.</li>
-<li><code>docs/plans/PLAN-plan-template-blocks.md</code>'s Migration section
+  a reader can see that the exclusion is an opt-out nothing detects.
+* <code>docs/plans/PLAN-plan-template-blocks.md</code>'s Migration section
   agrees with <code>docs/audits/compliance.md</code> about which repositories
   have landed the template blocks, so this repository's own plans do
-  not contradict the survey that feeds the sweep.</li>
-<li><code>PLAN-audit-compliance-split.md</code> and <code>PLAN-scope-coverage.md</code>
+  not contradict the survey that feeds the sweep.
+* <code>PLAN-audit-compliance-split.md</code> and <code>PLAN-scope-coverage.md</code>
   record <code>7843932</code> (#57) and <code>8b77b32</code> (#93) against their landed
   phases, so no plan in this repository carries a <code>Merged</code> column
-  with an empty cell against a phase that has shipped.</li>
-<li>Every mark <code>prune</code> dropped is listed in the pull request that
-  dropped it, and none was re-stamped by a sub-agent.</li>
-<li><code>pre-commit run --all-files</code> passes in this repository.</li>
-</ul>
+  with an empty cell against a phase that has shipped.
+* Every mark <code>prune</code> dropped is listed in the pull request that
+  dropped it, and none was re-stamped by a sub-agent.
+* <code>pre-commit run --all-files</code> passes in this repository.</p>
 <h4 id="back-brief_1">Back brief<a class="headerlink" href="#back-brief_1" title="Permanent link">&para;</a></h4>
 <p>Before 4c begins, the management session confirms with Mikal that
 shakenfist's twenty backfills -- nineteen plans that carry the phase
@@ -15804,7 +16029,67 @@ today, plus <code>PLAN-ci-cloud-sizing.md</code> once 4c appends one -- land as
 one pull request rather than split by plan family, and that
 <code>PLAN-queue-performance</code> gains a phase rather than moving phase 8.
 Both are cheap to agree and expensive to redo across twenty plans.</p>
-<p><strong>Merged:</strong></p>
+<p><strong>Merged:</strong> <code>fd0678c</code> (#113), carrying steps 4a and 4b, and the pull
+request carrying step 4f. 4f's own merge commit is recorded by the
+phase 5 planning commit, the way phase 3's <code>81dc421</code> (#83) was
+recorded by phase 4's -- a phase cannot name the commit that lands
+it.</p>
+<p>Steps 4c, 4d and 4e landed in the repositories they swept, so they
+are not in this repository's history and phase 5's range cannot
+reach them. They are listed for provenance rather than as a range;
+each was asserted a merge commit with <code>git rev-list --merges -1
+&lt;sha&gt;</code> returning itself, and each was reviewed by its own
+repository's checks. The SHAs are abbreviated to seven characters as
+the rest of this plan abbreviates them, each checked to resolve
+uniquely in the repository it belongs to:</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Repository</th>
+<th>Pull request</th>
+<th>Merge commit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>4c</td>
+<td>shakenfist</td>
+<td>#4160</td>
+<td><code>108987e</code></td>
+</tr>
+<tr>
+<td>4d</td>
+<td>divergulent</td>
+<td>#109</td>
+<td><code>2deb2af</code></td>
+</tr>
+<tr>
+<td>4e</td>
+<td>ryll</td>
+<td>#371</td>
+<td><code>c52c106</code></td>
+</tr>
+<tr>
+<td>4e</td>
+<td>instar</td>
+<td>#560</td>
+<td><code>3a297f7</code></td>
+</tr>
+<tr>
+<td>4e</td>
+<td>kerbside</td>
+<td>#419</td>
+<td><code>1d9d28d</code></td>
+</tr>
+<tr>
+<td>4e</td>
+<td>client-python-k3s</td>
+<td>#57</td>
+<td><code>0e88d41</code></td>
+</tr>
+</tbody>
+</table>
 <h3 id="5-push-audit">5. Push audit<a class="headerlink" href="#5-push-audit" title="Permanent link">&para;</a></h3>
 <p>Run <code>PUSH-AUDIT.md</code> over the accumulated diff of all four phases
 against <code>main</code>, scoping it with the <code>Merged</code> column this plan
@@ -15866,13 +16151,21 @@ for.</p>
 <li><code>PLAN-plan-template-blocks.md</code> names nine blocks, not eight.</li>
 <li><code>plan-push-audit-phase</code> is at v3, and this repository's own
   master plans each record a landing commit for every merged phase,
-  or say why no range is recoverable. <strong>Not met</strong>: six of its eight
-  plans that carry an audit phase do, one of those with a single
-  aggregate <code>Merged:</code> line rather than a per-phase one, which
-  decision 8 of phase 4 accepts as recorded. The other two --
-  <code>PLAN-audit-compliance-split.md</code> and <code>PLAN-scope-coverage.md</code> --
-  carry the column and leave seven cells empty against phases that
-  have landed. Step 4b fills them. The plans
+  or say why no range is recoverable. <strong>Met since 4b</strong>: six of its
+  eight plans that carry an audit phase already did, one of those
+  with a single aggregate <code>Merged:</code> line rather than a per-phase
+  one, which decision 8 of phase 4 accepts as recorded. The other
+  two -- <code>PLAN-audit-compliance-split.md</code> and
+  <code>PLAN-scope-coverage.md</code> -- carried the column with seven cells
+  empty against phases that had landed when this was measured.
+  Both are filled, and not by the same hand: step 4b filled
+  <code>PLAN-audit-compliance-split.md</code>'s four in <code>1ee048d</code>, part of
+  <code>fd0678c</code> (#113), all four naming <code>7843932</code>, while
+  <code>PLAN-scope-coverage.md</code>'s were filled by that plan's own push
+  audit as its phases landed -- <code>8b77b32</code> for phases 2 to 4, and
+  <code>c24636a, 0759e46</code> for phase 5 in <code>a1a2635</code> (#111). Step 4f read
+  both files rather than inferring this from 4b's pull request. The
+  plans
   elsewhere in the fleet that still carry v1's retracted wording are
   backfilled in phase 4, which phase 3's decision 4 scheduled once
   decision 1 confirmed the phase is staying. Measured 2026-09-04 on
@@ -15882,7 +16175,10 @@ for.</p>
   narrower again than the criterion's own scope: shakenfist nineteen
   plans need a landing commit; development, instar, ryll and
   kerbside need none; and divergulent's three incomplete plans need
-  the phase as well as the record. Phase 4's survey records how each
+  the phase as well as the record. Two of those figures did not
+  survive the sweep: instar needed one cell and client-python-k3s,
+  unlisted here, needed another, both for phases that landed after
+  this measurement. Phase 4's survey records how each
   figure was reached and why several moved between drafts.</li>
 <li><code>development</code> has a <code>PUSH-AUDIT.md</code> that its own <code>push-audit</code> check
   passes, and it is no longer <code>N/A</code> in the compliance table.</li>
@@ -15933,6 +16229,28 @@ for.</p>
   either today beyond the unjudged plans being named in the verdict
   every morning. Decision 7 of phase 4 records the narrower bucket
   rule that would close it and why it was not taken there.</li>
+<li><strong>The survey enumerated eight repositories; the fleet is
+  twenty-one.</strong> Step 4f's sweep found <code>uncalibrated-sextant</code> failing
+  <code>plan-audit-phase</code> on five of five incomplete plans, with no
+  <code>PUSH-AUDIT.md</code> either. Both were filed by the daily workflow on
+  2026-09-04, before this plan's phase 4 survey was written, and
+  neither appears anywhere in it: the phase 2 and phase 3 tables
+  reach shakenfist, ryll, instar, kerbside, divergulent, occystrap,
+  sfui and development, and stop. That is a hole in how the survey
+  was scoped rather than a regression, and it is left here rather
+  than closed in 4f because appending a phase to five plans in a
+  repository this plan never examined is a sweep of its own, with a
+  survey of its own. The next plan to widen this convention should
+  take its repository list from <code>.github/workflows/consistency-audit.yml</code>,
+  which is the fleet's actual roster, rather than from the set a
+  previous phase happened to visit. <code>AGENTS.md</code> says of the runbook
+  that it "is being made the last phase of every master plan [...]
+  drop this qualifier once the sweep has landed". Phase 4 is not
+  that sweep: it reached eight repositories of twenty-one, left
+  uncalibrated-sextant failing and instar carrying a plan no sweep
+  step covered. The qualifier stays until the widening described
+  here lands, and the plan that does it is the one that should drop
+  it.</li>
 <li>~~<strong><code>development</code> has no <code>PLAN-TEMPLATE.md</code></strong>~~ -- struck. Phase
   4's survey found one on <code>main</code>, 23KB carrying nine shared blocks
   including <code>plan-push-audit-phase</code> at v2, so new plans here do
