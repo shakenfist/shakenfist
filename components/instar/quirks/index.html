@@ -25578,12 +25578,30 @@ other instar write path has been. This is why the differencing plan spends
 its whole first phase establishing an external oracle (libvhdi, see below)
 before writing an emitter at all.</p>
 <h4 id="instar-behavior_50">instar Behavior<a class="headerlink" href="#instar-behavior_50" title="Permanent link">&para;</a></h4>
-<p>instar does not create differencing output either today: <code>plan_vhd</code>
-(<code>src/crates/create/src/lib.rs:767</code>) and <code>plan_vhdx</code> (<code>:919</code>) both reject a
-backing reference with <code>CreateError::BackingFileUnsupported</code>. Not a
-divergence — instar matches qemu-img's refusal to create either format,
-because it has not yet implemented the differencing emitters this plan
-adds.</p>
+<p>instar does not create differencing output either today: <code>instar create
+-f vpc -b parent.vhd child.vhd</code> and its vhdx equivalent both fail with
+<code>create failed: invalid option for target format</code>. Not a divergence —
+instar matches qemu-img's refusal to create either format.</p>
+<p>The refusal moved, though, and the distinction matters to anyone reading
+the source. <code>plan_vhdx</code> still rejects a backing reference outright.
+<code>plan_vhd</code> no longer does: it can build the metadata for a differencing
+VHD, and the refusal a user meets comes from a guard in the create
+operation instead, which is there because the guest cannot yet read the
+parent's identity off the parent and a child recording the wrong parent
+identity is worse than no child at all.</p>
+<p>Two things about that emitter are worth recording while nothing can
+reach it, because no tool available to this project can contradict
+either. Its parent locator entry writes the path the user typed —
+a POSIX path — under <code>W2ku</code> / <code>W2ru</code> platform codes that SPEC(VHD)
+defines as <em>Windows</em> paths, where measured Hyper-V output writes
+<code>.\fat-parent.vhd</code> and <code>C:\Projects\...</code>; that divergence is issue</p>
+<h1 id="570-and-must-be-settled-before-the-guard-is-removed-and-every-vhd">570 and must be settled before the guard is removed. And every VHD<a class="headerlink" href="#570-and-must-be-settled-before-the-guard-is-removed-and-every-vhd" title="Permanent link">&para;</a></h1>
+<p>instar creates carries an all-zero footer unique id, so a differencing
+child of an instar parent records an all-zero parent identity and any
+instar parent satisfies any instar child; that is issue #566. Neither
+affects the parent <em>unicode name</em> field, which is what libvhdi and
+qemu's <code>block/vpc.c</code> actually read to resolve a VHD parent — neither
+of them parses the locator table at all.</p>
 <h3 id="how-qemu-img-reads-a-differencing-image-and-what-instar-used-to-do">How qemu-img reads a differencing image, and what instar used to do<a class="headerlink" href="#how-qemu-img-reads-a-differencing-image-and-what-instar-used-to-do" title="Permanent link">&para;</a></h3>
 <p><strong>Classification: closes an Unsafe Quirk</strong> (qemu-img's side — silently
 wrong output, exit 0 — is unchanged and not deliberate policy on its part;

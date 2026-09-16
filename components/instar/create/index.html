@@ -14398,8 +14398,14 @@ the subformat. instar exposes <code>--grain-size</code> as an independent flag.<
 <p>Rejected (future work):
 - <code>backing_file</code>, <code>backing_fmt</code> — a VHD child with a parent is a
   <em>differencing</em> disk (<code>disk_type=4</code> plus the dynamic header's
-  parent locator table), which <code>plan_vhd</code> refuses with
-  <code>BackingFileUnsupported</code>. See <a href="#future-work">Future work</a>.</p>
+  parent locator table), which the create operation refuses with
+  <code>BackingFileUnsupported</code>. The refusal is in the operation rather
+  than in the planner: instar can now build the metadata for a
+  differencing VHD, but it cannot yet read the parent's identity off
+  the parent, and a child recording the wrong parent identity is
+  worse than no child at all. See
+  <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> and
+  <a href="#future-work">Future work</a>.</p>
 <h3 id="vhdx">vhdx<a class="headerlink" href="#vhdx" title="Permanent link">&para;</a></h3>
 <p>Honoured:
 - <code>size</code>, <code>block_size</code> (1 MiB..256 MiB power of two)</p>

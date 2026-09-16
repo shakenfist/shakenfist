@@ -14426,7 +14426,7 @@ directly relevant the moment instar parses a locator table.</p>
 <p>The host is further along than the rest of this picture
 suggests, which phase 1's survey established and which matters
 most to phase 11. <code>discover_backing_chain</code>
-(<code>src/vmm/src/main.rs:2416</code>) is not qcow2-only: it walks a chain
+(<code>src/vmm/src/main.rs:2501</code>) is not qcow2-only: it walks a chain
 with circular-reference detection, a depth limit and a path
 allowlist, and it already carries a non-qcow2 special case in the
 VMDK flat-descriptor short-circuit that resolves
@@ -14552,7 +14552,7 @@ as though they had none.</p>
    a host-side fact: <code>run_create_nonraw</code> resolves the typed
    backing path against the output's directory <em>for opening the
    file</em> but sends the guest <code>typed_backing.as_bytes()</code>
-   unchanged (<code>src/vmm/src/main.rs:16710-16769</code>). The guest
+   unchanged (<code>src/vmm/src/main.rs:16913-16963</code>). The guest
    therefore has one string, and writing two entries would mean
    fabricating the other -- <code>.\&lt;basename&gt;</code> is simply wrong
    whenever parent and child are in different directories, and a
@@ -14570,7 +14570,20 @@ as though they had none.</p>
    same reason: <code>parent_linkage</code> plus exactly one of
    <code>relative_path</code> or <code>absolute_win32_path</code>, and never
    <code>volume_path</code> (which needs a Windows volume GUID) or
-   <code>parent_linkage2</code>.</li>
+   <code>parent_linkage2</code>.
+   <strong>Reopened in part, 2026-09-15, by the review of the phase 5
+   pull request (#568).</strong> This answer settled <em>which</em> entries to
+   emit; it did not consider that the one path string the guest is
+   handed is a POSIX path, while <code>W2ku</code> and <code>W2ru</code> are defined as
+   Windows paths and measured Hyper-V output writes
+   <code>.\fat-parent.vhd</code> and <code>C:\Projects\...</code>. The emitter as built
+   writes the typed path verbatim under those codes, so a Windows
+   reader could resolve it drive-relative. Issue #570 carries the
+   options and the evidence, and must be settled before phase 7
+   removes the guard that currently stops any user reaching the
+   emitter. The reasoning above — one entry, never a fabricated
+   second — is unaffected, as is the parent unicode name field,
+   which is the only one libvhdi and qemu read.</li>
 <li><strong>Does an instar-only capability need an opt-in flag?</strong>
    RESOLVED 2026-09-05: <strong>no flag.</strong> instar already performs
    vmdk/vhd/vhdx <code>resize</code> and vmdk <code>rebase</code> where qemu-img
@@ -14582,7 +14595,7 @@ as though they had none.</p>
    RESOLVED 2026-09-05 by phase 1's survey, and the resolution
    is a description of code that already exists rather than a
    new rule to write. <code>discover_backing_chain</code>
-   (<code>src/vmm/src/main.rs:2416</code>) is not qcow2-only: it already
+   (<code>src/vmm/src/main.rs:2501</code>) is not qcow2-only: it already
    performs circular-reference detection, depth limiting and
    allowlist checking for every chain the host walks, governed
    by <code>security.backing_path_allowlist</code> and
@@ -14653,12 +14666,12 @@ records <code>instar-testdata &lt;sha&gt; (#pr)</code> and is audited there.</p>
 <td>4. Read-side policy: close the silent parent-ignoring read</td>
 <td><a href="/components/instar/plans/PLAN-differencing-phase-04-read-policy/">PLAN-differencing-phase-04-read-policy.md</a></td>
 <td>Complete</td>
-<td></td>
+<td><code>f981374</code> (#563)</td>
 </tr>
 <tr>
 <td>5. <code>plan_vhd</code> differencing emitter</td>
-<td>PLAN-differencing-phase-05-vhd-emitter.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-differencing-phase-05-vhd-emitter/">PLAN-differencing-phase-05-vhd-emitter.md</a></td>
+<td>Implemented, not yet merged</td>
 <td></td>
 </tr>
 <tr>
@@ -14761,9 +14774,10 @@ The VHDX <code>parent_linkage</code> key is the parent's DataWriteGuid,
 settled by measurement against Hyper-V bytes and confirmed
 against SPEC(VHDX) 2.6.2.6.3 and libvhdi's source. But
 <code>vhdx::build_header</code> derives the DataWriteGuid from the sequence
-number alone (<code>src/crates/vhdx/src/lib.rs:1341-1345</code>), and every
+number alone (<code>src/crates/vhdx/src/lib.rs:2201-2212</code>), and every
 instar VHDX writer passes sequence numbers 1 and 2 -- <code>plan_vhdx</code>
-at <code>src/crates/create/src/lib.rs:964-966</code> and the convert op at
+at <code>src/crates/create/src/lib.rs:965</code>
+and <code>:967</code> and the convert op at
 <code>src/operations/convert/src/main.rs:4469</code> and <code>:4492</code>. Every VHDX
 instar has ever written therefore shares one active-header
 DataWriteGuid, which makes libvhdi's parent-identity check
@@ -14779,6 +14793,15 @@ giving created images a real DataWriteGuid; phase 8's
 negative identity test must be built against a <strong>third-party</strong>
 parent either way, because an instar-created parent cannot fail
 it.</p>
+<p>Phase 8 carries one debt from phase 5, recorded here because the
+phase 5 plan is not where phase 8's planner will look. <code>create -f
+vpc -b</code> is still refused at the guest by an explicit guard that
+phase 7 removes, and that refusal has <strong>no committed test</strong>:
+the guard is in the guest binary and <code>crates/create</code>'s harness
+cannot reach it. Phase 5 verified it by hand against a built
+binary. Phase 8's brief must add the integration test that pins
+it, and phase 7's must not remove the guard without noticing that
+nothing would fail if it did.</p>
 <p>Phases 8 and 15 both build fixtures with partially populated
 blocks, and both must account for a libvhdi defect step 1a found
 and did not fix:
@@ -14847,14 +14870,14 @@ visible in the crates:</p>
   granularity, not block granularity: the per-block sector bitmap
   says which sectors of an allocated block are the child's.
   <code>VhdState</code> today computes the bitmap's size only to skip past
-  it (<code>src/crates/vhd/src/lib.rs:664-673</code>, <code>:766</code>) and never
+  it (<code>src/crates/vhd/src/lib.rs:1432-1441</code>, <code>:1534</code>) and never
   reads a bit, which is right for a dynamic disk and wrong for a
   differencing one.</li>
 <li>VHDX carries the equivalent in its sector-bitmap BAT entries,
   which the current walker deliberately skips
-  (<code>src/crates/vhdx/src/lib.rs:654</code>), and it treats
+  (<code>src/crates/vhdx/src/lib.rs:1820</code>), and it treats
   <code>PAYLOAD_BLOCK_PARTIALLY_PRESENT</code> as fully present data
-  (<code>:571</code>, <code>:581</code>, <code>:601</code>) -- a v1 simplification that is only
+  (<code>:1408</code>, <code>:1438</code>, <code>:1487</code>) -- a v1 simplification that is only
   safe while differencing images are rejected outright.</li>
 </ul>
 <p>Whether <code>map</code>'s per-extent <code>depth</code> field participates is a
@@ -14863,13 +14886,13 @@ backing-chain depth composition for qcow2 as well, so VHD/VHDX
 depth may reasonably follow qcow2's rather than lead it.</p>
 <p>Phase 7 is the smallest of the implementation phases: the host
 already attaches the backing file as input device 0 when <code>-b</code> is
-given (<code>run_create_nonraw</code>, <code>src/vmm/src/main.rs:16612</code>), so the
+given (<code>run_create_nonraw</code>, <code>src/vmm/src/main.rs:16815</code>), so the
 guest can read the parent's footer for its unique id and
 timestamp without any new call-table primitive. That is the fact
 that makes this plan tractable, and phase 1 confirmed it still
 holds: step 1b read the same function and found that it opens the
 host-resolved parent but embeds <code>typed_backing.as_bytes()</code>
-verbatim in what the guest receives (<code>:16710-16769</code>). That single
+verbatim in what the guest receives (<code>:16913-16963</code>). That single
 typed string is also what forces the single-locator-entry answer
 in open question 3.</p>
 <h3 id="constraints-that-apply-throughout">Constraints that apply throughout<a class="headerlink" href="#constraints-that-apply-throughout" title="Permanent link">&para;</a></h3>
@@ -14977,6 +15000,15 @@ status becomes <code>Complete</code>.</p>
   output, blocked on multi-output-device support in the call
   table, and vmdk/vpc/vhdx preallocation, blocked on a per-format
   BAT population pattern.</li>
+<li>Giving created VHD and VHDX images a real identity (#566).
+  <code>plan_vhd</code> writes an all-zero footer unique id and
+  <code>vhdx::build_header</code> derives the DataWriteGuid from the sequence
+  number, so every image instar creates shares one identity and the
+  parent-identity check is vacuous for chains instar wrote end to
+  end. Deferred by decision 2 of the phase 5 plan: it needs a
+  host-side entropy source passed through the call table, which is
+  the one ABI change this plan is built to avoid. Phase 8's
+  negative identity test must therefore use a third-party parent.</li>
 <li>Differencing-aware <code>check</code>, once a chain can be resolved:
   today <code>check</code> refuses VHDX differencing and validates a VHD
   differencing child as if it were dynamic.</li>
