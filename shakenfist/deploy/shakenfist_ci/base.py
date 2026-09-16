@@ -1486,10 +1486,14 @@ class BaseTestCase(testtools.TestCase):
         None, so a caller that wants to assert on it does not have to
         re-parse the message itself.
 
-        ``PLAN-transient-capacity-refusals.md``'s phase 4 adds a
-        ``Retry-After`` header and a machine-readable body to this
-        contract. When it does, this is the single helper to change --
-        not every test that calls it.
+        As of 2026-09-17,
+        ``PLAN-transient-capacity-refusals-phase-04-retry-after.md`` (D34)
+        added a machine-readable body to this contract: ``body['stage']``
+        equals ``stage`` and ``body['transient'] is True``, asserted
+        unconditionally below because both arrive in ``APIException.text``,
+        which every released client already carries. The response also
+        carries a fixed ``Retry-After: 15`` header, but that is asserted
+        only when the exception exposes one -- see the guard below for why.
 
         Do not route the request behind this assertion through
         ``shakenfist_ci.retries``. A refusal assertion must never retry:
@@ -1529,6 +1533,35 @@ class BaseTestCase(testtools.TestCase):
             match,
             f'Expected refusal message {expected!r} (optionally with a '
             f'": <detail>" suffix) at scheduling stage {stage}, got {message!r}')
+
+        # Phase 4 (D34): the body fields are asserted unconditionally --
+        # they arrive in APIException.text, which every released client
+        # already carries.
+        self.assertTrue(
+            body['transient'] is True,
+            f'Expected body[\'transient\'] is True at scheduling stage {stage}, got {body!r}')
+        self.assertEqual(
+            stage, body['stage'],
+            f'Expected body[\'stage\'] == {stage!r}, got {body!r}')
+
+        # The Retry-After header, unlike the body fields, is only visible
+        # through APIException.headers, which does not exist on every
+        # released client -- the suite installs shakenfist-client from
+        # PyPI (deploy/collection/roles/node/defaults/main.yml), and the
+        # headers attribute was only just added on the client-python
+        # transient-capacity-refusals-phase-04-client branch (commit
+        # 80019a0, "Carry response headers on APIException."). That commit
+        # is unreleased as of 2026-09-17 -- the last released client is
+        # v0.8.3 and no version number has been assigned to the release
+        # that will carry it -- so this assertion stays conditional until
+        # a released client with that commit becomes the suite's floor.
+        # Once it does, drop the guard and assert Retry-After
+        # unconditionally too (see this phase's Future work).
+        headers = getattr(response, 'headers', None)
+        if headers:
+            self.assertEqual(
+                '15', str(headers.get('Retry-After')),
+                f'Expected Retry-After: 15 at scheduling stage {stage}, got {headers!r}')
 
         return match.group('detail')
 
