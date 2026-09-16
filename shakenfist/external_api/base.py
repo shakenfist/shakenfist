@@ -99,6 +99,71 @@ def handles_credentials():
     return path == '/auth' or path.startswith('/auth/')
 
 
+# BaseOperation.defer()'s default re-examination delay is 15.0 seconds
+# (shakenfist/operations/baseoperation.py:674-678), so a client told to
+# wait this long is waiting exactly as long as the server itself waits
+# before looking at deferred work again -- the two numbers are the same
+# number, defined once here rather than independently chosen twice.
+# Phase 3 of PLAN-transient-capacity-refusals measured a node's
+# cpu_measured metric falling 5.3-5.6 s after a domain is destroyed, so
+# 15 s clears that path with roughly three times margin. See
+# docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md,
+# decision D31.
+TRANSIENT_RETRY_AFTER_SECONDS = 15
+
+
+def transient_capacity_error(message, stage):
+    """A 507 which says it is worth trying again, and when.
+
+    ``sf_api.error()`` (``shakenfist_utilities.api.error``) is a
+    third-party function pinned at ``pyproject.toml:38``
+    (``shakenfist-utilities==0.8.8``): it builds and returns a bare
+    ``flask.Response`` carrying ``{'error': ..., 'status': ...}``.
+    Adding fields there would mean lifting that pin so every one of the
+    305 other ``sf_api.error()`` call sites in this repository gained a
+    field that only ever means something for a capacity refusal. Per
+    D28 of
+    ``docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md``
+    this helper instead mutates the response object it gets back: it
+    sets the ``Retry-After`` header, fixed at
+    ``TRANSIENT_RETRY_AFTER_SECONDS`` (D31 -- the server has no
+    pending-release horizon to compute one from), and replaces the body
+    wholesale with a superset of the same shape (``error``, ``status``)
+    plus ``stage`` and ``transient``.
+
+    The cost is that the body is now assembled in two places -- here,
+    and inside ``shakenfist_utilities`` -- so a ``shakenfist-utilities``
+    upgrade that renames or restructures ``error``/``status`` would
+    silently drop these fields rather than raising. This module's unit
+    test asserts the whole decoded body by equality, not by membership,
+    for exactly that reason: such an upgrade fails the test instead of
+    shipping a 507 that has quietly lost its marker.
+
+    This does not contradict ``PLAN-api-input-validation``'s D4
+    (``PLAN-api-input-validation-phase-00-decisions.md``), which keeps
+    the ``{'error': ..., 'status': ...}`` shape and rejects "a
+    structured field-keyed body" for *validation* failures -- one keyed
+    by request *field name*. D4 says nothing about a status-specific
+    field on a ``507``, and ``stage``/``transient`` are not keyed by
+    request field; like ``status``, they describe the refusal itself,
+    not which request parameter caused it.
+
+    ``stage`` is supplied by the caller -- a scheduler filter name, the
+    literal ``'capacity_guard'`` for the admission-guard branch, or
+    ``'unknown'`` if neither applies -- this helper has no scheduling
+    knowledge of its own and never invents one.
+    """
+    resp = sf_api.error(507, message, suppress_traceback=True)
+    resp.headers['Retry-After'] = str(TRANSIENT_RETRY_AFTER_SECONDS)
+    resp.set_data(json.dumps({
+        'error': message,
+        'status': 507,
+        'stage': stage,
+        'transient': True,
+    }))
+    return resp
+
+
 # The parameter locations OpenAPI 2.0 defines. swagger_helper()
 # rejects anything else, so a mistyped location is an import-time
 # failure rather than a declaration silently ignored by the docs
