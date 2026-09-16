@@ -230,10 +230,18 @@ sf-client instance create myinstance 1 2048 \
 
 The specification is composed of a series of key-value pairs. Valid keys are:
 size; base; bus; and type. If you don't specify a key, you'll get a reasonable
-default. Here's how the keys work:
+default. Since v0.8 those four are the *only* keys accepted: anything else is
+refused with a 400 naming it, where a typo like `siz=20` used to be discarded in
+silence and get you a default sized disk. A disk specification must also ask for
+something, so one with neither a `size` nor a `base` is refused as well. See
+[the diskspec reference](/developer_guide/api_reference/instances/#diskspec)
+for the full contract. Here's how the keys work:
 
 * _size_ as per the shorthand notation.
-* _base_ as per the shorthand notation, including version specification.
+* _base_ as per the shorthand notation, including version specification. The
+  literal string "none" means no base image, exactly as omitting the key does --
+  so `-D base=none` on its own is a specification which asks for nothing, and is
+  refused.
 * _bus_ is the hardware bus to attach the disk to, and is one of virtio, sata,
   scsi, usb or nvme. Use virtio unless you have a really good reason otherwise --
   the performance of the others are terrible. An example of a good reason is to
@@ -297,7 +305,14 @@ of the following keys:
   [the networkspec reference](/developer_guide/api_reference/instances/#networkspec)
   for more detail.
 * _float_ if true indicates to immediately float the interface once the instance
-  is created.
+  is created. `true`, `yes`, `on`, `1` and their cases all mean yes and
+  `false`, `no`, `off` and `0` all mean no; the `sf-client` and ansible
+  interfaces convert what you type before it reaches the API.
+
+Since v0.8 those five are the only keys accepted here too, and anything else is
+refused with a 400 naming it. See
+[the networkspec reference](/developer_guide/api_reference/instances/#networkspec)
+for the full contract.
 
 So for example, this is valid:
 

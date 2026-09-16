@@ -53,6 +53,7 @@ import math
 import re
 import urllib.parse
 import uuid
+from collections.abc import Mapping
 from typing import Any
 from typing import Callable
 from typing import Optional
@@ -160,6 +161,40 @@ _SCALARS: dict[str, type[fields.Field[Any]]] = {
     'boolean': fields.Boolean,
     'object': fields.Dict,
 }
+
+
+def declared_boolean(value: Any) -> bool:
+    """Read a caller's boolean the way the published schema reads it.
+
+    The mirror image of _ExactInteger, and it exists for the same
+    reason. This layer is check-only (decision D14): validate() is run
+    for its findings and the deserialised result is thrown away, so a
+    handler is handed the raw body and has to do its own reading. A
+    bare truthiness test is not that reading. marshmallow's Boolean
+    accepts a set of *string* spellings -- 'false', 'no', 'off', '0',
+    'n', 'f' and their cases are all False -- and every one of them is
+    a non-empty string, which Python reads as True. So the published
+    specification said `{"float": "false"}` was a valid boolean meaning
+    False while external_api/instance.py floated the interface.
+
+    That is worse than the unvalidated state it replaced: before this
+    phase the specification said nothing about the value, and now it
+    says something the server contradicts.
+
+    Keyed on marshmallow's own sets rather than on a list retyped here,
+    so the spelling the compiled field accepts and the spelling a
+    handler reads cannot drift -- the argument _FORMATS makes about
+    format strings, applied to a value vocabulary. Anything outside
+    both sets falls through to bool(), which is what a caller sending a
+    real JSON boolean (the shipped CLI and the ansible collection both
+    do, having parsed their own command lines) has always got.
+    """
+    if isinstance(value, str):
+        if value in fields.Boolean.falsy:
+            return False
+        if value in fields.Boolean.truthy:
+            return True
+    return bool(value)
 
 
 # ---------------------------------------------------------------------
@@ -895,7 +930,7 @@ def _sort_key(key: Any) -> tuple[int, int, str]:
     return (1, 0, str(key))
 
 
-def _flatten_messages(parameter: str, messages: Any,
+def _flatten_messages(parameter: str, messages: Any, container: Any = None,
                       path: tuple[Any, ...] = ()
                       ) -> list[tuple[str, str, tuple[Any, ...]]]:
     """Flatten marshmallow's error structure into (name, detail, path) leaves.
@@ -929,7 +964,8 @@ def _flatten_messages(parameter: str, messages: Any,
             if isinstance(key, int):
                 name = '%s[%d]' % (parameter, key)
                 child = path + (key,)
-            elif key == SCHEMA_LEVEL_KEY:
+            elif key == SCHEMA_LEVEL_KEY and not isinstance(
+                    _element_value(container, path), Mapping):
                 # marshmallow's sentinel for an error about an object
                 # itself rather than about one of its properties: a
                 # nested schema handed something which is not a mapping
@@ -940,12 +976,24 @@ def _flatten_messages(parameter: str, messages: Any,
                 # say disk[0] -- and leave the path alone, because the
                 # value whose type the finding reports is the element,
                 # not something inside it.
+                #
+                # `_schema` is also a perfectly legal JSON key, and
+                # with additionalProperties: false a caller who sends
+                # one gets an Unknown field error keyed by it -- which
+                # is a real key of theirs and must keep its name, in
+                # the one place this phase exists to make legible. The
+                # sentinel is only reachable when the element is not a
+                # mapping, since a mapping is what its schema would
+                # have descended into, so that is what discriminates
+                # the two. Keying on the detail string instead would
+                # tie the flattener to marshmallow's wording.
                 name = parameter
                 child = path
             else:
                 name = '%s.%s' % (parameter, key)
                 child = path + (key,)
-            flattened.extend(_flatten_messages(name, nested, child))
+            flattened.extend(
+                _flatten_messages(name, nested, container, child))
         return flattened
     if isinstance(messages, list):
         return [(parameter, '; '.join(str(m) for m in messages), path)]
@@ -997,7 +1045,8 @@ def _schema_findings(schema: Optional[marshmallow.Schema],
         return []
     leaves = []
     for parameter, messages in mismatches.items():
-        for name, detail, path in _flatten_messages(str(parameter), messages):
+        for name, detail, path in _flatten_messages(
+                str(parameter), messages, known.get(parameter)):
             leaves.append((name, detail, parameter, path))
 
     # Sliced before the values are resolved, so the elements past the

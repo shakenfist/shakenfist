@@ -76,8 +76,11 @@ which could not cope and produce a server error naming nothing.
 Any of the values below may also be sent as JSON `null`, which means "not
 supplied" and gets you the same behaviour as omitting the key -- the shipped
 client and the shipped ansible collection both do that for several of them on an
-ordinary request. The exception is a `networkspec`'s `network_uuid`, which is
-required, and where a null is refused exactly as an omission is.
+ordinary request. The exceptions are the three values a handler requires: a
+`networkspec`'s `network_uuid`, and a `videospec`'s `model` and `memory`. For
+those a null is refused exactly as an omission is, which is the same statement
+as the rest of this paragraph rather than a different one -- omitting them is
+already a 400.
 
 ### diskspec
 
@@ -89,7 +92,8 @@ A `diskspec` consists of the following fields as a JSON dictionary:
   image.
 * base (string): the base image for the disk. This can be a variety of URL-like strings,
   as documented on [the artifacts page in the user guide](/user_guide/artifacts/).
-  For a blank disk, omit this value.
+  For a blank disk, omit this value, send null, or send the literal string
+  "none" -- all three mean the same thing here.
 * bus (enum): the hardware bus the disk device should be attached to on the instance.
   In general you shouldn't care about this and can omit this value. However, in
   some cases, such as unmodified Microsoft Windows images it is required. The options
@@ -104,8 +108,9 @@ A `diskspec` consists of the following fields as a JSON dictionary:
   specially by Shaken Fist.
 
 A `diskspec` must ask for something: one which specifies neither a `size` nor a
-`base` -- including a size of zero with no base -- is refused with a 400, because
-it describes a disk nobody asked for.
+`base` -- including a size of zero with no base, and a `base` of the literal
+string "none", which means no base -- is refused with a 400, because it
+describes a disk nobody asked for.
 
 A full example of a `diskspec` is therefore:
 
@@ -147,7 +152,11 @@ Similarly, a `networkspec` consists of the following fields in a JSON dictionary
   find out when the instance fails to start, not when you create it.
 * float (boolean): whether to associate a floating IP with this interface to enable external
   accessibility to the instance. Note that you can float and unfloat an interface
-  after instance creation if desired.
+  after instance creation if desired. A JSON boolean is the expected form, and
+  the shipped client and ansible collection both send one; the string spellings
+  the validation layer accepts (`true`, `yes`, `on`, `1`, `false`, `no`, `off`,
+  `0`, and their cases) are read with the meaning the validation layer gives
+  them, so `"false"` does not float the interface.
 
 The same structure is passed to
 [POST /instances/{instance_ref}/interfaces](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__interfaces)
@@ -181,8 +190,10 @@ passed as a list. You only have one `videospec` per instance. Once again, a
   request, long after the call which accepted it.
 
 If you supply a `videospec` at all it must contain both `model` and `memory`, or
-the call is refused with a 400. Omit the whole structure, send null, or send an
-empty dictionary to get the defaults instead.
+the call is refused with a 400 -- and a null counts as not containing it, since a
+stored null reaches the hypervisor and produces an instance which cannot start.
+Omit the whole structure, send null, or send an empty dictionary to get the
+defaults instead. A null `vdi` is defaulted like an absent one.
 
 ???+ tip "REST API calls"
 

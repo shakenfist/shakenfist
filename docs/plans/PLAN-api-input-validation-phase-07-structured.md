@@ -27,6 +27,52 @@ documentation that describes it.
 
 ## Amendments
 
+**2026-09-17, after the pull request review.** The automated review of
+[#4232](https://github.com/shakenfist/shakenfist/pull/4232) raised one
+`fix`, two `document` items and three `consider` items. All six were
+taken. Four of them change what this plan says, and the changes are
+made in place below rather than only recorded here:
+
+* **A third handler guard, and D42's count moves from two to three.**
+  The videospec's `model` and `memory` checks were *presence* tests, so
+  an explicit null passed them and was stored on the instance —
+  `self.video['vdi'].startswith('spice')` in a later console request,
+  and `type='None'` rendered into the domain XML at `libvirt.tmpl:206`.
+  That is exactly finding F6's videospec row, which this phase set out
+  to close and did not. They are value tests now (`is None`, the same
+  spelling `_netdesc_safety_checks` uses), and being handler guards
+  they hold at `warn` and `off` like the other two. A non-mapping
+  videospec needed an explicit shape guard in front of them, because
+  the presence tests answered 400 for one by accident: `'model' not in
+  ['vga']` is a membership test which happens to be True.
+* **The census is wrong about `float`.** Its networkspec row said
+  `"false"` does not float the interface. Python truthiness says
+  otherwise — a non-empty string is true — so the schema published
+  `"false"` as a boolean meaning False while the handler floated the
+  interface. `validation.declared_boolean()` is now the one reading,
+  keyed on marshmallow's own truthy and falsy sets so the check and the
+  read cannot drift. The row is corrected.
+* **A sixth spelling of the diskspec which asks for nothing.**
+  `base` of the literal string `"none"` is read as no base by
+  `util_general.noneish`, so `{"base": "none"}` alone is refused by
+  D45's guard. True since step 4 and neither swept nor documented;
+  both now.
+* **The `_schema` sentinel collapse could not tell the sentinel from a
+  caller's key of that name.** `_flatten_messages` now discriminates on
+  whether the element is a mapping, which is the only state in which
+  marshmallow's sentinel is reachable, so `{"disk": [{"_schema": 1}]}`
+  answers `disk[0]._schema: Unknown field.` and a non-mapping element
+  still answers `disk[0]: Not a valid mapping type.`
+
+The two `document` items are the user guide's `-D` and `-N` key lists,
+which did not say that an unlisted key is now refused, and the
+collection's broken `video` parameter, which this plan said somebody
+should file and nobody did. It is
+[#4236](https://github.com/shakenfist/shakenfist/issues/4236). The
+remaining `consider` item was the mutation harness, which now proves
+the tree is green before it breaks anything — otherwise a tree which
+was already red would report every mutation as caught.
+
 **2026-09-16, after step 1.** The census this plan gated step 3 on
 found three things the plan had wrong and one it had under-specified.
 All four are corrected in place below; this note records what changed,
@@ -510,7 +556,7 @@ Declared `arrayofdict` at `external_api/instance.py:514` (create) and
 | `macaddress` | yes, colon-separated, either case (`instances.md:100`) | CLI `-n`/`-f`/`add-interface` send it **as `None` on every call** (`commandline/instance.py:473`, `:483`, `:998`, `:1009`); CI sends real MACs (`guest_ci_tests/test_networking.py`, `smoke_ci_tests/test_agentops.py:300`) and one malformed one asserting a 400 (`guest_ci_tests/test_networking.py:135`) | `str`; **`None`** | `if netdesc.get('macaddress'):` (`:346`) — falsy skips the check; `NetworkInterface.new` (`network/interface.py:143-145`) then generates one. A truthy value must match `util_network.valid_macaddr` (`util/network.py:431-440`, `fullmatch` against `_MACADDR_BODY`), else 400 at `:348-351` | pattern, already enforced |
 | `address` | yes, string (`instances.md:103`) | CLI `-n netuuid@addr` / `-f` / `-N address=...` (`commandline/instance.py:478`, `:487`, `:1003`); ansible `networkspecs:`; CI (`guest_ci_tests/test_cloudinit.py:85` sends **`None` explicitly**; `cluster_ci_tests/test_networking.py:181` sends addresses) | `str` (an IPv4 address, **or the literal `'none'`** — `docs/user_guide/usage.md:281-284`); `None` | `noneish` twice: `:369` skips the range check, `:402-403` turns it into `None` meaning "this interface has no address" (the comment at `:398-401` credits OpenStack Kolla). Falsy/absent → `reserve_random_free_address` (`:406`). Otherwise `n.ipam.is_in_range` (`:372`), then `n.ipam.reserve` (`:417`) | no |
 | `model` | yes, enum of 8 (`instances.md:105`) / **9 in `usage.md:288`** | ansible `networks:` sends `'virtio'` (`sf_instance.py:318`); CLI `-n`/`-f` send `'virtio'` (`commandline/instance.py:474`, `:484`, `:999`, `:1010`); CI omits it | `str` | defaulted to `'virtio'` when absent or falsy (`:430-431`), stored on the `NetworkInterface` (`network/interface.py:165`), rendered raw as `<model type='{{net.model}}'/>` (`libvirt.tmpl:139`). **Nothing in `shakenfist/` restricts it** | **yes, unenforced — see below** |
-| `float` | yes, boolean (`instances.md:109`) | ansible `networks:` sends `False` (`sf_instance.py:319`) and `networkspecs:` parses to a real bool (`sf_instance.py:329-333`); CLI `-f` sends `True` (`commandline/instance.py:475`), `-N float=...` parses `'true'`/`'True'` to a bool (`commandline/instance.py:325-329`); CI omits it | `bool` | `if 'float' in netdesc and netdesc['float']:` (`:442`) — a bare truthiness test, so `"yes"` floats and `"false"` does not | no |
+| `float` | yes, boolean (`instances.md:109`) | ansible `networks:` sends `False` (`sf_instance.py:319`) and `networkspecs:` parses to a real bool (`sf_instance.py:329-333`); CLI `-f` sends `True` (`commandline/instance.py:475`), `-N float=...` parses `'true'`/`'True'` to a bool (`commandline/instance.py:325-329`); CI omits it | `bool` | `validation.declared_boolean(netdesc.get('float'))` (`:472`) — marshmallow's own truthy and falsy sets, so `"yes"` floats and `"false"` does not. **Corrected after review:** this was `if 'float' in netdesc and netdesc['float']`, a bare truthiness test on the raw body, for which `"false"` is a non-empty string and therefore floats. The schema published the value as a boolean meaning False while the server inverted it | no |
 | `iface_uuid` | no | nobody. Written by the handler at `external_api/instance.py:455`; read at `:1193`, `:1205` and `operations/node_inst_netdesc_op.py:391`, `:464` | n/a | server-populated | n/a |
 
 ### Undocumented keys that some caller sends
@@ -625,6 +671,12 @@ before phase 7, and phase 7 does not make it worse. Out of scope, but
 somebody should file it: the collection's `video` parameter cannot work.
 No in-tree playbook uses it (`ansible_module_ci/004.yml` does not), which
 is why nobody has noticed.
+
+**Filed after review as
+[#4236](https://github.com/shakenfist/shakenfist/issues/4236),** carrying
+`automated-fix-attempted` from the moment it was filed. The phase's
+close-out audit did not catch that this paragraph had committed to
+filing it and that nothing had; the review did.
 
 ### N5. `config.DISK_BUS`'s description is wrong
 
@@ -1001,12 +1053,13 @@ so a change to either that alters the answer fails a test.
    `size` in the second diskspec contains `disk[1].size`.
 7. Under `API_VALIDATION_MODE=warn`, every row of F5 and F6 answers
    what this plan measured it answering before the phase, **except the
-   seven rows that are handler guards rather than schema checks**: the
-   null `network_uuid` on both routes, and the diskspec that asks for
-   nothing in its several spellings. Those answer 400 at every mode, by
-   design — D42 says a guard keeps working under the rollback, and two
-   of these guards are new in this phase precisely so that the rollback
-   does not hand back the bug the phase closed. `off` is measured
+   ten rows that are handler guards rather than schema checks**: the
+   null `network_uuid` on both routes, the diskspec that asks for
+   nothing in its several spellings, and the videospec whose `model` or
+   `memory` is an explicit null. Those answer 400 at every mode, by
+   design — D42 says a guard keeps working under the rollback, and
+   three of these guards are new in this phase precisely so that the
+   rollback does not hand back the bug the phase closed. `off` is measured
    identically to `warn`, on the whole table rather than on a sample.
 8. Every handler guard listed in D42 is still present:
    `_netdesc_safety_checks` still refuses a netdesc that is not a dict,
@@ -1126,21 +1179,24 @@ found in this audit and is item 5 below.
    `{"disk": [{"size": 8}, {"size": "banana"}]}` and the sweep asserts
    the answer is `400 disk[1].size: Not a valid integer.` — the index,
    and the key, and not the container.
-7. **Met.** The count of seven was checked against the table rather
-   than against the number in the item. Exactly seven rows of `CASES`
-   carry the phrase `moves at warn`, and they are the seven the item
+7. **Met.** The count of ten was checked against the table rather
+   than against the number in the item. Exactly ten rows of `CASES`
+   carry the phrase `moves at warn`, and they are the ten the item
    describes: `net.uuid.null` and `hotplug.uuid.null` (the null
-   `network_uuid` on both routes), and `disk.empty`,
+   `network_uuid` on both routes); `disk.empty`,
    `disk.size_null_only`, `disk.size_zero_only`,
-   `disk.size_and_base_null` and `disk.unknown_key_only` (the diskspec
-   which asks for nothing, in its five spellings — the last of those is
-   the typo'd key which leaves the spec empty once the schema is not
-   enforcing). Every other row's `warn` answer is what the plan
+   `disk.size_and_base_null`, `disk.base_none_only` and
+   `disk.unknown_key_only` (the diskspec which asks for nothing, in its
+   six spellings — the last two are the typo'd key which leaves the
+   spec empty once the schema is not enforcing, and a `base` of the
+   literal string `"none"`); and `video.model.null` and
+   `video.memory.null` (the videospec guard the review found was still
+   a presence test). Every other row's `warn` answer is what the plan
    measured before the phase, including the eleven F5 rows which still
    answer `500 server error` with an exception recorded. `off` is
    measured on the whole table and not on a sample:
    `NestedSweepOffTestCase` subclasses the warn class, so it runs the
-   identical 99 rows with `mode = 'off'`.
+   identical 104 rows with `mode = 'off'`.
 8. **Met.** Read in the tree rather than remembered.
    `_netdesc_safety_checks` (`external_api/instance.py:349`) still
    refuses a netdesc which is not a dict, still refuses one with no
@@ -1304,18 +1360,24 @@ size-or-base, and a value test rather than a presence test in
 `_netdesc_safety_checks`), and `metadata` and `bound_claims` kept their
 bare `dict` with a comment at each saying why.
 
-**Step 5, the sweep.** `test_nested_sweep.py`: 99 rows of (spec, key,
+**Step 5, the sweep.** `test_nested_sweep.py`: 104 rows of (spec, key,
 sent value) driven through the real stack on both endpoints, at
-`enforce`, at `warn` and at `off`. Fifty-seven refused at `enforce` and
-forty-two accepted, because a sweep which only proves things are
+`enforce`, at `warn` and at `off`. Sixty-one refused at `enforce` and
+forty-three accepted, because a sweep which only proves things are
 refused passes just as well against a server which refuses everything.
-Twelve mutations in `tools/mutate-nested-sweep.sh`, none survived.
+Two of the properties this step pins cannot be seen in a status code at
+all and carry a test each: that a null `video` key is defaulted rather
+than stored, and that a `float` of `"false"` does not float the
+interface. Sixteen mutations in `tools/mutate-nested-sweep.sh`, none
+survived; the harness now proves the unmutated tree is green before it
+breaks anything, since otherwise an already-red tree reports every
+mutation as caught.
 
 **Step 6, the documentation.** The API reference now states, per spec,
 which keys exist, which are required, what each value's type and enum
 are, and that an undocumented key is refused. The release note names
-the three real narrowings and, because the plan had been wrong about
-this, names what is *not* narrowed. Three documentation bugs this phase
+the narrowings and, because the plan had been wrong about this, names
+what is *not* narrowed. Three documentation bugs this phase
 did not cause were fixed on the way.
 
 **Step 7, cluster CI.** Four cases in
@@ -1463,6 +1525,11 @@ not only fix the decision.
   reduced to `uefi` and `secure_boot` as an explicit `null` — scalars,
   `required=False`, reached by no element schema — and re-measured at
   `enforce` during this step as still a recorded 500.
+* **[#4236](https://github.com/shakenfist/shakenfist/issues/4236)**, the
+  ansible collection's `video` parameter, which declares a string and
+  sends one where the API wants an object. Broken since enforcement was
+  turned on in phase 4 rather than by this phase, recorded as census
+  finding N4, and filed during review.
 * **[client-python#398](https://github.com/shakenfist/client-python/issues/398)**,
   coercing a videospec `memory` in `apiclient.py` beside the disk-size
   block it mirrors. A tidy-up and not a release gate: D46's width means

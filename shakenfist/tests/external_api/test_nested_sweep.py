@@ -46,15 +46,23 @@ must get exactly that back. ``NestedSweepWarnTestCase`` is the proof,
 and ``NestedSweepOffTestCase`` re-runs the same table at ``off``,
 where ``check()`` does not run at all.
 
-Seven rows deliberately answer 400 at ``warn`` where they used to
+Ten rows deliberately answer 400 at ``warn`` where they used to
 answer 507 or 200, and they are the phase's two new *handler* guards
 rather than schema checks -- D42 keeps every existing guard, and step 4
 added two more because a rollback must not hand back the bug the phase
 just closed. They are marked ``moves at warn`` in the notes:
-``{"network_uuid": null}`` on either route, and the five shapes of
+``{"network_uuid": null}`` on either route, and the six shapes of
 diskspec which ask for neither a size nor a base -- one of which is a
 diskspec whose only key is a typo, since a typo'd ``size`` leaves the
-spec asking for nothing.
+spec asking for nothing, and one of which asks for a base of the
+literal string ``none``, which ``util_general.noneish`` reads as no
+base at all.
+
+A third handler guard joined them in review: the videospec's ``model``
+and ``memory`` checks were presence tests, so an explicit null passed
+them and was stored. They are value tests now, which is why
+``video.model.null`` and ``video.memory.null`` are refused in every
+column.
 
 Mutation coverage lives in ``tools/mutate-nested-sweep.sh``, which
 breaks each schema and each guard on purpose and names the row which
@@ -65,7 +73,9 @@ missing row, because it reads as evidence.
 
 import json
 from collections import namedtuple
+from unittest import mock
 
+from shakenfist.instance import Instance
 from shakenfist.tests.external_api.test_required_sweep import (
     SweepFixtureTestCase)
 
@@ -291,6 +301,15 @@ CASES = [
          'F6 row 5 and D41: the original complaint of issue #936, filed in '
          '2020 -- a caller who typed siz instead of size got a default '
          'sized disk and no indication anything was wrong'),
+    Case('disk.schema_key', CREATE, 'diskspec', None,
+         {'disk': [{'size': 8, '_schema': 1}]},
+         refused('disk[0]._schema: Unknown field.'), ACCEPTED,
+         'D41 and the flattener: _schema is marshmallow\'s sentinel for an '
+         'error about an object rather than about one of its properties, '
+         'and it is also a legal JSON key. The finding must name the '
+         'caller\'s key here and must *not* name it in '
+         'disk.element_not_a_mapping below, which is what the Mapping test in '
+         '_flatten_messages discriminates'),
     Case('disk.unknown_key_only', CREATE, 'diskspec', None,
          {'disk': [{'siz': 20}]},
          refused('disk[0].siz: Unknown field.'),
@@ -326,6 +345,17 @@ CASES = [
          'zero_with_base above: minimum 0 keeps a zero size *legal*, and '
          'the guard then refuses it only when there is no base to take a '
          'size from, which is the same fact as a sizeless disk with no base'),
+    Case('disk.base_none_only', CREATE, 'diskspec', None,
+         {'disk': [{'base': 'none'}]},
+         refused('disk specification must specify at least one of size or '
+                 'base'),
+         refused('disk specification must specify at least one of size or '
+                 'base'),
+         'D45, moves at warn: usage.md documents the literal string "none" '
+         'as "no base", and _diskspec_value_absent reads it through '
+         'util_general.noneish, so this diskspec asks for nothing in exactly '
+         'the way an empty one does. Swept because a reader of D45 would not '
+         'guess that a spec with a key in it is refused'),
     Case('disk.size_and_base_null', CREATE, 'diskspec', None,
          {'disk': [{'size': None, 'base': None}]},
          refused('disk specification must specify at least one of size or '
@@ -481,14 +511,26 @@ CASES = [
     Case('net.float.yes', CREATE, 'networkspec', 'float',
          {'network': [{'network_uuid': NETWORK, 'float': 'yes'}]},
          ACCEPTED, ACCEPTED,
-         'width: "yes" is in marshmallow\'s truthy set, and the handler\'s '
-         'own test is a bare truthiness check, so the schema is exactly as '
-         'wide as the handler. Definition-of-done item 5 is wrong about this '
-         'row'),
+         'width: "yes" is in marshmallow\'s truthy set, so the schema calls '
+         'it a boolean meaning True, and the handler agrees. '
+         'Definition-of-done item 5 is wrong about this row'),
     Case('net.float.false', CREATE, 'networkspec', 'float',
          {'network': [{'network_uuid': NETWORK, 'float': False}]},
          ACCEPTED, ACCEPTED,
          'width: what the ansible collection sends on every network'),
+    Case('net.float.false_string', CREATE, 'networkspec', 'float',
+         {'network': [{'network_uuid': NETWORK, 'float': 'false'}]},
+         ACCEPTED, ACCEPTED,
+         'width: "false" is in marshmallow\'s falsy set, so the schema calls '
+         'it a boolean meaning False. The handler used to read the raw '
+         'string truthily and float the interface anyway -- the status code '
+         'cannot see that, so what the value *means* is pinned by '
+         'test_a_falsy_float_spelling_does_not_float below'),
+    Case('net.float.true_string', CREATE, 'networkspec', 'float',
+         {'network': [{'network_uuid': NETWORK, 'float': 'true'}]},
+         ACCEPTED, ACCEPTED,
+         'width: the spelling where a bare truthiness test and the schema '
+         'happened to agree all along'),
     Case('net.float.int', CREATE, 'networkspec', 'float',
          {'network': [{'network_uuid': NETWORK, 'float': 5}]},
          refused('network[0].float: Not a valid boolean.'), ACCEPTED,
@@ -644,7 +686,11 @@ CASES = [
     Case('video.vdi.null', CREATE, 'videospec', 'vdi',
          {'video': {'model': 'cirrus', 'memory': 16384, 'vdi': None}},
          ACCEPTED, ACCEPTED,
-         'width: an enum and a null are not in conflict'),
+         'width: an enum and a null are not in conflict, and an absent vdi '
+         'is defaulted rather than refused -- so a null one is too. The '
+         'status code cannot see the difference between storing the null '
+         'and defaulting it, which is what '
+         'test_a_null_video_key_is_never_stored below is for'),
     Case('video.memory.numeric_string', CREATE, 'videospec', 'memory',
          {'video': {'model': 'cirrus', 'memory': '65536'}},
          ACCEPTED, ACCEPTED,
@@ -682,9 +728,20 @@ CASES = [
          "the hypervisor's"),
     Case('video.model.null', CREATE, 'videospec', 'model',
          {'video': {'model': None, 'memory': 16384}},
-         ACCEPTED, ACCEPTED,
-         'width: the handler tests presence, not truth, so a null model '
-         'passes its guard and must pass the schema too'),
+         refused('video specification requires "model"'),
+         refused('video specification requires "model"'),
+         'F6 row 9, moves at warn: the handler tested presence, so a null '
+         'model passed its guard, was stored verbatim and was rendered raw '
+         'into the domain XML at libvirt.tmpl:206 as type=\'None\'. A value '
+         'test refuses it, and being a handler guard it refuses it at every '
+         'mode -- a rollback must not hand back an instance which cannot '
+         'start'),
+    Case('video.memory.null', CREATE, 'videospec', 'memory',
+         {'video': {'model': 'cirrus', 'memory': None}},
+         refused('video specification requires "memory"'),
+         refused('video specification requires "memory"'),
+         'F6 row 9, moves at warn: the same fact about memory, which '
+         'rendered as vram=\'None\''),
     Case('video.unknown_key', CREATE, 'videospec', None,
          {'video': {'model': 'vga', 'memory': 16384, 'wombat': 1}},
          refused('video.wombat: Unknown field.'), ACCEPTED,
@@ -693,9 +750,13 @@ CASES = [
     Case('video.not_a_mapping', CREATE, 'videospec', None,
          {'video': [{'model': 'vga'}]},
          refused('video: Not a valid mapping type.'),
-         refused('video specification requires "model"'),
+         refused('video specification should be a JSON object'),
          'regression guard for the _schema sentinel on a top-level object '
-         'parameter, and F1\'s third row unchanged'),
+         'parameter. The warn message changed in review: the presence tests '
+         'answered 400 here by accident, because "model" not in ["vga"] is a '
+         'membership test which happens to be True, and the value tests '
+         'which replaced them needed a real shape guard in front. Still a '
+         '400 with no exception recorded, which is what D42 asks of warn'),
     Case('video.null', CREATE, 'videospec', None,
          {'video': None},
          ACCEPTED, ACCEPTED,
@@ -842,6 +903,81 @@ class _NestedSweepMixin:
             'docs/plans/PLAN-api-input-validation-phase-07-structured.md:\n'
             + '\n'.join(mismatches))
 
+    def test_a_null_video_key_is_never_stored(self):
+        """What a status code cannot see about the videospec.
+
+        A null ``vdi`` is accepted, as it was before, so ``video.vdi.
+        null`` answers the same 507 either way. The difference is what
+        gets stored: the handler used to test *presence*, so the null
+        went onto the instance and surfaced a long way away -- an
+        AttributeError in ``self.video['vdi'].startswith('spice')``
+        during a console request, and ``type='None'`` rendered into
+        the domain XML. The guard is a value test now, so an explicit
+        null is defaulted exactly as an absent key is.
+
+        Asserted at ``Instance.new`` rather than by reading the object
+        back, because the create this fixture can reach ends at a 507
+        and enqueues the instance for deletion; the argument the
+        handler passed is the fact under test and is the one thing
+        that survives either way.
+        """
+        with mock.patch.object(Instance, 'new', wraps=Instance.new) as new:
+            response = self.client.post(
+                '/instances', headers={'Authorization': self.token},
+                content_type='application/json',
+                data=json.dumps({
+                    'name': 'videonull', 'cpus': 1, 'memory': 1024,
+                    'disk': [{'size': 8}],
+                    'video': {'model': 'vga', 'memory': 16384, 'vdi': None}}))
+
+        self.assertEqual(
+            507, response.status_code,
+            'the request did not reach placement, so it never reached '
+            'Instance.new either and this test proves nothing')
+        self.assertEqual(
+            {'model': 'vga', 'memory': 16384, 'vdi': 'spice'},
+            new.call_args.kwargs['video'])
+
+    def test_a_falsy_float_spelling_does_not_float(self):
+        """What a status code cannot see about ``float``.
+
+        marshmallow reads ``'false'`` as the boolean False, so the
+        published schema calls it a valid boolean meaning "do not
+        float". The handler read the raw body truthily -- and a
+        non-empty string is truthy -- so it floated the interface,
+        which is the schema blessing a value whose meaning the server
+        inverts. Both spellings are asserted, because a test which only
+        showed the falsy one not floating would pass just as well
+        against a handler which had stopped floating anything.
+        """
+        for spelling, floats in (('false', False), ('true', True)):
+            before = {str(i.uuid) for i in self.instance.interfaces}
+            response = self.client.post(
+                '/instances/%s/interfaces' % self.instance.uuid,
+                headers={'Authorization': self.token},
+                content_type='application/json',
+                data=json.dumps({'network': {
+                    'network_uuid': str(self.network.uuid),
+                    'float': spelling}}))
+            self.assertEqual(200, response.status_code,
+                             'float=%r was not accepted' % spelling)
+
+            created = [i for i in self.instance.interfaces
+                       if str(i.uuid) not in before]
+            self.assertEqual(1, len(created),
+                             'float=%r created %d interfaces'
+                             % (spelling, len(created)))
+            address = created[0].floating.get('floating_address')
+            if floats:
+                self.assertIsNotNone(
+                    address, 'float=%r did not float the interface, so the '
+                    'falsy half of this test proves nothing' % spelling)
+            else:
+                self.assertIsNone(
+                    address, 'float=%r floated the interface, which is the '
+                    'opposite of what the published schema says it means'
+                    % spelling)
+
     def test_every_key_has_an_accepted_value(self):
         """The schemas are shown not to be too narrow.
 
@@ -899,12 +1035,14 @@ class NestedSweepWarnTestCase(_NestedSweepMixin, SweepFixtureTestCase):
     what they had. ``check()`` still runs and still logs every finding,
     so the observability is unchanged; it simply does not act on one.
 
-    Seven rows deliberately do not roll back, and this class asserts
-    that they do not. They are the two handler guards step 4 added: a
-    null ``network_uuid`` on either route (F7, which used to be a 200
-    and an interface on an arbitrary network), and the five shapes of
-    diskspec which ask for neither a size nor a base. A guard is not a
-    schema check and does not answer to ``API_VALIDATION_MODE`` --
+    Ten rows deliberately do not roll back, and this class asserts
+    that they do not. They are the three handler guards this phase
+    added: a null ``network_uuid`` on either route (F7, which used to
+    be a 200 and an interface on an arbitrary network), the six shapes
+    of diskspec which ask for neither a size nor a base, and a
+    ``videospec`` whose ``model`` or ``memory`` is an explicit null
+    (which used to be stored and to reach the hypervisor). A guard is
+    not a schema check and does not answer to ``API_VALIDATION_MODE`` --
     which is the whole reason step 4 wrote them as guards rather than
     leaving the schema to do it, since a rollback which handed back the
     bug the phase just closed would not be a rollback.

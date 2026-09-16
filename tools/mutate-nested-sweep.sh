@@ -87,6 +87,24 @@ with open(path, 'w') as f:
 PYEOF
 }
 
+# The unmutated tree must be green before anything is broken on
+# purpose. Without this the script has the failure mode it was written
+# to catch, one level up: if the sweep is already red -- a rotted
+# fixture, a half-finished edit -- then every mutation below is
+# "caught" by a failure this script did not cause, and it exits 0
+# having proved nothing.
+echo "=== baseline: the sweep must pass before anything is mutated"
+if ! "${PYTHON}" -m stestr run --no-subunit-trace 'test_nested_sweep' \
+        > "${BACKUP}/baseline.log" 2>&1; then
+    echo >&2
+    echo "The sweep fails with no mutation applied, so no verdict below" >&2
+    echo "would mean anything. Fix the tree, then run this again." >&2
+    echo >&2
+    tail -30 "${BACKUP}/baseline.log" >&2
+    exit 1
+fi
+echo "  green"
+
 SURVIVORS=0
 CHECKED=0
 
@@ -97,10 +115,23 @@ check() {
     local name="$1"
     local expected="$2"
     local output
+    local status
 
     CHECKED=$((CHECKED + 1))
     output=$("${PYTHON}" -m stestr run --no-subunit-trace \
         'test_nested_sweep' 2>&1)
+    status=$?
+
+    # The run has to have failed, not merely to have mentioned the row.
+    # Grepping alone would sign off a mutation whose row id appeared in
+    # a passing run's output for any other reason.
+    if [ "${status}" -eq 0 ]; then
+        SURVIVORS=$((SURVIVORS + 1))
+        echo "  *** MUTATION SURVIVED: ${name}"
+        echo "  *** the sweep passed with the mutation applied"
+        restore
+        return
+    fi
 
     if echo "${output}" | grep -q -- "${expected}"; then
         echo "  caught by: ${expected}"
@@ -179,9 +210,23 @@ check "macaddress pattern" "net.macaddress.malformed"
 # ---------------------------------------------------------------------
 run "the _schema sentinel leaks into the message again (step 4's regression)"
 mutate "${VALIDATION}" \
-    "            elif key == SCHEMA_LEVEL_KEY:" \
-    "            elif key == SCHEMA_LEVEL_KEY and False:" || exit 1
+    "            elif key == SCHEMA_LEVEL_KEY and not isinstance(" \
+    "            elif False and key == SCHEMA_LEVEL_KEY and not isinstance(" || exit 1
 check "_schema sentinel collapse" "element_not_a_mapping"
+
+# ---------------------------------------------------------------------
+# 6b. The other half of the same discrimination, added in review: the
+#     collapse fires on the key alone again, so a caller who sends a
+#     key literally named _schema is told about a field they did not
+#     send. The two halves need separate mutations because each is
+#     caught by a different row.
+# ---------------------------------------------------------------------
+run "the _schema collapse stops looking at the element (review item 3)"
+mutate "${VALIDATION}" \
+    "            elif key == SCHEMA_LEVEL_KEY and not isinstance(
+                    _element_value(container, path), Mapping):" \
+    "            elif key == SCHEMA_LEVEL_KEY:" || exit 1
+check "_schema literal key" "disk.schema_key"
 
 # ---------------------------------------------------------------------
 # 7. D44's mechanism: a required nested field goes back to accepting a
@@ -225,7 +270,43 @@ mutate "${HANDLER}" \
 check "size or base guard" "disk.empty"
 
 # ---------------------------------------------------------------------
-# 11. The two derived coverage tests, which are the ones most at risk of
+# 11. The videospec guards test presence again, which is what they did
+#     until the review of #4232 -- so an explicit null passes them, is
+#     stored on the instance, and is rendered into the domain XML as
+#     type='None'. Caught at every mode, since it is a handler guard.
+# ---------------------------------------------------------------------
+run "the videospec guard tests presence again (review item 1)"
+mutate "${HANDLER}" \
+    "            if video.get('model') is None:" \
+    "            if 'model' not in video:" || exit 1
+check "videospec null guard" "video.model.null"
+
+# ---------------------------------------------------------------------
+# 12. `float` is read with a bare truthiness test again, so the string
+#     "false" floats the interface the schema just called false. The
+#     status code cannot see this, which is why the row that catches it
+#     is a test of its own rather than a line of the table.
+# ---------------------------------------------------------------------
+run "float is read truthily again (review item 2)"
+mutate "${HANDLER}" \
+    "        if validation.declared_boolean(netdesc.get('float')):" \
+    "        if netdesc.get('float'):" || exit 1
+check "declared_boolean" "test_a_falsy_float_spelling_does_not_float"
+
+# ---------------------------------------------------------------------
+# 13. _diskspec_value_absent stops reading util_general.noneish, so a
+#     base of the literal string "none" -- which usage.md documents as
+#     meaning no base -- reads as a base and the size-or-base guard
+#     lets the spec through.
+# ---------------------------------------------------------------------
+run "a base of \"none\" counts as a base again (D45)"
+mutate "${HANDLER}" \
+    "    return util_general.noneish(value)" \
+    "    return value is None" || exit 1
+check "noneish base" "disk.base_none_only"
+
+# ---------------------------------------------------------------------
+# 14. The two derived coverage tests, which are the ones most at risk of
 #     being vacuous: they are computed from the table rather than from a
 #     request, so nothing else in this script would notice if they had
 #     stopped meaning anything. Renaming one refused row's key invents a

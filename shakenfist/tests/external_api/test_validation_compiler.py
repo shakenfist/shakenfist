@@ -1105,6 +1105,35 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
             [(f.parameter, f.detail) for f in validation._schema_findings(
                 schema, {'disk': [{'size': 20}, {'size': 'banana'}]})])
 
+    def test_a_caller_key_named_schema_keeps_its_name(self):
+        """`_schema` is marshmallow's sentinel *and* a legal JSON key.
+
+        The flattener collapses the sentinel onto the container's own
+        name, because `disk[0]._schema: Invalid input type.` would send
+        a caller looking for a field of that name which the
+        specification does not publish. A caller who actually sends a
+        key called `_schema` must keep it, in the one place this phase
+        exists to make legible -- so the two are discriminated on
+        whether the element is a mapping, which is the only state in
+        which the sentinel is reachable, rather than on the key alone.
+        """
+        field = validation._field(_rendered('arrayofdiskspec'))
+        schema = marshmallow.Schema.from_dict({'disk': field})()
+
+        def findings(body):
+            return [(f.parameter, f.detail)
+                    for f in validation._schema_findings(schema, body)]
+
+        self.assertEqual(
+            [('disk[0]._schema', 'Unknown field.')],
+            findings({'disk': [{'size': 20, '_schema': 1}]}))
+
+        # The sentinel, unchanged: the element is not a mapping, so the
+        # failure is about disk[0] and says so.
+        self.assertEqual(
+            [('disk[0]', 'Not a valid mapping type.')],
+            findings({'disk': ['nope']}))
+
     # --- networkspec ---------------------------------------------------
 
     def test_a_complete_networkspec_is_accepted(self):
@@ -1234,14 +1263,16 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
                 'network_uuid': 'barry_net', 'iface_uuid': 'anything'}))
 
     def test_a_boolean_float_is_no_narrower_than_the_handler(self):
-        """The handler's test is `if 'float' in netdesc and
-        netdesc['float']` (external_api/instance.py:442), a bare
-        truthiness test, so finding F6's `"float": "yes"` row floats the
-        interface today. marshmallow's Boolean takes the usual string
-        spellings, so it still does -- which is the right answer under
-        phase 6's width rule, and means F6's row keeps its old status
-        rather than becoming a 400. What is refused is a value which is
-        not a boolean under any reading."""
+        """marshmallow's Boolean takes the usual string spellings, and
+        so the schema accepts every one of them -- which is the right
+        answer under phase 6's width rule, and means finding F6's
+        `"float": "yes"` row keeps its old status rather than becoming a
+        400. What is refused is a value which is not a boolean under any
+        reading.
+
+        What those spellings *mean* is a separate question, and it is
+        `declared_boolean`'s: the handler used to read the raw body
+        truthily, for which `"false"` is true."""
         for value in (True, False, 'yes', 'false', 1, 0):
             with self.subTest(value=value):
                 self.assertEqual([], self._findings('networkspec', {
@@ -1321,6 +1352,35 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
             self._findings('videospec', {'wombat': 1}))
 
     # --- properties of the vocabulary itself ---------------------------
+
+    def test_declared_boolean_reads_what_the_compiled_field_accepts(self):
+        """The check and the read, keyed on the same two sets.
+
+        This layer is check-only, so a handler gets the raw body and has
+        to do its own reading. Every spelling the compiled Boolean calls
+        false must read as false, or the published specification is
+        blessing a value whose meaning the server inverts -- which is
+        what `{"float": "false"}` did, since a non-empty string is true
+        to Python.
+        """
+        for value in fields.Boolean.truthy:
+            with self.subTest(value=value):
+                self.assertIs(True, validation.declared_boolean(value))
+        for value in fields.Boolean.falsy:
+            with self.subTest(value=value):
+                self.assertIs(False, validation.declared_boolean(value))
+
+        # The case which motivated it, stated as the disagreement it
+        # was rather than only as the answer it now gives.
+        self.assertTrue(bool('false'))
+        self.assertIs(False, validation.declared_boolean('false'))
+
+        # Outside both sets nothing changes: an absent key is false,
+        # and anything else keeps the truthiness answer the handler has
+        # always given, which is what warn and off still rely on since
+        # the schema is not refusing anything there.
+        self.assertIs(False, validation.declared_boolean(None))
+        self.assertIs(True, validation.declared_boolean('nonsense'))
 
     def test_the_single_and_array_forms_cannot_drift(self):
         """Definition of done item 3, as an assertion rather than a
