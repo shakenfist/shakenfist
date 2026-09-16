@@ -15542,8 +15542,8 @@ superseded.</p>
 </tr>
 <tr>
 <td>4. Re-shape the topologies against the phase 2 data</td>
-<td>PLAN-ci-cloud-sizing-phase-04-topologies.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-ci-cloud-sizing-phase-04-topologies/">PLAN-ci-cloud-sizing-phase-04-topologies.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -15705,29 +15705,91 @@ of refusals, while on the five-hypervisor jobs the D13 feedforward
 estimate carries two thirds of them. Adding hypervisors changes which
 half of the demand bound binds rather than retiring it.</p>
 <h3 id="phase-4-re-shape-the-topologies">Phase 4 -- Re-shape the topologies<a class="headerlink" href="#phase-4-re-shape-the-topologies" title="Permanent link">&para;</a></h3>
-<p>Apply the phase 2 decision to <code>ci-topology-slim-primary.yml</code> and
-<code>ci-topology-slim-tier.yml</code> (and the <code>-released</code> variants), keeping
-the <code>sf-absent</code> phantom, honouring the structural minimums
-(<code>test_network_lifecycle</code> needs two hypervisors that are not the
-network node; <code>test_affinity</code> needs three nodes;
-<code>test_database_tier</code> needs two database nodes), and updating any
-hardcoded node lists in <code>functional-tests.yml</code>. Land one topology
-at a time so a regression is attributable.</p>
-<p>The number that binds is per node, not per cluster. The 2026-09-08
-journal reading recorded in <em>A node can record twice its own
-ledger</em> found every post-#4106 <code>sufficient_idle_cpu</code> refusal on
-<code>slim-tier</code> was a pinned create onto <code>primary</code> or <code>sf1</code>, whose
-4-thread reservation leaves <code>cpu_schedulable</code> 1 and a ledger of 3,
-while <code>sf2</code> and the cluster had room. The victim tests select
-those nodes deterministically ("first non-network hypervisor").
-So the shape this phase chooses has to raise the <em>infra
-hypervisors'</em> ledger, not only the total: of the candidate shapes
-above, "tier as 3 x 6 vCPU" is the smallest that does (6 / 6 /
-12), and any shape that leaves an infra hypervisor at a ledger of
-3 leaves the failure in place. The
+<p>Apply the phase 2 decision to the three topology files that exist
+in <code>shakenfist/actions/ansible/</code>:
+<code>ci-topology-slim-primary.yml</code>, <code>ci-topology-slim-tier.yml</code> and
+<code>ci-topology-slim-primary-released.yml</code>. <strong>There is no
+<code>ci-topology-slim-tier-released.yml</code></strong>, and the released variant of
+<code>slim-primary</code> is not a copy of the other: its primary carries
+<code>network_node</code> and is not in <code>hypervisors</code> (<code>:62</code>), where plain
+<code>slim-primary</code> has sf1 as the network node, and only the
+non-released file carries the <code>sf-absent</code> phantom (<code>:29</code>). A diff
+applied mechanically to both would be wrong. Keep the phantom,
+and land one topology at a time so a regression is attributable.</p>
+<p>Honour the structural minimums, all three verified at phase 4's
+planning:
+<code>test_network_lifecycle</code> needs two hypervisors that are <strong>not</strong> the
+network node
+(<code>cluster_ci_tests/test_network_lifecycle.py:53</code>), and <code>slim-tier</code>
+is already exactly at that minimum, because its primary is the
+network node; three nodes are needed by <strong>two</strong> tests rather than
+one, both counting every node rather than only hypervisors --
+<code>test_affinity</code> (<code>cluster_ci_tests/test_scheduler.py:124</code>, guard at
+<code>:128</code>) and <code>test_binary_affinity_prefers_the_tagged_node</code> (<code>:282</code>,
+guard at <code>:291</code>);
+<code>test_database_tier</code> needs two database nodes
+(<code>cluster_ci_tests/test_database_tier.py:37</code>).</p>
+<p><code>functional-tests.yml</code> is in <em>this</em> repository
+(<code>.github/workflows/functional-tests.yml:436</code>) and holds no
+hardcoded node lists -- only topology names, concurrency and a
+per-job timeout. What it does hold is <code>slim-tier</code> at
+<code>timeout_minutes: 70</code> against <code>slim-primary</code>'s 60, justified by a
+comment (<code>:471</code>) that the tier runs the same suite on half the
+hypervisor capacity. If a reshape works, that premise weakens and
+the timeout coming back down is a falsifiable way to say so.</p>
+<p>The number that binds is per node, not per cluster, and phase 3's
+first merge run measures it directly rather than reconstructing it
+from journals: <code>slim-tier</code>'s three hypervisors publish ledgers of
+3, 3 and 6, and <code>slim-primary</code>'s five publish 3, 6, 6, 6 and 6.
+<code>slim-tier</code>'s cluster-wide p90 committed/ledger was 0.833 while
+its two small nodes sat at 1.000 peak, which is the whole argument
+for sizing per node.</p>
+<p><strong>Those ledger-3 nodes are the infra hypervisors, and the cause is
+now pinned to a line.</strong> The per-host CPU thread reservation is
+computed by the deployment playbook CI actually runs, at
+<code>examples/_shared/site.yml:359-363</code>:
+<code>(1 + ((node_is_network_node or node_is_database_node) ? 1 : 0)) * 2</code>.
+So a node carrying the network or database role reserves <strong>4</strong>
+threads and a plain hypervisor reserves 2. On a 4 vCPU guest that
+makes <code>cpu_schedulable</code> <code>max(1, 4 - 4)</code> = 1 -- the degenerate case
+floored by the helper at
+<code>daemons/resources/main.py:126</code> -- and a ledger of
+<code>floor(1 x 3.0)</code> = 3, against <code>max(1, 4 - 2)</code> = 2 and a ledger of 6
+on a plain hypervisor. Verified against the rendered
+<code>/etc/sf/config</code> of every node in phase 3's merge run, not derived.
+Note that the value appears nowhere in the collection or in
+<code>shakenfist/actions</code>: the role default of 2
+(<code>deploy/collection/roles/node/defaults/main.yml:24</code>) is only the
+fallback for a caller that does not set it, and this caller always
+does. Anything reasoning about how a CI node is configured has to
+read that playbook as well as the collection and the CI harness.</p>
+<p>The reservation is absolute rather than proportional, so it does not
+scale with the guest: raising an infra node from 4 to 6 vCPU takes
+its ledger 3 -&gt; 6, and to 8 vCPU takes it to 12, while the same
+change on a plain hypervisor gives 12 and 18. Phase 4's own D3
+records the consequence the candidate table does not -- uniform 6
+vCPU sizing gives <code>slim-tier</code> ledgers of 6 / 6 / <strong>12</strong>, because the
+plain node gains proportionally more, and 6 vCPU only lifts an infra
+node to where a plain hypervisor already sits today.</p>
+<p>Two further things the shape has to answer to. The master plan's
+criterion stands -- any shape that leaves an infra hypervisor at a
+ledger of 3 leaves the failure in place, and of the candidate
+shapes above "tier as 3 x 6 vCPU" is the smallest that raises them
+(6 / 6 / 12) -- but the candidate table's <code>vCPU</code> column counts
+every under-cloud instance including <code>slim-primary</code>'s primary,
+which is <strong>not</strong> a hypervisor (<code>:84</code>) and contributes no ledger at
+all. That column is under-cloud spend; <code>Ledger</code> is scheduling
+capacity. And phase 3's census found every capacity-guard refusal
+in its window falling on the <code>demand</code> bound rather than on the
+ledger this phase resizes. That bound is <code>SCHEDULER_TARGET_LOAD</code>
+(0.75) per <em>schedulable thread</em>, so it scales with the same number
+-- on a ledger-3 node it is 0.75 of one thread -- which means a
+reshape may help more than the ledger arithmetic alone suggests,
+through a mechanism this section did not previously name, and
+conditional on the same open question. The
 <a href="../PLAN-transient-capacity-refusals/">transient-capacity-refusals</a>
-plan's phase 2 wait summary is the instrument that will say
-whether the chosen shape was enough.</p>
+plan's phase 2 wait summary and phase 3's census are the
+instruments that will say whether the chosen shape was enough.</p>
 <h3 id="phase-5-guardrails">Phase 5 -- Guardrails<a class="headerlink" href="#phase-5-guardrails" title="Permanent link">&para;</a></h3>
 <p>Turn phase 1's summary into a check: warn outside the agreed
 headroom band, and add a cluster-CI assertion on the deployed
