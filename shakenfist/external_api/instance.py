@@ -248,7 +248,9 @@ instance_get_example_deleted = """{
 # instead; this sample publishes the body shape machine-readably.
 # `stage` here is a scheduler filter name -- it is `capacity_guard`
 # instead when every candidate was refused by the capacity guard
-# rather than by a filter.
+# rather than by a filter. `transient` is true only for a stage a
+# retry can actually clear (api_base.TRANSIENT_CAPACITY_STAGES); this
+# sample shows one, since that is the case a client acts on.
 instance_post_507_example = """{
     "error": "No nodes remaining at scheduling stage sufficient_idle_cpu",
     "status": 507,
@@ -635,13 +637,15 @@ class InstancesEndpoint(api_base.Resource):
             (406, 'Network not ready.', None),
             (409, 'Network address in use, or no node satisfies a hard '
                 'affinity constraint.', None),
-            (507, 'Unable to allocate resources for the instance. When the '
-                'refusal comes from scheduling (as opposed to a congested '
-                'network, which is not transient), the response carries a '
-                '`Retry-After` header naming the number of seconds to wait '
-                'before trying again, and the body carries `stage` (the '
-                'scheduler filter that refused, or `capacity_guard`) and '
-                '`transient: true`.', instance_post_507_example)
+            (507, 'Unable to allocate resources for the instance. A refusal '
+                'from scheduling carries `stage` (the scheduler filter that '
+                'refused, or `capacity_guard`) and a boolean `transient` in '
+                'the body. When `transient` is true the response also '
+                'carries a `Retry-After` header naming the number of seconds '
+                'to wait before trying again. A refusal no wait can clear -- '
+                'a structural filter stage such as `cpu_max_per_instance`, '
+                'or a congested network -- is not transient and carries no '
+                '`Retry-After`.', instance_post_507_example)
          ]))
     @api_base.requires_namespace_exist_if_specified
     @api_base.log_token_use
@@ -1061,8 +1065,11 @@ class InstancesEndpoint(api_base.Resource):
             inst.enqueue_delete_due_error('scheduling failed')
             # A 507 that fails to be produced is worse than one with a
             # vague stage (D30), so a missing or empty stage falls back
-            # to 'unknown' rather than raising.
-            return api_base.transient_capacity_error(
+            # to 'unknown' rather than raising. Whether the stage is
+            # worth retrying is capacity_error()'s decision, not this
+            # handler's -- not every filter stage is a momentary
+            # shortage, and 'unknown' is deliberately not one.
+            return api_base.capacity_error(
                 str(e), getattr(e, 'stage', '') or 'unknown')
 
         except exceptions.CandidateNodeNotFoundException as e:
@@ -1138,11 +1145,13 @@ class InstancesEndpoint(api_base.Resource):
             # There is no single stage here -- denials may span
             # 'cluster', 'claim' and 'node' across different candidates
             # (D30) -- so the guard branch publishes the constant
-            # rather than inventing a per-candidate summary.
-            return api_base.transient_capacity_error(
+            # rather than inventing a per-candidate summary. That
+            # constant is classified transient only while claims are
+            # advisory; see TRANSIENT_CAPACITY_STAGES.
+            return api_base.capacity_error(
                 'no node had capacity for this instance, %d candidates '
                 'refused it' % len(denials),
-                'capacity_guard')
+                api_base.CAPACITY_GUARD_STAGE)
 
         # Request the artifact fetches immediately, then the instance start
         instance_start_dependencies = inst.enqueue_disk_fetches(

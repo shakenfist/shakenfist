@@ -741,7 +741,11 @@ guard), set `Retry-After: 15` and extend the error body with
 branches, not two: the other two are the `CongestedNetwork`
 clauses at `:428` and `:451`, and phase 4's D29 leaves those bare
 because an exhausted address pool has a different and much longer
-horizon. `sf_api.error()` returns a bare `flask.Response`, so the
+horizon. Phase 4's review round refined this further: the filter
+branch is not one fact either. A structural stage such as
+`cpu_max_per_instance` gets a `507` carrying its `stage` but
+`transient: false` and no header, because no wait clears it. See
+phase 4's D35. `sf_api.error()` returns a bare `flask.Response`, so the
 header is set on the returned object -- but note it is
 `shakenfist_utilities.api.error()`, a third-party function pinned
 in `pyproject.toml`, so the *body* is built in another repository
@@ -1067,9 +1071,10 @@ because the following statements will be true:
 * No functional test fails with `507 sufficient_idle_cpu` at
   `create_instance`; a test that waits for capacity records how
   long, and the run's summary reports it.
-* `POST /instances` refusals for capacity carry `Retry-After`,
-  `stage` and `transient: true`, and `shakenfist_client` can be
-  told to honour them.
+* `POST /instances` refusals for capacity carry `stage` and a
+  `transient` boolean, with `Retry-After` on the refusals a retry
+  can actually clear, and `shakenfist_client` can be told to
+  honour them.
 * The decision on server-side queued placement is written down in
   the phase 5 file with the data it was made from, whichever way
   it went.

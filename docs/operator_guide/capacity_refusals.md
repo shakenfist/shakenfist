@@ -6,39 +6,55 @@ This document describes the response format and what it means.
 
 ## Which refusals are transient
 
-Two of the four `507` responses from instance creation are marked as transient
-and worth retrying. The other two are not.
+Not every `507` is worth retrying, and not even every *scheduling* `507` is.
+The server says which is which, so a client does not have to guess from the
+message text.
 
-**Transient refusals** (marked with `transient: true`):
+**Transient refusals** (`transient: true`) -- a resource the cluster measures
+and shares ran out, and an ordinary instance teardown returns it within
+seconds:
 
-1. **Filter-stage refusal** -- a scheduler filter stage (such as `sufficient_idle_cpu`,
-   `sufficient_idle_memory`, or `sufficient_free_disk`) eliminated every candidate.
-   The cluster does not have enough of a resource type right now, but an instance
-   being deleted will free it within seconds.
+1. **Resource filter stages** -- `sufficient_idle_cpu`, `sufficient_idle_memory`,
+   `sufficient_free_disk`, `sufficient_idle_disk` and `queue_state`. One of the
+   scheduler's pre-filter stages eliminated every candidate because the cluster
+   does not have enough of that resource *right now*.
 
-2. **Guard-stage refusal** -- the capacity admission guard refused every candidate.
-   The cluster's accounting shows no room for the placement, but a concurrent delete
-   or a capacity reconciler pass can change that within seconds.
+2. **The capacity guard** (`capacity_guard`) -- the capacity admission guard
+   refused every candidate. The cluster's accounting shows no room for the
+   placement, but a concurrent delete or a capacity reconciler pass can change
+   that within seconds.
 
-**Non-transient refusals** (no `transient` field, or `transient: false`):
+**Non-transient refusals** (`transient: false`, or no `transient` field at
+all) -- the cluster would refuse the identical request just as firmly in
+fifteen seconds, in an hour, or after every instance on it had been deleted:
 
-- **Address-pool exhaustion** (`CongestedNetwork`) -- the virtual network's address
-  pool is exhausted. No amount of waiting on the ten-second horizon will help; the
+- **Structural filter stages** -- `cpu_max_per_instance` means the request asks
+  for more vCPUs than any single node in the cluster will host, whatever else
+  is running. `is_hypervisor` and `pre_schedule` mean the candidate set was
+  empty before any resource was measured: no node in the request's candidate
+  list is a hypervisor, or there were no candidates to begin with. These are
+  still `507` responses and still carry their `stage`, because the stage is
+  what tells you what to fix -- but they carry no `Retry-After`, and a client
+  that retried them would replay the same impossible request until its
+  deadline.
+
+- **Address-pool exhaustion** (`CongestedNetwork`) -- the virtual network's
+  address pool is exhausted. This refusal carries no `stage` or `transient`
+  field at all. No amount of waiting on the ten-second horizon will help; the
   pool recovers only after the deletion halo expires, which is much longer and
-  differently-shaped than an instance teardown. This is a problem to solve by
-  adding more address space or freeing a network, not by retrying.
+  differently-shaped than an instance teardown. Solve it by adding address
+  space or freeing a network, not by retrying.
 
 - **Hard affinity conflict** (`409`) -- an instance requested a hard placement
-  constraint (`require_with_tag` or `require_without_tag`) which no node satisfies.
-  The cluster is not full; the constraint simply cannot be met. No amount of waiting
-  will help.
+  constraint (`require_with_tag` or `require_without_tag`) which no node
+  satisfies. The cluster is not full; the constraint simply cannot be met.
 
-- **No suitable node** (`404`) -- not a capacity fact at all; the cluster has no
-  hypervisor nodes at all.
+- **No suitable node** (`404`) -- not a capacity fact at all; a node named in
+  the request is not in the active node list.
 
 ## The response body
 
-A transient `507` returns a JSON body with four fields:
+A scheduling `507` returns a JSON body with four fields:
 
 ```json
 {
@@ -53,22 +69,28 @@ A transient `507` returns a JSON body with four fields:
 
 The `stage` field names where the refusal happened:
 
-- **Scheduler filter name** (e.g., `sufficient_idle_cpu`, `sufficient_idle_memory`,
-  `sufficient_free_disk`) -- a pre-filter stage eliminated every candidate.
-  The filter name is the official stage name for this refusal.
+- **A scheduler filter name** -- `sufficient_idle_cpu`, `sufficient_idle_memory`,
+  `sufficient_free_disk`, `sufficient_idle_disk`, `queue_state`,
+  `cpu_max_per_instance`, `is_hypervisor` or `pre_schedule`. The filter name is
+  the official stage name for this refusal, and is the same string the
+  instance's `schedule has no candidates at stage ...` audit event records.
 
-- **`capacity_guard`** -- the capacity admission guard refused every candidate. This
-  stage name is used when the admission check itself (not a pre-filter) refused the
-  placement.
+- **`capacity_guard`** -- the capacity admission guard refused every candidate.
+  This stage name is used when the admission check itself, rather than a
+  pre-filter, refused the placement.
 
-- **`unknown`** -- the stage could not be determined. This is a defensive value that
-  should never appear in normal operation; if you see it, report it.
+- **`unknown`** -- the refusal reached the API carrying no stage. This is a
+  defensive value that should never appear in normal operation; if you see it,
+  report it. It is never marked transient.
 
 ### `transient` field
 
-The `transient` field is a boolean that indicates whether the refusal is transient
-and worth retrying. It is `true` for the two scheduling refusals above and absent
-(or `false`) for the other four response types.
+The `transient` field is a boolean saying whether waiting and trying again can
+plausibly succeed. It is `true` only for the stages listed as transient above.
+Read this field rather than inferring retry-worthiness from the status code or
+the `stage` name: the classification lives in one place in the server
+(`TRANSIENT_CAPACITY_STAGES` in `shakenfist/external_api/base.py`), and a
+client that reproduces the list will drift from it.
 
 ## Retry-After header
 
@@ -84,9 +106,9 @@ computed per-refusal.
 ### Why 15 seconds
 
 The `15` is the default delay that the server itself uses when it defers work
-(`BaseOperation.defer()`'s 15-second default). This makes the promise honest:
-the number a client is told to wait and the number the server waits before
-re-examining deferred work are the same number, defined once in the code.
+(`BaseClusterOperation.defer()`'s 15-second default). This makes the promise
+honest: the number a client is told to wait and the number the server waits
+before re-examining deferred work were chosen to match.
 
 The server has no way to know which instances are being deleted at the moment a
 refusal happens, so it cannot compute how long until freed capacity reappears.
@@ -101,8 +123,21 @@ library or operator tooling that wraps the API, not in the server.
 
 ## Client-side retry
 
-The `shakenfist-client` Python library (as of the client-python repository's
-transient-capacity-refusals phase 4 branch) includes an optional retry for
+!!! warning "Not in a released client yet"
+
+    The `retry_transient_capacity` flag described below exists only on the
+    client-python repository's `transient-capacity-refusals-phase-04-client`
+    branch. It is **not** in any released `shakenfist-client` -- the latest
+    release is v0.8.3 -- so passing it to a `Client` you installed from PyPI
+    raises `TypeError`. This section will name a minimum client version once
+    that release is cut.
+
+    The server half of the contract described above is live regardless: the
+    `Retry-After` header and the `stage` and `transient` body fields are
+    readable by any HTTP client today, and implementing the retry yourself
+    needs nothing from the library.
+
+The `shakenfist-client` Python library includes an optional retry for
 transient refusals. It is **off by default**.
 
 ### Enabling the retry
@@ -127,8 +162,9 @@ When enabled, the client will:
 
 The retry is bounded by the caller's deadline (if one was passed to the API call)
 so the total time spent waiting and retrying cannot exceed the budget. Retries
-are not attempted for `507` responses that are not marked as transient, or for
-other HTTP status codes.
+are not attempted for `507` responses that are not marked as transient -- which
+includes every structural refusal listed above -- or for other HTTP status
+codes.
 
 ### Why the retry is off by default
 

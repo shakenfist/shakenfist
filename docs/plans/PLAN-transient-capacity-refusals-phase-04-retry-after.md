@@ -89,8 +89,8 @@ were a local edit. It is not, unless we choose to mutate the returned
 response here. D28 chooses that.
 
 **3. The stage names already exist, in two different vocabularies.**
-The filter path raises from `Scheduler._publish_filter_outcome()`
-(`shakenfist/scheduler.py:515-547`) with
+The filter path raises from `Scheduler._log_and_raise_on_error()`
+(`shakenfist/scheduler.py:525-558`) with
 `message = f'No nodes remaining at scheduling stage {stage}'`, where
 `stage` is a filter name such as `sufficient_idle_cpu`,
 `sufficient_idle_memory` or `sufficient_free_disk`. The guard path
@@ -166,14 +166,17 @@ Add `TRANSIENT_RETRY_AFTER_SECONDS = 15` and a helper to
 `shakenfist/external_api/base.py`:
 
 ```python
-def transient_capacity_error(message, stage):
-    """A 507 which says it is worth trying again, and when."""
+def capacity_error(message: str, stage: str) -> flask.Response:
+    """A 507 which says whether it is worth trying again, and when."""
 ```
 
 It calls `sf_api.error(507, message, suppress_traceback=True)`, then
-sets `Retry-After` on the returned `flask.Response` and rewrites its
-body to `{'error': ..., 'status': 507, 'stage': stage,
-'transient': True}`.
+rewrites the returned `flask.Response`'s body to `{'error': ...,
+'status': 507, 'stage': stage, 'transient': ...}`, and sets
+`Retry-After` when the refusal is transient. (The helper was named
+`transient_capacity_error()` as first written and as implemented in
+step 4a; D35 renamed it when it stopped always producing a transient
+refusal.)
 
 The alternative is to add the fields in `shakenfist-utilities` and
 lift the pin at `pyproject.toml:38`. Rejected: that makes a
@@ -190,6 +193,11 @@ unit test asserts the *whole* decoded body, so such an upgrade fails
 the test rather than shipping.
 
 ### D29 -- Only the two scheduling `507`s are marked transient
+
+**Superseded in part by [D35](#d35----the-stage-not-the-exception-class-decides-what-is-transient).** The
+boundary this decision draws -- scheduling refusals in, everything else
+out -- still holds. What it got wrong is that it treated the whole
+filter branch as one fact; D35 splits it by stage.
 
 The two `CongestedNetwork` refusals at `external_api/instance.py:428`
 and `:451` stay bare. They are a different fact: the network's address
@@ -214,8 +222,8 @@ all.
 
 ### D30 -- Carry the stage on the exception, do not parse the message
 
-`Scheduler._publish_filter_outcome()` builds both the stage name and
-the message (`scheduler.py:538-547`). Give `SchedulerException` a
+`Scheduler._log_and_raise_on_error()` builds both the stage name and
+the message (`scheduler.py:525-558`). Give `SchedulerException` a
 `stage` attribute set at that raise site, and have the handler read
 `e.stage`. The handler must not re-derive the stage by parsing
 `str(e)`: that would make the prose load-bearing at exactly the moment
@@ -331,12 +339,75 @@ alternative is either a suite that cannot assert the header for a
 release cycle, or a client wheel built from source in CI purely to
 satisfy one assertion. The conditional is the smallest of the three.
 
+### D35 -- The stage, not the exception class, decides what is transient
+
+Added in the phase's first review round, which found that D29 drew the
+line one level too coarsely.
+
+D29 asked which of `POST /instances`' refusals get the marker and
+answered "the two scheduling ones". That is right about the boundary
+between scheduling and everything else, and wrong *inside* the filter
+branch. `LowResourceException` is raised by
+`Scheduler._log_and_raise_on_error()` for every stage that empties the
+candidate set, and those stages are not one kind of fact:
+
+- `sufficient_idle_cpu`, `sufficient_idle_memory`,
+  `sufficient_free_disk`, `sufficient_idle_disk` and `queue_state` are
+  momentary shortages of a measured, shared resource. Phase 3 measured
+  CPU returning 5.3-5.6 s after a teardown. These are transient.
+- `cpu_max_per_instance` fires when the request asks for more vCPUs
+  than any node's per-instance maximum. `is_hypervisor` and
+  `pre_schedule` fire when the candidate set was empty before any
+  resource was measured. Deleting every instance in the cluster would
+  not satisfy any of the three. A client that retried one would replay
+  a structurally impossible request until its deadline for nothing,
+  and the operator guide, written from D29, told a human the same
+  untrue thing.
+
+So the discriminator becomes the stage name, in two frozensets in
+`external_api/base.py`. The helper is renamed `capacity_error()` --
+`transient_capacity_error()` would be a lie for half its callers -- and
+decides transience itself from the stage rather than taking a
+`transient=` argument, because an argument is a classification that
+can be got wrong once per call site.
+
+A non-transient stage still returns a `507` and still publishes its
+`stage`; it publishes `transient: false` and no `Retry-After`. The
+alternative, dropping those refusals back to a bare
+`sf_api.error(507, ...)`, was rejected: the stage is the most useful
+thing in the body and is exactly what tells an operator that the fix
+is a smaller instance rather than a wait. An explicit `transient:
+false` is also a fact a client can act on, where an absent field is
+ambiguous between "not retryable" and "a server that predates this
+contract" -- both of which a client must treat as non-retryable, but
+only one of which is worth reporting.
+
+An unrecognised stage, including the `'unknown'` fallback D30
+introduced for a refusal that arrives carrying no stage, is
+non-transient. Being wrong in that direction costs one refusal a
+client could have retried; being wrong in the other costs a client its
+whole deadline.
+
+Because the two sets are hand-written and the stage names live in
+`scheduler.py`, `test_capacity_error.py` parses `scheduler.py` and
+fails if any stage reaching this helper is in neither set -- a stage
+added or renamed later cannot fall silently into the non-transient
+default. The check was mutation-tested by adding a stage.
+
+`capacity_guard` stays transient, with a caveat recorded at the set:
+it is only honest while `mariadb.CLAIM_ENFORCEMENT_HARD` is `False`.
+Today a namespace claim cannot refuse a placement, so every guard
+denial is cluster or node capacity. When phase 5 of
+PLAN-scheduler-reservations flips that constant, a claim denial
+becomes namespace quota exhaustion, which no wait clears, and claim
+denials must be split out of the transient set at that point.
+
 ## Step plan
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
-| 4a | medium | sonnet | none | The server-side helper, per D28 and D31. In `shakenfist/external_api/base.py`, add `TRANSIENT_RETRY_AFTER_SECONDS = 15` with a comment citing `BaseOperation.defer()`'s 15.0 default (`shakenfist/operations/baseoperation.py:674-678`) and phase 3's measured 5.3-5.6 s drop, and a `transient_capacity_error(message, stage)` helper. It calls `sf_api.error(507, message, suppress_traceback=True)` -- note `sf_api` is `shakenfist_utilities.api`, a third-party package pinned at `pyproject.toml:38`, so do not try to edit it -- then sets `Retry-After` on the returned `flask.Response` and replaces its data with `json.dumps({'error': message, 'status': 507, 'stage': stage, 'transient': True})`. Docstring records D28's reasoning and cross-references `PLAN-api-input-validation`'s D4 per D32. Unit test asserts the *whole* decoded body and the header, so a `shakenfist-utilities` upgrade that changes the body shape fails here. No callers wired yet. Commit subject: `Add a 507 which says it is transient.` |
-| 4b | medium | opus | none | The stage, per D30. Give `SchedulerException` in `shakenfist/exceptions.py` a `stage` attribute (default `''`), set it at the two raise sites: `Scheduler._publish_filter_outcome()` (`shakenfist/scheduler.py:515-547`, where `stage` is already a local) and `shakenfist/operations/node_inst_netdesc_op.py:281`. Do not change any message text -- `assertRefusedAtStage()` and its four callers in `cluster_ci_tests/test_saturation.py` depend on the current wording, and this phase changes the body, not the prose. `AffinityConstraintUnsatisfiable` is a *subclass* of `LowResourceException` (`exceptions.py:101`) and inherits the attribute; that is fine and must not change the ordering of the except clauses at `external_api/instance.py:927-937`. Unit tests assert the attribute survives the raise for each filter stage name. Commit subject: `Carry the scheduler stage on the exception.` |
+| 4a | medium | sonnet | none | The server-side helper, per D28 and D31. In `shakenfist/external_api/base.py`, add `TRANSIENT_RETRY_AFTER_SECONDS = 15` with a comment citing `BaseClusterOperation.defer()`'s 15.0 default (`shakenfist/operations/baseoperation.py:674-678`) and phase 3's measured 5.3-5.6 s drop, and a `transient_capacity_error(message, stage)` helper. It calls `sf_api.error(507, message, suppress_traceback=True)` -- note `sf_api` is `shakenfist_utilities.api`, a third-party package pinned at `pyproject.toml:38`, so do not try to edit it -- then sets `Retry-After` on the returned `flask.Response` and replaces its data with `json.dumps({'error': message, 'status': 507, 'stage': stage, 'transient': True})`. Docstring records D28's reasoning and cross-references `PLAN-api-input-validation`'s D4 per D32. Unit test asserts the *whole* decoded body and the header, so a `shakenfist-utilities` upgrade that changes the body shape fails here. No callers wired yet. Commit subject: `Add a 507 which says it is transient.` (D35 later renamed this helper `capacity_error()` and made `transient` depend on the stage.) |
+| 4b | medium | opus | none | The stage, per D30. Give `SchedulerException` in `shakenfist/exceptions.py` a `stage` attribute (default `''`), set it at the two raise sites: `Scheduler._log_and_raise_on_error()` (`shakenfist/scheduler.py:525-558`, where `stage` is already a local) and `shakenfist/operations/node_inst_netdesc_op.py:281`. Do not change any message text -- `assertRefusedAtStage()` and its four callers in `cluster_ci_tests/test_saturation.py` depend on the current wording, and this phase changes the body, not the prose. `AffinityConstraintUnsatisfiable` is a *subclass* of `LowResourceException` (`exceptions.py:101`) and inherits the attribute; that is fine and must not change the ordering of the except clauses at `external_api/instance.py:927-937`. Unit tests assert the attribute survives the raise for each filter stage name. Commit subject: `Carry the scheduler stage on the exception.` |
 | 4c | medium | sonnet | none | Wire both scheduling branches, per D29. In `shakenfist/external_api/instance.py`, replace `sf_api.error(507, str(e), suppress_traceback=True)` at `:944` with the 4a helper passing `getattr(e, 'stage', '') or 'unknown'`, and the `sf_api.error(507, ...)` at `:1017` passing the constant `'capacity_guard'`. Leave the `CongestedNetwork` 507s at `:428` and `:451` alone, the `409` at `:937` alone, and the `404` alone. Then update the `507` response declaration at `:574`: description names the `Retry-After` header and the `stage`/`transient` fields, and the third tuple element becomes a real sample body. Do not change the tuple arity (D32). Run `tox -epy3 -- shakenfist.tests.external_api` and confirm `test_openapi_spec.py` still passes. Commit subject: `Say that a capacity refusal is transient.` |
 | 4d | medium | sonnet | none | Client headers, in the `client-python` repository (`/srv/kasm_profiles/mikal/vscode/src/shakenfist/client-python`), on its own branch and PR. Add `headers=None` as a keyword argument to `APIException.__init__` (`shakenfist_client/apiclient.py:64-70`), storing `self.headers = headers or {}`. It must be keyword-with-default: the five positional arguments are constructed at three sites (`apiclient.py:385-387`, `:393-394`, `:408`) and by downstream callers. Pass `r.headers` at the two `_actual_request_url` raise sites; `_authenticate()`'s raise may pass it too. Unit test constructs the exception both ways and asserts the old five-positional form still works. Commit subject: `Carry response headers on APIException.` |
 | 4e | high | opus | none | The opt-in retry, in `client-python`. Add a `Client(..., retry_transient_capacity=False)` constructor flag. In `_request_url` (`apiclient.py:412-460`), extend the existing loop: catch `InsufficientResourcesException`, and retry only when the flag is set **and** the decoded body has `transient` truthy -- never on the status code alone, since an old server's 507 carries no marker and an unmarked 507 is not a promise. Sleep the `Retry-After` header's value when present and parseable, else `TRANSIENT_RETRY_DEFAULT = 15`; clamp to something sane so a hostile header cannot park a caller. Bound by the same `deadline` the 406 clause uses, which `create_instance()` already supplies (`apiclient.py:674-681`). Note `_calculate_async_deadline(ASYNC_CONTINUE)` returns -1 (`:180-188`), so under that strategy the deadline is already in the past and no retry happens -- that is correct, not a bug, and the code should say so in a comment rather than special-casing it. Unit tests: off by default; on-but-unmarked does not retry; on-and-marked retries and honours the header; the deadline is respected. Update the client's README/docs for the flag. Commit subject: `Optionally wait out a transient capacity refusal.` |
@@ -410,7 +481,8 @@ Falsifiable, in order:
    server and deliberately does not import its constants.
 2. A unit test decodes the helper's response body and asserts it
    equals `{'error': ..., 'status': 507, 'stage': ..., 'transient':
-   True}` by equality, not by membership. A second test,
+   ...}` by equality, not by membership, for a transient stage, a
+   permanent stage and an unrecognised one. A second test,
    `test_sf_api_error_shape_canary`, calls `sf_api.error()` directly
    and pins its body shape the same way. Changing `sf_api.error()`'s
    body shape makes the canary fail and leaves the first test passing
@@ -419,15 +491,22 @@ Falsifiable, in order:
    test would fail. It does not and cannot; see the corrected risk of
    the same name for why, and what the canary protects instead.)
 3. `POST /instances` returns `Retry-After: 15` and a body with
-   `transient: true` for both scheduling `507`s, and returns neither
-   for the two `CongestedNetwork` `507`s, the `409` and the `404`.
-   Asserted by four tests, one per outcome.
+   `transient: true` for a transient filter stage and for the
+   capacity-guard branch; a `507` with `transient: false`, its stage
+   intact and no `Retry-After` for a structural filter stage and for
+   the `'unknown'` fallback (D35); and neither field nor header for
+   the two `CongestedNetwork` `507`s, the `409` and the `404`.
+   Asserted by one test per outcome, so a failure in one does not
+   hide another.
 4. The filter branch's `stage` equals the scheduler filter name for
    at least `sufficient_idle_cpu`, and deleting the `stage=` argument
-   at `scheduler.py:538-547` makes that test fail. The handler
+   at `scheduler.py:525-558` makes that test fail. The handler
    contains no parse of `str(e)`.
-5. The guard branch's `stage` is the literal `capacity_guard`.
-6. No message text produced by `_publish_filter_outcome()` changed:
+5. The guard branch's `stage` is `constants.CAPACITY_GUARD_STAGE`,
+   whose value is `capacity_guard`, and both producers of that stage
+   -- the create path and the preflight redirect -- use the constant
+   rather than a literal.
+6. No message text produced by `_log_and_raise_on_error()` changed:
    `assertRefusedAtStage()`'s regexp still matches, and all four of
    its callers in `test_saturation.py` are byte-for-byte unchanged.
 7. `shakenfist/tests/external_api/test_openapi_spec.py` passes, and
@@ -446,7 +525,10 @@ Falsifiable, in order:
     nothing (D33).
 12. `assertRefusedAtStage()` asserts the body fields with no
     conditional, and the header behind a `getattr` guard whose comment
-    names the client version that retires it.
+    names the client version that retires it. A body missing those
+    fields, or not a dict at all, fails as an assertion rather than as
+    a `KeyError` escaping the helper -- mutation-tested by removing
+    the guard.
 13. `docs/plans/PLAN-transient-capacity-refusals.md` nowhere asserts
     that the suite turns the client retry on. The phrase does still
     appear there once, inside the sentence recording that an earlier
@@ -458,6 +540,21 @@ Falsifiable, in order:
     file and from `PLAN-api-input-validation.md`'s Future work. Filed
     as [#4240](https://github.com/shakenfist/shakenfist/issues/4240).
 15. `python3 tools/check-plan-status.py` reports agreement.
+16. `docs/operator_guide/capacity_refusals.md` says which stages are
+    transient and which are not, rather than generalising over the
+    filter branch, and its client-retry section opens by saying the
+    flag is in no released client.
+17. Every stage name `scheduler.py` passes to
+    `_log_and_raise_on_error()` without an `exception_class` override
+    appears in exactly one of `TRANSIENT_CAPACITY_STAGES` or
+    `PERMANENT_CAPACITY_STAGES`, checked by parsing `scheduler.py`
+    rather than against a hand-maintained list. Mutation-tested by
+    adding a stage: the check fails.
+18. `TRANSIENT_RETRY_AFTER_SECONDS` equals
+    `BaseClusterOperation.defer()`'s `delay` default, asserted by
+    reading the signature. The constant's comment claims the two were
+    chosen to match; it no longer claims they are one definition,
+    because they are two literals.
 
 ## Future work this phase creates
 
@@ -469,7 +566,14 @@ Falsifiable, in order:
 - **Nothing asserts the capacity-guard branch's contract.** See the
   risk of the same name. Best provoked from `test_saturation.py`.
 - **Retire `assertRefusedAtStage()`'s header conditional** once the
-  minimum client version carries `APIException.headers`.
+  minimum client version carries `APIException.headers`. The same
+  release fixes the operator guide's client-retry warning, which names
+  a branch because no version exists to name.
+- **Split claim denials out of the transient marker** when
+  PLAN-scheduler-reservations phase 5 sets
+  `mariadb.CLAIM_ENFORCEMENT_HARD` to `True` (D35). Until then
+  `capacity_guard` is honestly transient; afterwards it covers a
+  namespace quota refusal that no wait clears.
 - **A header-capable OpenAPI response declaration** (D32), filed as
   [#4240](https://github.com/shakenfist/shakenfist/issues/4240)
   against `PLAN-api-input-validation`.

@@ -1,6 +1,7 @@
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.config import config
+from shakenfist.constants import CAPACITY_GUARD_STAGE
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.schema.operations import node_inst_netdesc_op as schema
 from shakenfist.schema.operations.baseclusteroperation import dependency
@@ -286,7 +287,7 @@ class NodeInstNetdescOp(BaseClusterOperation):
                 raise LowResourceException(
                     'No node had capacity for this instance, '
                     f'{len(denials)} candidates refused it',
-                    stage='capacity_guard')
+                    stage=CAPACITY_GUARD_STAGE)
 
             # The artifact fetches minted at create time targeted the
             # original placement, so the redirect target's image cache has
