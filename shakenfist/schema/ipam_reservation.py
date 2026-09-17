@@ -66,6 +66,10 @@ class ReservationType(str, Enum):
         ROUTED: A routed IP address for external connectivity.
         INSTANCE: An IP assigned to an instance interface.
         DELETION_HALO: A recently-released address in the deletion halo.
+        MANUAL: An address a caller reserved through the API, held
+            against something Shaken Fist does not manage -- a keepalived
+            VIP inside a guest, for example. Nothing in the cluster owns
+            the address, so only an explicit release frees it.
         UNKNOWN: An unknown or legacy reservation type.
     """
 
@@ -122,6 +126,7 @@ class ReservationType(str, Enum):
     INSTANCE = ReservationTypeValue(string='instance', proto_id=6)
     DELETION_HALO = ReservationTypeValue(string='deletion-halo', proto_id=7)
     UNKNOWN = ReservationTypeValue(string='unknown', proto_id=8)
+    MANUAL = ReservationTypeValue(string='manual', proto_id=9)
 
 
 class IPAMReservation(BaseModel):

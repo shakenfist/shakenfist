@@ -11,6 +11,7 @@ from shakenfist.config import config
 from shakenfist.config import SFConfig
 from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.external_api import network as api_network
+from shakenfist.network import network as net
 from shakenfist.exceptions import NetworkOperationFailed
 from shakenfist.external_api import app as external_api
 from shakenfist.schema.ipam_reservation import IPAMReservation
@@ -884,3 +885,153 @@ class NetworkUnrouteAddressEndpointTestCase(base.ShakenFistTestCase):
         self.assertEqual(403, resp.status_code)
         mock_enqueue.assert_not_called()
         fake_fn.ipam.release.assert_not_called()
+
+
+class NetworkAddressEndpointTestCase(base.ShakenFistTestCase):
+    """Manual address reservations.
+
+    A caller can hold an address in a network against something Shaken
+    Fist does not manage -- a keepalived VIP inside a guest, say -- so
+    that IPAM never hands it to an interface. Without this the address
+    is free, and `reserve_random_free_address` will eventually pick it
+    (kerbside-patches CI run 35202102331, where the VIP landed on a test
+    instance's second interface and kolla-ansible's prechecks refused to
+    deploy).
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        fake_config = SFConfig(
+            NODE_NAME='seriously',
+            NODE_EGRESS_IP='127.0.0.1',
+            NETWORK_NODE_IP='127.0.0.1',
+            NODE_EGRESS_NIC='eth0',
+            NODE_MESH_NIC='eth1',
+            NODE_IS_NETWORK_NODE=True,
+        )
+        self.config = mock.patch(
+            'shakenfist.external_api.base.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.client = external_api.app.test_client()
+
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('foo', 'key1', 'bar')
+
+        self.network_id = str(uuid4())
+        self.mock_mariadb.create_network(
+            'reservenet',
+            uuid=self.network_id,
+            namespace='foo',
+            netblock='10.9.8.0/24',
+            set_state=dbo.STATE_CREATED)
+
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
+        self.assertEqual(200, resp.status_code)
+        self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
+
+    def _reserve(self, address, comment=None):
+        body = {}
+        if comment:
+            body['comment'] = comment
+        return self.client.post(
+            '/networks/%s/addresses/%s' % (self.network_id, address),
+            headers={'Authorization': self.auth_token},
+            data=json.dumps(body))
+
+    def _release(self, address):
+        return self.client.delete(
+            '/networks/%s/addresses/%s' % (self.network_id, address),
+            headers={'Authorization': self.auth_token})
+
+    def test_reserve_a_free_address(self):
+        resp = self._reserve('10.9.8.3', comment='kolla VIP')
+        self.assertEqual(200, resp.status_code)
+
+        reservation = resp.get_json()
+        self.assertEqual('10.9.8.3', reservation['address'])
+        self.assertEqual(ReservationType.MANUAL.value,
+                         reservation['reservation_type'])
+        self.assertEqual('kolla VIP', reservation['comment'])
+        self.assertEqual(ObjectType.NETWORK.value, reservation['user_type'])
+        self.assertEqual(self.network_id, reservation['user_uuid'])
+
+    def test_a_reserved_address_is_not_allocated(self):
+        """The whole point: IPAM must not hand the address out again."""
+        self.assertEqual(200, self._reserve('10.9.8.3').status_code)
+
+        n = net.Network.from_db(self.network_id)
+        for _ in range(250):
+            address = n.ipam.reserve_random_free_address(
+                (ObjectType.NETWORK, self.network_id),
+                ReservationType.INSTANCE, '')
+            self.assertNotEqual('10.9.8.3', address)
+
+    def test_reserve_an_address_already_in_use(self):
+        # 10.9.8.1 is the gateway, reserved when the IPAM was created.
+        resp = self._reserve('10.9.8.1')
+        self.assertEqual(409, resp.status_code)
+
+    def test_reserve_the_same_address_twice(self):
+        self.assertEqual(200, self._reserve('10.9.8.3').status_code)
+        self.assertEqual(409, self._reserve('10.9.8.3').status_code)
+
+    def test_reserve_an_address_outside_the_netblock(self):
+        resp = self._reserve('10.9.9.3')
+        self.assertEqual(400, resp.status_code)
+
+    def test_reserve_an_address_which_is_not_an_address(self):
+        resp = self._reserve('banana')
+        self.assertEqual(400, resp.status_code)
+
+    def test_release_a_reservation(self):
+        self.assertEqual(200, self._reserve('10.9.8.3').status_code)
+        self.assertEqual(200, self._release('10.9.8.3').status_code)
+
+        # Released addresses sit in the deletion halo rather than becoming
+        # immediately free, which is IPAM's normal behaviour and not
+        # special to manual reservations.
+        n = net.Network.from_db(self.network_id)
+        reservation = n.ipam.get_reservation('10.9.8.3')
+        self.assertEqual(ReservationType.DELETION_HALO,
+                         reservation.reservation_type)
+
+    def test_release_an_address_we_do_not_hold(self):
+        resp = self._release('10.9.8.3')
+        self.assertEqual(404, resp.status_code)
+
+    def test_release_an_address_something_else_holds(self):
+        """A gateway or an instance's address is not the caller's to free."""
+        resp = self._release('10.9.8.1')
+        self.assertEqual(403, resp.status_code)
+
+        n = net.Network.from_db(self.network_id)
+        reservation = n.ipam.get_reservation('10.9.8.1')
+        self.assertEqual(ReservationType.GATEWAY,
+                         reservation.reservation_type)
+
+    def test_reserve_takes_over_a_deletion_halo_address(self):
+        """A caller naming an address gets it even if it is cooling down."""
+        n = net.Network.from_db(self.network_id)
+        n.ipam.reserve('10.9.8.3', (ObjectType.NETWORK, self.network_id),
+                       ReservationType.INSTANCE, '')
+        n.ipam.release('10.9.8.3')
+
+        resp = self._reserve('10.9.8.3')
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(ReservationType.MANUAL.value,
+                         resp.get_json()['reservation_type'])

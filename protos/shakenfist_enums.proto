@@ -64,6 +64,7 @@ enum ReservationType {
   RESERVATION_TYPE_INSTANCE = 6;  // "instance"
   RESERVATION_TYPE_DELETION_HALO = 7;  // "deletion-halo"
   RESERVATION_TYPE_UNKNOWN = 8;  // "unknown"
+  RESERVATION_TYPE_MANUAL = 9;  // "manual"
 }
 
 // RelationshipType enum - object reference relationship types

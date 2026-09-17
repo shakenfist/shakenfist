@@ -307,6 +307,40 @@ block using the REST API.
                  info_by_addr[addr]['comment']))
     ```
 
+## Reserving an address
+
+IPAM allocates from the network's block at random, and an address it did not
+allocate is an address it will eventually hand to an interface. Where
+something Shaken Fist does not manage owns an address -- a keepalived VIP
+inside a guest, for example -- reserve it so that nothing else is given it.
+
+A reservation takes the address out of the pool and does nothing else: no
+interface, no DHCP entry, no routing. It is held until it is released, and
+only reservations made this way can be released this way.
+
+???+ tip "REST API calls"
+
+    * [POST ​/networks​/{network_ref}​/addresses​/{address}](https://openapi.shakenfist.com/#/networks/post_networks__network_ref__addresses__address_): reserve a specific address in a network.
+    * [DELETE ​/networks​/{network_ref}​/addresses​/{address}](https://openapi.shakenfist.com/#/networks/delete_networks__network_ref__addresses__address_): release an address reserved that way.
+
+    Reserving an address which is already in use returns a 409, and releasing
+    an address held by anything but a manual reservation returns a 403.
+    Clusters which support this advertise the `reserve-addresses` capability
+    in the `networks` family on the API root.
+
+??? example "Python API client: reserve an address for a VIP"
+
+    ```python
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    sf_client.reserve_network_address(network_ref, '10.0.2.3',
+                                      comment='kolla VIP')
+
+    # ... and when the deployment using it is gone
+    sf_client.release_network_address(network_ref, '10.0.2.3')
+    ```
+
 ## Routed IPs
 
 Unlikely floating IPs, which are associated with a network interface, routed IPs

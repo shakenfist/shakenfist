@@ -26,6 +26,7 @@ from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import util as api_util
+from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
 from shakenfist.schema.operations.net_op \
@@ -698,6 +699,103 @@ class NetworkAddressesEndpoint(api_base.Resource):
             if reservation:
                 out.append(reservation.model_dump(mode='json'))
         return out
+
+
+class NetworkAddressEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Reserve a specific address in a network.',
+        [
+            ('network_ref', 'path', 'uuidorname',
+             'The network to reserve the address in.', True),
+            ('address', 'path', 'string', 'The IPv4 address to reserve.', True),
+            ('comment', 'body', 'string',
+             'A note describing what the address is reserved for.', False),
+            ('namespace', 'body', 'namespace',
+             api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False)
+        ],
+        [(200, 'The reservation which was created.', None),
+         (400, 'The IPv4 address is not in the network\'s netblock or is invalid.',
+          None),
+         (409, 'That address is already in use.', None),
+         (404, 'Network not found.', None)]))
+    @api_base.arg_is_network_ref
+    @api_base.requires_network_ownership
+    @api_base.requires_network_active
+    @api_base.log_token_use
+    def post(self, network_ref=None, address=None, network_from_db=None,
+             comment=None):
+        try:
+            ipaddress.ip_address(address)
+        except ValueError:
+            return sf_api.error(400, 'invalid address')
+
+        if not network_from_db.ipam.is_in_range(address):
+            return sf_api.error(
+                400, 'reservation request for address outside network block')
+
+        # A manual reservation is owned by the network, not by anything the
+        # cluster runs. Nothing releases it implicitly, which is the point:
+        # the address is being held for something Shaken Fist does not
+        # manage, such as a keepalived VIP inside a guest.
+        #
+        # evict_halo is set because the caller named this address rather
+        # than asking for any free one, which is the case the deletion halo
+        # exists to be overridden for.
+        if not network_from_db.ipam.reserve(
+                address, network_from_db.unique_label(),
+                ReservationType.MANUAL, comment or '', evict_halo=True):
+            return sf_api.error(409, 'address is already in use')
+
+        network_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'address reservation request from REST API',
+            extra={'address': address})
+        reservation = network_from_db.ipam.get_reservation(address)
+        return reservation.model_dump(mode='json')
+
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Release a manually reserved address in a network.',
+        [
+            ('network_ref', 'path', 'uuidorname',
+             'The network to release the address in.', True),
+            ('address', 'path', 'string', 'The IPv4 address to release.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False)
+        ],
+        [(200, 'The address was released.', None),
+         (400, 'The IPv4 address is not in the network\'s netblock or is invalid.',
+          None),
+         (403, 'That address is not a manual reservation.', None),
+         (404, 'Network or reservation not found.', None)]))
+    @api_base.arg_is_network_ref
+    @api_base.requires_network_ownership
+    @api_base.requires_network_active
+    @api_base.log_token_use
+    def delete(self, network_ref=None, address=None, network_from_db=None):
+        try:
+            ipaddress.ip_address(address)
+        except ValueError:
+            return sf_api.error(400, 'invalid address')
+
+        if not network_from_db.ipam.is_in_range(address):
+            return sf_api.error(
+                400, 'release request for address outside network block')
+
+        reservation = network_from_db.ipam.get_reservation(address)
+        if not reservation:
+            return sf_api.error(404, 'address is not reserved')
+
+        # Only manual reservations are the caller's to release. Releasing a
+        # gateway or an instance's address here would hand it out again
+        # while the thing using it was still using it.
+        if reservation.reservation_type != ReservationType.MANUAL:
+            return sf_api.error(403, 'address is not a manual reservation')
+
+        if not network_from_db.ipam.release(address):
+            return sf_api.error(404, 'address is not reserved')
+
+        network_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'address release request from REST API',
+            extra={'address': address})
 
 
 class NetworkRouteAddressEndpoint(api_base.Resource):

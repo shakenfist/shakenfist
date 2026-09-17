@@ -3,6 +3,7 @@ import time
 
 from testtools import content
 
+from shakenfist_client import apiclient
 from shakenfist_ci import base
 
 
@@ -359,3 +360,100 @@ class TestUnrouteReleasesRoutedAddress(base.BaseNamespacedTestCase):
                 'routed', res['reservation_type'],
                 'Address %s is still reserved as routed after unroute: %s'
                 % (address, res))
+
+
+class TestReservedAddressIsNotAllocated(base.BaseNamespacedTestCase):
+    """A manually reserved address must not be given to an instance.
+
+    IPAM allocates at random and only knows about the addresses it
+    allocated itself, so an address something outside Shaken Fist owns --
+    a keepalived VIP inside a guest is the motivating case -- is free
+    until it is reserved, and eventually an interface is given it. The
+    unit tests cover the handler; this covers the property the handler
+    exists for, against a real cluster: once reserved, the address is
+    refused to a caller asking for it by name.
+
+    This needs no host level access, only the API, so it does not use the
+    node-exec helpers.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'netreserve'
+        super().__init__(*args, **kwargs)
+
+    def setUp(self):
+        super().setUp()
+        self.net = self.test_client.allocate_network(
+            '192.168.245.0/24', True, True, '%s-net' % self.namespace)
+        self.addDetail(
+            'net',
+            content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
+        self._await_networks_ready([self.net['uuid']])
+
+    def _reservations(self):
+        return {r['address']: r for r in
+                self.test_client.get_network_addresses(self.net['uuid'])}
+
+    def test_reserved_address_is_refused_to_an_instance(self):
+        reservation = self.test_client.reserve_network_address(
+            self.net['uuid'], '192.168.245.10', comment='a VIP')
+        self.addDetail(
+            'reservation',
+            content.text_content(
+                json.dumps(reservation, indent=4, sort_keys=True)))
+        self.assertEqual('manual', reservation['reservation_type'])
+
+        reservations = self._reservations()
+        self.assertIn('192.168.245.10', reservations)
+        self.assertEqual(
+            'manual', reservations['192.168.245.10']['reservation_type'])
+
+        # An instance asking for the address by name is refused. An
+        # explicit address takes over a deletion halo reservation, but a
+        # real one is never taken over, which is what makes the
+        # reservation worth having.
+        self.assertRaises(
+            apiclient.ResourceStateConflictException,
+            # raw-create: the 409 is the assertion. The wrapper only waits
+            # out a 507, but waiting at all would hide the refusal this
+            # test exists to see behind a capacity timeout.
+            self.test_client.create_instance,
+            'reserved-address', 1, 1024,
+            [{'network_uuid': self.net['uuid'],
+              'address': '192.168.245.10'}],
+            [{'size': 8, 'base': base.CLUSTER_CI_IMAGE, 'type': 'disk'}],
+            None, None)
+
+    def test_release_returns_the_address(self):
+        self.test_client.reserve_network_address(
+            self.net['uuid'], '192.168.245.11')
+        self.test_client.release_network_address(
+            self.net['uuid'], '192.168.245.11')
+
+        # Released addresses sit in the deletion halo for a while before
+        # returning to the pool. What matters here is that nothing still
+        # holds the address as a manual reservation.
+        reservations = self._reservations()
+        self.addDetail(
+            'reservations after release',
+            content.text_content(
+                json.dumps(reservations, indent=4, sort_keys=True)))
+        res = reservations.get('192.168.245.11')
+        if res:
+            self.assertNotEqual(
+                'manual', res['reservation_type'],
+                'Address 192.168.245.11 is still reserved: %s' % res)
+
+    def test_an_address_in_use_cannot_be_reserved(self):
+        # 192.168.245.1 is the network's gateway, reserved when the
+        # network was created.
+        self.assertRaises(
+            apiclient.ResourceStateConflictException,
+            self.test_client.reserve_network_address,
+            self.net['uuid'], '192.168.245.1')
+
+    def test_only_manual_reservations_are_released(self):
+        self.assertRaises(
+            apiclient.UnauthorizedException,
+            self.test_client.release_network_address,
+            self.net['uuid'], '192.168.245.1')
