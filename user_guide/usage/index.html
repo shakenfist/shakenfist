@@ -14356,20 +14356,31 @@ pre-installed for your convenience.</p>
 <p>You can also use a "detailed disk specification", which is what fancy people use.
 Its syntax is similar:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myinstance<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>-D<span class="w"> </span><span class="nv">size</span><span class="o">=</span><span class="m">8</span>,base<span class="o">=</span>cirros,bus<span class="o">=</span>ide,type<span class="o">=</span>cdrom<span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>-D<span class="w"> </span><span class="nv">size</span><span class="o">=</span><span class="m">8</span>,base<span class="o">=</span>cirros,bus<span class="o">=</span>sata,type<span class="o">=</span>cdrom<span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span>-n<span class="w"> </span>netuuid
 </code></pre></div>
 <p>The specification is composed of a series of key-value pairs. Valid keys are:
 size; base; bus; and type. If you don't specify a key, you'll get a reasonable
-default. Here's how the keys work:</p>
+default. Since v0.8 those four are the <em>only</em> keys accepted: anything else is
+refused with a 400 naming it, where a typo like <code>siz=20</code> used to be discarded in
+silence and get you a default sized disk. A disk specification must also ask for
+something, so one with neither a <code>size</code> nor a <code>base</code> is refused as well. See
+<a href="/developer_guide/api_reference/instances/#diskspec">the diskspec reference</a>
+for the full contract. Here's how the keys work:</p>
 <ul>
 <li><em>size</em> as per the shorthand notation.</li>
-<li><em>base</em> as per the shorthand notation, including version specification.</li>
-<li><em>bus</em> is any valid disk bus for libvirt, which is virtio, ide, scsi, usb. Use
-  virtio unless you have a really good reason otherwise -- the performance of the
-  others are terrible. An example of a good reason is to install virtio drivers
-  into legacy operating systems that lack them natively.</li>
-<li><em>type</em> can be one of disk or cdrom. Note that cdroms are excluded from snapshots.</li>
+<li><em>base</em> as per the shorthand notation, including version specification. The
+  literal string "none" means no base image, exactly as omitting the key does --
+  so <code>-D base=none</code> on its own is a specification which asks for nothing, and is
+  refused.</li>
+<li><em>bus</em> is the hardware bus to attach the disk to, and is one of virtio, sata,
+  scsi, usb or nvme. Use virtio unless you have a really good reason otherwise --
+  the performance of the others are terrible. An example of a good reason is to
+  install virtio drivers into legacy operating systems that lack them natively.
+  ide was supported before v0.7, but the performance was so poor that support was
+  removed; a disk specification asking for it is rejected.</li>
+<li><em>type</em> can be one of disk or cdrom, and any other value is rejected. Note that
+  cdroms are excluded from snapshots.</li>
 </ul>
 <h3 id="network-specifications">Network specifications<a class="headerlink" href="#network-specifications" title="Permanent link">&para;</a></h3>
 <p>Similarly, networks have a "short network specification", where you can specify
@@ -14405,12 +14416,23 @@ of the following keys:</p>
 <li><em>macaddress</em> the mac address to use for the interface, in the colon
   separated form <code>02:00:00:ea:3a:28</code>. Either case is accepted, and a value
   in any other form is rejected.</li>
-<li><em>model</em> is the model of the network device, with options being ne2k_isa,
-  i82551, i82557b, i82559er, ne2k_pci, pcnet, rtl8139, e1000, and virtio. The
-  default model is virtio.</li>
+<li><em>model</em> is the model of the network device. The default is virtio, and it is
+  almost always the right answer; e1000, rtl8139, pcnet and the i825xx family are
+  the usual choices for a guest which lacks virtio drivers. Shaken Fist does not
+  check this value and cannot give you a definitive list of the ones which work:
+  it is handed to the hypervisor unexamined, so the set which works is whatever
+  your hypervisor's qemu build supports. See
+  <a href="/developer_guide/api_reference/instances/#networkspec">the networkspec reference</a>
+  for more detail.</li>
 <li><em>float</em> if true indicates to immediately float the interface once the instance
-  is created.</li>
+  is created. <code>true</code>, <code>yes</code>, <code>on</code>, <code>1</code> and their cases all mean yes and
+  <code>false</code>, <code>no</code>, <code>off</code> and <code>0</code> all mean no; the <code>sf-client</code> and ansible
+  interfaces convert what you type before it reaches the API.</li>
 </ul>
+<p>Since v0.8 those five are the only keys accepted here too, and anything else is
+refused with a 400 naming it. See
+<a href="/developer_guide/api_reference/instances/#networkspec">the networkspec reference</a>
+for the full contract.</p>
 <p>So for example, this is valid:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>testinstance<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="m">2048</span><span class="w"> </span>-d<span class="w"> </span><span class="m">20</span>@debian:12<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">    </span>-N<span class="w"> </span><span class="nv">network_uuid</span><span class="o">=</span>testnet,address<span class="o">=</span><span class="m">10</span>.0.0.99,float<span class="o">=</span><span class="nb">true</span>

@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-api-input-validation/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-api-input-validation-phase-07-structured/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Declarative validation and a consistent error contract for the REST API - Shaken Fist</title>
+        <title>Phase 7: Structured parameter schemas - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#declarative-validation-and-a-consistent-error-contract-for-the-rest-api" class="md-skip">
+        <a href="#phase-7-structured-parameter-schemas" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Declarative validation and a consistent error contract for the REST API
+              Phase 7: Structured parameter schemas
             
           </span>
         </div>
@@ -13866,10 +13866,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prompt" class="md-nav__link">
+  <a href="#amendments" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prompt
+        Amendments
       
     </span>
   </a>
@@ -13877,144 +13877,44 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#situation" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Situation
+        Context
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Situation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#why-the-per-endpoint-fix-was-abandoned" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why the per-endpoint fix was abandoned
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#the-asset-nobody-is-using" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The asset nobody is using
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#the-catch-stated-up-front" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The catch, stated up front
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#type-vocabulary-gaps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Type vocabulary gaps
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#reported-issues-this-plan-addresses" class="md-nav__link">
+  <a href="#scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reported issues this plan addresses
+        Scope
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Reported issues this plan addresses">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#core-declarative-validation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Core: declarative validation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#error-contract-and-attribution" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Error contract and attribution
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#enabling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Enabling
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#adjacent-related-deliberately-not-absorbed" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Adjacent — related, deliberately not absorbed
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#decisions" class="md-nav__link">
+  <a href="#what-the-survey-found" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Decisions
+        What the survey found
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Decisions">
+    <nav class="md-nav" aria-label="What the survey found">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#phases" class="md-nav__link">
+  <a href="#f1-the-outer-shape-is-checked-and-only-the-outer-shape" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Phases
+        F1. The outer shape is checked, and only the outer shape
       
     </span>
   </a>
@@ -14022,10 +13922,43 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#where-the-tracked-issues-stand" class="md-nav__link">
+  <a href="#f2-the-structured-population-is-six-declarations-not-a-class" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Where the tracked issues stand
+        F2. The structured population is six declarations, not a class
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f3-bound_claims-is-already-guarded-and-better-than-a-schema-would-be" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F3. bound_claims is already guarded, and better than a schema would be
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f4-metadata-is-unconstrained-on-purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F4. metadata is unconstrained on purpose
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f5-eleven-nested-values-are-a-recorded-500-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F5. Eleven nested values are a recorded 500 today
       
     </span>
   </a>
@@ -14058,837 +13991,1769 @@
   
 
 
-<h1 id="declarative-validation-and-a-consistent-error-contract-for-the-rest-api">Declarative validation and a consistent error contract for the REST API<a class="headerlink" href="#declarative-validation-and-a-consistent-error-contract-for-the-rest-api" title="Permanent link">&para;</a></h1>
-<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
-<p>Before responding to questions or discussion points in this
-document, explore the shakenfist codebase thoroughly. Read
-relevant source files, understand existing patterns (the
-decorator chain in <code>shakenfist/external_api/base.py</code>, especially
-<code>Resource.method_decorators</code>, <code>log_request</code>,
-<code>handle_authorization_exceptions</code>, <code>record_exception</code> and
-<code>suppress_exceptions_to_client</code>; the <code>swagger_helper()</code>
-declarations on every endpoint; the four existing
-<code>use_kwargs</code> sites; <code>shakenfist/util/exceptions.py</code>). Ground
-your answers in what the code does today. Do not speculate when
-you could read it instead. Where a question touches on external
-concepts (webargs / marshmallow schema composition, Flask-RESTful
-dispatch, OpenAPI 2.0 parameter locations, HTTP status code
-semantics for malformed input), research as needed to give a
-confident answer. Flag any uncertainty explicitly rather than
-guessing.</p>
-<p>All planning documents should go into <code>docs/plans/</code>.</p>
-<p>Consult <code>ARCHITECTURE.md</code> for the component inventory and
-<code>CLAUDE.md</code> for build commands, project conventions, and the
-warning about decorator ordering in <code>external_api/app.py</code>.</p>
-<p>When we get to detailed planning, I prefer a separate plan
-file per detailed phase, named with <code>-phase-NN-descriptive</code>
-appended.</p>
-<p>I prefer one commit per logical change, and at minimum one
-commit per phase. Each commit should be self-contained.</p>
-<p><strong>Status: phases 0 to 6 planned; 0, 1, 2, 3, 4, 5 and 6 complete.</strong>
-The open questions at the bottom are answered in the Decisions
-section; see
-<a href="../PLAN-api-input-validation-phase-00-decisions/"><code>PLAN-api-input-validation-phase-00-decisions.md</code></a>
-for the measurements behind them,
-<a href="../PLAN-api-input-validation-phase-01-declaration-audit/"><code>PLAN-api-input-validation-phase-01-declaration-audit.md</code></a>
-for what the audit found,
-<a href="../PLAN-api-input-validation-phase-02-type-vocabulary/"><code>PLAN-api-input-validation-phase-02-type-vocabulary.md</code></a>
-for what the vocabulary work shipped and the four deviations it
-recorded, and
-<a href="../PLAN-api-input-validation-phase-03-compile-and-warn/"><code>PLAN-api-input-validation-phase-03-compile-and-warn.md</code></a>
-for the measurement that closed it, and
-<a href="../PLAN-api-input-validation-phase-04-enforce/"><code>PLAN-api-input-validation-phase-04-enforce.md</code></a>
-for the reading that unlocked the flip and what the flip changed for
-callers, and
-<a href="../PLAN-api-input-validation-phase-05-narrow/"><code>PLAN-api-input-validation-phase-05-narrow.md</code></a>
-for the narrowing and the two leaks it closed, and
-<a href="../PLAN-api-input-validation-phase-06-required/"><code>PLAN-api-input-validation-phase-06-required.md</code></a>
-for the required-ness decision and what the semantic type tokens turned
-out to be enforcing. Phase 6's survey split the phase it was planning:
-what was one row covering required-ness and four semantic issues is now
-phase 6 for the scalar half and phase 7 for element schemas on <code>dict</code>
-and <code>arrayofdict</code>, which #528 needs and which nothing in the vocabulary
-can express today. The push audit moves to phase 8. Neither phase 7 nor
-phase 8 is yet cut into a per-phase file.</p>
-<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<p>The REST API does not validate its inputs. A request body value
-of any JSON type reaches the handler that reads it, and what
-happens next depends entirely on whether that particular handler
-happened to guard the conversion.</p>
-<p>The mechanism is two decorators in
-<code>shakenfist/external_api/base.py</code>, both applied to every endpoint
-through <code>Resource.method_decorators</code>:</p>
+<h1 id="phase-7-structured-parameter-schemas">Phase 7: Structured parameter schemas<a class="headerlink" href="#phase-7-structured-parameter-schemas" title="Permanent link">&para;</a></h1>
+<p>Phase 7 of <a href="../PLAN-api-input-validation/"><code>PLAN-api-input-validation.md</code></a>,
+following <a href="../PLAN-api-input-validation-phase-06-required/">phase 6</a>.</p>
+<p>Phases 3 and 4 built a validation layer that compiles the published
+OpenAPI specification into marshmallow fields and rejects anything the
+specification does not describe. Phase 6 made the scalar tokens mean
+something. All of it stops at the surface of a structure: a <code>dict</code>
+compiles to <code>fields.Dict()</code> and an <code>arrayofdict</code> to
+<code>fields.List(fields.Dict())</code>, neither carrying a value schema, so a
+diskspec, a networkspec or a videospec is checked for being a mapping
+and then handed to the handler unexamined. This phase teaches the
+vocabulary to describe what is inside one.</p>
+<p><strong>Planning effort:</strong> high. The compiler change is small and the
+declarations are few. Deciding what each spec's schema may <em>say</em> is
+not: every key this phase constrains is a key some caller may be
+sending today, and a schema narrower than the server is a breaking
+change wearing the clothes of a correctness fix.</p>
+<p><strong>Review effort:</strong> high. A reviewer's job here is to find a key, a
+value or a type that this phase's schemas refuse and some working
+caller sends. The second job is to check that each published <code>enum</code>
+was read off the code that consumes the value and not off the
+documentation that describes it.</p>
+<h2 id="amendments">Amendments<a class="headerlink" href="#amendments" title="Permanent link">&para;</a></h2>
+<p><strong>2026-09-17, after the pull request review.</strong> The automated review of
+<a href="https://github.com/shakenfist/shakenfist/pull/4232">#4232</a> raised one
+<code>fix</code>, two <code>document</code> items and three <code>consider</code> items. All six were
+taken. Four of them change what this plan says, and the changes are
+made in place below rather than only recorded here:</p>
 <ul>
-<li><code>log_request</code> merges <strong>every key of the JSON request body</strong>
-  into the handler's kwargs verbatim, with no type checking and
-  no schema (<code>base.py:588-598</code>). A body key also silently
-  overwrites a same-named URL path parameter.</li>
-<li><code>handle_authorization_exceptions</code> catches <strong>any</strong> <code>TypeError</code>
-  raised anywhere below it and returns
-  <code>400 &lt;str(exception)&gt;</code>. So a <code>TypeError</code> raised arbitrarily
-  deep in the stack is handed to the client as the interpreter's
-  own error text.</li>
+<li><strong>A third handler guard, and D42's count moves from two to three.</strong>
+  The videospec's <code>model</code> and <code>memory</code> checks were <em>presence</em> tests, so
+  an explicit null passed them and was stored on the instance —
+  <code>self.video['vdi'].startswith('spice')</code> in a later console request,
+  and <code>type='None'</code> rendered into the domain XML at <code>libvirt.tmpl:206</code>.
+  That is exactly finding F6's videospec row, which this phase set out
+  to close and did not. They are value tests now (<code>is None</code>, the same
+  spelling <code>_netdesc_safety_checks</code> uses), and being handler guards
+  they hold at <code>warn</code> and <code>off</code> like the other two. A non-mapping
+  videospec needed an explicit shape guard in front of them, because
+  the presence tests answered 400 for one by accident: <code>'model' not in
+  ['vga']</code> is a membership test which happens to be True.</li>
+<li><strong>The census is wrong about <code>float</code>.</strong> Its networkspec row said
+  <code>"false"</code> does not float the interface. Python truthiness says
+  otherwise — a non-empty string is true — so the schema published
+  <code>"false"</code> as a boolean meaning False while the handler floated the
+  interface. <code>validation.declared_boolean()</code> is now the one reading,
+  keyed on marshmallow's own truthy and falsy sets so the check and the
+  read cannot drift. The row is corrected.</li>
+<li><strong>A sixth spelling of the diskspec which asks for nothing.</strong>
+  <code>base</code> of the literal string <code>"none"</code> is read as no base by
+  <code>util_general.noneish</code>, so <code>{"base": "none"}</code> alone is refused by
+  D45's guard. True since step 4 and neither swept nor documented;
+  both now.</li>
+<li><strong>The <code>_schema</code> sentinel collapse could not tell the sentinel from a
+  caller's key of that name.</strong> <code>_flatten_messages</code> now discriminates on
+  whether the element is a mapping, which is the only state in which
+  marshmallow's sentinel is reachable, so <code>{"disk": [{"_schema": 1}]}</code>
+  answers <code>disk[0]._schema: Unknown field.</code> and a non-mapping element
+  still answers <code>disk[0]: Not a valid mapping type.</code></li>
 </ul>
-<p>Anything that escapes both — a <code>ValueError</code>, an <code>OverflowError</code>,
-an <code>OSError</code> — falls through to <code>suppress_exceptions_to_client</code>
-and becomes a 500 with an exception repr in the body and a
-recorded server exception on disk.</p>
-<p>Issue #3609 is one instance: <code>{"limit": "5"}</code> on the events
-endpoints produced
-<code>400 "'&lt;=' not supported between instances of 'str' and 'int'"</code>.</p>
-<h3 id="why-the-per-endpoint-fix-was-abandoned">Why the per-endpoint fix was abandoned<a class="headerlink" href="#why-the-per-endpoint-fix-was-abandoned" title="Permanent link">&para;</a></h3>
-<p>PR #3610 fixed #3609 by adding a shared <code>coerce_int()</code> helper and
-routing seven call sites through it. It was closed unmerged after
-six rounds of review. Two findings from that attempt matter here,
-because they are the argument for doing this declaratively:</p>
-<ol>
-<li><strong>Hand-rolled guards get written wrong.</strong> Of seven guards
-   written by hand, two were wrong on the first attempt: one
-   caught <code>(TypeError, ValueError)</code> and missed <code>OverflowError</code>
-   (reachable because Python's JSON parser accepts the
-   non-standard <code>Infinity</code> literal, and <code>int(float('inf'))</code>
-   raises <code>OverflowError</code>), and one type-checked
-   <code>max_versions</code> without range-checking it, leaving a
-   silently destructive negative value.</li>
-<li><strong>The class was still not covered when the PR was
-   abandoned.</strong> Of the 13 parameters this API <em>declares</em> as
-   <code>integer</code>, 6 were still read unconverted, including <code>cpus</code>
-   and <code>memory</code> on <code>POST /instances</code>, which are passed to
-   <code>Instance.new()</code> as received.</li>
-</ol>
-<p>Every endpoint added in future inherits the defect by default,
-because the default is no validation.</p>
-<h3 id="the-asset-nobody-is-using">The asset nobody is using<a class="headerlink" href="#the-asset-nobody-is-using" title="Permanent link">&para;</a></h3>
-<p><strong>124 of the 129 handler methods (96%) already declare their
-parameters.</strong> Every <code>swag_from(api_base.swagger_helper(...))</code>
-call passes a list of</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>(name, location, type, description, required)
+<p>The two <code>document</code> items are the user guide's <code>-D</code> and <code>-N</code> key lists,
+which did not say that an unlisted key is now refused, and the
+collection's broken <code>video</code> parameter, which this plan said somebody
+should file and nobody did. It is
+<a href="https://github.com/shakenfist/shakenfist/issues/4236">#4236</a>. The
+remaining <code>consider</code> item was the mutation harness, which now proves
+the tree is green before it breaks anything — otherwise a tree which
+was already red would report every mutation as caught.</p>
+<p><strong>2026-09-16, after step 1.</strong> The census this plan gated step 3 on
+found three things the plan had wrong and one it had under-specified.
+All four are corrected in place below; this note records what changed,
+so a reader who remembers the original does not think the plan drifted.</p>
+<ul>
+<li><strong>D43 named six enums. Three of them are publishable.</strong>
+  <code>network[].model</code> and <code>video.model</code> go straight into the libvirt
+  domain XML with nothing between (<code>libvirt.tmpl:139</code> and <code>:206</code>), so
+  the real vocabulary is the hypervisor's qemu build. Worse, our own
+  two documentation pages disagree about the first: <code>usage.md:288</code>
+  recommends <code>ne2k_isa</code>, which <code>instances.md:105</code> omits. Publishing the
+  API reference's list would answer 400 to a value our user guide tells
+  people to use — phase 2's <code>netblock</code> reasoning, exactly.</li>
+<li><strong>D44's mechanism does not work.</strong> Every compiled field is
+  <code>allow_none=True</code> (<code>validation.py:382</code>) and the object branch
+  recurses through the same <code>_field()</code>, so a <code>required</code>, <code>string</code>-typed
+  nested <code>network_uuid</code> still accepts <code>null</code> and still reaches
+  <code>from_db_by_ref(None, ns)</code>. The fix is not to break the nullability
+  invariant: phase 6 already made an explicit <code>null</code> for a required
+  parameter a 400 at the top level (<code>validation.py:838</code>), and the
+  nested case applies that same rule one level down.</li>
+<li><strong>D46 asked for <code>fields.Integer(strict=True)</code>, which cannot be
+  used.</strong> <code>strict=True</code> refuses anything that is not already a Python
+  <code>int</code>, and a query parameter is a string on the wire — <code>base.py</code>
+  hands <code>flask.request.args.to_dict()</code> to <code>check()</code>, so <code>offset=10</code>
+  arrives as <code>'10'</code>. Applying D46 literally broke
+  <code>test_blob_data_bounds</code> within a minute. It is also narrower than the
+  handler for bodies, since <code>{"cpus": "8"}</code> is accepted today by
+  pydantic's lax mode. The decision is rewritten against the defect
+  rather than against the Python type.</li>
+<li><strong><code>video.memory</code> cannot be typed <code>integer</code> without a client
+  release.</strong> <code>docs/user_guide/consoles.md:95</code> documents
+  <code>--videospec model=qxl,memory=65536,vdi=spiceconcurrent</code>, and the
+  CLI's parser does <code>video[s[0]] = s[1]</code> with no coercion
+  (<code>commandline/instance.py:499</code>), so that documented command puts the
+  string <code>"65536"</code> on the wire. It works today only because jinja
+  stringifies either type. Typing it is the operator's decision, taken
+  deliberately; see D49 for the ordering it requires.</li>
+</ul>
+<p>Two smaller corrections to finding F5's attributions, both from the
+census reading the code rather than the traceback: the
+<code>network[].address</code> 500 is raised by <code>util_general.noneish</code> at
+<code>external_api/instance.py:369</code>, not by <code>n.ipam.is_in_range</code> below it;
+and the <code>disk[].size</code> 500 is not pydantic, because
+<code>InstanceData.disk_spec</code> is <code>list[dict[str, Any]]</code> with no validator.
+F5's table is corrected. The second correction means <code>"size": "20"</code>
+probably works end to end today, which makes D45's integer typing a
+narrowing — see D50.</p>
+<p>Nothing else the plan assumed was wrong. In particular D41 came
+through unconditional, which is the outcome the census existed to test.</p>
+<p><strong>2026-09-16, after step 5.</strong> Rewriting D46 had a consequence nobody
+followed through at the time, and four steps independently reported the
+same thing. D46 originally asked for marshmallow's <code>strict=True</code>, which
+refuses any value that is not already a Python <code>int</code>; its replacement
+refuses a <em>fractional number</em> and accepts anything <code>int()</code> converts
+faithfully, including a numeric string. Three of this plan's "this will
+now be refused" claims were written against the original and are false
+against what shipped:</p>
+<ul>
+<li><code>disk[].size</code> as the string <code>"20"</code> is <strong>accepted</strong>, so D50's second
+  narrowing never existed.</li>
+<li><code>video.memory</code> as the string <code>"65536"</code> is <strong>accepted</strong>, so D49's
+  ordering obligation never existed and the documented
+  <code>--videospec memory=65536</code> keeps working.</li>
+<li><code>network[].float</code> as <code>"yes"</code> is <strong>accepted</strong>, because marshmallow's
+  <code>Boolean</code> takes it, which is correctly no narrower than the handler's
+  bare truthiness test.</li>
+</ul>
+<p>D49, D50 and definition-of-done items 5, 7 and 8 are corrected below.
+The lesson is worth more than the corrections: a decision rewritten
+mid-phase invalidates every <em>other</em> statement that was reasoning from
+it, and nothing in this plan's structure made those statements findable.
+Step 8's audit should re-read the decisions as a set rather than
+item by item.</p>
+<p>Two narrowings the plan never named were also found, both real and both
+shipped. <code>additionalProperties: false</code> refuses a caller-supplied
+<code>blob_uuid</code> inside a diskspec, which the handler genuinely acted on
+(<code>instance.py:935</code>, <code>:974</code>); the documented spelling
+<code>base: "sf://blob/&lt;uuid&gt;"</code> reaches the identical branch and is
+unaffected. And D45's size-or-base guard is a handler guard, so it
+holds at <code>warn</code> and <code>off</code> too — it is the one narrowing in this phase
+an operator cannot roll back.</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>The compiler already recurses. <code>_field()</code>
+(<code>shakenfist/external_api/validation.py:400</code>) reads a rendered schema
+fragment and builds a marshmallow field from it, and its <code>array</code>
+branch calls itself:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">if</span> <span class="n">declared</span> <span class="o">==</span> <span class="s1">'array'</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="k">return</span> <span class="n">fields</span><span class="o">.</span><span class="n">List</span><span class="p">(</span><span class="n">_field</span><span class="p">(</span><span class="n">spec</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'items'</span><span class="p">,</span> <span class="p">{})),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 </code></pre></div>
-<p>tuples — 254 parameters in total across 20 files, with 113
-declared <code>body</code> and 118 declared <code>query</code>. <code>swagger_helper()</code>
-already maps the type token through an <code>argtypes</code> table
-(<code>base.py:141-160</code>) covering <code>string</code>, <code>integer</code>, <code>number</code>,
-<code>boolean</code>, <code>uuid</code>, <code>uuidorname</code>, <code>namespace</code>, <code>node</code>, <code>url</code>,
-<code>ipv4</code>, <code>dict</code>, <code>arrayofdict</code>, <code>arrayofstring</code>, <code>binary</code>,
-<code>bearer</code>.</p>
-<p>That is a schema. It is read by nothing except the documentation
-generator.</p>
-<p>Making it load-bearing is the cheap path to closing #528: no new
-per-endpoint schemas need to be authored for the 96% that already
-declare, and webargs is already a dependency doing exactly this
-job at four sites (<code>blob.py</code>, <code>network.py</code>, <code>artifact.py</code>,
-<code>instance.py</code>) — none of them on request bodies. All four were
-<code>location='query'</code> when this was written; three are now
-<code>location='json_or_query'</code>, the custom loader #3629 introduced
-(see D6 below).</p>
-<h3 id="the-catch-stated-up-front">The catch, stated up front<a class="headerlink" href="#the-catch-stated-up-front" title="Permanent link">&para;</a></h3>
-<p>Because nothing has ever read these declarations, nothing has
-ever checked them. Phase 0 measured the damage: parameter
-<em>names</em> are 97% accurate, but parameter <em>locations</em> are not.</p>
-<p><strong>116 of the 119 parameters that appear in a URL path are
-declared as something other than <code>path</code></strong> — 104 as <code>query</code>, 11
-as <code>body</code>, and one as <code>'qeury'</code>, a typo. Only 3 are correct. A
-second declaration says <code>'post'</code>, which is not an OpenAPI
-location at all. Since location is exactly what a parser uses to
-decide <em>where to look for a value</em>, compiling these as written
-would look for <code>artifact_ref</code> in the query string of a request
-that carries it in the path.</p>
-<p>This is less alarming than it sounds, because the mounted routes
-in <code>app.py</code> are ground truth: which names are path parameters is
-derivable, not a matter of judgement, so the fix is mechanical
-rather than an audit. But it makes the declaration audit a
-<strong>precondition</strong> for compiling, not a tidy-up that can follow it.</p>
-<p><code>required</code> is a separate and probably worse problem: <code>mode</code> on
-<code>POST /instances/&lt;ref&gt;/agent/put</code> is declared required while
-omitting it has always been accepted, so enforcing required-ness
-naively would break working clients.</p>
-<p><strong>The plan must therefore treat "the declarations are accurate"
-as a hypothesis to be tested, not an assumption.</strong> The mechanism
-for testing it is a warn-only mode that validates, logs what it
-<em>would</em> have rejected, and changes nothing — deployed to sfcbr,
-which carries real traffic and ships logs to Loki.</p>
-<h3 id="type-vocabulary-gaps">Type vocabulary gaps<a class="headerlink" href="#type-vocabulary-gaps" title="Permanent link">&para;</a></h3>
-<p>The existing vocabulary is too coarse in at least these ways,
-each of which is a real defect in the issue list:</p>
+<p>What it has no branch for is an object with <code>properties</code>. <code>_SCALARS</code>
+(<code>validation.py:86</code>) maps <code>'object'</code> to <code>fields.Dict</code>, which accepts
+any mapping whatsoever, and <code>ARGTYPES['dict']</code> (<code>base.py:400</code>) renders
+<code>{'type': 'object'}</code> with nothing inside it. So the recursion exists,
+the vocabulary is the thing that has nothing to recurse into.</p>
+<p>That matters for how this phase is built. The module's design rule,
+stated in three separate comments in <code>validation.py</code>, is that the
+published specification and the enforced check must be the same string
+by construction — <code>ANY_VALUE_FORMAT</code> and <code>_FORMATS</code> are both keyed on
+exactly what <code>ARGTYPES</code> renders, precisely so that a token cannot
+render as one thing and compile as another. A structured token obeys
+the same rule: it renders <code>properties</code> into the published OpenAPI, and
+the compiler builds its schema by reading them back.</p>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
+<p><strong>In:</strong></p>
 <ul>
-<li><strong>No unsigned integer.</strong> Artifact version indexes and
-  <code>max_versions</code> must not be negative. A negative <code>max_versions</code>
-  is silently destructive: <code>Artifact.delete_old_versions()</code>
-  computes <code>sorted(indexes)[:-max]</code>, so <code>-1</code> deletes the oldest
-  version on every index add.</li>
-<li><strong>No bounded integer.</strong> The events <code>limit</code> has a documented
-  default of 100 and a cap of 1000; <code>offset</code> on blob reads and
-  upload truncate must be non-negative and, for truncate, within
-  the object.</li>
-<li><strong>No format-constrained string.</strong> MAC addresses (#534, since
-  fixed outside this plan), base64-encoded user data (#3269),
-  netblocks that must not overlap reserved ranges (#323).</li>
-<li><strong>No structured value types.</strong> Disk, network and video specs
-  are validated imperatively today (#528).</li>
+<li>An object branch in <code>_field()</code>, so a rendered <code>properties</code> block
+  compiles to a nested marshmallow schema.</li>
+<li>Structured type tokens for the three specs the API actually
+  publishes — diskspec, networkspec, videospec — in both their
+  single-object and array forms.</li>
+<li>The six declarations that carry them (enumerated in F2 below).</li>
+<li><a href="https://github.com/shakenfist/shakenfist/issues/528">#528</a>, which
+  since 2026-09-12 is also the tracker for what
+  <a href="https://github.com/shakenfist/shakenfist/issues/936">#936</a>
+  described. See F9: the issue's <em>text</em> describes different work, and
+  fixing that is part of this phase.</li>
+<li>Items 2 and 3 of
+  <a href="https://github.com/shakenfist/shakenfist/issues/4167">#4167</a> — the
+  nested half. Its top-level half was phase 6's.</li>
+<li>The nested half of
+  <a href="https://github.com/shakenfist/shakenfist/issues/3612">#3612</a>, the
+  mechanism issue: a wrong-typed value one level down is the same
+  defect as a wrong-typed value at the top, and phases 3 to 6 only
+  closed the top.</li>
+<li>Integer strictness (F8). A check-only field that accepts <code>1.5</code> as an
+  integer and hands the handler <code>1.5</code> is not a check.</li>
 </ul>
-<h2 id="reported-issues-this-plan-addresses">Reported issues this plan addresses<a class="headerlink" href="#reported-issues-this-plan-addresses" title="Permanent link">&para;</a></h2>
-<p>Found by scanning all 83 open issues. The core group is the
-reason for the plan; the error-contract group is the other half
-of "what does a caller see when they get it wrong", and it shares
-the same decorator chain.</p>
-<h3 id="core-declarative-validation">Core: declarative validation<a class="headerlink" href="#core-declarative-validation" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Issue</th>
-<th>Filed</th>
-<th>Summary</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/528">#528</a></td>
-<td>2020-11-11</td>
-<td><strong>Broaden declarative type/validity checking across all API endpoints.</strong> The parent issue; explicitly notes only ~4 endpoint files use <code>use_kwargs</code> today.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/936">#936</a></td>
-<td>2021-09-02</td>
-<td>Replace hand-rolled instance-create validation with a declarative schema. Video/disk/network specs are validated imperatively in <code>instance.py</code>. <strong>Closed 2026-09-12 as a duplicate of #528</strong>, which now carries this work; phase 7 is where it lands.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3612">#3612</a></td>
-<td>2026-08-03</td>
-<td>Body parameters merged into handler kwargs untyped; broad <code>except TypeError</code> returns interpreter messages. The mechanism description above.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3609">#3609</a></td>
-<td>2026-08-02</td>
-<td><code>GET /nodes/&lt;node&gt;/events</code> with a string <code>limit</code> returns a 400 containing a Python type error. The trigger.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/534">#534</a></td>
-<td>2020-11-12</td>
-<td>Validate MAC address <em>format</em> on interface create (uniqueness is already enforced). <strong>Closed 2026-09-12 by <a href="https://github.com/shakenfist/shakenfist/pull/4183">#4183</a></strong>, not by this plan — see the note below.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3269">#3269</a></td>
-<td>2026-06-13</td>
-<td>Enforce base64-encoded user data at the API instead of failing later on the hypervisor with a traceback.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/323">#323</a></td>
-<td>2020-09-26</td>
-<td>Reject virtual networks that overlap reserved ranges (e.g. the floating network).</td>
-</tr>
-</tbody>
-</table>
-<h3 id="error-contract-and-attribution">Error contract and attribution<a class="headerlink" href="#error-contract-and-attribution" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Issue</th>
-<th>Filed</th>
-<th>Summary</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3523">#3523</a></td>
-<td>2026-07-26</td>
-<td>A bare <code>KeyError</code> surfaces as a generic "Server error" whose traceback shows only wrapper frames, plus a content-free paired WARNING.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3371">#3371</a></td>
-<td>2026-07-11</td>
-<td><code>record_exception()</code> logs tracebacks only at DEBUG, so ~35k traceback lines/day never reach centralised logging.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3615">#3615</a></td>
-<td>2026-08-03</td>
-<td><code>log_request</code> assigns a string over the whole header dict when redacting Authorization, so every authenticated request logs no headers at all.</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3606">#3606</a></td>
-<td>2026-08-02</td>
-<td><code>JWT token has incorrect nonce</code> logged at ERROR with no client, namespace or endpoint context (40 events/14d on sfcbr).</td>
-</tr>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/2094">#2094</a></td>
-<td>2023-11-23</td>
-<td><code>DELETE .../route/&lt;addr&gt;</code> returns a bare 403 when the address is already unrouted; make it idempotent or friendlier.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="enabling">Enabling<a class="headerlink" href="#enabling" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Issue</th>
-<th>Filed</th>
-<th>Summary</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="https://github.com/shakenfist/shakenfist/issues/3616">#3616</a></td>
-<td>2026-08-03</td>
-<td>Add <code>external_api/base.py</code> to the mypy target list. The validation layer lands here; it should be type-checked.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="adjacent-related-deliberately-not-absorbed">Adjacent — related, deliberately not absorbed<a class="headerlink" href="#adjacent-related-deliberately-not-absorbed" title="Permanent link">&para;</a></h3>
+<p><strong>Out:</strong></p>
 <ul>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/1974">#1974</a> — pagination for listing endpoints. It needs exactly the bounded <code>limit</code>/<code>offset</code> parameter types this plan defines, and the events <code>limit</code> is a special case of it, but the query and response-shape work belongs to
-  <a href="../api-query-batching-roadmap/"><code>api-query-batching-roadmap.md</code></a>.
-  <strong>Coordinate on the parameter types; do not merge the plans.</strong></li>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/3271">#3271</a> — bare image shorthand silently shadows a local label. Input <em>interpretation</em> rather than input <em>validity</em>; the resolution-order fix is independent.</li>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/3373">#3373</a> — the mariadb gRPC client conflates "unavailable" with "not found". Same family (the wrong thing is surfaced to the caller) but a different layer, and already scoped elsewhere.</li>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/3308">#3308</a> — the ansible collection's networkspec parser makes every non-empty value truthy. A <em>consumer</em> of this contract, and a good end-to-end test of it, but fixed in the collection.</li>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/764">#764</a> and <a href="https://github.com/shakenfist/shakenfist/issues/121">#121</a> — validating fetched image content. Validation, but of downloaded bytes rather than API input. Out of scope.</li>
+<li><code>metadata</code> on <code>POST /instances</code>, and the <code>value</code> parameters of every
+  metadata endpoint. Their keys are the caller's and their values are
+  deliberately uninterpreted; <code>ARGTYPES['any']</code>'s own comment records
+  why. See F4.</li>
+<li><code>bound_claims</code> on the mapping-rule endpoints. Already completely
+  guarded by hand, better than a schema could be. See F3.</li>
+<li><a href="https://github.com/shakenfist/shakenfist/issues/4223">#4223</a>, the
+  null-reference lookup bug this phase's survey found. Filed, not
+  fixed here. See F7.</li>
+<li>The remaining <code>uefi</code> / <code>secure_boot</code> half of #4167. They are
+  <code>required=False</code> booleans, so phase 6's required-ness enforcement
+  does not reach them and no element schema contains them. #4167 stays
+  open carrying them.</li>
+<li>Response validation, which decision D7 put out of scope for the
+  whole plan.</li>
+<li>Making <code>InstancesEndpoint.post</code> declarative beyond its parameter
+  types. Roughly 130 of its lines interleave validation with blob,
+  label and artifact <em>resolution</em>, which no schema expresses. F7 of
+  the phase 6 plan said this and it is still true.</li>
 </ul>
+<h2 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h2>
+<p>The master plan's phase 7 row is accurate in every particular: <code>dict</code>
+does compile to <code>fields.Dict()</code>, <code>arrayofdict</code> does compile to
+<code>fields.List(fields.Dict())</code>, neither does carry a value schema, and
+the keys inside a diskspec, networkspec or videospec are unvalidated in
+every mode. Everything below is detail the row could not have had.</p>
+<p>The survey was run by sending requests, not by reading — phase 6's
+decision D36 and the lesson of phase 5's finding F5. A probe subclassed
+<code>RequiredSweepTestCase</code> from
+<code>shakenfist/tests/external_api/test_required_sweep.py</code>, which already
+carries a whole authenticated decorator stack and a working fixture,
+and drove roughly sixty malformed requests through it at the default
+<code>API_VALIDATION_MODE=enforce</code>. Every status quoted below was measured.
+The probe itself is in the appendix; it was not committed.</p>
+<h3 id="f1-the-outer-shape-is-checked-and-only-the-outer-shape">F1. The outer shape is checked, and only the outer shape<a class="headerlink" href="#f1-the-outer-shape-is-checked-and-only-the-outer-shape" title="Permanent link">&para;</a></h3>
+<p><code>fields.Dict()</code> and <code>fields.List()</code> do reject the wrong container, and
+the messages are already good:</p>
+<table>
+<thead>
+<tr>
+<th>Sent</th>
+<th>Answer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"disk": {"size": 8}</code></td>
+<td>400 <code>disk: Not a valid list.</code></td>
+</tr>
+<tr>
+<td><code>"disk": ["wombat"]</code></td>
+<td>400 <code>disk[0]: Not a valid mapping type.</code></td>
+</tr>
+<tr>
+<td><code>"video": [{"model": "vga"}]</code></td>
+<td>400 <code>video: Not a valid mapping type.</code></td>
+</tr>
+<tr>
+<td><code>"network": {"network_uuid": "..."}</code></td>
+<td>400 <code>network: Not a valid list.</code></td>
+</tr>
+<tr>
+<td><code>"side_channels": [5]</code></td>
+<td>400 <code>side_channels[0]: Not a valid string.</code></td>
+</tr>
+</tbody>
+</table>
+<p>That last row matters out of proportion to its size. <code>arrayofstring</code>
+renders <code>{'type': 'array', 'items': {'type': 'string'}}</code> and the
+existing <code>array</code> branch compiles the <code>items</code> fragment, so its elements
+<em>are</em> validated, with an indexed message naming the offending element.
+The machinery this phase needs already works; <code>arrayofdict</code> simply
+renders <code>{'items': {'type': 'object'}}</code>, and an object with no
+properties constrains nothing. The error shape a nested failure should
+produce is therefore already established rather than invented here.</p>
+<h3 id="f2-the-structured-population-is-six-declarations-not-a-class">F2. The structured population is six declarations, not a class<a class="headerlink" href="#f2-the-structured-population-is-six-declarations-not-a-class" title="Permanent link">&para;</a></h3>
+<p>Every <code>dict</code> and <code>arrayofdict</code> declaration in the tree:</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Parameter</th>
+<th>Token</th>
+<th>Disposition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /instances</code></td>
+<td><code>disk</code></td>
+<td><code>arrayofdict</code></td>
+<td>diskspec — <strong>in scope</strong></td>
+</tr>
+<tr>
+<td><code>POST /instances</code></td>
+<td><code>network</code></td>
+<td><code>arrayofdict</code></td>
+<td>networkspec — <strong>in scope</strong></td>
+</tr>
+<tr>
+<td><code>POST /instances</code></td>
+<td><code>video</code></td>
+<td><code>dict</code></td>
+<td>videospec — <strong>in scope</strong></td>
+</tr>
+<tr>
+<td><code>POST /instances/{ref}/interfaces</code></td>
+<td><code>network</code></td>
+<td><code>dict</code></td>
+<td>networkspec — <strong>in scope</strong></td>
+</tr>
+<tr>
+<td><code>POST /instances</code></td>
+<td><code>metadata</code></td>
+<td><code>dict</code></td>
+<td>free-form, out — see F4</td>
+</tr>
+<tr>
+<td><code>POST /auth/namespaces/{ns}/rules</code></td>
+<td><code>bound_claims</code></td>
+<td><code>dict</code></td>
+<td>guarded, out — see F3</td>
+</tr>
+<tr>
+<td><code>PUT /auth/namespaces/{ns}/rules/{name}</code></td>
+<td><code>bound_claims</code></td>
+<td><code>dict</code></td>
+<td>guarded, out — see F3</td>
+</tr>
+</tbody>
+</table>
+<p>Three shapes, four operations in scope. This is a much smaller phase
+than "teach the vocabulary to carry element schemas" suggests, and the
+smallness is the finding: the work is not a sweep, it is three schemas
+written carefully.</p>
+<p>All seven are already registered in <code>STRUCTURED_PARAMETERS</code>
+(<code>shakenfist/tests/external_api/test_openapi_spec.py:104</code>), whose
+completeness is derived from the published specification. Every entry
+this phase changes has to be updated there in the same commit or
+<code>test_every_published_structure_or_bound_is_registered</code> fails, which is
+the mechanism working as designed.</p>
+<h3 id="f3-bound_claims-is-already-guarded-and-better-than-a-schema-would-be">F3. <code>bound_claims</code> is already guarded, and better than a schema would be<a class="headerlink" href="#f3-bound_claims-is-already-guarded-and-better-than-a-schema-would-be" title="Permanent link">&para;</a></h3>
+<p>Every malformed matcher is refused, by hand, with a message that names
+the claim and the type:</p>
+<table>
+<thead>
+<tr>
+<th>Sent as the matcher for claim <code>sub</code></th>
+<th>Answer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>5</code></td>
+<td>400 <code>the matcher for claim "sub" must be a string or a list of strings, not a int</code></td>
+</tr>
+<tr>
+<td><code>{"eq": "someone"}</code></td>
+<td>400 <code>... not a dict</code></td>
+</tr>
+<tr>
+<td><code>true</code></td>
+<td>400 <code>... not a bool</code></td>
+</tr>
+<tr>
+<td><code>null</code></td>
+<td>400 <code>... not a NoneType</code></td>
+</tr>
+<tr>
+<td><code>[1, 2]</code></td>
+<td>400 <code>the matcher for claim "sub" must contain only non-empty strings</code></td>
+</tr>
+<tr>
+<td><code>["a", 5]</code></td>
+<td>400 same</td>
+</tr>
+<tr>
+<td><code>[["a"]]</code></td>
+<td>400 same</td>
+</tr>
+<tr>
+<td><code>{}</code> (the whole mapping)</td>
+<td>400 <code>a rule must bind at least one claim, otherwise it accepts every identity the issuer will ...</code></td>
+</tr>
+</tbody>
+</table>
+<p>This is exactly right, and it is right for a reason a schema cannot
+reproduce: <code>federation.claim_matches</code> (<code>shakenfist/federation.py:347</code>)
+matches a string against a string or a list of strings and returns
+<code>False</code> for everything else <em>silently</em>, so a rule written with a
+matcher of any other shape would be stored, would look like a grant,
+and would never match an identity. The API refusing it at write time is
+the only place that failure is visible. A <code>{"type": "object"}</code> with
+free-form keys and a value schema of "string or array of string" would
+say the same thing less precisely and would duplicate a guard whose
+messages are better. Leave it, and record why.</p>
+<p>It is also the proof of a thing worth stating plainly: the goal of this
+phase is not to replace hand-written guards with declarations. It is to
+stop the cases where there is no guard at all.</p>
+<h3 id="f4-metadata-is-unconstrained-on-purpose">F4. <code>metadata</code> is unconstrained on purpose<a class="headerlink" href="#f4-metadata-is-unconstrained-on-purpose" title="Permanent link">&para;</a></h3>
+<p><code>_validate_instance_metadata</code> (<code>instance.py:1526</code>) is key-dependent:
+<code>tags</code> must be a list, <code>affinity</code> must be a dict in one of two
+recognised shapes, and everything else may be any non-empty JSON value.
+The keys are the caller's. <code>ARGTYPES['any']</code>'s comment already records
+that sfcbr's k3s traffic stores both a dict and a list under one
+parameter. Nothing here is a phase 7 shape.</p>
+<h3 id="f5-eleven-nested-values-are-a-recorded-500-today">F5. Eleven nested values are a recorded 500 today<a class="headerlink" href="#f5-eleven-nested-values-are-a-recorded-500-today" title="Permanent link">&para;</a></h3>
+<p>Measured at <code>enforce</code>, every one writing an exception record and
+answering the bare <code>server error</code> phase 5 left behind:</p>
+<table>
+<thead>
+<tr>
+<th>Sent</th>
+<th>Where it lands</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>disk[].base</code> an int, a bool or a list</td>
+<td><code>AttributeError: 'int' object has no attribute 'lower'</code> in <code>util/general.py:noneish</code></td>
+</tr>
+<tr>
+<td><code>disk[].size</code> a non-numeric string or a dict</td>
+<td><code>int()</code> in <code>instance._safe_int_cast</code> (<code>instance.py:112</code>, from <code>:940</code>) — <code>ValueError</code> or <code>TypeError</code></td>
+</tr>
+<tr>
+<td><code>network[].network_uuid</code> an int, a dict or a bool</td>
+<td><code>AttributeError: 'int' object has no attribute 'replace'</code> in <code>util/general.py:valid_uuid4</code></td>
+</tr>
+<tr>
+<td><code>network[].address</code> an int or a list</td>
+<td><code>AttributeError</code> in <code>util_general.noneish</code>, from <code>external_api/instance.py:369</code></td>
+</tr>
+<tr>
+<td><code>network[].model</code> an int</td>
+<td>pydantic, building the <code>NetworkInterface</code></td>
+</tr>
+</tbody>
+</table>
+<p>Items 2 and 3 of #4167 are the first and third rows and are exactly as
+filed, eleven months on. The second, fourth and fifth rows are new —</p>
+<h1 id="4167-found-two-by-inspection-and-stopped-which-is-the-difference">4167 found two by inspection and stopped, which is the difference<a class="headerlink" href="#4167-found-two-by-inspection-and-stopped-which-is-the-difference" title="Permanent link">&para;</a></h1>
+<p>between reading and sending.</p>
+<p>Two of the attributions in that table were corrected by step 1's
+census, which read the code where the probe had only read the status.
+The <code>address</code> row is <code>noneish</code> above <code>is_in_range</code>, not <code>is_in_range</code>;
+and the <code>size</code> row is <code>_safe_int_cast</code>, not pydantic, because
+<code>InstanceData.disk_spec</code> is <code>list[dict[str, Any]]</code> and validates
+nothing. That second correction narrows the row: <code>"size": "20"</code> reaches
+<code>int("20")</code> and works, so only a <em>non-numeric</em> string faults, and
+typing <code>size</code> as an integer is therefore a narrowing rather than a
+straight fix. D50 records it as one.</p>
+<p>The interface hotplug endpoint answers the same way for the netdesc
+rows, from the same <code>_netdesc_safety_checks</code> and the same
+<code>NetworkInterface</code> construction.</p>
+<h3 id="f6-nine-more-are-accepted-in-silence">F6. Nine more are accepted in silence<a class="headerlink" href="#f6-nine-more-are-accepted-in-silence" title="Permanent link">&para;</a></h3>
+<p>These reach placement, which in the probe's single-node fixture means a
+507 — the same control the phase 6 sweep used, and proof the request
+got past every guard in the handler. On the interface hotplug endpoint,
+which has no scheduler in front of it, the equivalents answer <strong>200 and
+create the object</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Sent</th>
+<th>Documented as</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>disk[].size</code> <code>-5</code></td>
+<td>an integer size in GB</td>
+<td>accepted</td>
+</tr>
+<tr>
+<td><code>disk[].size</code> <code>null</code>, <code>8.5</code>, <code>true</code></td>
+<td>as above</td>
+<td>accepted</td>
+</tr>
+<tr>
+<td><code>disk[]</code> <code>{}</code> — no size, no base</td>
+<td>a spec with at least one</td>
+<td>accepted</td>
+</tr>
+<tr>
+<td><code>disk[].type</code> <code>"nonsense"</code> or <code>5</code></td>
+<td>enum: <code>disk</code>, <code>cdrom</code></td>
+<td>accepted</td>
+</tr>
+<tr>
+<td><code>disk[]</code> with an unknown key</td>
+<td>four documented keys</td>
+<td>accepted, key discarded</td>
+</tr>
+<tr>
+<td><code>network[].model</code> <code>"nonsense"</code></td>
+<td>enum of eight NIC models</td>
+<td>accepted</td>
+</tr>
+<tr>
+<td><code>network[].float</code> <code>"yes"</code></td>
+<td>a boolean</td>
+<td>accepted, and truthy, so it floats</td>
+</tr>
+<tr>
+<td><code>network[]</code> with an unknown key</td>
+<td>five documented keys</td>
+<td>accepted, key discarded</td>
+</tr>
+<tr>
+<td><code>video.model</code> / <code>.memory</code> / <code>.vdi</code>, any type at all</td>
+<td>enum / integer / enum</td>
+<td>accepted</td>
+</tr>
+</tbody>
+</table>
+<p>The videospec row is the starkest. <code>instance.py:833</code> checks that the
+keys <code>model</code> and <code>memory</code> are <em>present</em> and defaults <code>vdi</code>, and checks
+nothing else, so <code>{"model": 5, "memory": "lots", "vdi": 7}</code> is stored
+verbatim on the instance. It surfaces much later and somewhere else:
+<code>instance.py:1865</code> does <code>video.get('vdi', '').startswith('spice')</code>,
+which is an <code>AttributeError</code> on a non-string, in the console endpoint
+rather than in the create that accepted it.</p>
+<p>The unknown-key rows are the original complaint. #936 was filed as
+"silent failure on missing fields", and a caller who writes <code>siz</code>
+instead of <code>size</code> gets a default-sized disk and no indication that
+anything went wrong.</p>
+<h3 id="f7-a-null-object-reference-resolves-to-an-arbitrary-object">F7. A null object reference resolves to an arbitrary object<a class="headerlink" href="#f7-a-null-object-reference-resolves-to-an-arbitrary-object" title="Permanent link">&para;</a></h3>
+<p>The most serious thing the survey found, and it is not a vocabulary
+bug. <code>Network.from_db_by_ref(None, namespace)</code>
+(<code>shakenfist/network/network.py:189</code>) builds
+<code>ObjectFilterCriteria(..., name=object_ref)</code>, and a <code>None</code> name reads
+as <em>no name filter</em> rather than as a name of <code>None</code>. The query returns
+every active network in the namespace, and one match is returned as
+though the caller had named it.</p>
+<p><code>_netdesc_safety_checks</code> checks that <code>network_uuid</code> is <em>present</em>, not
+that it has a value, so it walks through. End to end:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>POST /instances/&lt;ref&gt;/interfaces  {"network": {"network_uuid": null}}
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>→ 200, and an interface is created on whichever network the namespace holds
+</code></pre></div>
+<p>With two networks in the namespace it raises <code>MultipleObjects</code> instead,
+surfacing as <code>400 multiple networks have the name "None"</code>, which is at
+least a refusal but is not a message anyone can act on.</p>
+<p>The same shape is in <code>Instance.from_db_by_ref</code> (<code>instance.py:452</code>) and
+<code>Artifact.from_db_by_ref</code> (<code>artifact.py:243</code>). Only the netdesc reaches
+it, because every other <code>from_db_by_ref</code> call site in
+<code>shakenfist/external_api/</code> is fed a route segment. The generic
+<code>baseobject.from_db_by_ref</code> (<code>baseobject.py:394</code>) is correct, comparing
+<code>o.name == object_ref</code> in Python where nothing has a name of <code>None</code>;
+the defect arrived when the name match was pushed down to SQL for index
+efficiency.</p>
+<p><strong>Filed as <a href="https://github.com/shakenfist/shakenfist/issues/4223">#4223</a>
+and deliberately not fixed here.</strong> A networkspec schema making
+<code>network_uuid</code> a required string closes the only path a caller can
+reach today, which would mask the defect at one call site and leave the
+function wrong for the next one. The issue was filed carrying the
+<code>automated-fix-attempted</code> label, which is the mitigation the master
+plan has now recommended through two phases of being overtaken; this is
+the first time it has been applied at filing rather than by the fixer.</p>
+<h3 id="f8-the-compiled-path-is-check-only-so-a-coercing-field-is-a-lie">F8. The compiled path is check-only, so a coercing field is a lie<a class="headerlink" href="#f8-the-compiled-path-is-check-only-so-a-coercing-field-is-a-lie" title="Permanent link">&para;</a></h3>
+<p><code>"cpus": 1.5</code> answers 500. It passes validation, because marshmallow's
+<code>fields.Integer</code> defaults to <code>strict=False</code> and <code>int(1.5)</code> succeeds,
+and then reaches <code>InstanceData</code> unchanged and raises pydantic
+<code>ValidationError</code>.</p>
+<p>The reason it reaches the handler <em>unchanged</em> is decision D14's
+check-only design: <code>validate_request</code> runs <code>schema.validate()</code> for its
+findings and discards the deserialised result, so the handler always
+sees the raw body. That is the right design — it is what keeps <code>warn</code>
+and <code>off</code> honest — but it makes a non-strict numeric field actively
+harmful rather than merely lax. The field says "this is a valid
+integer" about a value that is not one and that nothing downstream will
+convert.</p>
+<p>It is a scalar problem, not a structured one, but it is in scope for
+two reasons. It is one line and a test. And a nested integer — a
+diskspec <code>size</code>, a videospec <code>memory</code> — would inherit the same lie the
+moment this phase declares one, so fixing it afterwards would mean
+revisiting the schemas this phase writes.</p>
+<p><code>fields.Float</code> has the same flag and does not need it: a number field
+accepting an integer is not a lie, because JSON has one numeric type
+and every integer is a valid float.</p>
+<h3 id="f9-the-issue-this-phase-is-filed-under-describes-different-work">F9. The issue this phase is filed under describes different work<a class="headerlink" href="#f9-the-issue-this-phase-is-filed-under-describes-different-work" title="Permanent link">&para;</a></h3>
+<h1 id="936-replace-hand-rolled-instance-create-validation-with-a">936 — *"Replace hand-rolled instance-create validation with a<a class="headerlink" href="#936-replace-hand-rolled-instance-create-validation-with-a" title="Permanent link">&para;</a></h1>
+<p>declarative schema"*, whose residual reads "move to a declarative
+marshmallow schema for completeness and to catch the remaining gaps" —
+is this phase, precisely. It was closed as a duplicate of #528 on
+2026-09-12, in a cleanup sweep of the oldest open issues, and the phase
+6 plan recorded the move.</p>
+<h1 id="528s-own-text-though-is-broaden-declarative-typevalidity">528's own text, though, is *"Broaden declarative type/validity<a class="headerlink" href="#528s-own-text-though-is-broaden-declarative-typevalidity" title="Permanent link">&para;</a></h1>
+<p>checking across all API endpoints"<em>, whose residual reads "extend
+schema coverage across the remaining endpoints. Only ~4 endpoint files
+use <code>use_kwargs</code> typed schemas today". That is not this phase and it is
+not open work: phase 3 compiled </em>every* declaration in the tree into a
+schema and phase 4 turned rejection on, which covered every endpoint
+without extending <code>use_kwargs</code> to any of them. Read literally, #528 was
+closed by phase 4 and nobody noticed.</p>
+<p>So the surviving tracker's text describes finished work while the
+closed duplicate's text describes the work that remains. An
+implementing agent sent to #528 reads a description of <code>use_kwargs</code>
+coverage and either does the wrong thing or spends their first half
+hour working out that they should not.</p>
+<p><strong>Recommendation, as a step of this phase:</strong> rewrite #528's body to the
+element-schema scope, linking this plan, and note in it that the
+<code>use_kwargs</code> residual was overtaken by phase 4. Reopening #936 instead
+would undo a deliberate cleanup and leave two trackers again.</p>
+<h3 id="nothing-else-in-the-phase-description-was-wrong">Nothing else in the phase description was wrong<a class="headerlink" href="#nothing-else-in-the-phase-description-was-wrong" title="Permanent link">&para;</a></h3>
+<p>The claim that this is "a vocabulary change the size of phase 2" is the
+one thing the survey would soften. Phase 2 added eleven tokens and
+rewrote every body parameter's rendering. This adds five tokens, one
+compiler branch and six declarations. The care required is comparable;
+the surface area is not.</p>
+<h2 id="the-key-and-value-census-step-1">The key and value census (step 1)<a class="headerlink" href="#the-key-and-value-census-step-1" title="Permanent link">&para;</a></h2>
+<p>Five sources: the tree, the client repository, the CI suites, the
+documentation and the handlers. The full working is in the step 1
+report; what follows is the part later steps have to agree with.</p>
+<h2 id="diskspec">diskspec<a class="headerlink" href="#diskspec" title="Permanent link">&para;</a></h2>
+<p>Declared <code>arrayofdict</code> at <code>external_api/instance.py:518</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Documented?</th>
+<th>Sent by</th>
+<th>Types sent</th>
+<th>What the handler does with each type</th>
+<th>Enum candidate?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>size</code></td>
+<td>yes, "integer, GB" (<code>instances.md:71</code>)</td>
+<td>ansible <code>disks:</code>/<code>diskspecs:</code> (<code>sf_instance.py:390</code>, <code>:398</code>); CLI <code>-d</code> (<code>commandline/instance.py:452</code>) and <code>-D</code> (string, then int-coerced at <code>apiclient.py:669-670</code>); CI everywhere (<code>shakenfist_ci/base.py:1671</code> and ~150 sites)</td>
+<td><code>int</code>; <code>None</code> (ansible <code>diskspecs</code> default at <code>sf_instance.py:398</code>, and <code>apiclient.py:669</code>'s <code>and d['size']</code> guard deliberately leaves a falsy size uncoerced); <strong>absent</strong> (<code>test_ci_capacity_wait.py:242</code>'s sizeless cdrom, and <code>guest_ci_tests/test_boot.py:16</code> scenarios)</td>
+<td>int → <code>_safe_int_cast</code> (<code>instance.py:940</code>) into <code>block_devices</code>, then <code>util_image.create_cow</code>/<code>create_blank</code>. <code>None</code>/absent → explicitly skipped by <code>scheduler.py:471-473</code>, <code>scheduler.py:577</code>, <code>mariadb.disk_spec_virtual_gb</code> (<code>mariadb.py:24703-24705</code>) and <code>util_image.create_cow</code> (<code>image.py:103</code>, <code>:115</code>), meaning "the size of the base image". A numeric string reaches <code>int()</code> in all three and works; <code>InstanceData.disk_spec</code> is <code>list[dict[str, Any]]</code> (<code>schema/instance_data.py:67</code>) and coerces nothing</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>base</code></td>
+<td>yes, string (<code>instances.md:72</code>)</td>
+<td>ansible (<code>sf_instance.py:388</code>, <code>:396</code>); CLI <code>-d</code>/<code>-D</code>; CI (~110 sites)</td>
+<td><code>str</code> (a <code>sf://upload/...</code>, <code>sf://blob/...</code>, <code>sf://snapshot/...</code>, <code>label:...</code>, bare name, or plain URL); <code>None</code> (ansible <code>sf_instance.py:388</code>, <code>:396</code>, CLI <code>commandline/instance.py:453</code>)</td>
+<td><code>None</code>/<code>''</code>/<code>'none'</code> → <code>util_general.noneish</code> (<code>util/general.py:121</code>) true → <code>d['disk_base'] = None</code>, blank disk. A string is prefix-dispatched at <code>external_api/instance.py:691-780</code>. A non-string truthy value is the <code>AttributeError</code> in <code>noneish</code> that F5 row 1 measured</td>
+<td>no — free-form</td>
+</tr>
+<tr>
+<td><code>bus</code></td>
+<td>yes, enum (<code>instances.md:75</code>)</td>
+<td>ansible (always, as <code>None</code>, <code>sf_instance.py:389</code>, <code>:397</code>); CLI <code>-d</code> (always <code>None</code>, <code>commandline/instance.py:454</code>) and <code>-D</code>; CI: <code>guest_ci_tests/test_disks.py:38</code> sends <code>'nvme'</code>, <code>cluster_ci_tests/test_disk_specs.py:51</code> sends <code>'banana'</code> and asserts a 400</td>
+<td><code>str</code>; <code>None</code></td>
+<td><code>None</code>/absent → <code>config.DISK_BUS</code>, default <code>'virtio'</code> (<code>instance.py:80-84</code>, <code>config.py:1026</code>). A value not in <code>_get_disk_device</code>'s table 400s at <code>external_api/instance.py:682-687</code>. <code>'ide'</code> additionally 400s at <code>:822-825</code> (unreachable — the bus check fires first)</td>
+<td><strong>yes, already enforced</strong></td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td>yes, enum disk/cdrom (<code>instances.md:81</code>)</td>
+<td>ansible (always <code>'disk'</code>, <code>sf_instance.py:391</code>, <code>:399</code>; <code>'cdrom'</code> via <code>ansible_module_ci/004.yml:115</code>); CLI <code>-d</code> (always <code>'disk'</code>); CI ~115 <code>'disk'</code>, one <code>'cdrom'</code> (<code>cluster_ci_tests/test_disk_specs.py</code>)</td>
+<td><code>str</code></td>
+<td><code>_get_defaulted_disk_type</code> (<code>instance.py:105-109</code>) defaults to <code>'disk'</code> and passes the value through to <code>present_as</code>, which is rendered raw as <code>device='...'</code> in the domain XML (<code>libvirt.tmpl:50</code>). Only <code>'cdrom'</code> is special-cased, at <code>instance.py:1790</code> (raw image, no COW, <code>snapshot_ignores</code>) and <code>:1869</code> (virtio→usb bus swap). Anything else behaves as a disk in our code and is handed to libvirt</td>
+<td><strong>yes, unenforced</strong></td>
+</tr>
+<tr>
+<td><code>blob_uuid</code></td>
+<td>no</td>
+<td>nobody. Written <em>by</em> the handler (<code>external_api/instance.py:713</code>, <code>:739</code>, <code>:765</code>, <code>:768</code>) and read at <code>instance.py:935</code>, <code>:974</code>, <code>:1410</code></td>
+<td>n/a</td>
+<td>server-populated</td>
+<td>n/a</td>
+</tr>
+<tr>
+<td><code>disk_base</code></td>
+<td>no</td>
+<td>nobody. Written by the handler at <code>external_api/instance.py:690</code></td>
+<td>n/a</td>
+<td>server-populated</td>
+<td>n/a</td>
+</tr>
+</tbody>
+</table>
+<h3 id="undocumented-keys-that-some-caller-sends">Undocumented keys that some caller sends<a class="headerlink" href="#undocumented-keys-that-some-caller-sends" title="Permanent link">&para;</a></h3>
+<p><strong>None.</strong> The two undocumented keys the handler reads (<code>blob_uuid</code>,
+<code>disk_base</code>) are written by the handler itself and never arrive from a
+caller. The ansible module is aware of them — <code>SERVER_POPULATED_DISK_KEYS</code>
+(<code>sf_instance.py:211</code>) — but only to <em>strip them from the server's
+response</em> before a dirtiness comparison (<code>sf_instance.py:427-433</code>); the
+disks it sends are built fresh at <code>:384-413</code>. Nothing in the client or
+the CI ever posts a disk spec it read back from a <code>GET</code>.</p>
+<p>So <code>additionalProperties: false</code> on the diskspec breaks no first-party
+caller. It will break a human who typed <code>-D siz=20</code>, which is the
+intent.</p>
+<h3 id="documented-keys-nobody-sends">Documented keys nobody sends<a class="headerlink" href="#documented-keys-nobody-sends" title="Permanent link">&para;</a></h3>
+<h2 id="networkspec">networkspec<a class="headerlink" href="#networkspec" title="Permanent link">&para;</a></h2>
+<p>Declared <code>arrayofdict</code> at <code>external_api/instance.py:514</code> (create) and
+<code>dict</code> at <code>:1134</code> (interface hotplug). Both go through
+<code>_netdesc_safety_checks</code> (<code>:330</code>) and the create path also through
+<code>_netdesc_allocate_address</code> (<code>:387</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Documented?</th>
+<th>Sent by</th>
+<th>Types sent</th>
+<th>What the handler does with each type</th>
+<th>Enum candidate?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>network_uuid</code></td>
+<td>yes, "uuid" (<code>instances.md:99</code>)</td>
+<td>ansible <code>networks:</code> (<code>sf_instance.py:317</code>) and <code>networkspecs:</code>; CLI <code>-n</code>/<code>-f</code>/<code>-N</code> (<code>commandline/instance.py:472</code>, <code>:482</code>) and <code>add-interface</code> (<code>:997</code>, <code>:1008</code>); CI (~110 sites)</td>
+<td><code>str</code> — a UUID, or a <strong>name</strong>: <code>cluster_ci_tests/test_networking.py</code> sends <code>'barry_net'</code>, and <code>docs/user_guide/usage.md:255-262</code> documents naming a network</td>
+<td><code>Network.from_db_by_ref(value, namespace)</code> at <code>external_api/instance.py:358</code>. Presence is checked (<code>:334</code>), value is not — hence #4223. Normalised back to a UUID string at <code>:367</code>. A non-string is the <code>AttributeError</code> in <code>valid_uuid4</code> F5 row 3 measured</td>
+<td>no — D44 says <code>string</code>, no <code>uuid</code> format</td>
+</tr>
+<tr>
+<td><code>macaddress</code></td>
+<td>yes, colon-separated, either case (<code>instances.md:100</code>)</td>
+<td>CLI <code>-n</code>/<code>-f</code>/<code>add-interface</code> send it <strong>as <code>None</code> on every call</strong> (<code>commandline/instance.py:473</code>, <code>:483</code>, <code>:998</code>, <code>:1009</code>); CI sends real MACs (<code>guest_ci_tests/test_networking.py</code>, <code>smoke_ci_tests/test_agentops.py:300</code>) and one malformed one asserting a 400 (<code>guest_ci_tests/test_networking.py:135</code>)</td>
+<td><code>str</code>; <strong><code>None</code></strong></td>
+<td><code>if netdesc.get('macaddress'):</code> (<code>:346</code>) — falsy skips the check; <code>NetworkInterface.new</code> (<code>network/interface.py:143-145</code>) then generates one. A truthy value must match <code>util_network.valid_macaddr</code> (<code>util/network.py:431-440</code>, <code>fullmatch</code> against <code>_MACADDR_BODY</code>), else 400 at <code>:348-351</code></td>
+<td>pattern, already enforced</td>
+</tr>
+<tr>
+<td><code>address</code></td>
+<td>yes, string (<code>instances.md:103</code>)</td>
+<td>CLI <code>-n netuuid@addr</code> / <code>-f</code> / <code>-N address=...</code> (<code>commandline/instance.py:478</code>, <code>:487</code>, <code>:1003</code>); ansible <code>networkspecs:</code>; CI (<code>guest_ci_tests/test_cloudinit.py:85</code> sends <strong><code>None</code> explicitly</strong>; <code>cluster_ci_tests/test_networking.py:181</code> sends addresses)</td>
+<td><code>str</code> (an IPv4 address, <strong>or the literal <code>'none'</code></strong> — <code>docs/user_guide/usage.md:281-284</code>); <code>None</code></td>
+<td><code>noneish</code> twice: <code>:369</code> skips the range check, <code>:402-403</code> turns it into <code>None</code> meaning "this interface has no address" (the comment at <code>:398-401</code> credits OpenStack Kolla). Falsy/absent → <code>reserve_random_free_address</code> (<code>:406</code>). Otherwise <code>n.ipam.is_in_range</code> (<code>:372</code>), then <code>n.ipam.reserve</code> (<code>:417</code>)</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td>yes, enum of 8 (<code>instances.md:105</code>) / <strong>9 in <code>usage.md:288</code></strong></td>
+<td>ansible <code>networks:</code> sends <code>'virtio'</code> (<code>sf_instance.py:318</code>); CLI <code>-n</code>/<code>-f</code> send <code>'virtio'</code> (<code>commandline/instance.py:474</code>, <code>:484</code>, <code>:999</code>, <code>:1010</code>); CI omits it</td>
+<td><code>str</code></td>
+<td>defaulted to <code>'virtio'</code> when absent or falsy (<code>:430-431</code>), stored on the <code>NetworkInterface</code> (<code>network/interface.py:165</code>), rendered raw as <code>&lt;model type='{{net.model}}'/&gt;</code> (<code>libvirt.tmpl:139</code>). <strong>Nothing in <code>shakenfist/</code> restricts it</strong></td>
+<td><strong>yes, unenforced — see below</strong></td>
+</tr>
+<tr>
+<td><code>float</code></td>
+<td>yes, boolean (<code>instances.md:109</code>)</td>
+<td>ansible <code>networks:</code> sends <code>False</code> (<code>sf_instance.py:319</code>) and <code>networkspecs:</code> parses to a real bool (<code>sf_instance.py:329-333</code>); CLI <code>-f</code> sends <code>True</code> (<code>commandline/instance.py:475</code>), <code>-N float=...</code> parses <code>'true'</code>/<code>'True'</code> to a bool (<code>commandline/instance.py:325-329</code>); CI omits it</td>
+<td><code>bool</code></td>
+<td><code>validation.declared_boolean(netdesc.get('float'))</code> (<code>:472</code>) — marshmallow's own truthy and falsy sets, so <code>"yes"</code> floats and <code>"false"</code> does not. <strong>Corrected after review:</strong> this was <code>if 'float' in netdesc and netdesc['float']</code>, a bare truthiness test on the raw body, for which <code>"false"</code> is a non-empty string and therefore floats. The schema published the value as a boolean meaning False while the server inverted it</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>iface_uuid</code></td>
+<td>no</td>
+<td>nobody. Written by the handler at <code>external_api/instance.py:455</code>; read at <code>:1193</code>, <code>:1205</code> and <code>operations/node_inst_netdesc_op.py:391</code>, <code>:464</code></td>
+<td>n/a</td>
+<td>server-populated</td>
+<td>n/a</td>
+</tr>
+</tbody>
+</table>
+<h3 id="undocumented-keys-that-some-caller-sends_1">Undocumented keys that some caller sends<a class="headerlink" href="#undocumented-keys-that-some-caller-sends_1" title="Permanent link">&para;</a></h3>
+<p><strong>None.</strong> <code>iface_uuid</code> is written by <code>_netdesc_allocate_address</code> after
+every caller check has run, and it never appears in a response body a
+caller could echo (<code>Instance.external_view</code> carries <code>interfaces</code>, not
+netdescs — <code>instance.py:643-660</code>). <code>order</code> appears alongside netdesc
+keys only in a unit-test fixture
+(<code>tests/schema/operations/test_node_inst_netdesc_op.py:140</code>); the create
+handler passes order as a positional argument (<code>:901</code>), not as a key.</p>
+<p><code>additionalProperties: false</code> on the networkspec breaks no first-party
+caller.</p>
+<h3 id="documented-keys-nobody-sends_1">Documented keys nobody sends<a class="headerlink" href="#documented-keys-nobody-sends_1" title="Permanent link">&para;</a></h3>
+<p>None — all five are sent.</p>
+<h2 id="videospec">videospec<a class="headerlink" href="#videospec" title="Permanent link">&para;</a></h2>
+<p>Declared <code>dict</code> at <code>external_api/instance.py:535</code>. The handler's whole
+check is <code>external_api/instance.py:833-841</code>: default the entire spec if
+absent, else require the <em>presence</em> of <code>model</code> and <code>memory</code> and default
+<code>vdi</code> to <code>'spice'</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Documented?</th>
+<th>Sent by</th>
+<th>Types sent</th>
+<th>What the handler does with each type</th>
+<th>Enum candidate?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model</code></td>
+<td>yes, enum vga/cirrus/qxl (<code>instances.md:119</code>)</td>
+<td>CLI default <code>'cirrus'</code> (<code>commandline/instance.py:491</code>) and <code>--videospec model=...</code> (<strong>string</strong>, <code>:499</code>); CI <code>cluster_ci_tests/test_vdi_console_file.py:133</code> sends <code>'cirrus'</code></td>
+<td><code>str</code></td>
+<td>presence required (<code>:837-838</code>); value rendered raw into <code>&lt;model type='...'&gt;</code> (<code>instance.py:2153</code> → <code>libvirt.tmpl:206</code>). Nothing checks it</td>
+<td><strong>yes, unenforced</strong></td>
+</tr>
+<tr>
+<td><code>memory</code></td>
+<td>yes, "integer, KiB" (<code>instances.md:121</code>)</td>
+<td>CLI default <code>16384</code> (<strong>int</strong>, <code>commandline/instance.py:491</code>); CLI <code>--videospec memory=65536</code> (<strong>string</strong>, <code>:499</code> — the parser never coerces); CI sends <code>16384</code></td>
+<td><code>int</code> <strong>and <code>str</code></strong></td>
+<td>presence required (<code>:839-840</code>); rendered raw into <code>vram='{{video_memory}}'</code> (<code>instance.py:2154</code> → <code>libvirt.tmpl:206</code>), where jinja stringifies either type identically. Nothing coerces or validates</td>
+<td>no, but see below</td>
+</tr>
+<tr>
+<td><code>vdi</code></td>
+<td>yes, enum of 4 (<code>instances.md:123</code>)</td>
+<td>CLI <code>--videospec vdi=...</code> (string); CI <code>cluster_ci_tests/test_vdi_console_file.py:133</code> sends <code>'spiceconcurrent'</code></td>
+<td><code>str</code></td>
+<td>defaulted to <code>'spice'</code> if absent (<code>:840-841</code>); consumed in the five places listed above</td>
+<td><strong>yes, unenforced; docs are correct</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="undocumented-keys-that-some-caller-sends_2">Undocumented keys that some caller sends<a class="headerlink" href="#undocumented-keys-that-some-caller-sends_2" title="Permanent link">&para;</a></h3>
+<p><strong>None.</strong> The handler reads only <code>model</code>, <code>memory</code> and <code>vdi</code>; the whole
+dict is stored verbatim on the instance (<code>instance.py:614</code>,
+<code>schema/instance_data.py:95</code>, <code>video: dict[str, Any]</code>) and echoed in
+<code>external_view</code> (<code>instance.py:655</code>), so an unknown key is stored and
+returned but acted on nowhere.</p>
+<h3 id="documented-keys-nobody-sends_2">Documented keys nobody sends<a class="headerlink" href="#documented-keys-nobody-sends_2" title="Permanent link">&para;</a></h3>
+<p>None — all three are sent. Note that <code>apiclient.create_instance</code>'s
+<code>video</code> kwarg defaults to <code>None</code> (<code>apiclient.py:625</code>) and the body
+always carries <code>'video': video</code> (<code>apiclient.py:651</code>), so a raw
+<code>apiclient</code> caller who does not pass one sends <code>"video": null</code> and the
+handler's <code>if not video:</code> (<code>:833</code>) supplies the whole default. <strong>The
+videospec schema must tolerate a null for the parameter itself</strong>, which
+it does — <code>allow_none=True</code> at <code>validation.py:426</code>.</p>
+<h2 id="cross-cutting-findings">Cross-cutting findings<a class="headerlink" href="#cross-cutting-findings" title="Permanent link">&para;</a></h2>
+<h3 id="n1-five-documented-keys-are-routinely-sent-as-json-null">N1. Five documented keys are routinely sent as JSON <code>null</code><a class="headerlink" href="#n1-five-documented-keys-are-routinely-sent-as-json-null" title="Permanent link">&para;</a></h3>
+<p><code>disk[].base</code>, <code>disk[].bus</code>, <code>disk[].type</code>, <code>disk[].size</code>,
+<code>network[].macaddress</code>, <code>network[].address</code>. Every one of them is sent
+as <code>null</code> by the shipped CLI, the shipped collection, or the CI suite on
+a normal, working request, and every one has a handler branch that
+treats <code>null</code> as "not supplied".</p>
+<p>This is <em>already safe</em> by construction: <code>_field()</code> sets
+<code>allow_none=True</code> on every compiled field (<code>validation.py:426</code>) and the
+object branch recurses through <code>_field()</code>
+(<code>validation.py:504-506</code>), so nested fields inherit it. Step 3 needs to
+write no <code>x-nullable</code>; it needs only to <strong>not</strong> invent a nullability
+check of its own.</p>
+<p>It does however mean the <em>published</em> document will say
+<code>{"type": "string"}</code> about a property whose dominant value is <code>null</code>.
+That is the same compromise phase 3 already made at the top level (the
+module docstring at <code>validation.py:141-150</code> records it, citing
+<code>"source_url": null</code> and <code>"nvram_template": null</code>), so consistency
+argues for leaving it alone and saying so in a comment.</p>
+<h3 id="n2-f5s-attribution-for-networkaddress-looks-wrong">N2. F5's attribution for <code>network[].address</code> looks wrong<a class="headerlink" href="#n2-f5s-attribution-for-networkaddress-looks-wrong" title="Permanent link">&para;</a></h3>
+<p>The plan's F5 row 4 puts the 500 for a non-string <code>address</code> "inside
+<code>n.ipam.is_in_range</code>". Reading <code>external_api/instance.py:369</code>, the
+guard is
+<code>if netdesc.get('address') and not util_general.noneish(netdesc.get('address'))</code>
+— for <code>address: 5</code> or <code>address: [ ... ]</code>, <code>noneish</code> is reached first and
+raises <code>AttributeError: 'int' object has no attribute 'lower'</code>
+(<code>util/general.py:124</code>) before <code>is_in_range</code> is called. Same status,
+same recorded exception, different frame. Worth correcting in the plan
+so step 5's sweep asserts against the right thing if it ever pins a
+traceback.</p>
+<h3 id="n3-f5s-attribution-for-disksize-may-also-be-wrong">N3. F5's attribution for <code>disk[].size</code> may also be wrong<a class="headerlink" href="#n3-f5s-attribution-for-disksize-may-also-be-wrong" title="Permanent link">&para;</a></h3>
+<p>F5 row 2 says a string or dict <code>size</code> produces "pydantic
+<code>ValidationError</code> from <code>InstanceData</code> inside <code>Instance.new</code>".
+<code>InstanceData.disk_spec</code> is <code>list[dict[str, Any]]</code>
+(<code>schema/instance_data.py:67</code>) with no validator
+(<code>grep -n "validator" schema/instance_data.py</code> finds none), so it
+accepts both. The likelier frame is <code>int(disk['size'])</code> at
+<code>scheduler.py:473</code>/<code>:578</code>, which raises <code>ValueError</code> for <code>'banana'</code> and
+<code>TypeError</code> for a dict — and note that <code>int('20')</code> <em>succeeds</em>, so
+<strong><code>"size": "20"</code> very probably works end to end today</strong>. Step 5 should
+re-measure a numeric-string <code>size</code> specifically before D45's <code>integer</code>
+typing refuses it; if it does work, the narrowing is still fine (no
+first-party caller sends one, because <code>apiclient.py:669-670</code> coerces)
+but it belongs in the release note.</p>
+<h3 id="n4-the-sf_instance-ansible-module-sends-video-as-a-string">N4. The <code>sf_instance</code> ansible module sends <code>video</code> as a <em>string</em><a class="headerlink" href="#n4-the-sf_instance-ansible-module-sends-video-as-a-string" title="Permanent link">&para;</a></h3>
+<p><code>sf_instance.py</code>'s <code>video</code> parameter is <code>{'type': 'str'}</code>
+(argument_spec) and is passed straight through as a kwarg
+(<code>sf_instance.py:456-462</code>), which reaches <code>apiclient.py:651</code> as
+<code>'video': '&lt;some string&gt;'</code>. The parameter is declared <code>dict</code>, so
+<code>fields.Dict()</code> already refuses it at <code>enforce</code> — this is broken <em>today</em>,
+before phase 7, and phase 7 does not make it worse. Out of scope, but
+somebody should file it: the collection's <code>video</code> parameter cannot work.
+No in-tree playbook uses it (<code>ansible_module_ci/004.yml</code> does not), which
+is why nobody has noticed.</p>
+<p><strong>Filed after review as
+<a href="https://github.com/shakenfist/shakenfist/issues/4236">#4236</a>,</strong> carrying
+<code>automated-fix-attempted</code> from the moment it was filed. The phase's
+close-out audit did not catch that this paragraph had committed to
+filing it and that nothing had; the review did.</p>
+<h3 id="n5-configdisk_buss-description-is-wrong">N5. <code>config.DISK_BUS</code>'s description is wrong<a class="headerlink" href="#n5-configdisk_buss-description-is-wrong" title="Permanent link">&para;</a></h3>
+<p><code>config.py:1028-1031</code> says "One of virtio, scsi, usb, ide, etc. See
+libvirt docs for full list of options". <code>ide</code> 400s every create
+(<code>instance.py:99-100</code> → <code>external_api/instance.py:686</code>) and there is no
+"full list" — the supported set is the five keys of <code>bases</code>
+(<code>instance.py:92-98</code>). A one-line docstring fix; not this phase's, but
+it is the same defect class D43 exists to prevent, one layer down.</p>
+<hr />
 <h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
-<p>Resolved by phase 0. The measurements behind each are in
-<a href="../PLAN-api-input-validation-phase-00-decisions/"><code>PLAN-api-input-validation-phase-00-decisions.md</code></a>.</p>
-<p><strong>The central hypothesis held.</strong> 229 of 236 declared parameter
-names (97%) match a kwarg their handler actually accepts, and no
-declared type contradicts its signature default. The
-declarations are good enough to compile.</p>
-<ol>
-<li><strong>Library — webargs + marshmallow.</strong> All three candidates
-   (webargs, marshmallow, pydantic) are already pinned direct
-   dependencies, so this is a fit decision, not a dependency
-   one. webargs exists to parse Flask request arguments, is
-   already used at four sites, and does per-location parsing.
-   Pydantic models persisted state here; keep that boundary.</li>
-<li><strong>Compile the existing declarations,</strong> with a per-endpoint
-   override for cases a declaration cannot express. Authoring
-   254 schemas to replace declarations that are already correct
-   is make-work, and the four endpoints that hand-author schemas
-   today are exactly the ones whose documentation has drifted.</li>
-<li><strong>Validation runs at index 0 of <code>method_decorators</code></strong> —
-   verified empirically as the innermost position, so after
-   authentication and before every per-method decorator. webargs'
-   default 422 handling must be replaced so failures come out
-   through <code>sf_api.error</code>.</li>
-<li><strong>The error shape does not change:</strong>
-   <code>{"error": "&lt;parameter&gt;: &lt;reason&gt;", "status": 400}</code>. The
-   official client never parses the message, and only 11 test
-   assertions touch error text.</li>
-<li><strong>Warn-only ends when every remaining rejection is
-   intended</strong> — not after a fixed duration. The window must
-   cover a full functional CI run plus seven days of sfcbr.
-   Warn records carry the offending value's <em>type</em>, never its
-   value.</li>
-<li><strong>Query strings become an accepted fallback</strong> for parameters
-   declared <code>query</code>, with the JSON body still authoritative.
-   Additive and unbreakable: the client sends everything in the
-   body regardless of method.</li>
-<li><strong>Response validation is out of scope,</strong> not deferred. It
-   breaks working clients when wrong, and no issue asks for it.</li>
-<li><strong>A body key colliding with a path parameter is rejected.</strong>
-   <code>log_request</code> already dodges one instance of this by mapping
-   body <code>uuid</code> to <code>passed_uuid</code>, which shows it is a known
-   hazard rather than a feature.
-   <em>Amended by phase 3:</em> the decision stands, the supporting
-   evidence does not. <code>passed_uuid</code> occurs once in the tree — the
-   assignment itself — so no handler accepts it and the remap
-   dodges nothing; it converts a body <code>uuid</code> into a guaranteed 400
-   on every endpoint. The check also cannot live where D3 puts the
-   validator, because <code>log_request</code> runs first and has already
-   merged the body. See D11 and D12 in
-   <a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a>.</li>
-<li><strong>The type vocabulary gains tokens and an optional
-   constraints element</strong> (<code>unsignedinteger</code>, <code>macaddr</code>,
-   <code>base64</code>, <code>netblock</code>; <code>minimum</code> / <code>maximum</code> / <code>pattern</code>).
-   These are valid Swagger 2.0 keywords, so constraints render
-   into the published OpenAPI instead of being invisible to
-   callers the way the events <code>limit</code> cap was.</li>
-</ol>
-<h3 id="phases">Phases<a class="headerlink" href="#phases" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Phase</th>
-<th>Status</th>
-<th>Description</th>
-<th>Merged</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>0: Research and decisions</td>
-<td>Complete</td>
-<td>Measured declaration accuracy; chose webargs, compilation, chain placement, error shape, warn-only criterion. See <a href="../PLAN-api-input-validation-phase-00-decisions/">phase 0</a></td>
-<td><code>25e03b764</code> (#3620)</td>
-</tr>
-<tr>
-<td>1: Declaration audit</td>
-<td>Complete</td>
-<td>Correct 116 path-parameter locations from the route table, 2 invalid location tokens, 5 wrong names (incl. <code>sshkey</code>/<code>userdata</code> in the published OpenAPI) and 20 undeclared parameters; make <code>swagger_helper()</code> reject unknown locations; add a test that keeps declarations honest. A precondition for phase 3, and a documentation-correctness fix worth landing on its own merits. See <a href="../PLAN-api-input-validation-phase-01-declaration-audit/">phase 1</a></td>
-<td><code>25e03b764</code> (#3620)</td>
-</tr>
-<tr>
-<td>2: Type vocabulary</td>
-<td>Complete</td>
-<td>The specification-validation test (#3626) plus <code>schemes</code>/<code>securityDefinitions</code> template fixes; one schema-carrying body parameter per operation, taking the validation error count from 129 to zero; <code>unsignedinteger</code>/<code>macaddr</code>/<code>base64</code>/<code>netblock</code> tokens and the optional constraints element, rendered into the published OpenAPI so bounds like the events <code>limit</code> cap are visible to callers. See <a href="../PLAN-api-input-validation-phase-02-type-vocabulary/">phase 2</a></td>
-<td><code>ad759f25e</code> (#3666), <code>e9b28a65a</code> (#3685)</td>
-</tr>
-<tr>
-<td>3: Compile and warn</td>
-<td>Complete</td>
-<td>Code landed 2026-08-13 via #3726: declarations compiled to schemas, warn-only validation ahead of the handlers; four further decisions (D10-D13) recorded in the phase plan, including that an undeclared body key is <em>already</em> a 400 carrying interpreter text. The measurement window opened the same day and closed 2026-08-21 with every finding explained: 33 intended rejections, and two declaration bugs — the undeclared <code>namespace</code> of #3739 and fourteen metadata <code>value</code> declarations narrower than their handlers — which phase 4 fixes before it enforces. See <a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a></td>
-<td><code>3790aa487</code> (#3726), <code>0c7eacf48</code> (#3742), <code>6274cd924</code> (#3835)</td>
-</tr>
-<tr>
-<td>4: Enforce</td>
-<td>Complete</td>
-<td>Landed 2026-09-09 via <a href="https://github.com/shakenfist/shakenfist/pull/4141">#4141</a>. Fixed the two declaration bugs the warn window found (#3739's undeclared <code>namespace</code> on 55 handlers, and fourteen metadata <code>value</code> declarations), taught the derivation to see decorator-consumed kwargs so that class cannot recur, and turned on rejection with one malformed-input response shape that never contains interpreter text. The <code>get_args</code> fold moved to Future work as <a href="https://github.com/shakenfist/shakenfist/issues/4098">#4098</a>: read as "delete the four <code>@use_kwargs</code> decorators" it is a bug, because the compiled path is check-only and <code>@use_kwargs</code> is the only thing that gets a query parameter to a handler. See <a href="../PLAN-api-input-validation-phase-04-enforce/">phase 4</a></td>
-<td><code>1c203b111</code> (#4101), <code>f1040a23b</code> (#4141)</td>
-</tr>
-<tr>
-<td>5: Narrow the handlers</td>
-<td>Complete</td>
-<td>Deleted the <code>except TypeError</code> arm from <code>handle_authorization_exceptions</code> (D23): a handler-internal <code>TypeError</code> is now a recorded 500 like any other server fault, and under the <code>warn</code>/<code>off</code> rollback an undeclared body key gets that same 500 instead of the 400-with-interpreter-text it used to (D25). Fixed <a href="https://github.com/shakenfist/shakenfist/issues/3523">#3523</a> (a partial <code>cpuinfo</code> probe raising <code>KeyError</code> in <code>get_user_agent</code>) and removed two <code>requires_namespace_exist_if_specified</code> applications phase 4 found dead and never filed (F8). Grew a sixth step mid-phase, after step 2 found the generic 500 body still carried <code>repr(e)</code> (F11): every 500 response now answers a bare <code>server error</code> with no exception detail at all, for any cause (D31). Filed <a href="https://github.com/shakenfist/shakenfist/issues/4161">#4161</a> for the proxy path answering an unreachable node with a 500 (F9) — re-verifying the finding before filing found that an unrelated fix (<a href="https://github.com/shakenfist/shakenfist/issues/3743">#3743</a>) had already closed its largest instance, so the issue is scoped to what is still true rather than to the table as originally surveyed. See <a href="../PLAN-api-input-validation-phase-05-narrow/">phase 5</a></td>
-<td><code>b3de0a44f</code> (#4162)</td>
-</tr>
-<tr>
-<td>6: Required and scalar semantics</td>
-<td>Complete</td>
-<td>A sweep drove one real request per declaration through the whole decorator stack: of the 75 body/query declarations carrying <code>required=True</code> (every one had a handler default, so none was structurally required), 63 were already refused by a handler guard, 7 reached a null-hostile constructor and 500'd, and only 6 were accepted outright — of those, only <code>shared</code> on <code>POST /artifacts</code> was genuinely optional and moved to <code>required=False</code>; the other 5 committed a broken operation on omission (a queued agent command with a null path, a DNS record pointing at null) and kept <code>required=True</code> so enforcement turns that into a 400 instead. The <code>MISSING_REQUIRED</code> filter in <code>validate_request</code> was then deleted, so an omitted or explicit-null required parameter now answers 400 naming it, in every mode but <code>warn</code>/<code>off</code>. Separately, five of the nine semantic type tokens (<code>byte</code>, <code>a CIDR netblock</code>, <code>an IPv4 address as a string</code>, <code>url</code>, <code>uuid</code>) were given real validators keyed on the exact <code>format</code> string they publish, closing #3269 by rejecting non-base64 <code>user_data</code> at the API instead of on the hypervisor; <code>macaddr</code> already validated via PR #4183 and is unchanged. <code>POST /networks</code> gained a handler guard refusing a netblock that overlaps the deployed floating network, closing #323. #534 was closed outside this plan by #4183 before the phase started (see the note below). See <a href="../PLAN-api-input-validation-phase-06-required/">phase 6</a></td>
-<td><code>81aa9a7d0</code> (#4199)</td>
-</tr>
-<tr>
-<td>7: Structured parameter schemas</td>
-<td>Complete</td>
-<td>Taught the type vocabulary to describe what is <em>inside</em> a structure, and then described three. <code>_field()</code> gained an object branch, so a rendered <code>properties</code> block compiles to a nested marshmallow schema with <code>unknown=RAISE</code>, and <code>ARGTYPES</code> gained <code>diskspec</code>, <code>arrayofdiskspec</code>, <code>networkspec</code>, <code>arrayofnetworkspec</code> and <code>videospec</code>, built from three module-level constants so a shape declared twice cannot drift. The population was six <code>dict</code>/<code>arrayofdict</code> declarations across four operations, of which two stayed out and are documented as staying out: <code>metadata</code> is free-form by design and <code>bound_claims</code> is already guarded by hand with better messages than a schema could produce. Twenty-one nested values which were a recorded 500 or a silent acceptance now answer 400 naming the key and its index (<code>disk[1].size: Not a valid integer.</code>) — eleven that faulted, ten that were accepted — while five values which look like they should have been narrowed are deliberately still accepted, because a validator narrower than its handler is a breaking change wearing the clothes of a correctness fix. Three real narrowings were taken and written down: a <code>disk[].type</code> outside <code>disk</code>/<code>cdrom</code>, a caller-supplied <code>blob_uuid</code> inside a diskspec, and a diskspec asking for neither a <code>size</code> nor a <code>base</code>. Three of the new guards are handler guards rather than schema checks and so are not rolled back by <code>API_VALIDATION_MODE=warn</code>, deliberately: the size-or-base guard; a <code>networkspec</code> whose <code>network_uuid</code> is an explicit <code>null</code>, which previously resolved to an arbitrary network in the namespace and on interface hotplug answered 200 and created an interface on a network the caller never named; and a <code>videospec</code> whose <code>model</code> or <code>memory</code> is an explicit <code>null</code>, which the review found the phase had missed because those two checks were still presence tests, so a null was stored and rendered into the domain XML as <code>type='None'</code>. The review also found the phase had published <code>network[].float</code> as a boolean while reading it with a bare truthiness test on the raw body, so <code>"false"</code> floated the interface; <code>validation.declared_boolean()</code> is now the single reading, keyed on marshmallow's own truthy and falsy sets. That defect is the lookup function's rather than the vocabulary's, so it was filed as <a href="https://github.com/shakenfist/shakenfist/issues/4223">#4223</a> and left for its own fix, carrying <code>automated-fix-attempted</code> from the moment it was filed. Decision D46 was rewritten mid-phase (marshmallow's <code>strict=True</code> refuses a query parameter, which arrives as a string on the wire) and the rewrite silently invalidated three other statements reasoning from it, which four separate steps rediscovered independently — the phase's own recorded lesson, and the reason its close-out re-read the decisions as a set. See <a href="../PLAN-api-input-validation-phase-07-structured/">phase 7</a></td>
-<td>—</td>
-</tr>
-<tr>
-<td>8: Push audit</td>
-<td>Not started</td>
-<td>Runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in this plan against <code>develop</code>, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence</td>
-<td>—</td>
-</tr>
-</tbody>
-</table>
-<p>The <code>Merged</code> column records what put each phase on <code>develop</code>.
-These entries were reconstructed after the fact, because the plan
-did not record them as its phases landed; they come from the
-repository's merged pull request list cross-checked against the
-first-parent history, and not from a path-filtered <code>git log</code>,
-which cannot say which commits arrived inside a pull request.
-Every SHA is the merge commit of the pull request named beside
-it, so <code>&lt;sha&gt;^1..&lt;sha&gt;</code> is the whole of what that pull request
-put on <code>develop</code>. A phase which has not landed reads <code>—</code>.</p>
-<p>Phases 0 and 1 shared a pull request: #3620 carried the master
-plan, the phase 0 decisions and the declaration audit together.
-Phase 4 landed across two pull requests, #4101 and #4141.</p>
-<h3 id="where-the-tracked-issues-stand">Where the tracked issues stand<a class="headerlink" href="#where-the-tracked-issues-stand" title="Permanent link">&para;</a></h3>
-<p>Recorded here rather than by editing the tables above, so there
-is one place to maintain and the tables stay a record of what
-the plan was scoped against.</p>
-<p><strong>Closed since the plan was written:</strong> #3609 (the trigger,
-2026-08-07), #3626 (specification validation in CI), #3616
-(<code>base.py</code> under mypy), #3642 (variadic handlers in the audit),</p>
-<h1 id="3629-body-supplied-all-see-d6-below-3615-log_request">3629 (body-supplied <code>all</code>, see D6 below), #3615 (<code>log_request</code><a class="headerlink" href="#3629-body-supplied-all-see-d6-below-3615-log_request" title="Permanent link">&para;</a></h1>
-<p>discarding headers), #3739 (the ref decorators' undeclared
-<code>namespace</code>, closed when phase 4 merged 2026-09-09), #3606 (JWT
-rejection attribution, PR #3714, merged 2026-08-12), #3371
-(<code>record_exception</code> tracebacks only at DEBUG) and #3523 (a
-partial <code>cpuinfo</code> probe raising <code>KeyError</code> in <code>get_user_agent</code>,
-closed when phase 5 landed <code>dc6019d6a</code>).</p>
-<p><strong>Filed by phase 4, and deliberately not fixed by it:</strong> #4098 (the
-<code>get_args</code> fold, see the carried section below) and #4100 (an
-explicit <code>thin: false</code> on a snapshot request, which two comments
-in the tree wrongly blamed on this plan — the compiled path never
-injects, so no phase of this plan unblocks it; it needs a client
-release which omits the key).</p>
-<p><strong>Filed by phase 5, and deliberately not fixed by it:</strong> #4161 (the
-proxy path answering an unreachable node — or the local nodelock
-socket refusing a connection — with an unqualified 500, see F9 in
-<a href="../PLAN-api-input-validation-phase-05-narrow/">phase 5</a>). Filing
-it required re-verifying the finding first: an unrelated fix
-(#3743, merged 2026-08-21) had already closed the largest of the
-three classes the phase 5 survey recorded, so the issue is scoped
-to the two proxy call sites and the local-socket case that fix
-does not cover, not to the survey's original table.</p>
-<p><strong>Filed by phase 7's survey, and deliberately not fixed by it:</strong>
-<a href="https://github.com/shakenfist/shakenfist/issues/4223">#4223</a>, a null
-object reference resolving to an arbitrary object. The pushed-down
-<code>from_db_by_ref</code> implementations build
-<code>ObjectFilterCriteria(name=object_ref)</code>, and a <code>None</code> name reads as <em>no
-name filter</em> rather than as a name of <code>None</code>, so the query returns
-every active object in the namespace and one match is answered as
-though the caller had named it. The only path a caller can reach is the
-netdesc's <code>network_uuid</code>, which <code>_netdesc_safety_checks</code> tests for
-presence rather than for a value, and it was measured end to end:
-<code>POST /instances/{ref}/interfaces</code> with <code>{"network_uuid": null}</code>
-answers 200 and creates an interface. Phase 7 leaves it alone on
-purpose — its networkspec schema will make <code>network_uuid</code> a required
-string, which closes the reachable path while leaving the lookup
-function wrong for the next caller, and that is a mask rather than a
-fix. The issue was filed carrying <code>automated-fix-attempted</code>, which is
-the first time this plan has applied that label at filing rather than
-watching the fixer apply it afterwards.</p>
-<p><strong>Closed by phase 6</strong>, all three when
-<a href="https://github.com/shakenfist/shakenfist/pull/4199">#4199</a> merged
-on 2026-09-15: #3269 (<code>ec406a78a</code>, step 4's commit <code>Enforce the
-formats the API publishes.</code> — proven by
-<code>test_format_validation.py</code>'s <code>test_wrapped_base64_user_data_still_reaches_placement</code>,
-which drives an unencoded <code>user_data</code> through a real
-<code>POST /instances</code> and asserts the config drive decode at
-<code>instance.py:1930</code> is never reached), #323 (<code>c7a432886</code>, step 5's commit
-<code>Refuse an overlapping netblock.</code> — proven by
-<code>shakenfist/tests/external_api/test_network.py</code>'s overlap cases and
-the cluster CI case in
-<code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_networking.py</code>)
-and #4195 (<code>7cf4d47b3</code>, the review round's commit <code>Answer a bad blob
-and a bad mode honestly.</code> — proven by the
-<code>('InstanceAgentPutEndpoint', 'post', 'mode')</code> row of
-<code>test_required_sweep.py</code>, which expects the 406 the guard at
-<code>external_api/instance.py:1955</code> answers instead of the 500 that
-<code>int()</code> and <code>symbolic_to_numeric_permissions()</code> between them used
-to raise).</p>
-<p>Those three SHAs are the commits as they landed. An earlier
-revision of this paragraph named <code>03ea26514</code> and <code>d6b84b365</code> for
-the first two, which is what they were before #4199 was rebased
-onto <code>develop</code> shortly before it merged; those objects now exist
-in no clone but the one that wrote them. A SHA recorded while a
-branch is still in flight is a SHA a rebase can invalidate, so
-read them off the first-parent range after the merge, the way the
-<code>Merged</code> column above is built.</p>
-<p><strong>Closed by phase 7, and what closed each:</strong>
-<a href="https://github.com/shakenfist/shakenfist/issues/528">#528</a>, the
-parent, and since 2026-09-12 also the tracker for what #936
-described. Its scope was two things wearing one title. Its own text
-described extending <code>use_kwargs</code> coverage across the remaining
-endpoints, and that was overtaken by <strong>phase 4</strong> rather than by this
-phase: phase 3 compiled every declaration in the tree into a schema
-and phase 4 turned rejection on, which covered every endpoint without
-extending <code>use_kwargs</code> to any of them — read literally, #528 was
-closed on 2026-09-09 and nobody noticed. What remained was #936's
-scope, the element schemas, and that is phase 7. The issue's body was
-rewritten to the element-schema scope before it was closed, so that
-its history does not read as though the <code>use_kwargs</code> work were
-abandoned.</p>
-<p><strong>Closes on merge, in our judgement:</strong>
-<a href="https://github.com/shakenfist/shakenfist/issues/3612">#3612</a>, the
-mechanism issue. It named two things. The broad <code>except TypeError</code>
-returning interpreter messages was deleted by <strong>phase 5</strong> (D23), and
-phase 5 went further and made every 500 answer a bare <code>server error</code>
-carrying no exception detail at all (D31). Body parameters reaching
-handlers untyped was closed at the top level by phases 3 and 4 and at
-every nesting depth by phase 7, which is the half that was still open
-when this phase started: before it, <code>arrayofdict</code> compiled to
-<code>fields.List(fields.Dict())</code> with no value schema, so a wrong-typed
-value one level down was unvalidated in every mode. We think it can
-be closed outright rather than rescoped, because nothing of what it
-describes survives: the two structures still carrying no element
-schema (<code>metadata</code>, and the mapping rules' <code>bound_claims</code>) are
-uninterpreted by design and guarded by hand respectively, which is a
-recorded decision (D47) rather than a residual. It is left open until
-phase 7 merges rather than closed from a branch.</p>
-<p><strong>Still open and still owned by this plan:</strong> #2094.</p>
-<p><strong>Reduced but not closed by phase 7:</strong>
-<a href="https://github.com/shakenfist/shakenfist/issues/4167">#4167</a>.
-Its items 2 and 3 — a <code>disk[].base</code> set to a truthy non-string, and a
-<code>network[].network_uuid</code> set to a non-string, both an <code>AttributeError</code>
-in <code>shakenfist/util/general.py</code> and both a recorded 500 — now answer
-<code>400 disk[0].base: Not a valid string.</code> and
-<code>400 network[0].network_uuid: Not a valid string.</code>, pinned in
-<code>shakenfist/tests/external_api/test_nested_sweep.py</code>. Item 1 survives
-in part. Phase 6's required-ness enforcement closed its <code>cpus</code> and
-<code>memory</code> cases, which now answer <code>400 cpus: declared required but not
-supplied</code>; <code>uefi</code> and <code>secure_boot</code> are <code>required=False</code> booleans, so
-that enforcement does not reach them, and no element schema contains
-them. <code>POST /instances {"uefi": null}</code> was re-measured through the
-phase 7 sweep fixture at <code>enforce</code> during the phase 7 close-out and is
-still a recorded 500 answering <code>server error</code>. The issue was commented
-with that measurement rather than closed.</p>
-<p><strong>Phase 5 was overtaken from outside, as predicted.</strong> Three of
-its four attribution issues were picked up by the automated issue
-fixer rather than by this plan — #3615, #3606 and #3371, leaving
-only #3523. That is fine: they were genuinely independent of
-phases 3 and 4, which is why they were grouped rather than
-sequenced. It is recorded because it changed what phase 5 <em>is</em>.
-The forecast written here was that phase 5 would reduce to the
-single item which actually depends on phases 3 and 4 — narrowing
-<code>except TypeError</code> to JWT errors, which cannot happen until a
-validation layer is rejecting the malformed input that broad
-catch absorbs. That is now the fact rather than the forecast.
-Nobody picks that item up incidentally, because on its own it
-looks like a regression risk with no visible benefit.</p>
-<p><strong>Phase 6 was overtaken the same way, four hours after its plan
-merged.</strong> #534 was in phase 6's scope, named in a merged plan,
-and the automated issue fixer landed
-<a href="https://github.com/shakenfist/shakenfist/pull/4183">#4183</a> for
-it on 2026-09-12 — a complete fix, wider than the one phase 6
-briefed, covering both callers of <code>_netdesc_safety_checks</code> with a
-drift test and a guest CI case. Phase 6 step 5 is now #323 alone.
-Being overtaken is not a failure: the work is done and the issue
-is closed. It is recorded because two phases running have lost
-scope this way, and because the mitigation is cheap and was not
-used — an <code>automated-fix-attempted</code> label applied when the issue
-is filed reserves it against the fixer while a branch is in
-flight.</p>
-<p>It then happened a second time inside the same phase, and this
-time the two fixes collided. Phase 6's survey filed
-<a href="https://github.com/shakenfist/shakenfist/issues/4194">#4194</a> (a
-missing blob answered as a 500) and #4195 seventeen seconds apart
-on 2026-09-13, and the branch fixing both was already open. The
-fixer opened
-<a href="https://github.com/shakenfist/shakenfist/pull/4196">#4196</a> for</p>
-<h1 id="4194-an-hour-and-three-quarters-later-and-it-merged-at-0838">4194 an hour and three quarters later and it merged at 08:38,<a class="headerlink" href="#4194-an-hour-and-three-quarters-later-and-it-merged-at-0838" title="Permanent link">&para;</a></h1>
-<p>carrying the same one-line change this branch carried. Nothing
-broke: rebasing #4199 onto <code>develop</code> dropped the now-identical
-hunk silently, and the only trace is that the phase's
-<code>instance.py</code> diff shrank by two lines and that a second test for
-the same behaviour lives in <code>test_agent_operation_parameters.py</code>.
-It is recorded because it shows what the mitigation is worth and
-when it has to be applied. #4194 does carry
-<code>automated-fix-attempted</code> — the fixer adds it when it starts, an
-hour and three quarters after the useful moment — while #4195,
-seventeen seconds younger and never picked up, carries no label
-at all. The label only reserves an issue if it is there before
-the fixer looks.</p>
-<h3 id="carried-into-phase-2-from-phase-1">Carried into phase 2 from phase 1<a class="headerlink" href="#carried-into-phase-2-from-phase-1" title="Permanent link">&para;</a></h3>
-<p>Phase 1 corrected which location each parameter declares. It did
-not change how <code>swagger_helper()</code> renders them, which leaves two
-specification-validity problems for phase 2 to pick up. Measured
-with <code>openapi_spec_validator</code> over the flasgger output (raised by
-the ninth review round and re-measured independently): develop
-produced 363 validation errors and this branch 241 at that
-measurement, with the entire "path template variable has no
-corresponding path parameter" class eliminated by the location
-audit. The <code>security</code> fix below then landed in phase 1 after all,
-and a rebase brought in the eleven federated-authentication
-handlers, so the branch now measures <strong>129</strong>: 128 from the body
-class, 1 from <code>schemes</code>.</p>
-<ul>
-<li><strong>Multiple body parameters per operation — fixed in phase 2.</strong>
-  Swagger 2.0 permits at most one <code>in: body</code> parameter, and it
-  must carry a <code>schema</code> rather than <code>type</code>/<code>format</code>;
-  <code>swagger_helper()</code> emitted <code>type</code>/<code>format</code> for everything, and
-  32 of 132 operations declared more than one body parameter (23
-  before phase 1 — correcting <code>key</code> from query to body on the
-  metadata endpoints added most of the rest, and the
-  federated-authentication endpoints arrived with several more).
-  Phase 2's second PR collapses an operation's body declarations
-  into a single generated <code>schema</code> at render time — declarations
-  keep their one-tuple-per-parameter shape, which is what the
-  audit reads and phase 3 compiles. The raw-body marker renders
-  as a binary schema, and declaring raw and named body parameters
-  together is rejected at import time. This took the validation
-  error count from 128 to zero, so the ratchet in
-  <code>test_openapi_spec.py</code> became a plain validity assertion.</li>
-<li><strong><code>schemes</code> renders as a string, not an array — fixed in
-  phase 2.</strong> <code>API_ADVERTISED_HTTP_SCHEMES</code> is typed <code>str</code> in
-  <code>config.py</code> while its own description calls it a "space
-  separated list", and <code>app.py</code> fed it straight into the
-  specification's top-level <code>schemes</code> key, which OpenAPI 2.0
-  requires to be an array of strings. A default deployment
-  therefore published <code>schemes: 'http'</code>. Pre-existing —
-  introduced in <code>01ef8a563</code>, not by this plan. Phase 2's first PR
-  splits the documented space-separated contract at the consumer
-  in <code>app.py</code>, and added the <code>securityDefinitions</code> entry the
-  <code>security</code> requirements referenced without defining.</li>
-<li><strong><code>security</code> renders as an object, not an array — fixed in
-  phase 1 after all.</strong> <code>swagger_helper()</code> emitted
-  <code>'security': {'bearerAuth': []}</code>, but OpenAPI 2.0 requires
-  <code>security</code> to be an <em>array</em> of requirement objects. This was
-  deferred here twice on scoping grounds, and the eleventh review
-  round questioned deferring a one-line change inside a function
-  the phase was already editing (the <code>format</code>/duplicated-key
-  fixes were the same class of renderer tweak). It shipped:
-  <code>'security': [{'bearerAuth': []}]</code> eliminated the entire
-  126-error class, the largest remaining. Kept in this list as a
-  record of the scoping call rather than as work to do.</li>
-<li><strong>Nothing validates the generated specification — fixed in
-  phase 2.</strong> Phase 1's path-implies-required rule exists to
-  satisfy linters and client generators, and was checked by hand.
-  Phase 2's first PR added
-  <code>shakenfist/tests/external_api/test_openapi_spec.py</code>, which
-  runs <code>openapi_spec_validator</code> over flasgger's output and holds
-  the remaining invalidity to an exact ratchet count (128, all in
-  the body-parameter class above), failing on any new error class
-  or any change in the count
-  (<a href="https://github.com/shakenfist/shakenfist/issues/3626">#3626</a>).
-  The test landed before the renderer fix on purpose: it turns
-  "invalid in N places" into a number that moves.</li>
-</ul>
-<h3 id="carried-into-phase-3-from-phase-1">Carried into phase 3 from phase 1<a class="headerlink" href="#carried-into-phase-3-from-phase-1" title="Permanent link">&para;</a></h3>
-<p><strong>Generate the derivation's input space rather than sampling it.</strong>
-A precondition for compiling, in the same way the audit itself
-was.</p>
-<p>Phase 1 took five review rounds, and four of them found a defect
-in the machinery added by the round before: the Werkzeug
-converter regex, the <code>flask.request.args</code> fallback, the webargs
-scope leak, and an emptied parameter list. Every one was
-<code>declarations.py</code> misreading source, and every one was a shape
-that did not occur anywhere in the tree — so no amount of testing
-against the tree could have found them, and neither could
-mutating it, which only permutes shapes already present.</p>
-<p>While the declarations are documentation, a misread costs a wrong
-line in the published API. Once phase 3 compiles them, the same
-misread rejects a valid request: a <code>path</code> parameter derived as
-<code>body</code> produces a schema hunting the JSON body for a URL segment,
-and decision D6's query-string fallback is granted only to
-parameters derived as <code>query</code>. The cost of the defect class rises
-sharply exactly here, which is why this belongs to phase 3 and
-not earlier.</p>
-<p>The shape to build is a <strong>combinatorial generator</strong>, not a
-fuzzer. Enumerate the axes and assert the derivation recovers
-what the source was constructed to mean:</p>
-<table>
-<thead>
-<tr>
-<th>Axis</th>
-<th>Values</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Route</td>
-<td>absent, <code>&lt;x&gt;</code>, <code>&lt;path:x&gt;</code>, <code>&lt;int(min=1):x&gt;</code>, non-literal</td>
-</tr>
-<tr>
-<td>webargs</td>
-<td>none, <code>get_args</code> on the class, on the module, inline dict, <code>location='json'</code></td>
-</tr>
-<tr>
-<td><code>request.args</code></td>
-<td>absent, <code>.get()</code>, subscript, on a non-request object</td>
-</tr>
-<tr>
-<td>Declaration</td>
-<td>well-formed, wrong arity, non-literal name, raw-body sentinel</td>
-</tr>
-</tbody>
-</table>
-<p>A few dozen cases, deterministic, well under a second. The oracle
-is free because the source is constructed knowing where the
-parameter comes from, which is what makes this different from
-mutating declarations in the tree: <code>audit()</code> derives the truth
-and compares, so flipping a declared location and asserting drift
-tests the comparison, not the derivation. Every real defect was
-on the other side of that comparison.</p>
-<p>No new dependency. <code>hypothesis</code> is not in the project, and
-randomness buys nothing over enumerating a space this small —
-the value is in covering the axes, not in sampling them.</p>
-<p><code>tools/check-api-declaration-guards.sh</code> stays as it is. It
-mutates the real tree to prove the <em>guards</em> fire, which is a
-different question from whether the <em>derivation</em> is right, and
-the two are complementary.</p>
-<p><strong>D6's query-string fallback shipped early, at three sites.</strong>
-<a href="https://github.com/shakenfist/shakenfist/issues/3629">Issue #3629</a>:
-<code>all</code> on the outstanding-operations endpoints was bound with
-<code>@use_kwargs(get_args, location='query')</code>, and webargs finishes
-with <code>kwargs.update(parsed_args)</code>, so the <code>load_default=False</code>
-from an absent query string overwrote the <code>all=True</code> that
-<code>log_request</code> merged in from the JSON body. The shipped client
-only ever sends a body, so the parameter never worked through
+<p>Numbering continues from phase 6, which ended at D38.</p>
+<p><strong>D39. Structured shapes are new type tokens, not a new tuple
+element.</strong> A declaration stays five or six elements. <code>ARGTYPES</code> grows
+<code>diskspec</code>, <code>arrayofdiskspec</code>, <code>networkspec</code>, <code>arrayofnetworkspec</code> and
+<code>videospec</code>, each rendering a complete JSON Schema object fragment with
+<code>properties</code>.</p>
+<p>The alternative — a seventh element carrying a properties dict at each
+declaration site — was rejected because it puts the same schema in two
+places the moment a shape is used twice, and networkspec already is.
+More importantly it breaks the module's stated design rule: the
+compiler reads the <em>rendered specification</em>, so a shape that is not in
+<code>ARGTYPES</code> is a shape the published OpenAPI and the enforced check can
+disagree about. <code>swagger_helper</code> already deep-copies <code>ARGTYPES[token]</code>
+for exactly this family of reasons (<code>base.py:688</code>), and the array
+tokens already nest an <code>items</code> dict through that copy, so nothing about
+the rendering path needs to change.</p>
+<p><strong>D40. Shapes render inline, from one shared Python constant.</strong> No
+OpenAPI <code>definitions</code> section and no <code>$ref</code>. The five tokens are built
+in <code>base.py</code> from three module-level constants, so networkspec's single
+and array forms cannot drift, but each renders its properties inline
+into the operation that declares it. <code>$ref</code> would be tidier in the
+published document and would require teaching both the renderer and the
+compiler to resolve references, for two operations that share a shape.</p>
+<p><strong>D41. Unknown keys are refused.</strong> The schemas publish
+<code>additionalProperties: false</code> and compile to marshmallow schemas with
+<code>unknown=RAISE</code>.</p>
+<p>This is the decision most likely to be argued with, and it is the one
+that makes the phase worth doing. A silently discarded <code>siz</code> key is the
+original complaint of #936, and a validation layer that types the keys
+it knows while ignoring the ones it does not has fixed the smaller half
+of the problem. But it is also the only change here that can break a
+caller who is doing something that works today, so it is conditional on
+step 1: if the key census finds any caller sending an undocumented key
+that the handler acts on, that key is documented and typed rather than
+refused; if it finds one the handler ignores, the decision is re-argued
+in writing before step 3 writes the schemas.</p>
+<p><strong>D42. Every existing handler guard stays.</strong> Not one of the checks in
+<code>_netdesc_safety_checks</code>, the disk-bus check, the IDE refusal or the
+videospec presence checks is deleted, even where a schema now subsumes
 it.</p>
-<p>This was predicted here to close with phase 3, "or sooner". It
-closed sooner, in <code>0de6c3b5c</code> (2026-08-09), and phase 3 inherits
-the mechanism rather than choosing one:</p>
+<p>This is phase 6's D34 in a new setting. <code>warn</code> and <code>off</code> are rollbacks:
+an operator who turns validation off because this phase broke their
+fleet must get the behaviour they had before it, not a newly
+unguarded API. The schemas are strictly additive. The cost is
+duplicated checking on the enforce path, which is cheap and which the
+tests make visible rather than hiding.</p>
+<p><strong>D43. An <code>enum</code> is published only where the server refuses outside
+it. Three enums, not six</strong> — corrected by the census, which is what it
+was for.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What the code accepts</th>
+<th>Published?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>disk[].bus</code></td>
+<td><code>sata, scsi, usb, virtio, nvme</code>, the <code>bases</code> dict at <code>instance.py:92</code></td>
+<td><strong>yes</strong> — already enforced, docs agree</td>
+</tr>
+<tr>
+<td><code>video.vdi</code></td>
+<td><code>vnc, spice, spiceconcurrent, spicedebug</code> (<code>instance.py:1715</code>, <code>:2161</code>, <code>libvirt.tmpl:156</code>)</td>
+<td><strong>yes</strong> — the one case where publishing genuinely is the enforcement</td>
+</tr>
+<tr>
+<td><code>disk[].type</code></td>
+<td>any string; only <code>cdrom</code> is special-cased (<code>instance.py:1790</code>, <code>:1869</code>)</td>
+<td><strong>yes, as a narrowing</strong> — see D50</td>
+</tr>
+<tr>
+<td><code>network[].model</code></td>
+<td>any string, rendered raw at <code>libvirt.tmpl:139</code></td>
+<td><strong>no</strong></td>
+</tr>
+<tr>
+<td><code>video.model</code></td>
+<td>any string, rendered raw at <code>libvirt.tmpl:206</code></td>
+<td><strong>no</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The two <code>model</code> keys were the plan's own named risk and the census says
+the risk is real. Both are rendered into the domain XML with nothing
+between, so the server's true vocabulary is the hypervisor's qemu
+build, which varies by node and by release and which this API cannot
+know. <code>usage.md:288</code> documents <code>ne2k_isa</code> and <code>instances.md:105</code> does
+not list it; two documentation pages disagreeing is itself proof that
+neither is a specification. Both are typed <code>string</code> with a description
+naming the common values and no <code>enum</code>. If enforcement is ever wanted
+it belongs in a hypervisor capability check, not in a request schema.</p>
+<p><code>network[].macaddress</code> keeps the pattern #4183 already enforces, which
+is not an enum and is unchanged by this phase.</p>
+<p><strong>D44. <code>network_uuid</code> is required inside the netdesc schema, typed
+<code>string</code>, with no <code>uuid</code> format — and <code>required</code> there means present
+<em>and not null</em>.</strong> Required because <code>_netdesc_safety_checks</code> already
+refuses a netdesc without it. <code>string</code> because a non-string is finding
+F5's third row. No <code>uuid</code> format, because the parameter accepts a
+network <em>name</em> as well as a UUID (<code>usage.md:255</code> documents naming one,
+and <code>cluster_ci_tests/test_networking.py</code> sends <code>'barry_net'</code>), and
+phase 6's rule that a validator must be no narrower than the handler
+applies.</p>
+<p>The census corrected this decision's mechanism. Typing the property was
+not going to close F7's path: every compiled field is <code>allow_none=True</code>
+(<code>validation.py:382</code>) and the object branch recurses through the same
+<code>_field()</code>, so <code>{"network_uuid": null}</code> would satisfy a required string
+and still reach <code>from_db_by_ref(None, ns)</code>.</p>
+<p>The answer is not <code>allow_none=False</code>, which would break a
+module-wide invariant that exists for a good reason — an optional
+declared parameter legitimately arrives as <code>null</code>, and the shipped
+client sends five of them on every instance create (census finding N1).
+It is that <strong><code>required</code> inside an object fragment carries the same
+meaning phase 6 gave it at the top level</strong>: present, and not an
+explicit <code>null</code>. <code>validate_request</code> already applies exactly that rule
+to <code>compiled.required_names</code> at <code>validation.py:838</code>, with a comment
+explaining that a caller who sent <code>{"key": null}</code> should get the same
+answer as one who sent no key at all, because it is one fact from the
+handler's side. Applying it one level down is that rule, not a new one.</p>
+<p>This closes the netdesc path. It does <strong>not</strong> close
+<a href="https://github.com/shakenfist/shakenfist/issues/4223">#4223</a>, which
+stays open and keeps its own fix: the lookup function is still wrong
+for the next caller who reaches it by another route.</p>
+<p><strong>D45. <code>size</code>-or-<code>base</code> stays a handler guard, and gains one.</strong> The
+schema types <code>size</code> as a non-negative integer and <code>base</code> as a string;
+it cannot express "at least one of these two", and Swagger 2.0 has no
+<code>anyOf</code>. Today neither is required and <code>disk: [{}]</code> is accepted, which
+is a bug (F6). The handler gets an explicit guard for it in the same
+step, next to the existing <code>instance must specify at least one disk</code>.</p>
+<p>The census confirmed <code>minimum: 0</code> rather than <code>minimum: 1</code>, from four
+code paths and an in-tree test. A sizeless or <code>None</code>-sized disk means
+"the size of the base image" — <code>scheduler.py:471</code>, <code>scheduler.py:577</code>,
+<code>mariadb.disk_spec_virtual_gb</code> (<code>mariadb.py:24703</code>) and
+<code>util_image.create_cow</code> (<code>image.py:103</code>) all skip it explicitly, and
+<code>test_ci_capacity_wait.py:242</code> relies on a sizeless cdrom. <code>size: 0</code> is
+behaviourally identical to the documented <code>None</code>, so <code>minimum: 1</code> would
+refuse something the documentation already shows working. A <em>negative</em>
+size genuinely corrupts the capacity ledger (<code>scheduler.py:473</code>,
+<code>mariadb.py:24710</code>), which is what the bound is for.</p>
+<p><code>size</code> must also stay nullable: the ansible module sends
+<code>'size': None</code> on its <code>diskspecs:</code> path (<code>sf_instance.py:398</code>) and
+<code>apiclient.py:669</code>'s <code>and d['size']</code> guard deliberately leaves a falsy
+size uncoerced.</p>
+<p><strong>D46. An integer field refuses a fractional number</strong> — at every
+nesting depth, bound to the <code>_SCALARS</code> mapping so a future branch of
+<code>_field()</code> cannot forget it. F8 is the argument: under a check-only
+design, a field that accepts <code>1.5</code> as an integer and hands the handler
+<code>1.5</code> has validated nothing and has told the caller it did.</p>
+<p><strong>This is deliberately not marshmallow's <code>strict=True</code>, which this
+decision originally asked for and which cannot be used.</strong> <code>strict=True</code>
+refuses anything that is not already a Python <code>int</code>, and two kinds of
+caller legitimately send something else:</p>
 <ul>
-<li><code>base.py</code> registers a <strong><code>json_or_query</code> webargs location
-  loader</strong> which merges <code>req.args</code> and the JSON body with the
-  body authoritative, then drops keys the schema does not name
-  (mirroring webargs' <code>unknown=EXCLUDE</code> default for the query
-  location). The instance, artifact and network
-  outstanding-operations endpoints are bound to it.</li>
-<li><strong>A <code>('query', 'json')</code> tuple location was tried and
-  rejected.</strong> webargs keys validation failures by location, and
-  a tuple key is not JSON-serialisable, so a 422 becomes a 500.
-  Phase 3 must not re-derive this: the custom loader is the
-  supported shape.</li>
-<li><code>declarations.py</code> derives a schema bound to <code>json_or_query</code>
-  as a <strong><code>query</code></strong> location, so the published declaration is
-  unchanged and phase 1's audit still holds.</li>
+<li><strong>A query parameter is a string on the wire.</strong> <code>base.py:1907</code> hands
+  <code>flask.request.args.to_dict()</code> to <code>check()</code>, so <code>offset=10</code> arrives
+  as <code>'10'</code>. Every integer query parameter in the tree would answer
+  <code>400 ... Not a valid integer.</code> on a request the server has always
+  served. This is not a hypothetical: applying the decision literally
+  failed <code>test_blob_data_bounds</code> on the first run.</li>
+<li><strong>A body integer sent as a JSON string reaches a handler that
+  coerces it.</strong> <code>{"cpus": "8"}</code> works today because pydantic's lax mode
+  converts it, so refusing it would be a validator narrower than its
+  handler — the breaking change dressed as a correctness fix that phase
+  6's width rule exists to stop.</li>
 </ul>
-<p>Phase 3 therefore generalises an existing, tested loader to
-every parameter derived <code>query</code>, rather than introducing a
-second precedence rule alongside it. See
-<a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a>.</p>
-<h3 id="carried-into-phase-4-from-phase-3">Carried into phase 4 from phase 3<a class="headerlink" href="#carried-into-phase-4-from-phase-3" title="Permanent link">&para;</a></h3>
-<p>The measurement window found two declaration bugs, and phase 4
-fixes both before it enforces. Their detail is in
-<a href="../PLAN-api-input-validation-phase-04-enforce/">phase 4</a>; what
-belongs here is the one item phase 4 declined.</p>
-<ul>
-<li><strong>The <code>get_args</code> fold is deferred, and this plan's description
-  of it was wrong.</strong> Phase 4's line above used to read "fold the
-  hand-authored <code>get_args</code> schemas into the compiled path".
-  Read as "delete the four <code>@use_kwargs</code> decorators", that is a
-  defect rather than a refactor: <code>validation.check()</code> returns
-  findings and <code>validate_request</code> calls through, so the compiled
-  path never coerces or injects anything, and <code>log_request</code>
-  merges only the JSON body -- nothing merges
-  <code>flask.request.args</code>. <code>@use_kwargs</code> is therefore the sole
-  mechanism by which a query-string parameter reaches a handler.
-  Removing it from <code>blob.py</code> would silently revert <code>offset</code> and
-  <code>limit</code> to their signature defaults, reading a whole blob where
-  the caller asked for a range.</li>
-</ul>
-<p>The defensible reading is to keep <code>@use_kwargs</code> and generate
-  its schema from the same declaration list <code>swagger_helper()</code>
-  receives, which removes the second source of truth D2 objected
-  to. That needs signature defaults at runtime and moves
-  <code>blob.py</code>'s hand-rolled negative-offset check into a field,
-  changing an error message -- a second request-visible change in
-  the phase that flips enforcement. It is tracked as
-  <a href="https://github.com/shakenfist/shakenfist/issues/4098">#4098</a>
-  and remains a candidate for a later phase. Phase 6 did not
-  take it: that phase corrects declarations and enforces them,
-  and deriving the schema from signature defaults is a change to
-  where declarations come from. Enforcement does not depend on
-  it: the compiled check runs first, so the duplication is
-  inert.</p>
-<h2 id="open-questions-for-phase-0">Open questions for phase 0<a class="headerlink" href="#open-questions-for-phase-0" title="Permanent link">&para;</a></h2>
-<p>All answered above; retained as the record of what phase 0
-was asked to decide.</p>
+<p>So the check is written against the defect rather than against the
+Python type: <strong>a finite float with a fractional part is refused, and
+everything <code>int()</code> converts faithfully is left alone.</strong> An integral
+float such as <code>8.0</code> is accepted for exactly the reason <code>fields.Float</code>
+is left alone — JSON has one numeric type, so <code>8.0</code> and <code>8</code> are the
+same JSON number and reading one as the integer 8 invents nothing.
+Infinity falls through to the base class, whose "Number too large."
+message is better than anything this would write.</p>
+<p><code>fields.Float</code> is unchanged, for the reason F8 records.</p>
+<p><strong>D47. <code>metadata</code> and <code>bound_claims</code> get no element schema</strong>, for the
+reasons in F3 and F4, recorded in comments beside their declarations so
+the next reader does not re-derive them.</p>
+<p><strong>D48. A nested failure names its path.</strong> <code>disk[0].size</code>, not <code>disk</code>.
+The <code>arrayofstring</code> behaviour in F1 already produces <code>side_channels[0]</code>
+and sets the expectation; marshmallow's nested errors arrive as a
+nested dict and <code>_schema_findings</code> has to flatten them. A finding that
+names only the top-level parameter would make a diskspec list of six
+unusable to debug.</p>
+<p>Step 3b found the limit of this, and it is worth recording rather than
+fixing. "One fact, one message" now holds <em>within</em> a nesting level but
+not across them: an omitted required parameter at the top level answers
+reason <code>missing-required</code> with <code>declared required but not supplied</code>,
+while an omitted or null required <em>property</em> answers reason
+<code>type-mismatch</code> with <code>Missing data for required field.</code> Rewording the
+nested detail to match would have a <code>type-mismatch</code> finding speaking in
+a reason code it is not counted under, which trades a cosmetic
+inconsistency for a telemetry one. Left alone deliberately.</p>
+<p>Step 4 found a regression this decision's machinery caused, now fixed:
+wrapping a spec in <code>fields.Nested</code> made a non-mapping element answer
+<code>network[0]._schema: Invalid input type.</code>, leaking marshmallow's
+internal sentinel into a caller-facing message where F1 had already
+blessed <code>network[0]: Not a valid mapping type.</code> as good. The flattener
+collapses the schema-level key onto the container's own name, and the
+two pre-existing tests asserting that string pass unchanged — which is
+the evidence the case did not move, rather than a new assertion saying
+it did not.</p>
+<p><strong>D49. <code>video.memory</code> is typed <code>integer</code>. There is no ordering
+obligation</strong> — the original text of this decision said there was, and
+it was wrong; see the second amendment. Corrected text follows.
+The census found that the documented invocation in
+<code>docs/user_guide/consoles.md:95</code> —
+<code>--videospec model=qxl,memory=65536,vdi=spiceconcurrent</code> — puts the
+<em>string</em> <code>"65536"</code> on the wire, because the CLI's parser does
+<code>video[s[0]] = s[1]</code> with no coercion (<code>commandline/instance.py:499</code>)
+and <code>apiclient.py</code> coerces a diskspec <code>size</code> but not a videospec
+<code>memory</code>. It works today only because jinja stringifies either type on
+the way into the domain XML.</p>
+<p>Typing it was taken as the operator's decision on the understanding
+that it broke the shipped CLI until a client release. <strong>It does not.</strong>
+D46's rewrite means an integer field accepts a numeric string, so
+<code>{"memory": "65536"}</code> is accepted and the documented invocation keeps
+working — measured, and pinned as the sweep row
+<code>video.memory.numeric_string</code>.</p>
+<p><a href="https://github.com/shakenfist/client-python/issues/398">client-python#398</a>
+is therefore a tidy-up rather than a release gate, and the release note
+must not name it as a version requirement. It is still worth having:
+validation is check-only, so the handler stores whatever the caller
+sent, and a videospec whose memory is a string is a string in the
+database. The coercion belongs in <code>apiclient.py</code> beside the disk-size
+block it mirrors, so that every caller of the library is fixed rather
+than only those who came through the command line.</p>
+<p><strong>D50. Three narrowings are taken deliberately, and measured.</strong> The
+original text of this decision named two, one of which does not exist;
+see the second amendment. The three that shipped are:</p>
 <ol>
-<li><strong>webargs/marshmallow, pydantic, or hand-rolled?</strong> Pydantic is
-   already a core dependency (config and <code>schema/</code>), but webargs
-   is what the four existing sites use and is already wired into
-   Flask request parsing. Which one, and is consistency with
-   <code>schema/</code> worth more than consistency with the existing four
-   endpoints?</li>
-<li><strong>Compile the existing declarations, or author new schemas?</strong>
-   Compiling gets 96% coverage for free but inherits any drift.
-   Authoring is honest but is 254 hand-written declarations.
-   Is there a middle path — compile, then let an endpoint
-   override with an explicit schema where the declaration is
-   insufficient?</li>
-<li><strong>Where does validation sit in <code>method_decorators</code>?</strong> It must
-   run after authentication (so an unauthenticated caller cannot
-   probe the schema) but before the handler. <code>CLAUDE.md</code> warns
-   that this ordering is subtle; what breaks?</li>
-<li><strong>What is the malformed-input response shape?</strong> A single
-   <code>400 {"error": "..."}</code> naming the parameter, or a
-   field-keyed structure? Does anything depend on the current
-   text? What does <code>shakenfist-client</code> do with it?</li>
-<li><strong>How long does warn-only run, and what makes it "quiet
-   enough"?</strong> sfcbr is one cluster with one workload; CI is
-   another. Is that enough evidence to enforce?</li>
-<li><strong>What happens to a query parameter on a GET?</strong> The events
-   endpoints read <code>limit</code> only from the JSON body — a <code>?limit=5</code>
-   query string is silently ignored, which is surprising and
-   fragile (a GET body is not guaranteed to survive proxies).
-   Should the migration accept <code>location=('query', 'json')</code> for
-   these, and is that a breaking change for anyone?</li>
-<li><strong>Do we validate responses too?</strong> Out of scope as written, but
-   the same declarations describe response examples, and
-   <code>external_view()</code> drift is a real source of client bugs.</li>
-<li><strong>Body keys silently overwriting path parameters.</strong> Is that
-   ever intentional? <code>ArtifactVersionEndpoint.delete</code> currently
-   lets a body <code>version_id</code> override the URL segment. If not
-   intentional, the schema layer is where it stops.</li>
+<li><strong><code>disk[].type</code> publishes <code>[disk, cdrom]</code></strong>, refusing libvirt's
+   <code>floppy</code> and <code>lun</code>. Only <code>cdrom</code> is special-cased
+   (<code>instance.py:1790</code> and <code>:1869</code>); every other value is treated as a
+   plain disk by every code path we own and handed to libvirt as a
+   device name, so what this refuses is input that produced a silently
+   wrong result rather than a working one.</li>
+<li><strong><code>blob_uuid</code> inside a diskspec is refused</strong>, by
+   <code>additionalProperties: false</code>, because it is not a documented key.
+   This one the census did not name and it is real: the handler acts on
+   a caller-supplied <code>blob_uuid</code> (<code>instance.py:935</code>, <code>:974</code>). The
+   documented spelling <code>base: "sf://blob/&lt;uuid&gt;"</code> reaches the identical
+   branch — <code>external_api/instance.py:793</code> sets the key from it — so
+   nothing a caller is told to do stops working.</li>
+<li><strong>A diskspec with neither <code>size</code> nor <code>base</code> is refused</strong>, by D45's
+   handler guard, including a <code>size</code> of <code>0</code> with no <code>base</code>. Because it
+   is a handler guard rather than a schema check it holds at <code>warn</code> and
+   <code>off</code> too, which makes it the only narrowing in this phase an
+   operator cannot roll back. That is deliberate — a disk that asks for
+   nothing is not a rollback-worthy behaviour — but it should be said
+   out loud.</li>
 </ol>
-<h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
+<p>What is <strong>not</strong> narrowed, despite the original text of this decision:
+<code>disk[].size</code> as the string <code>"20"</code> is accepted, because D46 refuses a
+fractional number rather than a non-<code>int</code>. Step 5 measured each of
+these before and after rather than asserting any of it.</p>
+<h2 id="step-plan">Step plan<a class="headerlink" href="#step-plan" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>The key and value census.</strong> For each of diskspec, networkspec and videospec, enumerate every key any caller sends and every value type it sends, from five sources: the tree (<code>shakenfist/deploy/collection/plugins/modules/sf_instance.py</code>, which builds netdescs at lines 317-364), the client (<code>../client-python/shakenfist_client/</code>, note <code>apiclient.py:669</code> already coerces <code>size</code> to <code>int</code>), the CI suites (<code>shakenfist/deploy/shakenfist_ci/</code>), the API reference (<code>docs/developer_guide/api_reference/instances.md:67-130</code>, which documents four disk keys, five network keys and three video keys), and the handlers themselves (<code>external_api/instance.py</code> and <code>shakenfist/instance.py</code>, for every key read off a spec). Produce a table, one row per key, with: which sources send it, what types they send, what the handler does with each type, and whether it is documented. This is the input to D41 and D43 and the table goes in this plan. Do not change any code.</td>
+</tr>
+<tr>
+<td>2</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>The compiler's object branch.</strong> In <code>shakenfist/external_api/validation.py</code>, add a branch to <code>_field()</code> (around line 430, beside the existing <code>array</code> branch) for a rendered <code>{'type': 'object', 'properties': {...}}</code>: build a marshmallow schema from the properties with <code>Schema.from_dict</code>, honour <code>required</code> and <code>additionalProperties: false</code> (<code>unknown=RAISE</code>), and return <code>fields.Nested</code>. An object with no <code>properties</code> must keep compiling to <code>fields.Dict</code> exactly as now, because <code>metadata</code> and <code>bound_claims</code> rely on it (D47). Apply D46 in the same step: <code>fields.Integer(strict=True)</code> wherever the rendered type is <code>integer</code>. Then D48: make <code>_schema_findings</code> flatten marshmallow's nested error dict into dotted, indexed paths so a finding reads <code>disk[0].size</code>; <code>side_channels[0]</code> is the shape to match. Read the comments in that file first — they explain why every check is keyed on the rendered specification rather than on the type token, and that rule binds this change.</td>
+</tr>
+<tr>
+<td>3</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>The three schemas.</strong> In <code>shakenfist/external_api/base.py</code>, add <code>diskspec</code>, <code>arrayofdiskspec</code>, <code>networkspec</code>, <code>arrayofnetworkspec</code> and <code>videospec</code> to <code>ARGTYPES</code> (around line 380), built from three module-level constants so the single and array forms cannot drift (D40). Populate them from step 1's census, not from the documentation. Every <code>enum</code> must be read off the code that consumes the value: the libvirt XML templating in <code>shakenfist/instance.py</code> for <code>video.model</code> and <code>network[].model</code>, <code>instance._get_defaulted_disk_bus</code> and <code>_get_disk_device</code> for <code>disk[].bus</code>, and whatever consumes <code>video['vdi']</code> (start at <code>external_api/instance.py:1802</code> and <code>:1865</code>) for the VDI protocols. <code>network_uuid</code> per D44. <code>additionalProperties: false</code> per D41, unless step 1 found a reason to revisit it. Update every affected row of <code>STRUCTURED_PARAMETERS</code> in <code>shakenfist/tests/external_api/test_openapi_spec.py:104</code> in the same commit, with a comment per entry saying what backs the constraint — that table's own comment explains the standard.</td>
+</tr>
+<tr>
+<td>4</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>The declarations, and the guard D45 asks for.</strong> Change the six declarations in F2's table to the new tokens: <code>external_api/instance.py:514</code> (<code>network</code> → <code>arrayofnetworkspec</code>), <code>:518</code> (<code>disk</code> → <code>arrayofdiskspec</code>), <code>:535</code> (<code>video</code> → <code>videospec</code>), <code>:1134</code> (<code>network</code> → <code>networkspec</code>). Leave <code>metadata</code> at <code>dict</code> and add the comment D47 asks for; do the same for <code>bound_claims</code> at <code>auth.py:1125</code> and <code>:1208</code>. <strong>Delete no handler guard</strong> (D42). Add the missing guard from D45 beside <code>instance must specify at least one disk</code> at <code>instance.py:673</code>: a diskspec with neither <code>size</code> nor <code>base</code> is a 400.</td>
+</tr>
+<tr>
+<td>5</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>The nested sweep.</strong> A new <code>shakenfist/tests/external_api/test_nested_sweep.py</code>, modelled on <code>test_required_sweep.py</code> and subclassing its <code>RequiredSweepTestCase</code> fixture, which already carries the whole decorator stack and working instance, network and blob fixtures. One row per (spec, key, sent value), with the status and whether an exception was recorded — pin every row of F5 and F6 above at its <em>new</em> answer, plus one accepted value per key so the schemas are shown not to be too narrow. Run it at <code>enforce</code>; add a second class at <code>warn</code> proving D42, that every row answers exactly what F5 and F6 measured before this phase. Mutation-test it: break each schema on purpose and confirm the right row fails with the right message, and keep the mutations in a script beside the test as the pr-re-review skill's adversarial pass asks. Cover the interface hotplug endpoint as well as instance create — it is the one with no scheduler in front of it, so its answers are 200s rather than 507s.</td>
+</tr>
+<tr>
+<td>6</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>Documentation.</strong> <code>docs/developer_guide/api_reference/instances.md:67-130</code> gains, per spec, which keys are required, what each value's type and enum are, and that an unknown key is now refused. <code>docs/developer_guide/writing_an_endpoint.md</code> gains the structured tokens beside the rest of the vocabulary and says how to add another one. A release note in <code>docs/release_notes/v07-v08.md</code> says plainly that a request carrying an undocumented key inside a diskspec, networkspec or videospec now answers 400 where it used to be ignored, names the two narrowings of D50, names the client version D49 requires, and names <code>API_VALIDATION_MODE=warn</code> as the rollback. <strong>Also fix the three documentation bugs the census found, none of which this phase caused:</strong> <code>docs/user_guide/usage.md:237</code> lists <code>ide</code> as a valid disk bus and <code>config.DISK_BUS</code>'s description at <code>shakenfist/config.py:1028</code> does the same, while <code>external_api/instance.py:825</code> answers <code>400 IDE disks are no longer supported</code>; and <code>usage.md:288</code> lists nine NIC models where <code>instances.md:105</code> lists eight, the extra being <code>ne2k_isa</code>. Per D43 neither list is a specification, so say that the set is the hypervisor's rather than reconciling two prose lists into a third.</td>
+</tr>
+<tr>
+<td>7</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>Cluster CI.</strong> Add cases to <code>shakenfist/deploy/shakenfist_ci/cluster_ci_tests/</code> for the contract changes a unit test cannot prove are real: an unknown diskspec key answering 400, a non-string <code>network_uuid</code> answering 400 rather than 500, and a well-formed instance with every documented key still creating. Follow the cases phase 6 added in <code>cluster_ci_tests/test_networking.py</code>.</td>
+</tr>
+<tr>
+<td>8</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>Close out.</strong> Rewrite #528's body per F9. Audit the definition of done item by item, in this plan, the way phase 6's step 6 did. Record what landed in the master plan's <code>Merged</code> column <em>after</em> the merge, from the first-parent range — this is the mistake #4222 exists to correct.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
+<p><strong>An <code>enum</code> narrower than the server breaks working instances.</strong> The
+one that would hurt most is <code>network[].model</code>: the documentation lists
+eight NIC models, and whether libvirt accepts a ninth is a question
+about the XML template, not the docs. <em>Mitigation:</em> D43 makes step 3
+read the consuming code, and step 1's census names every value any
+caller actually sends. The reviewer's second job, stated at the top of
+this plan, is to check each enum against the code.</p>
+<p><strong><code>additionalProperties: false</code> breaks a caller sending an
+undocumented key.</strong> <em>Mitigation:</em> step 1 censuses five sources before
+step 3 writes anything, and D41 says in advance what happens if the
+census finds one. The release note and <code>warn</code> are the operator's
+rollback.</p>
+<p><strong>A nested default is not applied, because the path is check-only.</strong> A
+<code>fields.Nested</code> schema with <code>load_default</code> values would look like it
+fills in <code>bus</code> and <code>vdi</code>, and nothing would use them — the handler sees
+the raw body. <em>Mitigation:</em> declare no defaults in the schemas, and
+have step 5 assert that a handler receives exactly the body that was
+sent. The existing default-filling in <code>instance.py:833</code> stays and is
+the only thing that defaults anything.</p>
+<p><strong>The error message degrades.</strong> A marshmallow nested failure is a
+nested dict, and a naive rendering produces something like
+<code>disk: {0: {size: ['Not a valid integer.']}}</code> in a response body that
+phase 4 spent a whole step making uniform. <em>Mitigation:</em> D48, and step
+5 pins the exact strings.</p>
+<p><strong>The autofixer lands one of these while the branch is open.</strong> It has
+happened to this plan twice, most recently colliding with #4199 inside
+phase 6. <em>Mitigation:</em> #4223 was filed with <code>automated-fix-attempted</code>
+already applied. Any issue filed during this phase gets the same at
+filing time, not afterwards.</p>
+<p><strong>Duplicated checking drifts.</strong> D42 keeps the handler guards, so
+<code>network_uuid</code> is now refused in two places with two messages.
+<em>Mitigation:</em> the enforce-mode sweep pins which message a caller sees,
+so a change to either that alters the answer fails a test.</p>
+<h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
+<ol>
+<li><code>_field()</code> in <code>shakenfist/external_api/validation.py</code> has a branch
+   for <code>{'type': 'object', 'properties': ...}</code>, and an object <em>without</em>
+   <code>properties</code> still compiles to <code>fields.Dict</code> — proven by a test that
+   <code>POST /instances</code> still accepts a <code>metadata</code> value of a dict and of
+   a list under the same key.</li>
+<li>Every compiled integer field, at every nesting depth, refuses a
+   number with a fractional part and accepts an integral one and a
+   numeric string — pinned by a registry-wide test that enumerates the
+   compiled endpoints rather than by a grep. <code>"cpus": 1.5</code> on
+   <code>POST /instances</code> answers 400 rather than 500, and <code>"cpus": "8"</code>
+   still reaches the handler. (This item originally read <code>grep -n
+   "strict=True" ...</code>, which D46's rewrite makes meaningless: the check
+   is a field subclass bound into <code>_SCALARS</code>, not a keyword at a
+   construction site, precisely so that nesting cannot forget it.)</li>
+<li><code>ARGTYPES</code> carries <code>diskspec</code>, <code>arrayofdiskspec</code>, <code>networkspec</code>,
+   <code>arrayofnetworkspec</code> and <code>videospec</code>, and the single and array forms
+   of networkspec are the same Python object by construction — proven
+   by a test asserting the rendered <code>items</code> equals the rendered single
+   form, not by reading.</li>
+<li>Every row of F5 answers 400 naming the offending key, and no row
+   writes an exception record.</li>
+<li>Every row of F6 answers 400 <strong>except these five values</strong>, each of
+   which is still accepted and has a row in the sweep asserting so:
+   <code>network[].model</code> and <code>video.model</code> as any string (D43 — neither
+   carries an enum, because both are rendered raw into the libvirt
+   domain XML and the vocabulary is therefore the hypervisor's),
+   <code>network[].float</code> as <code>"yes"</code> (marshmallow's truthy set is no
+   narrower than the handler's bare truthiness test), and
+   <code>disk[].size</code> and <code>video.memory</code> as numeric strings (D46 refuses a
+   fractional number, not a string).</li>
+</ol>
+<p>(Twice corrected. This item originally excepted "any key the census
+   showed a caller sends", which is vacuous — the census showed a
+   caller sends every documented key; the exception has to be keyed on
+   values, and named. It then named <em>four</em> values and omitted
+   <code>video.model</code>, which step 8's audit caught: F6's last row is
+   "<code>video.model</code> / <code>.memory</code> / <code>.vdi</code>, any type at all", and D43's
+   own table says in as many words that <code>video.model</code> publishes no
+   enum for exactly the reason <code>network[].model</code> does not. The
+   deliverable was right throughout — <code>video.model.nonsense</code> has been
+   an accepted row of the sweep since step 5, and the release note
+   names both <code>model</code> keys — so this was the item's wording reasoning
+   from half of D43, the same failure mode as the D46 rewrite's three
+   dependents.)
+6. A finding inside an array names its index: the response to a bad
+   <code>size</code> in the second diskspec contains <code>disk[1].size</code>.
+7. Under <code>API_VALIDATION_MODE=warn</code>, every row of F5 and F6 answers
+   what this plan measured it answering before the phase, <strong>except the
+   ten rows that are handler guards rather than schema checks</strong>: the
+   null <code>network_uuid</code> on both routes, the diskspec that asks for
+   nothing in its several spellings, and the videospec whose <code>model</code> or
+   <code>memory</code> is an explicit null. Those answer 400 at every mode, by
+   design — D42 says a guard keeps working under the rollback, and
+   three of these guards are new in this phase precisely so that the
+   rollback does not hand back the bug the phase closed. <code>off</code> is measured
+   identically to <code>warn</code>, on the whole table rather than on a sample.
+8. Every handler guard listed in D42 is still present:
+   <code>_netdesc_safety_checks</code> still refuses a netdesc that is not a dict,
+   one with no <code>network_uuid</code> — and now one whose <code>network_uuid</code> is
+   null — and a malformed MAC; the disk bus check is unchanged. The
+   IDE refusal at <code>external_api/instance.py:825</code> is unreachable at
+   every mode, because the bus check answers <code>invalid disk bus ide</code>
+   first; that was already true before this phase and is recorded here
+   so the item does not read as though it were observable.
+9. A diskspec with neither <code>size</code> nor <code>base</code> answers 400 (D45).
+10. <code>STRUCTURED_PARAMETERS</code> agrees with the published specification —
+    <code>test_every_published_structure_or_bound_is_registered</code> passes —
+    and every entry this phase changed carries a comment saying what
+    backs it.
+11. No page states a spec's shape differently: the API reference, the
+    schemas in <code>ARGTYPES</code>, and the release note all name the same keys,
+    the same types and the same enums. A script in the test suite
+    compares the reference's key lists against <code>ARGTYPES</code> rather than a
+    reviewer comparing them by eye.
+12. #528's body describes element schemas rather than <code>use_kwargs</code>
+    coverage, and says the <code>use_kwargs</code> residual was overtaken by phase
+    4.
+13. #4167 is closed, or its remaining <code>uefi</code>/<code>secure_boot</code> scope is
+    restated in the issue so that what is left is what is actually
+    left.
+14. The master plan's Execution table reads <code>Complete</code> for phase 7 with
+    a <code>Merged</code> SHA taken from the first-parent range after the merge,
+    and the <code>docs/plans/index.md</code> row reads <code>8 of 9</code>.
+15. <code>pre-commit run --all-files</code> is clean.</p>
+<h3 id="definition-of-done-audit-step-8">Definition-of-done audit (step 8)<a class="headerlink" href="#definition-of-done-audit-step-8" title="Permanent link">&para;</a></h3>
+<p>Every verdict below was produced by running something or by reading the
+tree as it stands, never by trusting what a step reported. Where the
+evidence is a measurement, the measurement is quoted.</p>
+<p>Read the decisions as a set first, which is this phase's own recorded
+lesson (see the second amendment). D46's rewrite has three dependents
+in the plan — D49, D50 and definition-of-done items 5, 7 and 8 — all of
+which were corrected after step 5. Two more dependents outside the plan
+were still stale when this step started and are fixed in it: the
+<code>video.memory</code> comment in <code>base.py</code> still said the typing was "a
+narrowing with an ordering obligation attached", which is the sentence
+D49's correction deletes, and
+<code>test_a_video_memory_string_is_still_accepted</code>'s docstring in
+<code>test_validation_compiler.py</code> still spoke of D49 in the present tense as
+saying the typing "breaks the shipped CLI until <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/398" title="GitHub Issue: shakenfist/client-python #398">client-python#398</a>
+ships". Neither changed any behaviour; both would have told the next
+reader something the plan had already retracted. A third dependency was
+found in this audit and is item 5 below.</p>
+<ol>
+<li><strong>Met.</strong> The object branch is <code>validation.py:579</code>, and it is keyed on
+   <code>isinstance(spec.get('properties'), dict)</code> rather than on the type
+   token — the comment at <code>:585</code> says so explicitly, because
+   marshmallow's default for a <code>Schema</code> is <code>unknown=RAISE</code> and an
+   object branch keyed on <code>type</code> would have refused every metadata key
+   ever sent. <code>ARGTYPES['dict']</code> still renders a bare
+   <code>{'type': 'object'}</code> and the compiled field is still <code>fields.Dict</code>
+   (<code>test_validation_compiler.py:355</code>). The end-to-end proof the item
+   asks for is
+   <code>test_metadata_takes_a_dict_and_a_list_under_the_same_key</code>
+   (<code>test_request_validation.py:1423</code>), which drives a real
+   <code>POST /instances</code> carrying <code>{"k3s": {"a": "dict"}}</code> and then
+   <code>{"k3s": ["a", "list"]}</code> and gets a 507 with no exception recorded
+   both times.</li>
+<li><strong>Met.</strong> Measured over a real registry build rather than read: 27
+   compiled integer fields, of which <code>disk[].size</code> and <code>video.memory</code>
+   are nested (<code>_ExactInteger</code> both), and every one of the 27 refuses
+   <code>1.5</code>, accepts <code>8.0</code> and accepts <code>'8'</code>. The registry-wide test is
+   <code>test_every_compiled_integer_refuses_a_fractional_number</code>, which
+   reaches nested fields through <code>_every_compiled_field</code>'s two ways
+   down (a <code>List.inner</code> and a <code>Nested.schema.fields</code>) rather than
+   through a grep, exactly as the item's parenthesis requires. End to
+   end, <code>"cpus": 1.5</code> answers <code>400 cpus: Not a valid integer.</code> with no
+   exception recorded, and <code>"cpus": "2"</code> reaches placement
+   (<code>test_a_fractional_cpu_count_is_a_bad_request</code> and
+   <code>test_a_numeric_string_cpu_count_still_reaches_placement</code>). One stale
+   docstring was fixed in this step: <code>_every_compiled_field</code>'s said
+   "the nested arm reaches nothing today, since no declaration carries
+   a <code>properties</code> block until step 4", which stopped being true when
+   step 4 landed and made the test read as weaker than it is.</li>
+<li><strong>Met.</strong> All five tokens are in <code>ARGTYPES</code>. The identity is real, not
+   merely equal: <code>ARGTYPES['arrayofnetworkspec']['items'] is
+   ARGTYPES['networkspec']</code> evaluates <code>True</code>, and so does the diskspec
+   pair. <code>test_the_single_and_array_forms_cannot_drift</code> asserts both
+   that identity and that the two <em>render</em> identically through the deep
+   copy <code>swagger_helper()</code> makes, which is the assertion the item asks
+   for since rendering is where a copy could diverge.</li>
+<li><strong>Met.</strong> All eleven F5 values, at <code>enforce</code>: 400, <code>recorded=False</code>,
+   and an error naming the key and its index —
+   <code>disk[0].base: Not a valid string.</code> (int, bool, list),
+   <code>disk[0].size: Not a valid integer.</code> (non-numeric string, dict),
+   <code>network[0].network_uuid: Not a valid string.</code> (int, dict, bool),
+   <code>network[0].address: Not a valid string.</code> (int, list) and
+   <code>network[0].model: Not a valid string.</code> (int). Each is a row of
+   <code>CASES</code> in <code>test_nested_sweep.py</code> and each is asserted at all three
+   modes.</li>
+<li><strong>Met, as amended — and the amendment is the audit's main finding.</strong>
+   The item excepted four values and there are five: <code>video.model</code> as
+   any string is an F6 value which is still accepted, and the item did
+   not name it. The <em>deliverable</em> is right and always was —
+   <code>video.model.nonsense</code> has been an accepted row of the sweep since
+   step 5, <code>base.py</code>'s videospec comment says the vocabulary is the
+   hypervisor's, D43's own table says <code>video.model</code> publishes no enum
+   for exactly the reason <code>network[].model</code> does not, and the release
+   note names both <code>model</code> keys in its "several things which look like
+   narrowings are not" paragraph. What was wrong was this item's
+   wording, which had reasoned from half of D43. That is the same
+   failure mode the second amendment records for D46, arriving a third
+   time, and it is the reason the amendment told this step to read the
+   decisions as a set. The item is corrected above. With the fifth
+   exception named, every other F6 value answers 400 at <code>enforce</code>:
+   <code>size</code> of <code>-5</code>, <code>8.5</code> and <code>true</code>; a diskspec of <code>{}</code>; <code>type</code> of
+   <code>"nonsense"</code> and of <code>5</code>; an unknown diskspec key; an unknown netdesc
+   key; <code>video.vdi</code> of <code>"nonsense"</code>; and <code>video.memory</code> of <code>"lots"</code>.</li>
+<li><strong>Met.</strong> <code>disk.second_element</code> sends
+   <code>{"disk": [{"size": 8}, {"size": "banana"}]}</code> and the sweep asserts
+   the answer is <code>400 disk[1].size: Not a valid integer.</code> — the index,
+   and the key, and not the container.</li>
+<li><strong>Met.</strong> The count of ten was checked against the table rather
+   than against the number in the item. Exactly ten rows of <code>CASES</code>
+   carry the phrase <code>moves at warn</code>, and they are the ten the item
+   describes: <code>net.uuid.null</code> and <code>hotplug.uuid.null</code> (the null
+   <code>network_uuid</code> on both routes); <code>disk.empty</code>,
+   <code>disk.size_null_only</code>, <code>disk.size_zero_only</code>,
+   <code>disk.size_and_base_null</code>, <code>disk.base_none_only</code> and
+   <code>disk.unknown_key_only</code> (the diskspec which asks for nothing, in its
+   six spellings — the last two are the typo'd key which leaves the
+   spec empty once the schema is not enforcing, and a <code>base</code> of the
+   literal string <code>"none"</code>); and <code>video.model.null</code> and
+   <code>video.memory.null</code> (the videospec guard the review found was still
+   a presence test). Every other row's <code>warn</code> answer is what the plan
+   measured before the phase, including the eleven F5 rows which still
+   answer <code>500 server error</code> with an exception recorded. <code>off</code> is
+   measured on the whole table and not on a sample:
+   <code>NestedSweepOffTestCase</code> subclasses the warn class, so it runs the
+   identical 104 rows with <code>mode = 'off'</code>.</li>
+<li><strong>Met.</strong> Read in the tree rather than remembered.
+   <code>_netdesc_safety_checks</code> (<code>external_api/instance.py:349</code>) still
+   refuses a netdesc which is not a dict, still refuses one with no
+   <code>network_uuid</code> — and now refuses one whose <code>network_uuid</code> is null,
+   which is the change the item accounts for — and still refuses a
+   malformed MAC through <code>util_network.valid_macaddr</code>. The disk bus
+   check at <code>:732</code> is unchanged. The IDE refusal is still present at
+   <code>:876</code> and still unreachable: the sweep's <code>disk.bus.ide</code> row answers
+   <code>invalid disk bus ide</code> at <code>warn</code> and <code>off</code> and
+   <code>disk[0].bus: Must be one of: sata, scsi, usb, virtio, nvme.</code> at
+   <code>enforce</code>, and never <code>IDE disks are no longer supported</code>.</li>
+<li><strong>Met.</strong> <code>disk.empty</code> answers <code>400 disk specification must specify
+   at least one of size or base</code> at all three modes, as do the other
+   four spellings listed under item 7.</li>
+<li><strong>Met.</strong> <code>test_openapi_spec.py</code> passes, including
+    <code>test_every_published_structure_or_bound_is_registered</code>, whose
+    completeness is derived from the published specification. Every
+    entry this phase changed — <code>video</code>, <code>disk</code>, <code>network</code> on
+    <code>POST /instances</code> and <code>network</code> on the hotplug route, plus the
+    <code>metadata</code> entry which changed only its comment — carries a comment
+    saying what backs each constraint. The comparison ignores
+    <code>description</code> and nothing else, which
+    <code>_without_descriptions()</code>'s docstring justifies.</li>
+<li><strong>Met, as amended: the script did not exist and was written in this
+    step.</strong> Steps 6 and 7 documented the specs by hand and nothing
+    compared the result to <code>ARGTYPES</code>, which is precisely what this item
+    exists to prevent — and the census had already found two live
+    instances of that drift in tree (<code>usage.md</code> listing nine NIC models
+    where the API reference listed eight, and <code>usage.md</code> and
+    <code>config.DISK_BUS</code>'s description both still listing the <code>ide</code> bus
+    which has been refused since v0.7). The new
+    <code>shakenfist/tests/external_api/test_api_reference_specs.py</code> parses
+    the three <code>### &lt;spec&gt;</code> sections of
+    <code>docs/developer_guide/api_reference/instances.md</code> and asserts, in
+    both directions, that the documented key set is the published key
+    set; that each key's bracketed annotation is its published type,
+    with <code>(enum)</code> meaning a string which publishes an <code>enum</code>; that
+    <code>, required</code> and the fragment's <code>required</code> list agree; and that
+    every published enum value appears verbatim in the bullet which
+    documents it. It was mutation tested rather than merely run: adding
+    a key to <code>ARGTYPES</code>, retyping <code>video.memory</code>, adding an undocumented
+    enum member, dropping <code>network_uuid</code> from <code>required</code> and giving
+    <code>network[].model</code> an enum each fail it, and the unmutated tree
+    passes. The remaining half of the item — that the release note says
+    the same thing — was checked by reading, and it does; it is also
+    the document which had the <code>video.model</code> exception right when item
+    5 did not.</li>
+<li><strong>Met.</strong> #528's body now describes the element-schema scope, links
+    this plan and states that the <code>use_kwargs</code> residual was overtaken by
+    phase 4 rather than abandoned, preserving what the original text
+    asked for. It was then closed as completed, with a comment naming
+    phase 4 (merged, <code>1c203b111</code> and <code>f1040a23b</code>) for the first half and
+    this phase's seven implementation commits for the second, and naming
+    what is deliberately not done.</li>
+<li><strong>Met, as restated rather than closed.</strong> #4167 item 1 was
+    re-measured rather than reasoned about: at the default <code>enforce</code>,
+    through this phase's own <code>SweepFixtureTestCase</code> fixture,
+    <code>POST /instances {"uefi": null}</code> and <code>{"secure_boot": null}</code> both
+    still answer 500 with an exception recorded and a body of
+    <code>server error</code>, while omitting <code>uefi</code> or sending <code>true</code> reaches
+    placement. Phase 6 closed the <code>cpus</code> and <code>memory</code> half of that item
+    (<code>400 cpus: declared required but not supplied</code>). So something
+    survives and the issue stays open, with a comment restating that
+    the surviving scope is an explicit JSON <code>null</code> for a
+    <code>required=False</code> scalar whose handler cannot take one — and that
+    items 2 and 3 are closed, quoting their new answers.</li>
+<li><strong>Not met, and cannot be met from a branch.</strong> The <code>Merged</code> column
+    stays <code>—</code> until the pull request merges, by the rule the column's
+    own note states: every SHA there is the <em>merge commit</em> of a pull
+    request, so that <code>&lt;sha&gt;^1..&lt;sha&gt;</code> is the whole of what it put on
+    <code>develop</code>. Reading it from the branch, or from a path-filtered
+    <code>git log</code>, is what #4222 exists to correct for phase 6. After the
+    merge, take the SHA from the first-parent range —
+    <code>git log --first-parent --oneline develop</code> — and record it beside
+    the pull request number. The rest of the item is met: the Execution
+    table reads <code>Complete</code> for phase 7 with a rewritten description, and
+    <code>docs/plans/index.md</code> reads <code>8 of 9</code> with the status still
+    <code>In progress</code>, because phase 8, the push audit, has not run.</li>
+<li><strong>Met.</strong> <code>pre-commit run --all-files</code> is clean, including the
+    <code>Check plan statuses and index arithmetic agree</code> and
+    <code>Check documentation links and anchors resolve</code> hooks and the mypy
+    and unit-test hooks. The full <code>stestr</code> suite passes (4999 tests,
+    121 skips) with the new documentation-consistency test in it.</li>
+</ol>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p>Before executing any step, back brief the operator on the plan as
+understood and how the intended work aligns with it.</p>
+<p>Two gates, both cheap to ask about and expensive to redo:</p>
 <ul>
-<li>Rewriting the API surface, changing resource paths, or
-  versioning the API.</li>
-<li>Response-shape validation (see open question 7).</li>
-<li>Authentication or authorization changes.</li>
-<li>The mariadb-layer error semantics in #3373.</li>
+<li><strong>After step 1, before step 3.</strong> The census is what D41 and D43 are
+  conditional on. If it finds a caller sending an undocumented key, or
+  an enum value the code accepts and the documentation does not list,
+  say so and get a decision before writing the schemas. Writing them
+  first and narrowing later means rewriting step 5's sweep too.</li>
+<li><strong>After step 3, before step 4.</strong> The rendered schemas are the
+  contract. Show them — the actual <code>ARGTYPES</code> fragments — and the enum
+  sources they were read from, before any declaration starts using
+  them.</li>
+</ul>
+<h2 id="appendix-the-survey-probe">Appendix: the survey probe<a class="headerlink" href="#appendix-the-survey-probe" title="Permanent link">&para;</a></h2>
+<p>The probe was a single file, <code>test_zz_probe.py</code>, placed in
+<code>shakenfist/tests/external_api/</code>, subclassing <code>RequiredSweepTestCase</code>
+with <code>mode = 'enforce'</code> and overriding nothing but adding one test
+method. It drove a list of <code>(label, body overlay)</code> pairs through
+<code>self.client.post</code>, counted <code>self.mock_record_exception.call_count</code>
+either side of each request to detect a recorded fault, and wrote its
+results to a file rather than to stdout, because stestr captures
+stdout.</p>
+<p>It was run with
+<code>.tox/py3/bin/python -m stestr run --no-subunit-trace 'test_zz_probe.ProbeTestCase.test_probe'</code>
+— naming the single test method, because inheriting the fixture also
+inherits the parent's tests, and running the phase 6 sweep at <code>enforce</code>
+fails every row of it for reasons that have nothing to do with the
+probe.</p>
+<p>It was deleted rather than committed. Step 5 builds the committed
+version, which differs in that it asserts rather than reports.</p>
+<h2 id="progress">Progress<a class="headerlink" href="#progress" title="Permanent link">&para;</a></h2>
+<p>Written at the close-out, for a reader who was not here.</p>
+<h3 id="what-the-phase-did-in-order">What the phase did, in order<a class="headerlink" href="#what-the-phase-did-in-order" title="Permanent link">&para;</a></h3>
+<p><strong>Step 1, the census.</strong> Before any schema was written, every key any
+caller sends into a diskspec, networkspec or videospec was enumerated
+from five sources: this tree, the client repository, the CI suites, the
+documentation and the handlers themselves. The tables are above under
+<em>The key and value census</em>. The census existed to test D41 and D43, and
+it changed four decisions — see <em>What the steps found</em> below. It was
+documentation only.</p>
+<p><strong>Step 2, the compiler.</strong> <code>_field()</code> gained an object branch which
+builds a nested marshmallow schema from a rendered <code>properties</code> block,
+honouring <code>required</code> and <code>additionalProperties: false</code>. <code>_ExactInteger</code>
+landed in the same step, bound into <code>_SCALARS</code> so that no future branch
+of <code>_field()</code> can build an integer which forgets it. Nothing rendered a
+<code>properties</code> block yet, so no request changed its answer except through
+the integer fix.</p>
+<p><strong>Step 3, the schemas.</strong> <code>ARGTYPES</code> gained <code>diskspec</code>,
+<code>arrayofdiskspec</code>, <code>networkspec</code>, <code>arrayofnetworkspec</code> and <code>videospec</code>,
+built from three module-level constants so a shape declared twice is
+the same Python object. Every type came from the census and every enum
+was read off the code which consumes the value. Still nothing declared
+them, so still nothing changed for a caller.</p>
+<p><strong>Step 3b, unplanned.</strong> Step 3 reported that D44's mechanism had never
+been built, and declined to overturn a committed decision on its own
+authority, which was right. This step built it: <code>required</code> inside an
+object fragment now means present <em>and not an explicit null</em>, the same
+meaning phase 6 gave <code>required</code> at the top level.</p>
+<p><strong>Step 4, the declarations.</strong> The four structured declarations were
+retyped and the contract moved. Two handler guards were added (D45's
+size-or-base, and a value test rather than a presence test in
+<code>_netdesc_safety_checks</code>), and <code>metadata</code> and <code>bound_claims</code> kept their
+bare <code>dict</code> with a comment at each saying why.</p>
+<p><strong>Step 5, the sweep.</strong> <code>test_nested_sweep.py</code>: 104 rows of (spec, key,
+sent value) driven through the real stack on both endpoints, at
+<code>enforce</code>, at <code>warn</code> and at <code>off</code>. Sixty-one refused at <code>enforce</code> and
+forty-three accepted, because a sweep which only proves things are
+refused passes just as well against a server which refuses everything.
+Two of the properties this step pins cannot be seen in a status code at
+all and carry a test each: that a null <code>video</code> key is defaulted rather
+than stored, and that a <code>float</code> of <code>"false"</code> does not float the
+interface. Sixteen mutations in <code>tools/mutate-nested-sweep.sh</code>, none
+survived; the harness now proves the unmutated tree is green before it
+breaks anything, since otherwise an already-red tree reports every
+mutation as caught.</p>
+<p><strong>Step 6, the documentation.</strong> The API reference now states, per spec,
+which keys exist, which are required, what each value's type and enum
+are, and that an undocumented key is refused. The release note names
+the narrowings and, because the plan had been wrong about this, names
+what is <em>not</em> narrowed. Three documentation bugs this phase
+did not cause were fixed on the way.</p>
+<p><strong>Step 7, cluster CI.</strong> Four cases in
+<code>cluster_ci_tests/test_api_validation.py</code>, against a deployed cluster.
+Three refusals and — the one which matters most and is the easiest to
+skip — a single instance carrying all twelve documented keys which must
+actually boot, checked down to <code>df</code> showing a virtio disk.</p>
+<p><strong>Step 8, the close-out.</strong> This section, the definition-of-done audit
+above, the master plan and index, and the issue tracker.</p>
+<h3 id="what-the-steps-found-that-the-survey-did-not">What the steps found that the survey did not<a class="headerlink" href="#what-the-steps-found-that-the-survey-did-not" title="Permanent link">&para;</a></h3>
+<p>Sixteen things, give or take, none of which are in the plan's <em>What the
+survey found</em> section because none of them were visible from outside.</p>
+<p><em>From the census (step 1):</em></p>
+<ol>
+<li><strong>D41 came through unconditional.</strong> No first-party caller sends an
+   undocumented key into any of the three specs, and neither the CLI nor
+   the ansible module has a key allowlist of its own, so the server's
+   400 is the only place a typo can ever surface.</li>
+<li><strong>D43 named six enums and only three are publishable.</strong> Both <code>model</code>
+   keys go into the libvirt domain XML with nothing in between, so the
+   real vocabulary is the hypervisor's qemu build.</li>
+<li><strong>D44's mechanism did not work.</strong> Every compiled field is
+   <code>allow_none=True</code>, so a required, string-typed nested <code>network_uuid</code>
+   would still have accepted a null.</li>
+<li><strong>D46's <code>strict=True</code> could not be used at all.</strong> A query parameter
+   is a string on the wire; applying the decision literally failed
+   <code>test_blob_data_bounds</code> within a minute.</li>
+<li><strong>Two of finding F5's attributions were wrong</strong>, because the survey
+   had read the status and not the code. The <code>address</code> fault is in
+   <code>noneish</code> above <code>is_in_range</code>, and the <code>size</code> fault is
+   <code>_safe_int_cast</code> rather than pydantic — which narrowed that row to a
+   <em>non-numeric</em> string.</li>
+</ol>
+<p><em>From the compiler (steps 2 and 3):</em></p>
+<ol>
+<li><strong>D48 needed no code.</strong> <code>_flatten_messages</code> already recursed through
+   marshmallow's nested error dict and already produced <code>disk[0].size</code>
+   by the same route it produced <code>side_channels[0]</code>. It is now pinned
+   by tests rather than left to be rediscovered.</li>
+<li><strong>The object branch has to be keyed on <code>properties</code>, not on the
+   type.</strong> Marshmallow's schema default is <code>unknown=RAISE</code>, so keying it
+   on <code>type == 'object'</code> refuses every <code>metadata</code> key ever sent —
+   mutation tested, which is D47 turning out to be load bearing rather
+   than decorative. For the same reason the <code>additionalProperties</code> arm
+   has both halves written out.</li>
+<li><strong>The enum compiler was new.</strong> Nothing in the tree published an
+   <code>enum</code> before this phase, so <code>_field()</code> had no branch for one and all
+   three published enums would have been documentation the server did
+   not enforce — which would have made the stated reason for publishing
+   the <code>vdi</code> enum false.</li>
+</ol>
+<p><em>From the declarations (steps 3b and 4):</em></p>
+<ol>
+<li><strong>The <code>_schema</code> sentinel regression.</strong> Wrapping a spec in
+   <code>fields.Nested</code> made a non-mapping element answer
+   <code>network[0]._schema: Invalid input type.</code>, leaking marshmallow's
+   internal sentinel into a caller-facing message where F1 had already
+   blessed <code>network[0]: Not a valid mapping type.</code> as good. The
+   flattener now collapses the schema-level key onto the container's own
+   name, and the two pre-existing tests asserting that string pass
+   unchanged — which is the evidence the case did not move.</li>
+<li><strong>The <code>warn</code>-mode guard gap.</strong> The schema refusing a null
+    <code>network_uuid</code> is not enough, because <code>warn</code> and <code>off</code> are the
+    operator's rollback and bypass it, and a rollback which hands back
+    the bug the phase just closed is not a rollback. So
+    <code>_netdesc_safety_checks</code> tests the value rather than the key.</li>
+<li><strong><code>noneish</code> cannot be asked about a size.</strong> It lowercases whatever
+    it is handed, so the size-or-base guard needed
+    <code>_diskspec_value_absent()</code> around it rather than calling it
+    directly on the integer the guard exists to protect.</li>
+<li><strong>A narrowing the plan never named: <code>blob_uuid</code> inside a
+    diskspec.</strong> <code>additionalProperties: false</code> refuses a caller-supplied
+    one, and the handler genuinely acted on it. The documented spelling
+    <code>base: "sf://blob/&lt;uuid&gt;"</code> reaches the identical branch, so nothing
+    a caller is told to do stops working.</li>
+</ol>
+<p><em>From the sweep (step 5):</em></p>
+<ol>
+<li><strong>A third class of <code>warn</code>-mover.</strong> The plan expected two rows not to
+    roll back and there are seven, in three classes: the null
+    <code>network_uuid</code> on both routes, the four spellings of a diskspec
+    which asks for nothing, and one nobody had seen — a diskspec
+    carrying <em>only</em> a typo'd key has neither a size nor a base, so the
+    size-or-base guard answers it at every mode rather than the schema
+    answering it at <code>enforce</code>.</li>
+<li><strong>D48 has a limit, recorded rather than fixed.</strong> "One fact, one
+    message" holds within a nesting level and not across them: an
+    omitted required <em>parameter</em> answers <code>missing-required</code>, an omitted
+    required <em>property</em> answers <code>type-mismatch</code>. Rewording the nested
+    detail would trade a cosmetic inconsistency for a telemetry one.</li>
+</ol>
+<p><em>From the documentation (step 6):</em></p>
+<ol>
+<li><strong><code>usage.md</code>'s worked example had answered 400 as written.</strong> It
+    showed <code>-D size=8,base=cirros,bus=ide,type=cdrom</code>, and <code>ide</code> has
+    been refused since v0.7. <code>config.DISK_BUS</code>'s own description listed
+    <code>ide</code> too and pointed at the libvirt documentation for "the full
+    list", which is not the list we accept. The API reference also
+    typed <code>network_uuid</code> as a uuid (a network <em>name</em> resolves there, and
+    the CI suite relies on it) and typed <code>video.vdi</code> as a plain string
+    when it is the one real enum in the vocabulary.</li>
+</ol>
+<p><em>From the close-out (step 8):</em></p>
+<ol>
+<li><strong>D46's rewrite had two more stale dependents outside the plan</strong>,
+    both fixed here: <code>base.py</code>'s <code>video.memory</code> comment still called the
+    typing "a narrowing with an ordering obligation attached", and a
+    test docstring still quoted D49's retracted claim in the present
+    tense. <strong>Definition-of-done item 5 named four accepted values and
+    there are five</strong> — it had reasoned from half of D43 and omitted
+    <code>video.model</code>. And <strong>item 11's script did not exist</strong>; it was
+    written in this step as
+    <code>shakenfist/tests/external_api/test_api_reference_specs.py</code> and
+    mutation tested.</li>
+</ol>
+<p>The pattern in 3, 4, 13 and 16 is the phase's real lesson, and it is
+recorded in the second amendment as well as here: <strong>a decision rewritten
+mid-phase invalidates every other statement which was reasoning from
+it, and nothing in this plan's structure made those statements
+findable.</strong> Four steps rediscovered the same drift independently before
+anyone wrote it down, and the close-out found two more instances after
+the corrections had supposedly been made. A phase which amends a
+decision should grep for the decision's number and for its <em>claims</em>,
+not only fix the decision.</p>
+<h3 id="what-is-left">What is left<a class="headerlink" href="#what-is-left" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>The <code>Merged</code> column</strong> of the master plan's Execution table, which
+  cannot be filled until the pull request merges and must then be taken
+  from the first-parent range rather than from a path-filtered log. This
+  is definition-of-done item 14, and it is the only item recorded as not
+  met.</li>
+<li><strong>Phase 8</strong>, the push audit, which runs over the accumulated diff of
+  every phase of this plan rather than over this one's.</li>
+<li><strong><a href="https://github.com/shakenfist/shakenfist/issues/4223">#4223</a></strong>, the
+  null-reference lookup, filed by this phase's survey and deliberately
+  not fixed by it. The only path a caller can reach is closed twice over
+  now, by the schema and by the handler guard, but the function is still
+  wrong for the next caller who reaches it another way.</li>
+<li><strong><a href="https://github.com/shakenfist/shakenfist/issues/4167">#4167</a></strong>,
+  reduced to <code>uefi</code> and <code>secure_boot</code> as an explicit <code>null</code> — scalars,
+  <code>required=False</code>, reached by no element schema — and re-measured at
+  <code>enforce</code> during this step as still a recorded 500.</li>
+<li><strong><a href="https://github.com/shakenfist/shakenfist/issues/4236">#4236</a></strong>, the
+  ansible collection's <code>video</code> parameter, which declares a string and
+  sends one where the API wants an object. Broken since enforcement was
+  turned on in phase 4 rather than by this phase, recorded as census
+  finding N4, and filed during review.</li>
+<li><strong><a href="https://github.com/shakenfist/client-python/issues/398">client-python#398</a></strong>,
+  coercing a videospec <code>memory</code> in <code>apiclient.py</code> beside the disk-size
+  block it mirrors. A tidy-up and not a release gate: D46's width means
+  the documented CLI invocation keeps working either way, and the only
+  cost of not doing it is a videospec whose memory is stored as a
+  string.</li>
 </ul>
 
 
@@ -14910,7 +15775,7 @@ was asked to decide.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-api-input-validation.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-api-input-validation.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-api-input-validation/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-api-input-validation-phase-07-structured.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-api-input-validation-phase-07-structured.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-api-input-validation-phase-07-structured/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

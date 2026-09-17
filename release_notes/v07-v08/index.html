@@ -14897,6 +14897,81 @@
   disables it — <code>warn</code> and <code>off</code> do not. An operator with existing
   automation which allocates out of the floating block must renumber
   those networks.</li>
+<li><strong>Behaviour change: the <code>diskspec</code>, <code>networkspec</code> and <code>videospec</code>
+  structures are now checked key by key.</strong> Until now only the outer
+  shape of these was examined — that <code>disk</code> was a list and that its
+  elements were dictionaries — and everything inside them reached the
+  handler unexamined. Two things change for a caller on <code>POST
+  /instances</code>, and for the <code>networkspec</code> on <code>POST
+  /instances/...instanceref.../interfaces</code> as well:<ul>
+<li><strong>A key which is not documented is refused with a 400 naming
+  it</strong>, where it was previously accepted and silently discarded.
+  <code>{"disk": [{"siz": 20}]}</code> now answers <code>400 disk[0].siz: Unknown
+  field.</code> instead of creating a default sized disk and saying
+  nothing, which is the original complaint of issue #936. The four
+  <code>diskspec</code> keys, five <code>networkspec</code> keys and three <code>videospec</code>
+  keys are documented in the
+  <a href="/developer_guide/api_reference/instances/#diskspec">instances API reference</a>.</li>
+<li><strong>A nested value of the wrong type is refused with a 400 naming
+  the key</strong>, where eleven of them previously produced a recorded
+  <code>500</code> and a bare <code>server error</code> which named nothing. A finding
+  names its path, so a bad element of a six disk list is
+  <code>disk[0].size: Not a valid integer.</code> rather than <code>disk</code>.
+  Five changes come with this, each replacing a silently wrong result
+  with a refusal, or with the answer the published specification
+  promises:</li>
+<li>A <code>disk[].type</code> other than <code>disk</code> or <code>cdrom</code> is refused. Any
+  string was previously accepted and handed to libvirt as a device
+  name; since only <code>cdrom</code> is treated specially, everything else
+  behaved as a plain disk.</li>
+<li>A <code>blob_uuid</code> inside a <code>diskspec</code> is refused, because it is not a
+  documented key — the server writes that key itself while
+  resolving a <code>base</code>, but the handler also acted on a caller
+  supplied one. The documented spelling <code>"base": "sf://blob/&lt;uuid&gt;"</code>
+  reaches the identical code path and is unaffected.</li>
+<li>A <code>diskspec</code> which asks for neither a <code>size</code> nor a <code>base</code>,
+  including a <code>size</code> of 0 with no base and a <code>base</code> of the literal
+  string <code>"none"</code> (which has always meant "no base"), is refused
+  with <code>400 disk specification must specify at least one of size or
+  base</code>. It previously created a disk nobody had asked for.</li>
+<li>A <code>videospec</code> whose <code>model</code> or <code>memory</code> is an explicit <code>null</code> is
+  refused with the same <code>400</code> an omitted one has always got. The
+  handler checked that those keys were <em>present</em>, so a null passed
+  it, was stored on the instance and was rendered into the libvirt
+  domain XML as <code>type='None'</code> and <code>vram='None'</code> — a failure which
+  surfaced when the instance would not start, a long way from the
+  call which accepted it.</li>
+<li>A <code>network[].float</code> is read with the meaning the published schema
+  gives it, so the string <code>"false"</code> (and <code>"no"</code>, <code>"off"</code>, <code>"0"</code>)
+  no longer floats the interface. The value used to be read as a
+  bare truthiness test on the raw request body, for which any
+  non-empty string is true, so the specification called <code>"false"</code> a
+  boolean meaning false while the server floated the interface
+  anyway. A JSON boolean is unaffected, and it is what <code>sf-client</code>
+  and the ansible collection both send.
+  Several things which look like narrowings are not, and are still
+  accepted: a <code>disk[].size</code> sent as the numeric string <code>"20"</code>, a
+  <code>video.memory</code> sent as the string <code>"65536"</code> (so <code>sf-client instance
+  create ... --videospec memory=65536</code> keeps working — the client is
+  tidied up in
+  <a href="https://github.com/shakenfist/client-python/issues/398">client-python#398</a>,
+  which is not required for this release), a <code>network[].float</code> of
+  <code>"yes"</code>, and any string at all as a <code>network[].model</code> or a
+  <code>video.model</code>. The two <code>model</code> values go into the libvirt domain XML
+  unexamined, so their real vocabulary is the hypervisor's qemu build
+  and this API does not pretend to know it.
+  <code>API_VALIDATION_MODE=warn</code> rolls all of the above back to logging
+  without refusing, as it does for the rest of the validation layer.
+  Three new <strong>handler</strong> guards are deliberately not rolled back,
+  because a rollback must not hand back the bug this work just closed:
+  the size-or-base guard above, the <code>videospec</code> null guard above, and a
+  <code>networkspec</code> whose <code>network_uuid</code> is an explicit <code>null</code>, which is
+  now refused in every mode exactly as an omitted one always was. That second one previously resolved to an
+  arbitrary network in the caller's namespace — on interface hotplug it
+  answered <code>200</code> and created an interface on a network the caller never
+  named.</li>
+</ul>
+</li>
 </ul>
 <h2 id="supported-distributions">Supported distributions<a class="headerlink" href="#supported-distributions" title="Permanent link">&para;</a></h2>
 <ul>
