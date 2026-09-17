@@ -224,21 +224,32 @@ Its syntax is similar:
 
 ```bash
 sf-client instance create myinstance 1 2048 \
-    -D size=8,base=cirros,bus=ide,type=cdrom -d 8 -d 8 \
+    -D size=8,base=cirros,bus=sata,type=cdrom -d 8 -d 8 \
     -n netuuid
 ```
 
 The specification is composed of a series of key-value pairs. Valid keys are:
 size; base; bus; and type. If you don't specify a key, you'll get a reasonable
-default. Here's how the keys work:
+default. Since v0.8 those four are the *only* keys accepted: anything else is
+refused with a 400 naming it, where a typo like `siz=20` used to be discarded in
+silence and get you a default sized disk. A disk specification must also ask for
+something, so one with neither a `size` nor a `base` is refused as well. See
+[the diskspec reference](/developer_guide/api_reference/instances/#diskspec)
+for the full contract. Here's how the keys work:
 
 * _size_ as per the shorthand notation.
-* _base_ as per the shorthand notation, including version specification.
-* _bus_ is any valid disk bus for libvirt, which is virtio, ide, scsi, usb. Use
-  virtio unless you have a really good reason otherwise -- the performance of the
-  others are terrible. An example of a good reason is to install virtio drivers
-  into legacy operating systems that lack them natively.
-* _type_ can be one of disk or cdrom. Note that cdroms are excluded from snapshots.
+* _base_ as per the shorthand notation, including version specification. The
+  literal string "none" means no base image, exactly as omitting the key does --
+  so `-D base=none` on its own is a specification which asks for nothing, and is
+  refused.
+* _bus_ is the hardware bus to attach the disk to, and is one of virtio, sata,
+  scsi, usb or nvme. Use virtio unless you have a really good reason otherwise --
+  the performance of the others are terrible. An example of a good reason is to
+  install virtio drivers into legacy operating systems that lack them natively.
+  ide was supported before v0.7, but the performance was so poor that support was
+  removed; a disk specification asking for it is rejected.
+* _type_ can be one of disk or cdrom, and any other value is rejected. Note that
+  cdroms are excluded from snapshots.
 
 ### Network specifications
 
@@ -285,11 +296,23 @@ of the following keys:
 * _macaddress_ the mac address to use for the interface, in the colon
   separated form `02:00:00:ea:3a:28`. Either case is accepted, and a value
   in any other form is rejected.
-* _model_ is the model of the network device, with options being ne2k_isa,
-  i82551, i82557b, i82559er, ne2k_pci, pcnet, rtl8139, e1000, and virtio. The
-  default model is virtio.
+* _model_ is the model of the network device. The default is virtio, and it is
+  almost always the right answer; e1000, rtl8139, pcnet and the i825xx family are
+  the usual choices for a guest which lacks virtio drivers. Shaken Fist does not
+  check this value and cannot give you a definitive list of the ones which work:
+  it is handed to the hypervisor unexamined, so the set which works is whatever
+  your hypervisor's qemu build supports. See
+  [the networkspec reference](/developer_guide/api_reference/instances/#networkspec)
+  for more detail.
 * _float_ if true indicates to immediately float the interface once the instance
-  is created.
+  is created. `true`, `yes`, `on`, `1` and their cases all mean yes and
+  `false`, `no`, `off` and `0` all mean no; the `sf-client` and ansible
+  interfaces convert what you type before it reaches the API.
+
+Since v0.8 those five are the only keys accepted here too, and anything else is
+refused with a 400 naming it. See
+[the networkspec reference](/developer_guide/api_reference/instances/#networkspec)
+for the full contract.
 
 So for example, this is valid:
 

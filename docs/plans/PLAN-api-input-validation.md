@@ -310,7 +310,7 @@ declarations are good enough to compile.
 | 4: Enforce | Complete | Landed 2026-09-09 via [#4141](https://github.com/shakenfist/shakenfist/pull/4141). Fixed the two declaration bugs the warn window found (#3739's undeclared `namespace` on 55 handlers, and fourteen metadata `value` declarations), taught the derivation to see decorator-consumed kwargs so that class cannot recur, and turned on rejection with one malformed-input response shape that never contains interpreter text. The `get_args` fold moved to Future work as [#4098](https://github.com/shakenfist/shakenfist/issues/4098): read as "delete the four `@use_kwargs` decorators" it is a bug, because the compiled path is check-only and `@use_kwargs` is the only thing that gets a query parameter to a handler. See [phase 4](PLAN-api-input-validation-phase-04-enforce.md) | `1c203b111` (#4101), `f1040a23b` (#4141) |
 | 5: Narrow the handlers | Complete | Deleted the `except TypeError` arm from `handle_authorization_exceptions` (D23): a handler-internal `TypeError` is now a recorded 500 like any other server fault, and under the `warn`/`off` rollback an undeclared body key gets that same 500 instead of the 400-with-interpreter-text it used to (D25). Fixed [#3523](https://github.com/shakenfist/shakenfist/issues/3523) (a partial `cpuinfo` probe raising `KeyError` in `get_user_agent`) and removed two `requires_namespace_exist_if_specified` applications phase 4 found dead and never filed (F8). Grew a sixth step mid-phase, after step 2 found the generic 500 body still carried `repr(e)` (F11): every 500 response now answers a bare `server error` with no exception detail at all, for any cause (D31). Filed [#4161](https://github.com/shakenfist/shakenfist/issues/4161) for the proxy path answering an unreachable node with a 500 (F9) — re-verifying the finding before filing found that an unrelated fix ([#3743](https://github.com/shakenfist/shakenfist/issues/3743)) had already closed its largest instance, so the issue is scoped to what is still true rather than to the table as originally surveyed. See [phase 5](PLAN-api-input-validation-phase-05-narrow.md) | `b3de0a44f` (#4162) |
 | 6: Required and scalar semantics | Complete | A sweep drove one real request per declaration through the whole decorator stack: of the 75 body/query declarations carrying `required=True` (every one had a handler default, so none was structurally required), 63 were already refused by a handler guard, 7 reached a null-hostile constructor and 500'd, and only 6 were accepted outright — of those, only `shared` on `POST /artifacts` was genuinely optional and moved to `required=False`; the other 5 committed a broken operation on omission (a queued agent command with a null path, a DNS record pointing at null) and kept `required=True` so enforcement turns that into a 400 instead. The `MISSING_REQUIRED` filter in `validate_request` was then deleted, so an omitted or explicit-null required parameter now answers 400 naming it, in every mode but `warn`/`off`. Separately, five of the nine semantic type tokens (`byte`, `a CIDR netblock`, `an IPv4 address as a string`, `url`, `uuid`) were given real validators keyed on the exact `format` string they publish, closing #3269 by rejecting non-base64 `user_data` at the API instead of on the hypervisor; `macaddr` already validated via PR #4183 and is unchanged. `POST /networks` gained a handler guard refusing a netblock that overlaps the deployed floating network, closing #323. #534 was closed outside this plan by #4183 before the phase started (see the note below). See [phase 6](PLAN-api-input-validation-phase-06-required.md) | `81aa9a7d0` (#4199) |
-| 7: Structured parameter schemas | Not started | `dict` compiles to `fields.Dict()` and `arrayofdict` to `fields.List(fields.Dict())`, neither carrying a value schema, so every key inside a diskspec, networkspec or videospec is unvalidated in every mode. Teaching the vocabulary to carry an element schema is what #528 needs — the scope #936 described before it was closed as a duplicate of #528 on 2026-09-12 — and it is also items 2 and 3 of #4167. Split out of phase 6 by that phase's survey: the other issues in that row are guards and scalar validators, and this is a vocabulary change the size of phase 2 | — |
+| 7: Structured parameter schemas | Complete | Taught the type vocabulary to describe what is *inside* a structure, and then described three. `_field()` gained an object branch, so a rendered `properties` block compiles to a nested marshmallow schema with `unknown=RAISE`, and `ARGTYPES` gained `diskspec`, `arrayofdiskspec`, `networkspec`, `arrayofnetworkspec` and `videospec`, built from three module-level constants so a shape declared twice cannot drift. The population was six `dict`/`arrayofdict` declarations across four operations, of which two stayed out and are documented as staying out: `metadata` is free-form by design and `bound_claims` is already guarded by hand with better messages than a schema could produce. Twenty-one nested values which were a recorded 500 or a silent acceptance now answer 400 naming the key and its index (`disk[1].size: Not a valid integer.`) — eleven that faulted, ten that were accepted — while five values which look like they should have been narrowed are deliberately still accepted, because a validator narrower than its handler is a breaking change wearing the clothes of a correctness fix. Three real narrowings were taken and written down: a `disk[].type` outside `disk`/`cdrom`, a caller-supplied `blob_uuid` inside a diskspec, and a diskspec asking for neither a `size` nor a `base`. Three of the new guards are handler guards rather than schema checks and so are not rolled back by `API_VALIDATION_MODE=warn`, deliberately: the size-or-base guard; a `networkspec` whose `network_uuid` is an explicit `null`, which previously resolved to an arbitrary network in the namespace and on interface hotplug answered 200 and created an interface on a network the caller never named; and a `videospec` whose `model` or `memory` is an explicit `null`, which the review found the phase had missed because those two checks were still presence tests, so a null was stored and rendered into the domain XML as `type='None'`. The review also found the phase had published `network[].float` as a boolean while reading it with a bare truthiness test on the raw body, so `"false"` floated the interface; `validation.declared_boolean()` is now the single reading, keyed on marshmallow's own truthy and falsy sets. That defect is the lookup function's rather than the vocabulary's, so it was filed as [#4223](https://github.com/shakenfist/shakenfist/issues/4223) and left for its own fix, carrying `automated-fix-attempted` from the moment it was filed. Decision D46 was rewritten mid-phase (marshmallow's `strict=True` refuses a query parameter, which arrives as a string on the wire) and the rewrite silently invalidated three other statements reasoning from it, which four separate steps rediscovered independently — the phase's own recorded lesson, and the reason its close-out re-read the decisions as a set. See [phase 7](PLAN-api-input-validation-phase-07-structured.md) | — |
 | 8: Push audit | Not started | Runs `PUSH-AUDIT.md` over the accumulated diff of every phase in this plan against `develop`, not the last phase's diff alone. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence | — |
 
 The `Merged` column records what put each phase on `develop`.
@@ -361,6 +361,25 @@ three classes the phase 5 survey recorded, so the issue is scoped
 to the two proxy call sites and the local-socket case that fix
 does not cover, not to the survey's original table.
 
+**Filed by phase 7's survey, and deliberately not fixed by it:**
+[#4223](https://github.com/shakenfist/shakenfist/issues/4223), a null
+object reference resolving to an arbitrary object. The pushed-down
+`from_db_by_ref` implementations build
+`ObjectFilterCriteria(name=object_ref)`, and a `None` name reads as *no
+name filter* rather than as a name of `None`, so the query returns
+every active object in the namespace and one match is answered as
+though the caller had named it. The only path a caller can reach is the
+netdesc's `network_uuid`, which `_netdesc_safety_checks` tests for
+presence rather than for a value, and it was measured end to end:
+`POST /instances/{ref}/interfaces` with `{"network_uuid": null}`
+answers 200 and creates an interface. Phase 7 leaves it alone on
+purpose — its networkspec schema will make `network_uuid` a required
+string, which closes the reachable path while leaving the lookup
+function wrong for the next caller, and that is a mask rather than a
+fix. The issue was filed carrying `automated-fix-attempted`, which is
+the first time this plan has applied that label at filing rather than
+watching the fixer apply it afterwards.
+
 **Closed by phase 6**, all three when
 [#4199](https://github.com/shakenfist/shakenfist/pull/4199) merged
 on 2026-09-15: #3269 (`ec406a78a`, step 4's commit `Enforce the
@@ -390,9 +409,57 @@ branch is still in flight is a SHA a rebase can invalidate, so
 read them off the first-parent range after the merge, the way the
 `Merged` column above is built.
 
-**Still open and still owned by this plan:** #528 (parent, and
-since 2026-09-12 also the tracker for what #936 described), #3612
-(the mechanism), #2094.
+**Closed by phase 7, and what closed each:**
+[#528](https://github.com/shakenfist/shakenfist/issues/528), the
+parent, and since 2026-09-12 also the tracker for what #936
+described. Its scope was two things wearing one title. Its own text
+described extending `use_kwargs` coverage across the remaining
+endpoints, and that was overtaken by **phase 4** rather than by this
+phase: phase 3 compiled every declaration in the tree into a schema
+and phase 4 turned rejection on, which covered every endpoint without
+extending `use_kwargs` to any of them — read literally, #528 was
+closed on 2026-09-09 and nobody noticed. What remained was #936's
+scope, the element schemas, and that is phase 7. The issue's body was
+rewritten to the element-schema scope before it was closed, so that
+its history does not read as though the `use_kwargs` work were
+abandoned.
+
+**Closes on merge, in our judgement:**
+[#3612](https://github.com/shakenfist/shakenfist/issues/3612), the
+mechanism issue. It named two things. The broad `except TypeError`
+returning interpreter messages was deleted by **phase 5** (D23), and
+phase 5 went further and made every 500 answer a bare `server error`
+carrying no exception detail at all (D31). Body parameters reaching
+handlers untyped was closed at the top level by phases 3 and 4 and at
+every nesting depth by phase 7, which is the half that was still open
+when this phase started: before it, `arrayofdict` compiled to
+`fields.List(fields.Dict())` with no value schema, so a wrong-typed
+value one level down was unvalidated in every mode. We think it can
+be closed outright rather than rescoped, because nothing of what it
+describes survives: the two structures still carrying no element
+schema (`metadata`, and the mapping rules' `bound_claims`) are
+uninterpreted by design and guarded by hand respectively, which is a
+recorded decision (D47) rather than a residual. It is left open until
+phase 7 merges rather than closed from a branch.
+
+**Still open and still owned by this plan:** #2094.
+
+**Reduced but not closed by phase 7:**
+[#4167](https://github.com/shakenfist/shakenfist/issues/4167).
+Its items 2 and 3 — a `disk[].base` set to a truthy non-string, and a
+`network[].network_uuid` set to a non-string, both an `AttributeError`
+in `shakenfist/util/general.py` and both a recorded 500 — now answer
+`400 disk[0].base: Not a valid string.` and
+`400 network[0].network_uuid: Not a valid string.`, pinned in
+`shakenfist/tests/external_api/test_nested_sweep.py`. Item 1 survives
+in part. Phase 6's required-ness enforcement closed its `cpus` and
+`memory` cases, which now answer `400 cpus: declared required but not
+supplied`; `uefi` and `secure_boot` are `required=False` booleans, so
+that enforcement does not reach them, and no element schema contains
+them. `POST /instances {"uefi": null}` was re-measured through the
+phase 7 sweep fixture at `enforce` during the phase 7 close-out and is
+still a recorded 500 answering `server error`. The issue was commented
+with that measurement rather than closed.
 
 **Phase 5 was overtaken from outside, as predicted.** Three of
 its four attribution issues were picked up by the automated issue

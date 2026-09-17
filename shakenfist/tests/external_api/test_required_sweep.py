@@ -621,29 +621,19 @@ SWEEP = {
 }
 
 
-class RequiredSweepTestCase(AuthenticatedStackTestCase):
-    """Every declared-required parameter, omitted once, through the stack.
+class SweepFixtureTestCase(AuthenticatedStackTestCase):
+    """The sweep's fixtures, carrying no tests of its own.
 
-    Inherits the whole decorator stack and a real authenticated client
-    from AuthenticatedStackTestCase for the reason that class
-    documents: phase 3's review found a handler tested in isolation and
-    the deployed behaviour giving different answers.
+    Split out in phase 7 for the same reason AuthenticatedStackTestCase
+    carries no tests: a subclass which wants these fixtures at
+    ``enforce`` -- test_nested_required_null.py is the first --
+    inherits every test method too, and the sweep below is deliberately
+    a ``warn`` measurement whose rows all fail at ``enforce``. A class
+    holding a fixture and a class holding the assertions which use it
+    are two things, and only the first is reusable.
 
-    Runs at ``warn``, not ``enforce``. Step 3 deleted the filter that
-    used to keep a missing-required finding out of the enforceable
-    set, so an ``enforce`` run now answers a generic ``<parameter>:
-    declared required but not supplied`` for every omission before any
-    handler sees it -- the validation layer's answer, not the
-    handler's, and the opposite of what this file exists to measure.
-    ``warn`` still runs ``check()`` and still logs every finding
-    (decision D34: an operator's rollback keeps the same
-    observability), it just does not act on one, so a request reaches
-    its handler exactly as it did before this phase and the table
-    below still describes real handler behaviour. That also makes
-    this file definition-of-done item 5 for all 76 rows, not merely
-    the ``guarded`` and ``faults`` pair the step 3 brief names: every
-    row here is evidence that ``warn`` reproduces this phase's
-    pre-enforcement answers.
+    Everything here was RequiredSweepTestCase's ``setUp`` and helpers,
+    moved unchanged.
     """
 
     mode = 'warn'
@@ -882,6 +872,36 @@ class RequiredSweepTestCase(AuthenticatedStackTestCase):
         if status >= 400:
             return 'guarded'
         return 'accepted'
+
+
+class RequiredSweepTestCase(SweepFixtureTestCase):
+    """Every declared-required parameter, omitted once, through the stack.
+
+    Inherits the whole decorator stack and a real authenticated client
+    from AuthenticatedStackTestCase for the reason that class
+    documents: phase 3's review found a handler tested in isolation and
+    the deployed behaviour giving different answers.
+
+    Runs at ``warn``, not ``enforce``. Step 3 deleted the filter that
+    used to keep a missing-required finding out of the enforceable
+    set, so an ``enforce`` run now answers a generic ``<parameter>:
+    declared required but not supplied`` for every omission before any
+    handler sees it -- the validation layer's answer, not the
+    handler's, and the opposite of what this file exists to measure.
+    ``warn`` still runs ``check()`` and still logs every finding
+    (decision D34: an operator's rollback keeps the same
+    observability), it just does not act on one, so a request reaches
+    its handler exactly as it did before this phase and the table
+    below still describes real handler behaviour. That also makes
+    this file definition-of-done item 5 for all 76 rows, not merely
+    the ``guarded`` and ``faults`` pair the step 3 brief names: every
+    row here is evidence that ``warn`` reproduces this phase's
+    pre-enforcement answers.
+
+    The fixtures are SweepFixtureTestCase's, which is that class's
+    whole reason for existing: this one's ``mode`` is load bearing and
+    a subclass cannot change it without taking these four tests along.
+    """
 
     def test_every_required_declaration_has_a_recipe(self):
         """No declaration is swept by accident or skipped by omission.

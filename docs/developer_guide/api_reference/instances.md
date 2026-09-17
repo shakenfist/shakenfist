@@ -64,22 +64,53 @@ The instance creation API call also takes three data structures: the `diskspec`;
 the `networkspec`; and the `videospec`. These structures are not well documented
 in the OpenAPI interface, so are documented here instead.
 
+Since v0.8 all three are described to the API's input validation layer instead of
+being handed to the handler unexamined, which has two consequences for every one
+of them. **A key which is not listed below is refused with a 400 naming it**,
+where it used to be silently discarded -- typing `siz` instead of `size` got you
+a default sized disk and no indication that anything had gone wrong. And a value
+of the wrong type is refused with a 400 naming the key and the element it is in
+(`disk[0].size: Not a valid integer.`), where many of them used to reach code
+which could not cope and produce a server error naming nothing.
+
+Any of the values below may also be sent as JSON `null`, which means "not
+supplied" and gets you the same behaviour as omitting the key -- the shipped
+client and the shipped ansible collection both do that for several of them on an
+ordinary request. The exceptions are the three values a handler requires: a
+`networkspec`'s `network_uuid`, and a `videospec`'s `model` and `memory`. For
+those a null is refused exactly as an omission is, which is the same statement
+as the rest of this paragraph rather than a different one -- omitting them is
+already a 400.
+
 ### diskspec
 
 A `diskspec` consists of the following fields as a JSON dictionary:
 
-* size (integer): the size of the disk in gigabytes.
+* size (integer): the size of the disk in gigabytes. Must be zero or greater; a
+  negative size is refused with a 400, because it corrupts the cluster's capacity
+  accounting. Omit this value, or send null, for a disk the size of its base
+  image.
 * base (string): the base image for the disk. This can be a variety of URL-like strings,
   as documented on [the artifacts page in the user guide](/user_guide/artifacts/).
-  For a blank disk, omit this value.
+  For a blank disk, omit this value, send null, or send the literal string
+  "none" -- all three mean the same thing here.
 * bus (enum): the hardware bus the disk device should be attached to on the instance.
   In general you shouldn't care about this and can omit this value. However, in
   some cases, such as unmodified Microsoft Windows images it is required. The options
   available here are: sata; scsi; usb; virtio (the default); and nvme. While ide
   was previously supported, that support was removed in v0.7 due to extremely
-  poor performance.
-* type (enum): the type of device. The default is "disk", but in some cases you might
-  want "cdrom".
+  poor performance, and a bus of ide is refused with a 400 along with every other
+  value outside that list.
+* type (enum): the type of device, either "disk" (the default) or "cdrom". Any
+  other value is refused with a 400. Before v0.8 any string was accepted here and
+  handed to libvirt as a device name, which meant that libvirt's own device types
+  were accepted and then behaved as plain disks, because only "cdrom" is treated
+  specially by Shaken Fist.
+
+A `diskspec` must ask for something: one which specifies neither a `size` nor a
+`base` -- including a size of zero with no base, and a `base` of the literal
+string "none", which means no base -- is refused with a 400, because it
+describes a disk nobody asked for.
 
 A full example of a `diskspec` is therefore:
 
@@ -96,19 +127,41 @@ A full example of a `diskspec` is therefore:
 
 Similarly, a `networkspec` consists of the following fields in a JSON dictionary:
 
-* network_uuid (uuid): the UUID of the network the interface should exist on.
+* network_uuid (string, required): the network the interface should exist on.
+  Despite the name this is not restricted to being a UUID -- the unique name of a
+  network in the namespace you are creating in is accepted as well, which is why
+  this value is published as a plain string rather than as a UUID. A
+  `networkspec` with no `network_uuid`, or with a null one, is refused with a 400.
 * macaddress (string): the MAC address of the interface, in the colon separated form
   `02:00:00:ea:3a:28`. Either case is accepted. A value in any other form is rejected
-  with a 400. Omit this value to be allocated a MAC address automatically.
-* address (string): the IPv4 address to assign to the interface. Omit this value to be
-  allocated a random address.
-* model (enum): the model of the network interface card. In general you should not have
+  with a 400. Omit this value, or send null, to be allocated a MAC address
+  automatically -- which is what the shipped client does on every call.
+* address (string): the IPv4 address to assign to the interface, or the literal
+  string "none" for an interface with no address at all. Omit this value, or send
+  null, to be allocated a random address. Because of the "none" case this value is
+  published as a plain string and is not validated as an IPv4 address.
+* model (string): the model of the network interface card. In general you should not have
   to set this, although it can matter in some cases, such as unmodified Microsoft
-  Windows images. The options include: i82551; i82557b; i82559er; ne2k_pci; pcnet;
-  rtl8139; e1000; and virtio (the default).
+  Windows images. virtio is the default and is almost always the right answer;
+  e1000, rtl8139, pcnet and the i825xx family are the usual choices for a guest
+  without virtio drivers. There is deliberately **no enumeration of legal values
+  here, and a value this API does not recognise is not refused**: the value is
+  rendered into the instance's libvirt domain XML unexamined, so the set which
+  actually works is whatever the hypervisor's qemu build supports, which varies by
+  node and by release and which this API cannot know. If a model is wrong you will
+  find out when the instance fails to start, not when you create it.
 * float (boolean): whether to associate a floating IP with this interface to enable external
   accessibility to the instance. Note that you can float and unfloat an interface
-  after instance creation if desired.
+  after instance creation if desired. A JSON boolean is the expected form, and
+  the shipped client and ansible collection both send one; the string spellings
+  the validation layer accepts (`true`, `yes`, `on`, `1`, `false`, `no`, `off`,
+  `0`, and their cases) are read with the meaning the validation layer gives
+  them, so `"false"` does not float the interface.
+
+The same structure is passed to
+[POST /instances/{instance_ref}/interfaces](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__interfaces)
+when hot plugging an interface into a running instance, where it is a single
+dictionary rather than a list of them, and is checked identically.
 
 ### videospec
 
@@ -116,16 +169,31 @@ A `videospec` differs from a `diskspec` and a `networkspec` in that it is not
 passed as a list. You only have one `videospec` per instance. Once again, a
 `videospec` is a JSON dictionary with the following fields:
 
-* model (enum): the model of the video card to attach to the instance. Possible
-  options include: vga; cirrus (the default); and qxl.
+* model (string): the model of the video card to attach to the instance. cirrus is
+  the default, and vga and qxl are the other usual choices -- qxl is the one to
+  pair with SPICE. As with a `networkspec`'s model there is deliberately **no
+  enumeration of legal values, and an unrecognised one is not refused**, for the
+  same reason: the value is rendered into the libvirt domain XML unexamined, so
+  the working set belongs to the hypervisor's qemu build rather than to this API.
 * memory (integer): the amount of video RAM the video card should have, in
-  kibibytes (blocks of 1024 bytes).
-* vdi (string): the VDI protocol to use. Options are "vnc", "spice" (the default),
+  kibibytes (blocks of 1024 bytes). A value with a fractional part is refused with
+  a 400.
+* vdi (enum): the VDI protocol to use. Options are "vnc", "spice" (the default),
   "spiceconcurrent", or "spicedebug". spice and spiceconcurrent are the same except
   that spiceconcurrent allows limited multi-user sessions, with subsequent sessions
   not experiencing full VDI functionality. spicedebug behaves like spice but also
   sets `G_MESSAGES_DEBUG=all` in the qemu environment so the SPICE server emits
   verbose logs to the qemu log, which is useful for diagnosing connectivity issues.
+  This enumeration is Shaken Fist's own, rather than the hypervisor's, so unlike
+  the two model fields a value outside it is refused with a 400 when you create the
+  instance. It previously reached the instance and then failed in a console
+  request, long after the call which accepted it.
+
+If you supply a `videospec` at all it must contain both `model` and `memory`, or
+the call is refused with a 400 -- and a null counts as not containing it, since a
+stored null reaches the hypervisor and produces an instance which cannot start.
+Omit the whole structure, send null, or send an empty dictionary to get the
+defaults instead. A null `vdi` is defaulted like an absent one.
 
 ???+ tip "REST API calls"
 

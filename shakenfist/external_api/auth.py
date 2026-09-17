@@ -1122,6 +1122,17 @@ class AuthNamespaceRulesEndpoint(api_base.Resource):
             ('issuer', 'body', 'string',
              'The name of the trusted issuer whose tokens this rule '
              'accepts.', True),
+            # Deliberately a bare 'dict', with no element schema (D47).
+            # The claim names are the issuer's, and the matchers are
+            # already completely guarded by hand below, better than a
+            # schema could manage: federation.claim_matches() returns
+            # False *silently* for a matcher which is not a string or a
+            # list of strings, so a rule stored with any other shape
+            # would look like a grant and would never match an
+            # identity. This endpoint refusing it at write time is the
+            # only place that failure is ever visible, and the messages
+            # it writes name the claim and the type it was given.
+            # Census finding F3.
             ('bound_claims', 'body', 'dict',
              'Claim name to matcher. A matcher is an exact string, or a '
              'list of acceptable strings. Matching is exact: no globbing, '
@@ -1205,6 +1216,12 @@ class AuthNamespaceRuleEndpoint(api_base.Resource):
             ('issuer', 'body', 'string',
              'The name of the trusted issuer whose tokens this rule '
              'accepts.', True),
+            # Unstructured for the same reason as the create endpoint
+            # above: the hand written matcher guards are both wider and
+            # more precise than a properties block, and they are the
+            # only thing standing between a malformed matcher and a
+            # rule which silently matches nobody (D47, census finding
+            # F3).
             ('bound_claims', 'body', 'dict',
              'Claim name to matcher, as for creation.', True),
             ('scopes', 'body', 'arrayofstring',

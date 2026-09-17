@@ -685,8 +685,16 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                     'placed_on': None,
                                     'namespace': None,
                                 }))
+        # The networkspec schema makes network_uuid required, so the
+        # validation layer answers before _netdesc_safety_checks() gets
+        # a look at this. The handler guard is still there and still
+        # says 'network specification is missing network_uuid' -- it is
+        # what a cluster running API_VALIDATION_MODE=warn or off
+        # answers, which is decision D42, and the phase 7 sweep is what
+        # pins that.
         self.assertEqual(
-            {'error': 'network specification is missing network_uuid', 'status': 400},
+            {'error': 'network[0].network_uuid: Missing data for required '
+             'field.', 'status': 400},
             resp.get_json())
         self.assertEqual(400, resp.status_code)
 
@@ -1143,7 +1151,16 @@ class ExternalApiInstanceDiskLoopTestCase(ExternalApiInstanceTestCase):
                 'cpus': 1,
                 'memory': 1024,
                 'network': [],
-                'disk': [{'size': 8, 'blob_uuid': self.BLOB_UUID}],
+                # Spelled as a base rather than as a bare blob_uuid:
+                # the diskspec schema refuses an undocumented key now
+                # (D41), and blob_uuid is one the handler writes for
+                # itself rather than one a caller supplies. The blob
+                # URL form is the documented spelling and reaches the
+                # same branch -- external_api/instance.py's BLOB_URL
+                # arm sets d['blob_uuid'] from it before the fetch loop
+                # ever sees the disk.
+                'disk': [{'size': 8,
+                          'base': f'{BLOB_URL}{self.BLOB_UUID}'}],
                 'namespace': 'system',
             }))
         self.assertEqual(200, resp.status_code, resp.get_json())

@@ -32,6 +32,7 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.external_api import app as external_api
 from shakenfist.external_api import base as api_base
+from shakenfist.external_api import instance as instance_api
 from shakenfist.external_api import validation
 from shakenfist.instance import Instance
 from shakenfist.tests import base
@@ -1323,3 +1324,120 @@ class EnforcedValidationTestCase(AuthenticatedStackTestCase):
             {'error': 'banana: not declared by this endpoint', 'status': 400},
             response.get_json())
         self.assertNotIn('request refused by input validation', events)
+
+
+# Enough of a body to reach placement, so a test about one value fails
+# for the reason it says it does. A single node cluster with no
+# hypervisor cannot place an instance, so a well formed request lands
+# on the scheduler's 507 -- which is the control this file uses to say
+# "the request got past every guard", the same one the phase 6 sweep
+# and test_instance_create_validation.py use.
+PLACEABLE_INSTANCE = {
+    'name': 'validationfixture',
+    'cpus': 1,
+    'memory': 1024,
+    'disk': [{'size': 8}]
+}
+
+
+class InstanceCreateBodyTestCase(AuthenticatedStackTestCase):
+    """POST /instances at 'enforce', for the phase 7 step 2 properties.
+
+    Through the whole decorator stack for the reason
+    AuthenticatedStackTestCase documents, and with record_exception
+    spied on rather than performed: a 500 here writes a file under
+    /srv/shakenfist/exceptions/ for what is a caller's mistake, and "no
+    record was written" is the half of finding F8 that a status code
+    assertion alone would not catch.
+    """
+
+    mode = 'enforce'
+
+    def _post(self, body):
+        # InstancesEndpoint.post caches its Scheduler in a module
+        # global and only builds one if that global is falsy, so a
+        # request which reaches placement leaves a real Scheduler
+        # behind for every later test in the same worker process.
+        # patch.object restores the attribute it saved even though the
+        # handler reassigns it, which is the containment wanted here;
+        # copied from test_instance_create_validation.py, where the
+        # same escape produced a 507 in unrelated tests.
+        with mock.patch.object(instance_api, 'SCHEDULER', None), \
+                mock.patch.object(
+                    api_base.util_exceptions, 'record_exception',
+                    return_value={'exception-record': 'test'}) as recorded:
+            response = self.client.post(
+                '/instances', data=json.dumps(body),
+                content_type='application/json',
+                headers={'Authorization': self.token})
+        return response, recorded
+
+    def test_a_fractional_cpu_count_is_a_bad_request(self):
+        """Finding F8, end to end.
+
+        Before decision D46 this answered 500: marshmallow's
+        fields.Integer accepted 1.5 because int(1.5) succeeds, the
+        check-only layer (D14) handed the handler the body it was sent,
+        and InstanceData raised a pydantic ValidationError. A recorded
+        500 for a caller's mistake, which is what the whole plan
+        exists to stop.
+        """
+        body = dict(PLACEABLE_INSTANCE)
+        body['cpus'] = 1.5
+        response, recorded = self._post(body)
+
+        self.assertEqual(400, response.status_code, response.get_json())
+        self.assertEqual(
+            {'error': 'cpus: Not a valid integer.', 'status': 400},
+            response.get_json())
+        recorded.assert_not_called()
+
+    def test_a_whole_cpu_count_still_reaches_placement(self):
+        """The control. Without it the refusal above could be an
+        endpoint which had stopped accepting any cpu count at all."""
+        response, recorded = self._post(dict(PLACEABLE_INSTANCE))
+
+        self.assertEqual(507, response.status_code, response.get_json())
+        recorded.assert_not_called()
+
+    def test_a_numeric_string_cpu_count_still_reaches_placement(self):
+        """The width D46 could not have, written as an assertion.
+
+        D46 asked for marshmallow's strict=True, which refuses anything
+        that is not already a Python int. `{"cpus": "2"}` is accepted
+        today -- pydantic's lax mode converts it -- so refusing it here
+        would be a validator narrower than its handler, which is the
+        breaking change dressed as a correctness fix that phase 6's
+        width rule exists to stop. See _ExactInteger's docstring for
+        the other half of the argument, which is that strict=True also
+        refuses every integer *query* parameter, all of which arrive as
+        strings.
+        """
+        body = dict(PLACEABLE_INSTANCE)
+        body['cpus'] = '2'
+        response, recorded = self._post(body)
+
+        self.assertEqual(507, response.status_code, response.get_json())
+        recorded.assert_not_called()
+
+    def test_metadata_takes_a_dict_and_a_list_under_the_same_key(self):
+        """Definition-of-done item 1, and the regression guard for D47.
+
+        ARGTYPES['dict'] renders a bare {'type': 'object'}, which the
+        compiler must keep compiling to fields.Dict rather than to an
+        empty nested schema -- marshmallow's default for a schema is
+        unknown=RAISE, so an object branch keyed on the type rather
+        than on the presence of `properties` would have refused every
+        metadata key ever sent. The two shapes here are the ones
+        ARGTYPES['dict']'s own comment records sfcbr's k3s traffic
+        storing under one parameter.
+        """
+        for value in ({'a': 'dict'}, ['a', 'list']):
+            with self.subTest(value=value):
+                body = dict(PLACEABLE_INSTANCE)
+                body['metadata'] = {'k3s': value}
+                response, recorded = self._post(body)
+
+                self.assertEqual(
+                    507, response.status_code, response.get_json())
+                recorded.assert_not_called()

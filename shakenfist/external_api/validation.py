@@ -49,9 +49,11 @@ construction (decision D33).
 
 import base64
 import ipaddress
+import math
 import re
 import urllib.parse
 import uuid
+from collections.abc import Mapping
 from typing import Any
 from typing import Callable
 from typing import Optional
@@ -59,6 +61,11 @@ from typing import Optional
 import marshmallow
 from marshmallow import fields
 from marshmallow import validate
+# marshmallow's sentinel key for an error about an object rather than
+# about one of its fields. Imported from where it is defined rather
+# than reached through marshmallow.schema, which re-exports it and so
+# is not an explicit export for mypy --strict.
+from marshmallow.exceptions import SCHEMA as SCHEMA_LEVEL_KEY
 from shakenfist_utilities import logs
 
 from shakenfist import exceptions
@@ -83,13 +90,111 @@ _IGNORED_LOCATIONS = frozenset(['header', 'formData'])
 # specification" design of this module exists to prevent.
 ANY_VALUE_FORMAT = 'any JSON value'
 
+
+class _ExactInteger(fields.Integer):
+    """fields.Integer, except that 1.5 is not an integer (decision D46).
+
+    marshmallow's Integer accepts any value int() will take, so 1.5
+    passes because int(1.5) is 1. In a *deserialising* layer that is
+    merely lax: the handler would receive the 1 the field produced.
+    This layer is check-only by design (decision D14) --
+    validate_request() runs schema.validate() for its findings and
+    throws the deserialised result away, so the handler always sees the
+    body the caller sent. A field which accepts a value it would have
+    had to truncate is therefore not lax here, it is a false statement:
+    it says the value is a valid integer about a value which is not one
+    and which nothing downstream will convert.
+
+    Measured before the fix (phase 7 finding F8): POST /instances with
+    "cpus": 1.5 passed validation, reached InstanceData unchanged and
+    raised a pydantic ValidationError -- a recorded 500 for a caller's
+    mistake.
+
+    **This is not marshmallow's `strict=True`, which D46 asked for and
+    which cannot be used here.** `strict=True` refuses anything that is
+    not already a Python int, and two kinds of caller legitimately send
+    something else:
+
+    * A query parameter is a string on the wire. base.py hands
+      `flask.request.args.to_dict()` to check(), so `offset=10` arrives
+      as `'10'` and `strict=True` answers `400 offset: Not a valid
+      integer.` on a request the server has always served. Every
+      integer query parameter in the tree is affected;
+      test_blob_data_bounds caught it within a minute of the change.
+    * A body integer sent as a JSON string reaches a handler which
+      coerces it. `{"cpus": "8"}` is accepted today because pydantic's
+      lax mode converts it, so refusing it here would be a validator
+      narrower than its handler -- the breaking-change-dressed-as-a-fix
+      that phase 6's width rule (and the _FORMATS comment above) exists
+      to prevent.
+
+    So the check is written against the defect rather than against the
+    Python type: a JSON number with a fractional part is refused, and
+    everything int() converts faithfully is left alone. An integral
+    float is faithful and is accepted, for exactly the reason
+    fields.Float is left alone below -- JSON has one numeric type, so
+    8.0 and 8 are the same JSON number and reading one as the integer 8
+    invents nothing. Infinity is left to the base class, which has a
+    better message for it ("Number too large.") than this would.
+
+    A subclass rather than a keyword at the construction site, because
+    the construction site is the _SCALARS lookup below and D46 asks for
+    this at every nesting depth. Binding it to the mapping from
+    rendered type to field class means a branch of _field() which one
+    day builds an integer some other way cannot forget it.
+    """
+
+    def _validated(self, value: Any) -> int:
+        if (isinstance(value, float) and math.isfinite(value)
+                and not value.is_integer()):
+            # make_error rather than a hand-written message, so a
+            # truncating value reads exactly like every other bad
+            # integer: "Not a valid integer."
+            raise self.make_error('invalid', input=value)
+        return super()._validated(value)
+
+
 _SCALARS: dict[str, type[fields.Field[Any]]] = {
     'string': fields.String,
-    'integer': fields.Integer,
+    'integer': _ExactInteger,
     'number': fields.Float,
     'boolean': fields.Boolean,
     'object': fields.Dict,
 }
+
+
+def declared_boolean(value: Any) -> bool:
+    """Read a caller's boolean the way the published schema reads it.
+
+    The mirror image of _ExactInteger, and it exists for the same
+    reason. This layer is check-only (decision D14): validate() is run
+    for its findings and the deserialised result is thrown away, so a
+    handler is handed the raw body and has to do its own reading. A
+    bare truthiness test is not that reading. marshmallow's Boolean
+    accepts a set of *string* spellings -- 'false', 'no', 'off', '0',
+    'n', 'f' and their cases are all False -- and every one of them is
+    a non-empty string, which Python reads as True. So the published
+    specification said `{"float": "false"}` was a valid boolean meaning
+    False while external_api/instance.py floated the interface.
+
+    That is worse than the unvalidated state it replaced: before this
+    phase the specification said nothing about the value, and now it
+    says something the server contradicts.
+
+    Keyed on marshmallow's own sets rather than on a list retyped here,
+    so the spelling the compiled field accepts and the spelling a
+    handler reads cannot drift -- the argument _FORMATS makes about
+    format strings, applied to a value vocabulary. Anything outside
+    both sets falls through to bool(), which is what a caller sending a
+    real JSON boolean (the shipped CLI and the ansible collection both
+    do, having parsed their own command lines) has always got.
+    """
+    if isinstance(value, str):
+        if value in fields.Boolean.falsy:
+            return False
+        if value in fields.Boolean.truthy:
+            return True
+    return bool(value)
 
 
 # ---------------------------------------------------------------------
@@ -368,18 +473,68 @@ class CompiledEndpoint:
         return out
 
 
-def _field(spec: dict[str, Any]) -> fields.Field[Any]:
+def _field(spec: dict[str, Any], required: bool = False) -> fields.Field[Any]:
     """One rendered parameter or property as a marshmallow field.
 
-    Every field is optional and nullable. Optional because required-ness
-    is metadata here (see CompiledEndpoint). Nullable because a JSON
-    null reaches the handler as None today and several handlers treat
-    that as "not supplied" -- rejecting it would be a behaviour change
-    invented by the compiler rather than described by a declaration,
-    and in warn-only it would fill the log with findings that are
-    artefacts of this module.
+    Every *optional* field is nullable, and every *parameter* is
+    optional. Nullable because a JSON null reaches the handler as None
+    today and several handlers treat that as "not supplied" --
+    rejecting it would be a behaviour change invented by the compiler
+    rather than described by a declaration, and in warn-only it would
+    fill the log with findings that are artefacts of this module. That
+    is not a hypothetical: the shipped client sends five documented
+    keys as an explicit null on every instance create (census finding
+    N1 of the phase 7 plan). Optional because at the top level
+    required-ness is metadata here (see CompiledEndpoint), which phase
+    6 enforces itself so that it can say which parameter is missing in
+    its own words.
+
+    `required` is the one exception, and only the object branch below
+    passes it: a property inside a rendered object fragment has no
+    CompiledEndpoint to carry its required-ness as metadata, so a
+    `required` list on the fragment is honoured by marshmallow
+    directly. That is still a check and never a coercion -- a missing
+    property becomes a finding naming its path, exactly as a
+    wrong-typed one does.
     """
-    kwargs: dict[str, Any] = {'required': False, 'allow_none': True}
+    # A required property is the one thing which is not nullable, which
+    # is decision D44: `required` inside a fragment means present *and
+    # not an explicit null*, the same meaning phase 6 gave `required` at
+    # the top level. check() applies that rule to compiled.required_names
+    # a few hundred lines below, with a comment arguing that a caller who
+    # sent `{"key": null}` and one who sent no key at all are stating one
+    # fact from the handler's side and must get one answer; this is that
+    # rule one level down, not a new one. Without it a required,
+    # string-typed `network_uuid` accepted `{"network_uuid": null}` and
+    # reached Network.from_db_by_ref(None, namespace), which resolves to
+    # an arbitrary network in the namespace -- finding F7, measured as a
+    # 200 and a created interface on the hotplug route.
+    #
+    # The nullability invariant above is untouched by this, because its
+    # stated reason is about *optional* parameters. Nothing this compiler
+    # builds for a parameter is ever required (only the object branch
+    # passes the argument), and no fragment marks a key required which
+    # any censused caller sends as null.
+    #
+    # The null message is *taken from* the required message rather than
+    # written out, so the two cannot drift apart: marshmallow would
+    # otherwise answer 'Field may not be null.' for the null and 'Missing
+    # data for required field.' for the omission, which is two messages
+    # for the one fact and undoes the uniform malformed-input shape phase
+    # 4 spent a step on. An error_messages override rather than a
+    # schema-level validator because a validator never runs on a null --
+    # the field has refused it before any validator is reached -- so
+    # matching the messages that way would mean a @validates_schema
+    # re-implementing marshmallow's own presence check and reporting
+    # through a different error key. test_validation_compiler.py holds
+    # the two strings equal for every field class this module can build,
+    # because whether a marshmallow subclass overrides one of them
+    # without the other is a property of a library we do not own.
+    kwargs: dict[str, Any] = {
+        'required': required, 'allow_none': not required}
+    if required:
+        kwargs['error_messages'] = {
+            'null': fields.Field.default_error_messages['required']}
 
     validators: list[Any] = []
     minimum, maximum = spec.get('minimum'), spec.get('maximum')
@@ -404,6 +559,30 @@ def _field(spec: dict[str, Any]) -> fields.Field[Any]:
             return value
 
         validators.append(_fullmatch)
+
+    # An `enum` in the rendered fragment becomes a membership check,
+    # for the same reason a `pattern` does and under the same rule: the
+    # published document and the enforced check are the same structure
+    # by construction, so a vocabulary entry cannot say "one of these
+    # four" to a client generator and mean nothing at all to the
+    # server. Phase 7's structured tokens (base.py's DISKSPEC_SCHEMA
+    # and VIDEOSPEC_SCHEMA) are the first fragments in the tree to
+    # publish one; decision D43 is the rule which decides that a key
+    # gets an enum, and it is deliberately met by only three of them.
+    #
+    # marshmallow runs no validator on a null, so an enum does not
+    # fire on the explicit nulls the shipped clients send for a disk's
+    # bus and type -- which is the property that lets D43 publish an
+    # enum on a key whose dominant value is null.
+    #
+    # Dropped again by the object, `any` and unrecognised-type branches
+    # below along with the rest of the validator list, for the reason
+    # each of them records: those compile to fields which do not
+    # coerce, so a validator would meet a value of whatever Python type
+    # the caller happened to send.
+    enum = spec.get('enum')
+    if isinstance(enum, list):
+        validators.append(validate.OneOf(enum))
 
     declared = spec.get('type')
     if not isinstance(declared, str):
@@ -431,6 +610,76 @@ def _field(spec: dict[str, Any]) -> fields.Field[Any]:
         # items is always present: swagger_helper() renders the array
         # tokens with it, and OpenAPI 2.0 requires it.
         return fields.List(_field(spec.get('items', {})), **kwargs)
+
+    element_properties = spec.get('properties')
+    if isinstance(element_properties, dict):
+        # A structured object fragment (phase 7): compile its
+        # properties into a nested schema so a value one level down is
+        # checked the way a top level one is.
+        #
+        # Keyed on the presence of `properties` rather than on the type
+        # being `object`, which is the whole of decision D47.
+        # ARGTYPES['dict'] renders a bare {'type': 'object'} and two
+        # live parameters need that to keep meaning "any mapping at
+        # all": `metadata` on POST /instances, whose keys are the
+        # caller's and which deliberately stores both a dict and a list
+        # as the *value* under one caller-chosen key (sfcbr's k3s
+        # traffic does exactly that), and `bound_claims` on the mapping
+        # rule endpoints, which is guarded by hand in federation.py
+        # with messages better than a schema could produce. A branch
+        # keyed on the type would have refused both.
+        #
+        # Reading the rendered fragment rather than knowing anything
+        # about type tokens is the module's standing rule (see the
+        # module docstring and _FORMATS): the published specification
+        # and the enforced check are the same structure by
+        # construction, so a token cannot render one shape and compile
+        # as another.
+        required_properties = spec.get('required') or []
+        nested = marshmallow.Schema.from_dict(
+            {name: _field(prop, required=name in required_properties)
+             for name, prop in element_properties.items()})
+
+        # marshmallow's own default for a schema is RAISE, so the
+        # EXCLUDE arm has to be written out: without it every
+        # structured token would refuse unknown keys whether it
+        # published additionalProperties: false or not, and the
+        # published specification would be saying something the server
+        # does not do. `is False` rather than a truthiness test because
+        # JSON Schema also spells additionalProperties as a *schema*,
+        # and only the literal false means "no other keys".
+        #
+        # Annotated because mypy widens marshmallow's two Literal
+        # constants to str across a conditional, and Schema's own
+        # parameter is the Literal.
+        unknown: marshmallow.types.UnknownOption = (
+            marshmallow.RAISE
+            if spec.get('additionalProperties') is False
+            else marshmallow.EXCLUDE)
+
+        # Bounds and formats are dropped, for the same reason the `any`
+        # and unrecognised-type branches below drop them: a
+        # validate.Range meeting a mapping raises TypeError rather than
+        # ValidationError, straight out through schema.validate() and
+        # into _schema_findings' broad except, which reports *no*
+        # findings for the whole request and so silently disables every
+        # other check on it. _validated_constraints() already refuses a
+        # minimum, maximum or pattern on anything but a numeric or
+        # string type at import time, so none can arrive here today;
+        # this keeps that true if a future token renders one itself.
+        kwargs.pop('validate', None)
+
+        # marshmallow says "Invalid input type." when a schema is
+        # handed something which is not a mapping at all; fields.Dict,
+        # which every one of these parameters compiled to before this
+        # branch existed, said "Not a valid mapping type.". The wrong
+        # container was already refused with a good message before
+        # phase 7 (finding F1 records it as such), so teaching a
+        # structure to say something new about a case whose answer has
+        # not changed would be a contract move nobody asked for.
+        nested.error_messages = {'type': 'Not a valid mapping type.'}
+
+        return fields.Nested(nested(unknown=unknown), **kwargs)
 
     if 'type' not in spec and spec.get('format') == ANY_VALUE_FORMAT:
         # The 'any' token, which is typeless deliberately rather than
@@ -681,7 +930,7 @@ def _sort_key(key: Any) -> tuple[int, int, str]:
     return (1, 0, str(key))
 
 
-def _flatten_messages(parameter: str, messages: Any,
+def _flatten_messages(parameter: str, messages: Any, container: Any = None,
                       path: tuple[Any, ...] = ()
                       ) -> list[tuple[str, str, tuple[Any, ...]]]:
     """Flatten marshmallow's error structure into (name, detail, path) leaves.
@@ -714,9 +963,37 @@ def _flatten_messages(parameter: str, messages: Any,
                                   key=lambda kv: _sort_key(kv[0])):
             if isinstance(key, int):
                 name = '%s[%d]' % (parameter, key)
+                child = path + (key,)
+            elif key == SCHEMA_LEVEL_KEY and not isinstance(
+                    _element_value(container, path), Mapping):
+                # marshmallow's sentinel for an error about an object
+                # itself rather than about one of its properties: a
+                # nested schema handed something which is not a mapping
+                # at all. It is neither a key the caller sent nor a
+                # property the specification publishes, so
+                # `disk[0]._schema: ...` would send them looking for a
+                # field of that name. The failure is about disk[0], so
+                # say disk[0] -- and leave the path alone, because the
+                # value whose type the finding reports is the element,
+                # not something inside it.
+                #
+                # `_schema` is also a perfectly legal JSON key, and
+                # with additionalProperties: false a caller who sends
+                # one gets an Unknown field error keyed by it -- which
+                # is a real key of theirs and must keep its name, in
+                # the one place this phase exists to make legible. The
+                # sentinel is only reachable when the element is not a
+                # mapping, since a mapping is what its schema would
+                # have descended into, so that is what discriminates
+                # the two. Keying on the detail string instead would
+                # tie the flattener to marshmallow's wording.
+                name = parameter
+                child = path
             else:
                 name = '%s.%s' % (parameter, key)
-            flattened.extend(_flatten_messages(name, nested, path + (key,)))
+                child = path + (key,)
+            flattened.extend(
+                _flatten_messages(name, nested, container, child))
         return flattened
     if isinstance(messages, list):
         return [(parameter, '; '.join(str(m) for m in messages), path)]
@@ -768,7 +1045,8 @@ def _schema_findings(schema: Optional[marshmallow.Schema],
         return []
     leaves = []
     for parameter, messages in mismatches.items():
-        for name, detail, path in _flatten_messages(str(parameter), messages):
+        for name, detail, path in _flatten_messages(
+                str(parameter), messages, known.get(parameter)):
             leaves.append((name, detail, parameter, path))
 
     # Sliced before the values are resolved, so the elements past the

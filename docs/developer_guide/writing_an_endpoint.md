@@ -55,6 +55,49 @@ IPv4 pattern would describe the API as narrower than it is), and real
 array types for `arrayofstring`/`arrayofdict` and a real object type
 for `dict`.
 
+Five tokens describe a *structured* parameter rather than a scalar
+one: `diskspec`, `arrayofdiskspec`, `networkspec`,
+`arrayofnetworkspec` and `videospec`. Each renders a complete JSON
+Schema object — its properties, their types, the enums the server
+really does refuse outside, and `additionalProperties: false` —
+inline into every operation which declares it. The validation layer
+then compiles its check from that same rendered fragment, which is the
+point of putting the shape in `ARGTYPES` rather than at the
+declaration site: a token which renders one thing and compiles another
+is precisely the drift this design exists to prevent. So an
+undeclared key inside a diskspec is refused, and a nested value of the
+wrong type is refused naming its path — `disk[0].size: Not a valid
+integer.` rather than `disk`.
+
+Adding another structure is three edits, and they belong in one commit:
+
+1. **A module-level constant in `external_api/base.py`**, beside
+   `DISKSPEC_SCHEMA`, `NETWORKSPEC_SCHEMA` and `VIDEOSPEC_SCHEMA`.
+   That is where the properties live, each with a comment naming the
+   code it was read off. An `enum` goes in only where the server
+   already refuses everything outside it: a networkspec's `model`
+   deliberately carries none, because the value is rendered into the
+   libvirt domain XML unexamined and the vocabulary is therefore the
+   hypervisor's qemu build rather than this API's, and publishing a
+   list would make the specification narrower than the server.
+2. **Tokens in `ARGTYPES` built from that constant**, one per form the
+   tree declares — `'networkspec': NETWORKSPEC_SCHEMA` and
+   `'arrayofnetworkspec': {'type': 'array', 'items': NETWORKSPEC_SCHEMA}`.
+   Never retype the properties for the array form. The two forms
+   sharing one Python object is what stops them drifting, and
+   `swagger_helper()` deep-copies the token at each declaration site so
+   sharing is safe.
+3. **An entry in `STRUCTURED_PARAMETERS`**
+   (`shakenfist/tests/external_api/test_openapi_spec.py`) for every
+   parameter which declares the new token, in the same commit or CI
+   fails: the set which must be listed is derived from the published
+   specification, so a new structure is missing an entry the moment it
+   is published. What the entry *says* is still written by hand
+   against the handler, which is the whole value of it.
+
+Like every other object and array token, a structured one can only be
+declared in the body.
+
 `any` is the one token that deliberately constrains nothing: it
 renders with no `type` at all, only a `format` annotation saying what
 the parameter is. It exists for the object metadata `value`

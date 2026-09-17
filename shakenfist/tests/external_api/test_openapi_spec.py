@@ -6,6 +6,7 @@ from shakenfist.config import config
 from shakenfist.external_api import app as external_api
 from shakenfist.external_api import base as api_base
 from shakenfist.tests import base
+from shakenfist.util import network as util_network
 
 
 class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
@@ -103,13 +104,83 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
     # code, not with the declaration.
     STRUCTURED_PARAMETERS = [
         # (path, method, parameter, expected subset of its schema)
+        # Unstructured on purpose, and the only object in this table
+        # which is: _validate_instance_metadata() is key dependent and
+        # accepts any non-empty JSON value under a key of the caller's
+        # choosing, so there is no properties block to write (D47).
         ('/instances', 'post', 'metadata', {'type': 'object'}),
-        ('/instances', 'post', 'video', {'type': 'object'}),
-        # Lists of diskspecs and networkspecs, so an array of objects.
+        # A videospec. Nothing is required, because the handler
+        # defaults the whole spec when it is absent
+        # (external_api/instance.py:833). model carries no enum because
+        # instance.py:2153 renders it raw into the domain XML, so the
+        # set which works is the hypervisor's rather than this API's;
+        # vdi does carry one because Shaken Fist itself branches on the
+        # value in three places (instance.py:1715, instance.py:2161 and
+        # libvirt.tmpl:156) and nothing else refuses a value outside
+        # it. memory is typed integer and deliberately unbounded: no
+        # handler refuses a zero or a negative one.
+        ('/instances', 'post', 'video',
+         {'type': 'object',
+          'additionalProperties': False,
+          'properties': {
+              'model': {'type': 'string'},
+              'memory': {'type': 'integer', 'format': 'int64'},
+              'vdi': {'type': 'string',
+                      'enum': ['vnc', 'spice', 'spiceconcurrent',
+                               'spicedebug']},
+          }}),
+        # A list of diskspecs. size's floor is 0 rather than 1 because
+        # a sizeless or zero sized disk means "the size of the base
+        # image" to scheduler.py:471, scheduler.py:577,
+        # mariadb.disk_spec_virtual_gb and util_image.create_cow alike,
+        # while a negative one corrupts the capacity ledger. bus
+        # publishes the keys of the bases dictionary in
+        # instance._get_disk_device(), which is a refusal the handler
+        # already makes; type publishes the deliberate narrowing of
+        # D50, since only 'cdrom' is special cased and every other
+        # value is handed to libvirt as a device name. base carries no
+        # format because it is prefix dispatched and may be a URL, an
+        # sf:// reference, a label: reference or a bare artifact name.
         ('/instances', 'post', 'disk',
-         {'type': 'array', 'items': {'type': 'object'}}),
+         {'type': 'array',
+          'items': {
+              'type': 'object',
+              'additionalProperties': False,
+              'properties': {
+                  'size': {'type': 'integer', 'format': 'int64',
+                           'minimum': 0},
+                  'base': {'type': 'string'},
+                  'bus': {'type': 'string',
+                          'enum': ['sata', 'scsi', 'usb', 'virtio', 'nvme']},
+                  'type': {'type': 'string', 'enum': ['disk', 'cdrom']},
+              }}}),
+        # A list of networkspecs, the same shape the interface hotplug
+        # endpoint below takes one of. network_uuid is the only
+        # required key in this whole vocabulary because
+        # _netdesc_safety_checks() already refuses a netdesc without
+        # one -- and it is typed 'string' with no uuid format because
+        # the handler passes it to Network.from_db_by_ref(), which
+        # resolves a network *name* as readily as a UUID. macaddress
+        # publishes util_network's one MAC pattern, which
+        # valid_macaddr() enforces at instance.py:347. address carries
+        # no ipv4 format because the literal string 'none' is a
+        # documented value meaning "no address on this interface".
+        # model carries no enum for the reason video's model does not.
         ('/instances', 'post', 'network',
-         {'type': 'array', 'items': {'type': 'object'}}),
+         {'type': 'array',
+          'items': {
+              'type': 'object',
+              'additionalProperties': False,
+              'required': ['network_uuid'],
+              'properties': {
+                  'network_uuid': {'type': 'string'},
+                  'macaddress': {'type': 'string',
+                                 'format': 'a MAC address',
+                                 'pattern': util_network.MACADDR_PATTERN},
+                  'address': {'type': 'string'},
+                  'model': {'type': 'string'},
+                  'float': {'type': 'boolean'},
+              }}}),
         # Side channel names, so an array of strings.
         ('/instances', 'post', 'side_channels',
          {'type': 'array', 'items': {'type': 'string'}}),
@@ -121,8 +192,24 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
         # must NOT publish a bound of any kind.
         ('/instances/{instance_ref}/consoledata', 'get', 'length',
          {'type': 'integer'}),
+        # One networkspec rather than a list of them, and asserted
+        # separately from the create endpoint's array precisely because
+        # a table entry is the audit: the two render from one Python
+        # constant, and these two entries are what would fail if they
+        # ever stopped doing so.
         ('/instances/{instance_ref}/interfaces', 'post', 'network',
-         {'type': 'object'}),
+         {'type': 'object',
+          'additionalProperties': False,
+          'required': ['network_uuid'],
+          'properties': {
+              'network_uuid': {'type': 'string'},
+              'macaddress': {'type': 'string',
+                             'format': 'a MAC address',
+                             'pattern': util_network.MACADDR_PATTERN},
+              'address': {'type': 'string'},
+              'model': {'type': 'string'},
+              'float': {'type': 'boolean'},
+          }}),
         ('/instances/{instance_ref}/events', 'get', 'limit',
          {'type': 'integer', 'minimum': 1, 'maximum': 1000}),
         ('/instances/{instance_ref}/snapshot', 'post', 'max_versions',
@@ -318,6 +405,30 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
 
         return published, collisions
 
+    @staticmethod
+    def _without_descriptions(schema):
+        """The published schema with every 'description' removed, recursively.
+
+        An entry above describes the shape it expects in full, because
+        a constraint nobody asked for is the failure mode this table
+        exists to catch. Prose is the one part of a published schema
+        that is not a contract, and the structured specs carry a
+        paragraph of it on every property, so comparing it would put
+        those paragraphs in two files and would fail this test on a
+        wording fix. Everything else -- type, format, enum, minimum,
+        pattern, required, additionalProperties, the property names
+        themselves -- is compared exactly.
+        """
+        if isinstance(schema, dict):
+            return {
+                key: OpenAPISpecificationTestCase._without_descriptions(value)
+                for (key, value) in schema.items() if key != 'description'
+            }
+        if isinstance(schema, list):
+            return [OpenAPISpecificationTestCase._without_descriptions(value)
+                    for value in schema]
+        return schema
+
     def test_structured_parameters_publish_their_real_shape(self):
         # Pinned against the published specification rather than
         # against the declarations, because the specification is what a
@@ -348,12 +459,13 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                 wrong.append('%s %s has no parameter %r' % (method, path, name))
                 continue
 
+            published_schema = self._without_descriptions(published[name])
             for (key, value) in expected.items():
-                if published[name].get(key) != value:
+                if published_schema.get(key) != value:
                     wrong.append(
                         '%s %s %s: %s is %r, expected %r'
                         % (method, path, name, key,
-                           published[name].get(key), value))
+                           published_schema.get(key), value))
 
             # A bound nobody asked for is the failure mode that shipped
             # twice, so an entry describes the published shape in full:
@@ -362,12 +474,12 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
             # is listed precisely to assert that nothing bounds it, and
             # a maximum narrowing it would be the same defect.
             for key in sorted(api_base.CONSTRAINT_KEYS | {'items'}):
-                if key not in expected and key in published[name]:
+                if key not in expected and key in published_schema:
                     wrong.append(
                         '%s %s %s publishes %s %r, which this table does '
                         'not expect -- if the handler really enforces it, '
                         'add it here'
-                        % (method, path, name, key, published[name][key]))
+                        % (method, path, name, key, published_schema[key]))
 
         self.assertEqual([], wrong, '\n'.join(wrong))
 
