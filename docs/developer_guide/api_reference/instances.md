@@ -156,10 +156,12 @@ Similarly, a `networkspec` consists of the following fields in a JSON dictionary
 * float (boolean): whether to associate a floating IP with this interface to enable external
   accessibility to the instance. Note that you can float and unfloat an interface
   after instance creation if desired. A JSON boolean is the expected form, and
-  the shipped client and ansible collection both send one; the string spellings
-  the validation layer accepts (`true`, `yes`, `on`, `1`, `false`, `no`, `off`,
-  `0`, and their cases) are read with the meaning the validation layer gives
-  them, so `"false"` does not float the interface.
+  the shipped client and ansible collection both send one. A range of string
+  spellings (`true`/`false`, `yes`/`no`, `on`/`off`, `1`/`0`, and some
+  single-letter and case variants of each) are also read with the meaning
+  they carry, so `"false"` does not float the interface -- but this
+  acceptance is narrower than it looks (`"tRue"` is refused with a 400) and
+  should not be relied on; send a real JSON boolean instead.
 
 The same structure is passed to
 [POST /instances/{instance_ref}/interfaces](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__interfaces)
