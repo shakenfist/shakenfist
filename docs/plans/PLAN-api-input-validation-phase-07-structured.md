@@ -1285,16 +1285,18 @@ found in this audit and is item 5 below.
     the surviving scope is an explicit JSON `null` for a
     `required=False` scalar whose handler cannot take one — and that
     items 2 and 3 are closed, quoting their new answers.
-14. **Not met, and cannot be met from a branch.** The `Merged` column
-    stays `—` until the pull request merges, by the rule the column's
+14. **Met after the merge, as the item said it would be.** The
+    `Merged` column stays `—` until the pull request merges, by the rule the column's
     own note states: every SHA there is the *merge commit* of a pull
     request, so that `<sha>^1..<sha>` is the whole of what it put on
     `develop`. Reading it from the branch, or from a path-filtered
     `git log`, is what #4222 exists to correct for phase 6. After the
     merge, take the SHA from the first-parent range —
     `git log --first-parent --oneline develop` — and record it beside
-    the pull request number. The rest of the item is met: the Execution
-    table reads `Complete` for phase 7 with a rewritten description, and
+    the pull request number. Done: #4232 merged on 2026-09-17 and the
+    first-parent range gives `91312b9a3`, which phase 8's planning
+    commit recorded in the cell. The rest of the item was already
+    met: the Execution table reads `Complete` for phase 7 with a rewritten description, and
     `docs/plans/index.md` reads `8 of 9` with the status still
     `In progress`, because phase 8, the push audit, has not run.
 15. **Met.** `pre-commit run --all-files` is clean, including the
