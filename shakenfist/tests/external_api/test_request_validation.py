@@ -104,11 +104,13 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         back is buying "requests that were working keep working", not a
         tidier error for requests that were already being refused.
 
-        The five metadata delete handlers are the one thing the
+        The five metadata delete handlers are one of the things the
         rollback does not undo at all: they no longer accept the
         `value` kwarg they used to ignore, in any mode. That was
         UNDECLARED_BY_DESIGN's last entry, and removing it is what
-        emptied the set.
+        emptied the set. Phase 7's three handler guards are three more,
+        and `test_nested_sweep.py`'s `NestedSweepWarnTestCase` is where
+        they are measured.
         """
         config.API_VALIDATION_MODE = 'warn'
 

@@ -310,8 +310,8 @@ declarations are good enough to compile.
 | 4: Enforce | Complete | Landed 2026-09-09 via [#4141](https://github.com/shakenfist/shakenfist/pull/4141). Fixed the two declaration bugs the warn window found (#3739's undeclared `namespace` on 55 handlers, and fourteen metadata `value` declarations), taught the derivation to see decorator-consumed kwargs so that class cannot recur, and turned on rejection with one malformed-input response shape that never contains interpreter text. The `get_args` fold moved to Future work as [#4098](https://github.com/shakenfist/shakenfist/issues/4098): read as "delete the four `@use_kwargs` decorators" it is a bug, because the compiled path is check-only and `@use_kwargs` is the only thing that gets a query parameter to a handler. See [phase 4](PLAN-api-input-validation-phase-04-enforce.md) | `1c203b111` (#4101), `f1040a23b` (#4141) |
 | 5: Narrow the handlers | Complete | Deleted the `except TypeError` arm from `handle_authorization_exceptions` (D23): a handler-internal `TypeError` is now a recorded 500 like any other server fault, and under the `warn`/`off` rollback an undeclared body key gets that same 500 instead of the 400-with-interpreter-text it used to (D25). Fixed [#3523](https://github.com/shakenfist/shakenfist/issues/3523) (a partial `cpuinfo` probe raising `KeyError` in `get_user_agent`) and removed two `requires_namespace_exist_if_specified` applications phase 4 found dead and never filed (F8). Grew a sixth step mid-phase, after step 2 found the generic 500 body still carried `repr(e)` (F11): every 500 response now answers a bare `server error` with no exception detail at all, for any cause (D31). Filed [#4161](https://github.com/shakenfist/shakenfist/issues/4161) for the proxy path answering an unreachable node with a 500 (F9) — re-verifying the finding before filing found that an unrelated fix ([#3743](https://github.com/shakenfist/shakenfist/issues/3743)) had already closed its largest instance, so the issue is scoped to what is still true rather than to the table as originally surveyed. See [phase 5](PLAN-api-input-validation-phase-05-narrow.md) | `b3de0a44f` (#4162) |
 | 6: Required and scalar semantics | Complete | A sweep drove one real request per declaration through the whole decorator stack: of the 75 body/query declarations carrying `required=True` (every one had a handler default, so none was structurally required), 63 were already refused by a handler guard, 7 reached a null-hostile constructor and 500'd, and only 6 were accepted outright — of those, only `shared` on `POST /artifacts` was genuinely optional and moved to `required=False`; the other 5 committed a broken operation on omission (a queued agent command with a null path, a DNS record pointing at null) and kept `required=True` so enforcement turns that into a 400 instead. The `MISSING_REQUIRED` filter in `validate_request` was then deleted, so an omitted or explicit-null required parameter now answers 400 naming it, in every mode but `warn`/`off`. Separately, five of the nine semantic type tokens (`byte`, `a CIDR netblock`, `an IPv4 address as a string`, `url`, `uuid`) were given real validators keyed on the exact `format` string they publish, closing #3269 by rejecting non-base64 `user_data` at the API instead of on the hypervisor; `macaddr` already validated via PR #4183 and is unchanged. `POST /networks` gained a handler guard refusing a netblock that overlaps the deployed floating network, closing #323. #534 was closed outside this plan by #4183 before the phase started (see the note below). See [phase 6](PLAN-api-input-validation-phase-06-required.md) | `81aa9a7d0` (#4199) |
-| 7: Structured parameter schemas | Complete | Taught the type vocabulary to describe what is *inside* a structure, and then described three. `_field()` gained an object branch, so a rendered `properties` block compiles to a nested marshmallow schema with `unknown=RAISE`, and `ARGTYPES` gained `diskspec`, `arrayofdiskspec`, `networkspec`, `arrayofnetworkspec` and `videospec`, built from three module-level constants so a shape declared twice cannot drift. The population was six `dict`/`arrayofdict` declarations across four operations, of which two stayed out and are documented as staying out: `metadata` is free-form by design and `bound_claims` is already guarded by hand with better messages than a schema could produce. Twenty-one nested values which were a recorded 500 or a silent acceptance now answer 400 naming the key and its index (`disk[1].size: Not a valid integer.`) — eleven that faulted, ten that were accepted — while five values which look like they should have been narrowed are deliberately still accepted, because a validator narrower than its handler is a breaking change wearing the clothes of a correctness fix. Three real narrowings were taken and written down: a `disk[].type` outside `disk`/`cdrom`, a caller-supplied `blob_uuid` inside a diskspec, and a diskspec asking for neither a `size` nor a `base`. Three of the new guards are handler guards rather than schema checks and so are not rolled back by `API_VALIDATION_MODE=warn`, deliberately: the size-or-base guard; a `networkspec` whose `network_uuid` is an explicit `null`, which previously resolved to an arbitrary network in the namespace and on interface hotplug answered 200 and created an interface on a network the caller never named; and a `videospec` whose `model` or `memory` is an explicit `null`, which the review found the phase had missed because those two checks were still presence tests, so a null was stored and rendered into the domain XML as `type='None'`. The review also found the phase had published `network[].float` as a boolean while reading it with a bare truthiness test on the raw body, so `"false"` floated the interface; `validation.declared_boolean()` is now the single reading, keyed on marshmallow's own truthy and falsy sets. That defect is the lookup function's rather than the vocabulary's, so it was filed as [#4223](https://github.com/shakenfist/shakenfist/issues/4223) and left for its own fix, carrying `automated-fix-attempted` from the moment it was filed. Decision D46 was rewritten mid-phase (marshmallow's `strict=True` refuses a query parameter, which arrives as a string on the wire) and the rewrite silently invalidated three other statements reasoning from it, which four separate steps rediscovered independently — the phase's own recorded lesson, and the reason its close-out re-read the decisions as a set. See [phase 7](PLAN-api-input-validation-phase-07-structured.md) | `91312b9a3` (#4232) |
-| 8: Push audit | In progress | Runs `PUSH-AUDIT.md` once per merge over the twelve merges in the `Merged` column above, pooling the findings — *not* over `develop...HEAD`, which is empty by the time this phase runs, and not over an accumulated diff, which git cannot express here because the twelve are interleaved with thirty-odd unrelated merges on the same files (`PUSH-AUDIT.md:23-51`). The row said `develop` until phase 8's survey corrected it. Findings land as their own pull request, and the plan is not complete until each is resolved or declined in writing here; if the audit finds nothing, that is recorded in one sentence. See [phase 8](PLAN-api-input-validation-phase-08-push-audit.md) | — |
+| 7: Structured parameter schemas | Complete | Taught the type vocabulary to describe what is *inside* a structure, and then described three. `_field()` gained an object branch, so a rendered `properties` block compiles to a nested marshmallow schema with `unknown=RAISE`, and `ARGTYPES` gained `diskspec`, `arrayofdiskspec`, `networkspec`, `arrayofnetworkspec` and `videospec`, built from three module-level constants so a shape declared twice cannot drift. The population was six `dict`/`arrayofdict` declarations across four operations, of which two stayed out and are documented as staying out: `metadata` is free-form by design and `bound_claims` is already guarded by hand with better messages than a schema could produce. Twenty-one nested values which were a recorded 500 or a silent acceptance now answer 400 naming the key and its index (`disk[1].size: Not a valid integer.`) — eleven that faulted, ten that were accepted — while five values which look like they should have been narrowed are deliberately still accepted, because a validator narrower than its handler is a breaking change wearing the clothes of a correctness fix. Three real narrowings were taken and written down: a `disk[].type` outside `disk`/`cdrom`, a caller-supplied `blob_uuid` inside a diskspec, and a diskspec asking for neither a `size` nor a `base`. Three of the new guards are handler guards rather than schema checks and so are not rolled back by `API_VALIDATION_MODE=warn`, deliberately: the size-or-base guard; a `networkspec` whose `network_uuid` is an explicit `null`, which previously resolved to an arbitrary network in the namespace and on interface hotplug answered 200 and created an interface on a network the caller never named; and a `videospec` whose `model` or `memory` is an explicit `null`, which the review found the phase had missed because those two checks were still presence tests, so a null was stored and rendered into the domain XML as `type='None'`. The review also found the phase had published `network[].float` as a boolean while reading it with a bare truthiness test on the raw body, so `"false"` floated the interface; `validation.declared_boolean()` is now the single reading, keyed on marshmallow's own truthy and falsy sets — at the one call site the review found; phase 8's audit then measured the other eighteen declared booleans and found ten more reading a string spelling with the opposite of its published meaning. The null `network_uuid` defect above is the *lookup function's* rather than the vocabulary's, so it was filed as [#4223](https://github.com/shakenfist/shakenfist/issues/4223) and left for its own fix, carrying `automated-fix-attempted` from the moment it was filed; `sfconductor` then closed it on the merge of #4232 without it having been fixed, and phase 8 reopened it (see *Known defects*). Decision D46 was rewritten mid-phase (marshmallow's `strict=True` refuses a query parameter, which arrives as a string on the wire) and the rewrite silently invalidated three other statements reasoning from it, which four separate steps rediscovered independently — the phase's own recorded lesson, and the reason its close-out re-read the decisions as a set. See [phase 7](PLAN-api-input-validation-phase-07-structured.md) | `91312b9a3` (#4232) |
+| 8: Push audit | Complete | Ran `PUSH-AUDIT.md` once per merge over the twelve merges in the `Merged` column above, pooling the findings — *not* over `develop...HEAD`, which is empty by the time this phase runs, and not over an accumulated diff, which git cannot express here because the twelve are interleaved with thirty-odd unrelated merges on the same files (`PUSH-AUDIT.md:23-51`). The row said `develop` until phase 8's survey corrected it. Wave 1 was clean. Wave 2 found **four blocking findings, none of them a vulnerability**: three were false statements about what the validation layer refuses — a decision changed in one phase and its documentation left behind in another, which is the exact class this phase existed to look for — and the fourth was a real behavioural defect at the shipped default mode, ten declared booleans whose published schema said the opposite of what the server did. All four are fixed on this phase's branch, every advisory finding has a disposition (fixed, filed or declined in writing), and the verdict is in the phase plan under *The audit's result*. See [phase 8](PLAN-api-input-validation-phase-08-push-audit.md) | — |
 
 The `Merged` column records what put each phase on `develop`.
 These entries were reconstructed after the fact, because the plan
@@ -322,6 +322,14 @@ which cannot say which commits arrived inside a pull request.
 Every SHA is the merge commit of the pull request named beside
 it, so `<sha>^1..<sha>` is the whole of what that pull request
 put on `develop`. A phase which has not landed reads `—`.
+
+Phase 8's cell therefore reads `—` even though the phase is
+complete, exactly as phase 7's did: a cell which can only be
+filled from the first-parent history *after* the merge cannot be
+filled by the branch being merged. Whoever merges phase 8's pull
+request fills it in. That has now been true of three phases
+running, and phase 8's Future work says the obligation belongs to
+the merger rather than to the phase.
 
 Phases 0 and 1 shared a pull request: #3620 carried the master
 plan, the phase 0 decisions and the declaration audit together.
@@ -373,17 +381,25 @@ object reference resolving to an arbitrary object. The pushed-down
 `ObjectFilterCriteria(name=object_ref)`, and a `None` name reads as *no
 name filter* rather than as a name of `None`, so the query returns
 every active object in the namespace and one match is answered as
-though the caller had named it. The only path a caller can reach is the
-netdesc's `network_uuid`, which `_netdesc_safety_checks` tests for
+though the caller had named it. The only path a caller could reach was
+the netdesc's `network_uuid`, which `_netdesc_safety_checks` tested for
 presence rather than for a value, and it was measured end to end:
 `POST /instances/{ref}/interfaces` with `{"network_uuid": null}`
-answers 200 and creates an interface. Phase 7 leaves it alone on
-purpose — its networkspec schema will make `network_uuid` a required
-string, which closes the reachable path while leaving the lookup
-function wrong for the next caller, and that is a mask rather than a
+answered 200 and created an interface. Phase 7 left the lookup alone on
+purpose and closed the reachable path in two parts instead: the handler
+guard now tests the value rather than its presence
+(`if netdesc.get('network_uuid') is None:`,
+`shakenfist/external_api/instance.py:366`), which holds at `warn` and
+`off` as well, and `NETWORKSPEC_SCHEMA` marks `network_uuid` required
+(`base.py:516`), which at `enforce` refuses an explicit null because a
+required compiled field is built `allow_none=False`
+(`validation.py:534`). The lookup function itself is still wrong for
+any caller reaching it another way, so this is a mask rather than a
 fix. The issue was filed carrying `automated-fix-attempted`, which is
 the first time this plan has applied that label at filing rather than
-watching the fixer apply it afterwards.
+watching the fixer apply it afterwards; `sfconductor` then closed it
+on the merge of #4232 without it having been fixed, and phase 8's
+audit reopened it (see *Known defects*).
 
 **Filed by a sibling plan, and belonging to this one:**
 [#4240](https://github.com/shakenfist/shakenfist/issues/4240),
@@ -532,6 +548,80 @@ seventeen seconds younger and never picked up, carries no label
 at all. The label only reserves an issue if it is there before
 the fixer looks.
 
+### Known defects
+
+Defects this plan is responsible for and did not fix, recorded in
+one place by phase 8's audit because until then some of them
+appeared in a phase plan and none of them appeared here. Each says
+what it is and why it is not fixed.
+
+* **[#4242](https://github.com/shakenfist/shakenfist/issues/4242)
+  — `network[].model` and `video.model` reach the libvirt domain
+  XML unescaped.** Filed 2026-09-17 from the phase 7 review, which
+  is the change that published both as free strings. They are the
+  only two values a request can turn into raw markup at the default
+  mode; phase 8's audit enumerated all 46 declared unconstrained
+  strings and walked each to its sink to confirm that. The fix is
+  two-part — a schema `pattern` on both `model` properties *and*
+  XML escaping at render time — and it touches
+  `shakenfist/instance.py` and the domain template, which is
+  outside what an audit of this plan's diff should be writing and
+  needs its own functional coverage, so phase 8's scope excluded
+  it explicitly. Two things were added to the issue rather than
+  fixed: `Instance._create_domain_xml()` is not the only sink, the
+  interface hotplug path builds `device_xml` as a plain f-string
+  at `shakenfist/instance.py:2837-2843`; and the
+  `ET.fromstring()` check at `:2177` is not a mitigation, because
+  an injected value can produce well-formed XML with an extra
+  element in it.
+* **[#4236](https://github.com/shakenfist/shakenfist/issues/4236)
+  — the ansible collection's `sf_instance` sends `video` as a
+  string.** A consequence of phase 7 typing the videospec: the
+  module builds a string where the API now requires an object, so
+  the collection's own `video` parameter no longer works against
+  an `enforce`-mode cluster. It is a collection defect rather than
+  an API one and phase 7 left it for its own fix.
+  [#4227](https://github.com/shakenfist/shakenfist/issues/4227) is
+  the same defect filed separately and the two should be merged.
+* **[#4223](https://github.com/shakenfist/shakenfist/issues/4223)
+  — a null object reference resolves to an arbitrary object.** The
+  reachable path through the API is closed twice over (a handler
+  guard testing the value, which holds in every mode, plus
+  `network_uuid` being required in the networkspec schema, which
+  refuses an explicit null at `enforce`), but the lookup function
+  itself still reads a `None` name as *no name filter*, so any
+  other caller of it gets an arbitrary object. `sfconductor`
+  closed the issue on the merge of #4232 without it having been
+  fixed, and against this plan's own text; phase 8's audit
+  reopened it, restated the surviving scope in a comment and
+  removed `automated-fix-attempted` so the issue-fix workflow can
+  take it.
+* **Eight further issues filed by phase 8's audit**, all advisory
+  and all with the reasoning recorded on the issue:
+  [#4248](https://github.com/shakenfist/shakenfist/issues/4248)
+  (two request values guarded only by the schema, so a rollback
+  exposes a dnsmasq hosts file and the capacity ledger),
+  [#4249](https://github.com/shakenfist/shakenfist/issues/4249)
+  (the validation pass is bounded in output and unbounded in
+  input),
+  [#4250](https://github.com/shakenfist/shakenfist/issues/4250)
+  (namespace names are unvalidated on create and reach a dnsmasq
+  configuration file),
+  [#4251](https://github.com/shakenfist/shakenfist/issues/4251)
+  (code tidy-ups: five copied format wrappers, a dead IDE guard,
+  an undocumented guard chain),
+  [#4252](https://github.com/shakenfist/shakenfist/issues/4252)
+  (the nested sweep cannot see "accepted with the wrong meaning":
+  add the null-equals-absent differential),
+  [#4253](https://github.com/shakenfist/shakenfist/issues/4253)
+  (no functional coverage for `warn` or `off`),
+  [#4254](https://github.com/shakenfist/shakenfist/issues/4254)
+  (pin the error contract's fixed facts mechanically), and
+  [client-python#401](https://github.com/shakenfist/client-python/issues/401)
+  (`sf-client` reads only the literal `true`/`True` in
+  `-N ...,float=`, so four spellings the API accepts are silently
+  false).
+
 ### Carried into phase 2 from phase 1
 
 Phase 1 corrected which location each parameter declares. It did
@@ -629,7 +719,7 @@ what the source was constructed to mean:
 | Axis | Values |
 |---|---|
 | Route | absent, `<x>`, `<path:x>`, `<int(min=1):x>`, non-literal |
-| webargs | none, `get_args` on the class, on the module, inline dict, `location='json'` |
+| webargs | none, `get_args` on the class, on the module, inline dict, `location='json'`, `location='json_or_query'` |
 | `request.args` | absent, `.get()`, subscript, on a non-request object |
 | Declaration | well-formed, wrong arity, non-literal name, raw-body sentinel |
 

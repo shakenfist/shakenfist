@@ -22,19 +22,24 @@
 # This is a developer tool, not a CI job: it edits the tree in place,
 # and it takes about a minute. Run it after changing ARGTYPES'
 # structured schemas, the object branch of validation._field(), the
-# nested finding flattener, or either of the two instance handler
+# nested finding flattener, or any of the three instance handler
 # guards phase 7 added.
 #
 # Usage:
 #
 #   bash tools/mutate-nested-sweep.sh
 #
-# Run it from the root of a clean-ish worktree. Uncommitted work is
-# safe: the four files it touches -- the vocabulary, the compiler, the
-# handler and the sweep itself -- are restored from a copy taken before
-# the first mutation, never with `git checkout`, because a
+# Run it from the root of a clean-ish worktree. Your own uncommitted
+# work is safe: the four files it touches -- the vocabulary, the
+# compiler, the handler and the sweep itself -- are restored from a copy
+# taken before the first mutation, never with `git checkout`, because a
 # directory-wide checkout discards uncommitted work in that directory
 # and is painful to notice afterwards.
+#
+# What is *not* safe is a concurrent edit to one of those four files by
+# somebody else while this runs: restore() copies the whole file back
+# from the snapshot, so an edit made in between is silently reverted.
+# Do not run this in a worktree another agent is editing.
 
 set -uo pipefail
 
@@ -299,6 +304,47 @@ mutate "${HANDLER}" \
     "            if video.get('model') is None:" \
     "            if 'model' not in video:" || exit 1
 check "videospec null guard" "video.model.null"
+
+# ---------------------------------------------------------------------
+# 11b. The videospec `memory` guard, which is the other half of the
+#      same review item and a separate line of code. Added by the phase
+#      8 audit, which found the script was behind the code: the review
+#      round added three guards and only one of them was mutated here.
+# ---------------------------------------------------------------------
+run "the videospec memory guard tests presence again (review item 1)"
+mutate "${HANDLER}" \
+    "            if video.get('memory') is None:" \
+    "            if 'memory' not in video:" || exit 1
+check "videospec memory guard" "video.memory.null"
+
+# ---------------------------------------------------------------------
+# 11c. The `vdi` defaulting, which is what
+#      test_a_null_video_key_is_never_stored exists for. That test is a
+#      mock call_args assertion behind a 507 precondition and is the
+#      most plausibly-vacuous test in the file, so this mutation is
+#      really a test of the test.
+# ---------------------------------------------------------------------
+run "the videospec vdi defaulting tests presence again (review item 1)"
+mutate "${HANDLER}" \
+    "            if video.get('vdi') is None:" \
+    "            if 'vdi' not in video:" || exit 1
+check "videospec vdi defaulting" "test_a_null_video_key_is_never_stored"
+
+# ---------------------------------------------------------------------
+# 11d. The shape guard the review had to add in front of the value
+#      tests. Without it a non-mapping videospec reaches
+#      video.get('model') and is an AttributeError, where the presence
+#      tests it replaced answered 400 by accident. Caught at warn and
+#      off, where the schema is not refusing it first.
+# ---------------------------------------------------------------------
+run "the videospec shape guard is gone (review item 1)"
+mutate "${HANDLER}" \
+    "            if not isinstance(video, dict):
+                return sf_api.error(
+                    400, 'video specification should be a JSON object')
+" \
+    "" || exit 1
+check "videospec shape guard" "video.not_a_mapping"
 
 # ---------------------------------------------------------------------
 # 12. `float` is read with a bare truthiness test again, so the string

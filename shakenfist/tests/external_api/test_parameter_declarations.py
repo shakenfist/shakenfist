@@ -766,7 +766,7 @@ class DerivationTestCase(base.ShakenFistTestCase):
         compiled a query-string fallback for a parameter that never
         arrives from the query string.
         """
-        source = '''
+        source = """
 class A(api_base.Resource):
     get_args = {'alpha': None}
 
@@ -781,7 +781,7 @@ class B(api_base.Resource):
     @use_kwargs(get_args, location='query')
     def get(self, beta=None):
         pass
-'''
+"""
         tree = ast.parse(source)
         a, b = tree.body[0], tree.body[1]
 
@@ -795,7 +795,7 @@ class B(api_base.Resource):
     def test_module_level_schema_is_found(self):
         """Falling back to the module scope still works, and picks up
         only the module's own assignments."""
-        source = '''
+        source = """
 get_args = {'alpha': None}
 
 
@@ -803,7 +803,7 @@ class A(api_base.Resource):
     @use_kwargs(get_args, location='query')
     def get(self, alpha=None):
         pass
-'''
+"""
         tree = ast.parse(source)
         cls = tree.body[1]
 
@@ -821,7 +821,7 @@ class A(api_base.Resource):
         is readable and legitimately binds nothing, so it is not a
         problem either.
         """
-        source = '''
+        source = """
 get_args = {'leak': None}
 
 
@@ -831,7 +831,7 @@ class Thing(api_base.Resource):
     @use_kwargs(get_args, location='query')
     def get(self):
         pass
-'''
+"""
         tree = ast.parse(source)
         cls = tree.body[1]
         problems = []
@@ -850,7 +850,7 @@ class Thing(api_base.Resource):
         another handler's keys, and 'cannot read this' must never wear
         the same face as 'not found'.
         """
-        source = '''
+        source = """
 get_args = {'leak': None}
 
 
@@ -860,7 +860,7 @@ class Thing(api_base.Resource):
     @use_kwargs(get_args, location='query')
     def get(self):
         pass
-'''
+"""
         tree = ast.parse(source)
         cls = tree.body[1]
         problems = []
@@ -874,14 +874,14 @@ class Thing(api_base.Resource):
 
     def test_partially_readable_schema_keeps_what_it_can(self):
         """A non-literal key is reported, and its siblings still count."""
-        source = '''
+        source = """
 class Thing(api_base.Resource):
     get_args = {'alpha': None, KEY: None}
 
     @use_kwargs(get_args, location='query')
     def get(self, alpha=None):
         pass
-'''
+"""
         cls = self._parse_class(source)
         problems = []
 
@@ -894,7 +894,7 @@ class Thing(api_base.Resource):
     def test_query_derivation_reads_the_use_kwargs_location(self):
         """A schema bound at a location other than query is not a query
         schema, and a schema on one handler is not on its siblings."""
-        source = '''
+        source = """
 class Thing:
     get_args = {'all': None}
 
@@ -908,7 +908,7 @@ class Thing:
 
     def delete(self, all=None):
         pass
-'''
+"""
         cls = self._parse_class(source)
         handlers = {fn.name: fn for fn in cls.body
                     if hasattr(fn, 'decorator_list')}
@@ -931,7 +931,7 @@ class Thing:
         location is a third answer and must not wear the same face as
         an absent one, which means webargs' json default.
         """
-        source = '''
+        source = """
 class Thing(api_base.Resource):
     get_args = {'all': None}
 
@@ -954,7 +954,7 @@ class Thing(api_base.Resource):
     @use_kwargs(get_args)
     def patch(self, all=None):
         pass
-'''
+"""
         cls = self._parse_class(source)
         handlers = {fn.name: fn for fn in cls.body
                     if isinstance(fn, ast.FunctionDef)}
@@ -984,13 +984,13 @@ class Thing(api_base.Resource):
         self.assertIn('cannot read', problems[0])
 
     def test_request_args_reads_are_found(self):
-        source = '''
+        source = """
 class Thing:
     def get(self, a=None, b=None, c=None):
         a = flask.request.args.get('a')
         b = request.args['b']
         c = something.else_.args.get('c')
-'''
+"""
         cls = self._parse_class(source)
         fn = cls.body[0]
 
@@ -1006,7 +1006,7 @@ class Thing:
         not read this'; this was the last source without the
         treatment.
         """
-        source = '''
+        source = """
 class Thing:
     def get(self, a=None, b=None, c=None, d=None):
         a = flask.request.args.get(TARGET_KEY)
@@ -1014,7 +1014,7 @@ class Thing:
         c = flask.request.args.getlist('c')
         for d in flask.request.args:
             pass
-'''
+"""
         cls = self._parse_class(source)
         fn = cls.body[0]
 
@@ -1041,14 +1041,14 @@ class Thing:
         (issue 3642). By definition the shape is not in the tree, so it
         is pinned on constructed source.
         """
-        source = '''
+        source = """
 class Thing:
     def post(self, thing_ref=None, **kwargs):
         pass
 
     def put(self, thing_ref=None, *extras):
         pass
-'''
+"""
         cls = self._parse_class(source)
 
         problems = []
@@ -1072,11 +1072,11 @@ class Thing:
         flask.request.args.get(TARGET_KEY) derives to body -- which is
         the best answer available -- but must say so in problems, so
         the consumers refuse to trust it."""
-        source = '''
+        source = """
 class Thing:
     def get(self, a=None):
         a = flask.request.args.get(TARGET_KEY)
-'''
+"""
         tree = ast.parse(source)
         cls = tree.body[0]
         fn = cls.body[0]
@@ -1091,12 +1091,12 @@ class Thing:
     def test_unreadable_declaration_is_reported_not_skipped(self):
         """A declaration this module cannot destructure must fail the
         audit rather than escape every assertion in it."""
-        source = '''
+        source = """
 class Thing:
     @swag_from(api_base.swagger_helper(*ARGS))
     def get(self):
         pass
-'''
+"""
         cls = self._parse_class(source)
         declared = declarations.declarations(cls.body[0])
 
@@ -1108,7 +1108,7 @@ class Thing:
         """swagger_helper() destructures five elements plus an optional
         constraints dictionary, so a tuple of any other length is
         malformed however readable its parts are."""
-        source = '''
+        source = """
 class Thing(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'things', 'A thing.',
@@ -1116,7 +1116,7 @@ class Thing(api_base.Resource):
         []))
     def get(self, name=None):
         pass
-'''
+"""
         cls = self._parse_class(source)
         declared = declarations.declarations(cls.body[0])
 
@@ -1128,7 +1128,7 @@ class Thing(api_base.Resource):
         does not disturb the five values the audit reads. Without a
         positive test the arity widening is covered only by the tree
         happening to contain a constrained declaration today."""
-        source = '''
+        source = """
 class Thing(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'things', 'A thing.',
@@ -1137,7 +1137,7 @@ class Thing(api_base.Resource):
         []))
     def get(self, limit=None):
         pass
-'''
+"""
         cls = self._parse_class(source)
         declared = declarations.declarations(cls.body[0])
 
@@ -1148,11 +1148,11 @@ class Thing(api_base.Resource):
     def test_only_resource_subclasses_are_endpoints(self):
         """A helper class with a get() accessor is not an endpoint, and
         must not be asked to document itself."""
-        source = '''
+        source = """
 class Helper:
     def get(self, thing):
         return self.things[thing]
-'''
+"""
         self._write('helper.py', source)
 
         problems = []
@@ -1169,10 +1169,10 @@ class Helper:
         derives every parameter to `body` -- and the fixer, trusting the
         derivation, would rewrite a correct `path` declaration.
         """
-        self._write('app.py', '''
+        self._write('app.py', """
 api.add_resource(FakeEndpoint, *ROUTES)
-''')
-        self._write('fake.py', '''
+""")
+        self._write('fake.py', """
 class FakeEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'fakes', 'A fake.',
@@ -1185,7 +1185,7 @@ class FakeEndpoint(api_base.Resource):
 class InheritedEndpoint(FakeEndpoint):
     def post(self, fake_ref=None):
         pass
-''')
+""")
 
         drifted, _, problems = declarations.audit(self.tempdir)
 
@@ -1211,11 +1211,11 @@ class InheritedEndpoint(FakeEndpoint):
         match. No collision exists in the tree, so only a constructed
         source can reach this.
         """
-        self._write('app.py', '''
+        self._write('app.py', """
 api.add_resource(api_one.FakeEndpoint, '/ones/<one_ref>')
 api.add_resource(api_two.FakeEndpoint, '/twos/<two_ref>')
-''')
-        self._write('one.py', '''
+""")
+        self._write('one.py', """
 class FakeEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'ones', 'A one.',
@@ -1223,8 +1223,8 @@ class FakeEndpoint(api_base.Resource):
         []))
     def get(self, one_ref=None):
         pass
-''')
-        self._write('two.py', '''
+""")
+        self._write('two.py', """
 class FakeEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'twos', 'A two.',
@@ -1232,7 +1232,7 @@ class FakeEndpoint(api_base.Resource):
         []))
     def get(self, two_ref=None):
         pass
-''')
+""")
 
         drifted, _, problems = declarations.audit(self.tempdir)
 
@@ -1258,11 +1258,11 @@ class FakeEndpoint(api_base.Resource):
                     "api.add_resource(REGISTRY['Fake'], '/fakes/<x>')\n",
                     "api.add_resource(make(), '/fakes/<x>')\n"):
             self._write('app.py', app)
-            self._write('fake.py', '''
+            self._write('fake.py', """
 class FakeEndpoint(api_base.Resource):
     def get(self):
         pass
-''')
+""")
 
             _, _, problems = declarations.audit(self.tempdir)
 
@@ -1278,11 +1278,11 @@ class FakeEndpoint(api_base.Resource):
         declaration to match. Only Readyz is mounted twice today, on
         two parameter-free routes, so this needs constructed sources.
         """
-        self._write('app.py', '''
+        self._write('app.py', """
 api.add_resource(FakeEndpoint, '/fakes')
 api.add_resource(FakeEndpoint, '/fakes/<fake_ref>')
-''')
-        self._write('fake.py', '''
+""")
+        self._write('fake.py', """
 class FakeEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'fakes', 'A fake.',
@@ -1290,7 +1290,7 @@ class FakeEndpoint(api_base.Resource):
         []))
     def post(self, name=None):
         pass
-''')
+""")
 
         _, _, problems = declarations.audit(self.tempdir)
 
@@ -1307,7 +1307,7 @@ class FakeEndpoint(api_base.Resource):
         declaration it could not parse.
         """
         self._write('app.py', "api.add_resource(FakeEndpoint, '/fakes')\n")
-        self._write('fake.py', '''
+        self._write('fake.py', """
 class FakeEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'fakes', 'A fake.',
@@ -1315,7 +1315,7 @@ class FakeEndpoint(api_base.Resource):
         []))
     def post(self, name=None):
         pass
-''')
+""")
 
         _, _, problems = declarations.audit(self.tempdir)
 
@@ -1324,12 +1324,12 @@ class FakeEndpoint(api_base.Resource):
         self.assertIn('FakeEndpoint.post', problems[0])
 
     def test_unresolvable_query_schema_is_reported(self):
-        source = '''
+        source = """
 class Thing(api_base.Resource):
     @use_kwargs({'alpha': None}, location='query')
     def get(self, alpha=None):
         pass
-'''
+"""
         cls = self._parse_class(source)
         problems = []
 
@@ -1348,7 +1348,7 @@ class Thing(api_base.Resource):
         handler is reported as clean.
         """
         self._write('app.py', "api.add_resource(FakeEndpoint, '/fakes')\n")
-        self._write('fake.py', '''
+        self._write('fake.py', """
 class FakeEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'fakes', 'A fake.',
@@ -1356,7 +1356,7 @@ class FakeEndpoint(api_base.Resource):
         []))
     def post(self, name=None, **kwargs):
         pass
-''')
+""")
 
         drifted, _, problems = declarations.audit(self.tempdir)
 
@@ -1381,7 +1381,7 @@ class FakeEndpoint(api_base.Resource):
         a flask.request.args read, and not in the signature -- so
         without this term the parameter is functional and undeclarable.
         """
-        source = '''
+        source = """
 def arg_is_thing_ref(func):
     def wrapper(*args, **kwargs):
         body_namespace = kwargs.pop('namespace', None)
@@ -1394,7 +1394,7 @@ class Thing:
     @arg_is_thing_ref
     def get(self, thing_ref=None):
         pass
-'''
+"""
         tree = ast.parse(source)
         functions = {'arg_is_thing_ref': [tree.body[0]]}
         fn = tree.body[1].body[0]
@@ -1412,7 +1412,7 @@ class Thing:
         which stopped at the decorator would answer "consumes nothing"
         for nine handlers.
         """
-        source = '''
+        source = """
 def _resolve(func, widen):
     def wrapper(*args, **kwargs):
         body_namespace = kwargs.pop('namespace', None)
@@ -1428,7 +1428,7 @@ class Thing:
     @arg_is_thing_ref
     def get(self, thing_ref=None):
         pass
-'''
+"""
         tree = ast.parse(source)
         functions = {'_resolve': [tree.body[0]],
                      'arg_is_thing_ref': [tree.body[1]]}
@@ -1444,7 +1444,7 @@ class Thing:
         """The decorator's real body is somewhere this cannot read, so
         the empty set it would otherwise return is a confident wrong
         answer rather than an absence."""
-        source = '''
+        source = """
 def arg_is_thing_ref(func):
     return somewhere_else.resolve(func)
 
@@ -1453,7 +1453,7 @@ class Thing:
     @arg_is_thing_ref
     def get(self, thing_ref=None):
         pass
-'''
+"""
         tree = ast.parse(source)
         functions = {'arg_is_thing_ref': [tree.body[0]]}
         fn = tree.body[1].body[0]
@@ -1468,7 +1468,7 @@ class Thing:
         """The parameter is consumed whether or not its name can be
         read, so saying nothing about it would leave it undeclarable and
         unenforceable -- #3739 one level down."""
-        source = '''
+        source = """
 def arg_is_thing_ref(func):
     def wrapper(*args, **kwargs):
         value = kwargs.pop(KEY, None)
@@ -1480,7 +1480,7 @@ class Thing:
     @arg_is_thing_ref
     def get(self, thing_ref=None):
         pass
-'''
+"""
         tree = ast.parse(source)
         functions = {'arg_is_thing_ref': [tree.body[0]]}
         fn = tree.body[1].body[0]
@@ -1500,7 +1500,7 @@ class Thing:
         would report the whole API and mean nothing. A pop on something
         which is not a kwargs dict is not a consumed parameter either.
         """
-        source = '''
+        source = """
 def helper(func):
     def wrapper(*args, **kwargs):
         local = {'a': 1}
@@ -1515,7 +1515,7 @@ class Thing:
     @helper
     def get(self, thing_ref=None):
         pass
-'''
+"""
         tree = ast.parse(source)
         functions = {'helper': [tree.body[0]]}
         fn = tree.body[1].body[0]
@@ -1529,7 +1529,7 @@ class Thing:
         """Names are resolved bare, because that is all a decoration
         site carries. Two modules defining one is therefore a name this
         cannot resolve, not a name it may pick a winner for."""
-        source = '''
+        source = """
 def arg_is_thing_ref(func):
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
@@ -1540,7 +1540,7 @@ class Thing:
     @arg_is_thing_ref
     def get(self, thing_ref=None):
         pass
-'''
+"""
         tree = ast.parse(source)
         functions = {'arg_is_thing_ref': [tree.body[0], tree.body[0]]}
         fn = tree.body[1].body[0]
@@ -1559,7 +1559,7 @@ class Thing:
         pre-commit hook refuse the tree rather than silently pass it.
         """
         self._write('app.py', "api.add_resource(FakeEndpoint, '/fakes')\n")
-        self._write('fake.py', '''
+        self._write('fake.py', """
 def arg_is_fake_ref(func):
     def wrapper(*args, **kwargs):
         body_namespace = kwargs.pop('namespace', None)
@@ -1575,7 +1575,7 @@ class FakeEndpoint(api_base.Resource):
     @arg_is_fake_ref
     def get(self, alpha=None):
         pass
-''')
+""")
 
         drifted, _, problems = declarations.audit(self.tempdir)
 
@@ -1587,7 +1587,7 @@ class FakeEndpoint(api_base.Resource):
         # And declaring it makes the audit clean, which is the other
         # side of the assertion: a term which reports whatever it is
         # given is no better than one which reports nothing.
-        self._write('fake.py', '''
+        self._write('fake.py', """
 def arg_is_fake_ref(func):
     def wrapper(*args, **kwargs):
         body_namespace = kwargs.pop('namespace', None)
@@ -1604,7 +1604,7 @@ class FakeEndpoint(api_base.Resource):
     @arg_is_fake_ref
     def get(self, alpha=None):
         pass
-''')
+""")
 
         drifted, _, problems = declarations.audit(self.tempdir)
 
@@ -1693,10 +1693,10 @@ class FixerTestCase(base.ShakenFistTestCase):
         # Two declarations on one physical line, which is what the
         # reverse ordering exists for and which no declaration in the
         # tree currently exhibits.
-        self._write('app.py', '''
+        self._write('app.py', """
 api.add_resource(FakeEndpoint, '/fakes/<fake_ref>/parts/<part_ref>')
-''')
-        self._write('fake.py', '''
+""")
+        self._write('fake.py', """
 class FakeEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'fakes', 'A fake.',
@@ -1704,7 +1704,7 @@ class FakeEndpoint(api_base.Resource):
         []))
     def get(self, fake_ref=None, part_ref=None):
         pass
-''')
+""")
 
         self.assertEqual(1, self.fixer.main(False, self.tempdir))
         self.assertEqual(0, self.fixer.main(True, self.tempdir))
@@ -1731,10 +1731,10 @@ class FakeEndpoint(api_base.Resource):
         slice guard there: closed, but refusing a rewrite it should
         have made.
         """
-        self._write('app.py', '''
+        self._write('app.py', """
 api.add_resource(FakeEndpoint, '/fakes/<fake_ref>/parts/<part_ref>')
-''')
-        self._write('fake.py', '''
+""")
+        self._write('fake.py', """
 class FakeEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'fakes', 'A fake.',
@@ -1742,7 +1742,7 @@ class FakeEndpoint(api_base.Resource):
         []))
     def get(self, fake_ref=None, part_ref=None):
         pass
-''')
+""")
 
         self.assertEqual(1, self.fixer.main(False, self.tempdir))
         self.assertEqual(0, self.fixer.main(True, self.tempdir))
@@ -1766,10 +1766,10 @@ class FakeEndpoint(api_base.Resource):
         matters -- SystemExit alone would be satisfied by a script that
         exited after writing.
         """
-        self._write('app.py', '''
+        self._write('app.py', """
 api.add_resource(FakeEndpoint, *ROUTES)
-''')
-        self._write('fake.py', '''
+""")
+        self._write('fake.py', """
 class FakeEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'fakes', 'A fake.',
@@ -1777,7 +1777,7 @@ class FakeEndpoint(api_base.Resource):
         []))
     def get(self, fake_ref=None):
         pass
-''')
+""")
         with open(os.path.join(self.tempdir, 'fake.py'),
                   encoding='utf-8') as f:
             before = f.read()
@@ -1798,10 +1798,10 @@ class FakeEndpoint(api_base.Resource):
         happily -- so the guard in the rewrite path is the only thing
         standing between that shape and a mangled file.
         """
-        self._write('app.py', '''
+        self._write('app.py', """
 api.add_resource(FakeEndpoint, '/fakes/<fake_ref>')
-''')
-        self._write('fake.py', '''
+""")
+        self._write('fake.py', """
 class FakeEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'fakes', 'A fake.',
@@ -1810,7 +1810,7 @@ class FakeEndpoint(api_base.Resource):
         []))
     def get(self, fake_ref=None):
         pass
-''')
+""")
         with open(os.path.join(self.tempdir, 'fake.py'),
                   encoding='utf-8') as f:
             before = f.read()
@@ -1831,10 +1831,10 @@ class FakeEndpoint(api_base.Resource):
         drift between the AST offsets and the file, which is the
         failure that turns a targeted edit into corruption.
         """
-        self._write('app.py', '''
+        self._write('app.py', """
 api.add_resource(FakeEndpoint, '/fakes/<fake_ref>')
-''')
-        self._write('fake.py', '''
+""")
+        self._write('fake.py', """
 class FakeEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'fakes', 'A fake.',
@@ -1842,7 +1842,7 @@ class FakeEndpoint(api_base.Resource):
         []))
     def get(self, fake_ref=None):
         pass
-''')
+""")
         with open(os.path.join(self.tempdir, 'fake.py'),
                   encoding='utf-8') as f:
             before = f.read()
@@ -1857,7 +1857,7 @@ class FakeEndpoint(api_base.Resource):
 
     def test_leaves_a_correct_tree_alone(self):
         self._write('app.py', "api.add_resource(FakeEndpoint, '/fakes')\n")
-        self._write('fake.py', '''
+        self._write('fake.py', """
 class FakeEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'fakes', 'A fake.',
@@ -1865,7 +1865,7 @@ class FakeEndpoint(api_base.Resource):
         []))
     def post(self, name=None):
         pass
-''')
+""")
         with open(os.path.join(self.tempdir, 'fake.py'),
                   encoding='utf-8') as f:
             before = f.read()
@@ -2092,10 +2092,24 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
                 [('thing', 'body', 'string', 'A thing.', False,
                   {'pattern': 'a+$'})],
                 # A top-level alternation escapes the anchors: ^a|b$ is
-                # (^a)|(b$), anchored on neither branch. A grouped
-                # alternation like ^(a|b)$ is fine.
+                # (^a)|(b$), anchored on neither branch. The accepted
+                # forms -- a grouped alternation, an escaped pipe, a
+                # pipe inside a character class -- are pinned in
+                # test_an_accepted_pattern_dialect below, which exists
+                # because this comment used to claim they were fine
+                # with no test behind it, and one of the three was
+                # refused.
                 [('thing', 'body', 'string', 'A thing.', False,
                   {'pattern': '^a|b$'})],
+                # The Python-only dialect: these constructs compile in
+                # CPython and are meaningless to a JSON Schema
+                # validator or a client generator.
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '^(?P<x>a)$'})],
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '^(?#comment)a$'})],
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '^\\Aa\\Z$'})],
                 # A sixth element which is not a dictionary, in the
                 # shape that used to be a wrong-arity case.
                 [('thing', 'body', 'string', 'A thing.', False, 1)],
@@ -2115,6 +2129,30 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
             with self.subTest(parameters=parameters):
                 self.assertRaises(
                     exceptions.InvalidAPIDeclaration, self._helper, parameters)
+
+    def test_an_accepted_pattern_dialect(self):
+        # The other half of the pattern guard: what it must *not*
+        # refuse. Every one of these is a pattern a declaration could
+        # reasonably carry, and '^[a|b]$' was refused at import time
+        # until the phase 8 audit of PLAN-api-input-validation taught
+        # the alternation scanner about character classes -- a '|'
+        # inside one is a literal pipe, so a declaration carrying one
+        # would have stopped sf-api from starting.
+        for pattern in ('^(a|b)$',
+                        '^((a|b)|c)$',
+                        '^a\\|b$',
+                        '^[a|b]$',
+                        '^[|]$',
+                        '^([a|b]|c)$'):
+            with self.subTest(pattern=pattern):
+                out = self._helper([
+                    ('thing', 'body', 'string', 'A thing.', False,
+                     {'pattern': pattern})])
+                body = [p for p in out['parameters']
+                        if p['in'] == 'body'][0]
+                self.assertEqual(
+                    pattern,
+                    body['schema']['properties']['thing']['pattern'])
 
     def test_new_tokens_render_their_bounds(self):
         # The D9 vocabulary: bounds and formats phase 3 will compile,

@@ -120,6 +120,12 @@ metrics. The headlines:
   violate without a local failure. See
   [docs/developer_guide/standards.md](docs/developer_guide/standards.md).
 
+- **Request validation is check-only, so a handler reads the raw body.**
+  A declared `boolean` must be read with
+  `validation.declared_boolean()`: `if flag:` calls the string `"false"`
+  true, which is the opposite of what the published schema promises. See
+  [docs/developer_guide/writing_an_endpoint.md](docs/developer_guide/writing_an_endpoint.md).
+
 - **Events and logs are different channels.** An event is a durable,
   queryable record on an object; a log line is not. See
   [docs/operator_guide/events.md](docs/operator_guide/events.md).

@@ -211,21 +211,25 @@ Checked and clean, recorded so no step re-derives them:
 * **Every SHA the plan cites exists on `develop`.** All 12 merge SHAs
   verified with `git merge-base --is-ancestor`; all are merge commits, so
   `<sha>^1..<sha>` is well-formed for each. Two SHAs in the phase 6 plan
-  (`03ea26514`, `d6b84b365`) resolve to nothing, but see below -- that is
-  a separate, real finding.
+  (`03ea26514`, `d6b84b365`) resolve to nothing -- they are pre-rebase
+  objects which exist in no clone but the one that wrote them, and the
+  commits they were meant to name landed as `ec406a78a` and
+  `c7a432886` -- but see below: that is a separate, real finding.
 * **`index.md` arithmetic is right.** Line 111 reads `8 of 9`,
   `In progress`. Phases 0-8 is nine, eight are complete. No change until
   step 8g.
 * **The master plan's corrective paragraph is correct.** Lines 398-412
-  explain that an earlier revision named `03ea26514` and `d6b84b365`, and
-  give the real SHAs. Citing the dead ones there is deliberate.
+  explain that an earlier revision named `03ea26514` and `d6b84b365`,
+  and give the real SHAs (`ec406a78a` and `c7a432886`). Citing the dead
+  ones there is deliberate.
 
 One thing that *is* a finding, found by the same check: the phase 6 plan
 at `PLAN-api-input-validation-phase-06-required.md:977` still asserts the
 dead SHAs as live fact -- *"#3269 and #323 both carry `Fixes #NNNN` in
 their commits (`03ea26514` and `d6b84b365`) and will auto-close on
-merge"*. #4222 fixed the master plan and left the phase plan behind.
-Corrected in the planning commit.
+merge"*. Those two objects are dead and the commits landed as
+`ec406a78a` and `c7a432886`. #4222 fixed the master plan and left the
+phase plan behind. Corrected in the planning commit.
 
 ## Decisions
 
@@ -450,13 +454,16 @@ steps (2a, 2b, 2c, 2d) then ran in parallel per decision 6. All six sections
 are collected below in the order 8a, 8b, 2a, 2b, 2c, 2d, each keeping its own
 evidence and citations.
 
-**Result: four blocking findings, and none of them is a vulnerability or a
-wrong answer at the shipped default.** Three are false statements about what
-the validation layer refuses — a decision changed in one phase and its
-documentation left behind in another, which is the exact class decision 4
-predicted. The fourth is a real behavioural defect: two request parameters
-whose published schema says the opposite of what the server does. Every
-advisory finding is listed in its step's section. Disposition is 8g's.
+**Result: four blocking findings, and none of them is a vulnerability.**
+Three are false statements about what the validation layer refuses — a
+decision changed in one phase and its documentation left behind in another,
+which is the exact class decision 4 predicted. The fourth is a real
+behavioural defect at the shipped default mode: request parameters whose
+published schema says the opposite of what the server does. (This paragraph
+read "or a wrong answer at the shipped default" when 8f collected it. 8g
+corrected it: that is true of the three documentation findings and false of
+B-4, which is measured at `enforce`.) Every advisory finding is listed in its
+step's section. Disposition is 8g's.
 
 ### Reconciliation across the four parallel steps
 
@@ -2929,6 +2936,396 @@ this plan's nor reachable from a declared parameter. Recorded only so the next
 person walking `util_concurrency.execute()` call sites does not have to rediscover
 that it was considered.
 
+## Dispositions
+
+Step 8g, per decision 5 and definition-of-done items 5 and 6. Every
+finding recorded above appears here exactly once, with one of three
+dispositions: **fixed** on this branch, **filed** as a numbered issue,
+or **declined** with a reason. Nothing is left without one.
+
+Issues filed by this step:
+[#4248](https://github.com/shakenfist/shakenfist/issues/4248),
+[#4249](https://github.com/shakenfist/shakenfist/issues/4249),
+[#4250](https://github.com/shakenfist/shakenfist/issues/4250),
+[#4251](https://github.com/shakenfist/shakenfist/issues/4251),
+[#4252](https://github.com/shakenfist/shakenfist/issues/4252),
+[#4253](https://github.com/shakenfist/shakenfist/issues/4253),
+[#4254](https://github.com/shakenfist/shakenfist/issues/4254) and
+[client-python#401](https://github.com/shakenfist/client-python/issues/401).
+Every open issue on this surface was searched first --
+`gh issue list --state open` plus four keyword searches -- and the two
+findings which already had a home were recorded there rather than
+filed again (#4242 and #4167, below).
+
+### The survey findings
+
+| # | Disposition |
+|---|---|
+| F1 | **Fixed** in the planning commit. The phase 8 row names the twelve ranges instead of `develop`. |
+| F2 | **Fixed** in the planning commit. Phase 7's `Merged` cell reads `91312b9a3` (#4232); phase 7's definition-of-done item 14 corrected. |
+| F3 | **Fixed** in the planning commit. The phase 2 cell names #3666, #3682 and #3685 and the note under the table says phase 2 landed across three. The five out-of-band merges are context per decision 3, which needs no disposition beyond that decision. |
+| F4 | **Fixed** by this step. #4223 is reopened, carries a comment distinguishing the two API routes phase 7 guarded from the lookup function which is still wrong, and no longer carries `automated-fix-attempted`. The conductor behaviour behind it is **declined** here and recorded in Future work: it is a `private-ci` defect, not this repository's. |
+| F5 | **Fixed** by this step. `docs/plans/PLAN-api-input-validation.md` gained a *Known defects* subsection naming #4242, #4236 and #4223, each with what it is and why it is not fixed, plus the eight issues filed above. It also records that [#4227](https://github.com/shakenfist/shakenfist/issues/4227) is a second filing of #4236 and that the two should be merged. |
+| F6 | **Fixed** by step 8d, all three: the release note's three-item list names its own third item and wraps at the paragraph's width; neither `usage.md` nor `instances.md` gives an incomplete `float` spelling set; and no page claims the ansible module converts spellings it does not. |
+| F7 | Nothing to dispose of except the one real finding it contained, the phase 6 plan's two dead SHAs, **fixed** in the planning commit. Every mention of `03ea26514` and `d6b84b365` in every file of this plan now sits in a passage which says they are dead and names `ec406a78a` and `c7a432886` as what replaced them -- corrected in this step, which is what made definition-of-done item 4 pass rather than nearly pass. |
+
+### The four blocking findings
+
+All four are **fixed on this branch**. No blocking finding was
+downgraded, and none was declined.
+
+**B-1**, four sites, no behaviour change:
+
+* `shakenfist/config.py` -- the `API_VALIDATION_MODE` description now
+  says any finding answers 400 including a missing required parameter,
+  and names what the rollback does *not* restore.
+* `docs/operator_guide/logging.md` -- both sentences corrected.
+* `docs/developer_guide/writing_an_endpoint.md` -- the stale summary
+  paragraph rewritten and pointed at the `required`-specific section
+  sixty lines below it, so the file no longer contradicts itself.
+* `shakenfist/external_api/instance.py` -- the comment on the `name`
+  guard now gives the real reason the guard is still needed (`warn` and
+  `off` reach it) rather than citing a retired decision.
+* `docs/release_notes/v07-v08.md:210` is **deliberately unchanged**, as
+  the finding says: it is explicitly historical, dated with "At this
+  point in the rollout", and carries a forward pointer to the entry
+  which records the change.
+
+**B-2**, fixed in the two documents which were wrong. `logging.md`'s
+`warn` bullet now names both classes of request which do not roll back
+-- the undeclared body key which becomes a 500 and writes an exception
+record per request, and the three handler guards which refuse in every
+mode -- and its `off` bullet says the same two exceptions apply.
+`writing_an_endpoint.md` gained the paragraph 8a's finding 6 said was
+missing rather than only a corrected sentence: what a handler guard is,
+which three exist, why they are not rolled back, and how to choose
+between writing a check as a guard and writing it as a declaration.
+
+**B-3**, fixed in the master plan. The paragraph now says the guard
+tests the value, names the two-part closure in the past tense (the
+handler guard covers `warn` and `off`, `network_uuid` being required in
+`NETWORKSPEC_SCHEMA` covers `enforce`, because a required compiled
+field is built `allow_none=False`), and says what is still wrong. It
+does **not** argue that the schema fails to close the reachable path;
+that half of 8a's finding 14 was withdrawn at collection and is not
+reinstated here or in the #4223 comment.
+
+**B-4**, fixed at the generator rather than at the three confirmed
+instances, per this repository's preference for fixing the caller over
+papering over at the receiver. Two halves:
+
+* **The reading.** Ten of the nineteen declared booleans were routed
+  through `validation.declared_boolean()`: `uefi` and `secure_boot` on
+  instance create, `shared` on both artifact routes, `all` and `thin`
+  on snapshot, `all` on the instance, network and agent-operation
+  listings, and `clean_wait` on delete-all-networks. `confirm` on the
+  three delete-all routes was deliberately left reading only a JSON
+  `true` -- an identity test on a destructive route refuses a string
+  spelling rather than acting on it, which is the safe direction --
+  and `provide_dhcp`/`provide_nat`/`provide_dns` were left alone
+  because they are coerced downstream and because `declared_boolean`
+  would turn their "absent means True" default into False.
+* **The test, which is the half that keeps the class closed.**
+  `shakenfist/tests/external_api/test_boolean_sweep.py` enumerates
+  every `boolean` declaration from `declarations.handlers()` -- the
+  same source the published specification is built from -- and fails
+  if one has no entry, so a twentieth boolean cannot join the class
+  silently. For each it sends four requests (JSON `true`, JSON
+  `false`, `'true'`, `'off'`) and requires the string spelling to
+  produce the same observable as the JSON boolean marshmallow says it
+  means. There is no hand-written expected value in the table, which
+  is the point: the pinned-expectation shape is how `net.float.yes`
+  passed for years while being wrong. Each row also carries an
+  anti-vacuity check -- the two JSON booleans must produce *different*
+  observables before any spelling is compared -- so a row whose
+  observable cannot see the property fails instead of decorating.
+  Mutation evidence is free here: the test was written before the
+  fixes and named all ten defective sites on its first run.
+
+  The behaviour change is documented in `v07-v08.md` (it is a
+  *reading* rather than a schema check, so it holds in every mode) and
+  the rule is now written down for the next endpoint author in
+  `writing_an_endpoint.md`. A comment on
+  [#4167](https://github.com/shakenfist/shakenfist/issues/4167)
+  records the overlap 2b asked about: its item 1 named `uefi` and
+  `secure_boot` as null-or-omitted reaching a pydantic
+  `ValidationError`, and that half is now closed (measured: both
+  answer the scheduler's 507 with no exception recorded), while
+  `cpus` and `memory` remain. The same comment records that #4167's
+  opening premise -- "`required` is deliberately not enforced" -- is
+  itself B-1, and is no longer true.
+
+### 8a, the decision set review
+
+Findings 1-4 are B-1 and B-2; finding 14 is B-3. Findings 18 and 19
+are recorded as clean and need no disposition. Every remaining
+advisory is **fixed** here, because each is a single stale sentence in
+a file this branch already touches and the plan's convention is to
+correct a false claim where it lives:
+
+| # | Where | Fix |
+|---|---|---|
+| 5 | `test_request_validation.py` docstring | "the one thing the rollback does not undo" became "one of the things", with a pointer at `NestedSweepWarnTestCase`. |
+| 6 | `writing_an_endpoint.md`, the *What validation does with them* section | The missing handler-guard paragraph, written as part of B-2. |
+| 7 | D42's own canonical text | "videospec presence checks" became the `model` and `memory` value tests, with a note that the review changed them. |
+| 8 | Phase 7 plan, two places | "the only narrowing an operator cannot roll back" became one of three, naming the other two. |
+| 9 | `test_nested_sweep.py` docstring | "two new handler guards" became three, and the following paragraph was folded in as the third class, so the ten rows are 2 + 6 + 2 rather than internally contradictory. |
+| 10 | Phase 7 definition-of-done item 9 | "the other four spellings" became five. |
+| 11 | Phase 7 Progress item 13 | "seven, in three classes" became ten, with the per-class counts and a pointer to item 7 which had it right. |
+| 12 | Phase 7 step 2 brief | The literal `fields.Integer(strict=True)` instruction replaced by what D46's rewrite says, plus a note that applying it literally broke `test_blob_data_bounds` in a minute. A future phase copying this brief as a pattern would have reintroduced the defect. |
+| 13 | Phase 7 step 6 brief | Three wrong things in one clause corrected: three narrowings not two, no client version is a release requirement, and the rollback is `warn` *and* `off`. |
+| 15 | Phase 0 plan, D6 and D8 | Both gained the *Amended by phase 3* note the master plan's D8 already carried. D6's tuple-location mechanism was tried and rejected before phase 3 began; D8's `passed_uuid` evidence was deleted by D11. |
+| 16 | Phase 0 plan, the hand-off list | The `get_args` fold item now records D19's supersession and #4098. |
+| 17 | Master plan, the derivation axis table | Gained `location='json_or_query'`, which the shipped generator has and the published copy of the table did not. |
+
+### 8b, wave 1
+
+| Finding | Disposition |
+|---|---|
+| Ninety triple-single-quoted string literals in two test files, banned by CLAUDE.md and not mechanically enforced | **Fixed.** Mechanically converted after checking that no block contains a `"""` (45 blocks, one containing a single `"`). All 81 tests in the two files pass. |
+| Four `print()` calls in a CLI tool script | **Declined**, no defect: a command-line tool's output is what `print()` is for. |
+| The database-layer rules (three-layer pattern, SQL pushdown, gRPC conventions) | **Declined**, not applicable: this plan never touches `mariadb.py`, `protos/` or `daemons/database/`. |
+
+### 2a, code quality
+
+| Finding | Disposition |
+|---|---|
+| `validation.py`'s array branch keeps the `validate` kwarg its three sibling shape branches pop, so a whole-array validator would be applied in a way nothing else in the module does | **Fixed**, as a comment rather than a behaviour change. Popping it would silently discard a constraint somebody meant; the invariant which makes it unreachable (`base._validated_constraints()` refuses bounds and patterns on non-scalar rendered types, and no array-typed fragment carries an enum or format) is now written where the next reader is, with the decision left to whoever renders the first such token. |
+| Five copy-pasted `_format_*` wrappers | **Filed** as #4251. A refactor with a test behind it, not a defect. |
+| `validation.py:1110-1111`'s "every compiled field is `allow_none=True`" | **Fixed.** Scoped to "an *optional* compiled field" and pointed at the builder. This one is worth noting: the loose wording demonstrably misled one of this audit's own steps into a wrong conclusion about D44, which is as direct a piece of evidence as a comment defect ever gets. |
+| The unreachable IDE disk guard at `instance.py:884-886` | **Filed** as #4251. Dead in every mode, not wrong -- the handler still answers the right 400 from the earlier bus check. Deleting it is a small change which wants its own review rather than riding in an audit commit. |
+| The guard chain is ordered by accretion, and a fifth phase has no single place to look | **Filed** as #4251. A design observation with a documentation fix, not a defect. |
+
+### 2b, tests
+
+| Finding | Disposition |
+|---|---|
+| B1 | B-4, **fixed**. |
+| B2 -- four handler guards whose tests are all satisfied by the validation layer at `enforce`, leaving the guards with zero executed coverage | **Fixed**, all four. `test_snapshot_max_versions.py`, `test_blob_data_bounds.py`, `test_label_access.py` and a new `ArtifactMaxVersionsTestCase` in `test_artifact_access.py` now run their refusals at `warn` and `off` as well, and assert the guard's *own message* so the answering layer is identified rather than inferred from a status code both layers produce. The artifact versions route had no negative test at all and now has three. |
+| B3 -- the pattern dialect refusal and the alternation scanner have no test, and exercising them found `^[a|b]$` falsely refused at import time | **Fixed.** The scanner now tracks `[`/`]` alongside `(`/`)`, because a `|` inside a character class is a literal pipe; a declaration carrying one would have stopped `sf-api` from starting. Ten new cases in `test_parameter_declarations.py`: six accepted patterns in a new `test_an_accepted_pattern_dialect` (which exists because the old comment claimed grouped alternations were fine with nothing behind it) and four Python-only constructs in the refusal table. Mutation-checked: reverting the `in_class` tracking fails the new test. |
+| B4 -- the nested sweep is structurally blind to *accepted with the wrong meaning*; two derived differential tests recommended | **Half fixed, half filed.** The string-spelling-equals-boolean differential is `test_boolean_sweep.py`, written here. The null-equals-absent differential is **filed** as #4252, because it is a new test over three schemas rather than a fix to what shipped. |
+| B5 -- three review-added videospec guards have no mutation, and `restore()` silently reverts a concurrent edit | **Fixed.** `tools/mutate-nested-sweep.sh` now runs 19 mutations with 0 survivors, the three new ones covering the `memory` null guard, the `vdi` defaulting (which proves `test_a_null_video_key_is_never_stored` is not vacuous) and the non-mapping shape guard. The header now warns that the restore is unsafe against a *sibling's* edit rather than claiming uncommitted work is safe, and the "two handler guards" reference became three. |
+| B6 -- no functional coverage for `warn` or `off` | **Filed** as #4253. It needs a cluster CI case which restarts `sf-api`, which an audit branch should not be writing. Its precondition is disposed of below. |
+| The `test_openapi_spec.py:113` citation of `instance.py:833` | **Fixed**, now `:916-917`. |
+
+### 2c, documentation
+
+| Finding | Disposition |
+|---|---|
+| F6.1, F6.2, F6.3 | **Fixed** by step 8d. |
+| New-1 | B-1, **fixed**. |
+| New-2 -- two "phase 6" references in a `developer_guide` file, which the shared block calls a plan smell | **Fixed** rather than folded into #3732, which is closed. Both sentences were reworded to state the fact without naming the phase; the file now contains no phase reference at all. |
+| New-3 -- a narrow mechanical check for the error contract's fixed facts | **Filed** as #4254, with the recommendation intact: pin the wire-format string and add a grep tied to what `test_required_sweep.py` already proves, and explicitly do *not* build narrative parity across the four documents. |
+| New-4 -- `sf-client` reads only the literal `true`/`True` in `-N ...,float=` | **Filed** as client-python#401, and cross-referenced to client-python#398, which is the same family (the CLI's ad-hoc `key=value` parsing producing a value the server reads differently) on a different key. It cannot be fixed in this repository. |
+
+### 2d, security
+
+| Finding | Disposition |
+|---|---|
+| S1 | B-1, **fixed**. |
+| S2 -- the DNS `value` and `disk[].size`'s `minimum: 0` are guarded only by the schema | **Filed** as #4248, and the reason is worth stating because the alternative was tempting. Both fixes are three lines and the plan has a worked precedent (`artifact.validated_max_versions()`). But a new handler guard is new validation behaviour and a narrowing an operator cannot roll back, which this phase's Scope puts out of bounds -- the same reason #4242 is out of bounds for it -- and each wants functional coverage. Taking them here would have been the audit quietly extending the plan it was auditing. The issue names the precedent to copy. |
+| S3 -- #4242 is the only `enforce`-mode raw-XML sink, and its recorded scope missed the hotplug f-string | **No action, already recorded.** The second sink and the note that `ET.fromstring()` is not a mitigation were posted to #4242 during collection; #4242 itself is out of scope per Scope, and the *Known defects* subsection now carries it with both halves. |
+| S4 | B-2, **fixed**. |
+| S5 -- the validation pass is bounded in output and unbounded in input (95x amplification, 2.08 s for a 2 MB body) | **Filed** as #4249. Authenticated-only, and a general body cap belongs where the body is first read rather than where it is validated -- the issue says why, and names `limit_federated_body_size` as the model. |
+| S6 -- the kwarg derivation cannot see a decorator defined outside the package | **Declined**, with the reason: `declarations.py:597-607` already documents it as a deliberate gap, the audit confirmed there is no such decorator today (every ref decorator is in `base.py` or `artifact.py`), and the derivation already reports a non-literal `pop` key rather than skipping it silently -- which 2d proved by mutation. The residual is a `problems` entry owed the day a decorator is imported from outside the package, and there is nothing to fix until then. |
+| S7 -- namespace names are unvalidated on create and reach a dnsmasq configuration file | **Filed** as #4250. Admin-only, so not an escalation; filed because the recorded reason for leaving namespace strings unconstrained ("a ref decorator resolves it and answers 404") is true of every route which resolves a namespace and false of the one which creates one. |
+| The confirmed-clean list | No disposition owed; recorded so nothing re-derives it. |
+
+### The flagged precondition, verified
+
+2b flagged rather than filed the claim that `API_VALIDATION_MODE`
+"cannot be set through the supported deployment path". Verified
+independently by this step, and it is half right:
+
+* The facts hold. `grep -rn API_VALIDATION_MODE
+  shakenfist/deploy/collection/` returns nothing, and
+  `roles/node/templates/config` is 89 lines of explicitly enumerated
+  `SHAKENFIST_*` assignments with no generic passthrough.
+* The conclusion does not. `API_VALIDATION_MODE` is a declared
+  `SFConfig` field, so `sf-ctl set-config API_VALIDATION_MODE warn`
+  writes a `cluster_config` row, `_exportable_cluster_config_key()`
+  returns True for it, and `load_cluster_config()` exports it as
+  `SHAKENFIST_API_VALIDATION_MODE` into every daemon's environment at
+  process start. That is the same mechanism `KERBSIDE_URL` and
+  `AUTH_SECRET_SEED` use and it is documented elsewhere in the
+  operator guide.
+
+So it is a **documentation defect, fixed here**: neither
+`v07-v08.md` nor `logging.md` said *how* to set the mode, and an
+operator reaching for the rollback during an incident would have looked
+for an ansible variable which does not exist. Both now say
+`sf-ctl set-config API_VALIDATION_MODE warn`, that `sf-api` must be
+restarted because the value is read at process start, and that
+`sf-ctl unset-config` puts it back. No collection change is owed, and
+that is recorded here so a later reader does not add a redundant
+template line.
+
+### Two things noted rather than disposed of
+
+* [#4100](https://github.com/shakenfist/shakenfist/issues/4100) ("an
+  explicit `thin: false` on snapshot is indistinguishable from omitting
+  it") is unaffected by B-4's fix and remains open and correct.
+  `declared_boolean('false')` is `False`, which still falls through to
+  `SNAPSHOTS_DEFAULT_TO_THIN` exactly as an omission does; the blocker
+  there is the shipped client, as that issue says.
+* The three Future work items already recorded below are **declined**
+  here by scope rather than left undisposed: two are changes to
+  `PLAN-TEMPLATE.md` and one is a `private-ci` investigation.
+
+## The audit's result
+
+The audit did not find nothing, so the one sentence the master plan's
+phase 8 row asks for is not available. What it found, and what that
+means about the plan as shipped:
+
+**Four blocking findings. None is a vulnerability, and three of the
+four change no behaviour at all.** Those three are the same defect
+wearing different clothes: a decision was changed in one phase
+and the sentences reasoning from it were left standing in another.
+`missing-required` went from exempt to enforced when phase 6 deleted
+the filter, and four places still said it was recorded and never
+enforced -- including `shakenfist/config.py`'s own description of
+`API_VALIDATION_MODE`, which is the operator's rendered account of what
+a security control does, and including a file which contradicted itself
+sixty lines later. `warn` was documented as answering a request
+"exactly as it always was" while two separate later decisions made that
+false in two directions. And the master plan's front-page record of a
+live, open defect described a guard phase 7 had rewritten. The fourth
+blocking finding is behavioural, and it is wrong at the shipped default
+mode rather than only under the rollback: the API declares nineteen boolean
+parameters, `validation.declared_boolean()` was applied to one of them,
+and ten of the rest read a string spelling with the opposite of its
+published meaning -- `{"uefi": "false"}` booted with UEFI,
+`{"secure_boot": "off"}` enabled secure boot *and* defeated the
+`secure_boot and not uefi` refusal because both operands were truthy
+strings, and a `system` operator sending `{"shared": "false"}` got an
+artifact shared with every namespace.
+
+**What that says about the plan as shipped.** The mechanism is sound
+and the enforcement is right: twelve pull requests, 24,702 insertions,
+and the audit found no request the server answers incorrectly at
+`enforce` except through the declared-boolean reading, which is a
+handler defect rather than a defect in the layer. Every one of 2d's
+confirmed-clean checks held -- no new execution, SQL or deserialisation
+sink; no credential, token or nonce in a response, a log line or an
+event; no filesystem path built from a caller-supplied name; findings
+which carry types and never values; a validation decorator which fails
+closed in both directions. The compiler is 294 statements with one
+uncovered. What the plan did *not* get right is the part no phase could
+review for itself. Five of 8a's nineteen findings, three of the four
+blocking ones, and the whole reason this phase exists are the same
+shape: a statement written in phase 4 or 5 about a decision phase 6 or
+7 changed. The release note is correct in every single case, because
+each phase appended to it chronologically and a dated claim about a
+past state stays true. Every in-place statement of the contract rotted
+-- two reference documents, one pydantic `Field` description and one
+code comment -- because each phase edited the paragraph it was thinking
+about. That is the durable lesson, and it is worth more than the four
+fixes: **a long plan should write its contract once, chronologically,
+and point every reference document at it.**
+
+**And the test surface was strong but the wrong shape in one specific
+way.** The nested sweep is 104 rows over three modes with a mutation
+script behind it, which is unusually good; its observable is
+`(status, exception, message)` and 35 of its 43 accepted rows resolve
+to a scheduler 507, so it is structurally blind to *accepted with the
+wrong meaning* -- which is the class of both defects the phase 7 review
+found and of the ten this audit found. The fix, applied here, is a
+derived differential: enumerate the property from the source and
+compare two requests to each other rather than to a hand-written
+expected value. `test_boolean_sweep.py` is that, it found all ten
+defects on its first run, and the remaining half of the same idea is
+filed as #4252. Four handler guards also had tests which the
+validation layer was answering first, so the guards -- the only defence
+under the rollback -- had no executed coverage at all; all four now run
+at `warn` and `off` and assert the guard's own message.
+
+## Definition of done, audited
+
+Item by item, the way phase 7's step 8 did it. Every verdict below was
+checked against the tree rather than recalled.
+
+1. **Met.** Wave 1 and wave 2 were each run against all twelve ranges
+   of decision 1, and the *Wave 1* and *2a* sections record what was
+   run per range rather than pooling it. Wave 1's style greps are
+   reported per range, and 2a's mechanical sweep likewise. The four
+   judgment sections pool deliberately -- 2d says why in its opening
+   paragraph, and it is the right choice there: every one of its
+   findings arises from a statement or a guard which crosses phase
+   boundaries, so a per-range presentation would scatter one finding
+   across four ranges. Item 1's requirement is that a finding can be
+   traced back to a range, and each one names the merge it came from
+   where that is a fact about the finding (B-1's site 1 names range 5
+   for its introduction and range 9 for its rewording).
+2. **Met.** The phase 2 cell names #3666, #3682 and #3685; the phase 7
+   cell names `91312b9a3` (#4232); the note under the table says phase
+   2 landed across three and says what #3682 was.
+   `grep -c '#3682' docs/plans/PLAN-api-input-validation*.md` is 1 in
+   the master plan and 6 in this file, not zero.
+3. **Met.** The phase 8 row says "over the twelve merges in the
+   `Merged` column above" and states why `develop...HEAD` is the wrong
+   range, citing `PUSH-AUDIT.md:23-51`.
+4. **Met, and it took a fix in this step to get there.** The script in
+   the item was run from the repository root:
+
+   ```
+   docs/plans/PLAN-api-input-validation-phase-06-required.md 03ea26514
+   docs/plans/PLAN-api-input-validation-phase-06-required.md d6b84b365
+   docs/plans/PLAN-api-input-validation-phase-08-push-audit.md 03ea26514  (x4)
+   docs/plans/PLAN-api-input-validation-phase-08-push-audit.md d6b84b365  (x4)
+   docs/plans/PLAN-api-input-validation.md 03ea26514
+   docs/plans/PLAN-api-input-validation.md d6b84b365
+   ```
+
+   Every line names one of the two permitted SHAs and no other, which
+   is the item's test. The second half of the item -- that every
+   mention sits inside a passage which says they are dead and names
+   `ec406a78a` and `c7a432886` as the replacements -- was **not** true
+   when this step started: this file's own three prose mentions said
+   the objects resolve to nothing without naming what replaced them.
+   Fixed here. The item is the reason that was noticed, which is a
+   point in favour of writing a definition-of-done item as a runnable
+   script and then actually running it.
+5. **Met.** See *Dispositions* above: every finding in this file, from
+   F1 through 2d's S7, carries fixed, filed or declined, and the eight
+   issues filed are listed by number.
+6. **Met.** All four blocking findings are fixed on this branch. None
+   was declined and none was downgraded to advisory, which the phase's
+   own risk section asked to be checked.
+7. **Met.** #4223 is open, carries the comment distinguishing the two
+   guarded API routes from the still-wrong lookup function and quoting
+   phase 7's own commit, and carries no labels at all -- so
+   `automated-fix-attempted` is gone and the issue-fix workflow can
+   take it.
+8. **Met.** `docs/plans/PLAN-api-input-validation.md` has a *Known
+   defects* subsection naming #4242, #4236 and #4223 with what each is
+   and why it is not fixed, plus the eight filed here and the note
+   that #4227 duplicates #4236.
+9. **Met** by step 8d, verified here: `grep -n "float" docs/user_guide/usage.md`
+   and `docs/developer_guide/api_reference/instances.md` show both now
+   say a JSON boolean is the expected form and that the string
+   acceptance is narrower than it looks; the release note names the
+   null `network_uuid` case directly instead of by ordinal and wraps at
+   63-70 characters; and `usage.md` states `sf-client`'s actual
+   literal-`true`/`True` behaviour and names the ansible divergence.
+10. **Met.** The Execution table reads `Complete` for phase 8 and
+    `docs/plans/index.md` line 111 reads `Complete`, `9 of 9`.
+    `python3 tools/check-plan-status.py` agrees, which it did not
+    before the master plan's row was flipped -- it caught the
+    half-applied edit that left the index ahead of the plan.
+11. **Met.** `python3 tools/check-plan-status.py` prints "Plan
+    statuses, index arithmetic and phase links agree", and
+    `pre-commit run --all-files` passes every hook. `tox` (`py3`,
+    `flake8`, `cover`) passes with no failures, including the new
+    `test_boolean_sweep.py` and the four new mode-crossing guard
+    classes. `bash tools/mutate-nested-sweep.sh` reports 19 mutations,
+    0 survivors.
+12. **Not applicable, and deliberately so.** The item is conditional on
+    the audit finding nothing blocking. It found four. *The audit's
+    result* above says what they were and what they mean about the plan
+    as shipped, which is what the master plan's phase 8 row asks for in
+    the case that actually obtained.
+
 ## Future work
 
 * **A `Merged` cell that can only be filled after merge will be blank at
@@ -2937,11 +3334,30 @@ that it was considered.
   own definition of done recorded that it could not do it. The task
   belongs to whoever merges the pull request, not to the phase. Worth a
   line in `PLAN-TEMPLATE.md`.
+
+  **This phase's own cell is the third instance and is deliberately
+  left as `—`.** Phase 8 is `Complete` and its `Merged` cell is empty,
+  because the rule under the Execution table is that every SHA there is
+  a merge commit read off the first-parent history, which does not
+  exist until this pull request merges. The master plan says so
+  explicitly beneath the table now, so the next reader finds a
+  complete phase with an empty cell and an explanation rather than
+  what looks like an oversight. Whoever merges this fills it in.
 * **The phase 8 row's range was wrong here and in the agent operation
   deadlines plan.** Two independent discoveries of the same defect in two
   plans suggests the row is copied from a template written before
   `PUSH-AUDIT.md` gained its range rule. Worth fixing in the template so
   there is not a third.
+* **A false claim about how a plan's own control is deployed survived
+  seven phases.** The release note told an operator to set
+  `API_VALIDATION_MODE=warn` as the rollback and never said how, and
+  the setting appears nowhere in the ansible collection -- so the
+  natural search for it fails. It *is* settable, through
+  `sf-ctl set-config`, and both documents now say so. The general
+  lesson is worth a line somewhere: a plan which introduces an
+  operator-facing control owes the *mechanism* for setting it, not
+  just its name and its values, and the two are written in different
+  files by different phases.
 * **`sfconductor` closed #4223 on merge without being asked** (F4). The
   pull request body named only `Fixes #3612`, and no commit in the range
   carried a closing keyword. Whatever heuristic closed it can close any

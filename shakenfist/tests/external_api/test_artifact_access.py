@@ -27,6 +27,7 @@ from unittest import mock
 
 from shakenfist import mariadb
 from shakenfist.artifact import Artifact
+from shakenfist.config import config
 from shakenfist.external_api import app as external_api
 from shakenfist.namespace import Namespace
 from shakenfist.namespace_key import NamespaceKey
@@ -595,6 +596,85 @@ class ArtifactMutationTestCase(ArtifactAccessFixture):
         self.assertNotEqual(
             Artifact.STATE_DELETED,
             Artifact.from_db(self.artifact.uuid).state.value)
+
+
+class ArtifactMaxVersionsTestCase(ArtifactAccessFixture):
+    """POST /artifacts/<ref>/versions, in all three validation modes.
+
+    Added by the phase 8 audit of PLAN-api-input-validation. This is
+    the first of the three routes which write an artifact's
+    `max_versions`, and the only one whose negative guard had no test
+    at all -- the route appeared in the suite only as a 200 in an
+    authorisation matrix. The guard matters because a negative
+    persists into the setter and has every later `add_index()` delete
+    the oldest surviving version.
+
+    Run at every mode on purpose. At `enforce` the declared
+    `minimum: 0` answers first, and the handler's own
+    `except InvalidMaxVersions` arm is the only defence left once an
+    operator rolls enforcement back -- so a test which only ran at the
+    default would be measuring the schema and reporting it as the
+    handler.
+    """
+
+    mode = 'enforce'
+
+    def setUp(self):
+        super().setUp()
+        self.saved_mode = config.API_VALIDATION_MODE
+        config.API_VALIDATION_MODE = self.mode
+        self.addCleanup(self._restore_mode)
+
+    def _restore_mode(self):
+        config.API_VALIDATION_MODE = self.saved_mode
+
+    def _post(self, max_versions):
+        return self.client.post(
+            '/artifacts/%s/versions' % self.artifact.uuid,
+            headers={'Authorization': self._token('owner')},
+            data=json.dumps({'max_versions': max_versions}))
+
+    def test_a_negative_max_versions_is_refused(self):
+        before = self.artifact.max_versions
+        resp = self._post(-1)
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertEqual(before, Artifact.from_db(
+            self.artifact.uuid).max_versions)
+
+    def test_an_unparsable_max_versions_is_a_400_not_a_500(self):
+        for value in (['two'], {'two': 2}, 'two'):
+            with self.subTest(value=value):
+                resp = self._post(value)
+                self.assertEqual(400, resp.status_code, resp.get_json())
+
+    def test_a_valid_max_versions_is_still_written(self):
+        # The control: without it the refusals above could be a route
+        # which now refuses every max_versions.
+        resp = self._post(7)
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertEqual(7, Artifact.from_db(
+            self.artifact.uuid).max_versions)
+
+
+class ArtifactMaxVersionsWarnTestCase(ArtifactMaxVersionsTestCase):
+    """The handler guard, with the schema layer not refusing."""
+
+    mode = 'warn'
+
+    def test_a_negative_max_versions_is_refused(self):
+        before = self.artifact.max_versions
+        resp = self._post(-1)
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertEqual('max version cannot be negative',
+                         resp.get_json()['error'])
+        self.assertEqual(before, Artifact.from_db(
+            self.artifact.uuid).max_versions)
+
+
+class ArtifactMaxVersionsOffTestCase(ArtifactMaxVersionsWarnTestCase):
+    """And with the layer not running at all."""
+
+    mode = 'off'
 
 
 class ArtifactWriteTargetTestCase(ArtifactAccessFixture):

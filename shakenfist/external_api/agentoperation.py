@@ -14,6 +14,7 @@ from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
+from shakenfist.external_api import validation
 from shakenfist.util.access_tokens import request_namespace
 
 
@@ -207,6 +208,12 @@ class InstanceAgentOperationsEndpoint(api_base.Resource):
     @api_base.requires_instance_ownership
     @api_base.log_token_use
     def get(self, instance_ref=None, instance_from_db=None, all=False):
+        # declared_boolean rather than `if all:` on the raw body: see
+        # test_boolean_sweep.py. A falsy string spelling would otherwise
+        # list every operation the instance has ever run, rather than
+        # the queued ones the caller asked for.
+        all = validation.declared_boolean(all)
+
         out = []
         ops = instance_from_db.agent_operations
 

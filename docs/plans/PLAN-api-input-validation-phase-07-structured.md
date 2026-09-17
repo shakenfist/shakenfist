@@ -178,8 +178,11 @@ shipped. `additionalProperties: false` refuses a caller-supplied
 (`instance.py:935`, `:974`); the documented spelling
 `base: "sf://blob/<uuid>"` reaches the identical branch and is
 unaffected. And D45's size-or-base guard is a handler guard, so it
-holds at `warn` and `off` too — it is the one narrowing in this phase
-an operator cannot roll back.
+holds at `warn` and `off` too — it is one of the three refusals in this
+phase an operator cannot roll back (the other two are the null
+`network_uuid` and the null `video.model`/`video.memory`, both also
+handler guards; corrected by the phase 8 audit, which found this
+sentence written the day before the third guard was added).
 
 
 ## Context
@@ -757,8 +760,10 @@ in writing before step 3 writes the schemas.
 
 **D42. Every existing handler guard stays.** Not one of the checks in
 `_netdesc_safety_checks`, the disk-bus check, the IDE refusal or the
-videospec presence checks is deleted, even where a schema now subsumes
-it.
+videospec `model` and `memory` value tests is deleted, even where a
+schema now subsumes it. (Those two were *presence* tests when this
+decision was written; the review round turned them into value tests,
+which is where D42's third new handler guard comes from.)
 
 This is phase 6's D34 in a new setting. `warn` and `off` are rollbacks:
 an operator who turns validation off because this phase broke their
@@ -961,10 +966,12 @@ see the second amendment. The three that shipped are:
 3. **A diskspec with neither `size` nor `base` is refused**, by D45's
    handler guard, including a `size` of `0` with no `base`. Because it
    is a handler guard rather than a schema check it holds at `warn` and
-   `off` too, which makes it the only narrowing in this phase an
-   operator cannot roll back. That is deliberate — a disk that asks for
-   nothing is not a rollback-worthy behaviour — but it should be said
-   out loud.
+   `off` too, which makes it one of the three refusals in this phase an
+   operator cannot roll back — the other two being the null
+   `network_uuid` and the null `video.model`/`video.memory`, which are
+   handler guards for the same reason. That is deliberate — a disk that
+   asks for nothing is not a rollback-worthy behaviour — but it should
+   be said out loud.
 
 What is **not** narrowed, despite the original text of this decision:
 `disk[].size` as the string `"20"` is accepted, because D46 refuses a
@@ -976,11 +983,11 @@ these before and after rather than asserting any of it.
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
 | 1 | high | opus | none | **The key and value census.** For each of diskspec, networkspec and videospec, enumerate every key any caller sends and every value type it sends, from five sources: the tree (`shakenfist/deploy/collection/plugins/modules/sf_instance.py`, which builds netdescs at lines 317-364), the client (`../client-python/shakenfist_client/`, note `apiclient.py:669` already coerces `size` to `int`), the CI suites (`shakenfist/deploy/shakenfist_ci/`), the API reference (`docs/developer_guide/api_reference/instances.md:67-130`, which documents four disk keys, five network keys and three video keys), and the handlers themselves (`external_api/instance.py` and `shakenfist/instance.py`, for every key read off a spec). Produce a table, one row per key, with: which sources send it, what types they send, what the handler does with each type, and whether it is documented. This is the input to D41 and D43 and the table goes in this plan. Do not change any code. |
-| 2 | high | opus | none | **The compiler's object branch.** In `shakenfist/external_api/validation.py`, add a branch to `_field()` (around line 430, beside the existing `array` branch) for a rendered `{'type': 'object', 'properties': {...}}`: build a marshmallow schema from the properties with `Schema.from_dict`, honour `required` and `additionalProperties: false` (`unknown=RAISE`), and return `fields.Nested`. An object with no `properties` must keep compiling to `fields.Dict` exactly as now, because `metadata` and `bound_claims` rely on it (D47). Apply D46 in the same step: `fields.Integer(strict=True)` wherever the rendered type is `integer`. Then D48: make `_schema_findings` flatten marshmallow's nested error dict into dotted, indexed paths so a finding reads `disk[0].size`; `side_channels[0]` is the shape to match. Read the comments in that file first — they explain why every check is keyed on the rendered specification rather than on the type token, and that rule binds this change. |
+| 2 | high | opus | none | **The compiler's object branch.** In `shakenfist/external_api/validation.py`, add a branch to `_field()` (around line 430, beside the existing `array` branch) for a rendered `{'type': 'object', 'properties': {...}}`: build a marshmallow schema from the properties with `Schema.from_dict`, honour `required` and `additionalProperties: false` (`unknown=RAISE`), and return `fields.Nested`. An object with no `properties` must keep compiling to `fields.Dict` exactly as now, because `metadata` and `bound_claims` rely on it (D47). Apply D46 in the same step: a field subclass bound into `_SCALARS` which refuses a fractional number wherever the rendered type is `integer`. (Corrected by the phase 8 audit: this brief originally said `fields.Integer(strict=True)`, which is the instruction D46's rewrite exists to retract -- applying it literally broke `test_blob_data_bounds` within a minute, because it also refuses the numeric strings the API accepts.) Then D48: make `_schema_findings` flatten marshmallow's nested error dict into dotted, indexed paths so a finding reads `disk[0].size`; `side_channels[0]` is the shape to match. Read the comments in that file first — they explain why every check is keyed on the rendered specification rather than on the type token, and that rule binds this change. |
 | 3 | high | opus | none | **The three schemas.** In `shakenfist/external_api/base.py`, add `diskspec`, `arrayofdiskspec`, `networkspec`, `arrayofnetworkspec` and `videospec` to `ARGTYPES` (around line 380), built from three module-level constants so the single and array forms cannot drift (D40). Populate them from step 1's census, not from the documentation. Every `enum` must be read off the code that consumes the value: the libvirt XML templating in `shakenfist/instance.py` for `video.model` and `network[].model`, `instance._get_defaulted_disk_bus` and `_get_disk_device` for `disk[].bus`, and whatever consumes `video['vdi']` (start at `external_api/instance.py:1802` and `:1865`) for the VDI protocols. `network_uuid` per D44. `additionalProperties: false` per D41, unless step 1 found a reason to revisit it. Update every affected row of `STRUCTURED_PARAMETERS` in `shakenfist/tests/external_api/test_openapi_spec.py:104` in the same commit, with a comment per entry saying what backs the constraint — that table's own comment explains the standard. |
 | 4 | medium | sonnet | none | **The declarations, and the guard D45 asks for.** Change the six declarations in F2's table to the new tokens: `external_api/instance.py:514` (`network` → `arrayofnetworkspec`), `:518` (`disk` → `arrayofdiskspec`), `:535` (`video` → `videospec`), `:1134` (`network` → `networkspec`). Leave `metadata` at `dict` and add the comment D47 asks for; do the same for `bound_claims` at `auth.py:1125` and `:1208`. **Delete no handler guard** (D42). Add the missing guard from D45 beside `instance must specify at least one disk` at `instance.py:673`: a diskspec with neither `size` nor `base` is a 400. |
 | 5 | high | opus | none | **The nested sweep.** A new `shakenfist/tests/external_api/test_nested_sweep.py`, modelled on `test_required_sweep.py` and subclassing its `RequiredSweepTestCase` fixture, which already carries the whole decorator stack and working instance, network and blob fixtures. One row per (spec, key, sent value), with the status and whether an exception was recorded — pin every row of F5 and F6 above at its *new* answer, plus one accepted value per key so the schemas are shown not to be too narrow. Run it at `enforce`; add a second class at `warn` proving D42, that every row answers exactly what F5 and F6 measured before this phase. Mutation-test it: break each schema on purpose and confirm the right row fails with the right message, and keep the mutations in a script beside the test as the pr-re-review skill's adversarial pass asks. Cover the interface hotplug endpoint as well as instance create — it is the one with no scheduler in front of it, so its answers are 200s rather than 507s. |
-| 6 | medium | sonnet | none | **Documentation.** `docs/developer_guide/api_reference/instances.md:67-130` gains, per spec, which keys are required, what each value's type and enum are, and that an unknown key is now refused. `docs/developer_guide/writing_an_endpoint.md` gains the structured tokens beside the rest of the vocabulary and says how to add another one. A release note in `docs/release_notes/v07-v08.md` says plainly that a request carrying an undocumented key inside a diskspec, networkspec or videospec now answers 400 where it used to be ignored, names the two narrowings of D50, names the client version D49 requires, and names `API_VALIDATION_MODE=warn` as the rollback. **Also fix the three documentation bugs the census found, none of which this phase caused:** `docs/user_guide/usage.md:237` lists `ide` as a valid disk bus and `config.DISK_BUS`'s description at `shakenfist/config.py:1028` does the same, while `external_api/instance.py:825` answers `400 IDE disks are no longer supported`; and `usage.md:288` lists nine NIC models where `instances.md:105` lists eight, the extra being `ne2k_isa`. Per D43 neither list is a specification, so say that the set is the hypervisor's rather than reconciling two prose lists into a third. |
+| 6 | medium | sonnet | none | **Documentation.** `docs/developer_guide/api_reference/instances.md:67-130` gains, per spec, which keys are required, what each value's type and enum are, and that an unknown key is now refused. `docs/developer_guide/writing_an_endpoint.md` gains the structured tokens beside the rest of the vocabulary and says how to add another one. A release note in `docs/release_notes/v07-v08.md` says plainly that a request carrying an undocumented key inside a diskspec, networkspec or videospec now answers 400 where it used to be ignored, names the three narrowings of D50 and names `API_VALIDATION_MODE=warn` and `off` as the rollback. (Corrected by the phase 8 audit: this brief said two narrowings, named a client version as a release requirement -- which D49's retraction removed, `client-python#398` being a tidy-up rather than a release gate -- and named only one of the two rollback modes. What shipped is right; the brief was not.) **Also fix the three documentation bugs the census found, none of which this phase caused:** `docs/user_guide/usage.md:237` lists `ide` as a valid disk bus and `config.DISK_BUS`'s description at `shakenfist/config.py:1028` does the same, while `external_api/instance.py:825` answers `400 IDE disks are no longer supported`; and `usage.md:288` lists nine NIC models where `instances.md:105` lists eight, the extra being `ne2k_isa`. Per D43 neither list is a specification, so say that the set is the hypervisor's rather than reconciling two prose lists into a third. |
 | 7 | medium | sonnet | none | **Cluster CI.** Add cases to `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/` for the contract changes a unit test cannot prove are real: an unknown diskspec key answering 400, a non-string `network_uuid` answering 400 rather than 500, and a well-formed instance with every documented key still creating. Follow the cases phase 6 added in `cluster_ci_tests/test_networking.py`. |
 | 8 | high | opus | none | **Close out.** Rewrite #528's body per F9. Audit the definition of done item by item, in this plan, the way phase 6's step 6 did. Record what landed in the master plan's `Merged` column *after* the merge, from the first-parent range — this is the mistake #4222 exists to correct. |
 
@@ -1232,7 +1239,7 @@ found in this audit and is item 5 below.
    `enforce`, and never `IDE disks are no longer supported`.
 9. **Met.** `disk.empty` answers `400 disk specification must specify
    at least one of size or base` at all three modes, as do the other
-   four spellings listed under item 7.
+   five spellings listed under item 7.
 10. **Met.** `test_openapi_spec.py` passes, including
     `test_every_published_structure_or_bound_is_registered`, whose
     completeness is derived from the published specification. Every
@@ -1485,12 +1492,15 @@ survey found* section because none of them were visible from outside.
 *From the sweep (step 5):*
 
 13. **A third class of `warn`-mover.** The plan expected two rows not to
-    roll back and there are seven, in three classes: the null
-    `network_uuid` on both routes, the four spellings of a diskspec
-    which asks for nothing, and one nobody had seen — a diskspec
-    carrying *only* a typo'd key has neither a size nor a base, so the
+    roll back and there are ten, in three classes: the null
+    `network_uuid` on both routes (2), the six spellings of a diskspec
+    which asks for nothing (6), and the null `video.model` and
+    `video.memory` the review round turned into value tests (2). One of
+    the diskspec spellings is one nobody had seen — a diskspec carrying
+    *only* a typo'd key has neither a size nor a base, so the
     size-or-base guard answers it at every mode rather than the schema
-    answering it at `enforce`.
+    answering it at `enforce`. (Counts corrected by the phase 8 audit;
+    definition-of-done item 7 states the final ten correctly.)
 14. **D48 has a limit, recorded rather than fixed.** "One fact, one
     message" holds within a nesting level and not across them: an
     omitted required *parameter* answers `missing-required`, an omitted
