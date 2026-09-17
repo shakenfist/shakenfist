@@ -413,13 +413,48 @@ class SFConfig(BaseSettings):
     )
     FEDERATION_JWKS_CACHE_SECONDS: int = Field(
         300,
+        # ge=1 because PyJWKClient refuses a lifespan of zero or less in
+        # its constructor, and that constructor runs inside
+        # JWKSCache._client_and_lock rather than at startup -- so
+        # without the bound a mistyped value is a 500 and a traceback on
+        # every exchange instead of a configuration error.
+        ge=1,
         description=(
             'How long in seconds a trusted issuer\'s JWKS is cached before '
             'being refetched. Lower values shorten the window in which a '
             'key the issuer has revoked is still accepted; higher values '
-            'reduce load on the issuer. An unknown key id always triggers '
-            'an immediate refetch regardless of this setting, so raising '
-            'it does not delay recognising a newly rotated key.'
+            'reduce load on the issuer. An unknown key id can also trigger '
+            'a refetch before this expires, subject to '
+            'FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS, so raising this '
+            'does not by itself delay recognising a newly rotated key.'
+        )
+    )
+    FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS: int = Field(
+        30,
+        # Zero is meaningful and documented, negative is not -- and
+        # PyJWKClient refuses a negative value in a constructor which
+        # runs per exchange rather than at startup. See
+        # FEDERATION_JWKS_CACHE_SECONDS above.
+        ge=0,
+        description=(
+            'The shortest interval in seconds between a successful JWKS '
+            'fetch and a refetch forced by an unrecognised key id. The '
+            'window is measured from any successful fetch, including the '
+            'first one and a refetch after FEDERATION_JWKS_CACHE_SECONDS '
+            'expires, not only from a previous forced fetch. A token '
+            'signed with a key we have never seen is how an issuer key '
+            'rotation announces itself, so it is worth a fetch -- but it '
+            'is also something any anonymous caller of the exchange '
+            'endpoint can fabricate, and without a floor each fabricated '
+            'key id is another fetch held under that issuer\'s lock. The '
+            'cost is that a rotation landing inside the window is not '
+            'recognised until it elapses. Zero disables the floor and '
+            'fetches on every unrecognised key id, which is what PyJWT '
+            'did before 2.14. Setting this at or above '
+            'FEDERATION_JWKS_CACHE_SECONDS disables forced refetches '
+            'altogether, because the cache expiry fetch restarts the '
+            'window before it can elapse; rotation is then only picked '
+            'up when the cache expires.'
         )
     )
     FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS: int = Field(

@@ -319,11 +319,63 @@ exchange answers 503 rather than assuming the request is fine.
 
 | Setting | Default | Notes |
 |---------|---------|-------|
-| `FEDERATION_JWKS_CACHE_SECONDS` | 300 | How long an issuer's published keys are cached. Lower shortens the window in which a revoked key is still accepted; higher reduces load on the provider. An unknown key id always triggers an immediate refetch, so raising this does not delay recognising a rotated key |
+| `FEDERATION_JWKS_CACHE_SECONDS` | 300 | How long an issuer's published keys are cached. Lower shortens the window in which a revoked key is still accepted; higher reduces load on the provider. An unknown key id can also force a refetch before this expires, so raising this does not by itself delay recognising a rotated key |
+| `FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS` | 30 | The shortest interval between a successful JWKS fetch and a refetch forced by an unrecognised key id, measured from any successful fetch and not only from a previous forced one. A rotation landing inside the window is not recognised until it elapses; without a window, every invented key id a stranger sends is another fetch. `0` fetches on every unrecognised key id |
 | `FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS` | 5 | How long to wait for an issuer's JWKS endpoint. The fetch happens while holding that issuer's refetch lock, so this is also the longest one unreachable provider can pin an API worker |
 | `FEDERATION_MAX_TOKEN_BYTES` | 16384 | Largest exchange request accepted, refused before parsing. A real identity token is one to two kilobytes. A request with no `Content-Length` is refused with 411 rather than measured, so chunked encoding cannot opt out of the limit |
 | `FEDERATION_RATE_LIMIT_PER_MINUTE` | 60 | Exchange attempts allowed per source address per minute. `0` disables rate limiting entirely |
 | `FEDERATION_JWKS_CA_BUNDLE` | *(empty)* | Path to a PEM bundle of extra certificate authorities to trust when fetching an issuer's JWKS. Empty means the system trust store alone |
+
+### When an issuer rotates its signing keys
+
+An identity provider replaces its signing keys periodically, and the
+first warning a cluster gets is a token naming a key id that is not in
+the cached key set. That is worth a refetch, and one happens -- but no
+more often than `FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS`, because
+`/auth/federated` takes no credential and an unrecognised key id is
+something anyone can invent. Without a floor each invented key id
+would be another fetch of the provider's JWKS, made by us, on someone
+else's say-so.
+
+The cost is bounded and worth naming: a rotation which happens just
+after a successful fetch is not recognised until the window elapses,
+and exchanges presenting the new key are refused in the meantime with
+`no signing key for this token`. Thirty seconds is the default. Lower
+it if an issuer rotates often enough for that to matter, or set it to
+`0` to fetch on every unrecognised key id, accepting that a stranger
+can then set the fetch rate.
+
+When sizing the window, note that it starts at *any* successful fetch,
+not only at a fetch an unrecognised key id forced. The first fetch of
+an issuer's JWKS starts it, and so does the refetch after
+`FEDERATION_JWKS_CACHE_SECONDS` expires -- so a rotation arriving ten
+seconds after a routine cache-expiry refetch waits out the remaining
+twenty, even though no forced fetch has ever happened for that issuer.
+
+That also means setting it at or above `FEDERATION_JWKS_CACHE_SECONDS`
+turns forced refetches off entirely rather than merely slowing them:
+every cache-expiry fetch restarts the window before it can elapse, so
+an unrecognised key id never gets to force anything and a rotation is
+picked up only when the cache next expires. Nothing refuses that
+configuration — it is a longer delay, not an incorrect decision — but
+it is not what the two settings look like they do. Keep the cooldown
+comfortably below the cache lifetime.
+
+### The JWKS URI must be the final URL
+
+Redirects are not followed when fetching an issuer's JWKS, so
+`jwks_uri` has to be the URL which serves the key set rather than one
+which points at it. A provider which answers `/.well-known/jwks` with a
+301 or 302 to a CDN path needs the CDN path configured on the issuer.
+This is a change in PyJWT 2.14, which builds its fetch opener with
+redirects refused, so an issuer which worked before an upgrade to that
+release can start failing at it.
+
+The symptom is every exchange against that issuer answering 401 with
+`no signing key for this token from issuer <name>: Fail to fetch data
+from the url`, which is the same message an unreachable provider
+produces. `curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n'
+<jwks_uri>` distinguishes the two.
 
 ### An identity provider behind a private CA
 

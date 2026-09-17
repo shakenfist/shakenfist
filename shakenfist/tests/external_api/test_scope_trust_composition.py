@@ -30,12 +30,10 @@ backdrop: trust is the thing that opens the door, and the point is
 that a scoped key walking through it stays scoped.
 """
 
-import io
 import json
 import logging
 import sys
 import time
-from unittest import mock
 
 import jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -51,6 +49,7 @@ from shakenfist.namespace_key import NamespaceKey
 from shakenfist.schema.namespace_key_attributes import (
     NamespaceKeyAttributesData)
 from shakenfist.tests import base
+from shakenfist.tests import fake_jwks
 from shakenfist.tests.mock_mariadb import MockMariaDB
 from shakenfist.trusted_issuer import TrustedIssuer
 
@@ -320,24 +319,17 @@ class FederatedKeyTrustCompositionTestCase(TrustCompositionFixture):
             {'repository': 'shakenfist/ryll'},
             ['artifact.read'], 3600, 'pr')
 
-        patcher = mock.patch(
-            'jwt.jwks_client.urllib.request.urlopen',
-            side_effect=self._urlopen)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        fake_jwks.patch_transport(self, self._respond)
 
-    def _urlopen(self, request, **kwargs):
-        body = json.dumps({
-            'keys': [
-                json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(
-                    self.key.public_key())) | {
-                        'kid': 'key-1', 'use': 'sig', 'alg': 'RS256'}
-            ]
-        }).encode('utf-8')
-        response = mock.MagicMock()
-        response.__enter__.return_value = io.BytesIO(body)
-        response.__exit__.return_value = False
-        return response
+    def _respond(self, url):
+        # GitHub is the only issuer this module configures, so any
+        # other URL is unexpected and raises rather than being handed
+        # a key set.
+        if not url.startswith(GITHUB):
+            return None
+
+        return json.dumps(fake_jwks.jwks_document(
+            {'key-1': self.key})).encode('utf-8')
 
     def _federated_token(self):
         """Exchange an identity token and authenticate with the result."""

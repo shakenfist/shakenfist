@@ -104,6 +104,41 @@ iptables -m conntrack --help > /dev/null && echo ok
 See the floating IP discussion in [the networking overview](networking/overview.md)
 for what the rule does and why both of its matches are needed.
 
+### Federated issuers: JWKS redirects and the rotation cooldown
+
+This release moves to PyJWT 2.14, which changes two things an operator
+using [identity federation](authentication.md) can see. Neither needs
+action unless it describes your provider.
+
+Redirects are no longer followed when fetching an issuer's JWKS, so a
+`jwks_uri` which answers 301 or 302 — one pointing at a CDN path rather
+than serving the key set itself — stops working, and every exchange
+against that issuer answers 401. Reconfigure the issuer with the final
+URL. See
+[the JWKS URI must be the final URL](authentication.md#the-jwks-uri-must-be-the-final-url)
+for how to tell this apart from an unreachable provider.
+
+A refetch forced by an unrecognised key id is now rate limited to one
+per `FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS` (default 30) per
+issuer, which means a key rotation landing inside that window is not
+recognised until it elapses. This is deliberate — `/auth/federated`
+takes no credential, so before it every invented key id a stranger sent
+bought another JWKS fetch made by us — but if you rotate often enough
+for the delay to matter, lower the setting or set it to `0` for the
+previous behaviour. See
+[when an issuer rotates its signing keys](authentication.md#when-an-issuer-rotates-its-signing-keys).
+
+Both settings are now range checked, and that check runs at import of
+`shakenfist.config` — which every daemon does, not just `sf-api`.
+`FEDERATION_JWKS_CACHE_SECONDS` must be at least 1 and
+`FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS` at least 0. A nonsensical
+value previously broke only federated exchanges, with a 500 per
+attempt and an otherwise working cluster; after this upgrade no daemon
+on that node starts at all. That is the better failure — a
+configuration error should not wait for somebody's first federated
+login to surface — but check `/etc/sf/config` for both settings before
+rolling the daemons.
+
 ## MariaDB schema migrations
 
 Starting with v0.8, Shaken Fist uses MariaDB to store object state data. The

@@ -99,7 +99,7 @@ dependencies = [
     # jwt.exceptions types in external_api/base.py. Flask-JWT-Extended
     # happens to require it too, but that is its choice to revisit, not a
     # dependency of ours to inherit.
-    "PyJWT==2.13.0",                      # mit
+    "PyJWT==2.14.0",                      # mit
     "flask-request-id-middleware==1.1",   # mit
 
     # The 2026-06 grpcio bisect (1.81 -> 1.75.1 -> 1.72.2 -> 1.70.0)

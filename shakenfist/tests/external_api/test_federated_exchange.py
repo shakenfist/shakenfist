@@ -7,7 +7,6 @@ happen in, and about the exchange never granting more than the rule it
 went through says.
 """
 
-import io
 import json
 import logging
 import sys
@@ -23,6 +22,7 @@ from shakenfist.mapping_rule import MappingRule
 from shakenfist.namespace import Namespace
 from shakenfist.namespace_key import NamespaceKey
 from shakenfist.tests import base
+from shakenfist.tests import fake_jwks
 from shakenfist.tests.mock_mariadb import MockMariaDB
 from shakenfist.trusted_issuer import TrustedIssuer
 from shakenfist.util import credentials
@@ -58,6 +58,20 @@ class FederatedExchangeTestCase(base.ShakenFistTestCase):
         self.fetches = []
         self.jti_counter = 0
 
+        # Several tests here count JWKS fetches, and PyJWT 2.14's
+        # rotation cooldown suppresses a forced refetch for 30 seconds
+        # after any successful one -- comfortably longer than a test
+        # runs, so at the default every such assertion would hold
+        # whether or not the code under test did its job. Turned off so
+        # that fetch counting means what it says; the cooldown has its
+        # own tests in test_federation.py. The cache is rebuilt
+        # afterwards because the client reads the value at construction.
+        cooldown = mock.patch.object(
+            federation.config,
+            'FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS', 0)
+        cooldown.start()
+        self.addCleanup(cooldown.stop)
+
         federation.JWKS_CACHE = federation.JWKSCache()
         self.issuer = TrustedIssuer.new(
             'github', GITHUB, GITHUB_JWKS, AUDIENCE)
@@ -67,28 +81,21 @@ class FederatedExchangeTestCase(base.ShakenFistTestCase):
              'ref': ['refs/heads/develop', 'refs/heads/main']},
             ['blob.read', 'artifact.*'], 3600, 'ryll-ci')
 
-        patcher = mock.patch(
-            'jwt.jwks_client.urllib.request.urlopen',
-            side_effect=self._urlopen)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        fake_jwks.patch_transport(self, self._respond)
 
         self.client = external_api.app.test_client()
 
-    def _urlopen(self, request, **kwargs):
-        self.fetches.append(request.full_url)
-        body = json.dumps({
-            'keys': [
-                json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(
-                    key.public_key())) | {
-                        'kid': kid, 'use': 'sig', 'alg': 'RS256'}
-                for kid, key in self.keys.items()
-            ]
-        }).encode('utf-8')
-        response = mock.MagicMock()
-        response.__enter__.return_value = io.BytesIO(body)
-        response.__exit__.return_value = False
-        return response
+    def _respond(self, url):
+        # This module's issuers only -- GITHUB here, and the Authentik
+        # one SecondIssuerTestCase adds. Anything else raises rather
+        # than being answered and counted as a JWKS fetch, which
+        # several tests below assert exact numbers of.
+        if not url.startswith((GITHUB, 'https://auth.example.com')):
+            return None
+
+        self.fetches.append(url)
+        return json.dumps(
+            fake_jwks.jwks_document(self.keys)).encode('utf-8')
 
     def _token(self, claims=None, audience=AUDIENCE, issuer=GITHUB,
                exp_delta=300, key=None, kid='key-1', jti=None):

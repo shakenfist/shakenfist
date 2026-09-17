@@ -246,11 +246,19 @@ definition has no Shaken Fist credential yet.
 
 Token validation lives in `shakenfist/federation.py`, which is deliberately
 Flask-free: issuer resolution from an unverified `iss`, signature checking
-against a `PyJWKClient` cache (one client and one lock per issuer, so a key
-rotation does not stampede the provider), audience and lifetime checks, and
-claim matching against a rule. The endpoint composes these in a fixed order —
-cheap local rejections before anything that costs a network round trip — and
-that order is a security property rather than a style, asserted by tests.
+against a `PyJWKClient` cache (one client and one lock per issuer, so an
+unreachable provider cannot delay tokens from a healthy one), audience and
+lifetime checks, and claim matching against a rule. A token naming a key id
+we have not seen forces a JWKS refetch, which is how key rotation is picked
+up without configuration, but no more often than
+`FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS` — the endpoint is
+unauthenticated, so an unrecognised key id is free for a stranger to invent.
+See [when an issuer rotates its signing
+keys](docs/operator_guide/authentication.md#when-an-issuer-rotates-its-signing-keys).
+
+The endpoint composes these in a fixed order — cheap local rejections before
+anything that costs a network round trip — and that order is a security
+property rather than a style, asserted by tests.
 
 The JWKS fetch verifies TLS against the system trust store, plus whatever
 `FEDERATION_JWKS_CA_BUNDLE` names, for a provider behind a private CA. Those
