@@ -77,9 +77,14 @@ Adding another structure is three edits, and they belong in one commit:
    code it was read off. An `enum` goes in only where the server
    already refuses everything outside it: a networkspec's `model`
    deliberately carries none, because the value is rendered into the
-   libvirt domain XML unexamined and the vocabulary is therefore the
+   libvirt domain XML and the vocabulary is therefore the
    hypervisor's qemu build rather than this API's, and publishing a
-   list would make the specification narrower than the server.
+   list would make the specification narrower than the server. It
+   carries a character-class `pattern` instead, which every model
+   name fits -- rendered-into-the-XML is a reason not to publish an
+   enum, but it is also the reason the value cannot go wholly
+   unconstrained (issue #4242), and the render site escapes as well
+   because a schema pattern rolls back with `API_VALIDATION_MODE`.
 2. **Tokens in `ARGTYPES` built from that constant**, one per form the
    tree declares — `'networkspec': NETWORKSPEC_SCHEMA` and
    `'arrayofnetworkspec': {'type': 'array', 'items': NETWORKSPEC_SCHEMA}`.

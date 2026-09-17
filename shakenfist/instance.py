@@ -13,6 +13,7 @@ import shutil
 import socket
 import time
 import xml.etree.ElementTree as ET
+from xml.sax import saxutils
 from collections import defaultdict
 from contextlib import contextmanager
 from functools import partial
@@ -113,6 +114,19 @@ def _safe_int_cast(i):
     if i:
         return int(i)
     return i
+
+
+def _xml_attribute_escape(value):
+    # Caller-supplied values rendered into a quoted attribute of the
+    # libvirt domain XML must not be able to close that attribute and
+    # write further elements into the domain definition (issue #4242).
+    # The API publishes a pattern for the model values
+    # (api_base.DEVICE_MODEL_PATTERN), but a schema check is rolled
+    # back by API_VALIDATION_MODE=warn/off, so this escaping is the
+    # guard which holds at every mode. Both quote styles are escaped
+    # because libvirt.tmpl quotes attributes with ' and
+    # hot_plug_interface() with ".
+    return saxutils.escape(str(value), {"'": '&apos;', '"': '&quot;'})
 
 
 def traverse_cluster_operations_tree(op, only_incomplete=True):
@@ -2079,7 +2093,7 @@ class Instance(dbowo):
                 {
                     'macaddr': ni.macaddr,
                     'bridge': n.subst_dict()['vx_bridge'],
-                    'model': ni.model,
+                    'model': _xml_attribute_escape(ni.model),
                     'mtu': config.MAX_HYPERVISOR_MTU - 50
                 }
             )
@@ -2150,8 +2164,8 @@ class Instance(dbowo):
             console_port=ports.get('console_port'),
             vdi_port=ports.get('vdi_port'),
             vdi_tls_port=ports.get('vdi_tls_port'),
-            video_model=self.video['model'],
-            video_memory=self.video['memory'],
+            video_model=_xml_attribute_escape(self.video['model']),
+            video_memory=_xml_attribute_escape(self.video['memory']),
             uefi=self.uefi,
             secure_boot=self.secure_boot,
             nvram_template_attribute=nvram_template_attribute,
@@ -2834,10 +2848,11 @@ class Instance(dbowo):
 
             bridge = n.subst_dict()['vx_bridge']
             mtu = config.MAX_HYPERVISOR_MTU - 50
+            model = _xml_attribute_escape(ni.model)
             device_xml = f'''    <interface type="bridge">
       <mac address="{ni.macaddr}"/>
       <source bridge="{bridge}"/>
-      <model type="{ni.model}"/>
+      <model type="{model}"/>
       <mtu size="{mtu}"/>
       </interface>
       '''

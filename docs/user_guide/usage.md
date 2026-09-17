@@ -298,9 +298,10 @@ of the following keys:
   in any other form is rejected.
 * _model_ is the model of the network device. The default is virtio, and it is
   almost always the right answer; e1000, rtl8139, pcnet and the i825xx family are
-  the usual choices for a guest which lacks virtio drivers. Shaken Fist does not
-  check this value and cannot give you a definitive list of the ones which work:
-  it is handed to the hypervisor unexamined, so the set which works is whatever
+  the usual choices for a guest which lacks virtio drivers. Shaken Fist cannot
+  give you a definitive list of the ones which work: beyond a simple
+  letters-digits-and-punctuation shape check, the value is handed to the
+  hypervisor, so the set which works is whatever
   your hypervisor's qemu build supports. See
   [the networkspec reference](/developer_guide/api_reference/instances/#networkspec)
   for more detail.

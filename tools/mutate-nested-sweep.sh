@@ -204,6 +204,12 @@ mutate "${BASE}" \
 " "" || exit 1
 check "macaddress pattern" "net.macaddress.malformed"
 
+run "the model pattern is widened past inertness (issue #4242)"
+mutate "${BASE}" \
+    "DEVICE_MODEL_PATTERN = '^[A-Za-z0-9._-]{1,32}\$'" \
+    "DEVICE_MODEL_PATTERN = '^.{1,64}\$'" || exit 1
+check "device model pattern" "model.injection"
+
 # ---------------------------------------------------------------------
 # 6. The _schema sentinel collapse is reverted -- the regression step 4
 #    found and fixed while wrapping a spec in fields.Nested.

@@ -502,6 +502,26 @@ DISKSPEC_SCHEMA: dict[str, Any] = {
     },
 }
 
+# The character class both `model` properties publish (issue #4242).
+# Not an enum -- D43's reasoning stands: the working vocabulary is the
+# hypervisor's qemu build, which this API cannot know -- but not "no
+# constraint at all" either, which is what D43 had been implemented
+# as. Both values are interpolated into quoted attributes in the
+# libvirt domain XML, so an unconstrained one could close the
+# attribute and write further device elements into the domain
+# definition. This class covers every real qemu NIC and video model
+# name (virtio, e1000e, ne2k_isa, vmxnet3, qxl, ...) so it is no
+# narrower than any value that could ever work, while refusing every
+# XML metacharacter. The {1,32} bound also refuses an explicit empty
+# string, which the netdesc handler would have defaulted to virtio --
+# a deliberate D50-style narrowing: no censused caller sends one (they
+# omit the key or send null, and a null runs no validator), and an
+# empty string that means "the default" is a silent surprise rather
+# than a working request. Like any schema pattern this is rolled back
+# by API_VALIDATION_MODE=warn/off; the guard which holds at every mode
+# is the render-time escaping in instance.py's _xml_attribute_escape().
+DEVICE_MODEL_PATTERN = '^[A-Za-z0-9._-]{1,32}$'
+
 NETWORKSPEC_SCHEMA: dict[str, Any] = {
     'type': 'object',
     # D41, and the census found here what it found for a diskspec: the
@@ -563,10 +583,9 @@ NETWORKSPEC_SCHEMA: dict[str, Any] = {
         'model': {
             'type': 'string',
             # No enum, and this is the key D43 exists for. The value is
-            # stored on the NetworkInterface and rendered raw into the
-            # domain XML at libvirt.tmpl:139 with nothing in
-            # shakenfist/ in between, so the set which works is the
-            # hypervisor's qemu build, which varies by node and by
+            # stored on the NetworkInterface and rendered into the
+            # domain XML at libvirt.tmpl:139, so the set which works is
+            # the hypervisor's qemu build, which varies by node and by
             # release. Our own two documentation pages already disagree
             # about it -- usage.md:288 recommends ne2k_isa and
             # api_reference/instances.md:105 omits it -- which is proof
@@ -574,7 +593,10 @@ NETWORKSPEC_SCHEMA: dict[str, Any] = {
             # either list would answer 400 to a value the user guide
             # tells people to use. If this is ever to be enforced it
             # belongs in a hypervisor capability check, not in a
-            # request schema.
+            # request schema. The pattern is not that check: it is the
+            # character class which keeps the value inert in the XML
+            # (issue #4242), and every model name matches it.
+            'pattern': DEVICE_MODEL_PATTERN,
             'description': (
                 'The model of the network card. virtio is the default and is '
                 'almost always the right answer; e1000, rtl8139, pcnet and '
@@ -603,9 +625,11 @@ VIDEOSPEC_SCHEMA: dict[str, Any] = {
             'type': 'string',
             # No enum, for the reason the netdesc's model carries none:
             # instance.py:2153 passes the value through to
-            # libvirt.tmpl:206, where it is rendered raw as the video
-            # model type, with nothing in shakenfist/ in between. The
-            # vocabulary is the hypervisor's (D43).
+            # libvirt.tmpl:206, where it is rendered as the video model
+            # type. The vocabulary is the hypervisor's (D43); the
+            # pattern is the netdesc model's, and exists for the same
+            # reason (issue #4242).
+            'pattern': DEVICE_MODEL_PATTERN,
             'description': (
                 'The model of the video card. cirrus is the default; vga and '
                 'qxl are the other usual choices, and qxl is the one to pair '

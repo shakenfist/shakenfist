@@ -299,12 +299,12 @@ class TestNestedSpecKeysRefused(base.BaseNamespacedTestCase):
 
     The unit sweep -- shakenfist/tests/external_api/test_nested_sweep.py
     -- measures ninety nine of those values against a mocked MariaDB and
-    a fixture with no hypervisor. The two rows repeated here are the
+    a fixture with no hypervisor. The rows repeated here are the
     ones whose *old* behaviour a caller could see in production, and
     this is the only suite which can show that a real sf-api behind
     gunicorn now answers them the way the sweep says it does.
 
-    Neither test allocates a network or creates an instance, and that is
+    None of these tests allocates a network or creates an instance, and that is
     a finding rather than a saving: a create which is refused by the
     validation layer never reaches the handler, so it never resolves a
     network, never reaches the scheduler and never places anything. If
@@ -353,6 +353,59 @@ class TestNestedSpecKeysRefused(base.BaseNamespacedTestCase):
             body = json.loads(e.text)
             self.assertEqual(
                 {'error': 'disk[0].siz: Unknown field.', 'status': 400},
+                body)
+
+            for marker in _INTERPRETER_TEXT_MARKERS:
+                self.assertNotIn(
+                    marker, e.text,
+                    'Validation refusal leaked interpreter text: %s' % e.text)
+
+    def test_attribute_closing_model_refused(self):
+        """Issue #4242, at the real API.
+
+        A `network[].model` is rendered into a quoted attribute of the
+        instance's libvirt domain XML, and the API publishes no enum
+        for it on purpose (D43: the vocabulary is the hypervisor's qemu
+        build). What it publishes instead is a character class, and a
+        value which could close the attribute and write device elements
+        into the domain definition must be refused with a 400 naming
+        the key. The render site also escapes, but that half is not
+        observable from a request which never creates an instance; the
+        unit suite pins it (test_instance.py's
+        InstanceDomainXMLEscapingTestCase).
+
+        The network is deliberately one which does not exist: the
+        refusal has to come from the validation layer, before the
+        handler ever resolves a network, exactly as the class docstring
+        demands of these tests.
+        """
+        try:
+            # raw-create: as above, the refusal is the assertion.
+            self.test_client.create_instance(
+                'netspec-model-injection', 1, 1024,
+                [
+                    {
+                        'network_uuid': 'nosuchnetwork',
+                        'model': "virtio'/><x"
+                    }
+                ],
+                [
+                    {
+                        'size': 8,
+                        'base': base.CLUSTER_CI_IMAGE,
+                        'type': 'disk'
+                    }
+                ], None, None)
+            self.fail('An attribute-closing model was not refused')
+        except apiclient.RequestMalformedException as e:
+            self.addDetail('response', content.text_content(str(e.text)))
+            self.assertEqual(400, e.status_code)
+
+            body = json.loads(e.text)
+            self.assertEqual(
+                {'error': ('network[0].model: String does not match '
+                           'expected pattern.'),
+                 'status': 400},
                 body)
 
             for marker in _INTERPRETER_TEXT_MARKERS:

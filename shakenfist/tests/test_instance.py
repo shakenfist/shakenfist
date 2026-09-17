@@ -1,9 +1,11 @@
 import base64
 import json
 import os
+import shutil
 import tempfile
 import time
 import uuid
+import xml.etree.ElementTree as ET
 from functools import partial
 from unittest import mock
 
@@ -568,6 +570,8 @@ class FakeLibvirtError(Exception):
 class FakeLibvirtModule:
     libvirtError = FakeLibvirtError
     VIR_DOMAIN_REBOOT_ACPI_POWER_BTN = 4
+    VIR_DOMAIN_AFFECT_LIVE = 1
+    VIR_DOMAIN_AFFECT_CONFIG = 2
 
 
 class FakeDomain:
@@ -576,9 +580,15 @@ class FakeDomain:
         self._error = error
         self.reboot_flags = None
         self.reset_calls = 0
+        self.attached_xml = None
 
     def isActive(self):
         return 1 if self._active else 0
+
+    def attachDeviceFlags(self, device_xml, flags=0):
+        if self._error:
+            raise self._error
+        self.attached_xml = device_xml
 
     def reboot(self, flags=0):
         if self._error:
@@ -696,6 +706,146 @@ class InstanceRebootTestCase(base.ShakenFistTestCase):
             'internal error: something else entirely')))
         with testtools.ExpectedException(FakeLibvirtError):
             self.inst.reboot(hard=True)
+
+
+class InstanceDomainXMLEscapingTestCase(base.ShakenFistTestCase):
+    """A caller-supplied model value must stay data in the domain XML.
+
+    Issue 4242: network[].model and video.model reach the domain XML
+    from the request body, and the schema pattern which refuses an XML
+    metacharacter in them is rolled back by API_VALIDATION_MODE=warn
+    and off. So the render sites escape, and that escaping is what
+    these tests pin -- with payloads which are *well-formed* if the
+    escaping is lost, because a payload the XML validator would catch
+    tests the validator, not the escape. Each payload closes the quoted
+    attribute and writes a <serial> device, an element the template
+    never emits, so 'the injection ran' and 'the injection stayed data'
+    are one findall apart.
+    """
+
+    # For the template's single-quoted attributes: closes type='...',
+    # adds a device, and reopens a model so the render is well-formed
+    # without the escape.
+    HOSTILE_NET_MODEL = "virtio'/><serial type='pty'/><model type='e1000"
+    HOSTILE_VIDEO_MODEL = "qxl'/><serial type='pty'/><model type='vga"
+
+    # For hot_plug_interface()'s double-quoted f-string.
+    HOSTILE_HOTPLUG_MODEL = 'virtio"/><serial type="pty"/><model type="e1000'
+
+    def setUp(self):
+        super().setUp()
+        storage_path = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, storage_path, ignore_errors=True)
+        shutil.copyfile(
+            os.path.abspath(os.path.join(
+                os.path.dirname(__file__), '..', 'deploy', 'collection',
+                'roles', 'hypervisor', 'files', 'libvirt.tmpl')),
+            os.path.join(storage_path, 'libvirt.tmpl'))
+
+        fake_config = SFConfig(
+            STORAGE_PATH=storage_path,
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+        )
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
+        self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.baseobject.get_minimum_object_version', return_value=6)
+        self.gmov.start()
+        self.addCleanup(self.gmov.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance('cirros', self.instance_uuid)
+        self.inst = instance.Instance.from_db(self.instance_uuid)
+
+        self.ni = mock.MagicMock()
+        self.ni.macaddr = '02:00:00:aa:bb:cc'
+        self.fake_net = mock.MagicMock()
+        self.fake_net.subst_dict.return_value = {'vx_bridge': 'br-vxlan-1'}
+
+    def test_xml_attribute_escape(self):
+        self.assertEqual(
+            '&lt;a&gt;&amp;&apos;&quot;',
+            instance._xml_attribute_escape('<a>&\'"'))
+        # Stringified first, so the values jinja used to stringify keep
+        # rendering identically: a legacy null model as 'None', a video
+        # memory as its digits.
+        self.assertEqual('None', instance._xml_attribute_escape(None))
+        self.assertEqual('16384', instance._xml_attribute_escape(16384))
+
+    def test_create_domain_xml_keeps_hostile_models_inert(self):
+        self.ni.model = self.HOSTILE_NET_MODEL
+        pm = mock.PropertyMock
+        patches = [
+            mock.patch.object(instance.Instance, 'interfaces',
+                              new_callable=pm, return_value=[self.ni]),
+            mock.patch.object(instance.Instance, 'block_devices',
+                              new_callable=pm,
+                              return_value={'devices': [],
+                                            'extracommands': []}),
+            mock.patch.object(instance.Instance, 'ports', new_callable=pm,
+                              return_value={'console_port': 30000,
+                                            'vdi_port': 30001}),
+            mock.patch.object(instance.Instance, 'video', new_callable=pm,
+                              return_value={'model': self.HOSTILE_VIDEO_MODEL,
+                                            'memory': 16384, 'vdi': 'vnc'}),
+            mock.patch('shakenfist.instance.network.Network.from_db',
+                       return_value=self.fake_net),
+            mock.patch.object(instance.Instance, 'add_event'),
+        ]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+
+        xml = self.inst._create_domain_xml()
+
+        root = ET.fromstring(xml)
+        self.assertEqual(
+            [], root.findall('.//serial'),
+            'a hostile model value added a device to the domain')
+
+        interfaces = root.findall('./devices/interface')
+        self.assertEqual(1, len(interfaces))
+        self.assertEqual(
+            [self.HOSTILE_NET_MODEL],
+            [m.get('type') for m in interfaces[0].findall('model')],
+            'the interface model did not round-trip as data')
+
+        videos = root.findall('./devices/video')
+        self.assertEqual(1, len(videos))
+        self.assertEqual(
+            [self.HOSTILE_VIDEO_MODEL],
+            [m.get('type') for m in videos[0].findall('model')],
+            'the video model did not round-trip as data')
+
+    def test_hot_plug_interface_keeps_a_hostile_model_inert(self):
+        self.ni.model = self.HOSTILE_HOTPLUG_MODEL
+        domain = FakeDomain()
+        lc = mock.patch(
+            'shakenfist.instance.util_libvirt.LibvirtConnection',
+            return_value=FakeLibvirtConnection(domain))
+        lc.start()
+        self.addCleanup(lc.stop)
+
+        with mock.patch('shakenfist.instance.add_event_multi'), \
+                mock.patch.object(instance.Instance, '_record_domain_xml'):
+            self.inst.hot_plug_interface(self.fake_net, self.ni)
+
+        root = ET.fromstring(domain.attached_xml)
+        self.assertEqual('interface', root.tag)
+        self.assertEqual(
+            [], root.findall('.//serial'),
+            'a hostile model value added a device to the hotplug fragment')
+        self.assertEqual(
+            [self.HOSTILE_HOTPLUG_MODEL],
+            [m.get('type') for m in root.findall('model')],
+            'the hotplugged model did not round-trip as data')
 
 
 class InstancesTestCase(base.ShakenFistTestCase):

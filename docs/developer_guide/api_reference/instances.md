@@ -145,11 +145,14 @@ Similarly, a `networkspec` consists of the following fields in a JSON dictionary
   Windows images. virtio is the default and is almost always the right answer;
   e1000, rtl8139, pcnet and the i825xx family are the usual choices for a guest
   without virtio drivers. There is deliberately **no enumeration of legal values
-  here, and a value this API does not recognise is not refused**: the value is
-  rendered into the instance's libvirt domain XML unexamined, so the set which
+  here, and a value this API does not recognise is not refused**: the set which
   actually works is whatever the hypervisor's qemu build supports, which varies by
   node and by release and which this API cannot know. If a model is wrong you will
-  find out when the instance fails to start, not when you create it.
+  find out when the instance fails to start, not when you create it. The one
+  check the value does get is the published pattern `^[A-Za-z0-9._-]{1,32}$`,
+  which every model name fits: the value is rendered into the instance's libvirt
+  domain XML, so a value carrying an XML metacharacter is refused with a 400
+  (and is escaped at render time regardless).
 * float (boolean): whether to associate a floating IP with this interface to enable external
   accessibility to the instance. Note that you can float and unfloat an interface
   after instance creation if desired. A JSON boolean is the expected form, and
@@ -173,8 +176,10 @@ passed as a list. You only have one `videospec` per instance. Once again, a
   the default, and vga and qxl are the other usual choices -- qxl is the one to
   pair with SPICE. As with a `networkspec`'s model there is deliberately **no
   enumeration of legal values, and an unrecognised one is not refused**, for the
-  same reason: the value is rendered into the libvirt domain XML unexamined, so
-  the working set belongs to the hypervisor's qemu build rather than to this API.
+  same reason: the value is rendered into the libvirt domain XML, so the working
+  set belongs to the hypervisor's qemu build rather than to this API. It carries
+  the same `^[A-Za-z0-9._-]{1,32}$` pattern as the `networkspec`'s model, for
+  the same reason.
 * memory (integer): the amount of video RAM the video card should have, in
   kibibytes (blocks of 1024 bytes). A value with a fractional part is refused with
   a 400.

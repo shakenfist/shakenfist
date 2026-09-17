@@ -1175,13 +1175,15 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
     def test_any_nic_model_is_accepted(self):
         """D43, as the census amended it.
 
-        network[].model is rendered raw into the domain XML at
-        libvirt.tmpl:139 with nothing in shakenfist/ in between, so the
-        set which works is the hypervisor's qemu build. Our own two
-        documentation pages disagree about it: usage.md:288 recommends
-        ne2k_isa and api_reference/instances.md:105 omits it. An enum
-        taken from either would answer 400 to a value the user guide
-        tells people to use.
+        network[].model is rendered into the domain XML at
+        libvirt.tmpl:139, so the set which works is the hypervisor's
+        qemu build. Our own two documentation pages disagree about it:
+        usage.md:288 recommends ne2k_isa and
+        api_reference/instances.md:105 omits it. An enum taken from
+        either would answer 400 to a value the user guide tells people
+        to use. The pattern issue #4242 added is not an enum in
+        disguise: every name qemu could ever use fits it, which is what
+        the fourth, invented model below is in this list to show.
         """
         self.assertNotIn(
             'enum',
@@ -1190,6 +1192,34 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
             with self.subTest(model=model):
                 self.assertEqual([], self._findings('networkspec', {
                     'network_uuid': 'barry_net', 'model': model}))
+
+    def test_a_model_which_could_close_its_attribute_is_refused(self):
+        """Issue #4242: both model values are interpolated into quoted
+        attributes of the libvirt domain XML, so a value carrying an
+        XML metacharacter could close the attribute and write further
+        device elements into the domain definition. The published
+        pattern refuses every such value at enforce; the render-time
+        escaping in instance._xml_attribute_escape() is the guard which
+        holds when API_VALIDATION_MODE rolls this schema back. Both
+        fragments are asserted to carry the *same* pattern constant, so
+        the two cannot drift apart.
+        """
+        for token in ('networkspec', 'videospec'):
+            self.assertEqual(
+                api_base.DEVICE_MODEL_PATTERN,
+                api_base.ARGTYPES[token]['properties']['model']['pattern'])
+
+        for hostile in ("virtio'/><x", 'cirrus"/><x', 'a&b', 'x' * 33, ''):
+            with self.subTest(hostile=hostile):
+                self.assertEqual(
+                    [('spec.model',
+                      'String does not match expected pattern.')],
+                    self._findings('networkspec', {
+                        'network_uuid': 'barry_net', 'model': hostile}))
+                self.assertEqual(
+                    [('spec.model',
+                      'String does not match expected pattern.')],
+                    self._findings('videospec', {'model': hostile}))
 
     def test_each_networkspec_key_refuses_its_own_bad_value(self):
         for (supplied, expected) in [
@@ -1294,8 +1324,8 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
 
     def test_any_video_model_is_accepted(self):
         """D43 again. instance.py:2153 passes the value to
-        libvirt.tmpl:206, which renders it raw as the video model type,
-        so the vocabulary is the hypervisor's."""
+        libvirt.tmpl:206, which renders it as the video model type, so
+        the vocabulary is the hypervisor's."""
         self.assertNotIn(
             'enum', api_base.ARGTYPES['videospec']['properties']['model'])
         for model in ('vga', 'cirrus', 'qxl', 'virtio', 'bochs'):

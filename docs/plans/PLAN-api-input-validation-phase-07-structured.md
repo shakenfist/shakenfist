@@ -27,6 +27,28 @@ documentation that describes it.
 
 ## Amendments
 
+**2026-09-17, issue #4242.** The review of #4232 also found the gap in
+how D43 was implemented, and because the auto-filer did not run for
+that approved PR, it was filed by hand as
+[#4242](https://github.com/shakenfist/shakenfist/issues/4242). D43's
+reasoning stands -- neither `model` carries an enum, and the working
+vocabulary is still the hypervisor's -- but "no enum" had been built
+as "no constraint at all", and both values are interpolated into
+quoted attributes of the domain XML, rendered with escaping off. An
+authenticated user could therefore close the attribute and write
+device elements into their instance's domain definition. The fix is
+the shape this phase's own guards taught: a published character-class
+`pattern` (`api_base.DEVICE_MODEL_PATTERN`, wide enough for every
+qemu model name) which enforces at `enforce`, and render-time
+escaping (`instance._xml_attribute_escape()`, applied in
+`_create_domain_xml()` and `hot_plug_interface()`) which holds at
+`warn` and `off`, where a schema pattern rolls back. Three
+`*.model.injection` sweep rows pin the mode split, and
+`test_instance.InstanceDomainXMLEscapingTestCase` pins the escaping
+with payloads that are well-formed injections without it. D43's table
+below is unchanged: the pattern is not an enum and publishes no
+vocabulary.
+
 **2026-09-17, after the pull request review.** The automated review of
 [#4232](https://github.com/shakenfist/shakenfist/pull/4232) raised one
 `fix`, two `document` items and three `consider` items. All six were
