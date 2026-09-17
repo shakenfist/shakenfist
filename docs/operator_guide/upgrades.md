@@ -128,6 +128,17 @@ for the delay to matter, lower the setting or set it to `0` for the
 previous behaviour. See
 [when an issuer rotates its signing keys](authentication.md#when-an-issuer-rotates-its-signing-keys).
 
+Both settings are now range checked, and that check runs at import of
+`shakenfist.config` — which every daemon does, not just `sf-api`.
+`FEDERATION_JWKS_CACHE_SECONDS` must be at least 1 and
+`FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS` at least 0. A nonsensical
+value previously broke only federated exchanges, with a 500 per
+attempt and an otherwise working cluster; after this upgrade no daemon
+on that node starts at all. That is the better failure — a
+configuration error should not wait for somebody's first federated
+login to surface — but check `/etc/sf/config` for both settings before
+rolling the daemons.
+
 ## MariaDB schema migrations
 
 Starting with v0.8, Shaken Fist uses MariaDB to store object state data. The

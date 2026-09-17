@@ -86,6 +86,13 @@ class FederatedExchangeTestCase(base.ShakenFistTestCase):
         self.client = external_api.app.test_client()
 
     def _respond(self, url):
+        # This module's issuers only -- GITHUB here, and the Authentik
+        # one SecondIssuerTestCase adds. Anything else raises rather
+        # than being answered and counted as a JWKS fetch, which
+        # several tests below assert exact numbers of.
+        if not url.startswith((GITHUB, 'https://auth.example.com')):
+            return None
+
         self.fetches.append(url)
         return json.dumps(
             fake_jwks.jwks_document(self.keys)).encode('utf-8')

@@ -352,6 +352,15 @@ an issuer's JWKS starts it, and so does the refetch after
 seconds after a routine cache-expiry refetch waits out the remaining
 twenty, even though no forced fetch has ever happened for that issuer.
 
+That also means setting it at or above `FEDERATION_JWKS_CACHE_SECONDS`
+turns forced refetches off entirely rather than merely slowing them:
+every cache-expiry fetch restarts the window before it can elapse, so
+an unrecognised key id never gets to force anything and a rotation is
+picked up only when the cache next expires. Nothing refuses that
+configuration — it is a longer delay, not an incorrect decision — but
+it is not what the two settings look like they do. Keep the cooldown
+comfortably below the cache lifetime.
+
 ### The JWKS URI must be the final URL
 
 Redirects are not followed when fetching an issuer's JWKS, so

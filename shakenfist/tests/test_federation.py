@@ -83,6 +83,14 @@ class FederationTestCase(base.ShakenFistTestCase):
         fake_jwks.patch_transport(self, self._respond)
 
     def _respond(self, url):
+        # Only this suite's issuers. Anything else is either code under
+        # test dialling out unexpectedly or a URL somebody forgot to
+        # add here, and both are worth a loud failure rather than a
+        # key set. GITHUB covers the repointed jwks_uri the client
+        # replacement test uses.
+        if not url.startswith((GITHUB, AUTHENTIK)):
+            return None
+
         self.fetches.append(url)
         self.fetch_started.set()
         # A real JWKS fetch is a network round trip. Without some
@@ -387,7 +395,11 @@ class JWKSCachingTestCase(FederationTestCase):
         # JWKSCache is ever collapsed onto a single shared lock.
         slow = TrustedIssuer.new(
             'authentik', AUTHENTIK, AUTHENTIK_JWKS, AUDIENCE)
-        self.fetch_delays[AUTHENTIK_JWKS] = 3
+        # A second is plenty: a shared lock would make the healthy
+        # exchange wait out the whole of it, so the half second
+        # threshold below still has a 2x margin, and the suite does not
+        # pay three seconds a run for it.
+        self.fetch_delays[AUTHENTIK_JWKS] = 1
 
         errors = []
 
@@ -412,9 +424,14 @@ class JWKSCachingTestCase(FederationTestCase):
         finally:
             thread.join(timeout=30)
 
+        # Joined with a timeout, so say whether it actually finished.
+        # Otherwise a wedged fetch leaks a thread into the rest of the
+        # suite instead of failing here.
+        self.assertFalse(
+            thread.is_alive(), 'the slow issuer\'s exchange never finished')
         self.assertEqual([], errors)
         self.assertLess(
-            elapsed, 1,
+            elapsed, 0.5,
             'a healthy issuer waited on a slow one\'s JWKS fetch')
 
     def test_repointing_an_issuers_jwks_uri_replaces_the_client(self):
@@ -482,6 +499,53 @@ class JWKSRotationCooldownTestCase(FederationTestCase):
         self.assertEqual(
             1, len(self.fetches),
             'an unrecognised key id fetched inside the cooldown window')
+
+    def test_a_rotation_after_the_window_is_recognised(self):
+        # The other half of the promise, and the half the operator
+        # documentation actually rests on: the delay is a delay, not a
+        # refusal that lasts until the cache expires. Without this, a
+        # cooldown wired from the wrong setting or a clock that never
+        # advanced would leave every test in this file passing while
+        # federated exchanges failed for the whole cache lifespan.
+        #
+        # The window is moved by rewinding the client's own record of
+        # its last fetch, rather than by sleeping through it: a real 30
+        # second sleep in the unit suite is not worth the fidelity, and
+        # a short real cooldown would be a wall-clock race on a loaded
+        # runner. Patching time.monotonic is the obvious alternative
+        # and is not used -- jwt.jwks_client.time is the time module
+        # itself, so patching through it moves the clock for the whole
+        # process. Reaching for a private attribute is deliberate: if
+        # PyJWT renames it this raises AttributeError here, which is a
+        # loud failure in the one test that would otherwise quietly
+        # stop exercising the window.
+        federation.validate_token(self._token(), self.issuer)
+        self.assertEqual(1, len(self.fetches))
+
+        rotated = _keypair()
+        self.keys['key-2'] = rotated
+
+        # Inside the window, the rotation is not yet visible. Asserted
+        # here as well as in its own test so that this test proves the
+        # window is what moved, rather than that it was never applied.
+        self.assertRaises(
+            exceptions.TokenValidationFailed, federation.validate_token,
+            self._token(kid='key-2', key=rotated), self.issuer)
+        self.assertEqual(1, len(self.fetches))
+
+        cooldown = federation.config.FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS
+        client, _ = federation.JWKS_CACHE._client_and_lock(
+            str(self.issuer.uuid), self.issuer.jwks_uri)
+        client._last_successful_fetch -= (cooldown + 1)
+
+        claims = federation.validate_token(
+            self._token(kid='key-2', key=rotated), self.issuer)
+
+        self.assertEqual(GITHUB, claims['iss'])
+        self.assertEqual(
+            2, len(self.fetches),
+            'the rotated key was still not fetched after the window '
+            'elapsed')
 
     def test_a_flood_of_invented_key_ids_costs_one_fetch(self):
         # The reason the window is worth its cost. Twenty tokens, each
@@ -585,24 +649,19 @@ class TokenIdentityTestCase(FederationTestCase):
         # spellings themselves.
         token = self._token()
         head, signature = token.rsplit('.', 1)
-        spellings = set()
         identities = set()
 
         for char in string.ascii_letters + string.digits + '-_':
             for padding in ('', '=', '=='):
                 candidate = head + '.' + signature[:-1] + char + padding
-                spellings.add(candidate)
                 identities.add(federation.token_identity(candidate, {}))
 
         # Every candidate is a re-spelling of one token, so they must
         # all share that token's identity. Asserting the value rather
         # than just the count: a token_identity which started keying on
-        # the signature text would still produce one identity here if
-        # it produced one per call, and the set would still have size
-        # one if it were empty of meaning. Note that assertGreater on
-        # len(spellings) would be true by construction -- spellings is
-        # built by concatenation here, not by asking PyJWT what it
-        # verifies -- so it is not a guard and is not written.
+        # the signature text would still produce a single identity here
+        # if it produced one per call, and a set of size one proves
+        # nothing about which value it holds.
         self.assertEqual({federation.token_identity(token, {})}, identities)
 
     def test_the_fallback_is_stable_for_one_token(self):
@@ -978,6 +1037,9 @@ class FakeJWKSTransportTestCase(base.ShakenFistTestCase):
         fake_jwks.patch_transport(self, self._respond)
 
     def _respond(self, url):
+        if not url.startswith(GITHUB):
+            return None
+
         self.fetches.append(url)
         return json.dumps(
             fake_jwks.jwks_document({'key-1': self.key})).encode('utf-8')

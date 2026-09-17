@@ -51,9 +51,26 @@ def patch_transport(test_case, respond):
     body as bytes. It is also the test's chance to record the fetch, or
     to sleep, since the point of several of these tests is how many
     fetches happen and whether they overlap.
+
+    Returning None from respond means "I was not expecting that URL",
+    and raises rather than answering it. The patch is on the class, so
+    it catches every urllib fetch the process makes and not just
+    PyJWT's -- which is what keeps a test from reaching the real
+    internet, but would otherwise mean handing a JWKS document to
+    unrelated code and counting it as a JWKS fetch in a suite where
+    several tests assert exact fetch counts. A module whose docstring
+    is entirely about a failure that was silent should not have one of
+    its own.
     """
     def _open(self, fullurl, data=None, timeout=None):
-        body = respond(getattr(fullurl, 'full_url', fullurl))
+        url = getattr(fullurl, 'full_url', fullurl)
+        body = respond(url)
+        if body is None:
+            raise AssertionError(
+                f'unexpected HTTP request to {url} under the JWKS fake. '
+                f'If the code under test should be making it, teach this '
+                f'test case\'s _respond about the URL; if it should not, '
+                f'that is the bug.')
         response = mock.MagicMock()
         response.read.return_value = body
         response.__enter__.return_value = io.BytesIO(body)

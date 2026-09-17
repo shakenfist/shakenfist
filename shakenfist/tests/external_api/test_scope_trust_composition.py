@@ -322,6 +322,12 @@ class FederatedKeyTrustCompositionTestCase(TrustCompositionFixture):
         fake_jwks.patch_transport(self, self._respond)
 
     def _respond(self, url):
+        # GitHub is the only issuer this module configures, so any
+        # other URL is unexpected and raises rather than being handed
+        # a key set.
+        if not url.startswith(GITHUB):
+            return None
+
         return json.dumps(fake_jwks.jwks_document(
             {'key-1': self.key})).encode('utf-8')
 

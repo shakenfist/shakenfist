@@ -450,7 +450,11 @@ class SFConfig(BaseSettings):
             'cost is that a rotation landing inside the window is not '
             'recognised until it elapses. Zero disables the floor and '
             'fetches on every unrecognised key id, which is what PyJWT '
-            'did before 2.14.'
+            'did before 2.14. Setting this at or above '
+            'FEDERATION_JWKS_CACHE_SECONDS disables forced refetches '
+            'altogether, because the cache expiry fetch restarts the '
+            'window before it can elapse; rotation is then only picked '
+            'up when the cache expires.'
         )
     )
     FEDERATION_JWKS_FETCH_TIMEOUT_SECONDS: int = Field(
