@@ -1536,12 +1536,22 @@ class BaseTestCase(testtools.TestCase):
 
         # Phase 4 (D34): the body fields are asserted unconditionally --
         # they arrive in APIException.text, which every released client
-        # already carries.
+        # already carries. Read them the same guarded way as 'error'
+        # above: against a server predating this contract, or one whose
+        # body is not a dict at all, an unguarded index reports a bare
+        # KeyError from inside this helper instead of the message the
+        # rest of the function goes to trouble to build.
+        #
+        # Every stage this helper is called with is one a retry can
+        # clear, so transient is always true here. A structural stage
+        # such as cpu_max_per_instance publishes transient: false and
+        # would need its own assertion.
+        fields = body if isinstance(body, dict) else {}
         self.assertTrue(
-            body['transient'] is True,
+            fields.get('transient') is True,
             f'Expected body[\'transient\'] is True at scheduling stage {stage}, got {body!r}')
         self.assertEqual(
-            stage, body['stage'],
+            stage, fields.get('stage'),
             f'Expected body[\'stage\'] == {stage!r}, got {body!r}')
 
         # The Retry-After header, unlike the body fields, is only visible

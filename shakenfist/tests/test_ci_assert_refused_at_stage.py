@@ -210,3 +210,33 @@ class AssertRefusedAtStageTestCase(test_base.ShakenFistTestCase):
         detail = self._assert_refused(response, 'sufficient_idle_memory')
 
         self.assertEqual('node n1 full', detail)
+
+    def test_body_missing_the_marker_fails_as_an_assertion(self):
+        # A server predating phase 4 returns the bare
+        # {'error': ..., 'status': ...} body. The stage regexp still
+        # matches, so the helper reaches the marker assertions with the
+        # keys absent -- it must report that as a crafted failure, not
+        # as a KeyError escaping from inside the helper.
+        response = ci_apiclient.InsufficientResourcesException(
+            status_code=507,
+            text=json.dumps({
+                'error': ('No nodes remaining at scheduling stage '
+                          'sufficient_idle_cpu'),
+                'status': 507,
+            }))
+
+        self.assertRaises(
+            AssertionError, self._assert_refused, response,
+            'sufficient_idle_cpu')
+
+    def test_non_dict_body_fails_as_an_assertion(self):
+        # A 507 whose body is not JSON at all -- a proxy's HTML error
+        # page, say. The status assertion passes, the message assertion
+        # is what should fail, and nothing below it may raise a
+        # TypeError first.
+        response = ci_apiclient.InsufficientResourcesException(
+            status_code=507, text='<html>503 from the load balancer</html>')
+
+        self.assertRaises(
+            AssertionError, self._assert_refused, response,
+            'sufficient_idle_cpu')
