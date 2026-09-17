@@ -14323,23 +14323,25 @@ and <code>body-path-collision</code>.</p>
 <code>null</code> both answer <code>400 &lt;parameter&gt;: declared required but not
 supplied</code>, in every <code>API_VALIDATION_MODE</code> but <code>warn</code> and <code>off</code>. That
 was not always true: several parameters were declared required while
-omitting them had always worked, so
-<a href="../../plans/PLAN-api-input-validation-phase-06-required/">phase 6</a>
-audited every <code>body</code>/<code>query</code> declaration carrying <code>required=True</code>
-against what its handler actually does with an omission before
-turning enforcement on, and corrected the one that was genuinely
-optional (<code>shared</code> on <code>POST /artifacts</code>). Declare <code>required=True</code> only
-where the handler refuses the request without the parameter today; if
-the handler supplies a sensible default on omission, declare
-<code>required=False</code> and let the schema say what is already true — a
-declaration claiming more than the handler enforces is now a caller
-visible lie, not a documentation nit.</p>
+omitting them had always worked, so before enforcement was turned on
+every <code>body</code>/<code>query</code> declaration carrying <code>required=True</code> was audited
+against what its handler actually does with an omission, and the one
+that was genuinely optional (<code>shared</code> on <code>POST /artifacts</code>) was
+corrected —
+<a href="../../plans/PLAN-api-input-validation-phase-06-required/">PLAN-api-input-validation-phase-06-required</a>
+records the evidence. Declare <code>required=True</code> only where the handler
+refuses the request without the parameter today; if the handler
+supplies a sensible default on omission, declare <code>required=False</code> and
+let the schema say what is already true — a declaration claiming more
+than the handler enforces is now a caller visible lie, not a
+documentation nit.</p>
 <p>Adding a <code>required=True</code> <code>body</code> or <code>query</code> declaration also owes the
 evidence sweep an entry, and CI will say so:
 <code>shakenfist/tests/external_api/test_required_sweep.py</code> enumerates every
 such declaration from the source and fails if one has no recipe, or if
-its measured answer differs from the <code>SWEEP</code> table published in the
-phase 6 plan. So a new one needs three things there — a <code>RECIPES</code> entry
+its measured answer differs from its pinned <code>SWEEP</code> table, which holds
+the audit's published verdict for every declaration. So a new one
+needs three things there — a <code>RECIPES</code> entry
 for the handler (a complete, valid request plus the status that request
 answers), a <code>SWEEP</code> row for the parameter, and the counts in
 <code>test_the_census_still_finds_seventy_six</code> bumped.</p>
