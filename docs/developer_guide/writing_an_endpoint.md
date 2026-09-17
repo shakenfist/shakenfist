@@ -411,24 +411,26 @@ and `body-path-collision`.
 `null` both answer `400 <parameter>: declared required but not
 supplied`, in every `API_VALIDATION_MODE` but `warn` and `off`. That
 was not always true: several parameters were declared required while
-omitting them had always worked, so
-[phase 6](../plans/PLAN-api-input-validation-phase-06-required.md)
-audited every `body`/`query` declaration carrying `required=True`
-against what its handler actually does with an omission before
-turning enforcement on, and corrected the one that was genuinely
-optional (`shared` on `POST /artifacts`). Declare `required=True` only
-where the handler refuses the request without the parameter today; if
-the handler supplies a sensible default on omission, declare
-`required=False` and let the schema say what is already true — a
-declaration claiming more than the handler enforces is now a caller
-visible lie, not a documentation nit.
+omitting them had always worked, so before enforcement was turned on
+every `body`/`query` declaration carrying `required=True` was audited
+against what its handler actually does with an omission, and the one
+that was genuinely optional (`shared` on `POST /artifacts`) was
+corrected —
+[PLAN-api-input-validation-phase-06-required](../plans/PLAN-api-input-validation-phase-06-required.md)
+records the evidence. Declare `required=True` only where the handler
+refuses the request without the parameter today; if the handler
+supplies a sensible default on omission, declare `required=False` and
+let the schema say what is already true — a declaration claiming more
+than the handler enforces is now a caller visible lie, not a
+documentation nit.
 
 Adding a `required=True` `body` or `query` declaration also owes the
 evidence sweep an entry, and CI will say so:
 `shakenfist/tests/external_api/test_required_sweep.py` enumerates every
 such declaration from the source and fails if one has no recipe, or if
-its measured answer differs from the `SWEEP` table published in the
-phase 6 plan. So a new one needs three things there — a `RECIPES` entry
+its measured answer differs from its pinned `SWEEP` table, which holds
+the audit's published verdict for every declaration. So a new one
+needs three things there — a `RECIPES` entry
 for the handler (a complete, valid request plus the status that request
 answers), a `SWEEP` row for the parameter, and the counts in
 `test_the_census_still_finds_seventy_six` bumped.
