@@ -13908,6 +13908,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#federated-issuers-jwks-redirects-and-the-rotation-cooldown" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Federated issuers: JWKS redirects and the rotation cooldown
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -14111,6 +14122,17 @@
     <span class="md-ellipsis">
       
         Network nodes need the iptables conntrack match
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#federated-issuers-jwks-redirects-and-the-rotation-cooldown" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Federated issuers: JWKS redirects and the rotation cooldown
       
     </span>
   </a>
@@ -14358,6 +14380,36 @@ run a custom kernel. Check before you roll the daemons:</p>
 </code></pre></div>
 <p>See the floating IP discussion in <a href="../networking/overview/">the networking overview</a>
 for what the rule does and why both of its matches are needed.</p>
+<h3 id="federated-issuers-jwks-redirects-and-the-rotation-cooldown">Federated issuers: JWKS redirects and the rotation cooldown<a class="headerlink" href="#federated-issuers-jwks-redirects-and-the-rotation-cooldown" title="Permanent link">&para;</a></h3>
+<p>This release moves to PyJWT 2.14, which changes two things an operator
+using <a href="../authentication/">identity federation</a> can see. Neither needs
+action unless it describes your provider.</p>
+<p>Redirects are no longer followed when fetching an issuer's JWKS, so a
+<code>jwks_uri</code> which answers 301 or 302 — one pointing at a CDN path rather
+than serving the key set itself — stops working, and every exchange
+against that issuer answers 401. Reconfigure the issuer with the final
+URL. See
+<a href="../authentication/#the-jwks-uri-must-be-the-final-url">the JWKS URI must be the final URL</a>
+for how to tell this apart from an unreachable provider.</p>
+<p>A refetch forced by an unrecognised key id is now rate limited to one
+per <code>FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS</code> (default 30) per
+issuer, which means a key rotation landing inside that window is not
+recognised until it elapses. This is deliberate — <code>/auth/federated</code>
+takes no credential, so before it every invented key id a stranger sent
+bought another JWKS fetch made by us — but if you rotate often enough
+for the delay to matter, lower the setting or set it to <code>0</code> for the
+previous behaviour. See
+<a href="../authentication/#when-an-issuer-rotates-its-signing-keys">when an issuer rotates its signing keys</a>.</p>
+<p>Both settings are now range checked, and that check runs at import of
+<code>shakenfist.config</code> — which every daemon does, not just <code>sf-api</code>.
+<code>FEDERATION_JWKS_CACHE_SECONDS</code> must be at least 1 and
+<code>FEDERATION_JWKS_ROTATION_COOLDOWN_SECONDS</code> at least 0. A nonsensical
+value previously broke only federated exchanges, with a 500 per
+attempt and an otherwise working cluster; after this upgrade no daemon
+on that node starts at all. That is the better failure — a
+configuration error should not wait for somebody's first federated
+login to surface — but check <code>/etc/sf/config</code> for both settings before
+rolling the daemons.</p>
 <h2 id="mariadb-schema-migrations">MariaDB schema migrations<a class="headerlink" href="#mariadb-schema-migrations" title="Permanent link">&para;</a></h2>
 <p>Starting with v0.8, Shaken Fist uses MariaDB to store object state data. The
 MariaDB schema is versioned; migrations must be applied by an operator (or
