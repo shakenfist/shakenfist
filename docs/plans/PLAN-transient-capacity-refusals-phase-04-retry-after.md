@@ -349,12 +349,25 @@ were made in the planning commit and are not a step here.
 
 ## Risks and mitigations
 
-**A `shakenfist-utilities` upgrade silently drops the new fields.**
-D28 assembles the body in two places. Mitigation: 4a's unit test
-asserts the whole decoded body rather than the presence of two keys,
-so an upgrade that renames or restructures `error`/`status` fails a
-unit test in this repository rather than shipping a `507` that has
-quietly lost its marker. The management session checks that the
+**A `shakenfist-utilities` upgrade changes the body shape under us.**
+As originally written this risk was stated backwards, and 4a's
+monkeypatch check found it. The risk was "an upgrade silently drops
+the new fields", mitigated by asserting the whole decoded body. That
+mitigation cannot work and the failure mode cannot happen: because
+D28 specifies *replace, don't patch*, the helper discards the upstream
+body entirely and builds its own, so our fields are never derived from
+the upstream dict and no rename there can drop them. Renaming
+`status` to `status_code` upstream was confirmed to leave all of 4a's
+original assertions passing.
+
+The real exposure is the inverse. If the upstream body shape drifts,
+this `507` becomes the only error response in the API whose shape
+differs from the other 305 `sf_api.error()` call sites, and nothing
+notices. Mitigation: `test_sf_api_error_shape_canary` calls
+`sf_api.error()` directly and pins *its* body shape by whole-dict
+equality, so the drift fails a test here and tells us to re-sync.
+The same rename was confirmed to fail that canary and only that
+canary. The management session checks the canary exists and that the
 assertion is on the whole dict, not on `assertIn`.
 
 **A blind retry ends up in the CI suite anyway.** The master plan
@@ -389,13 +402,22 @@ Falsifiable, in order:
 
 1. `shakenfist/external_api/base.py` defines
    `TRANSIENT_RETRY_AFTER_SECONDS = 15` and exactly one helper that
-   produces a transient `507`. Grep shows no other module hard-codes
-   `'Retry-After'`.
+   produces a transient `507`. No other module *sets* the header:
+   `base.py:157` is the only assignment. Tests and the functional
+   suite's `assertRefusedAtStage()` do name the header and the
+   literal `15`, which is the contract being asserted rather than a
+   second definition of it -- the suite ships separately from the
+   server and deliberately does not import its constants.
 2. A unit test decodes the helper's response body and asserts it
    equals `{'error': ..., 'status': 507, 'stage': ..., 'transient':
-   True}` by equality, not by membership. Changing `sf_api.error()`'s
-   body shape makes it fail -- confirmed by monkeypatching the shape
-   in the test run, not by reading the assertion.
+   True}` by equality, not by membership. A second test,
+   `test_sf_api_error_shape_canary`, calls `sf_api.error()` directly
+   and pins its body shape the same way. Changing `sf_api.error()`'s
+   body shape makes the canary fail and leaves the first test passing
+   -- confirmed by monkeypatching the shape in the test run, not by
+   reading the assertion. (This item originally claimed the first
+   test would fail. It does not and cannot; see the corrected risk of
+   the same name for why, and what the canary protects instead.)
 3. `POST /instances` returns `Retry-After: 15` and a body with
    `transient: true` for both scheduling `507`s, and returns neither
    for the two `CongestedNetwork` `507`s, the `409` and the `404`.
@@ -425,11 +447,16 @@ Falsifiable, in order:
 12. `assertRefusedAtStage()` asserts the body fields with no
     conditional, and the header behind a `getattr` guard whose comment
     names the client version that retires it.
-13. The claim "the suite turns it on" appears nowhere in
-    `docs/plans/PLAN-transient-capacity-refusals.md`.
+13. `docs/plans/PLAN-transient-capacity-refusals.md` nowhere asserts
+    that the suite turns the client retry on. The phrase does still
+    appear there once, inside the sentence recording that an earlier
+    draft said so "and that was wrong" -- a correction a reader
+    benefits from, not the claim. A bare grep for the phrase
+    therefore matches; read the sentence rather than the grep.
 14. An issue exists for the OpenAPI response-declaration format's
     inability to express a response header (D32), referenced from this
-    file and from `PLAN-api-input-validation.md`'s Future work.
+    file and from `PLAN-api-input-validation.md`'s Future work. Filed
+    as [#4240](https://github.com/shakenfist/shakenfist/issues/4240).
 15. `python3 tools/check-plan-status.py` reports agreement.
 
 ## Future work this phase creates
@@ -443,8 +470,15 @@ Falsifiable, in order:
   risk of the same name. Best provoked from `test_saturation.py`.
 - **Retire `assertRefusedAtStage()`'s header conditional** once the
   minimum client version carries `APIException.headers`.
-- **A header-capable OpenAPI response declaration** (D32), filed as an
-  issue against `PLAN-api-input-validation`.
+- **A header-capable OpenAPI response declaration** (D32), filed as
+  [#4240](https://github.com/shakenfist/shakenfist/issues/4240)
+  against `PLAN-api-input-validation`.
+- **Name the client release in `assertRefusedAtStage()`'s header
+  guard.** 4f could not name one: `client-python` has no version
+  assigned to the release which will carry `APIException.headers`
+  (last release v0.8.3, the change unreleased on its own branch), so
+  the comment names the commit and says so rather than inventing a
+  number. Replace it with the version once one exists.
 
 ## Back brief
 
