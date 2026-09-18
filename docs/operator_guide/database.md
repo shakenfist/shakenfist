@@ -1620,6 +1620,14 @@ IPAM supports several reservation types:
 | `routed` | A routed IP address for external connectivity |
 | `instance` | An IP assigned to an instance interface |
 | `deletion-halo` | A recently-released address in the deletion halo |
+| `manual` | An address reserved through the API for something outside the cluster; released only by an explicit DELETE |
+
+A `deletion-halo` entry is evicted by a request which names that specific
+address, since the halo only exists to keep an address out of *random*
+allocation for a while. A `manual` reservation is not: it is held for
+something Shaken Fist does not manage, so a request to reserve or allocate
+that address is refused rather than granted, and only an explicit
+`DELETE /networks/{network_ref}/addresses/{address}` releases it.
 
 ## Upload Object Storage
 

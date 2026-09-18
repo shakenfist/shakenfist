@@ -328,6 +328,25 @@ only reservations made this way can be released this way.
     Clusters which support this advertise the `reserve-addresses` capability
     in the `networks` family on the API root.
 
+    The reservation may carry a `comment` of up to 255 characters, which is
+    stored on the reservation and recorded in the network's event log. A
+    longer one is refused with a 400.
+
+    Neither call requires the network to have finished being created, because
+    a reservation only touches IPAM. A network which is being deleted, or is
+    in error, is refused with a 406.
+
+    **The POST is not idempotent.** Reserving an address you already hold
+    returns the same 409 as reserving one somebody else holds, because the
+    server cannot tell the two apart: every manual reservation in a network
+    is owned by that network, so "is this mine?" has no answer better than
+    "is it in this network?". A client retrying a POST whose response it
+    lost should treat the 409 as ambiguous and read the reservation back
+    with `GET /networks/{network_ref}/addresses`, where a manual reservation
+    carrying its own comment is the confirmation it wanted. Configuration
+    management should reserve, then read, rather than relying on the POST's
+    status code alone.
+
 ??? example "Python API client: reserve an address for a VIP"
 
     ```python

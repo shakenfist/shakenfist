@@ -1116,3 +1116,100 @@ class NetworkAddressEndpointTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual(ReservationType.MANUAL.value,
                          resp.get_json()['reservation_type'])
+
+    def test_reserve_and_release_in_the_floating_network(self):
+        """The floating network is live but never reaches `created`.
+
+        `_apply_create_on_network_node()` early-returns for the floating
+        network before the STATE_CREATED transition, so it sits in
+        `initial` for the life of a cluster -- confirmed against a
+        running deployment, which reports `state: initial`. The handlers
+        therefore cannot gate on `created`: holding a floating address
+        for a device Shaken Fist does not manage is the same need the
+        feature exists for on a virtual network, and it is what the
+        reaper's manual-reservation protection is there to defend.
+        """
+        floating_id = str(FLOATING_NETWORK_UUID)
+        self.mock_mariadb.create_network(
+            'floating',
+            uuid=floating_id,
+            namespace=None,
+            netblock='192.168.10.0/24',
+            set_state=dbo.STATE_INITIAL)
+
+        self.assertEqual(
+            dbo.STATE_INITIAL,
+            net.Network.from_db(floating_id).state.value,
+            'the floating network is expected to never leave initial')
+
+        resp = self.client.post(
+            '/networks/%s/addresses/192.168.10.10' % floating_id,
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({'comment': 'hardware load balancer'}))
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(ReservationType.MANUAL.value,
+                         resp.get_json()['reservation_type'])
+
+        resp = self.client.delete(
+            '/networks/%s/addresses/192.168.10.10' % floating_id,
+            headers={'Authorization': self.auth_token})
+        self.assertEqual(200, resp.status_code)
+
+    def test_reserve_in_a_network_which_is_not_yet_created(self):
+        # An ordinary network sits in `initial` between Network.new()
+        # and the net worker applying the create. A reservation only
+        # touches the IPAM, which exists from new(), so there is nothing
+        # to wait for.
+        pending_id = str(uuid4())
+        self.mock_mariadb.create_network(
+            'pendingnet',
+            uuid=pending_id,
+            namespace='foo',
+            netblock='10.9.7.0/24',
+            set_state=dbo.STATE_INITIAL)
+
+        resp = self.client.post(
+            '/networks/%s/addresses/10.9.7.3' % pending_id,
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({}))
+        self.assertEqual(200, resp.status_code)
+
+    def test_reserve_in_a_dead_network(self):
+        # Reserving in a network which is going away holds an address in
+        # an IPAM which is about to be torn down, which is a reservation
+        # that silently does nothing. Refused, with the same 406 the
+        # stricter requires_network_active used to give.
+        dead_id = str(uuid4())
+        self.mock_mariadb.create_network(
+            'deadnet',
+            uuid=dead_id,
+            namespace='foo',
+            netblock='10.9.6.0/24',
+            set_state=dbo.STATE_DELETED)
+
+        resp = self.client.post(
+            '/networks/%s/addresses/10.9.6.3' % dead_id,
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({}))
+        self.assertEqual(406, resp.status_code)
+
+        resp = self.client.delete(
+            '/networks/%s/addresses/10.9.6.3' % dead_id,
+            headers={'Authorization': self.auth_token})
+        self.assertEqual(406, resp.status_code)
+
+    def test_reserve_with_a_comment_at_the_length_limit(self):
+        resp = self._reserve(
+            '10.9.8.3', comment='x' * api_network.MAX_RESERVATION_COMMENT)
+        self.assertEqual(200, resp.status_code)
+
+    def test_reserve_with_a_comment_over_the_length_limit(self):
+        # The comment lands in a TEXT column and in two events, once per
+        # address the caller reserves, so it is bounded at the handler.
+        resp = self._reserve(
+            '10.9.8.3', comment='x' * (api_network.MAX_RESERVATION_COMMENT + 1))
+        self.assertEqual(400, resp.status_code)
+
+        # And the refusal happened before anything was written.
+        n = net.Network.from_db(self.network_id)
+        self.assertIsNone(n.ipam.get_reservation('10.9.8.3'))

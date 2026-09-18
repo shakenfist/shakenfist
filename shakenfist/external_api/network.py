@@ -701,6 +701,12 @@ class NetworkAddressesEndpoint(api_base.Resource):
         return out
 
 
+# The longest comment a manual reservation may carry. See the bound's
+# enforcement in NetworkAddressEndpoint.post for why it is not on the
+# IPAMReservation model.
+MAX_RESERVATION_COMMENT = 255
+
+
 class NetworkAddressEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'networks', 'Reserve a specific address in a network.',
@@ -709,18 +715,20 @@ class NetworkAddressEndpoint(api_base.Resource):
              'The network to reserve the address in.', True),
             ('address', 'path', 'string', 'The IPv4 address to reserve.', True),
             ('comment', 'body', 'string',
-             'A note describing what the address is reserved for.', False),
+             'A note describing what the address is reserved for. At most '
+             '%d characters.' % MAX_RESERVATION_COMMENT, False),
             ('namespace', 'body', 'namespace',
              api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False)
         ],
         [(200, 'The reservation which was created.', None),
-         (400, 'The IPv4 address is not in the network\'s netblock or is invalid.',
+         (400, 'The IPv4 address is not in the network\'s netblock or is '
+          'invalid, or the comment is too long.',
           None),
          (409, 'That address is already in use.', None),
          (404, 'Network not found.', None)]))
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
-    @api_base.requires_network_active
+    @api_base.requires_network_not_dead
     @api_base.log_token_use
     def post(self, network_ref=None, address=None, network_from_db=None,
              comment=None):
@@ -732,6 +740,19 @@ class NetworkAddressEndpoint(api_base.Resource):
         if not network_from_db.ipam.is_in_range(address):
             return sf_api.error(
                 400, 'reservation request for address outside network block')
+
+        # The comment is stored in a TEXT column and copied into two
+        # events, so an unbounded one is an unbounded write to the event
+        # log as well as to the reservation row -- once per address in
+        # the caller's netblock. Bounded here rather than on
+        # IPAMReservation, because that model is also how reservations
+        # already in the database are read back and a bound there would
+        # turn an old long comment into a read failure. 255 characters
+        # matches the namespace metadata key bound in auth.py.
+        if comment and len(comment) > MAX_RESERVATION_COMMENT:
+            return sf_api.error(
+                400, 'comment is longer than %d characters'
+                % MAX_RESERVATION_COMMENT)
 
         # Emitted before the reservation is attempted, the way the route
         # and unroute handlers do it, so a refused attempt to take over an
@@ -781,7 +802,7 @@ class NetworkAddressEndpoint(api_base.Resource):
          (404, 'Network or reservation not found.', None)]))
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
-    @api_base.requires_network_active
+    @api_base.requires_network_not_dead
     @api_base.log_token_use
     def delete(self, network_ref=None, address=None, network_from_db=None):
         try:
@@ -818,7 +839,7 @@ class NetworkAddressEndpoint(api_base.Resource):
         # that address evicts the halo and takes it, and the second DELETE
         # completes its release against an address an instance now holds.
         # Closing that needs an expected_type on the RPC; until then, do not
-        # read this check as a guarantee.
+        # read this check as a guarantee. Tracked as issue #4261.
         if reservation.reservation_type != ReservationType.MANUAL:
             return sf_api.error(403, 'address is not a manual reservation')
 

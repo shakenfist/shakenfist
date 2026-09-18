@@ -431,8 +431,14 @@ class TestReservedAddressIsNotAllocated(base.BaseNamespacedTestCase):
             self.net['uuid'], '192.168.245.11')
 
         # Released addresses sit in the deletion halo for a while before
-        # returning to the pool. What matters here is that nothing still
-        # holds the address as a manual reservation.
+        # returning to the pool, so waiting for the address to be
+        # allocatable again would mean waiting out the halo. Assert the
+        # two shapes a released address may legitimately have instead:
+        # gone from the reservation list, or present as a deletion halo.
+        # Deliberately not `assertNotEqual('manual', ...)`, which would
+        # also accept the address turning into some other live
+        # reservation type -- a release that handed it to something else
+        # is not a release.
         reservations = self._reservations()
         self.addDetail(
             'reservations after release',
@@ -440,8 +446,8 @@ class TestReservedAddressIsNotAllocated(base.BaseNamespacedTestCase):
                 json.dumps(reservations, indent=4, sort_keys=True)))
         res = reservations.get('192.168.245.11')
         if res:
-            self.assertNotEqual(
-                'manual', res['reservation_type'],
+            self.assertEqual(
+                'deletion-halo', res['reservation_type'],
                 'Address 192.168.245.11 is still reserved: %s' % res)
 
     def test_an_address_in_use_cannot_be_reserved(self):
