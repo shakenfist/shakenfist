@@ -13709,34 +13709,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/capacity_refusals/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Capacity Refusals
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../../operator_guide/database/" class="md-nav__link">
         
   
@@ -14943,9 +14915,11 @@ implemented because the following statements will be true:</p>
   outcome, perhaps with an undo window) once sfui grows a
   toast affordance; noted at decision time as the likely
   eventual shape.</li>
-<li>A <code>flasgger</code> decision: it is a declared dependency but
+<li>~~A <code>flasgger</code> decision: it is a declared dependency but
   is never imported — drop it or wire it up (independent
-  of this plan; noticed during the survey).</li>
+  of this plan; noticed during the survey).~~ Decided:
+  dropped, along with four other never-imported
+  dependencies, in the fix for issue #399.</li>
 <li>An <code>sf-poll.js</code> page-infrastructure helper in sfui,
   wrapping the fetch-and-morph polling loop. Deliberately
   not built in phase 3: the dashboard's loop is entangled

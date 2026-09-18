@@ -13709,34 +13709,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../operator_guide/capacity_refusals/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Capacity Refusals
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../../operator_guide/database/" class="md-nav__link">
         
   
@@ -14699,13 +14671,13 @@ records <code>instar-testdata &lt;sha&gt; (#pr)</code> and is audited there.</p>
 <tr>
 <td>5. <code>plan_vhd</code> differencing emitter</td>
 <td><a href="/components/instar/plans/PLAN-differencing-phase-05-vhd-emitter/">PLAN-differencing-phase-05-vhd-emitter.md</a></td>
-<td>Implemented, not yet merged</td>
-<td></td>
+<td>Complete</td>
+<td><code>9a80776</code> (#568)</td>
 </tr>
 <tr>
 <td>6. <code>plan_vhdx</code> differencing emitter</td>
-<td>PLAN-differencing-phase-06-vhdx-emitter.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-differencing-phase-06-vhdx-emitter/">PLAN-differencing-phase-06-vhdx-emitter.md</a></td>
+<td>Planned</td>
 <td></td>
 </tr>
 <tr>
@@ -14802,19 +14774,22 @@ The VHDX <code>parent_linkage</code> key is the parent's DataWriteGuid,
 settled by measurement against Hyper-V bytes and confirmed
 against SPEC(VHDX) 2.6.2.6.3 and libvhdi's source. But
 <code>vhdx::build_header</code> derives the DataWriteGuid from the sequence
-number alone (<code>src/crates/vhdx/src/lib.rs:2201-2212</code>), and every
-instar VHDX writer passes sequence numbers 1 and 2 -- <code>plan_vhdx</code>
-at <code>src/crates/create/src/lib.rs:965</code>
-and <code>:967</code> and the convert op at
-<code>src/operations/convert/src/main.rs:4469</code> and <code>:4492</code>. Every VHDX
+number alone (<code>src/crates/vhdx/src/lib.rs:2201</code>, the two GUID
+writes at <code>:2206-2215</code>), and every instar VHDX writer passes
+sequence numbers 1 and 2 -- <code>plan_vhdx</code> at
+<code>src/crates/create/src/lib.rs:1161</code> and <code>:1163</code> and the convert
+op at <code>src/operations/convert/src/main.rs:4469</code> and <code>:4492</code>. Every VHDX
 instar has ever written therefore shares one active-header
 DataWriteGuid, which makes libvhdi's parent-identity check
 <strong>vacuous for instar-written chains</strong>: any instar parent
 satisfies any instar child. <code>plan_vhd</code> has the same hole for the
 same reason -- it writes <code>UUID_ZERO</code> as the footer unique id of
-every image it creates (<code>src/crates/create/src/lib.rs:776</code>,
-<code>:820</code>), and that field is exactly what a differencing child
-copies into its dynamic header at offset 552. Phase 6 should
+every image it creates (<code>src/crates/create/src/lib.rs:958</code>,
+<code>:1021</code> and <code>:1072</code>), and that field is exactly what a
+differencing child copies into its dynamic header at offset 552.
+Phase 5 did not change that: the child's copy comes from
+<code>opts.parent_unique_id</code> (<code>:977</code>), which the create operation
+still fills with zeros until phase 7. Phase 6 should
 confirm the VHDX half against a real instar-produced image (the
 claim is read from code, not measured on output) and consider
 giving created images a real DataWriteGuid; phase 8's
@@ -14923,6 +14898,18 @@ host-resolved parent but embeds <code>typed_backing.as_bytes()</code>
 verbatim in what the guest receives (<code>:16913-16963</code>). That single
 typed string is also what forces the single-locator-entry answer
 in open question 3.</p>
+<p>Phase 7 also inherits two guards it must not remove blindly.
+Phase 5 added an explicit backing refusal to the create
+operation's <code>ImageFormat::Vhd</code> arm and phase 6 adds the matching
+one for <code>ImageFormat::Vhdx</code>, because each emitter became able to
+write a child whose parent identity is all zeros before the guest
+could read a real one. Neither guard has a committed test -- both
+live in the guest binary, which <code>crates/create</code>'s harness cannot
+reach -- so phase 7 must not rely on a failing test to notice if
+it removes one too early. Issue #570 (POSIX paths emitted under
+Windows-only platform codes and the <code>absolute_win32_path</code> key)
+must be settled before either guard comes off, since removing
+them is what first exposes that choice to a user.</p>
 <h3 id="constraints-that-apply-throughout">Constraints that apply throughout<a class="headerlink" href="#constraints-that-apply-throughout" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Guest binaries stay under the 768KB per-operation cap

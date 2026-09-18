@@ -13786,34 +13786,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/capacity_refusals/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Capacity Refusals
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../operator_guide/database/" class="md-nav__link">
         
   
@@ -14636,7 +14608,7 @@ copies of <code>templates/mermaid-lint/</code> in <code>shakenfist/development</
 pinned mermaid-cli tag included; sync from there rather than
 editing either in place, so drift shows up as a diff. Rendering
 runs through puppeteer and needs a browser, hence a container,
-hence the only job here on <code>debian-12-docker</code> — a label that must
+hence the only job here on <code>debian-13-docker</code> — a label that must
 also appear in <code>.github/actionlint.yaml</code> or actionlint fails on
 the workflow.</p>
 <p>It is advisory, and <strong>must not be made a required status check</strong>.
@@ -14653,15 +14625,17 @@ the gate already covers a docker-capable runner and add
 <code>tools/mermaid-lint.sh</code> there as a step.</p>
 <p><code>demo-compose.yml</code> and <code>mermaid-lint.yml</code> are the two lanes that
 need a container runtime, and they get one in different ways.
-<code>demo-compose.yml</code> runs on <code>debian-12</code>, whose image does not have
+<code>demo-compose.yml</code> runs on <code>debian-13</code>, whose image does not have
 one, so it installs Docker Engine itself via
-<code>tools/demo/install-docker.sh</code> — from
-Docker's own apt repository, because Debian 12 ships neither a
-new enough engine nor a <code>docker compose</code> v2 plugin at all. The
-script is idempotent, so adding docker to the runner image would
-make it a no-op rather than a conflict. It also configures the
-daemon and builds for the runner's proxy, which neither inherits
-on its own.</p>
+<code>tools/demo/install-docker.sh</code> — from Docker's own apt repository,
+which is what Docker's own install instructions assume and what the
+lane has always used. Trixie would now serve too, packaging Engine
+26.1.5 and Compose 2.26.1 as a <code>docker compose</code> plugin where bookworm
+packaged neither, so the choice is convention rather than necessity.
+The script is idempotent, so adding docker to the runner image — or
+installing the distribution's packages into it — would make it a
+no-op rather than a conflict. It also configures the daemon and
+builds for the runner's proxy, which neither inherits on its own.</p>
 <p>Two behaviours only matter when driving CI by hand: on a
 <code>workflow_dispatch</code> run of <code>functional-tests.yml</code> an unselected target
 skips cleanly via a job-level <code>if:</code> (it does not report red), and
@@ -14779,15 +14753,15 @@ ref</em>, which on a repository that publishes a site from a branch turns
 seconds into minutes of duplicate findings misattributed to unrelated
 merge commits.</p>
 <p><code>gitleaks</code> is downloaded with a pinned version and sha256 rather than
-installed from apt: the package first appears in Debian 13 while these
-runners are Debian 12, and the shared static pool grants no
-passwordless sudo. The pin is also protection against the tool
-changing under us — <code>.gitleaks.toml</code> is written against 8.16's schema,
-in which per-rule allowlists are a single <code>[rules.allowlist]</code> table
-rather than the repeatable array later releases and the current
-upstream documentation describe. To move the pin, run
-<code>tools/gitleaks-scan.sh</code> against the new version locally first and
-check that the positive control still passes.</p>
+installed from apt, because the version has to be ours to choose:
+<code>.gitleaks.toml</code> is written against 8.16's schema, in which per-rule
+allowlists are a single <code>[rules.allowlist]</code> table rather than the
+repeatable array later releases and the current upstream documentation
+describe, so an archive that moves under us breaks the configuration.
+The shared static pool granting no passwordless sudo is a second
+reason. To move the pin, run <code>tools/gitleaks-scan.sh</code> against the new
+version locally first and check that the positive control still
+passes.</p>
 <h4 id="accepting-a-finding">Accepting a finding<a class="headerlink" href="#accepting-a-finding" title="Permanent link">&para;</a></h4>
 <p>History cannot be rewritten to unpublish anything from a public
 repository — the objects survive in every fork — so accepting a
@@ -14991,6 +14965,20 @@ Debian 13 ships 3.13. <code>kerbside-patches</code> tests every all-in-one
 master topology on <code>debian:13</code>, so this matches upstream rather than
 diverging from it. The containers Kolla builds are Debian trixie
 regardless of the guest, and are unaffected.</p>
+<p>The <code>workflow_dispatch</code> menu still offers a
+<code>kolla-ansible-master-debian-12</code> target alongside
+<code>kolla-ansible-master-debian-13</code>. Both select the same job and both
+provision a Debian 13 guest — there is no Debian 12 lane any more.
+The old spelling is kept only because <code>kerbside-patches</code>'
+<code>trigger-downstream.yml</code> dispatches it by name on every develop push,
+and a <code>workflow_dispatch</code> <code>choice</code> input rejects a value absent from
+its option list, so removing it would break that trigger outright.
+GitHub offers no way to label a choice option as deprecated, but the
+job reports itself by <code>matrix.test.description</code>, so a run started
+from the old name still announces the Debian 13 guest. Prefer the
+<code>debian-13</code> spelling; the other disappears once
+<a href="https://github.com/shakenfist/kerbside-patches/issues/1706">shakenfist/kerbside-patches#1706</a>
+lands.</p>
 <p>The <code>tempest-plugin/</code> directory is a separate releasable that
 contributes Kerbside-specific Tempest tests; see
 <code>tempest-plugin/README.md</code> for what it covers.</p>

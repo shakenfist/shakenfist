@@ -13613,34 +13613,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/capacity_refusals/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Capacity Refusals
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../operator_guide/database/" class="md-nav__link">
         
   
@@ -14299,8 +14271,11 @@ one. It needs nothing but Docker Engine 23.0 or newer with the Compose
 v2 plugin — no Python, no database, and no certificates of your own.
 On Debian 12, install Docker from
 <a href="https://docs.docker.com/engine/install/debian/">Docker's own repository</a>
-rather than from the distribution, which ships an engine too old to
-build the image.</p>
+rather than from the distribution: bookworm's engine is too old to build
+the image, and its only compose is the end-of-life Python v1. Debian 13
+packages both well enough (Engine 26.1.5, Compose 2.26.1 as a
+<code>docker compose</code> plugin), but Docker's repository is what Docker's own
+instructions assume and what kerbside's CI installs.</p>
 <p><code>pip install</code> does not give you <code>demo/</code>, so start from a checkout:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/shakenfist/kerbside
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">cd</span><span class="w"> </span>kerbside/demo

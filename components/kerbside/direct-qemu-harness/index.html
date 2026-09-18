@@ -13635,34 +13635,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/capacity_refusals/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Capacity Refusals
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../operator_guide/database/" class="md-nav__link">
         
   
@@ -14225,6 +14197,11 @@ is CI. This standalone harness is for local verification.</p>
 </ul>
 <p>Build the binary first (Docker, per the crate Makefile):
 <code>make -C rust/kerbside-proxy build</code> (debug) or a <code>--release</code> build.</p>
+<p>The host also needs a qemu with SPICE compiled in. On Debian 13 and
+later that is a separate package — <code>qemu-system-modules-spice</code>, which
+qemu-system-x86 only <em>recommends</em> — and without it qemu starts and dies
+with <code>There is no option group 'spice'</code>. <code>start-qemu.sh</code> checks for it
+and names it before launching anything.</p>
 <h2 id="the-metrics-assertion">The metrics assertion<a class="headerlink" href="#the-metrics-assertion" title="Permanent link">&para;</a></h2>
 <p>After a client connects, <code>verify-rust-proxy.sh assert</code> polls
 <code>http://127.0.0.1:&lt;prometheus-port&gt;/metrics</code> and requires

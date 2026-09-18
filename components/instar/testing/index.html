@@ -4109,6 +4109,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#shared-helpers-and-subprocess-budgets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared helpers and subprocess budgets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -14122,34 +14139,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../operator_guide/capacity_refusals/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Capacity Refusals
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../operator_guide/database/" class="md-nav__link">
         
   
@@ -14548,6 +14537,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#shared-helpers-and-subprocess-budgets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared helpers and subprocess budgets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -15170,6 +15176,55 @@ aims to be a drop-in replacement, any difference in output is considered a bug.<
 <p>Tests compare instar output against either:
 1. Live <code>qemu-img</code> output (for safe images - info, compare, convert)
 2. Stored expected output files (for malicious images)</p>
+<h3 id="shared-helpers-and-subprocess-budgets">Shared helpers and subprocess budgets<a class="headerlink" href="#shared-helpers-and-subprocess-budgets" title="Permanent link">&para;</a></h3>
+<p>Helpers shared by more than one test module live on <code>InstarTestBase</code>
+in <code>tests/base.py</code>, not copy-pasted into each class. In particular:</p>
+<ul>
+<li><code>_run_tool(argv, cwd)</code> runs a reference qemu tool (<code>qemu-img</code>,
+  <code>qemu-io</code>) with <code>cwd</code> inside a fixture directory and asserts it
+  exited 0. It is the helper used to <em>build</em> fixtures and to produce
+  qemu twins for differential comparison.</li>
+<li><code>_require_qemu_img()</code> skips unless <code>qemu-img</code> is installed, and
+  <code>_require_qemu_tools()</code> skips unless <code>qemu-io</code> is there too.</li>
+<li><code>sha256(path)</code> digests a file's full contents.</li>
+</ul>
+<p><strong>Require the narrowest guard the tests actually need.</strong> The two are
+not interchangeable, and the difference is not hypothetical: the <code>deb</code>
+legs of the distro matrix install <code>qemu-utils</code>, which carries both
+binaries, while the RPM legs install only <code>qemu-img</code> and never ask for
+<code>qemu-io</code> at all (see <code>tools/test-package-functional.sh</code>). A class
+gated on <code>_require_qemu_tools()</code> whose tests never run <code>qemu-io</code> is
+therefore one packaging decision away from skipping everywhere on
+half the matrix — and a skipped test is invisible in a green run.
+<code>TestSnapshotErrorPaths</code> is the worked example: eighteen of its
+nineteen tests only assert that instar refuses an image and leaves it
+byte-identical, so the class takes <code>_require_qemu_img()</code> and the one
+zstd test that needs a <code>qemu-io</code> write asks for it itself.</p>
+<p><strong>A <code>_run_tool</code> timeout is a hang guard, not a performance
+assertion.</strong> The budget (<code>QEMU_TOOL_TIMEOUT</code>, 300s) exists so a wedged
+<code>qemu-img</code> cannot block a stestr worker forever; it is not a claim
+about how long qemu should take. The distro matrix fans several
+4-worker suites out onto one self-hosted runner, so ~20 concurrent
+qemu processes routinely stretch a five-second operation past a
+minute. A tight budget there does not catch a regression — it
+converts host contention into a merge queue ejection, which is
+exactly what a 60s budget on one <code>qemu-img commit</code> did in
+<a href="https://github.com/shakenfist/instar/issues/528">#528</a>. Pass a lower
+<code>timeout=</code> only for a call whose duration is itself under test, and
+never to "tighten up" a reference invocation.</p>
+<p>This is distinct from the budgets on the <code>run_instar_*</code> helpers,
+where a timeout <em>is</em> a real assertion: instar hanging is a product
+bug, and those calls should stay bounded.</p>
+<p>Note that the contention this budget exists for cannot be reproduced
+by a pull request's own checks: the distro matrix runs only in the
+merge queue (and on <code>workflow_dispatch</code>), so the first real signal
+arrives at enqueue time. If a <code>_run_tool</code> <code>TimeoutExpired</code> recurs,
+diagnose before raising the number. Read the failing leg's per-suite
+wall clock and how many stestr workers were live alongside it; a
+budget that was ample at ~20 concurrent qemu processes and blows at
+~20 again is a contention change worth understanding, not a number
+that wants doubling. Raising 300 to 600 reflexively buys one more
+round of the same ejection.</p>
 <h2 id="test-categories">Test Categories<a class="headerlink" href="#test-categories" title="Permanent link">&para;</a></h2>
 <h3 id="safe-images-test_info_safepy">Safe Images (<code>test_info_safe.py</code>)<a class="headerlink" href="#safe-images-test_info_safepy" title="Permanent link">&para;</a></h3>
 <p>Tests against known-safe disk images. These run <code>qemu-img</code> directly and
