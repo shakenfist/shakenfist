@@ -334,3 +334,4 @@ An example configuration follows:
 
 - [Configuration](/components/kerbside/configuration/) - General configuration reference
 - [Proxy Architecture](/components/kerbside/proxy-architecture/) - Internal proxy design
+- [Kerbside for Shaken Fist](/components/kerbside/use-cases/shaken-fist/) - The Shaken Fist use-case guide: value proposition, setup, and the sf-e2e worked example

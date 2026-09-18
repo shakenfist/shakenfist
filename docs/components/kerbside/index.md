@@ -159,7 +159,7 @@ column names the CI lane that exercises the scenario end to end; see
 | [oVirt](/components/kerbside/use-cases/ovirt/) | Replaces oVirt's SPICE proxy (squid) with a protocol-aware front door: discovery via the engine API, host-subject pinned TLS to the hypervisor, and the engine, network, and account prerequisites | `ovirt_matrix`, merge tier |
 | Placement topologies | Kerbside instances placed by user population rather than by cloud — one per regional office, close to its users, with the WAN hop as the inspected backend leg | Not covered |
 | Proxmox | Deferred until a Proxmox source driver exists | No source yet |
-| Shaken Fist | Broker embedded in Shaken Fist itself; Ed25519 VDI console tokens exchanged offline at `/sf-console.vv` | `sf-e2e`, smoke tier and nightly |
+| [Shaken Fist](/components/kerbside/use-cases/shaken-fist/) | Broker embedded in Shaken Fist itself; Ed25519 VDI console tokens exchanged offline at `/sf-console.vv` | `sf-e2e`, smoke tier and nightly |
 | Standalone / static source | The static driver (`kerbside/sources/static.py`) for labs, demos, and direct-qemu style fleets. The [compose demo](/components/kerbside/installation/#try-it-the-demo-stack) is the worked example | `direct-qemu`, smoke tier and nightly |
 
 Scenarios without a link are planned rather than written; see

@@ -302,6 +302,7 @@ nav:
                 - "Kerbside VDI tokens phase 7: Shaken Fist mint-path functional test": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-07-ci.md
                 - "Kerbside VDI tokens phase 8: documentation": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-08-docs.md
                 - "Kerbside VDI tokens phase 9: full cross-repo end-to-end lane": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e.md
+                - "Phase 1: `docs/use-cases/shaken-fist.md`": components/kerbside/plans/PLAN-use-case-docs-phase-01-shaken-fist.md
                 - "Phase 1: package the migrations and add `kerbside db upgrade`": components/kerbside/plans/PLAN-demo-install-phase-01-db-upgrade.md
                 - "Phase 1: Shared visual-digest crate": components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate.md
                 - "Phase 2: Static source driver": components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor.md
@@ -359,6 +360,7 @@ nav:
                 - "VD Agent Protocol": components/kerbside/spice/vd-agent-protocol.md
             - Use Cases:
                 - "Kerbside for oVirt": components/kerbside/use-cases/ovirt.md
+                - "Kerbside for Shaken Fist": components/kerbside/use-cases/shaken-fist.md
         - Occystrap:
             - "Introduction": components/occystrap/index.md
             - "Command Reference": components/occystrap/command-reference.md
