@@ -610,9 +610,11 @@ implemented because the following statements will be true:
   outcome, perhaps with an undo window) once sfui grows a
   toast affordance; noted at decision time as the likely
   eventual shape.
-* A `flasgger` decision: it is a declared dependency but
+* ~~A `flasgger` decision: it is a declared dependency but
   is never imported — drop it or wire it up (independent
-  of this plan; noticed during the survey).
+  of this plan; noticed during the survey).~~ Decided:
+  dropped, along with four other never-imported
+  dependencies, in the fix for issue #399.
 * An `sf-poll.js` page-infrastructure helper in sfui,
   wrapping the fetch-and-morph polling loop. Deliberately
   not built in phase 3: the dashboard's loop is entangled

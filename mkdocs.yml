@@ -511,7 +511,6 @@ nav:
        - "Agent Operations": operator_guide/agent_operations.md
        - "Artifacts": operator_guide/artifacts.md
        - "Authentication": operator_guide/authentication.md
-       - "Capacity Refusals": operator_guide/capacity_refusals.md
        - "Database": operator_guide/database.md
        - "Events": operator_guide/events.md
        - "Exception Tracking": operator_guide/exception_tracking.md
