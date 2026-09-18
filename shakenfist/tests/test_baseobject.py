@@ -1,4 +1,5 @@
 import time
+import uuid
 from unittest import mock
 
 import testtools
@@ -304,3 +305,28 @@ class InMemoryOnlyStateTestCase(base.ShakenFistTestCase):
 
         mock_get_state.assert_not_called()
         mock_set_state.assert_not_called()
+
+
+class ValidObjectRefTestCase(base.ShakenFistTestCase):
+    """A null or non-string ref answers "not found" everywhere (issue 4223).
+
+    The pushed-down from_db_by_ref implementations hand the ref to
+    ObjectFilterCriteria as a name, which reads None as *no name filter*,
+    so an unguarded null ref resolved to an arbitrary active object in
+    the namespace. valid_object_ref() is the shared guard."""
+
+    def test_valid_object_ref(self):
+        self.assertTrue(baseobject.valid_object_ref('a-name'))
+        self.assertTrue(baseobject.valid_object_ref(
+            '12345678-1234-4321-8234-123456789012'))
+
+        for object_ref in (None, '', False, 0, 42, uuid.uuid4(), {}, []):
+            self.assertFalse(
+                baseobject.valid_object_ref(object_ref), repr(object_ref))
+
+    def test_generic_from_db_by_ref_null_ref_returns_none(self):
+        """The generic lookup answers None without reaching filter(),
+        which would raise NotImplementedError on this bare test class."""
+        for object_ref in (None, '', False, 0):
+            self.assertIsNone(MissingObjectTestObject.from_db_by_ref(
+                object_ref, namespace='tenant-a'))

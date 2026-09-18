@@ -137,6 +137,19 @@ def get_maximum_object_version(objname, max_cache_age=300):
     return VERSION_CACHE_MAXIMUM.get(objname, -1)
 
 
+def valid_object_ref(object_ref):
+    """Could this value be referencing an object at all?
+
+    An object reference is a UUID or a name, and both are non-empty
+    strings. Anything else must answer "not found" before it reaches a
+    lookup: the pushed-down from_db_by_ref implementations hand the ref
+    to ObjectFilterCriteria as a name, which reads None as *no name
+    filter*, so an unguarded null ref resolved to an arbitrary active
+    object in the namespace (issue 4223).
+    """
+    return isinstance(object_ref, str) and object_ref != ''
+
+
 class DatabaseBackedObject:
     object_type: ClassVar[ObjectType] = ObjectType.UNKNOWN
     initial_version: ClassVar[int] = 1
@@ -392,7 +405,10 @@ class DatabaseBackedObject:
 
     @classmethod
     def from_db_by_ref(cls, object_ref, namespace=None):
-        if object_ref and util_general.valid_uuid4(object_ref):
+        if not valid_object_ref(object_ref):
+            return None
+
+        if util_general.valid_uuid4(object_ref):
             # Already a valid UUID
             return cls.from_db(object_ref)
 

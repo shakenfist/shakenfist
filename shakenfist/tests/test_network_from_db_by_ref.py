@@ -198,3 +198,19 @@ class NetworkFromDbByRefTestCase(base.ShakenFistTestCase):
         msg = str(ctx.exception)
         self.assertIn('test-net', msg)
         self.assertIn('tenant-a', msg)
+
+    # ------------------------------------------------------------------
+    # Test 8: A null or non-string ref answers "not found" (issue 4223)
+    # ------------------------------------------------------------------
+
+    @mock.patch('shakenfist.network.network.mariadb.find_networks')
+    @mock.patch.object(Network, 'from_db')
+    def test_null_or_non_string_ref_returns_none(
+            self, mock_from_db, mock_find_networks):
+        """A null ref must never widen into "no name filter" (issue 4223)."""
+        for object_ref in (None, '', False, 0, uuid.uuid4()):
+            result = Network.from_db_by_ref(object_ref, namespace='tenant-a')
+            self.assertIsNone(result)
+
+        mock_from_db.assert_not_called()
+        mock_find_networks.assert_not_called()

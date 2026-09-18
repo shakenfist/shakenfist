@@ -16,6 +16,7 @@ from shakenfist.schema.network_data import NetworkData
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectWithOperations as dbowo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.baseobject import valid_object_ref
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
@@ -196,8 +197,16 @@ class Network(dbowo):
         The floating network (FLOATING_NETWORK_UUID) has namespace=None
         in the database. A tenant-scoped query (namespace != None) won't
         match it via SQL NULL semantics, so no explicit skip is required.
+
+        A null or otherwise non-string ref answers "not found" here:
+        handed to ObjectFilterCriteria as a name, None would read as
+        *no name filter* and resolve to an arbitrary active network in
+        the namespace (issue 4223).
         """
-        if object_ref and util_general.valid_uuid4(object_ref):
+        if not valid_object_ref(object_ref):
+            return None
+
+        if util_general.valid_uuid4(object_ref):
             return cls.from_db(object_ref)
 
         # namespace='system' or namespace=None means 'look across
