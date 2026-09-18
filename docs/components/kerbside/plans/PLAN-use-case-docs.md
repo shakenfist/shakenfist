@@ -44,9 +44,9 @@ Proposed pages:
 | Shaken Fist VDI | Broker embedded in SF; Ed25519 VDI console tokens (PLAN-kerbside-vdi-tokens.md); the sf-e2e lane is the worked example |
 | OpenStack | Nova 2025.1 spice-direct; Kolla-Ansible deployment via kerbside-patches; much of docs/index.md's OpenStack section moves here |
 | oVirt | Front-door architecture per PLAN-two-tier-ci.md; written by that plan's phase 4 as the FIRST page, establishing the format |
-| Multi-cloud aggregation | One kerbside brokering several sources at once — the distinctive value proposition; today implicit everywhere and stated nowhere. Covers the consequences: users keep one console entry point while workloads move between providers (cloud migration without retraining or re-plumbing client access), and multiple clouds in different regions present as a single VDI estate |
+| Multi-cloud aggregation | One kerbside brokering several sources at once — the distinctive value proposition. Surveyed 2026-09-18: no longer stated *nowhere*, but stated in one sentence — the `docs/index.md` Use Cases row, and one bullet of `docs/use-cases/ovirt.md` ("One entry point across clouds"). Covers the consequences: users keep one console entry point while workloads move between providers (cloud migration without retraining or re-plumbing client access), and multiple clouds in different regions present as a single VDI estate |
 | Placement topologies | The inverse of aggregation: kerbside instances placed by user population rather than by cloud — e.g. a kerbside per regional office, close to its users, so SPICE over the WAN is exactly the kerbside-to-hypervisor backend leg: TLS'd (with host-subject pinning), firewall-inspected, audited, and a single controllable egress point at the office edge. Multiple kerbsides against one cloud is natural for scraped sources (SF, oVirt); the OpenStack flow assumes one kerbside URL per Nova deployment, so per-group placement there needs the broker to route — document as a caveat |
-| Standalone / static source | The static driver (`kerbside/sources/static.py`) for labs, demos, and direct-qemu style fleets. **`docs/installation.md` owns the demo mechanics** — the commands, in order, with their real output — per PLAN-demo-install.md decision 2. This page owns the framing: why you would run a static source, how it works, what it cannot do, linking to the installation demo rather than restating it |
+| Standalone / static source | The static driver (`kerbside/sources/static.py`) for labs, demos, and direct-qemu style fleets. **`docs/installation.md` owns the demo mechanics** — the commands, in order, with their real output — per PLAN-demo-install.md decision 2, delivered 2026-08-22 as that plan's phase 5 (`docs/installation.md` "Try it: the demo stack"). This page owns the framing: why you would run a static source, how it works, what it cannot do, linking to the installation demo rather than restating it |
 | Proxmox | Deferred until the source exists; architecture notes already captured in PLAN-two-tier-ci.md's future-work section |
 
 `docs/index.md`'s introduction slims down to the generic
@@ -59,7 +59,21 @@ readme-discipline policy).
 
 The oVirt page landed 2026-08-10 as PLAN-two-tier-ci.md
 phase 4's deliverable, and settles the format. The
-remaining six pages are unblocked.
+remaining five writable pages are unblocked; Proxmox is
+not, and still has no source driver (`kerbside/sources/`
+holds `base.py`, `ovirt.py`, `shakenfist.py` and
+`static.py` and nothing else, checked 2026-09-18).
+
+A third thing landed since this plan was written, and the
+plan did not know it: **the index scaffolding already
+exists.** `docs/index.md` carries a `### Use Cases` heading
+with a seven-row table — every proposed page including
+Proxmox — each with a description and a "Tested in Kerbside
+CI" column, and the note that scenarios without a link are
+planned rather than written. Each page phase therefore
+*links an existing row* rather than adding one, and must
+agree with that row's description and CI claim or change
+it.
 
 Two things it decided that the rest should follow:
 
@@ -79,3 +93,44 @@ limitations" section is a table of what is *not* proven,
 each row naming why. That is more useful than a prose
 paragraph and much harder to let quietly rot, because a
 row either still applies or gets deleted.
+
+## Execution
+
+Promoted from a standalone plan on 2026-09-18, when phase 1
+was planned: six remaining pages cannot be tracked by a
+single status cell. Promotion brings the
+`plan-push-audit-phase` obligation from `PLAN-TEMPLATE.md`
+with it, which is phase 6 and is not optional. Because that
+audit runs over the accumulated diff of every phase, each
+row records the merge commit that landed it as it lands —
+the range is not reliably reconstructable afterwards.
+
+| Phase | Plan | Status | Merged |
+|-------|------|--------|--------|
+| 1. Shaken Fist | [PLAN-use-case-docs-phase-01-shaken-fist.md](/components/kerbside/plans/PLAN-use-case-docs-phase-01-shaken-fist/) | In progress | |
+| 2. OpenStack | | Not started | |
+| 3. Standalone / static source | | Not started | |
+| 4. Multi-cloud aggregation and placement topologies | | Not started | |
+| 5. Index slim-down and closeout | | Not started | |
+| 6. Push audit | | Not started | |
+
+The oVirt page is not a phase: it landed 2026-08-10 as
+`PLAN-two-tier-ci-phase-04-docs.md`'s deliverable, and is
+audited by that plan rather than this one.
+
+Proxmox is not a phase either. It stays deferred until a
+source driver exists, and acquires a phase then.
+
+Phases 2 to 4 group the remaining five pages. OpenStack
+and the static source each get their own phase because
+each has a reference page and a worked example to reconcile
+with; multi-cloud aggregation and placement topologies
+share one because they are the same architectural argument
+read forwards and backwards, neither has CI coverage, and
+writing them apart would duplicate the reasoning. Phase 5
+is the index work the Mission describes — slimming the
+introduction once the OpenStack page exists to receive
+`### Implementation in OpenStack` and `### What About
+Bumblebee?` — plus the README collapse that phase 1's risk
+table flags: one link to the Use Cases section rather than
+a bullet per page.
