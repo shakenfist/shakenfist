@@ -104,7 +104,7 @@ copies of `templates/mermaid-lint/` in `shakenfist/development`,
 pinned mermaid-cli tag included; sync from there rather than
 editing either in place, so drift shows up as a diff. Rendering
 runs through puppeteer and needs a browser, hence a container,
-hence the only job here on `debian-12-docker` — a label that must
+hence the only job here on `debian-13-docker` — a label that must
 also appear in `.github/actionlint.yaml` or actionlint fails on
 the workflow.
 
@@ -123,15 +123,17 @@ the gate already covers a docker-capable runner and add
 
 `demo-compose.yml` and `mermaid-lint.yml` are the two lanes that
 need a container runtime, and they get one in different ways.
-`demo-compose.yml` runs on `debian-12`, whose image does not have
+`demo-compose.yml` runs on `debian-13`, whose image does not have
 one, so it installs Docker Engine itself via
-`tools/demo/install-docker.sh` — from
-Docker's own apt repository, because Debian 12 ships neither a
-new enough engine nor a `docker compose` v2 plugin at all. The
-script is idempotent, so adding docker to the runner image would
-make it a no-op rather than a conflict. It also configures the
-daemon and builds for the runner's proxy, which neither inherits
-on its own.
+`tools/demo/install-docker.sh` — from Docker's own apt repository,
+which is what Docker's own install instructions assume and what the
+lane has always used. Trixie would now serve too, packaging Engine
+26.1.5 and Compose 2.26.1 as a `docker compose` plugin where bookworm
+packaged neither, so the choice is convention rather than necessity.
+The script is idempotent, so adding docker to the runner image — or
+installing the distribution's packages into it — would make it a
+no-op rather than a conflict. It also configures the daemon and
+builds for the runner's proxy, which neither inherits on its own.
 
 Two behaviours only matter when driving CI by hand: on a
 `workflow_dispatch` run of `functional-tests.yml` an unselected target
@@ -246,15 +248,15 @@ seconds into minutes of duplicate findings misattributed to unrelated
 merge commits.
 
 `gitleaks` is downloaded with a pinned version and sha256 rather than
-installed from apt: the package first appears in Debian 13 while these
-runners are Debian 12, and the shared static pool grants no
-passwordless sudo. The pin is also protection against the tool
-changing under us — `.gitleaks.toml` is written against 8.16's schema,
-in which per-rule allowlists are a single `[rules.allowlist]` table
-rather than the repeatable array later releases and the current
-upstream documentation describe. To move the pin, run
-`tools/gitleaks-scan.sh` against the new version locally first and
-check that the positive control still passes.
+installed from apt, because the version has to be ours to choose:
+`.gitleaks.toml` is written against 8.16's schema, in which per-rule
+allowlists are a single `[rules.allowlist]` table rather than the
+repeatable array later releases and the current upstream documentation
+describe, so an archive that moves under us breaks the configuration.
+The shared static pool granting no passwordless sudo is a second
+reason. To move the pin, run `tools/gitleaks-scan.sh` against the new
+version locally first and check that the positive control still
+passes.
 
 #### Accepting a finding
 
@@ -495,6 +497,21 @@ Debian 13 ships 3.13. `kerbside-patches` tests every all-in-one
 master topology on `debian:13`, so this matches upstream rather than
 diverging from it. The containers Kolla builds are Debian trixie
 regardless of the guest, and are unaffected.
+
+The `workflow_dispatch` menu still offers a
+`kolla-ansible-master-debian-12` target alongside
+`kolla-ansible-master-debian-13`. Both select the same job and both
+provision a Debian 13 guest — there is no Debian 12 lane any more.
+The old spelling is kept only because `kerbside-patches`'
+`trigger-downstream.yml` dispatches it by name on every develop push,
+and a `workflow_dispatch` `choice` input rejects a value absent from
+its option list, so removing it would break that trigger outright.
+GitHub offers no way to label a choice option as deprecated, but the
+job reports itself by `matrix.test.description`, so a run started
+from the old name still announces the Debian 13 guest. Prefer the
+`debian-13` spelling; the other disappears once
+[shakenfist/kerbside-patches#1706](https://github.com/shakenfist/kerbside-patches/issues/1706)
+lands.
 
 The `tempest-plugin/` directory is a separate releasable that
 contributes Kerbside-specific Tempest tests; see

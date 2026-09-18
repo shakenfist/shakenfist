@@ -361,8 +361,8 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 | 2. Real differencing fixtures, happy-path and adversarial (instar + instar-testdata) | [PLAN-differencing-phase-02-fixtures.md](/components/instar/plans/PLAN-differencing-phase-02-fixtures/) | Complete | instar-testdata `77f5f589f0` + `623a30866f` + `3eed61bf75` (direct to `main`); instar `1a677c77` (#552) |
 | 3. Parent-locator parsing in `crates/vhd` and `crates/vhdx` | [PLAN-differencing-phase-03-parse.md](/components/instar/plans/PLAN-differencing-phase-03-parse/) | Complete | `42e879f` (#558) |
 | 4. Read-side policy: close the silent parent-ignoring read | [PLAN-differencing-phase-04-read-policy.md](/components/instar/plans/PLAN-differencing-phase-04-read-policy/) | Complete | `f981374` (#563) |
-| 5. `plan_vhd` differencing emitter | [PLAN-differencing-phase-05-vhd-emitter.md](/components/instar/plans/PLAN-differencing-phase-05-vhd-emitter/) | Implemented, not yet merged | |
-| 6. `plan_vhdx` differencing emitter | PLAN-differencing-phase-06-vhdx-emitter.md | Not started | |
+| 5. `plan_vhd` differencing emitter | [PLAN-differencing-phase-05-vhd-emitter.md](/components/instar/plans/PLAN-differencing-phase-05-vhd-emitter/) | Complete | `9a80776` (#568) |
+| 6. `plan_vhdx` differencing emitter | [PLAN-differencing-phase-06-vhdx-emitter.md](/components/instar/plans/PLAN-differencing-phase-06-vhdx-emitter/) | Planned | |
 | 7. Guest create op and host CLI wiring | PLAN-differencing-phase-07-guest-host.md | Not started | |
 | 8. Rust unit tests and Python integration tests | PLAN-differencing-phase-08-tests.md | Not started | |
 | 9. Coverage fuzzing of the locator parsers | PLAN-differencing-phase-09-fuzz.md | Not started | |
@@ -406,19 +406,22 @@ The VHDX `parent_linkage` key is the parent's DataWriteGuid,
 settled by measurement against Hyper-V bytes and confirmed
 against SPEC(VHDX) 2.6.2.6.3 and libvhdi's source. But
 `vhdx::build_header` derives the DataWriteGuid from the sequence
-number alone (`src/crates/vhdx/src/lib.rs:2201-2212`), and every
-instar VHDX writer passes sequence numbers 1 and 2 -- `plan_vhdx`
-at `src/crates/create/src/lib.rs:965`
-and `:967` and the convert op at
-`src/operations/convert/src/main.rs:4469` and `:4492`. Every VHDX
+number alone (`src/crates/vhdx/src/lib.rs:2201`, the two GUID
+writes at `:2206-2215`), and every instar VHDX writer passes
+sequence numbers 1 and 2 -- `plan_vhdx` at
+`src/crates/create/src/lib.rs:1161` and `:1163` and the convert
+op at `src/operations/convert/src/main.rs:4469` and `:4492`. Every VHDX
 instar has ever written therefore shares one active-header
 DataWriteGuid, which makes libvhdi's parent-identity check
 **vacuous for instar-written chains**: any instar parent
 satisfies any instar child. `plan_vhd` has the same hole for the
 same reason -- it writes `UUID_ZERO` as the footer unique id of
-every image it creates (`src/crates/create/src/lib.rs:776`,
-`:820`), and that field is exactly what a differencing child
-copies into its dynamic header at offset 552. Phase 6 should
+every image it creates (`src/crates/create/src/lib.rs:958`,
+`:1021` and `:1072`), and that field is exactly what a
+differencing child copies into its dynamic header at offset 552.
+Phase 5 did not change that: the child's copy comes from
+`opts.parent_unique_id` (`:977`), which the create operation
+still fills with zeros until phase 7. Phase 6 should
 confirm the VHDX half against a real instar-produced image (the
 claim is read from code, not measured on output) and consider
 giving created images a real DataWriteGuid; phase 8's
@@ -532,6 +535,19 @@ host-resolved parent but embeds `typed_backing.as_bytes()`
 verbatim in what the guest receives (`:16913-16963`). That single
 typed string is also what forces the single-locator-entry answer
 in open question 3.
+
+Phase 7 also inherits two guards it must not remove blindly.
+Phase 5 added an explicit backing refusal to the create
+operation's `ImageFormat::Vhd` arm and phase 6 adds the matching
+one for `ImageFormat::Vhdx`, because each emitter became able to
+write a child whose parent identity is all zeros before the guest
+could read a real one. Neither guard has a committed test -- both
+live in the guest binary, which `crates/create`'s harness cannot
+reach -- so phase 7 must not rely on a failing test to notice if
+it removes one too early. Issue #570 (POSIX paths emitted under
+Windows-only platform codes and the `absolute_win32_path` key)
+must be settled before either guard comes off, since removing
+them is what first exposes that choice to a user.
 
 ### Constraints that apply throughout
 

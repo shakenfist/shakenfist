@@ -165,8 +165,11 @@ one. It needs nothing but Docker Engine 23.0 or newer with the Compose
 v2 plugin — no Python, no database, and no certificates of your own.
 On Debian 12, install Docker from
 [Docker's own repository](https://docs.docker.com/engine/install/debian/)
-rather than from the distribution, which ships an engine too old to
-build the image.
+rather than from the distribution: bookworm's engine is too old to build
+the image, and its only compose is the end-of-life Python v1. Debian 13
+packages both well enough (Engine 26.1.5, Compose 2.26.1 as a
+`docker compose` plugin), but Docker's repository is what Docker's own
+instructions assume and what kerbside's CI installs.
 
 `pip install` does not give you `demo/`, so start from a checkout:
 

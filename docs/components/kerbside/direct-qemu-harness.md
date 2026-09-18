@@ -49,6 +49,12 @@ There are two distinct paths, for two purposes:
 Build the binary first (Docker, per the crate Makefile):
 `make -C rust/kerbside-proxy build` (debug) or a `--release` build.
 
+The host also needs a qemu with SPICE compiled in. On Debian 13 and
+later that is a separate package — `qemu-system-modules-spice`, which
+qemu-system-x86 only *recommends* — and without it qemu starts and dies
+with `There is no option group 'spice'`. `start-qemu.sh` checks for it
+and names it before launching anything.
+
 ## The metrics assertion
 
 After a client connects, `verify-rust-proxy.sh assert` polls

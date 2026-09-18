@@ -19,6 +19,60 @@ Tests compare instar output against either:
 1. Live `qemu-img` output (for safe images - info, compare, convert)
 2. Stored expected output files (for malicious images)
 
+### Shared helpers and subprocess budgets
+
+Helpers shared by more than one test module live on `InstarTestBase`
+in `tests/base.py`, not copy-pasted into each class. In particular:
+
+- `_run_tool(argv, cwd)` runs a reference qemu tool (`qemu-img`,
+  `qemu-io`) with `cwd` inside a fixture directory and asserts it
+  exited 0. It is the helper used to *build* fixtures and to produce
+  qemu twins for differential comparison.
+- `_require_qemu_img()` skips unless `qemu-img` is installed, and
+  `_require_qemu_tools()` skips unless `qemu-io` is there too.
+- `sha256(path)` digests a file's full contents.
+
+**Require the narrowest guard the tests actually need.** The two are
+not interchangeable, and the difference is not hypothetical: the `deb`
+legs of the distro matrix install `qemu-utils`, which carries both
+binaries, while the RPM legs install only `qemu-img` and never ask for
+`qemu-io` at all (see `tools/test-package-functional.sh`). A class
+gated on `_require_qemu_tools()` whose tests never run `qemu-io` is
+therefore one packaging decision away from skipping everywhere on
+half the matrix — and a skipped test is invisible in a green run.
+`TestSnapshotErrorPaths` is the worked example: eighteen of its
+nineteen tests only assert that instar refuses an image and leaves it
+byte-identical, so the class takes `_require_qemu_img()` and the one
+zstd test that needs a `qemu-io` write asks for it itself.
+
+**A `_run_tool` timeout is a hang guard, not a performance
+assertion.** The budget (`QEMU_TOOL_TIMEOUT`, 300s) exists so a wedged
+`qemu-img` cannot block a stestr worker forever; it is not a claim
+about how long qemu should take. The distro matrix fans several
+4-worker suites out onto one self-hosted runner, so ~20 concurrent
+qemu processes routinely stretch a five-second operation past a
+minute. A tight budget there does not catch a regression — it
+converts host contention into a merge queue ejection, which is
+exactly what a 60s budget on one `qemu-img commit` did in
+[#528](https://github.com/shakenfist/instar/issues/528). Pass a lower
+`timeout=` only for a call whose duration is itself under test, and
+never to "tighten up" a reference invocation.
+
+This is distinct from the budgets on the `run_instar_*` helpers,
+where a timeout *is* a real assertion: instar hanging is a product
+bug, and those calls should stay bounded.
+
+Note that the contention this budget exists for cannot be reproduced
+by a pull request's own checks: the distro matrix runs only in the
+merge queue (and on `workflow_dispatch`), so the first real signal
+arrives at enqueue time. If a `_run_tool` `TimeoutExpired` recurs,
+diagnose before raising the number. Read the failing leg's per-suite
+wall clock and how many stestr workers were live alongside it; a
+budget that was ample at ~20 concurrent qemu processes and blows at
+~20 again is a contention change worth understanding, not a number
+that wants doubling. Raising 300 to 600 reflexively buys one more
+round of the same ejection.
+
 ## Test Categories
 
 ### Safe Images (`test_info_safe.py`)
