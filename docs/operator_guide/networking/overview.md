@@ -509,6 +509,13 @@ can be released this way -- asking to release a gateway or an instance's
 address is refused, because handing that address out again while it is still
 in use is exactly the collision this exists to prevent.
 
+An administrator can reserve in the floating network too, which is how you
+hold a floating address for a device Shaken Fist does not manage -- a hardware
+load balancer, or a router's virtual IP. The floating IP reaper releases
+floating addresses whose owner has gone away, and a manual reservation has no
+owner in the cluster by definition, so it is protected there explicitly:
+nothing but an explicit release will free it.
+
 ## Interface naming conventions
 
 The interface names in the examples above are a contract, not a

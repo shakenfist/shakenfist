@@ -10,10 +10,10 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.config import SFConfig
 from shakenfist.constants import FLOATING_NETWORK_UUID
-from shakenfist.external_api import network as api_network
-from shakenfist.network import network as net
 from shakenfist.exceptions import NetworkOperationFailed
 from shakenfist.external_api import app as external_api
+from shakenfist.external_api import network as api_network
+from shakenfist.network import network as net
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
@@ -971,11 +971,22 @@ class NetworkAddressEndpointTestCase(base.ShakenFistTestCase):
         self.assertEqual(self.network_id, reservation['user_uuid'])
 
     def test_a_reserved_address_is_not_allocated(self):
-        """The whole point: IPAM must not hand the address out again."""
+        """The whole point: IPAM must not hand the address out again.
+
+        Fifty allocations, not the 252 this /24 has free. Draining the
+        block to its last two addresses would make any future change
+        which reserves one more address at IPAM creation surface here as
+        a CongestedNetwork exception rather than as a clean failure, and
+        the tail of a near-full block is quadratic anyway:
+        reserve_random_free_address burns its five random attempts and
+        then linear scans from index 1 on every call. Fifty is well past
+        the point where a random allocator would have returned the
+        reserved address by chance.
+        """
         self.assertEqual(200, self._reserve('10.9.8.3').status_code)
 
         n = net.Network.from_db(self.network_id)
-        for _ in range(250):
+        for _ in range(50):
             address = n.ipam.reserve_random_free_address(
                 (ObjectType.NETWORK, self.network_id),
                 ReservationType.INSTANCE, '')
@@ -1023,6 +1034,76 @@ class NetworkAddressEndpointTestCase(base.ShakenFistTestCase):
         reservation = n.ipam.get_reservation('10.9.8.1')
         self.assertEqual(ReservationType.GATEWAY,
                          reservation.reservation_type)
+
+    def test_reserve_with_a_comment_which_is_not_a_string(self):
+        # comment is declared as a body string, so the request validator
+        # refuses a structure before the handler ever sees it. Without
+        # that the value would reach IPAMReservation's `comment` field
+        # and pydantic would raise, which is a 500 for a malformed
+        # request.
+        resp = self.client.post(
+            '/networks/%s/addresses/10.9.8.3' % self.network_id,
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({'comment': {'why': 'a VIP'}}))
+        self.assertEqual(400, resp.status_code)
+
+        # And nothing was reserved on the way to refusing it.
+        n = net.Network.from_db(self.network_id)
+        self.assertIsNone(n.ipam.get_reservation('10.9.8.3'))
+
+    def test_reserve_the_network_and_broadcast_addresses(self):
+        # Both are reserved when the IPAM is created, so neither is the
+        # caller's to take -- and neither is special-cased anywhere, so
+        # they go down the same already-in-use path as the gateway.
+        self.assertEqual(409, self._reserve('10.9.8.0').status_code)
+        self.assertEqual(409, self._reserve('10.9.8.255').status_code)
+
+    def test_reserve_an_ipv6_address(self):
+        # ip_address() parses this happily, so the 400 comes from
+        # is_in_range() instead: IPv4Network.__contains__ short-circuits
+        # on a version mismatch rather than raising. Pinned because a
+        # future is_in_range() which compared before checking the version
+        # would turn this into a 500.
+        resp = self._reserve('fe80::1')
+        self.assertEqual(400, resp.status_code)
+
+    def test_reserve_in_another_namespaces_network(self):
+        # The network belongs to 'foo'. A caller in another namespace
+        # cannot see it at all, so the ownership decorator answers 404
+        # rather than 403 -- not leaking whether the network exists.
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'foo', 'key': 'bar'}))
+        self.assertEqual(200, resp.status_code)
+        foo_token = 'Bearer %s' % resp.get_json()['access_token']
+
+        other_network_id = str(uuid4())
+        self.mock_mariadb.create_namespace('bar', 'key1', 'bar')
+        self.mock_mariadb.create_network(
+            'othernet',
+            uuid=other_network_id,
+            namespace='bar',
+            netblock='10.7.6.0/24',
+            set_state=dbo.STATE_CREATED)
+
+        resp = self.client.post(
+            '/networks/%s/addresses/10.7.6.3' % other_network_id,
+            headers={'Authorization': foo_token},
+            data=json.dumps({}))
+        self.assertEqual(404, resp.status_code)
+
+    def test_release_a_deletion_halo_address(self):
+        # A halo reservation is not a manual one, so it falls into the
+        # 403 branch. The documented contract names gateways and
+        # instance addresses; this pins what the third case does, which
+        # is refuse -- the halo is IPAM's cooldown to run down, not the
+        # caller's to cut short.
+        n = net.Network.from_db(self.network_id)
+        n.ipam.reserve('10.9.8.3', (ObjectType.NETWORK, self.network_id),
+                       ReservationType.INSTANCE, '')
+        n.ipam.release('10.9.8.3')
+
+        resp = self._release('10.9.8.3')
+        self.assertEqual(403, resp.status_code)
 
     def test_reserve_takes_over_a_deletion_halo_address(self):
         """A caller naming an address gets it even if it is cooling down."""

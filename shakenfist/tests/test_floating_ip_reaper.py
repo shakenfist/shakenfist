@@ -284,6 +284,47 @@ class FloatingIPReaperTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(['192.168.10.154'], ipam.released)
 
+    def test_manual_reservation_is_never_reaped(self):
+        # A manual reservation holds an address for something outside
+        # the cluster -- a hardware load balancer, a router's VIP --
+        # so there is no owning object for the leak check to find and
+        # it looks leaked on every sweep, forever. Releasing it would
+        # return the address to the floating pool and hand it to an
+        # interface, which is precisely the collision the reservation
+        # exists to prevent, and it would happen silently.
+        #
+        # The reservation here is aged and confirmed: its owner (the
+        # floating network) is alive, it has looked leaked for longer
+        # than the confirmation period, and its reserved_at is well
+        # outside the 300 second grace. Every other guard has been
+        # passed, so only the manual protection can save it.
+        res = _reservation(
+            user_type=ObjectType.NETWORK, user_uuid='floating-network-uuid',
+            reserved_at=time.time() - 100000)
+        res.reservation_type = ReservationType.MANUAL
+        ipam = FakeIPAM(
+            in_use={'192.168.10.154'},
+            reservations={'192.168.10.154': res})
+        floating_ip_reaper._leak_candidates['192.168.10.154'] = (
+            time.time() - floating_ip_reaper.LEAK_CONFIRMATION_SECONDS - 1)
+
+        owner = mock.Mock()
+        owner.state = State(value='created', update_time=time.time() - 100000)
+        owner_class = mock.Mock()
+        owner_class.from_db.return_value = owner
+
+        with mock.patch.object(
+                floating_ip_reaper, 'get_object_class',
+                return_value=owner_class):
+            self.assertTrue(self._sweep(ipam))
+
+        self.assertEqual(
+            [], ipam.released,
+            'a manual reservation in the floating network was reaped')
+        # It must not be accruing confirmation time either, or the
+        # protection would be one refactor away from being a delay.
+        self.assertEqual({}, floating_ip_reaper._leak_candidates)
+
     def test_bulk_gateway_read_failure_falls_back_to_per_network(self):
         # An sf-database from before GetNetworkFloatingGateways answers
         # UNIMPLEMENTED for the length of a mixed version window. The

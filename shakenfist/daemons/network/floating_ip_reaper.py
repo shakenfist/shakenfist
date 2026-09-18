@@ -223,6 +223,19 @@ def reap_floating_ips():
     floating_halo = list(floating_network.ipam.get_haloed_addresses())
     LOG.info('Found floating deletion halos: %s' % floating_halo)
 
+    # A manual reservation is held for something outside the cluster, so
+    # there is no object for the leak check below to find and it would
+    # otherwise look leaked forever. Holding a floating IP for an
+    # external device -- a hardware load balancer, a router's VIP -- is
+    # the same need the feature exists for on a virtual network, so the
+    # address is protected here rather than being refused at the API.
+    # Nothing releases it implicitly; only an explicit DELETE does.
+    floating_manual = [
+        addr for addr, res in reservations.items()
+        if res.reservation_type == ReservationType.MANUAL
+    ]
+    LOG.info('Found floating manual reservations: %s' % floating_manual)
+
     # Now the reverse check. Test if there are any reserved IPs which
     # are not actually in use. Free any we find.
     now = time.time()
@@ -233,7 +246,8 @@ def reap_floating_ips():
                                      floating_addresses,
                                      floating_routed,
                                      floating_reserved,
-                                     floating_halo):
+                                     floating_halo,
+                                     floating_manual):
             # This IP needs to have been allocated more than 300 seconds
             # ago to ensure that the network setup isn't still queued.
             # An address which is in use but has no reservation row at

@@ -733,6 +733,16 @@ class NetworkAddressEndpoint(api_base.Resource):
             return sf_api.error(
                 400, 'reservation request for address outside network block')
 
+        # Emitted before the reservation is attempted, the way the route
+        # and unroute handlers do it, so a refused attempt to take over an
+        # address which is already in use still leaves a trace on the
+        # network's event log. That is one of the more interesting things
+        # to find in an audit trail, and an event emitted only on success
+        # cannot record it.
+        network_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'address reservation request from REST API',
+            extra={'address': address, 'comment': comment})
+
         # A manual reservation is owned by the network, not by anything the
         # cluster runs. Nothing releases it implicitly, which is the point:
         # the address is being held for something Shaken Fist does not
@@ -746,10 +756,13 @@ class NetworkAddressEndpoint(api_base.Resource):
                 ReservationType.MANUAL, comment or '', evict_halo=True):
             return sf_api.error(409, 'address is already in use')
 
-        network_from_db.add_event(
-            EVENT_TYPE_AUDIT, 'address reservation request from REST API',
-            extra={'address': address})
+        # The reservation is read back rather than built here so the
+        # response is what the database actually holds. A concurrent
+        # release between the two calls leaves nothing to return, which is
+        # a 409 rather than an AttributeError dressed up as a 500.
         reservation = network_from_db.ipam.get_reservation(address)
+        if not reservation:
+            return sf_api.error(409, 'address is already in use')
         return reservation.model_dump(mode='json')
 
     @swag_from(api_base.swagger_helper(
@@ -780,6 +793,16 @@ class NetworkAddressEndpoint(api_base.Resource):
             return sf_api.error(
                 400, 'release request for address outside network block')
 
+        # Emitted before anything is looked up or changed, the way the
+        # route and unroute handlers do it, so a release refused with a 403
+        # (a gateway or an instance's address) or a 404 is recorded too. An
+        # event emitted only on success cannot show an attempt to release
+        # an address which is still in use, which is the attempt most worth
+        # seeing in an audit trail.
+        network_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'address release request from REST API',
+            extra={'address': address})
+
         reservation = network_from_db.ipam.get_reservation(address)
         if not reservation:
             return sf_api.error(404, 'address is not reserved')
@@ -787,15 +810,20 @@ class NetworkAddressEndpoint(api_base.Resource):
         # Only manual reservations are the caller's to release. Releasing a
         # gateway or an instance's address here would hand it out again
         # while the thing using it was still using it.
+        #
+        # This check is not atomic with the release below: release_address()
+        # takes no expected-type guard, so its UPDATE is unconditional. Two
+        # concurrent DELETEs of the same address can therefore defeat it --
+        # the first releases to the deletion halo, an instance create naming
+        # that address evicts the halo and takes it, and the second DELETE
+        # completes its release against an address an instance now holds.
+        # Closing that needs an expected_type on the RPC; until then, do not
+        # read this check as a guarantee.
         if reservation.reservation_type != ReservationType.MANUAL:
             return sf_api.error(403, 'address is not a manual reservation')
 
         if not network_from_db.ipam.release(address):
             return sf_api.error(404, 'address is not reserved')
-
-        network_from_db.add_event(
-            EVENT_TYPE_AUDIT, 'address release request from REST API',
-            extra={'address': address})
 
 
 class NetworkRouteAddressEndpoint(api_base.Resource):
