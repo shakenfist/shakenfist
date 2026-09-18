@@ -637,6 +637,10 @@ class InstancesEndpoint(api_base.Resource):
             (406, 'Network not ready.', None),
             (409, 'Network address in use, or no node satisfies a hard '
                 'affinity constraint.', None),
+            (503, 'The database could not be reached while recording the '
+                'placement. The half-built instance is torn down (the error '
+                'body names its uuid) and the request can be retried; the '
+                'response carries a `Retry-After` header.', None),
             (507, 'Unable to allocate resources for the instance. A refusal '
                 'from scheduling carries `stage` (the scheduler filter that '
                 'refused, or `capacity_guard`) and a boolean `transient` in '
@@ -1085,8 +1089,12 @@ class InstancesEndpoint(api_base.Resource):
         # place_instance() is what actually admits the instance, and a
         # refusal means some other create took the slot between the two.
         # So walk the list (D7). A WriteException is deliberately not
-        # caught -- an unreachable database is not a full cluster, and
-        # trying the next node would only ask it the same question.
+        # caught by the walk -- an unreachable database is not a full
+        # cluster, and trying the next node would only ask it the same
+        # question -- but it is caught around the walk below, where it
+        # becomes a 503 with cleanup rather than unwinding into the
+        # catch-all 500 with the half-built instance abandoned in
+        # 'initial' (issue 4246).
         #
         # This walk (including the P9 demand-only re-walk below) also
         # exists in node_inst_netdesc_op.py's _instance_preflight();
@@ -1117,24 +1125,49 @@ class InstancesEndpoint(api_base.Resource):
                         })
             return None
 
-        placement = place_walk(True)
+        try:
+            placement = place_walk(True)
 
-        # The D13 demand term spreads correlated bursts across nodes; it
-        # is not a capacity bound. The first pass already gave
-        # demand-quiet nodes their preference, so if nothing admitted
-        # and at least one candidate was refused on demand alone, the
-        # only alternative to a second pass with the clause waived is
-        # failing a create the cluster has real capacity for -- which
-        # would turn a spreading heuristic into a user-visible rate
-        # limit (the smoke CI single-node lockout of 2026-08-14).
-        if placement is None and any(
-                d['demand_only'] for d in denials.values()):
-            inst.add_event(
-                EVENT_TYPE_AUDIT,
-                'no candidate admitted and some refused on demand alone, '
-                'waiving demand guard',
-                extra={'candidates': candidates, 'denials': denials})
-            placement = place_walk(False)
+            # The D13 demand term spreads correlated bursts across
+            # nodes; it is not a capacity bound. The first pass already
+            # gave demand-quiet nodes their preference, so if nothing
+            # admitted and at least one candidate was refused on demand
+            # alone, the only alternative to a second pass with the
+            # clause waived is failing a create the cluster has real
+            # capacity for -- which would turn a spreading heuristic
+            # into a user-visible rate limit (the smoke CI single-node
+            # lockout of 2026-08-14).
+            if placement is None and any(
+                    d['demand_only'] for d in denials.values()):
+                inst.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'no candidate admitted and some refused on demand '
+                    'alone, waiving demand guard',
+                    extra={'candidates': candidates, 'denials': denials})
+                placement = place_walk(False)
+
+        except exceptions.WriteException as e:
+            # The placement write could not reach the database. This is
+            # the one create-path failure whose cleanup is itself a
+            # database write, so it is best-effort: on the exact outage
+            # that got us here it may fail too, leaving the instance in
+            # 'initial' for the caller to delete once the database
+            # returns -- the response names the uuid so it can. The 503
+            # is honest either way: the instance did not come up, and
+            # unlike a capacity 507 no cluster state argues against an
+            # immediate retry.
+            try:
+                inst.enqueue_delete_due_error('placement write failed')
+            except exceptions.DatabaseException as cleanup_error:
+                LOG.with_fields({'instance': inst.uuid}).error(
+                    'Could not clean up instance after failed placement '
+                    f'write: {cleanup_error}')
+            resp = sf_api.error(
+                503, f'could not record placement for instance {inst.uuid}: '
+                f'{e}', suppress_traceback=True)
+            resp.headers['Retry-After'] = str(
+                api_base.TRANSIENT_RETRY_AFTER_SECONDS)
+            return resp
 
         if placement is None:
             inst.add_event(

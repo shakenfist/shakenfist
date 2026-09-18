@@ -921,14 +921,50 @@ class ExternalApiCreateAdmissionWalkTestCase(ExternalApiTestCase):
     def test_a_database_failure_is_not_a_full_cluster(self):
         # A WriteException means the database could not be reached, not
         # that the cluster is full: asking the next node would only get
-        # the same answer, so it must not be caught by the walk.
+        # the same answer, so it must not be caught by the walk. But it
+        # must not unwind into the catch-all 500 either (issue 4246):
+        # every other create-path failure cleans up the half-built
+        # instance and says what went wrong, and a database blip is the
+        # most retryable failure of them all. The handler answers a 503
+        # with a Retry-After, and error-deletes the instance the same
+        # way the capacity refusals do.
         with self._candidates(self.NODE_A, self.NODE_B):
             with mock.patch(
                     'shakenfist.instance.Instance.place_instance',
-                    side_effect=exceptions.WriteException('database gone')):
-                resp = self._post('database-down')
+                    side_effect=exceptions.WriteException(
+                        'database gone')) as place:
+                with mock.patch('shakenfist.instance.Instance.'
+                                'enqueue_delete_due_error') as delete:
+                    resp = self._post('database-down')
 
-        self.assertEqual(500, resp.status_code)
+        self.assertEqual(503, resp.status_code, resp.get_json())
+        self.assertEqual('15', resp.headers.get('Retry-After'))
+        self.assertIn(
+            'could not record placement', resp.get_json()['error'])
+        # The walk stopped at the first candidate rather than asking
+        # NODE_B the same unanswerable question.
+        self.assertEqual(1, place.call_count)
+        delete.assert_called_once_with('placement write failed')
+
+    def test_a_database_failure_with_failed_cleanup_is_still_a_503(self):
+        # The cleanup is itself a database write, so on the exact
+        # outage that reaches this branch it may fail too. That must
+        # not turn the honest 503 back into a bare 500: the response
+        # names the instance uuid so a caller can delete it once the
+        # database returns.
+        with self._candidates(self.NODE_A):
+            with mock.patch(
+                    'shakenfist.instance.Instance.place_instance',
+                    side_effect=exceptions.WriteException('database gone')):
+                with mock.patch(
+                        'shakenfist.instance.Instance.'
+                        'enqueue_delete_due_error',
+                        side_effect=exceptions.DatabaseUnavailable(
+                            'still gone')):
+                    resp = self._post('database-still-down')
+
+        self.assertEqual(503, resp.status_code, resp.get_json())
+        self.assertEqual('15', resp.headers.get('Retry-After'))
 
 
 class ExternalApiAffinityRefusalTestCase(
