@@ -66,6 +66,7 @@ class LowResourceTestCase(SchedulerTestCase):
                                 fake_inst)
         self.assertEqual(
             'No nodes remaining at scheduling stage is_hypervisor', str(exc))
+        self.assertEqual('is_hypervisor', exc.stage)
 
     def test_requested_too_many_cpu(self):
         self.mock_mariadb.set_node_metrics_same({
@@ -81,6 +82,7 @@ class LowResourceTestCase(SchedulerTestCase):
         self.assertEqual(
             'No nodes remaining at scheduling stage cpu_max_per_instance',
             str(exc))
+        self.assertEqual('cpu_max_per_instance', exc.stage)
 
     def test_not_enough_cpu(self):
         self.mock_mariadb.set_node_metrics_same({
@@ -100,6 +102,7 @@ class LowResourceTestCase(SchedulerTestCase):
         self.assertEqual(
             'No nodes remaining at scheduling stage sufficient_idle_cpu',
             str(exc))
+        self.assertEqual('sufficient_idle_cpu', exc.stage)
 
     def test_not_enough_ram_for_system(self):
         self.mock_mariadb.set_node_metrics_same({
@@ -119,6 +122,7 @@ class LowResourceTestCase(SchedulerTestCase):
         self.assertEqual(
             'No nodes remaining at scheduling stage sufficient_idle_memory',
             str(exc))
+        self.assertEqual('sufficient_idle_memory', exc.stage)
 
     def test_not_enough_ram_on_node(self):
         self.mock_mariadb.set_node_metrics_same({
@@ -139,6 +143,7 @@ class LowResourceTestCase(SchedulerTestCase):
         self.assertEqual(
             'No nodes remaining at scheduling stage sufficient_idle_memory',
             str(exc))
+        self.assertEqual('sufficient_idle_memory', exc.stage)
 
     def test_not_enough_disk(self):
         # No disk_reservation_gb is published, so admission falls back to the
@@ -167,6 +172,7 @@ class LowResourceTestCase(SchedulerTestCase):
         self.assertEqual(
             'No nodes remaining at scheduling stage sufficient_free_disk',
             str(exc))
+        self.assertEqual('sufficient_free_disk', exc.stage)
 
     def test_not_enough_disk_bandwidth(self):
         # The resources daemon serialises this metric as a float string, so
@@ -194,6 +200,7 @@ class LowResourceTestCase(SchedulerTestCase):
         self.assertEqual(
             'No nodes remaining at scheduling stage sufficient_idle_disk',
             str(exc))
+        self.assertEqual('sufficient_idle_disk', exc.stage)
 
     def test_disk_bandwidth_below_threshold(self):
         # The resources daemon publishes this metric as a float (delta divided
@@ -283,6 +290,7 @@ class ForcedCandidatesTestCase(SchedulerTestCase):
             fake_inst, candidates=[])
         self.assertEqual(
             'No nodes remaining at scheduling stage pre_schedule', str(exc))
+        self.assertEqual('pre_schedule', exc.stage)
 
     def test_empty_forced_list_is_published_as_forced(self):
         # The schedule events are the primary diagnostic surface for
@@ -548,6 +556,7 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
         self.assertEqual(
             'No nodes remaining at scheduling stage sufficient_idle_cpu',
             str(exc))
+        self.assertEqual('sufficient_idle_cpu', exc.stage)
 
     def test_infra_role_node_admits_less(self):
         # Two identically sized machines, but one has an extra core
@@ -581,6 +590,7 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
         self.assertEqual(
             'No nodes remaining at scheduling stage sufficient_idle_memory',
             str(exc))
+        self.assertEqual('sufficient_idle_memory', exc.stage)
 
     def test_ram_check_falls_back_to_config_reservation(self):
         # Without a published memory_reserved_mb the check falls back to
@@ -1248,6 +1258,7 @@ class DiskReservationAdmissionTestCase(SchedulerTestCase):
         self.assertEqual(
             'No nodes remaining at scheduling stage sufficient_free_disk',
             str(exc))
+        self.assertEqual('sufficient_free_disk', exc.stage)
 
 
 class NodesByFreeDiskDescendingTestCase(SchedulerTestCase):
@@ -1520,6 +1531,7 @@ class AffinityVersusLoadSheddingTestCase(SchedulerTestCase):
         self.assertEqual(
             'No nodes remaining at scheduling stage sufficient_idle_disk',
             str(exc))
+        self.assertEqual('sufficient_idle_disk', exc.stage)
 
     def test_admission_still_outranks_affinity(self):
         # A node which cannot fit the instance is not a candidate at all,
@@ -1619,6 +1631,7 @@ class BinaryAffinityTestCase(SchedulerTestCase):
             # than the 507 it replaces.
             self.assertIn('affinity_constraints', str(e))
             self.assertIn('nonexistent', str(e))
+            self.assertEqual('affinity_constraints', e.stage)
 
     def test_require_ignores_instances_in_another_namespace(self):
         # The hard filter inherits the scorer's namespace scope. Crossing
@@ -2298,3 +2311,71 @@ class HasIdleDiskBandwidthPredicateTestCase(SchedulerTestCase):
             'busy_time_delta_per_second': 1201.0,
             'busy_time_threshold': 1200,
         }, reason)
+
+
+class SchedulerStageAttributeTestCase(SchedulerTestCase):
+    """The stage rides on the exception, not only in the message.
+
+    The create path publishes the stage as a machine-readable field on
+    its 507 (PLAN-transient-capacity-refusals phase 4, D30), so it must
+    not have to parse it back out of the prose. The message assertions
+    which surround these tests are equally load bearing in the other
+    direction: the cluster CI suite's assertRefusedAtStage() matches on
+    the wording, so the attribute is an addition and never a
+    replacement.
+    """
+
+    def test_the_stage_defaults_to_empty(self):
+        # An exception raised without a stage still has the attribute,
+        # so a handler reads a field rather than probing for one. The
+        # API turns an empty stage into 'unknown'.
+        self.assertEqual('', exceptions.SchedulerException('boom').stage)
+        self.assertEqual('', exceptions.LowResourceException('boom').stage)
+        self.assertEqual(
+            '', exceptions.AffinityConstraintUnsatisfiable('boom').stage)
+        self.assertEqual(
+            '', exceptions.CandidateNodeNotFoundException('boom').stage)
+
+    def test_the_capacity_denial_subclass_still_constructs(self):
+        # CapacityAdmissionDenied has its own __init__ which calls
+        # super().__init__(failing_stage) positionally. Adding a keyword
+        # argument to SchedulerException must leave that alone.
+        denial = exceptions.CapacityAdmissionDenied(
+            'node', [{'dimension': 'cpus', 'limit': 16.0, 'used': 16.0,
+                      'requested': 1.0, 'exceeded': True}])
+        self.assertEqual('node', denial.failing_stage)
+        self.assertEqual('', denial.stage)
+        self.assertEqual(
+            'node capacity guard refused placement: cpus', str(denial))
+
+    def test_every_filter_stage_carries_its_own_name(self):
+        # _log_and_raise_on_error() is the single raise site for every
+        # filter stage, so exercising it directly covers the stages the
+        # tests above do not provoke as well as the ones they do.
+        s = scheduler.Scheduler()
+        for stage in ('pre_schedule', 'is_hypervisor', 'cpu_max_per_instance',
+                      'sufficient_idle_cpu', 'sufficient_idle_memory',
+                      'sufficient_free_disk', 'sufficient_idle_disk',
+                      'queue_state'):
+            with mock.patch('shakenfist.scheduler.add_event_multi'):
+                exc = self.assertRaises(
+                    exceptions.LowResourceException,
+                    s._log_and_raise_on_error, [], stage, [])
+            self.assertEqual(stage, exc.stage)
+            self.assertEqual(
+                f'No nodes remaining at scheduling stage {stage}', str(exc))
+
+    def test_the_affinity_subclass_is_given_its_stage_too(self):
+        # The affinity stage raises a different class, passed in by the
+        # caller, and it must be constructed with the stage as well.
+        s = scheduler.Scheduler()
+        with mock.patch('shakenfist.scheduler.add_event_multi'):
+            exc = self.assertRaises(
+                exceptions.AffinityConstraintUnsatisfiable,
+                s._log_and_raise_on_error, [], 'affinity_constraints', [],
+                exception_class=exceptions.AffinityConstraintUnsatisfiable,
+                detail='requires tag nonexistent')
+        self.assertEqual('affinity_constraints', exc.stage)
+        self.assertEqual(
+            'No nodes remaining at scheduling stage affinity_constraints: '
+            'requires tag nonexistent', str(exc))

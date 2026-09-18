@@ -207,3 +207,14 @@ FINAL_OBJECT_STATES = [
     'abort',
     'expired'
 ]
+
+
+# The refusal stage published when the capacity admission guard, rather
+# than one of scheduler.py's named pre-filter stages, refused every
+# candidate. It is a published API token (it appears in the "stage"
+# field of a 507 body) with two independent producers -- the create
+# path in external_api/instance.py and the preflight redirect in
+# operations/node_inst_netdesc_op.py -- so it is named once here rather
+# than written out at each. Whether it is retry-worthy is decided in
+# external_api/base.py's TRANSIENT_CAPACITY_STAGES.
+CAPACITY_GUARD_STAGE = 'capacity_guard'

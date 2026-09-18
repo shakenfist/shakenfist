@@ -1,6 +1,7 @@
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.config import config
+from shakenfist.constants import CAPACITY_GUARD_STAGE
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.schema.operations import node_inst_netdesc_op as schema
 from shakenfist.schema.operations.baseclusteroperation import dependency
@@ -278,9 +279,15 @@ class NodeInstNetdescOp(BaseClusterOperation):
                     'reschedule failed, every candidate refused by capacity '
                     'guard',
                     extra={'candidates': candidates, 'denials': denials})
+                # Every candidate was refused by the capacity guard,
+                # which is the same fact the create path publishes as
+                # the capacity_guard stage. The message is unchanged;
+                # the stage is carried alongside it so no handler has
+                # to parse it back out (D30).
                 raise LowResourceException(
                     'No node had capacity for this instance, '
-                    f'{len(denials)} candidates refused it')
+                    f'{len(denials)} candidates refused it',
+                    stage=CAPACITY_GUARD_STAGE)
 
             # The artifact fetches minted at create time targeted the
             # original placement, so the redirect target's image cache has

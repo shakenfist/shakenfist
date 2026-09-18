@@ -37,6 +37,7 @@ from shakenfist import mariadb
 from shakenfist.network import network
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
+from shakenfist.constants import CAPACITY_GUARD_STAGE
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import scopes as api_scopes
@@ -97,6 +98,126 @@ REDACTED_PARAMETER = '*****'
 def handles_credentials():
     path = flask.request.path
     return path == '/auth' or path.startswith('/auth/')
+
+
+# BaseClusterOperation.defer()'s default re-examination delay is 15.0
+# seconds (shakenfist/operations/baseoperation.py:674-678), so a client
+# told to wait this long is waiting exactly as long as the server
+# itself waits before looking at deferred work again -- the two were
+# chosen to match. They are two literals, not one definition: nothing imports
+# the other, so test_capacity_error.py asserts defer()'s default
+# directly and a divergence fails there rather than quietly making
+# this comment untrue.
+#
+# Phase 3 of PLAN-transient-capacity-refusals measured a node's
+# cpu_measured metric falling 5.3-5.6 s after a domain is destroyed, so
+# 15 s clears that path with roughly three times margin. See
+# docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md,
+# decision D31.
+TRANSIENT_RETRY_AFTER_SECONDS = 15
+
+
+# Which refusal stages a retry can actually clear, and which it cannot.
+#
+# D29 originally drew this line at the exception class: every
+# LowResourceException was transient. That was too coarse. The class
+# covers filter stages which are momentary shortages *and* filter
+# stages which are structural facts about the request or the cluster,
+# and telling a client to retry the second kind makes it replay an
+# impossible request until its deadline for nothing.
+#
+# Transient -- the resource is measured, contended and returned by an
+# ordinary instance teardown within seconds (phase 3 measured 5.3-5.6 s
+# for CPU):
+TRANSIENT_CAPACITY_STAGES = frozenset([
+    'sufficient_idle_cpu',
+    'sufficient_idle_memory',
+    'sufficient_free_disk',
+    'sufficient_idle_disk',
+    'queue_state',
+
+    # The guard is an accounting refusal against the capacity counters,
+    # which a concurrent delete or a reconciler pass moves on the same
+    # horizon. This holds only while mariadb.CLAIM_ENFORCEMENT_HARD is
+    # False: today a namespace claim cannot refuse a placement at all,
+    # so every guard denial is cluster or node capacity. When phase 5
+    # flips that constant a claim denial becomes namespace quota
+    # exhaustion, which no wait clears, and claim denials must be split
+    # out of this set at that point rather than silently inheriting it.
+    CAPACITY_GUARD_STAGE,
+])
+
+# Permanent -- the cluster would refuse the identical request again in
+# fifteen seconds, in an hour, and after every instance on it had been
+# deleted. cpu_max_per_instance means the request asks for more vCPUs
+# than any single node will ever host; is_hypervisor and pre_schedule
+# mean the candidate set was empty before any resource was measured.
+# These still publish a stage and a 507 -- the refusal is real and the
+# stage is worth reading -- but they publish transient: false and no
+# Retry-After.
+PERMANENT_CAPACITY_STAGES = frozenset([
+    'pre_schedule',
+    'is_hypervisor',
+    'cpu_max_per_instance',
+])
+
+
+def capacity_error(message: str, stage: str) -> flask.Response:
+    """A 507 which says whether it is worth trying again, and when.
+
+    ``sf_api.error()`` (``shakenfist_utilities.api.error``) is a
+    third-party function pinned at ``pyproject.toml:38``
+    (``shakenfist-utilities==0.8.8``): it builds and returns a bare
+    ``flask.Response`` carrying ``{'error': ..., 'status': ...}``.
+    Adding fields there would mean lifting that pin so every one of the
+    305 other ``sf_api.error()`` call sites in this repository gained a
+    field that only ever means something for a capacity refusal. Per
+    D28 of
+    ``docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md``
+    this helper instead mutates the response object it gets back: it
+    replaces the body wholesale with a superset of the same shape
+    (``error``, ``status``) plus ``stage`` and ``transient``, and, for a
+    transient refusal only, sets the ``Retry-After`` header fixed at
+    ``TRANSIENT_RETRY_AFTER_SECONDS`` (D31 -- the server has no
+    pending-release horizon to compute one from).
+
+    The stage is the sole discriminator. A caller hands in where the
+    refusal happened and this helper decides what that means, because
+    the alternative -- a ``transient=`` argument at each call site --
+    puts the classification somewhere it can be got wrong once per
+    caller. A stage in neither set, including the ``'unknown'`` fallback
+    for a refusal that arrived carrying no stage at all, is published as
+    non-transient: refusing to promise retry-worthiness is the safe
+    direction to be wrong in.
+
+    The cost of re-serialising is that the body is now assembled in two
+    places -- here, and inside ``shakenfist_utilities`` -- so an upgrade
+    that renames or restructures ``error``/``status`` would leave this
+    507 the only error response in the API with the old shape. This
+    module's unit test asserts ``sf_api.error()``'s own body by
+    equality for exactly that reason.
+
+    This does not contradict ``PLAN-api-input-validation``'s D4
+    (``PLAN-api-input-validation-phase-00-decisions.md``), which keeps
+    the ``{'error': ..., 'status': ...}`` shape and rejects "a
+    structured field-keyed body" for *validation* failures -- one keyed
+    by request *field name*. D4 says nothing about a status-specific
+    field on a ``507``, and ``stage``/``transient`` are not keyed by
+    request field; like ``status``, they describe the refusal itself,
+    not which request parameter caused it.
+    """
+    transient = stage in TRANSIENT_CAPACITY_STAGES
+
+    resp = sf_api.error(507, message, suppress_traceback=True)
+    if transient:
+        resp.headers['Retry-After'] = str(TRANSIENT_RETRY_AFTER_SECONDS)
+    resp.set_data(json.dumps({
+        'error': message,
+        'status': 507,
+        'stage': stage,
+        'transient': transient,
+    }))
+    return resp
 
 
 # The parameter locations OpenAPI 2.0 defines. swagger_helper()

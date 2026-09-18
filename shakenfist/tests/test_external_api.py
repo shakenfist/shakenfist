@@ -990,6 +990,151 @@ class ExternalApiAffinityRefusalTestCase(
         delete.assert_called_once_with('scheduling failed')
 
 
+class ExternalApiTransientRefusalContractTestCase(
+        ExternalApiAffinityRefusalTestCase):
+    """Which of ``POST /instances``' refusals are transient.
+
+    Phase 4 of PLAN-transient-capacity-refusals (D29) marks only the two
+    *scheduling* 507s -- the filter branch (``LowResourceException`` from
+    ``SCHEDULER.find_candidates()``) and the capacity-guard branch (every
+    candidate refused by ``place_instance()``) -- with a ``Retry-After``
+    header and ``transient: true``. The ``CongestedNetwork`` 507 from
+    address allocation, the affinity 409 and the not-found 404 are left
+    bare: none of them is the "CPU/memory freed up within seconds" fact
+    the 15 s hint encodes.
+
+    The phase's first review round drew a further line *inside* the
+    filter branch: a ``LowResourceException`` from a structural stage
+    such as ``cpu_max_per_instance`` is a real 507 carrying a real
+    stage, but no wait clears it, so it publishes ``transient: false``
+    and no header. ``api_base.TRANSIENT_CAPACITY_STAGES`` is the
+    discriminator and ``test_capacity_error.py`` pins that every
+    scheduler stage is classified; these tests pin that the handler
+    routes each branch through it.
+    """
+
+    def test_filter_branch_507_is_transient(self):
+        # The filter branch: SCHEDULER.find_candidates() raises before
+        # any candidate is walked. The stage rides on the exception
+        # (SchedulerException.stage, added in 4b) rather than being
+        # parsed out of the message; test_scheduler.py already pins
+        # that scheduler.py sets it for 'sufficient_idle_cpu' and that
+        # deleting the stage= argument there breaks that pin. This test
+        # is about the handler faithfully publishing whatever stage it
+        # is handed.
+        with self._raises(exceptions.LowResourceException(
+                'No nodes remaining at scheduling stage sufficient_idle_cpu',
+                stage='sufficient_idle_cpu')):
+            resp = self._post('filter-branch-full')
+
+        self.assertEqual(507, resp.status_code, resp.get_json())
+        self.assertEqual('15', resp.headers.get('Retry-After'))
+        body = resp.get_json()
+        self.assertIs(True, body['transient'])
+        self.assertEqual('sufficient_idle_cpu', body['stage'])
+
+    def test_capacity_guard_507_is_transient(self):
+        # The guard branch: every candidate is refused by the capacity
+        # guard. Denials may span 'cluster', 'claim' and 'node' across
+        # different candidates (D30), so there is no single stage to
+        # report and the handler publishes the constant instead.
+        self._full(self.NODE_A)
+        self._full(self.NODE_B)
+
+        with self._candidates(self.NODE_A, self.NODE_B):
+            resp = self._post('guard-branch-full')
+
+        self.assertEqual(507, resp.status_code, resp.get_json())
+        self.assertEqual('15', resp.headers.get('Retry-After'))
+        body = resp.get_json()
+        self.assertIs(True, body['transient'])
+        self.assertEqual('capacity_guard', body['stage'])
+
+    def test_structural_filter_507_is_not_transient(self):
+        # cpu_max_per_instance means the request asked for more vCPUs
+        # than any node will ever host. It is still a 507 and still
+        # carries its stage, but a client that retried it would replay
+        # an impossible request until its deadline, so it is published
+        # as not worth retrying and without a Retry-After to sleep on.
+        with self._raises(exceptions.LowResourceException(
+                'No nodes remaining at scheduling stage cpu_max_per_instance',
+                stage='cpu_max_per_instance')):
+            resp = self._post('structural-refusal')
+
+        self.assertEqual(507, resp.status_code, resp.get_json())
+        self.assertNotIn('Retry-After', resp.headers)
+        body = resp.get_json()
+        self.assertIs(False, body['transient'])
+        self.assertEqual('cpu_max_per_instance', body['stage'])
+
+    def test_missing_stage_falls_back_to_unknown(self):
+        # A LowResourceException raised somewhere that has not been
+        # taught to carry a stage. D30 says a 507 that fails to be
+        # produced is worse than one with a vague stage, so the handler
+        # substitutes 'unknown' rather than raising -- and 'unknown' is
+        # in neither classification set, so it is not promised as
+        # retryable. The operator guide documents 'unknown' as a value
+        # clients may see; this is the branch that produces it.
+        error = exceptions.LowResourceException('cluster is full')
+        self.assertEqual('', error.stage)
+
+        with self._raises(error):
+            resp = self._post('stageless-refusal')
+
+        self.assertEqual(507, resp.status_code, resp.get_json())
+        self.assertNotIn('Retry-After', resp.headers)
+        body = resp.get_json()
+        self.assertEqual('unknown', body['stage'])
+        self.assertIs(False, body['transient'])
+
+    def test_congested_network_507_is_not_marked_transient(self):
+        # A different fact from scheduling capacity: the network's
+        # address pool is exhausted, which a 15 s Retry-After says
+        # nothing true about (D29). This 507 is left bare -- it carries
+        # no stage at all, so it is not routed through capacity_error()
+        # and has no transient field either way.
+        self.mock_mariadb.create_network(
+            'betsy', netblock='10.1.2.0/24', namespace='two')
+
+        with mock.patch(
+                'shakenfist.ipam.IPAM.reserve_random_free_address',
+                side_effect=exceptions.CongestedNetwork('no addresses left')):
+            resp = self.client.post(
+                '/instances',
+                headers={'Authorization': self.auth_token_two},
+                data=json.dumps({
+                    'name': 'congested',
+                    'cpus': 1,
+                    'memory': 1024,
+                    'network': [{'network_uuid': 'betsy'}],
+                    'disk': [{'size': 8, 'base': 'cirros'}],
+                    'namespace': 'two',
+                }))
+
+        self.assertEqual(507, resp.status_code, resp.get_json())
+        self.assertNotIn('Retry-After', resp.headers)
+        self.assertNotIn('transient', resp.get_json())
+        # Pin the test to the branch it names: without this, any other
+        # bare 507 from the create path would keep it green.
+        self.assertIn('no addresses left', resp.get_json()['error'])
+
+    def test_affinity_409_is_not_marked_transient(self):
+        with self._raises(exceptions.AffinityConstraintUnsatisfiable('nope')):
+            resp = self._post('affinity-not-transient')
+
+        self.assertEqual(409, resp.status_code, resp.get_json())
+        self.assertNotIn('Retry-After', resp.headers)
+        self.assertNotIn('transient', resp.get_json())
+
+    def test_candidate_not_found_404_is_not_marked_transient(self):
+        with self._raises(exceptions.CandidateNodeNotFoundException('gone')):
+            resp = self._post('not-found-not-transient')
+
+        self.assertEqual(404, resp.status_code, resp.get_json())
+        self.assertNotIn('Retry-After', resp.headers)
+        self.assertNotIn('transient', resp.get_json())
+
+
 class ExternalApiExceptionRecordingTestCase(ExternalApiTestCase):
     """Test that exceptions during JSON serialization are recorded."""
 

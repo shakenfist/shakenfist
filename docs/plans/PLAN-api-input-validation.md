@@ -380,6 +380,23 @@ fix. The issue was filed carrying `automated-fix-attempted`, which is
 the first time this plan has applied that label at filing rather than
 watching the fixer apply it afterwards.
 
+**Filed by a sibling plan, and belonging to this one:**
+[#4240](https://github.com/shakenfist/shakenfist/issues/4240),
+raised by `PLAN-transient-capacity-refusals` phase 4 (its D32).
+`swagger_helper()` renders a response declaration as a three-tuple
+of `(httpcode, description, sample)`, which can express neither a
+response header nor a body schema. That phase gave the two
+scheduling `507`s from `POST /instances` a `Retry-After` header,
+and could only publish it as English prose in the description.
+It declined to widen the tuple in passing, because declarations
+are validated at import time -- a malformed one stops sf-api
+starting -- and the arity touches every endpoint in the API, which
+is this plan's territory rather than a side quest inside a phase
+about capacity. Note the issue does not conflict with
+[D4](PLAN-api-input-validation-phase-00-decisions.md#d4--error-response-shape-open-question-4):
+that decision is about validation-failure bodies keyed by request
+field, and says nothing about response headers.
+
 **Closed by phase 6**, all three when
 [#4199](https://github.com/shakenfist/shakenfist/pull/4199) merged
 on 2026-09-15: #3269 (`ec406a78a`, step 4's commit `Enforce the

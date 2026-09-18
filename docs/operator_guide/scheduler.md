@@ -372,6 +372,10 @@ scheduler has always published, now sourced from the guard that
 actually admitted or refused the placement rather than a snapshot of
 it.
 
+For details about the 507 response format, including the `Retry-After` header,
+the `stage` field, and when a client should retry, see
+[Capacity Refusals](capacity_refusals.md).
+
 Ground-truth writers -- the cleaner's placement rewrites and the
 queues daemon's startup reconciliation -- do not enforce the guard,
 because they record where a libvirt domain already *is*: refusing to
