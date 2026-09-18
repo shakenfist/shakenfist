@@ -14014,6 +14014,27 @@ caller sends. The second job is to check that each published <code>enum</code>
 was read off the code that consumes the value and not off the
 documentation that describes it.</p>
 <h2 id="amendments">Amendments<a class="headerlink" href="#amendments" title="Permanent link">&para;</a></h2>
+<p><strong>2026-09-17, issue #4242.</strong> The review of #4232 also found the gap in
+how D43 was implemented, and because the auto-filer did not run for
+that approved PR, it was filed by hand as
+<a href="https://github.com/shakenfist/shakenfist/issues/4242">#4242</a>. D43's
+reasoning stands -- neither <code>model</code> carries an enum, and the working
+vocabulary is still the hypervisor's -- but "no enum" had been built
+as "no constraint at all", and both values are interpolated into
+quoted attributes of the domain XML, rendered with escaping off. An
+authenticated user could therefore close the attribute and write
+device elements into their instance's domain definition. The fix is
+the shape this phase's own guards taught: a published character-class
+<code>pattern</code> (<code>api_base.DEVICE_MODEL_PATTERN</code>, wide enough for every
+qemu model name) which enforces at <code>enforce</code>, and render-time
+escaping (<code>instance._xml_attribute_escape()</code>, applied in
+<code>_create_domain_xml()</code> and <code>hot_plug_interface()</code>) which holds at
+<code>warn</code> and <code>off</code>, where a schema pattern rolls back. Three
+<code>*.model.injection</code> sweep rows pin the mode split, and
+<code>test_instance.InstanceDomainXMLEscapingTestCase</code> pins the escaping
+with payloads that are well-formed injections without it. D43's table
+below is unchanged: the pattern is not an enum and publishes no
+vocabulary.</p>
 <p><strong>2026-09-17, after the pull request review.</strong> The automated review of
 <a href="https://github.com/shakenfist/shakenfist/pull/4232">#4232</a> raised one
 <code>fix</code>, two <code>document</code> items and three <code>consider</code> items. All six were

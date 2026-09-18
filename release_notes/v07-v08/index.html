@@ -14968,10 +14968,14 @@
   tidied up in
   <a href="https://github.com/shakenfist/client-python/issues/398">client-python#398</a>,
   which is not required for this release), a <code>network[].float</code> of
-  <code>"yes"</code>, and any string at all as a <code>network[].model</code> or a
-  <code>video.model</code>. The two <code>model</code> values go into the libvirt domain XML
-  unexamined, so their real vocabulary is the hypervisor's qemu build
-  and this API does not pretend to know it.
+  <code>"yes"</code>, and any plausible string as a <code>network[].model</code> or a
+  <code>video.model</code>. The two <code>model</code> values go into the libvirt domain XML,
+  so their real vocabulary is the hypervisor's qemu build and this API
+  does not pretend to know it; what each is checked against is the
+  published pattern <code>^[A-Za-z0-9._-]{1,32}$</code>, which every model name
+  fits and which refuses a value that could have carried XML into the
+  domain definition (the values are also escaped at render time, in
+  every validation mode).
   <code>API_VALIDATION_MODE=warn</code> rolls all of the above back to logging
   without refusing, as it does for the rest of the validation layer.
   Three new <strong>handler</strong> guards are deliberately not rolled back,

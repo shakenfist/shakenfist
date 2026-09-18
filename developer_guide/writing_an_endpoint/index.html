@@ -14007,9 +14007,14 @@ integer.</code> rather than <code>disk</code>.</p>
    code it was read off. An <code>enum</code> goes in only where the server
    already refuses everything outside it: a networkspec's <code>model</code>
    deliberately carries none, because the value is rendered into the
-   libvirt domain XML unexamined and the vocabulary is therefore the
+   libvirt domain XML and the vocabulary is therefore the
    hypervisor's qemu build rather than this API's, and publishing a
-   list would make the specification narrower than the server.</li>
+   list would make the specification narrower than the server. It
+   carries a character-class <code>pattern</code> instead, which every model
+   name fits -- rendered-into-the-XML is a reason not to publish an
+   enum, but it is also the reason the value cannot go wholly
+   unconstrained (issue #4242), and the render site escapes as well
+   because a schema pattern rolls back with <code>API_VALIDATION_MODE</code>.</li>
 <li><strong>Tokens in <code>ARGTYPES</code> built from that constant</strong>, one per form the
    tree declares — <code>'networkspec': NETWORKSPEC_SCHEMA</code> and
    <code>'arrayofnetworkspec': {'type': 'array', 'items': NETWORKSPEC_SCHEMA}</code>.
