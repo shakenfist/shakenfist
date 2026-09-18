@@ -478,13 +478,25 @@ CASES = [
          {'network': [{'network_uuid': NETWORK, 'model': 'nonsense'}]},
          ACCEPTED, ACCEPTED,
          'width, D43 and the key that decision exists for: the value is '
-         'rendered raw into libvirt.tmpl:139, so the vocabulary is the '
+         'rendered into libvirt.tmpl:139, so the vocabulary is the '
          "hypervisor's qemu build. Our own two documentation pages disagree "
          'about it, which is proof neither is a specification'),
     Case('net.model.virtio', CREATE, 'networkspec', 'model',
          {'network': [{'network_uuid': NETWORK, 'model': 'virtio'}]},
          ACCEPTED, ACCEPTED,
          'width: what the CLI and the ansible collection send'),
+    Case('net.model.injection', CREATE, 'networkspec', 'model',
+         {'network': [{'network_uuid': NETWORK, 'model': "virtio'/><x"}]},
+         refused('network[0].model: String does not match expected '
+                 'pattern.'),
+         ACCEPTED,
+         'issue #4242: a model which could close the attribute it is '
+         'quoted into at libvirt.tmpl:139 is refused by '
+         'DEVICE_MODEL_PATTERN. Accepted at warn deliberately, because a '
+         'schema pattern rolls back with the mode; what holds there is '
+         'the render-time escaping in instance._xml_attribute_escape(), '
+         'which this table cannot see and '
+         'test_instance.InstanceDomainXMLEscapingTestCase pins'),
     Case('net.macaddress.malformed', CREATE, 'networkspec', 'macaddress',
          {'network': [{'network_uuid': NETWORK, 'macaddress': 'banana'}]},
          refused('network[0].macaddress: String does not match expected '
@@ -622,6 +634,15 @@ CASES = [
          {'network': {'network_uuid': NETWORK, 'model': 'nonsense'}},
          ACCEPTED, ACCEPTED,
          'width, D43: no enum, and the interface is really created'),
+    Case('hotplug.model.injection', HOTPLUG, 'networkspec', 'model',
+         {'network': {'network_uuid': NETWORK, 'model': "virtio'/><x"}},
+         refused('network.model: String does not match expected pattern.'),
+         ACCEPTED,
+         'issue #4242 on the hotplug route, where the same value reaches '
+         'hot_plug_interface() and its double-quoted attribute -- which '
+         'is why _xml_attribute_escape() escapes both quote styles. At '
+         'warn the interface is really created, so the escaping is the '
+         'only thing between this value and the domain'),
     Case('hotplug.macaddress.malformed', HOTPLUG, 'networkspec', 'macaddress',
          {'network': {'network_uuid': NETWORK, 'macaddress': 'banana'}},
          refused('network.macaddress: String does not match expected '
@@ -724,8 +745,15 @@ CASES = [
     Case('video.model.nonsense', CREATE, 'videospec', 'model',
          {'video': {'model': 'nonsense', 'memory': 16384}},
          ACCEPTED, ACCEPTED,
-         'width, D43: rendered raw at libvirt.tmpl:206, so the vocabulary is '
+         'width, D43: rendered at libvirt.tmpl:206, so the vocabulary is '
          "the hypervisor's"),
+    Case('video.model.injection', CREATE, 'videospec', 'model',
+         {'video': {'model': "cirrus'/><x", 'memory': 16384}},
+         refused('video.model: String does not match expected pattern.'),
+         ACCEPTED,
+         'issue #4242: the same pattern as the netdesc model, for the '
+         'same attribute-closing value, this time at libvirt.tmpl:206. '
+         'Accepted at warn, where the render-time escaping is the guard'),
     Case('video.model.null', CREATE, 'videospec', 'model',
          {'video': {'model': None, 'memory': 16384}},
          refused('video specification requires "model"'),

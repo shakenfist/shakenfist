@@ -112,18 +112,22 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
         # A videospec. Nothing is required, because the handler
         # defaults the whole spec when it is absent
         # (external_api/instance.py:833). model carries no enum because
-        # instance.py:2153 renders it raw into the domain XML, so the
-        # set which works is the hypervisor's rather than this API's;
-        # vdi does carry one because Shaken Fist itself branches on the
-        # value in three places (instance.py:1715, instance.py:2161 and
-        # libvirt.tmpl:156) and nothing else refuses a value outside
-        # it. memory is typed integer and deliberately unbounded: no
-        # handler refuses a zero or a negative one.
+        # instance.py:2153 renders it into the domain XML, so the set
+        # which works is the hypervisor's rather than this API's; it
+        # does carry the character-class pattern which keeps the value
+        # inert in that XML (issue #4242), backed at every validation
+        # mode by the escaping in instance._xml_attribute_escape().
+        # vdi does carry an enum because Shaken Fist itself branches on
+        # the value in three places (instance.py:1715, instance.py:2161
+        # and libvirt.tmpl:156) and nothing else refuses a value
+        # outside it. memory is typed integer and deliberately
+        # unbounded: no handler refuses a zero or a negative one.
         ('/instances', 'post', 'video',
          {'type': 'object',
           'additionalProperties': False,
           'properties': {
-              'model': {'type': 'string'},
+              'model': {'type': 'string',
+                        'pattern': api_base.DEVICE_MODEL_PATTERN},
               'memory': {'type': 'integer', 'format': 'int64'},
               'vdi': {'type': 'string',
                       'enum': ['vnc', 'spice', 'spiceconcurrent',
@@ -165,7 +169,8 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
         # valid_macaddr() enforces at instance.py:347. address carries
         # no ipv4 format because the literal string 'none' is a
         # documented value meaning "no address on this interface".
-        # model carries no enum for the reason video's model does not.
+        # model carries no enum for the reason video's model does not,
+        # and the same inert-in-the-XML pattern (issue #4242).
         ('/instances', 'post', 'network',
          {'type': 'array',
           'items': {
@@ -178,7 +183,8 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                                  'format': 'a MAC address',
                                  'pattern': util_network.MACADDR_PATTERN},
                   'address': {'type': 'string'},
-                  'model': {'type': 'string'},
+                  'model': {'type': 'string',
+                            'pattern': api_base.DEVICE_MODEL_PATTERN},
                   'float': {'type': 'boolean'},
               }}}),
         # Side channel names, so an array of strings.
@@ -207,7 +213,8 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
                              'format': 'a MAC address',
                              'pattern': util_network.MACADDR_PATTERN},
               'address': {'type': 'string'},
-              'model': {'type': 'string'},
+              'model': {'type': 'string',
+                        'pattern': api_base.DEVICE_MODEL_PATTERN},
               'float': {'type': 'boolean'},
           }}),
         ('/instances/{instance_ref}/events', 'get', 'limit',
