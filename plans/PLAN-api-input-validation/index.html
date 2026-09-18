@@ -13475,6 +13475,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operator_guide/capacity_refusals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Refusals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operator_guide/database/" class="md-nav__link">
         
   
@@ -14526,6 +14554,22 @@ function wrong for the next caller, and that is a mask rather than a
 fix. The issue was filed carrying <code>automated-fix-attempted</code>, which is
 the first time this plan has applied that label at filing rather than
 watching the fixer apply it afterwards.</p>
+<p><strong>Filed by a sibling plan, and belonging to this one:</strong>
+<a href="https://github.com/shakenfist/shakenfist/issues/4240">#4240</a>,
+raised by <code>PLAN-transient-capacity-refusals</code> phase 4 (its D32).
+<code>swagger_helper()</code> renders a response declaration as a three-tuple
+of <code>(httpcode, description, sample)</code>, which can express neither a
+response header nor a body schema. That phase gave the two
+scheduling <code>507</code>s from <code>POST /instances</code> a <code>Retry-After</code> header,
+and could only publish it as English prose in the description.
+It declined to widen the tuple in passing, because declarations
+are validated at import time -- a malformed one stops sf-api
+starting -- and the arity touches every endpoint in the API, which
+is this plan's territory rather than a side quest inside a phase
+about capacity. Note the issue does not conflict with
+<a href="../PLAN-api-input-validation-phase-00-decisions/#d4--error-response-shape-open-question-4">D4</a>:
+that decision is about validation-failure bodies keyed by request
+field, and says nothing about response headers.</p>
 <p><strong>Closed by phase 6</strong>, all three when
 <a href="https://github.com/shakenfist/shakenfist/pull/4199">#4199</a> merged
 on 2026-09-15: #3269 (<code>ec406a78a</code>, step 4's commit <code>Enforce the

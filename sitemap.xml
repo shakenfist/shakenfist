@@ -2845,6 +2845,10 @@
          <lastmod>2026-09-18</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/operator_guide/capacity_refusals/</loc>
+         <lastmod>2026-09-18</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/operator_guide/credential_rotation/</loc>
          <lastmod>2026-09-18</lastmod>
     </url>
@@ -3546,6 +3550,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/plans/PLAN-transient-capacity-refusals-phase-03-metrics-on-change/</loc>
+         <lastmod>2026-09-18</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/plans/PLAN-transient-capacity-refusals-phase-04-retry-after/</loc>
          <lastmod>2026-09-18</lastmod>
     </url>
     <url>

@@ -13475,6 +13475,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../operator_guide/capacity_refusals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Refusals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../operator_guide/database/" class="md-nav__link">
         
   
@@ -14545,9 +14573,9 @@ many, the phase designs the queue -- FIFO by request time, pinned
 placements admitted against their node only -- and reverses D8 in
 writing.</p>
 <h3 id="9-what-should-the-api-say">9. What should the API say?<a class="headerlink" href="#9-what-should-the-api-say" title="Permanent link">&para;</a></h3>
-<p><strong>That it is transient, and when to try again.</strong> Both <code>507</code>
-bodies from <code>POST /instances</code> (<code>external_api/instance.py:906</code> for
-the pre-filter, <code>:976-981</code> for the guard) are bare strings. Phase 4
+<p><strong>That it is transient, and when to try again.</strong> Both scheduling
+<code>507</code> bodies from <code>POST /instances</code> (<code>external_api/instance.py:944</code>
+for the pre-filter, <code>:1017</code> for the guard) are bare strings. Phase 4
 adds a <code>Retry-After</code> header and a machine-readable <code>stage</code> and
 <code>transient: true</code> to the error body, so a client does not have to
 parse prose to know which refusal it got. The honest hint is a
@@ -14625,8 +14653,8 @@ every phase has been completed, abandoned or superseded.</p>
 </tr>
 <tr>
 <td>4. <code>Retry-After</code> and a machine-readable transient refusal, with an opt-in client retry</td>
-<td>PLAN-transient-capacity-refusals-phase-04-retry-after.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-transient-capacity-refusals-phase-04-retry-after/">PLAN-transient-capacity-refusals-phase-04-retry-after.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -14849,20 +14877,46 @@ applied only to the pairs the publish path actually reaches. And a
 vCPU total is not a second trigger worth watching: with no CPU
 hotplug it can only move when the domain set does.</p>
 <h3 id="phase-4-retry-after-and-a-machine-readable-transient-refusal">Phase 4 -- <code>Retry-After</code> and a machine-readable transient refusal<a class="headerlink" href="#phase-4-retry-after-and-a-machine-readable-transient-refusal" title="Permanent link">&para;</a></h3>
-<p>Server: on both <code>507</code> branches of <code>POST /instances</code>
-(<code>external_api/instance.py:906</code>, <code>:976-981</code>), set <code>Retry-After: 15</code>
-and extend the error body with <code>stage</code> (<code>sufficient_idle_cpu</code>, or
-<code>capacity_guard</code>) and <code>transient: true</code>. <code>sf_api.error()</code> returns
-a bare <code>flask.Response</code>, so the header is set on the returned
-object. The <code>409</code> affinity branch is untouched. Update the OpenAPI
-declaration and the API-validation plan's error contract if it
-describes the body shape.</p>
+<p>Server: on the two <em>scheduling</em> <code>507</code> branches of
+<code>POST /instances</code> (<code>external_api/instance.py:944</code>, the filter
+pre-check, and <code>:1017</code>, every candidate refused by the capacity
+guard), set <code>Retry-After: 15</code> and extend the error body with
+<code>stage</code> and <code>transient: true</code>. <code>POST /instances</code> has four <code>507</code>
+branches, not two: the other two are the <code>CongestedNetwork</code>
+clauses at <code>:428</code> and <code>:451</code>, and phase 4's D29 leaves those bare
+because an exhausted address pool has a different and much longer
+horizon. Phase 4's review round refined this further: the filter
+branch is not one fact either. A structural stage such as
+<code>cpu_max_per_instance</code> gets a <code>507</code> carrying its <code>stage</code> but
+<code>transient: false</code> and no header, because no wait clears it. See
+phase 4's D35. <code>sf_api.error()</code> returns a bare <code>flask.Response</code>, so the
+header is set on the returned object -- but note it is
+<code>shakenfist_utilities.api.error()</code>, a third-party function pinned
+in <code>pyproject.toml</code>, so the <em>body</em> is built in another repository
+and phase 4 rewrites the returned response rather than changing
+that package. The stage is carried on the exception from
+<code>scheduler.py</code>'s raise site rather than parsed out of the message.
+The <code>409</code> affinity branch is untouched. Update the OpenAPI
+declaration, within what its three-tuple response format can
+express -- it cannot declare a response header, which phase 4's
+D32 records as a filed gap rather than fixing here.</p>
+<p>The contract this changes already has an owner:
+<code>BaseTestCase.assertRefusedAtStage()</code>
+(<code>shakenfist/deploy/shakenfist_ci/base.py:1464</code>), landed by the
+sizing plan's phase 3a and used by four assertions in
+<code>cluster_ci_tests/test_saturation.py</code>. Its docstring names this
+phase as the single place to change when the contract moves.</p>
 <p>Client (<code>client-python</code>): carry response headers on
 <code>APIException</code>, and add an opt-in retry policy for <code>507</code> bodies
 carrying <code>transient: true</code>, bounded by the existing async-strategy
 deadline and reusing the shape of the 406 loop in <code>_request_url</code>.
-Off by default; the suite turns it on, and its phase 2 wrapper then
-becomes the <em>informed</em> layer over the client's blind one.</p>
+Off by default, and <strong>the CI suite leaves it off</strong>: the suite's
+clients use <code>ASYNC_PAUSE</code>, so a blind retry would spend up to 60 s
+inside each call the phase 2 wrapper makes, invisible to the wait
+records phase 5 reads as its denominator, and the saturation tests
+must never retry the refusal they are asserting. See phase 4's D33
+for the full reasoning; an earlier draft of this section said the
+suite turns it on, and that was wrong.</p>
 <p>Plan at medium effort; each half is small, and the coordination is
 a version pin between the two repositories.</p>
 <h3 id="phase-5-decide-on-server-side-queued-placement">Phase 5 -- Decide on server-side queued placement<a class="headerlink" href="#phase-5-decide-on-server-side-queued-placement" title="Permanent link">&para;</a></h3>
@@ -15151,9 +15205,10 @@ because the following statements will be true:</p>
 <li>No functional test fails with <code>507 sufficient_idle_cpu</code> at
   <code>create_instance</code>; a test that waits for capacity records how
   long, and the run's summary reports it.</li>
-<li><code>POST /instances</code> refusals for capacity carry <code>Retry-After</code>,
-  <code>stage</code> and <code>transient: true</code>, and <code>shakenfist_client</code> can be
-  told to honour them.</li>
+<li><code>POST /instances</code> refusals for capacity carry <code>stage</code> and a
+  <code>transient</code> boolean, with <code>Retry-After</code> on the refusals a retry
+  can actually clear, and <code>shakenfist_client</code> can be told to
+  honour them.</li>
 <li>The decision on server-side queued placement is written down in
   the phase 5 file with the data it was made from, whichever way
   it went.</li>
