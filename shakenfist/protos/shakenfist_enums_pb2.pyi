@@ -194,6 +194,8 @@ class _ReservationTypeEnumTypeWrapper(_enum_type_wrapper._EnumTypeWrapper[_Reser
     """"deletion-halo" """
     RESERVATION_TYPE_UNKNOWN: _ReservationType.ValueType  # 8
     """"unknown" """
+    RESERVATION_TYPE_MANUAL: _ReservationType.ValueType  # 9
+    """"manual" """
 
 class ReservationType(_ReservationType, metaclass=_ReservationTypeEnumTypeWrapper):
     """ReservationType enum - IPAM reservation types
@@ -217,6 +219,8 @@ RESERVATION_TYPE_DELETION_HALO: ReservationType.ValueType  # 7
 """"deletion-halo" """
 RESERVATION_TYPE_UNKNOWN: ReservationType.ValueType  # 8
 """"unknown" """
+RESERVATION_TYPE_MANUAL: ReservationType.ValueType  # 9
+""""manual" """
 Global___ReservationType: _TypeAlias = ReservationType  # noqa: Y015
 
 class _RelationshipType:

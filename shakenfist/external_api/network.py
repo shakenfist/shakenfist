@@ -26,6 +26,7 @@ from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import util as api_util
+from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
 from shakenfist.schema.operations.net_op \
@@ -698,6 +699,152 @@ class NetworkAddressesEndpoint(api_base.Resource):
             if reservation:
                 out.append(reservation.model_dump(mode='json'))
         return out
+
+
+# The longest comment a manual reservation may carry. See the bound's
+# enforcement in NetworkAddressEndpoint.post for why it is not on the
+# IPAMReservation model.
+MAX_RESERVATION_COMMENT = 255
+
+
+class NetworkAddressEndpoint(api_base.Resource):
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Reserve a specific address in a network.',
+        [
+            ('network_ref', 'path', 'uuidorname',
+             'The network to reserve the address in.', True),
+            ('address', 'path', 'string', 'The IPv4 address to reserve.', True),
+            ('comment', 'body', 'string',
+             'A note describing what the address is reserved for. At most '
+             '%d characters.' % MAX_RESERVATION_COMMENT, False),
+            ('namespace', 'body', 'namespace',
+             api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False)
+        ],
+        [(200, 'The reservation which was created.', None),
+         (400, 'The IPv4 address is not in the network\'s netblock or is '
+          'invalid, or the comment is too long.',
+          None),
+         (409, 'That address is already in use.', None),
+         (404, 'Network not found.', None)]))
+    @api_base.arg_is_network_ref
+    @api_base.requires_network_ownership
+    @api_base.requires_network_not_dead
+    @api_base.log_token_use
+    def post(self, network_ref=None, address=None, network_from_db=None,
+             comment=None):
+        try:
+            ipaddress.ip_address(address)
+        except ValueError:
+            return sf_api.error(400, 'invalid address')
+
+        if not network_from_db.ipam.is_in_range(address):
+            return sf_api.error(
+                400, 'reservation request for address outside network block')
+
+        # The comment is stored in a TEXT column and copied into two
+        # events, so an unbounded one is an unbounded write to the event
+        # log as well as to the reservation row -- once per address in
+        # the caller's netblock. Bounded here rather than on
+        # IPAMReservation, because that model is also how reservations
+        # already in the database are read back and a bound there would
+        # turn an old long comment into a read failure. 255 characters
+        # matches the namespace metadata key bound in auth.py.
+        if comment and len(comment) > MAX_RESERVATION_COMMENT:
+            return sf_api.error(
+                400, 'comment is longer than %d characters'
+                % MAX_RESERVATION_COMMENT)
+
+        # Emitted before the reservation is attempted, the way the route
+        # and unroute handlers do it, so a refused attempt to take over an
+        # address which is already in use still leaves a trace on the
+        # network's event log. That is one of the more interesting things
+        # to find in an audit trail, and an event emitted only on success
+        # cannot record it.
+        network_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'address reservation request from REST API',
+            extra={'address': address, 'comment': comment})
+
+        # A manual reservation is owned by the network, not by anything the
+        # cluster runs. Nothing releases it implicitly, which is the point:
+        # the address is being held for something Shaken Fist does not
+        # manage, such as a keepalived VIP inside a guest.
+        #
+        # evict_halo is set because the caller named this address rather
+        # than asking for any free one, which is the case the deletion halo
+        # exists to be overridden for.
+        if not network_from_db.ipam.reserve(
+                address, network_from_db.unique_label(),
+                ReservationType.MANUAL, comment or '', evict_halo=True):
+            return sf_api.error(409, 'address is already in use')
+
+        # The reservation is read back rather than built here so the
+        # response is what the database actually holds. A concurrent
+        # release between the two calls leaves nothing to return, which is
+        # a 409 rather than an AttributeError dressed up as a 500.
+        reservation = network_from_db.ipam.get_reservation(address)
+        if not reservation:
+            return sf_api.error(409, 'address is already in use')
+        return reservation.model_dump(mode='json')
+
+    @swag_from(api_base.swagger_helper(
+        'networks', 'Release a manually reserved address in a network.',
+        [
+            ('network_ref', 'path', 'uuidorname',
+             'The network to release the address in.', True),
+            ('address', 'path', 'string', 'The IPv4 address to release.', True),
+            ('namespace', 'body', 'namespace',
+             api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False)
+        ],
+        [(200, 'The address was released.', None),
+         (400, 'The IPv4 address is not in the network\'s netblock or is invalid.',
+          None),
+         (403, 'That address is not a manual reservation.', None),
+         (404, 'Network or reservation not found.', None)]))
+    @api_base.arg_is_network_ref
+    @api_base.requires_network_ownership
+    @api_base.requires_network_not_dead
+    @api_base.log_token_use
+    def delete(self, network_ref=None, address=None, network_from_db=None):
+        try:
+            ipaddress.ip_address(address)
+        except ValueError:
+            return sf_api.error(400, 'invalid address')
+
+        if not network_from_db.ipam.is_in_range(address):
+            return sf_api.error(
+                400, 'release request for address outside network block')
+
+        # Emitted before anything is looked up or changed, the way the
+        # route and unroute handlers do it, so a release refused with a 403
+        # (a gateway or an instance's address) or a 404 is recorded too. An
+        # event emitted only on success cannot show an attempt to release
+        # an address which is still in use, which is the attempt most worth
+        # seeing in an audit trail.
+        network_from_db.add_event(
+            EVENT_TYPE_AUDIT, 'address release request from REST API',
+            extra={'address': address})
+
+        reservation = network_from_db.ipam.get_reservation(address)
+        if not reservation:
+            return sf_api.error(404, 'address is not reserved')
+
+        # Only manual reservations are the caller's to release. Releasing a
+        # gateway or an instance's address here would hand it out again
+        # while the thing using it was still using it.
+        #
+        # This check is not atomic with the release below: release_address()
+        # takes no expected-type guard, so its UPDATE is unconditional. Two
+        # concurrent DELETEs of the same address can therefore defeat it --
+        # the first releases to the deletion halo, an instance create naming
+        # that address evicts the halo and takes it, and the second DELETE
+        # completes its release against an address an instance now holds.
+        # Closing that needs an expected_type on the RPC; until then, do not
+        # read this check as a guarantee. Tracked as issue #4261.
+        if reservation.reservation_type != ReservationType.MANUAL:
+            return sf_api.error(403, 'address is not a manual reservation')
+
+        if not network_from_db.ipam.release(address):
+            return sf_api.error(404, 'address is not reserved')
 
 
 class NetworkRouteAddressEndpoint(api_base.Resource):

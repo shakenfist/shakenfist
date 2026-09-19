@@ -468,6 +468,54 @@ missing either is re-routed, which installs both, so a network which is
 otherwise healthy is not dragged through a rebuild to recover one route.
 Removing a routed IP deletes both routes, and tolerates either being absent.
 
+## Reserved addresses
+
+Shaken Fist hands out addresses from a network's block at random, and it only
+knows about the addresses it allocated itself. An address a guest configures
+without asking -- a keepalived or VRRP virtual IP shared between instances, a
+load balancer address written into a deployment's configuration file -- is
+free as far as IPAM is concerned, so sooner or later it will be allocated to
+an interface and two things will answer for it.
+
+Reserve it instead:
+
+```bash
+debian@test:~$ sf-client network reserve-address demo 172.16.0.3 \
+                   --comment "kolla VIP"
+debian@test:~$ sf-client network addresses demo
+address      type     user                                          comment
+172.16.0.0   network  network 17be6538-8f96-4ccb-b71e-a7e3022fead3
+172.16.0.1   gateway  network 17be6538-8f96-4ccb-b71e-a7e3022fead3
+172.16.0.3   manual   network 17be6538-8f96-4ccb-b71e-a7e3022fead3  kolla VIP
+172.16.0.255 broadcast network 17be6538-8f96-4ccb-b71e-a7e3022fead3
+```
+
+A manual reservation takes the address out of the pool and does nothing else:
+no interface is created, dnsmasq is not told about it, and no traffic is
+routed. Shaken Fist is recording that something it does not manage owns the
+address, so that nothing else is given it. It is therefore also the one
+reservation type nothing releases implicitly -- an instance's address returns
+to the pool when the instance goes away, but a manual reservation is held
+until it is released:
+
+```bash
+debian@test:~$ sf-client network release-address demo 172.16.0.3
+```
+
+Released addresses go to the deletion halo like any other, so the address is
+not immediately re-allocatable. A reservation for an address which is already
+in use is refused rather than taking it over, and only a manual reservation
+can be released this way -- asking to release a gateway or an instance's
+address is refused, because handing that address out again while it is still
+in use is exactly the collision this exists to prevent.
+
+An administrator can reserve in the floating network too, which is how you
+hold a floating address for a device Shaken Fist does not manage -- a hardware
+load balancer, or a router's virtual IP. The floating IP reaper releases
+floating addresses whose owner has gone away, and a manual reservation has no
+owner in the cluster by definition, so it is protected there explicitly:
+nothing but an explicit release will free it.
+
 ## Interface naming conventions
 
 The interface names in the examples above are a contract, not a

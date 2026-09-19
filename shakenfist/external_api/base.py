@@ -1764,6 +1764,46 @@ def requires_network_active(func):
     return wrapper
 
 
+def requires_network_not_dead(func):
+    """Refuse the request if the network is deleted, deleting or in error.
+
+    This is the weaker sibling of ``requires_network_active``, for
+    endpoints which only touch a network's IPAM and need nothing plumbed
+    on the network node. Two kinds of network are live but not
+    ``created``: an ordinary network between ``Network.new()`` and the
+    net worker applying the create, and the floating network, which is
+    never ``created`` at all -- ``_apply_create_on_network_node()``
+    early-returns for it before the transition, so it sits in ``initial``
+    for the life of the cluster. ``requires_network_active`` refuses both
+    with a 406, which for an IPAM-only operation is a gate on something
+    the operation does not need.
+
+    Dead is still refused, and not only because writing to a network on
+    its way out is pointless: ``Network.__init__`` builds a *deleted*
+    network's IPAM with ``in_memory_only=True``, so a write against one
+    is accepted, kept in process memory, and lost -- the silent failure
+    CLAUDE.md's in-memory-only pitfall describes.
+
+    Requires that @arg_is_network_ref has already run.
+    """
+    def wrapper(*args, **kwargs):
+        log = LOG.with_fields({'network': kwargs['network_ref']})
+
+        if not kwargs.get('network_from_db'):
+            log.info('Network not found, kwarg missing')
+            return sf_api.error(404, 'network not found')
+
+        if kwargs['network_from_db'].is_dead():
+            state = kwargs['network_from_db'].state
+            log.info('Network is dead (%s)' % state.value)
+            return sf_api.error(406,
+                                'network %s is not ready (%s)'
+                                % (kwargs['network_from_db'].uuid, state.value))
+
+        return func(*args, **kwargs)
+    return wrapper
+
+
 def requires_namespace_exist_if_specified(func):
     # Apply this above any ref-resolving decorator (`arg_is_instance_ref`,
     # `arg_is_network_ref`, and friends), never below one. Those decorators

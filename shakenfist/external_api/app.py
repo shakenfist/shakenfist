@@ -413,7 +413,13 @@ API_CAPABILITIES = {
     'networks': [
         'list-addresses', 'route-addresses', 'get-network-namespace',
         'provide-dns', 'extra-dns-entries', 'network-clusteroperations',
-        'network-delete-async'],
+        'network-delete-async',
+        # reserve-addresses advertises that a caller can hold a
+        # specific address in a network against something the cluster
+        # does not manage. Without the token a client cannot tell a
+        # cluster which refuses the reservation from one which never
+        # offered it, and would hand the address out from the pool.
+        'reserve-addresses'],
     'networkinterfaces': ['interface-metadata'],
     'nodes': ['node-get', 'node-metadata', 'node-process-metrics'],
 }
@@ -629,6 +635,8 @@ api.add_resource(api_network.NetworksEndpoint, '/networks')
 api.add_resource(api_network.NetworkEndpoint, '/networks/<network_ref>')
 api.add_resource(api_network.NetworkAddressesEndpoint,
                  '/networks/<network_ref>/addresses')
+api.add_resource(api_network.NetworkAddressEndpoint,
+                 '/networks/<network_ref>/addresses/<address>')
 api.add_resource(api_network.NetworkEventsEndpoint,
                  '/networks/<network_ref>/events')
 api.add_resource(api_network.NetworkInterfacesEndpoint,

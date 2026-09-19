@@ -65,7 +65,7 @@ EXPECTED_CAPABILITIES = {
     'networks': [
         'list-addresses', 'route-addresses', 'get-network-namespace',
         'provide-dns', 'extra-dns-entries', 'network-clusteroperations',
-        'network-delete-async'],
+        'network-delete-async', 'reserve-addresses'],
     'networkinterfaces': ['interface-metadata'],
     'nodes': ['node-get', 'node-metadata', 'node-process-metrics'],
 }

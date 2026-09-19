@@ -10,9 +10,10 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import config
 from shakenfist.config import SFConfig
 from shakenfist.constants import FLOATING_NETWORK_UUID
-from shakenfist.external_api import network as api_network
 from shakenfist.exceptions import NetworkOperationFailed
 from shakenfist.external_api import app as external_api
+from shakenfist.external_api import network as api_network
+from shakenfist.network import network as net
 from shakenfist.schema.ipam_reservation import IPAMReservation
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.object_types import ObjectType
@@ -884,3 +885,331 @@ class NetworkUnrouteAddressEndpointTestCase(base.ShakenFistTestCase):
         self.assertEqual(403, resp.status_code)
         mock_enqueue.assert_not_called()
         fake_fn.ipam.release.assert_not_called()
+
+
+class NetworkAddressEndpointTestCase(base.ShakenFistTestCase):
+    """Manual address reservations.
+
+    A caller can hold an address in a network against something Shaken
+    Fist does not manage -- a keepalived VIP inside a guest, say -- so
+    that IPAM never hands it to an interface. Without this the address
+    is free, and `reserve_random_free_address` will eventually pick it
+    (kerbside-patches CI run 35202102331, where the VIP landed on a test
+    instance's second interface and kolla-ansible's prechecks refused to
+    deploy).
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        external_api.TESTING = True
+        external_api.app.testing = True
+        external_api.app.debug = False
+
+        external_api.app.logger.addHandler(logging.StreamHandler(sys.stdout))
+        external_api.app.logger.setLevel(logging.DEBUG)
+        logging.root.setLevel(logging.DEBUG)
+
+        fake_config = SFConfig(
+            NODE_NAME='seriously',
+            NODE_EGRESS_IP='127.0.0.1',
+            NETWORK_NODE_IP='127.0.0.1',
+            NODE_EGRESS_NIC='eth0',
+            NODE_MESH_NIC='eth1',
+            NODE_IS_NETWORK_NODE=True,
+        )
+        self.config = mock.patch(
+            'shakenfist.external_api.base.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.client = external_api.app.test_client()
+
+        self.mock_mariadb.create_namespace('system', 'key1', 'bar')
+        self.mock_mariadb.create_namespace('foo', 'key1', 'bar')
+
+        self.network_id = str(uuid4())
+        self.mock_mariadb.create_network(
+            'reservenet',
+            uuid=self.network_id,
+            namespace='foo',
+            netblock='10.9.8.0/24',
+            set_state=dbo.STATE_CREATED)
+
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
+        self.assertEqual(200, resp.status_code)
+        self.auth_token = 'Bearer %s' % resp.get_json()['access_token']
+
+    def _reserve(self, address, comment=None):
+        body = {}
+        if comment:
+            body['comment'] = comment
+        return self.client.post(
+            '/networks/%s/addresses/%s' % (self.network_id, address),
+            headers={'Authorization': self.auth_token},
+            data=json.dumps(body))
+
+    def _release(self, address):
+        return self.client.delete(
+            '/networks/%s/addresses/%s' % (self.network_id, address),
+            headers={'Authorization': self.auth_token})
+
+    def test_reserve_a_free_address(self):
+        resp = self._reserve('10.9.8.3', comment='kolla VIP')
+        self.assertEqual(200, resp.status_code)
+
+        reservation = resp.get_json()
+        self.assertEqual('10.9.8.3', reservation['address'])
+        self.assertEqual(ReservationType.MANUAL.value,
+                         reservation['reservation_type'])
+        self.assertEqual('kolla VIP', reservation['comment'])
+        self.assertEqual(ObjectType.NETWORK.value, reservation['user_type'])
+        self.assertEqual(self.network_id, reservation['user_uuid'])
+
+    def test_a_reserved_address_is_not_allocated(self):
+        """The whole point: IPAM must not hand the address out again.
+
+        Fifty allocations, not the 252 this /24 has free. Draining the
+        block to its last two addresses would make any future change
+        which reserves one more address at IPAM creation surface here as
+        a CongestedNetwork exception rather than as a clean failure, and
+        the tail of a near-full block is quadratic anyway:
+        reserve_random_free_address burns its five random attempts and
+        then linear scans from index 1 on every call. Fifty is well past
+        the point where a random allocator would have returned the
+        reserved address by chance.
+        """
+        self.assertEqual(200, self._reserve('10.9.8.3').status_code)
+
+        n = net.Network.from_db(self.network_id)
+        for _ in range(50):
+            address = n.ipam.reserve_random_free_address(
+                (ObjectType.NETWORK, self.network_id),
+                ReservationType.INSTANCE, '')
+            self.assertNotEqual('10.9.8.3', address)
+
+    def test_reserve_an_address_already_in_use(self):
+        # 10.9.8.1 is the gateway, reserved when the IPAM was created.
+        resp = self._reserve('10.9.8.1')
+        self.assertEqual(409, resp.status_code)
+
+    def test_reserve_the_same_address_twice(self):
+        self.assertEqual(200, self._reserve('10.9.8.3').status_code)
+        self.assertEqual(409, self._reserve('10.9.8.3').status_code)
+
+    def test_reserve_an_address_outside_the_netblock(self):
+        resp = self._reserve('10.9.9.3')
+        self.assertEqual(400, resp.status_code)
+
+    def test_reserve_an_address_which_is_not_an_address(self):
+        resp = self._reserve('banana')
+        self.assertEqual(400, resp.status_code)
+
+    def test_release_a_reservation(self):
+        self.assertEqual(200, self._reserve('10.9.8.3').status_code)
+        self.assertEqual(200, self._release('10.9.8.3').status_code)
+
+        # Released addresses sit in the deletion halo rather than becoming
+        # immediately free, which is IPAM's normal behaviour and not
+        # special to manual reservations.
+        n = net.Network.from_db(self.network_id)
+        reservation = n.ipam.get_reservation('10.9.8.3')
+        self.assertEqual(ReservationType.DELETION_HALO,
+                         reservation.reservation_type)
+
+    def test_release_an_address_we_do_not_hold(self):
+        resp = self._release('10.9.8.3')
+        self.assertEqual(404, resp.status_code)
+
+    def test_release_an_address_something_else_holds(self):
+        """A gateway or an instance's address is not the caller's to free."""
+        resp = self._release('10.9.8.1')
+        self.assertEqual(403, resp.status_code)
+
+        n = net.Network.from_db(self.network_id)
+        reservation = n.ipam.get_reservation('10.9.8.1')
+        self.assertEqual(ReservationType.GATEWAY,
+                         reservation.reservation_type)
+
+    def test_reserve_with_a_comment_which_is_not_a_string(self):
+        # comment is declared as a body string, so the request validator
+        # refuses a structure before the handler ever sees it. Without
+        # that the value would reach IPAMReservation's `comment` field
+        # and pydantic would raise, which is a 500 for a malformed
+        # request.
+        resp = self.client.post(
+            '/networks/%s/addresses/10.9.8.3' % self.network_id,
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({'comment': {'why': 'a VIP'}}))
+        self.assertEqual(400, resp.status_code)
+
+        # And nothing was reserved on the way to refusing it.
+        n = net.Network.from_db(self.network_id)
+        self.assertIsNone(n.ipam.get_reservation('10.9.8.3'))
+
+    def test_reserve_the_network_and_broadcast_addresses(self):
+        # Both are reserved when the IPAM is created, so neither is the
+        # caller's to take -- and neither is special-cased anywhere, so
+        # they go down the same already-in-use path as the gateway.
+        self.assertEqual(409, self._reserve('10.9.8.0').status_code)
+        self.assertEqual(409, self._reserve('10.9.8.255').status_code)
+
+    def test_reserve_an_ipv6_address(self):
+        # ip_address() parses this happily, so the 400 comes from
+        # is_in_range() instead: IPv4Network.__contains__ short-circuits
+        # on a version mismatch rather than raising. Pinned because a
+        # future is_in_range() which compared before checking the version
+        # would turn this into a 500.
+        resp = self._reserve('fe80::1')
+        self.assertEqual(400, resp.status_code)
+
+    def test_reserve_in_another_namespaces_network(self):
+        # The network belongs to 'foo'. A caller in another namespace
+        # cannot see it at all, so the ownership decorator answers 404
+        # rather than 403 -- not leaking whether the network exists.
+        resp = self.client.post(
+            '/auth', data=json.dumps({'namespace': 'foo', 'key': 'bar'}))
+        self.assertEqual(200, resp.status_code)
+        foo_token = 'Bearer %s' % resp.get_json()['access_token']
+
+        other_network_id = str(uuid4())
+        self.mock_mariadb.create_namespace('bar', 'key1', 'bar')
+        self.mock_mariadb.create_network(
+            'othernet',
+            uuid=other_network_id,
+            namespace='bar',
+            netblock='10.7.6.0/24',
+            set_state=dbo.STATE_CREATED)
+
+        resp = self.client.post(
+            '/networks/%s/addresses/10.7.6.3' % other_network_id,
+            headers={'Authorization': foo_token},
+            data=json.dumps({}))
+        self.assertEqual(404, resp.status_code)
+
+    def test_release_a_deletion_halo_address(self):
+        # A halo reservation is not a manual one, so it falls into the
+        # 403 branch. The documented contract names gateways and
+        # instance addresses; this pins what the third case does, which
+        # is refuse -- the halo is IPAM's cooldown to run down, not the
+        # caller's to cut short.
+        n = net.Network.from_db(self.network_id)
+        n.ipam.reserve('10.9.8.3', (ObjectType.NETWORK, self.network_id),
+                       ReservationType.INSTANCE, '')
+        n.ipam.release('10.9.8.3')
+
+        resp = self._release('10.9.8.3')
+        self.assertEqual(403, resp.status_code)
+
+    def test_reserve_takes_over_a_deletion_halo_address(self):
+        """A caller naming an address gets it even if it is cooling down."""
+        n = net.Network.from_db(self.network_id)
+        n.ipam.reserve('10.9.8.3', (ObjectType.NETWORK, self.network_id),
+                       ReservationType.INSTANCE, '')
+        n.ipam.release('10.9.8.3')
+
+        resp = self._reserve('10.9.8.3')
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(ReservationType.MANUAL.value,
+                         resp.get_json()['reservation_type'])
+
+    def test_reserve_and_release_in_the_floating_network(self):
+        """The floating network is live but never reaches `created`.
+
+        `_apply_create_on_network_node()` early-returns for the floating
+        network before the STATE_CREATED transition, so it sits in
+        `initial` for the life of a cluster -- confirmed against a
+        running deployment, which reports `state: initial`. The handlers
+        therefore cannot gate on `created`: holding a floating address
+        for a device Shaken Fist does not manage is the same need the
+        feature exists for on a virtual network, and it is what the
+        reaper's manual-reservation protection is there to defend.
+        """
+        floating_id = str(FLOATING_NETWORK_UUID)
+        self.mock_mariadb.create_network(
+            'floating',
+            uuid=floating_id,
+            namespace=None,
+            netblock='192.168.10.0/24',
+            set_state=dbo.STATE_INITIAL)
+
+        self.assertEqual(
+            dbo.STATE_INITIAL,
+            net.Network.from_db(floating_id).state.value,
+            'the floating network is expected to never leave initial')
+
+        resp = self.client.post(
+            '/networks/%s/addresses/192.168.10.10' % floating_id,
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({'comment': 'hardware load balancer'}))
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(ReservationType.MANUAL.value,
+                         resp.get_json()['reservation_type'])
+
+        resp = self.client.delete(
+            '/networks/%s/addresses/192.168.10.10' % floating_id,
+            headers={'Authorization': self.auth_token})
+        self.assertEqual(200, resp.status_code)
+
+    def test_reserve_in_a_network_which_is_not_yet_created(self):
+        # An ordinary network sits in `initial` between Network.new()
+        # and the net worker applying the create. A reservation only
+        # touches the IPAM, which exists from new(), so there is nothing
+        # to wait for.
+        pending_id = str(uuid4())
+        self.mock_mariadb.create_network(
+            'pendingnet',
+            uuid=pending_id,
+            namespace='foo',
+            netblock='10.9.7.0/24',
+            set_state=dbo.STATE_INITIAL)
+
+        resp = self.client.post(
+            '/networks/%s/addresses/10.9.7.3' % pending_id,
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({}))
+        self.assertEqual(200, resp.status_code)
+
+    def test_reserve_in_a_dead_network(self):
+        # Reserving in a network which is going away holds an address in
+        # an IPAM which is about to be torn down, which is a reservation
+        # that silently does nothing. Refused, with the same 406 the
+        # stricter requires_network_active used to give.
+        dead_id = str(uuid4())
+        self.mock_mariadb.create_network(
+            'deadnet',
+            uuid=dead_id,
+            namespace='foo',
+            netblock='10.9.6.0/24',
+            set_state=dbo.STATE_DELETED)
+
+        resp = self.client.post(
+            '/networks/%s/addresses/10.9.6.3' % dead_id,
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({}))
+        self.assertEqual(406, resp.status_code)
+
+        resp = self.client.delete(
+            '/networks/%s/addresses/10.9.6.3' % dead_id,
+            headers={'Authorization': self.auth_token})
+        self.assertEqual(406, resp.status_code)
+
+    def test_reserve_with_a_comment_at_the_length_limit(self):
+        resp = self._reserve(
+            '10.9.8.3', comment='x' * api_network.MAX_RESERVATION_COMMENT)
+        self.assertEqual(200, resp.status_code)
+
+    def test_reserve_with_a_comment_over_the_length_limit(self):
+        # The comment lands in a TEXT column and in two events, once per
+        # address the caller reserves, so it is bounded at the handler.
+        resp = self._reserve(
+            '10.9.8.3', comment='x' * (api_network.MAX_RESERVATION_COMMENT + 1))
+        self.assertEqual(400, resp.status_code)
+
+        # And the refusal happened before anything was written.
+        n = net.Network.from_db(self.network_id)
+        self.assertIsNone(n.ipam.get_reservation('10.9.8.3'))
