@@ -6,6 +6,7 @@ from openapi_spec_validator import OpenAPIV2SpecValidator
 
 from shakenfist.config import config
 from shakenfist.external_api import app as external_api
+from shakenfist.external_api import auth as api_auth
 from shakenfist.external_api import base as api_base
 from shakenfist.tests import base
 from shakenfist.util import network as util_network
@@ -275,6 +276,15 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
          {'type': 'integer', 'minimum': 1, 'maximum': 1000}),
         ('/upload/{upload_uuid}/truncate/{offset}', 'post', 'offset',
          {'type': 'integer', 'minimum': 0}),
+        # A namespace name being created, as opposed to one being
+        # resolved: every other namespace parameter is answered 404 by
+        # a database lookup, but on create nothing resolves anything,
+        # and the name is rendered verbatim into dnsmasq's conf-file on
+        # the network node (issue #4250). The pattern is backed at
+        # every validation mode by the handler guard in
+        # AuthNamespacesEndpoint.post().
+        ('/auth/namespaces', 'post', 'namespace',
+         {'type': 'string', 'pattern': api_auth.NAMESPACE_NAME_PATTERN}),
         ('/auth/namespaces/{namespace}/rules', 'post', 'scopes',
          {'type': 'array', 'items': {'type': 'string'}}),
         ('/auth/namespaces/{namespace}/rules', 'post', 'bound_claims',

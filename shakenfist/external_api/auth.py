@@ -7,6 +7,7 @@
 #        - and include examples: yes
 #   - Has complete CI coverage: yes
 import base64
+import re
 import time
 from functools import partial
 
@@ -53,6 +54,25 @@ from shakenfist.util.access_tokens import request_namespace
 
 LOG, HANDLER = logs.setup(__name__)
 daemon.set_log_level(LOG, 'api')
+
+
+# What a namespace name may look like, published in the OpenAPI
+# specification and enforced by a handler guard on create (issue
+# #4250). The name is rendered verbatim into dnsmasq's conf-file on
+# network nodes (domain=<namespace>.<zone> and local=/<namespace>.<zone>/
+# in deploy/collection/roles/network/files/dhcp.tmpl), so the character
+# set has to keep it inert there: a newline injects arbitrary dnsmasq
+# directives, and comma, slash, hash and whitespace all carry meaning
+# in that file. 63 is the DNS label length limit, the same ceiling
+# instance names carry for the same reason. Underscore is permitted
+# because existing deployments (and this repository's own CI) already
+# use it; dot is not, because it would silently add DNS domain levels,
+# and widening later is compatible where narrowing is not. This is
+# deliberately checked only on create: every other namespace route
+# resolves the name against the database and answers 404, which is a
+# stronger check than a format one (see validation.py's module
+# docstring), but on create there is nothing to resolve.
+NAMESPACE_NAME_PATTERN = '^[a-zA-Z0-9_-]{1,63}$'
 
 
 def arg_is_namespace(func):
@@ -249,20 +269,36 @@ class AuthNamespacesEndpoint(api_base.Resource):
     @swag_from(api_base.swagger_helper(
         'auth', 'Create a namespace.',
         [
-            ('namespace', 'body', 'string', 'The namespace to create.', True),
+            ('namespace', 'body', 'string', 'The namespace to create.', True,
+             {'pattern': NAMESPACE_NAME_PATTERN}),
             ('key_name', 'body', 'string',
              'Name of an optional first key created at the same time.', False),
             ('key', 'body', 'string',
              'Secret for an optional first key created at the same time.', False)
         ],
         [(200, 'The namespace as created.', namespace_get_example),
-         (400, 'No namespace specified, no key specified, or key is not a string.', None),
+         (400, 'No or invalid namespace specified, no key specified, or key is not a string.', None),
          (403, 'Illegal key name.', None)],
         requires_admin=True))
     @api_base.caller_is_admin
     def post(self, namespace=None, key_name=None, key=None):
         if not namespace:
             return sf_api.error(400, 'no namespace specified')
+
+        # The declaration publishes NAMESPACE_NAME_PATTERN, but a
+        # schema check is rolled back by API_VALIDATION_MODE=warn/off,
+        # and what this refuses is dnsmasq configuration injection on
+        # the network node (issue #4250) -- so the guard lives here and
+        # holds in every mode. The isinstance arm is unreachable while
+        # the mode is 'enforce', where a non-string is refused as a
+        # type mismatch before the handler is entered.
+        if not isinstance(namespace, str):
+            return sf_api.error(400, 'namespace name must be a string')
+        if not re.fullmatch(NAMESPACE_NAME_PATTERN, namespace):
+            return sf_api.error(
+                400, ('namespace name %s is invalid. Names are at most 63 '
+                      'characters from the set: a-z, A-Z, 0-9, hyphen (-), '
+                      'or underscore (_).' % namespace))
 
         if Namespace.from_db(namespace, suppress_failure_audit=True):
             return sf_api.error(403, 'namespace exists')

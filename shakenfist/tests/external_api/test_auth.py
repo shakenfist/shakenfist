@@ -466,6 +466,122 @@ class AuthKeysTestCase(base.ShakenFistTestCase):
             'version': 7
         }, resp.get_json())
 
+    def test_create_namespace_accepts_the_ci_naming_convention(self):
+        # Underscore and hyphen are both in this repository's own CI
+        # namespace names (ci-namespace_test-<uniquifier>), so the
+        # pattern accepting them is a floor, not an accident.
+        resp = self.client.post('/auth/namespaces',
+                                headers={'Authorization': self.auth_token},
+                                data=json.dumps({
+                                    'namespace': 'ci-namespace_test-abc123'
+                                }))
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual('ci-namespace_test-abc123',
+                         resp.get_json()['name'])
+
+    def test_create_namespace_rejects_dnsmasq_injection(self):
+        # A newline in a namespace name would be rendered verbatim into
+        # dnsmasq's conf-file as domain=<name>.<zone>, injecting
+        # arbitrary directives on the network node (issue #4250). In
+        # enforce mode the published pattern refuses it, so the wording
+        # is the validator's.
+        resp = self.client.post('/auth/namespaces',
+                                headers={'Authorization': self.auth_token},
+                                data=json.dumps({
+                                    'namespace':
+                                        'evil\ndhcp-script=/tmp/pwn'
+                                }))
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'namespace: String does not match expected pattern.',
+                'status': 400
+            },
+            resp.get_json())
+
+    def test_create_namespace_rejects_dnsmasq_injection_in_warn_mode(self):
+        # 'warn' and 'off' are the operator's rollback and hand the
+        # handler whatever the caller sent, so the handler guard is
+        # what answers there -- asserted at the mode where it is
+        # reachable, like the /auth key guard above.
+        self.set_validation_mode('warn')
+
+        resp = self.client.post('/auth/namespaces',
+                                headers={'Authorization': self.auth_token},
+                                data=json.dumps({
+                                    'namespace':
+                                        'evil\ndhcp-script=/tmp/pwn'
+                                }))
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {
+                'error': ('namespace name evil\ndhcp-script=/tmp/pwn is '
+                          'invalid. Names are at most 63 characters from '
+                          'the set: a-z, A-Z, 0-9, hyphen (-), or '
+                          'underscore (_).'),
+                'status': 400
+            },
+            resp.get_json())
+
+    def test_create_namespace_rejects_a_dot_in_warn_mode(self):
+        # A dot would silently add DNS domain levels under the
+        # network's zone, so it is outside the character set.
+        self.set_validation_mode('warn')
+
+        resp = self.client.post('/auth/namespaces',
+                                headers={'Authorization': self.auth_token},
+                                data=json.dumps({
+                                    'namespace': 'foo.bar'
+                                }))
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {
+                'error': ('namespace name foo.bar is invalid. Names are at '
+                          'most 63 characters from the set: a-z, A-Z, 0-9, '
+                          'hyphen (-), or underscore (_).'),
+                'status': 400
+            },
+            resp.get_json())
+
+    def test_create_namespace_rejects_an_overlong_name_in_warn_mode(self):
+        # 64 characters is one past the DNS label limit the pattern
+        # publishes.
+        self.set_validation_mode('warn')
+
+        resp = self.client.post('/auth/namespaces',
+                                headers={'Authorization': self.auth_token},
+                                data=json.dumps({
+                                    'namespace': 'a' * 64
+                                }))
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {
+                'error': ('namespace name %s is invalid. Names are at most '
+                          '63 characters from the set: a-z, A-Z, 0-9, '
+                          'hyphen (-), or underscore (_).' % ('a' * 64)),
+                'status': 400
+            },
+            resp.get_json())
+
+    def test_create_namespace_rejects_a_non_string_in_warn_mode(self):
+        # In enforce mode the declared type refuses this before the
+        # handler is entered; the isinstance guard is what answers on
+        # the rollback path.
+        self.set_validation_mode('warn')
+
+        resp = self.client.post('/auth/namespaces',
+                                headers={'Authorization': self.auth_token},
+                                data=json.dumps({
+                                    'namespace': ['a', 'list']
+                                }))
+        self.assertEqual(400, resp.status_code)
+        self.assertEqual(
+            {
+                'error': 'namespace name must be a string',
+                'status': 400
+            },
+            resp.get_json())
+
     def test_auth_add_key_missing_key(self):
         resp = self.client.post('/auth/namespaces',
                                 headers={'Authorization': self.auth_token},
