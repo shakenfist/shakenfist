@@ -232,6 +232,34 @@ def _invalid(what: str) -> marshmallow.ValidationError:
     return marshmallow.ValidationError('Not %s.' % what)
 
 
+def _string_format(value: Any, parser: Callable[[str], Any],
+                   what: str) -> Any:
+    """The mechanical skeleton every string format validator shares.
+
+    A None is returned untouched, a non-string is refused without
+    reaching the parser, and anything the parser raises becomes the one
+    marshmallow.ValidationError the rules above permit to escape --
+    which is what makes the second rule hold for every format at once
+    rather than once per copy. The value is returned rather than the
+    parse result, because this layer is check-only (decision D14) and
+    the handler must see the body the caller sent.
+
+    The validators below each document their parser and its width,
+    which is where the judgement lives; this is the wrapper around
+    them, in one place so the next format extends it instead of
+    copying an eight-line skeleton for the sixth time.
+    """
+    if value is None:
+        return value
+    if not isinstance(value, str):
+        raise _invalid(what)
+    try:
+        parser(value)
+    except Exception as e:
+        raise _invalid(what) from e
+    return value
+
+
 def _format_byte(value: Any) -> Any:
     """base64, strictly, once whitespace has been taken out.
 
@@ -271,16 +299,11 @@ def _format_byte(value: Any) -> Any:
     than the config drive on is one carrying non-alphabet junk which
     happens to survive the filter -- which is the defect, not a use.
     """
-    if value is None:
-        return value
-    if not isinstance(value, str):
-        raise _invalid('a valid base64 string')
-    try:
-        # binascii.Error subclasses ValueError.
-        base64.b64decode(''.join(value.split()), validate=True)
-    except Exception as e:
-        raise _invalid('a valid base64 string') from e
-    return value
+    # binascii.Error subclasses ValueError.
+    return _string_format(
+        value,
+        lambda v: base64.b64decode(''.join(v.split()), validate=True),
+        'a valid base64 string')
 
 
 def _format_netblock(value: Any) -> Any:
@@ -298,15 +321,8 @@ def _format_netblock(value: Any) -> Any:
     that is a policy about how small a network may be, not a statement
     about what parses, and D34 keeps handler guards in place regardless.
     """
-    if value is None:
-        return value
-    if not isinstance(value, str):
-        raise _invalid('a valid CIDR netblock')
-    try:
-        ipaddress.ip_network(value)
-    except Exception as e:
-        raise _invalid('a valid CIDR netblock') from e
-    return value
+    return _string_format(value, ipaddress.ip_network,
+                          'a valid CIDR netblock')
 
 
 def _format_ip_address(value: Any) -> Any:
@@ -325,15 +341,8 @@ def _format_ip_address(value: Any) -> Any:
     accepts is a documentation wart; enforcing narrower than the server
     accepts is a broken API.
     """
-    if value is None:
-        return value
-    if not isinstance(value, str):
-        raise _invalid('a valid IP address')
-    try:
-        ipaddress.ip_address(value)
-    except Exception as e:
-        raise _invalid('a valid IP address') from e
-    return value
+    return _string_format(value, ipaddress.ip_address,
+                          'a valid IP address')
 
 
 def _format_url(value: Any) -> Any:
@@ -367,15 +376,7 @@ def _format_url(value: Any) -> Any:
     server parses these strings today, so this is about the format
     meaning *something* rather than about a crash it prevents.
     """
-    if value is None:
-        return value
-    if not isinstance(value, str):
-        raise _invalid('a valid URL')
-    try:
-        urllib.parse.urlparse(value)
-    except Exception as e:
-        raise _invalid('a valid URL') from e
-    return value
+    return _string_format(value, urllib.parse.urlparse, 'a valid URL')
 
 
 def _format_uuid(value: Any) -> Any:
@@ -403,15 +404,7 @@ def _format_uuid(value: Any) -> Any:
     name rather than uuid -- namespace and node -- are not among them,
     so no caller can be naming one here.
     """
-    if value is None:
-        return value
-    if not isinstance(value, str):
-        raise _invalid('a valid UUID')
-    try:
-        uuid.UUID(value)
-    except Exception as e:
-        raise _invalid('a valid UUID') from e
-    return value
+    return _string_format(value, uuid.UUID, 'a valid UUID')
 
 
 # The table itself. Keys are the `format` strings ARGTYPES renders, not

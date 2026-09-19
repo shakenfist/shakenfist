@@ -258,6 +258,58 @@ class FormatValidatorTestCase(base.ShakenFistTestCase):
                       'sf://blob/6a9b0f4e-0b2f-4a5e-bd0e-000000000000'):
             self.assertRefuses(validation._format_uuid, value)
 
+    def test_the_shared_wrapper_holds_the_table_rules_on_its_own(self):
+        """The skeleton the five validators share, tested as the thing
+        the sixth one will be built from.
+
+        The three properties the _FORMATS table's rules require are
+        properties of _string_format rather than of any one validator,
+        so they are asserted against it directly: a None passes
+        through without the parser being consulted, a non-string is
+        refused without the parser being consulted (so a parser may
+        assume str, the way uuid.UUID cannot be handed a list), and
+        the *value* is returned rather than the parse result, because
+        the layer is check-only and the handler must see the body the
+        caller sent.
+        """
+        def _exploding_parser(value):
+            raise AssertionError('the parser was consulted')
+
+        self.assertIsNone(validation._string_format(
+            None, _exploding_parser, 'a valid thing'))
+        self.assertRefuses(
+            lambda v: validation._string_format(
+                v, _exploding_parser, 'a valid thing'), 5)
+
+        # The parse result (an int) is discarded; the string comes back.
+        self.assertEqual('17', validation._string_format(
+            '17', int, 'a valid thing'))
+
+    def test_the_shared_wrapper_converts_any_parser_exception(self):
+        """The second table rule, held in one place for every format.
+
+        Only marshmallow.ValidationError may escape a validator --
+        _schema_findings() reports no findings at all for a schema
+        whose check raised, so anything else would silently disable
+        every other check on the same request. The parser is allowed
+        to raise whatever its library raises; the wrapper owns turning
+        it into the one permitted exception, with the original chained
+        as the cause and the message in the table's `Not <what>.`
+        shape.
+        """
+        for exc in (ValueError('v'), TypeError('t'), OSError('o')):
+            def _parser(value, _exc=exc):
+                raise _exc
+            with self.subTest(exc=type(exc).__name__):
+                try:
+                    validation._string_format('x', _parser, 'a valid thing')
+                except marshmallow.ValidationError as e:
+                    self.assertEqual(['Not a valid thing.'], e.messages)
+                    self.assertIs(exc, e.__cause__)
+                else:
+                    self.fail('%s did not become a ValidationError'
+                              % type(exc).__name__)
+
     def test_no_validator_lets_a_library_exception_escape(self):
         """A validator which raised anything else would be worse than
         none at all.
