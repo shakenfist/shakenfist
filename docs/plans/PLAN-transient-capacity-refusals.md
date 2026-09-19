@@ -502,7 +502,7 @@ spelling above is the one to write.
 | 1. Close the warm-up window: reconcile when a hypervisor has metrics and no capacity row | [PLAN-transient-capacity-refusals-phase-01-warm-up.md](PLAN-transient-capacity-refusals-phase-01-warm-up.md) | Complete | `7cc93750d` (#4147), `e20dd7d4b` (#4153) |
 | 2. The suite waits, and says so: an informed `create_instance` wrapper and a per-run wait summary | [PLAN-transient-capacity-refusals-phase-02-suite-wait.md](PLAN-transient-capacity-refusals-phase-02-suite-wait.md) | Complete | `5ad9651ee` (#4166), `2c6206941` (#4187) |
 | 3. Publish metrics when the running-domain set changes | [PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md](PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md) | Complete | `03cd7be3a` (#4200) |
-| 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | [PLAN-transient-capacity-refusals-phase-04-retry-after.md](PLAN-transient-capacity-refusals-phase-04-retry-after.md) | In progress | — |
+| 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | [PLAN-transient-capacity-refusals-phase-04-retry-after.md](PLAN-transient-capacity-refusals-phase-04-retry-after.md) | Complete | `565e36e6e` (#4241), client-python `74d6e129b` (client-python#399) |
 | 5. Decide on server-side queued placement from the phase 2 data | PLAN-transient-capacity-refusals-phase-05-queue-decision.md | Not started | — |
 | 6. Documentation and close-out | PLAN-transient-capacity-refusals-phase-06-docs.md | Not started | — |
 | 7. Push audit | PLAN-transient-capacity-refusals-phase-07-push-audit.md | Not started | — |
@@ -1199,7 +1199,50 @@ chosen to defer to here, so that we do not forget them.
   costs an object, IPAM allocations, an event trail and a delete
   op, at the moment the cluster is busiest. Phase 5's queue, if it
   is built, removes this; if it is not, the cost stands and should
-  be measured.
+  be measured. Phase 4's client review found the sharper version of
+  it: because the client replays a marked request byte for byte,
+  every replay pays that cost again, and an `ASYNC_BLOCK` caller
+  with no timeout of its own had an hour of budget against a fixed
+  fifteen second hint. The client now caps replays at
+  `TRANSIENT_RETRY_MAXIMUM_ATTEMPTS = 5` for that reason, which
+  bounds the damage without removing it.
+- **The transient marker is a promise the server has not written
+  anything.** A client which replays a request byte for byte can
+  only do so safely if the refusal committed no part of it. The
+  create path is the marked endpoint today and it does commit --
+  see the bullet above -- so the promise currently rests on the
+  delete that follows the refusal. The obligation matters most for
+  the *second* endpoint anyone marks: `send_upload()`'s natural
+  refusal is also a `507`, and marking it transient without
+  thinking about partial writes would be a data bug rather than a
+  latency bug. Recorded in client-python's `AGENTS.md` and its
+  retry documentation. Found at phase 4's client review.
+- **Split claim denials out of the transient marker.** Phase 4
+  publishes `capacity_guard` as transient, which is honest only
+  while `mariadb.CLAIM_ENFORCEMENT_HARD` is `False` and a namespace
+  claim therefore cannot refuse a placement at all. When
+  PLAN-scheduler-reservations phase 5 flips that constant, a claim
+  denial becomes namespace quota exhaustion -- not something
+  fifteen seconds fixes -- and it must stop inheriting
+  `capacity_guard`'s classification. The constraint is recorded at
+  `TRANSIENT_CAPACITY_STAGES` in `shakenfist/external_api/base.py`,
+  where the person making that change will be reading. Found at
+  phase 4's review; see D35 there.
+- **Name the minimum client version, and retire two workarounds
+  with it.** `APIException.headers` is unreleased: the latest
+  `shakenfist-client` release is v0.8.3 and no tag contains commit
+  `80019a0`. Until one does, `assertRefusedAtStage()` asserts the
+  `Retry-After` header only when the exception exposes one, and
+  `docs/operator_guide/capacity_refusals.md` warns operators that
+  the `retry_transient_capacity` flag it documents is in no client
+  they can install. Both are one edit each once a release exists.
+- **A transient marker for address-pool exhaustion.** The two
+  `CongestedNetwork` `507`s are left bare by phase 4's D29. They
+  probably do deserve a marker, with a horizon derived from the
+  deletion halo rather than from `defer()`'s default, and the
+  deletion halo is a much longer and differently-shaped wait. Needs
+  its own evidence about how long the halo actually holds an
+  address in practice, which is why phase 4 declined to guess.
 
 ### Bugs fixed during this work
 

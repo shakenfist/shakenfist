@@ -160,11 +160,22 @@ When enabled, the client will:
    `[1, 60]` seconds to protect against hostile or malformed headers).
 3. Retry the **same request** (same instance name, same parameters).
 
-The retry is bounded by the caller's deadline (if one was passed to the API call)
-so the total time spent waiting and retrying cannot exceed the budget. Retries
-are not attempted for `507` responses that are not marked as transient -- which
-includes every structural refusal listed above -- or for other HTTP status
-codes.
+Two separate bounds stop that loop, and whichever is reached first re-raises the
+server's own refusal, so a caller sees exactly the exception it would have seen
+with the flag off:
+
+- **The caller's deadline**, if one was passed to the API call. This bounds the
+  sleeping; the request issued after the last sleep is not itself cut short, so
+  a call can return a round trip after its budget.
+- **An attempt cap** of five, because the deadline alone is a poor bound on what
+  replaying costs the *cluster*. Every refused create still costs an instance
+  record, IPAM allocations, an event trail and a delete operation, at the moment
+  the cluster is busiest. An `ASYNC_BLOCK` caller with no timeout of its own has
+  an hour of budget, which at a fifteen second hint is around 240 replays.
+
+Retries are not attempted for `507` responses that are not marked as transient
+-- which includes every structural refusal listed above -- or for other HTTP
+status codes.
 
 ### Why the retry is off by default
 
@@ -179,6 +190,12 @@ tolerate variable latency. It is off by default because:
 - The retry replays the identical request body. If an instance was deleted due
   to the refusal (which can happen during cleanup of failed creates), the same
   name is still in use and the retry will fail again with the same error.
+
+- A refused create holds its allocated addresses until its delete is processed,
+  so a long wait against a small network can run out of address space before it
+  runs out of budget. It does *not* hold capacity: the ledger is charged in the
+  same database transaction that writes the placement, and a refusal rolls that
+  transaction back.
 
 The client library makes the feature available to every caller; operators and
 tools that want it can turn it on. Test suites and other latency-aware workloads
