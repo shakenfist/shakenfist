@@ -175,7 +175,7 @@ dependencies = [
     "stevedore==5.9.1",
     "typing-inspection==0.4.4",
     "typing_extensions==4.16.0",
-    "urllib3==2.7.0",
+    "urllib3==2.8.0",
     "wrapt==2.4.1",
     "zope.event==6.2",
     "zope.interface==8.6",
