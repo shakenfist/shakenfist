@@ -14682,8 +14682,8 @@ every phase has been completed, abandoned or superseded.</p>
 <tr>
 <td>4. <code>Retry-After</code> and a machine-readable transient refusal, with an opt-in client retry</td>
 <td><a href="../PLAN-transient-capacity-refusals-phase-04-retry-after/">PLAN-transient-capacity-refusals-phase-04-retry-after.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>565e36e6e</code> (#4241), client-python <code>74d6e129b</code> (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/399" title="GitHub Issue: shakenfist/client-python #399">client-python#399</a>)</td>
 </tr>
 <tr>
 <td>5. Decide on server-side queued placement from the phase 2 data</td>
@@ -15362,7 +15362,50 @@ chosen to defer to here, so that we do not forget them.</p>
   costs an object, IPAM allocations, an event trail and a delete
   op, at the moment the cluster is busiest. Phase 5's queue, if it
   is built, removes this; if it is not, the cost stands and should
-  be measured.</li>
+  be measured. Phase 4's client review found the sharper version of
+  it: because the client replays a marked request byte for byte,
+  every replay pays that cost again, and an <code>ASYNC_BLOCK</code> caller
+  with no timeout of its own had an hour of budget against a fixed
+  fifteen second hint. The client now caps replays at
+  <code>TRANSIENT_RETRY_MAXIMUM_ATTEMPTS = 5</code> for that reason, which
+  bounds the damage without removing it.</li>
+<li><strong>The transient marker is a promise the server has not written
+  anything.</strong> A client which replays a request byte for byte can
+  only do so safely if the refusal committed no part of it. The
+  create path is the marked endpoint today and it does commit --
+  see the bullet above -- so the promise currently rests on the
+  delete that follows the refusal. The obligation matters most for
+  the <em>second</em> endpoint anyone marks: <code>send_upload()</code>'s natural
+  refusal is also a <code>507</code>, and marking it transient without
+  thinking about partial writes would be a data bug rather than a
+  latency bug. Recorded in client-python's <code>AGENTS.md</code> and its
+  retry documentation. Found at phase 4's client review.</li>
+<li><strong>Split claim denials out of the transient marker.</strong> Phase 4
+  publishes <code>capacity_guard</code> as transient, which is honest only
+  while <code>mariadb.CLAIM_ENFORCEMENT_HARD</code> is <code>False</code> and a namespace
+  claim therefore cannot refuse a placement at all. When
+  PLAN-scheduler-reservations phase 5 flips that constant, a claim
+  denial becomes namespace quota exhaustion -- not something
+  fifteen seconds fixes -- and it must stop inheriting
+  <code>capacity_guard</code>'s classification. The constraint is recorded at
+  <code>TRANSIENT_CAPACITY_STAGES</code> in <code>shakenfist/external_api/base.py</code>,
+  where the person making that change will be reading. Found at
+  phase 4's review; see D35 there.</li>
+<li><strong>Name the minimum client version, and retire two workarounds
+  with it.</strong> <code>APIException.headers</code> is unreleased: the latest
+  <code>shakenfist-client</code> release is v0.8.3 and no tag contains commit
+  <code>80019a0</code>. Until one does, <code>assertRefusedAtStage()</code> asserts the
+  <code>Retry-After</code> header only when the exception exposes one, and
+  <code>docs/operator_guide/capacity_refusals.md</code> warns operators that
+  the <code>retry_transient_capacity</code> flag it documents is in no client
+  they can install. Both are one edit each once a release exists.</li>
+<li><strong>A transient marker for address-pool exhaustion.</strong> The two
+  <code>CongestedNetwork</code> <code>507</code>s are left bare by phase 4's D29. They
+  probably do deserve a marker, with a horizon derived from the
+  deletion halo rather than from <code>defer()</code>'s default, and the
+  deletion halo is a much longer and differently-shaped wait. Needs
+  its own evidence about how long the halo actually holds an
+  address in practice, which is why phase 4 declined to guess.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>This section should list any bugs we encounter during development

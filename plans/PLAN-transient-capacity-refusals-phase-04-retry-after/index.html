@@ -14114,6 +14114,89 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#outcome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Outcome">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-contract-runs-against-a-real-cluster" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The contract runs against a real cluster
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-merge-queue-run-failed-and-not-on-this" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The merge-queue run failed, and not on this
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#three-definition-of-done-items-were-wrong-and-running-them-is-what-found-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three definition-of-done items were wrong, and running them is what found it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-review-found-the-one-thing-the-phase-got-wrong" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The review found the one thing the phase got wrong
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-client-half-added-beyond-its-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the client half added beyond its brief
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deferred-and-where-it-is-written-down" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deferred, and where it is written down
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14726,6 +14809,126 @@ propose and expensive to redo. Propose the loop's shape -- where the
 catch goes, how the sleep is chosen, what happens under each of the
 three async strategies -- and have it agreed before editing
 <code>apiclient.py</code>.</p>
+<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
+<p>Complete. Steps 4a-4g merged as
+<a href="https://github.com/shakenfist/shakenfist/pull/4241">#4241</a>, merge
+commit <code>565e36e6e</code>; steps 4d-4e merged as
+<a href="https://github.com/shakenfist/client-python/pull/399">client-python#399</a>,
+merge commit <code>74d6e129b</code>. This section is step 4h.</p>
+<h3 id="the-contract-runs-against-a-real-cluster">The contract runs against a real cluster<a class="headerlink" href="#the-contract-runs-against-a-real-cluster" title="Permanent link">&para;</a></h3>
+<p>The strongest evidence this phase produced is not a unit test. The
+merge-queue run for #4241
+(<a href="https://github.com/shakenfist/shakenfist/actions/runs/35314645028">35314645028</a>)
+carries the merged code, and in all three cluster topologies --
+<code>Debian 12 cluster</code>, <code>Debian 12 tier</code> and <code>Ubuntu 24.04 cluster</code> --
+every one of <code>assertRefusedAtStage()</code>'s four callers passed:</p>
+<ul>
+<li><code>TestSaturationRefusals.test_impossible_cpu_request_refused_at_sufficient_idle_cpu</code></li>
+<li><code>TestSaturationRefusals.test_impossible_memory_request_refused_at_sufficient_idle_memory</code></li>
+<li><code>TestSaturationRefusals.test_impossible_disk_request_refused_at_sufficient_free_disk</code></li>
+<li><code>TestNodeFillRefusal.test_full_node_refuses_a_targeted_create</code></li>
+</ul>
+<p>Those assertions are unconditional on <code>stage</code> and <code>transient</code> (D34),
+so twelve real <code>507</code> bodies from three real clusters carried both
+fields with the values the server was supposed to publish. The
+<code>Retry-After</code> assertion stayed conditional and therefore did not fire:
+the suite installs <code>shakenfist-client</code> from PyPI and no release
+carries <code>APIException.headers</code>. That is the workaround D34 chose, and
+retiring it is Future work in this file and in the master plan.</p>
+<h3 id="the-merge-queue-run-failed-and-not-on-this">The merge-queue run failed, and not on this<a class="headerlink" href="#the-merge-queue-run-failed-and-not-on-this" title="Permanent link">&para;</a></h3>
+<p><code>Node lifecycle (collection)</code> failed in that run, which is why the
+<code>Can merge</code> job is red. The failure is <code>SF failed to stop on sf4,
+there are 1 processes still running</code>, and the process it counted is a
+CI scaffolding loop -- <code>for i in $(seq 1 600); do case "$(hostname)"
+in sfcbr-*) exit 0 ;; esac; sleep 2; done</code> -- not a Shaken Fist
+daemon. The shutdown check is matching more broadly than it means to.
+It touches no path this phase changed, and every other job in the run
+passed. It is recorded here rather than triaged, because a closeout is
+not the place to chase an unrelated CI defect; it has not been filed.</p>
+<h3 id="three-definition-of-done-items-were-wrong-and-running-them-is-what-found-it">Three definition-of-done items were wrong, and running them is what found it<a class="headerlink" href="#three-definition-of-done-items-were-wrong-and-running-them-is-what-found-it" title="Permanent link">&para;</a></h3>
+<p>This is the second phase in a row where that happened, and the shape
+was the same each time: the item read plausibly and failed when
+executed.</p>
+<ul>
+<li><strong>Item 2</strong> claimed a <code>shakenfist-utilities</code> upgrade that changed the
+  error body shape would fail 4a's unit test. It does not and cannot.
+  D28 specifies replace-don't-patch, so the helper discards the
+  upstream body entirely and our fields are never derived from it. The
+  real exposure is the inverse -- our <code>507</code> silently becoming the only
+  error in the API shaped unlike the other 305 <code>sf_api.error()</code> call
+  sites -- so <code>test_sf_api_error_shape_canary</code> was added and confirmed
+  to be the only one of the four tests that a renamed key breaks.</li>
+<li><strong>Item 13</strong> asked that a phrase appear nowhere in the master plan. It
+  survives once, inside the sentence recording that an earlier draft
+  said it <em>and that was wrong</em> -- a correction worth keeping. Worth
+  noting for anyone re-running it: the phrase is line-wrapped in the
+  source, so a naive <code>grep</code> reports zero and reads as "gone". The
+  check has to flatten whitespace, and does.</li>
+<li><strong>Item 1</strong> asked that no other module hard-code <code>'Retry-After'</code>. The
+  tests and the CI suite legitimately name it and the literal <code>15</code> as
+  the contract being asserted; the suite ships separately from the
+  server and deliberately does not import its constants.</li>
+</ul>
+<p>All three were rewritten to say what they meant before the phase
+merged.</p>
+<h3 id="the-review-found-the-one-thing-the-phase-got-wrong">The review found the one thing the phase got wrong<a class="headerlink" href="#the-review-found-the-one-thing-the-phase-got-wrong" title="Permanent link">&para;</a></h3>
+<p>Thirteen items, of which twelve were accuracy, coverage or naming. The
+thirteenth was a real behavioural defect and is now
+<a href="#d35----the-stage-not-the-exception-class-decides-what-is-transient">D35</a>:
+D29 drew the transient boundary at the exception class, which is right
+about scheduling versus everything else and wrong <em>inside</em> the filter
+branch. <code>cpu_max_per_instance</code>, <code>is_hypervisor</code> and <code>pre_schedule</code>
+would have been published as worth retrying, so a client that opted in
+would have replayed a structurally impossible request until its
+deadline, and the operator guide told a human the same untrue thing.
+The stage is now the discriminator, the helper is <code>capacity_error()</code>,
+and <code>test_capacity_error.py</code> parses <code>scheduler.py</code> so a stage that is
+added or renamed later cannot fall silently into the non-transient
+default. That check was mutation-tested, as was the CI helper's body
+guard.</p>
+<p>Correcting the review's item 3 turned up a second error nobody had
+caught: <code>defer()</code> is a method of <code>BaseClusterOperation</code>, not
+<code>BaseOperation</code>. The comment, this plan and the operator guide all
+named the wrong class. Writing the assertion is what found it -- the
+test would not import.</p>
+<h3 id="what-the-client-half-added-beyond-its-brief">What the client half added beyond its brief<a class="headerlink" href="#what-the-client-half-added-beyond-its-brief" title="Permanent link">&para;</a></h3>
+<p>Two review rounds on #399 produced one change worth recording here,
+because it is a fact about the <em>server's</em> contract rather than the
+client's. The deadline was the only bound on the retry, and an
+<code>ASYNC_BLOCK</code> caller with no timeout of its own has an hour, which at
+a fixed fifteen second hint is around 240 replays of a request the
+server creates an instance object and allocates addresses for before
+the scheduler ever sees it. The client now caps replays at
+<code>TRANSIENT_RETRY_MAXIMUM_ATTEMPTS = 5</code>.</p>
+<p>The same rounds named the obligation that cap implies: because the
+client replays a marked request byte for byte, the server may only
+mark a refusal that committed no part of it. The create path is the
+only marked endpoint today; <code>send_upload()</code>'s natural refusal is also
+a <code>507</code>, and marking it without thinking about partial writes would be
+a data bug rather than a latency bug. Both facts are now in the master
+plan's Future work.</p>
+<h3 id="deferred-and-where-it-is-written-down">Deferred, and where it is written down<a class="headerlink" href="#deferred-and-where-it-is-written-down" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The <code>CongestedNetwork</code> <code>507</code>s stay bare (D29). Promoted to the master
+  plan's Future work; it needs evidence about the deletion halo that
+  this phase did not have.</li>
+<li>Nothing asserts the capacity-guard branch functionally. It needs a
+  concurrent placement race in <code>test_saturation.py</code>.</li>
+<li><code>capacity_guard</code> is transient only while
+  <code>mariadb.CLAIM_ENFORCEMENT_HARD</code> is <code>False</code>. The constraint is
+  recorded at <code>TRANSIENT_CAPACITY_STAGES</code>, where whoever flips that
+  constant will be reading, and in the master plan's Future work.</li>
+<li>The OpenAPI three-tuple response declaration cannot express a
+  response header (D32), filed as
+  <a href="https://github.com/shakenfist/shakenfist/issues/4240">#4240</a> and
+  open.</li>
+<li>No <code>shakenfist-client</code> release carries <code>APIException.headers</code>: the
+  latest is v0.8.3 and no tag contains commit <code>80019a0</code>. Until one
+  exists, <code>assertRefusedAtStage()</code>'s header assertion stays
+  conditional and the operator guide warns that the
+  <code>retry_transient_capacity</code> flag is in no client an operator can
+  install.</li>
+</ul>
 
 
 

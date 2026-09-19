@@ -14216,11 +14216,22 @@ flag when constructing a <code>Client</code>:</p>
    <code>[1, 60]</code> seconds to protect against hostile or malformed headers).</li>
 <li>Retry the <strong>same request</strong> (same instance name, same parameters).</li>
 </ol>
-<p>The retry is bounded by the caller's deadline (if one was passed to the API call)
-so the total time spent waiting and retrying cannot exceed the budget. Retries
-are not attempted for <code>507</code> responses that are not marked as transient -- which
-includes every structural refusal listed above -- or for other HTTP status
-codes.</p>
+<p>Two separate bounds stop that loop, and whichever is reached first re-raises the
+server's own refusal, so a caller sees exactly the exception it would have seen
+with the flag off:</p>
+<ul>
+<li><strong>The caller's deadline</strong>, if one was passed to the API call. This bounds the
+  sleeping; the request issued after the last sleep is not itself cut short, so
+  a call can return a round trip after its budget.</li>
+<li><strong>An attempt cap</strong> of five, because the deadline alone is a poor bound on what
+  replaying costs the <em>cluster</em>. Every refused create still costs an instance
+  record, IPAM allocations, an event trail and a delete operation, at the moment
+  the cluster is busiest. An <code>ASYNC_BLOCK</code> caller with no timeout of its own has
+  an hour of budget, which at a fifteen second hint is around 240 replays.</li>
+</ul>
+<p>Retries are not attempted for <code>507</code> responses that are not marked as transient
+-- which includes every structural refusal listed above -- or for other HTTP
+status codes.</p>
 <h3 id="why-the-retry-is-off-by-default">Why the retry is off by default<a class="headerlink" href="#why-the-retry-is-off-by-default" title="Permanent link">&para;</a></h3>
 <p>The retry is useful for operators, command-line tools, and workloads that can
 tolerate variable latency. It is off by default because:</p>
@@ -14235,6 +14246,13 @@ tolerate variable latency. It is off by default because:</p>
 <p>The retry replays the identical request body. If an instance was deleted due
   to the refusal (which can happen during cleanup of failed creates), the same
   name is still in use and the retry will fail again with the same error.</p>
+</li>
+<li>
+<p>A refused create holds its allocated addresses until its delete is processed,
+  so a long wait against a small network can run out of address space before it
+  runs out of budget. It does <em>not</em> hold capacity: the ledger is charged in the
+  same database transaction that writes the placement, and a refusal rolls that
+  transaction back.</p>
 </li>
 </ul>
 <p>The client library makes the feature available to every caller; operators and
