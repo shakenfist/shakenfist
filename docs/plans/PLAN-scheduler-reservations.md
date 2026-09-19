@@ -507,6 +507,17 @@ is here.
   should land before the re-run or it will not be able to separate
   a warm-up artefact from genuine contention either.
 
+  A third gate, recorded here because the flip is where it is
+  read: **a CI topology growth must land before hard enforcement,
+  or carry a claim-size bump with it.** Claim sizes are a
+  decaying maximum over previously measured peaks, so the first
+  run of a job whose topology just grew is sized from the old
+  peaks. Today that is admitted and audited; after the flip it is
+  a refusal. `PLAN-ci-cloud-sizing.md` phase 4 is the live
+  instance -- it takes `slim-tier` from 12 to 18 under-cloud
+  vCPU -- and its *claim layer sitting above that budget* section
+  carries the other direction of the same coupling.
+
   The back brief item that was outstanding at the deploy (the
   sizing formula never evaluated against real cost data, because
   `ssh` to `maui` was refused from the development host) was

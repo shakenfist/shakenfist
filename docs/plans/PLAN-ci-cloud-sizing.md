@@ -622,6 +622,55 @@ tier, so that 356 GB is not obviously over-provisioned per node --
 any saving has to come from having fewer nodes, which is what phase
 4 will weigh.
 
+### The claim layer sitting above that budget
+
+**Also not measured by this instrument, and owned by a different
+plan.** The under-cloud instances a topology creates live in a
+per-job namespace which the private-ci conductor covers with a
+capacity *claim*, and the size of that claim is set by
+`PLAN-claim-coverage-and-sizing.md` in the `shakenfist/private-ci`
+repository -- phases 0 and 1 complete at the time of writing. The two
+plans are the same capacity question one layer apart: this one sizes
+the nested cluster, that one sizes the under-cloud claim which pays
+for it. Neither referenced the other until this section was written.
+
+Three couplings, in the order they are likely to bite:
+
+1. **A topology change is an input to claim sizing.** The conductor's
+   `claim_size_for()` (`conductor/provisioner.py:350`) takes `max(runner
+   footprint, ceil(CLAIM_HEADROOM x worst observed peak))` with
+   `CLAIM_HEADROOM` 1.2, and the peak is the measured footprint of
+   previous runs of the same `(repo, job_name)`. Phase 4's reshape
+   therefore raises `debian-12-slim-tier`'s under-cloud footprint from
+   12 to 18 vCPU *before* the aggregate that sizes its claim has seen
+   the new number.
+2. **That is harmless only while claims are advisory.** The first run
+   on a grown topology is sized from the old peaks, so it is admitted
+   over its claim and audited as `placement admitted over namespace
+   capacity claim`, which is what `CLAIM_ENFORCEMENT_HARD` being false
+   intends. Once `PLAN-scheduler-reservations` phase 5 flips that
+   constant, the same first run becomes a refusal. **A topology growth
+   must land before hard enforcement, or carry a claim-size bump with
+   it.** The current order satisfies this by accident rather than by
+   management: phase 4 here is blocked on the operator, and
+   scheduler-reservations phase 5 is gated behind claim-plan phases 0,
+   1 and 4.
+3. **The claim measurement is blindest on exactly these jobs.** That
+   plan's sixth and seventh findings record that the peak is
+   reconstructed from instances surviving at teardown, so anything
+   hard-deleted mid-run is invisible -- and a nested-cloud job creates
+   and deletes instances throughout its run. The measured
+   under-statement is 1.75x, and 2.12x over the closed window, worst
+   on `shakenfist / Smoke tests (collection)`. So the claim plan's
+   phase 3 right-sizing pass cannot honestly size the clouds this plan
+   reshapes until that measurement is fixed, and a reader of either
+   plan should not treat the other's peak figures as independent.
+
+Note the dimensions agree from both sides, which is mild evidence both
+are looking at one thing: this plan finds RAM rather than vCPU is the
+scarce under-cloud resource, and the claim plan finds the over-claim
+exceedances are overwhelmingly `memory_mb`.
+
 ### The headroom band, with numbers
 
 Phase 0's D3 fixed the band's *form* and left its numbers to this
