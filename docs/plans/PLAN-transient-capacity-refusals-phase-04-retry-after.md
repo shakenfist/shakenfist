@@ -600,3 +600,137 @@ propose and expensive to redo. Propose the loop's shape -- where the
 catch goes, how the sleep is chosen, what happens under each of the
 three async strategies -- and have it agreed before editing
 `apiclient.py`.
+
+## Outcome
+
+Complete. Steps 4a-4g merged as
+[#4241](https://github.com/shakenfist/shakenfist/pull/4241), merge
+commit `565e36e6e`; steps 4d-4e merged as
+[client-python#399](https://github.com/shakenfist/client-python/pull/399),
+merge commit `74d6e129b`. This section is step 4h.
+
+### The contract runs against a real cluster
+
+The strongest evidence this phase produced is not a unit test. The
+merge-queue run for #4241
+([35314645028](https://github.com/shakenfist/shakenfist/actions/runs/35314645028))
+carries the merged code, and in all three cluster topologies --
+`Debian 12 cluster`, `Debian 12 tier` and `Ubuntu 24.04 cluster` --
+every one of `assertRefusedAtStage()`'s four callers passed:
+
+- `TestSaturationRefusals.test_impossible_cpu_request_refused_at_sufficient_idle_cpu`
+- `TestSaturationRefusals.test_impossible_memory_request_refused_at_sufficient_idle_memory`
+- `TestSaturationRefusals.test_impossible_disk_request_refused_at_sufficient_free_disk`
+- `TestNodeFillRefusal.test_full_node_refuses_a_targeted_create`
+
+Those assertions are unconditional on `stage` and `transient` (D34),
+so twelve real `507` bodies from three real clusters carried both
+fields with the values the server was supposed to publish. The
+`Retry-After` assertion stayed conditional and therefore did not fire:
+the suite installs `shakenfist-client` from PyPI and no release
+carries `APIException.headers`. That is the workaround D34 chose, and
+retiring it is Future work in this file and in the master plan.
+
+### The merge-queue run failed, and not on this
+
+`Node lifecycle (collection)` failed in that run, which is why the
+`Can merge` job is red. The failure is `SF failed to stop on sf4,
+there are 1 processes still running`, and the process it counted is a
+CI scaffolding loop -- `for i in $(seq 1 600); do case "$(hostname)"
+in sfcbr-*) exit 0 ;; esac; sleep 2; done` -- not a Shaken Fist
+daemon. The shutdown check is matching more broadly than it means to.
+It touches no path this phase changed, and every other job in the run
+passed. It is recorded here rather than triaged, because a closeout is
+not the place to chase an unrelated CI defect; it has not been filed.
+
+### Three definition-of-done items were wrong, and running them is what found it
+
+This is the second phase in a row where that happened, and the shape
+was the same each time: the item read plausibly and failed when
+executed.
+
+- **Item 2** claimed a `shakenfist-utilities` upgrade that changed the
+  error body shape would fail 4a's unit test. It does not and cannot.
+  D28 specifies replace-don't-patch, so the helper discards the
+  upstream body entirely and our fields are never derived from it. The
+  real exposure is the inverse -- our `507` silently becoming the only
+  error in the API shaped unlike the other 305 `sf_api.error()` call
+  sites -- so `test_sf_api_error_shape_canary` was added and confirmed
+  to be the only one of the four tests that a renamed key breaks.
+- **Item 13** asked that a phrase appear nowhere in the master plan. It
+  survives once, inside the sentence recording that an earlier draft
+  said it *and that was wrong* -- a correction worth keeping. Worth
+  noting for anyone re-running it: the phrase is line-wrapped in the
+  source, so a naive `grep` reports zero and reads as "gone". The
+  check has to flatten whitespace, and does.
+- **Item 1** asked that no other module hard-code `'Retry-After'`. The
+  tests and the CI suite legitimately name it and the literal `15` as
+  the contract being asserted; the suite ships separately from the
+  server and deliberately does not import its constants.
+
+All three were rewritten to say what they meant before the phase
+merged.
+
+### The review found the one thing the phase got wrong
+
+Thirteen items, of which twelve were accuracy, coverage or naming. The
+thirteenth was a real behavioural defect and is now
+[D35](#d35----the-stage-not-the-exception-class-decides-what-is-transient):
+D29 drew the transient boundary at the exception class, which is right
+about scheduling versus everything else and wrong *inside* the filter
+branch. `cpu_max_per_instance`, `is_hypervisor` and `pre_schedule`
+would have been published as worth retrying, so a client that opted in
+would have replayed a structurally impossible request until its
+deadline, and the operator guide told a human the same untrue thing.
+The stage is now the discriminator, the helper is `capacity_error()`,
+and `test_capacity_error.py` parses `scheduler.py` so a stage that is
+added or renamed later cannot fall silently into the non-transient
+default. That check was mutation-tested, as was the CI helper's body
+guard.
+
+Correcting the review's item 3 turned up a second error nobody had
+caught: `defer()` is a method of `BaseClusterOperation`, not
+`BaseOperation`. The comment, this plan and the operator guide all
+named the wrong class. Writing the assertion is what found it -- the
+test would not import.
+
+### What the client half added beyond its brief
+
+Two review rounds on #399 produced one change worth recording here,
+because it is a fact about the *server's* contract rather than the
+client's. The deadline was the only bound on the retry, and an
+`ASYNC_BLOCK` caller with no timeout of its own has an hour, which at
+a fixed fifteen second hint is around 240 replays of a request the
+server creates an instance object and allocates addresses for before
+the scheduler ever sees it. The client now caps replays at
+`TRANSIENT_RETRY_MAXIMUM_ATTEMPTS = 5`.
+
+The same rounds named the obligation that cap implies: because the
+client replays a marked request byte for byte, the server may only
+mark a refusal that committed no part of it. The create path is the
+only marked endpoint today; `send_upload()`'s natural refusal is also
+a `507`, and marking it without thinking about partial writes would be
+a data bug rather than a latency bug. Both facts are now in the master
+plan's Future work.
+
+### Deferred, and where it is written down
+
+- The `CongestedNetwork` `507`s stay bare (D29). Promoted to the master
+  plan's Future work; it needs evidence about the deletion halo that
+  this phase did not have.
+- Nothing asserts the capacity-guard branch functionally. It needs a
+  concurrent placement race in `test_saturation.py`.
+- `capacity_guard` is transient only while
+  `mariadb.CLAIM_ENFORCEMENT_HARD` is `False`. The constraint is
+  recorded at `TRANSIENT_CAPACITY_STAGES`, where whoever flips that
+  constant will be reading, and in the master plan's Future work.
+- The OpenAPI three-tuple response declaration cannot express a
+  response header (D32), filed as
+  [#4240](https://github.com/shakenfist/shakenfist/issues/4240) and
+  open.
+- No `shakenfist-client` release carries `APIException.headers`: the
+  latest is v0.8.3 and no tag contains commit `80019a0`. Until one
+  exists, `assertRefusedAtStage()`'s header assertion stays
+  conditional and the operator guide warns that the
+  `retry_transient_capacity` flag is in no client an operator can
+  install.
