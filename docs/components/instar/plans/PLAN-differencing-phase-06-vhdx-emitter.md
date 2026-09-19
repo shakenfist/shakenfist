@@ -72,6 +72,13 @@ Out of scope, explicitly:
 * Reading or composing a differencing VHDX. Phases 11 to 16.
 * `docs/create.md`. Its statement that vhdx rejects `backing_file`
   stays true through this phase; phase 10 owns the change.
+  **Corrected during review:** the statement was not merely stale but
+  false -- it attributed the refusal to `plan_vhdx`, which this phase
+  makes untrue, while the vpc bullet beside it had already been
+  re-attributed to the create operation when the VHD emitter landed.
+  The two sections described the same mechanism differently, so the
+  vhdx bullet was rewritten to mirror the vpc one. Phase 10 still owns
+  the wording for when the refusal is actually lifted.
 
 ## What the survey found
 
@@ -149,6 +156,21 @@ Five findings that change what this phase does:
    true. They are not corrected here — they are a specification of
    what 6b must build, and step 6e re-reads them against the
    shipped emitter.
+
+6. **Step 6a measured the identity claim, and it holds — with a
+   second hole beside it.** A real instar-produced VHDX carries
+   sequence 1 and 2 in its two headers; header 2 is active and its
+   `DataWriteGuid` renders as
+   `00000002-0000-0000-0200-000000000000`, exactly as `build_header`
+   predicts. The measurement also found that the Virtual Disk ID
+   metadata item is not merely constant but *computed* — it is
+   `virtual_disk_size` (LE u64) then `block_size` (LE u32) then the
+   ASCII bytes `VHDX` (`vhdx/src/lib.rs:2362-2375`) — so two
+   independently created images of the same size and block size get a
+   byte-identical Virtual Disk ID. Recorded on #566
+   (`issuecomment-5738800245`) with the raw bytes. Phase 8's negative
+   identity test must therefore use a third-party parent, as the
+   master plan already says.
 
 Nothing else in the phase 6 section was wrong. The `parent_linkage`
 = parent `DataWriteGuid` rule, the lowercase-braced rendering, the
@@ -389,7 +411,8 @@ how phase 15's harness will work.
   `pre-commit run --all-files` is clean.
 * `fuzz_create_emitters` builds and runs against the new path
   without tripping its `minimum_file_size` or overlap oracles.
-* `docs/create.md` is unchanged, and `create -f vhdx -b` still
+* `docs/create.md`'s vhdx bullet attributes the refusal to the same
+  place its vpc bullet does, and `create -f vhdx -b` still
   fails with the same error a user sees today. **Verified by hand
   against a binary built from this branch**, not by a committed
   test: `create -f vhdx parent.vhdx 64M` succeeds and

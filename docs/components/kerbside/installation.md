@@ -335,3 +335,55 @@ Whichever you pick, the pieces described in
 the same, and two references apply throughout:
 [configuration.md](/components/kerbside/configuration/) for every setting, and
 [console-sources.md](/components/kerbside/console-sources/) for configuring sources.
+
+## Upgrading
+
+`kerbside db upgrade` is the whole of a normal upgrade — see
+[What a running Kerbside needs](#what-a-running-kerbside-needs). This
+section records the upgrades which need something from you as well.
+
+### Upgrading past the source credential disclosure
+
+In Kerbside v0.6.0 and earlier, `GET /source/<name>` returned the
+source record verbatim, including the cleartext password Kerbside uses
+to authenticate to the backend cloud, to any holder of a valid API
+token. The `.vv` handler for direct connections separately wrote the
+same credential into the daemon log on every request, along with the
+console's SPICE ticket.
+
+A static source's ticket was exposed more widely still: console
+discovery logged it on every maintenance pass, so it reached the
+daemon log roughly once a minute whether or not anybody ever requested
+a console. Do not assume a log is clean because nothing connected to
+it.
+
+Those are fixed in code, but code cannot reach backwards.
+
+The first question is usually "was I affected?", and the honest answer
+is that you cannot tell. Kerbside writes no audit event when a source
+is read, so there is no record of who called `GET /source/<name>` or
+when. The audit trail can neither confirm nor exclude access, which is
+why the guidance below is to rotate rather than to investigate:
+rotation is the only action available that actually closes the
+exposure.
+
+If you ran v0.6.0 or earlier:
+
+- **Rotate the credentials in `sources.yaml`** — the oVirt, OpenStack
+  or Shaken Fist service account password for every configured source
+  — and restart the daemon so it picks them up. Anyone who held an API
+  token, and anyone who could read the daemon's log, could have read
+  the old ones.
+- **Rotate the SPICE passwords of any static sources**, in
+  `sources.yaml` and on the SPICE servers themselves. A static
+  source's ticket is a console password you configured rather than one
+  minted per request, so unlike an oVirt ticket it does not expire on
+  its own. oVirt, OpenStack and Shaken Fist tickets need no action:
+  they are short lived and are reissued on every request.
+- **Scrub or expire the daemon logs** from before the upgrade,
+  including anywhere they were shipped: a log aggregator, a backup, a
+  support bundle, or CI artifacts from a deployment lane.
+
+The credentials being rotated are management plane accounts on the
+cloud Kerbside proxies for, so they are worth treating as a real
+exposure rather than a formality.
