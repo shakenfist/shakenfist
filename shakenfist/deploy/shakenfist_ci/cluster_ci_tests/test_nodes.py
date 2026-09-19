@@ -194,6 +194,17 @@ class TestNodes(base.BaseNamespacedTestCase):
             # whatever else the rest of the suite is doing concurrently.
             self.assertGreaterEqual(per_node['cpu_committed'], 1)
 
+            # The same capacity row publishes a disk ceiling and ledger
+            # (issue 4208): disk_available alone is headroom, which moves
+            # under concurrent load, so it cannot answer "what could this
+            # node ever accept?". Our placement charges its 1 GB disk, so
+            # the ledger accounts for at least that; the limit is the
+            # row's own, never a live-derived fallback.
+            self.assertIsNotNone(per_node['disk_limit_gb'])
+            self.assertGreaterEqual(per_node['disk_committed_gb'], 1)
+            self.assertGreaterEqual(
+                per_node['disk_limit_gb'], per_node['disk_committed_gb'])
+
             # The published headroom is what admission will actually
             # honour: the hard maximum less whichever of the measurement
             # and the placement ledger is binding.

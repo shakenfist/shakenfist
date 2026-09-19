@@ -305,14 +305,21 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
         """A disk request beyond every node's published free space is
         refused.
 
-        Disk is the one dimension of the three with no published
-        *ceiling*: ``disk_available`` (``scheduler.py:1127-1132``) is
-        free space minus the node's own reservation, and nothing in
-        ``/admin/resources`` publishes a node's total disk the way
-        ``ram_max`` publishes total memory. So, unlike the memory test
-        above, this cannot be made immune to a sibling worker freeing
-        space during the test window -- it can only be made a generous
-        margin against it. The request is sized from
+        When this test was written, disk was the one dimension of the
+        three with no published *ceiling*: ``disk_available`` is free
+        space minus the node's own reservation, and nothing in
+        ``/admin/resources`` published a node's total disk the way
+        ``ram_max`` publishes total memory. Issue 4208 has since added
+        ``disk_limit_gb`` and ``disk_committed_gb`` from the capacity
+        row, but resizing this test onto that ceiling is deliberately
+        not done here: a request beyond a *stale* ``disk_limit_gb`` is
+        refused by the admission guard rather than the
+        ``sufficient_free_disk`` pre-filter (which reads live headroom
+        only), so the stage this test asserts would no longer be the
+        stage that answers. Until that is redesigned, this cannot be
+        made immune to a sibling worker freeing space during the test
+        window -- it can only be made a generous margin against it.
+        The request is sized from
         ``max(disk_available)`` over every node, plus the *sum* of every
         node's ``disk_available`` -- that is, the largest node's own free
         space, as if every other node's free space were also somehow
@@ -328,13 +335,13 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
           other node's ``disk_available`` at read time actually being
           freed onto the one node that held the maximum, between the
           read and the create -- could in principle still admit the
-          request: **asserted, not guarded**, and not fully closeable
-          the way the memory test's flake vector was, precisely because
-          no published field bounds a node's total disk. This is the
+          request: **asserted, not guarded**, and not closeable by this
+          test while it asserts the ``sufficient_free_disk`` stage,
+          because that pre-filter reads live headroom rather than the
+          published ``disk_limit_gb`` ceiling (see above). This is the
           honest residual risk D24's amendment could not remove for this
           dimension; it is far less likely than the single-unit-of-
-          headroom race the memory test had; there is no cluster-wide
-          disk ceiling to size against instead.
+          headroom race the memory test had.
         * Every node in the cluster is simultaneously fully committed on
           vCPUs or memory, so the request is refused at an earlier stage
           (``sufficient_idle_cpu`` or ``sufficient_idle_memory``) before
