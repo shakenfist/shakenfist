@@ -7370,6 +7370,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-use-case-docs-phase-01-shaken-fist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 1: `docs/use-cases/shaken-fist.md`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-demo-install-phase-01-db-upgrade/" class="md-nav__link">
         
   
@@ -9000,6 +9028,34 @@
     
   
     Kerbside for oVirt
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../use-cases/shaken-fist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside for Shaken Fist
   
 
     
@@ -14050,6 +14106,13 @@ repo root. For pre-push audits of our own work see
 <td><a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside/">phase 1</a> (done), <a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion/">phase 2</a> (done, promoted on four green nightlies), <a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue/">phase 3</a> (done, queue live 2026-08-09; first entry caught a real failure), <a href="/components/kerbside/plans/PLAN-two-tier-ci-phase-04-docs/">phase 4</a> (done)</td>
 </tr>
 <tr>
+<td>2026-08-02</td>
+<td><a href="/components/kerbside/plans/PLAN-use-case-docs/">Use case documentation</a></td>
+<td>One docs page per deployment permutation, each covering value proposition, how it works, and setup. The oVirt page landed 2026-08-10 as two-tier CI phase 4 and settles the format, the <code>docs/use-cases/</code> directory and the index placement; five writable pages remain and Proxmox stays deferred until a source driver exists. Promoted from a standalone plan on 2026-09-18 when phase 1 was planned, which brings the mandatory push-audit phase with it</td>
+<td>In progress</td>
+<td><a href="/components/kerbside/plans/PLAN-use-case-docs-phase-01-shaken-fist/">phase 1</a> (in progress -- the Shaken Fist page, chosen ahead of OpenStack so the format's second instance has the least unsettled ground under it: the VDI tokens plan is complete and <code>sf-e2e</code> gates it on every pull request, where the OpenStack deployment story is still moving upstream on Gerrit. The survey found the master plan's "remaining six pages are unblocked" wrong by its own table, the static-source row's precondition since met by the install rewrite, and the multi-cloud row's "stated nowhere" now one sentence and one bullet wide; all three corrected at source. It also found the index scaffolding already built -- <code>docs/index.md</code> carries a seven-row Use Cases table, so each page phase links an existing row rather than adding one. The load-bearing finding is not a staleness: <code>docs/console-sources.md:67-146</code> already documents the Shaken Fist flow in eighty accurate lines, so the phase's central decision is what the page does <em>not</em> say, and six specifics are named in the definition of done as forbidden to duplicate), phases 2-5 (not started -- OpenStack, standalone/static, multi-cloud plus placement topologies, then the index slim-down and closeout), phase 6 (not started -- push audit)</td>
+</tr>
+<tr>
 <td>2026-08-08</td>
 <td><a href="/components/kerbside/plans/PLAN-sfui-conversion/">Convert the admin UI to sfui</a></td>
 <td>Make kerbside the second sfui consumer: vendor sfui into the static assets, rebuild the six templates on tokens and sfui components (theme toggle, tab-strip nav, brand chrome, details disclosures, morphdom polling), drop Bootstrap/jQuery/axios, fix the accumulated markup defects, and add template smoke tests; resolves #244 and #133</td>
@@ -14073,24 +14136,8 @@ repo root. For pre-push audits of our own work see
 </tbody>
 </table>
 <h2 id="standalone-plans">Standalone plans<a class="headerlink" href="#standalone-plans" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Date</th>
-<th>Plan</th>
-<th>Intent</th>
-<th>Status</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>2026-08-02</td>
-<td><a href="/components/kerbside/plans/PLAN-use-case-docs/">Use case documentation</a></td>
-<td>One docs page per deployment permutation (Shaken Fist, OpenStack, oVirt, multi-cloud aggregation, placement topologies, static, later Proxmox), each covering value proposition, how it works, and setup; the oVirt page is delivered by two-tier CI phase 4 as the format-setting first instance</td>
-<td>In progress</td>
-</tr>
-</tbody>
-</table>
+<p>None at present. The last one, <a href="/components/kerbside/plans/PLAN-use-case-docs/">Use case documentation</a>, was promoted to a master plan on
+2026-09-18.</p>
 
 
 
