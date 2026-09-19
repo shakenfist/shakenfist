@@ -594,6 +594,14 @@ first round asked for was not a link at all. Editing the spec staled
 its mark too, pruned here like the other three, which is what takes
 this repository past its own threshold.
 
+Taken together, the two rounds say step 5.1's brief was wrong to
+scope the repair to one file. The "pushes to `main`" claim lived in
+three -- `docs/code-review-tracking.md`, `AGENTS.md` and
+`ARCHITECTURE.md` -- and the criterion spec carried two stale
+statements of its own, so repairing one of them left the tree
+disagreeing with itself until review caught it. Both rounds landed
+inside #139, so the merge commit recorded for step 7 covers them.
+
 **`review-coverage` fails against this repository, and that is the
 criterion working.** Rebasing onto main on 2026-09-19 put
 development itself over its own backlog threshold: main already
@@ -707,14 +715,23 @@ PR on this branch, the ryll work a separate PR.
 | 4 | development | `PROJECT-CONSISTENCY-AUDITS.md` + `PLAN-consistency.md` entries | Complete | `b677b61` (#11) |
 | 5 | development | `docs/code-review-tracking.md` steady-state rewrite | Complete | `b677b61` (#11) |
 | 6 | ryll | prune workflow + `tools/ci-prune-reviews.sh` + docs | Complete | ryll `1e94d00f` (#236) |
-| 7 | both | end-to-end verification (phase 5) | In progress | |
+| 7 | both | end-to-end verification (phase 5) | Complete | `ced6fef` (#139) |
 | 8 | both | push audit over each PR (phase 6) | Not started | |
 
 Step 7 stopped being blocked when both pull requests merged in
 August; phase 5 above is the plan for it. The statuses were brought
 into the shared vocabulary on 2026-09-17 -- see that phase's survey.
-Step 7 reaches `Complete` when its own pull request merges and the
-`Merged` column records that commit, not before.
+Step 7 merged on 2026-09-19 as `ced6fef` (#139), which is what moved
+it to `Complete`; this plan does not write that term without a
+landing commit beside it.
+
+That cell records step 7 and nothing else. This closeout is its
+own pull request (#146), so it lands outside any range anchored on
+`ced6fef` and phase 6 will not see it. What it changes is this
+plan file's own narrative and no tooling, so the omission costs
+the audit nothing -- it is written down here rather than left
+implicit because the rule is that a landing is recorded, not that
+it is judged small.
 
 The `Merged` column is what `plan-push-audit-phase` asks each phase
 to record as it lands, so that phase 6 has a range to audit once

@@ -107,6 +107,30 @@ Console sources (cloud platforms) that provide virtual machines.
 | project_domain_id | string | OpenStack project domain (OpenStack only) |
 | deleted | boolean | Soft delete flag |
 
+`password` is a live credential for the backend cloud's management
+plane, and is never returned by the REST API or rendered by the web UI.
+`db.get_source()` and `db.get_sources()` return only the fields listed
+in `db.SOURCE_PUBLIC_FIELDS` unless a caller opts in with
+`include_secrets=True`, which only the code paths that authenticate to
+a backend cloud do. That list is an allowlist rather than a list of
+things to strip, so a column added to the table is private until
+somebody decides otherwise.
+
+Three of the public fields are worth naming explicitly, because each
+could plausibly have gone the other way:
+
+- `ca_cert` is the public half of the backend's TLS identity rather
+  than a credential. The sources page renders it and clients need it
+  to validate the connection they are pointed at.
+- `url` is the backend's management plane endpoint. It is public
+  because the list endpoint has always returned it and because a
+  console client that cannot see which cloud a source is cannot do
+  much with it.
+- `username` is half of a credential pair. It is public for the same
+  historical reason as `url`. Narrowing either is an API behaviour
+  change rather than part of withholding the password, and is tracked
+  in [issue #449](https://github.com/shakenfist/kerbside/issues/449).
+
 ### consoles
 
 Virtual machine consoles discovered from sources.
@@ -123,6 +147,44 @@ Virtual machine consoles discovered from sources.
 | name | string | VM display name |
 | host_subject | string | Expected TLS certificate subject |
 | ticket | string | SPICE ticket for authentication |
+
+`ticket` is the password the SPICE server on the hypervisor will accept
+for this console, and it gets the same treatment as a source's
+`password`. `db.get_console()` and `db.get_consoles()` return only the
+fields in `db.CONSOLE_PUBLIC_FIELDS` unless a caller opts in with
+`include_secrets=True`, so it reaches neither the REST API nor the web
+UI. The ticket's lifetime depends on the source: oVirt mints a fresh
+one on every `.vv` request and expires it in about two minutes, while a
+static source persists the console password from its configuration
+indefinitely.
+
+There are exactly two callers entitled to read it back out of the
+database, and `git grep include_secrets` finds them alongside the
+source ones: the static branch of the direct `.vv` handler, which
+writes it into the file it returns, and the gRPC servicer, which hands
+it to the proxy to present to the hypervisor.
+
+The allowlist governs what leaves the database, which is not the whole
+story for logs. Discovery holds a ticket before there is a database row
+to read: the source driver yields it and `main._parse_sources()` passes
+it to `db.add_console()`. A static source's driver builds that dict
+straight from `sources.yaml`, so for the one source type whose ticket
+does not expire, the credential is in process memory every maintenance
+pass. Two log lines on that path are therefore redacted by hand rather
+than by the allowlist, and they are the reason
+`db.CONSOLE_SECRET_FIELDS` exists separately from
+`db.CONSOLE_PUBLIC_FIELDS`:
+
+- `main._parse_sources()` drops `CONSOLE_SECRET_FIELDS` from the
+  `Found console` line, which would otherwise write a static source's
+  SPICE password to the daemon log every 60 seconds.
+- The static driver reports a malformed console entry by naming the
+  keys it found rather than dumping the entry, which would otherwise
+  log the ticket of any entry that supplied one and omitted something
+  else.
+
+Both are pinned by unit tests, because neither is protected by the
+allowlist that protects everything else.
 
 ### consoletokens
 
