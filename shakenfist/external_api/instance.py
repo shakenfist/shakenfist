@@ -780,6 +780,26 @@ class InstancesEndpoint(api_base.Resource):
                     400, 'disk specification must specify at least one of '
                     'size or base')
 
+            # A negative size is never a disk. The schema's minimum
+            # refuses it at enforce, but API_VALIDATION_MODE=warn and
+            # off are the operator's rollback (decision D42), and this
+            # is the one value in that rollback's inventory with a
+            # cross-namespace blast radius: the scheduler sums it into
+            # the requested capacity, and admit_instance_placement's
+            # guarded UPDATE (used + requested <= limit) always admits
+            # a negative request and deflates the node's used_disk_gb
+            # -- inflating the capacity every other namespace's claims
+            # are admitted against (issue 4248). Values float() cannot
+            # read fall through on purpose: what a 'banana' size
+            # answers is the validation mode's business, and this guard
+            # asks one question only.
+            try:
+                size_is_negative = float(d.get('size')) < 0
+            except (TypeError, ValueError):
+                size_is_negative = False
+            if size_is_negative:
+                return sf_api.error(400, 'disk size must not be negative')
+
             # Ensure we're using a known disk bus. This is also what
             # refuses 'ide', which left _get_disk_device's table when
             # support was removed in v0.7 -- a later IDE-specific guard

@@ -463,6 +463,110 @@ class TestNestedSpecKeysRefused(base.BaseNamespacedTestCase):
                     marker, e.text,
                     'Validation refusal leaked interpreter text: %s' % e.text)
 
+    def test_negative_disk_size_refused(self):
+        """Issue 4248, at the real API.
+
+        A negative `disk[].size` is summed straight into the requested
+        capacity, and `admit_instance_placement`'s guarded UPDATE
+        (`used + requested <= limit`) always admits a negative request
+        and *deflates* the node's `used_disk_gb` -- inflating the
+        capacity every other namespace's claims are admitted against.
+        That was the only cross-namespace effect in the warn/off
+        inventory of the phase 8 push audit.
+
+        This suite runs at the `enforce` default, so the refusal pinned
+        here is the schema's `minimum: 0` (D45). The handler guard which
+        holds the same refusal at the `warn`/`off` rollback answers a
+        different 400 and is pinned by the unit sweep's
+        `disk.size.negative` rows, because a deployed cluster's
+        validation mode is not this suite's to change.
+        """
+        try:
+            # raw-create: as above, the refusal is the assertion.
+            self.test_client.create_instance(
+                'diskspec-negative-size', 1, 1024, None,
+                [
+                    {
+                        'size': -5
+                    }
+                ], None, None)
+            self.fail('A negative disk size was not refused')
+        except apiclient.RequestMalformedException as e:
+            self.addDetail('response', content.text_content(str(e.text)))
+            self.assertEqual(400, e.status_code)
+
+            body = json.loads(e.text)
+            self.assertEqual(
+                {'error': 'disk[0].size: Must be greater than or equal to 0.',
+                 'status': 400},
+                body)
+
+            for marker in _INTERPRETER_TEXT_MARKERS:
+                self.assertNotIn(
+                    marker, e.text,
+                    'Validation refusal leaked interpreter text: %s' % e.text)
+
+
+class TestDNSValueRefused(base.BaseNamespacedTestCase):
+    """Issue 4248, at the real API.
+
+    The DNS `value` on `POST /networks/{ref}/dns` is stored on the
+    network's hosteddns attribute and rendered raw as
+    `{{value}} {{name}}` into the addn-hosts file that network's
+    dnsmasq serves, through a jinja2.Template with autoescape off. A
+    value carrying a newline therefore injects extra host entries into
+    the caller's own network's DNS.
+
+    This suite runs at the `enforce` default, so the refusal pinned
+    here is the `ipv4` declaration's format validator. The handler
+    guard which holds the same refusal at the `warn`/`off` rollback
+    answers 406 and is pinned in the unit suite
+    (test_network.py's NetworkDNSAddressValueGuardTestCase), because a
+    deployed cluster's validation mode is not this suite's to change.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'apivaliddns'
+        super().__init__(*args, **kwargs)
+
+    def setUp(self):
+        super().setUp()
+        self.net = self.test_client.allocate_network(
+            '192.168.244.0/24', True, True, '%s-net' % self.namespace,
+            provide_dns=True)
+        self.addDetail(
+            'net',
+            content.text_content(json.dumps(self.net, indent=4, sort_keys=True)))
+        self._await_networks_ready([self.net['uuid']])
+
+    def test_injection_value_refused(self):
+        try:
+            self.test_client.update_network_dns_entry(
+                self.net['uuid'], 'probe',
+                '10.0.0.1 innocent\n10.0.0.2 victim.example.com')
+            self.fail('A DNS value carrying a newline was not refused')
+        except apiclient.RequestMalformedException as e:
+            self.addDetail('response', content.text_content(str(e.text)))
+            self.assertEqual(400, e.status_code)
+
+            body = json.loads(e.text)
+            self.assertEqual(
+                {'error': 'value: Not a valid IP address.', 'status': 400},
+                body)
+
+            for marker in _INTERPRETER_TEXT_MARKERS:
+                self.assertNotIn(
+                    marker, e.text,
+                    'Validation refusal leaked interpreter text: %s' % e.text)
+
+        # The control, which is also the width assertion: a well formed
+        # address on the same network still round trips, so neither the
+        # declaration nor the handler guard is narrower than the
+        # handler was.
+        self.test_client.update_network_dns_entry(
+            self.net['uuid'], 'probe', '192.168.244.5')
+        self.test_client.delete_network_dns_entry(self.net['uuid'], 'probe')
+
 
 class TestNullNetworkUuidRefusedOnHotplug(base.BaseNamespacedTestCase):
     """PLAN-api-input-validation-phase-07-structured.md, finding F7.

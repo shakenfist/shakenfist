@@ -100,10 +100,12 @@ def _handler_defaults(fn):
 # ``ArtifactsEndpoint.post`` has a real and sensible default in the
 # handler's own signature (``shared=False``), so the ``accepted``
 # verdict below says the declaration was wrong rather than the handler.
-# The other five ``accepted`` rows keep ``required=True``, because what
+# The other ``accepted`` rows keep ``required=True``, because what
 # they accept is a broken operation rather than a sensible default --
 # the reasoning for each is in *Step 2: which declarations are really
-# required* in the plan.
+# required* in the plan. There were five when step 2 measured; the DNS
+# ``value`` row moved to ``guarded`` when issue 4248's handler guard
+# started refusing the null the omission produced.
 #
 # They stay in the sweep. The enumeration is derived from the
 # declarations, so a relaxed one would otherwise fall out of the census
@@ -596,8 +598,14 @@ SWEEP = {
         (406, False, 'guarded'),
     ('NetworkDNSAddressEndpoint', 'post', 'name'):
         (406, False, 'guarded'),
+    # Was (200, False, 'accepted') when phase 6 measured it: the
+    # omission was stored as a DNS record pointing at null, which is
+    # why the declaration kept required=True. The issue 4248 guard
+    # refuses a non-string value in the handler -- the same value is
+    # rendered raw into dnsmasq's hosts file -- so the omission now
+    # answers 406 at every mode.
     ('NetworkDNSAddressEndpoint', 'post', 'value'):
-        (200, False, 'accepted'),
+        (406, False, 'guarded'),
     ('NetworkMetadataEndpoint', 'put', 'value'):
         (400, False, 'guarded'),
     ('NetworkMetadatasEndpoint', 'post', 'key'):
@@ -948,7 +956,7 @@ class RequiredSweepTestCase(SweepFixtureTestCase):
         Each of these was measured ``accepted`` below and judged to
         have a sensible default, so it is declared optional. Every
         other row in the table still claims to be required, including
-        the five ``accepted`` ones the step deliberately left alone --
+        the ``accepted`` ones the step deliberately left alone --
         pinning both directions means neither a quiet revert nor a
         later mechanical sweep of the remaining ``accepted`` rows can
         happen without this file saying so.

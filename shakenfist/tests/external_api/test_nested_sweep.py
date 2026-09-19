@@ -64,6 +64,15 @@ them and was stored. They are value tests now, which is why
 ``video.model.null`` and ``video.memory.null`` are refused in every
 column.
 
+A fourth handler guard was added after the phase, by the issue 4248
+fix: a diskspec size which reads as a negative number is refused in
+the handler, because the scheduler sums it into the requested capacity
+and ``admit_instance_placement``'s guarded UPDATE always admits a
+negative request -- deflating the node's used counters, which is a
+cross-namespace effect the ``warn``/``off`` rollback must not hand
+back. ``disk.size.negative`` and ``disk.size.negative_string`` are
+refused in every column now.
+
 Six more rows moved at ``warn`` after the phase, when the issue #4223
 fix taught ``from_db_by_ref`` to answer "not found" for a null or
 non-string ref: the ``net.uuid``/``hotplug.uuid`` ``int``, ``dict``
@@ -199,9 +208,20 @@ CASES = [
     Case('disk.size.negative', CREATE, 'diskspec', 'size',
          {'disk': [{'size': -5}]},
          refused('disk[0].size: Must be greater than or equal to 0.'),
-         ACCEPTED,
+         refused('disk size must not be negative'),
          'F6 row 1, and the whole argument for D45\'s minimum: a negative '
-         'size corrupts the capacity ledger at scheduler.py:473'),
+         'size corrupts the capacity ledger at scheduler.py:473. Accepted '
+         'at warn until issue 4248 added the handler guard -- the ledger '
+         'corruption is cross-namespace, so the rollback must not hand it '
+         'back. Moves at warn'),
+    Case('disk.size.negative_string', CREATE, 'diskspec', 'size',
+         {'disk': [{'size': '-5'}]},
+         refused('disk[0].size: Must be greater than or equal to 0.'),
+         refused('disk size must not be negative'),
+         'issue 4248: "-5" reaches int("-5") in the scheduler exactly as '
+         '-5 does (the numeric_string row is why strings get this far), so '
+         'the guard reads the value as a number rather than testing its '
+         'type. Moves at warn'),
     Case('disk.size.fractional', CREATE, 'diskspec', 'size',
          {'disk': [{'size': 8.5}]},
          refused('disk[0].size: Not a valid integer.'), ACCEPTED,
@@ -1085,13 +1105,15 @@ class NestedSweepWarnTestCase(_NestedSweepMixin, SweepFixtureTestCase):
     what they had. ``check()`` still runs and still logs every finding,
     so the observability is unchanged; it simply does not act on one.
 
-    Ten rows deliberately do not roll back, and this class asserts
-    that they do not. They are the three handler guards this phase
-    added: a null ``network_uuid`` on either route (F7, which used to
+    Twelve rows deliberately do not roll back, and this class asserts
+    that they do not. They are the four handler guards: a null
+    ``network_uuid`` on either route (F7, which used to
     be a 200 and an interface on an arbitrary network), the six shapes
-    of diskspec which ask for neither a size nor a base, and a
+    of diskspec which ask for neither a size nor a base, a
     ``videospec`` whose ``model`` or ``memory`` is an explicit null
-    (which used to be stored and to reach the hypervisor). A guard is
+    (which used to be stored and to reach the hypervisor), and a
+    negative diskspec size (issue 4248, which used to deflate the
+    capacity ledger across namespaces). A guard is
     not a schema check and does not answer to ``API_VALIDATION_MODE`` --
     which is the whole reason step 4 wrote them as guards rather than
     leaving the schema to do it, since a rollback which handed back the
