@@ -14126,7 +14126,14 @@ against this plan's restatement of them.</p>
 <li>The guest create op actually accepting <code>-b</code> for vhdx. Phase 7.</li>
 <li>Reading or composing a differencing VHDX. Phases 11 to 16.</li>
 <li><code>docs/create.md</code>. Its statement that vhdx rejects <code>backing_file</code>
-  stays true through this phase; phase 10 owns the change.</li>
+  stays true through this phase; phase 10 owns the change.
+  <strong>Corrected during review:</strong> the statement was not merely stale but
+  false -- it attributed the refusal to <code>plan_vhdx</code>, which this phase
+  makes untrue, while the vpc bullet beside it had already been
+  re-attributed to the create operation when the VHD emitter landed.
+  The two sections described the same mechanism differently, so the
+  vhdx bullet was rewritten to mirror the vpc one. Phase 10 still owns
+  the wording for when the refusal is actually lifted.</li>
 </ul>
 <h2 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h2>
 <p>The master plan's phase 6 paragraph
@@ -14230,6 +14237,22 @@ are in this plan's step briefs instead.</p>
    true. They are not corrected here — they are a specification of
    what 6b must build, and step 6e re-reads them against the
    shipped emitter.</p>
+</li>
+<li>
+<p><strong>Step 6a measured the identity claim, and it holds — with a
+   second hole beside it.</strong> A real instar-produced VHDX carries
+   sequence 1 and 2 in its two headers; header 2 is active and its
+   <code>DataWriteGuid</code> renders as
+   <code>00000002-0000-0000-0200-000000000000</code>, exactly as <code>build_header</code>
+   predicts. The measurement also found that the Virtual Disk ID
+   metadata item is not merely constant but <em>computed</em> — it is
+   <code>virtual_disk_size</code> (LE u64) then <code>block_size</code> (LE u32) then the
+   ASCII bytes <code>VHDX</code> (<code>vhdx/src/lib.rs:2362-2375</code>) — so two
+   independently created images of the same size and block size get a
+   byte-identical Virtual Disk ID. Recorded on #566
+   (<code>issuecomment-5738800245</code>) with the raw bytes. Phase 8's negative
+   identity test must therefore use a third-party parent, as the
+   master plan already says.</p>
 </li>
 </ol>
 <p>Nothing else in the phase 6 section was wrong. The <code>parent_linkage</code>
@@ -14542,7 +14565,8 @@ how phase 15's harness will work.</p>
   <code>pre-commit run --all-files</code> is clean.</li>
 <li><code>fuzz_create_emitters</code> builds and runs against the new path
   without tripping its <code>minimum_file_size</code> or overlap oracles.</li>
-<li><code>docs/create.md</code> is unchanged, and <code>create -f vhdx -b</code> still
+<li><code>docs/create.md</code>'s vhdx bullet attributes the refusal to the same
+  place its vpc bullet does, and <code>create -f vhdx -b</code> still
   fails with the same error a user sees today. <strong>Verified by hand
   against a binary built from this branch</strong>, not by a committed
   test: <code>create -f vhdx parent.vhdx 64M</code> succeeds and

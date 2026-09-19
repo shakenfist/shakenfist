@@ -14470,8 +14470,14 @@ the subformat. instar exposes <code>--grain-size</code> as an independent flag.<
 <p>Rejected (future work):
 - <code>backing_file</code>, <code>backing_fmt</code> — a VHDX child with a parent needs
   the <code>HasParent</code> file-parameter bit and a populated parent locator
-  metadata item, which <code>plan_vhdx</code> refuses with
-  <code>BackingFileUnsupported</code>. See <a href="#future-work">Future work</a>.</p>
+  metadata item, which the create operation refuses with
+  <code>BackingFileUnsupported</code>. The refusal is in the operation rather
+  than in the planner, exactly as for vpc above: instar can now build
+  the metadata for a differencing VHDX, but it cannot yet read the
+  parent's active-header <code>DataWriteGuid</code> off the parent, and a child
+  recording the wrong parent identity is worse than no child at all.
+  See <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> and
+  <a href="#future-work">Future work</a>.</p>
 <h3 id="raw">raw<a class="headerlink" href="#raw" title="Permanent link">&para;</a></h3>
 <p>Honoured:
 - <code>size</code>, <code>preallocation</code> (off|falloc|full)</p>

@@ -6778,6 +6778,34 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#upgrading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Upgrading">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#upgrading-past-the-source-credential-disclosure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading past the source credential disclosure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14142,6 +14170,34 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#upgrading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Upgrading">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#upgrading-past-the-source-credential-disclosure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading past the source credential disclosure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14505,6 +14561,50 @@ the guide for yours:</p>
 the same, and two references apply throughout:
 <a href="/components/kerbside/configuration/">configuration.md</a> for every setting, and
 <a href="/components/kerbside/console-sources/">console-sources.md</a> for configuring sources.</p>
+<h2 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">&para;</a></h2>
+<p><code>kerbside db upgrade</code> is the whole of a normal upgrade — see
+<a href="#what-a-running-kerbside-needs">What a running Kerbside needs</a>. This
+section records the upgrades which need something from you as well.</p>
+<h3 id="upgrading-past-the-source-credential-disclosure">Upgrading past the source credential disclosure<a class="headerlink" href="#upgrading-past-the-source-credential-disclosure" title="Permanent link">&para;</a></h3>
+<p>In Kerbside v0.6.0 and earlier, <code>GET /source/&lt;name&gt;</code> returned the
+source record verbatim, including the cleartext password Kerbside uses
+to authenticate to the backend cloud, to any holder of a valid API
+token. The <code>.vv</code> handler for direct connections separately wrote the
+same credential into the daemon log on every request, along with the
+console's SPICE ticket.</p>
+<p>A static source's ticket was exposed more widely still: console
+discovery logged it on every maintenance pass, so it reached the
+daemon log roughly once a minute whether or not anybody ever requested
+a console. Do not assume a log is clean because nothing connected to
+it.</p>
+<p>Those are fixed in code, but code cannot reach backwards.</p>
+<p>The first question is usually "was I affected?", and the honest answer
+is that you cannot tell. Kerbside writes no audit event when a source
+is read, so there is no record of who called <code>GET /source/&lt;name&gt;</code> or
+when. The audit trail can neither confirm nor exclude access, which is
+why the guidance below is to rotate rather than to investigate:
+rotation is the only action available that actually closes the
+exposure.</p>
+<p>If you ran v0.6.0 or earlier:</p>
+<ul>
+<li><strong>Rotate the credentials in <code>sources.yaml</code></strong> — the oVirt, OpenStack
+  or Shaken Fist service account password for every configured source
+  — and restart the daemon so it picks them up. Anyone who held an API
+  token, and anyone who could read the daemon's log, could have read
+  the old ones.</li>
+<li><strong>Rotate the SPICE passwords of any static sources</strong>, in
+  <code>sources.yaml</code> and on the SPICE servers themselves. A static
+  source's ticket is a console password you configured rather than one
+  minted per request, so unlike an oVirt ticket it does not expire on
+  its own. oVirt, OpenStack and Shaken Fist tickets need no action:
+  they are short lived and are reissued on every request.</li>
+<li><strong>Scrub or expire the daemon logs</strong> from before the upgrade,
+  including anywhere they were shipped: a log aggregator, a backup, a
+  support bundle, or CI artifacts from a deployment lane.</li>
+</ul>
+<p>The credentials being rotated are management plane accounts on the
+cloud Kerbside proxies for, so they are worth treating as a real
+exposure rather than a formality.</p>
 
 
 

@@ -15074,7 +15074,7 @@ verdict, and see
 <a href="/components/development/consistency-audits/">../consistency-audits.md</a> for what a run
 does.</p>
 <!-- consistency-audit:begin -->
-<p><em>Generated 2026-09-18T10:48:39.269605+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
+<p><em>Generated 2026-09-19T10:32:43.235741+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <h2 id="ci-review-automation">ci-review-automation<a class="headerlink" href="#ci-review-automation" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/ci-review-automation/">ci-review-automation.md</a></p>
 <table>
@@ -16057,7 +16057,7 @@ does.</p>
 <li><strong>client-python-k3s</strong> (Status): 4 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above</li>
 <li><strong>clingwrap</strong> (Status): 2 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above</li>
 <li><strong>divergulent</strong> (Status): 1 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above</li>
-<li><strong>instar</strong> (Status): 21 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above</li>
+<li><strong>instar</strong> (Status): 1 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above</li>
 <li><strong>library-utilities</strong> (Status): 1 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above</li>
 <li><strong>occystrap</strong> (Status): 5 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above</li>
 <li><strong>ryll</strong> (Status): 17 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above</li>
@@ -17937,8 +17937,8 @@ does.</p>
 </tr>
 <tr>
 <td>kerbside</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/452" title="GitHub Issue: shakenfist/kerbside #452">kerbside#452</a></td>
 </tr>
 <tr>
 <td>kerbside-client</td>
@@ -17995,6 +17995,7 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>instar</strong> (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-differencing.md (ends with a push audit phase that never names PUSH-AUDIT.md)</li>
+<li><strong>kerbside</strong> (Status): 1 of 2 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-use-case-docs.md (ends with a push audit phase that never names PUSH-AUDIT.md)</li>
 <li><strong>uncalibrated-sextant</strong> (Status): 5 of 5 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-locked-bootloader.md (no push audit phase; phase 3 is "3. Iteration, documentation, inventory closeout"), PLAN-display-mode-keystrokes.md (no push audit phase; phase 3 is "3. Iteration against ryll display-mode-ui, documentation,..."), PLAN-audit-cleanup.md (no push audit phase; phase 3 is "3. Test coverage and release verification"), PLAN-visual-digest.md (no push audit phase; phase 3 is "3. Repaint integration, format spec, closeout"), PLAN-continuous-digest.md (no push audit phase; phase 3 is "3. Docs, decoder coordination, closeout"); 2 plan(s) with no phases this check can read, not judged: PLAN-language-probes.md, PLAN-headless-readback-bug.md</li>
 </ul>
 <h2 id="plan-index">plan-index<a class="headerlink" href="#plan-index" title="Permanent link">&para;</a></h2>
@@ -18301,8 +18302,8 @@ does.</p>
 </tr>
 <tr>
 <td>hunkydory</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/hunkydory/issues/16" title="GitHub Issue: shakenfist/hunkydory #16">hunkydory#16</a></td>
+<td>N/A</td>
+<td>-</td>
 </tr>
 <tr>
 <td>instar</td>
@@ -18369,8 +18370,7 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>client-python</strong> (Status): 2 of 4 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository): shakenfist_client/apiclient.py:185 -&gt; docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md, shakenfist_client/tests/test_client_apiclient.py:2320 -&gt; docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md</li>
-<li><strong>hunkydory</strong> (Status): 1 of 1 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository): .github/workflows/runner-probe.yml:2 -&gt; PLAN-typescript-onboarding.md</li>
-<li><strong>instar</strong> (Status): 2 of 244 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository): scripts/create-vhd-testdata.sh:46 -&gt; docs/plans/PLAN-extra-coverage.md, scripts/create-vhd-testdata.sh:463 -&gt; instar-testdata/docs/plans/PLAN-extra-coverage.md</li>
+<li><strong>instar</strong> (Status): 2 of 251 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository): scripts/create-vhd-testdata.sh:46 -&gt; docs/plans/PLAN-extra-coverage.md, scripts/create-vhd-testdata.sh:463 -&gt; instar-testdata/docs/plans/PLAN-extra-coverage.md</li>
 <li><strong>visual-digest-rust</strong> (Status): 1 of 1 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository): shakenfist-visual-digest/tests/qr.rs:7 -&gt; PLAN-test-harness-phase-01-digest-crate.md</li>
 </ul>
 <h2 id="plan-template">plan-template<a class="headerlink" href="#plan-template" title="Permanent link">&para;</a></h2>
@@ -19480,8 +19480,8 @@ does.</p>
 <tbody>
 <tr>
 <td>actions</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/86" title="GitHub Issue: shakenfist/actions #86">actions#86</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>agent-python</td>
@@ -19510,8 +19510,8 @@ does.</p>
 </tr>
 <tr>
 <td>development</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/147" title="GitHub Issue: shakenfist/development #147">development#147</a></td>
 </tr>
 <tr>
 <td>divergulent</td>
@@ -19587,9 +19587,9 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>actions</strong> (Status): 98 of 103 in-scope files reviewed at HEAD; 5 need review (threshold 5)</li>
-<li><strong>kerbside</strong> (Status): 106 of 229 in-scope files reviewed at HEAD; 123 need review (threshold 5)</li>
-<li><strong>ryll</strong> (Status): 140 of 214 in-scope files reviewed at HEAD; 74 need review (threshold 5)</li>
+<li><strong>development</strong> (Status): 175 of 190 in-scope files reviewed at HEAD; 15 need review (threshold 5)</li>
+<li><strong>kerbside</strong> (Status): 100 of 230 in-scope files reviewed at HEAD; 130 need review (threshold 5)</li>
+<li><strong>ryll</strong> (Status): 178 of 214 in-scope files reviewed at HEAD; 36 need review (threshold 5)</li>
 </ul>
 <h2 id="review-scope-completeness">review-scope-completeness<a class="headerlink" href="#review-scope-completeness" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/review-scope-completeness/">review-scope-completeness.md</a></p>

@@ -15068,6 +15068,13 @@ bare <code>#N</code> but renders <code>repo#N</code> as plain text, so the short
 first round asked for was not a link at all. Editing the spec staled
 its mark too, pruned here like the other three, which is what takes
 this repository past its own threshold.</p>
+<p>Taken together, the two rounds say step 5.1's brief was wrong to
+scope the repair to one file. The "pushes to <code>main</code>" claim lived in
+three -- <code>docs/code-review-tracking.md</code>, <code>AGENTS.md</code> and
+<code>ARCHITECTURE.md</code> -- and the criterion spec carried two stale
+statements of its own, so repairing one of them left the tree
+disagreeing with itself until review caught it. Both rounds landed
+inside #139, so the merge commit recorded for step 7 covers them.</p>
 <p><strong><code>review-coverage</code> fails against this repository, and that is the
 criterion working.</strong> Rebasing onto main on 2026-09-19 put
 development itself over its own backlog threshold: main already
@@ -15219,8 +15226,8 @@ PR on this branch, the ryll work a separate PR.</p>
 <td>7</td>
 <td>both</td>
 <td>end-to-end verification (phase 5)</td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td><code>ced6fef</code> (#139)</td>
 </tr>
 <tr>
 <td>8</td>
@@ -15234,8 +15241,16 @@ PR on this branch, the ryll work a separate PR.</p>
 <p>Step 7 stopped being blocked when both pull requests merged in
 August; phase 5 above is the plan for it. The statuses were brought
 into the shared vocabulary on 2026-09-17 -- see that phase's survey.
-Step 7 reaches <code>Complete</code> when its own pull request merges and the
-<code>Merged</code> column records that commit, not before.</p>
+Step 7 merged on 2026-09-19 as <code>ced6fef</code> (#139), which is what moved
+it to <code>Complete</code>; this plan does not write that term without a
+landing commit beside it.</p>
+<p>That cell records step 7 and nothing else. This closeout is its
+own pull request (#146), so it lands outside any range anchored on
+<code>ced6fef</code> and phase 6 will not see it. What it changes is this
+plan file's own narrative and no tooling, so the omission costs
+the audit nothing -- it is written down here rather than left
+implicit because the rule is that a landing is recorded, not that
+it is judged small.</p>
 <p>The <code>Merged</code> column is what <code>plan-push-audit-phase</code> asks each phase
 to record as it lands, so that phase 6 has a range to audit once
 <code>git diff main</code> for this plan is empty. Steps 1--5 were one pull
