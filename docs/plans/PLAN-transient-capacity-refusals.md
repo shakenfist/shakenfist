@@ -427,19 +427,55 @@ exists -- `BaseClusterOperation.defer_with_backoff()` already
 re-enqueues with a delay for artifact fetches and network
 operations -- and a `202` with the instance held in `initial` (or a
 new `scheduling` state) until placement succeeds or a deadline
-passes is a contained change. Against it: it is exactly the
+passes looks like a contained change. Against it: it is exactly the
 "hold-until-fittable" that scheduler-reservations D8 rejected as
 queue-state surface the project does not want; it has no fairness
 model (a waiting 4-vCPU create starves behind a stream of 1-vCPU
 ones, and a pinned create starves worst); waiting instances hold
 IPAM allocations, so a CPU shortage can become an address shortage;
-and the client's `_await_instance_create` has a 900 s ceiling that
-bounds any useful deadline. If phase 2 shows the suite waits are
+and the client's create-and-await path has a ceiling that bounds any
+useful deadline. If phase 2 shows the suite waits are
 short and few once the topology is right, the answer is no and the
 phase closes as Abandoned with the numbers. If they are long or
 many, the phase designs the queue -- FIFO by request time, pinned
 placements admitted against their node only -- and reverses D8 in
 writing.
+
+Phase 5's survey corrected four of the sentences above, and the
+corrections move the arithmetic rather than the prose. See
+[its *What the survey found*](PLAN-transient-capacity-refusals-phase-05-queue-decision.md)
+for the full readings.
+
+* The client method is `await_instance_create()`, spelled without a
+  leading underscore, and its default ceiling is **600 s**, not
+  900 (`client-python/shakenfist_client/apiclient.py:1797`). Its
+  docstring also warns that `create_instance(timeout=...)` (`:737-749`)
+  bounds the whole call, so a caller that does not pass `timeout=0`
+  runs "two independent budgets on the same condition, run back to
+  back" -- a server-side hold would be a third.
+* `defer_with_backoff()`'s default schedule is
+  `delays=(15, 30, 60)` (`shakenfist/operations/baseoperation.py:708`)
+  -- three defers totalling **105 s**, after which it returns `False`
+  and the caller must error the operation out. All three waits phase 2
+  actually measured (190.5 s, 160.4 s, 140.6 s) are longer than that
+  entire budget, so "the machinery exists" is true but would give up
+  before the shortest recorded wait had cleared. A queue needs its own
+  schedule; the re-enqueue is not the hard part.
+* The IPAM concern is confirmed and is structural rather than
+  incidental. `_netdesc_allocate_address()` reserves the address and is
+  called at `external_api/instance.py:1027`; `find_candidates()` runs at
+  `:1049`, twenty-two lines later. The only thing that releases those
+  addresses today is the refusal itself -- every scheduling refusal
+  branch calls `enqueue_delete_due_error()` (`:1062`, `:1069`, `:1082`,
+  `:1177`). A queue that holds the instance instead of deleting it
+  holds its addresses for the whole hold, by construction.
+* `POST /instances` has **four** `507` branches, not two. The two
+  phase 4 routed through `capacity_error()` are at `:1076` and `:1184`;
+  the other two are `exceptions.CongestedNetwork` at `:477` and `:509`
+  and return a bare `sf_api.error(507, ...)` with no `Retry-After`,
+  `stage` or `transient` field. So a queue that converted CPU pressure
+  into address pressure would convert a refusal a client is told to
+  retry into one it is told nothing about.
 
 ### 9. What should the API say?
 
@@ -503,7 +539,7 @@ spelling above is the one to write.
 | 2. The suite waits, and says so: an informed `create_instance` wrapper and a per-run wait summary | [PLAN-transient-capacity-refusals-phase-02-suite-wait.md](PLAN-transient-capacity-refusals-phase-02-suite-wait.md) | Complete | `5ad9651ee` (#4166), `2c6206941` (#4187) |
 | 3. Publish metrics when the running-domain set changes | [PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md](PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md) | Complete | `03cd7be3a` (#4200) |
 | 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | [PLAN-transient-capacity-refusals-phase-04-retry-after.md](PLAN-transient-capacity-refusals-phase-04-retry-after.md) | Complete | `565e36e6e` (#4241), client-python `74d6e129b` (client-python#399) |
-| 5. Decide on server-side queued placement from the phase 2 data | PLAN-transient-capacity-refusals-phase-05-queue-decision.md | Not started | — |
+| 5. Decide on server-side queued placement from the phase 2 data | [PLAN-transient-capacity-refusals-phase-05-queue-decision.md](PLAN-transient-capacity-refusals-phase-05-queue-decision.md) | In progress | — |
 | 6. Documentation and close-out | PLAN-transient-capacity-refusals-phase-06-docs.md | Not started | — |
 | 7. Push audit | PLAN-transient-capacity-refusals-phase-07-push-audit.md | Not started | — |
 
@@ -789,12 +825,23 @@ numbers and the reasoning in the phase file. Otherwise, design the
 queue against open question 8's constraints -- FIFO by request
 time, pinned creates admitted against their node only, IPAM
 allocated at placement rather than at request, a deadline the
-client's 900 s create ceiling can contain -- and record the
+client's create ceiling can contain -- and record the
 reversal of scheduler-reservations D8 in that plan's decisions
 file before any code is written.
 
 Plan at high effort if it goes ahead; the state-machine and
 fairness questions are the expensive kind.
+
+Planned in
+[PLAN-transient-capacity-refusals-phase-05-queue-decision.md](PLAN-transient-capacity-refusals-phase-05-queue-decision.md),
+which fixes the numeric decision rule *before* the data is read,
+because "small" and "near its deadline" above are not numbers and a
+phase which reads twenty runs and then decides what those words meant
+is narrating a decision rather than taking one. That plan's gate is
+closed as written: the sizing plan's phase 4 reshape has not been
+applied to `shakenfist/actions`, whose `ci-topology-slim-tier.yml`
+still carries `cpu: 4` on all three nodes, so the data available today
+describes the cloud the reshape exists to replace.
 
 ### Phase 6 -- Documentation and close-out
 
