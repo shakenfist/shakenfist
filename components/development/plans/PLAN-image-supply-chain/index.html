@@ -15146,7 +15146,7 @@ needs the same treatment, and phase 6 says so.</p>
 <tr>
 <td>3. Unblock the migration</td>
 <td>In progress</td>
-<td>private-ci 392700d (#60)</td>
+<td>private-ci 9eace9d (#60), private-ci 2e18c13 (#61), private-ci dbb78ca (#63), actions 8684eec (#78), actions 781d267 (#80), kerbside 79c2506 (#435)</td>
 </tr>
 <tr>
 <td>4. The consumer sweep</td>
@@ -15388,6 +15388,56 @@ primary mounts at <code>/srv/ci</code>, and whose absence blocks <em>all</em> CI
 provisioning -- is built from <code>debian:11</code>, a base that can no longer
 be built at all: <code>bullseye-security</code>'s <code>Release</code> expired
 2026-09-08.</p>
+<p><strong>Status: the work is done and running; one correction is in
+review.</strong> Both stuck labels are unstuck. <code>ci-images/debian-gnome-13</code>
+first built on 2026-09-17 at 06:53 (529s, blob
+<code>b9b624c8-713e-440b-ad0f-82b0e5f5ef60</code>), and the dependencies disk
+now builds on Debian 13 -- verified in production rather than at
+merge, with the conductor deployed at private-ci <code>ad9863eb</code> and the
+nightly creating its builder as <code>disks=['100@debian:13', '50']</code> on
+2026-09-18, against <code>['100@debian:11', '50']</code> the night before.
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/39" title="GitHub Issue: shakenfist/private-ci #39">private-ci#39</a> is closed with that evidence. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/45" title="GitHub Issue: shakenfist/private-ci #45">private-ci#45</a> keeps its
+fourth checkbox for phase 5. Outstanding: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/450" title="GitHub Issue: shakenfist/kerbside #450">kerbside#450</a>, which
+corrects a defect introduced by <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/435" title="GitHub Issue: shakenfist/kerbside #435">kerbside#435</a>; the status cell moves
+to <code>Complete</code> when it merges.</p>
+<p><strong>Three things this phase got wrong, recorded for phase 7.</strong></p>
+<p><em>The survey scoped the gnome move at seven places across two
+repositories. It was about thirteen across four files, in four
+repositories.</em> <code>GNOME_LABEL</code>'s comment, two docstrings, three tests,
+and the marker paragraphs in private-ci's own <code>AGENTS.md</code> and
+<code>ARCHITECTURE.md</code> all named the release and would have gone
+factually wrong. More importantly, <code>shakenfist/kerbside</code> reads the
+cached snapshot off the disk by hardcoded path and was never looked
+at, because the survey grepped only the repositories it expected to
+touch. A consumer you do not grep for is a consumer you do not have.</p>
+<p><em>A merge is not a deploy, again.</em> <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/61" title="GitHub Issue: shakenfist/private-ci #61">private-ci#61</a> merged on 2026-09-17
+at 09:52 and that evening's nightly still built on Debian 11,
+because the conductor had not been redeployed -- it had even
+restarted in between, which is not the same thing. This is the same
+distinction that cost phase 2 a night of images, in a different
+component, and neither phase had a check that would have caught it.</p>
+<p><em>Two ordering gates the plan set were both crossed.</em> <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/78" title="GitHub Issue: shakenfist/actions #78">actions#78</a>
+merged ahead of its "must not merge until 3c has built" gate, and
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/63" title="GitHub Issue: shakenfist/private-ci #63">private-ci#63</a> merged ahead of <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/80" title="GitHub Issue: shakenfist/actions #80">actions#80</a> despite the playbook-first
+rule. Neither caused damage -- the first by luck, since ansible's
+<code>auto</code> interpreter discovery handles bullseye unaided, and the
+second because the conductor was not deployed in the window -- but a
+gate stated only in a plan file and a pull request body is not a
+gate. Phase 7 should ask what would actually have enforced them.</p>
+<p><strong>The gnome rename was reconsidered mid-phase, and the second answer
+was better.</strong> The plan called for renaming the cached snapshot from
+<code>debian-12-gnome-agents</code> to <code>debian-13-gnome-agents</code> and sequencing
+three repositories around it. Review on <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/80" title="GitHub Issue: shakenfist/actions #80">actions#80</a> pointed out that
+the disk is reformatted from scratch on every build, so a rename has
+no transition window at all. The published name is now
+<code>debian-gnome-agents</code>, carrying no release, with a transitional
+hardlink at the old name; <code>gnome_release</code> governs only the label
+lookup and the scratch filename. That removes the release from a
+cross-repository interface entirely, so the next desktop bump is not
+a fleet change. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/435" title="GitHub Issue: shakenfist/kerbside #435">kerbside#435</a> was written against the abandoned
+design and merged anyway, reading a path that is never published and
+silently taking the legacy hardlink on every run -- which is what
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/450" title="GitHub Issue: shakenfist/kerbside #450">kerbside#450</a> fixes.</p>
 <h4 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h4>
 <p>Checked 2026-09-16 against <code>private-ci</code> <code>84f39cc</code> and <code>actions</code>
 <code>edc4b73</code> -- that repository's <code>main</code> that day, pinned to a sha

@@ -14072,7 +14072,8 @@
 should keep the review backlog small: fewer than 5 in-scope files
 needing review. Repositories without a <code>.vscode/review-scope.toml</code>
 scope config do not have the tooling deployed and are reported as
-not applicable; currently ryll and kerbside do.</p>
+not applicable; see the compliance page for which repositories
+currently carry it.</p>
 <p>The check runs <code>scripts/review-tracking.py status</code> against the
 clone. A file needs review if it has never received a whole-file
 review, or if its content at HEAD no longer matches the blob SHA
@@ -14085,7 +14086,9 @@ this audit sees.</p>
 touch five in-scope files, so the issue this audit files acts as a
 standing work-queue nudge -- it lists the files needing review,
 and closes automatically once a review session brings the backlog
-back under the threshold.</p>
+back under the threshold. That list is written when the issue is
+filed and is not refreshed afterwards, so a long-lived issue
+understates the backlog it names (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/138" title="GitHub Issue: shakenfist/development #138">development#138</a>).</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template -- compliance is restored by doing review sessions,
 not by copying files. See

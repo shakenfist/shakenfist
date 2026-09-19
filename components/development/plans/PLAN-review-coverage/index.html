@@ -3314,6 +3314,89 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Phase 5: end-to-end verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-survey-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the survey found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-verification-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What verification found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks and mitigations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#definition-of-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -14203,6 +14286,89 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Phase 5: end-to-end verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-survey-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the survey found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step plan
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-verification-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What verification found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks and mitigations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#definition-of-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -14342,12 +14508,15 @@ anyway. In steady state it has two gaps:</p>
    reviewed files results, within minutes, in an automated commit
    pruning the stale marks and regenerating <code>REVIEWS.md</code>.</li>
 <li>The daily consistency audit computes ryll's effective review
-   backlog against HEAD, and opens (or updates) a
+   backlog against HEAD, and opens a
    <code>Consistency: Human review coverage</code> issue on ryll when 5 or
    more in-scope files need review, closing it again when the
    backlog drops below 5. The issue body lists the files needing
    review, split into stale and never-reviewed, as a session work
-   queue.</li>
+   queue as it stood when the issue was filed. <em>Corrected on
+   2026-09-17</em>: this said "opens (or updates)", which phase 5's
+   survey found the issue machinery has never done -- see that
+   phase's survey and D5.2.</li>
 <li>Repos without <code>.vscode/review-scope.toml</code> report the check as
    not applicable and are otherwise unaffected.</li>
 <li>The documentation (<code>docs/code-review-tracking.md</code>, a new
@@ -14466,10 +14635,15 @@ resolve); <code>missing</code> list contents and ordering.</p>
 <p>Behavioural notes, to verify rather than assume during
 implementation:</p>
 <ul>
-<li><code>audit-manage-issues.py</code> updates an existing open issue rather
-  than filing duplicates, and closes it when the check passes.
-  This gives the desired open/update/close lifecycle with no code
-  changes. Expect routine churn: a single feature PR can easily
+<li><code>audit-manage-issues.py</code> does not file duplicates, and closes
+  the issue when the check passes. It was assumed here to <em>update</em>
+  an open issue's body too; it does not, and never did --
+  <code>process_results()</code> creates, dedupes and closes, and edits
+  nothing (<code>scripts/audit-manage-issues.py:249-266</code>). The body is
+  therefore the work queue as of the day the issue was filed. Phase
+  5's survey measured how far that drifts; the fix belongs to
+  whoever owns the issue machinery, not here. Expect routine
+  churn: a single feature PR can easily
   touch 5 in-scope files, so the issue will often open shortly
   after a merge and close after the next session. That is
   accepted behaviour (a standing work-queue nudge); if it proves
@@ -14543,7 +14717,19 @@ workflow and script below target develop.</p>
 </li>
 <li>Loop safety: pushes made with the default <code>GITHUB_TOKEN</code> do not
   trigger workflows; even if the trigger changed, a second prune
-  run is a no-op and commits nothing.</li>
+  run is a no-op and commits nothing. <em>Corrected on 2026-09-17</em>:
+  implementation could not use <code>GITHUB_TOKEN</code>, because develop's
+  ruleset requires a pull request and GitHub will not make the
+  Actions app a bypass actor, so the push authenticates as
+  shakenfist-bot via <code>DEPENDENCIES_TOKEN</code>. A PAT push <em>does</em>
+  retrigger the workflow -- observed on 2026-09-11 -- so only the
+  second half of this sentence holds the loop shut, and it does:
+  the retriggered run finds nothing to prune and commits nothing.
+  The same follow-up added an <code>if: github.ref ==
+  'refs/heads/develop'</code> guard, after a <code>workflow_dispatch</code> on a
+  branch tried to push that branch's unmerged commits to develop on
+  2026-08-10. Both changes are in ryll <code>a0227e05</code> and <code>196db2f6</code>
+  and are documented in that workflow's header comment.</li>
 <li>Interaction with review sessions: a push of session commits
   (stamps) triggers a prune run that finds nothing stale and
   exits quietly. No conflict.</li>
@@ -14555,25 +14741,415 @@ workflow and script below target develop.</p>
   pre-commit), and actionlint via pre-commit for the workflow.</li>
 </ul>
 <h3 id="phase-5-end-to-end-verification">Phase 5: end-to-end verification<a class="headerlink" href="#phase-5-end-to-end-verification" title="Permanent link">&para;</a></h3>
-<p>After the development PR merges:</p>
-<ol>
-<li><code>workflow_dispatch</code> the consistency audit; confirm ryll's row
-   in <code>audits/review-coverage.md</code> regenerates, every other repo
-   shows N/A, and no issue is filed while the backlog is under 5.</li>
-</ol>
-<p>After the ryll PR merges:</p>
-<ol>
-<li>The merge itself should trigger the first prune run (the PR
-   touches in-scope files: <code>tools/</code>, <code>AGENTS.md</code>), pruning their
-   marks and committing. Verify the bot commit and regenerated
-   <code>REVIEWS.md</code> look right, and that no workflow loop occurs.</li>
-<li>Simulate backlog: after enough merges (or by temporarily
-   lowering the threshold in a test run), confirm the issue is
-   created with the file list, and closes after a review session
-   restores coverage.</li>
-<li>Confirm a normal review session still works end to end: pull
-   (picking up bot prunes), review, stamp, signed commit, push.</li>
-</ol>
+<p>Planned in detail on 2026-09-17; the rest of this section is that
+plan. Planning effort: medium -- the phase changes no criterion, no
+scheduler and nothing in <code>audit-manage-issues.py</code>; what it needed
+was the survey, and the survey is done.</p>
+<h4 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h4>
+<p>The premise of this section is that verification happens by staging
+it: dispatch the audit, watch the ryll merge, simulate a backlog.
+Six weeks passed between the phases landing and this planning, and
+in that time production ran every one of those experiments by
+itself. <strong>Nothing in items 1--4 still needs to be staged.</strong> What the
+evidence shows, and the three claims it falsifies:</p>
+<p><strong>The audit half works, and the lifecycle is verified including the
+close.</strong> The daily audit has run continuously (most recently
+<code>https://github.com/shakenfist/development/actions/runs/35087963103</code>,
+2026-09-16). The <code>review-coverage</code> table in
+<code>docs/audits/compliance.md</code> regenerates with it. On ryll the issue
+has opened and closed four times: #242 opened 2026-08-03 and closed
+2026-08-05, #275 opened 2026-08-14 and closed 2026-08-15, #282
+opened 2026-08-16 and closed 2026-08-17, #304 opened 2026-08-21 and
+still open. #242 and #275 carry shakenfist-bot's "This check is now
+passing in the automated consistency audit. Closing automatically."
+comment, so the close path is machine-verified and not merely
+plausible; #282 a human closed by hand. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/hunkydory/issues/10" title="GitHub Issue: shakenfist/hunkydory #10">hunkydory#10</a> is the same
+lifecycle in a third repository. Item 3's suggestion to lower the
+threshold in a test run is therefore not just unnecessary but
+unwanted: it would file real issues in other people's repositories
+to demonstrate something already demonstrated.</p>
+<p><strong>Item 1 names a file that no longer carries the table, and a state
+of the fleet that has not been true since day one.</strong> Compliance
+moved out of the criterion specs into <code>docs/audits/compliance.md</code>
+(<code>PLAN-audit-compliance-split</code>), so the row to look at is
+<code>docs/audits/compliance.md#review-coverage</code>, not
+<code>audits/review-coverage.md</code>. And "every other repo shows N/A" was
+wrong the day it was written: the pull request that landed steps
+1--5 was branch <code>kerbside-review-tracking</code>, so kerbside has had a
+scope config since 2026-08-03. Today five repositories are in scope
+for this criterion -- actions, development and hunkydory compliant,
+kerbside and ryll not -- and sixteen are N/A.</p>
+<p><strong>The prune half works, and holds the loop shut for a different
+reason than this plan and the documentation give.</strong> ryll's develop
+carries 35 <code>Prune stale review marks.</code> commits by shakenfist-bot.
+The workflow runs on every push and commits only when something went
+stale. On 2026-09-11 a prune commit did retrigger the workflow (run
+at 04:57:20, <code>displayTitle</code> "Prune stale review marks.") and that
+run committed nothing: the push authenticates as a PAT, not
+<code>GITHUB_TOKEN</code>, so the first half of phase 4's loop-safety sentence
+is false and only the second half is load-bearing. Corrected in
+phase 4 above. <code>docs/code-review-tracking.md</code> states the false half
+as fact and step 5.1 fixes it.</p>
+<p><strong>The issue body is never refreshed, and the drift is large.</strong>
+<code>process_results()</code> in <code>scripts/audit-manage-issues.py</code> creates,
+dedupes and closes; it never edits an open issue
+(<code>scripts/audit-manage-issues.py:249-266</code>). So the work queue is
+frozen at the moment of filing. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/304" title="GitHub Issue: shakenfist/ryll #304">ryll#304</a> has said "63 need review"
+since 2026-08-21 while the audit now measures 120 needing review,
+and its spec link points at <code>development/audits/review-coverage.md</code>,
+a path that stopped existing when the specs moved under <code>docs/</code>.
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/227" title="GitHub Issue: shakenfist/kerbside #227">kerbside#227</a> has said "0 of 152 in-scope files reviewed" since
+2026-08-03 while the audit now measures 114 reviewed of 229. This
+plan's Mission claimed the audit "opens (or updates)" the issue and
+phase 2 recorded the update as a behavioural note to verify rather
+than assume; it was assumed. Both corrected at source above, and
+D5.2 says what phase 5 does about the defect itself.</p>
+<p><strong>Both non-compliant repositories are far past the threshold, and
+that is not this plan's automation failing.</strong> As the compliance page
+was last regenerated before this planning, on 2026-09-16, ryll
+needed review on 120 of its 214 in-scope files and kerbside on 115
+of its 229; step 5.3 re-measured both a day later from clean clones
+and found 105 and 106 needing review, which is the ordinary movement
+of a backlog as commits land rather than a discrepancy. The
+compliance page is regenerated daily, so its figures will match
+neither of these dated measurements for long -- read it as the
+current position, and these as what was measured on the days named.
+The Situation section opens with "ryll is about to reach 100%
+human-reviewed", which has not been true for weeks -- but the cause
+is that the scope deliberately grew, driven by the
+<code>review-scope-completeness</code> criterion and by hand (ryll <code>cf5f6b1</code>
+"name every tracked file in the scope config", <code>1f22ac8</code> adding
+<code>.devcontainer</code>), not that marks are being lost. A backlog alert
+whose subject grew its own denominator is working as designed. D5.3
+declines to retune on this evidence.</p>
+<p><strong>Review sessions still work end to end.</strong> ryll's develop carries
+<code>review:</code> commits as recently as 2026-09-17 (<code>fde4f54</code>, <code>ba84ee3</code>),
+landing through pull requests alongside the bot's prunes, which is
+item 4 and needs nothing staged either.</p>
+<p><strong>The Execution table's statuses are outside the shared
+vocabulary.</strong> It used <code>Done</code> and <code>Blocked on merge</code>, where
+<code>plan-status-vocabulary</code> allows exactly one term from a fixed list.
+Nothing audits a master plan's own phase table -- <code>PlanIndex</code> reads
+only <code>docs/plans/index.md</code> -- so this was invisible rather than
+absent. Corrected in this planning commit.</p>
+<p><strong>Two things this survey deliberately did not correct.</strong> The phase
+1--4 sections name <code>scripts/audit-check.py</code>,
+<code>scripts/test_audit_check.py</code>, <code>audits/</code> and
+<code>PROJECT-CONSISTENCY-AUDITS.md</code>. Every one of those has moved:
+the check is now <code>ReviewCoverage</code> in
+<code>scripts/audit/checks/review.py:173</code>, registered at
+<code>scripts/audit/registry.py:78</code>, with <code>REVIEW_BACKLOG_THRESHOLD</code> at
+<code>scripts/audit/checks/review.py:97</code>; the tests are under
+<code>scripts/tests/</code>; the specs are under <code>docs/audits/</code>; and the
+criteria list is <code>docs/consistency-audits.md</code>. Those sections are
+the record of work that has landed, and rewriting their paths every
+time the tree moves turns a record into a maintenance burden, so
+they stand and the current locations are named here once. The
+<em>claims</em> that were wrong -- not the paths that merely aged -- were
+corrected at source.</p>
+<h4 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h4>
+<p><strong>D5.1. Verify from what production already did, and stage nothing.</strong>
+Every experiment this section proposes has a real counterpart with a
+date, a commit or an issue number attached, recorded in the survey
+above. Re-running them would add nothing, and item 3's version --
+temporarily lowering <code>REVIEW_BACKLOG_THRESHOLD</code> -- would file issues
+in ryll and kerbside to prove a lifecycle that <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/242" title="GitHub Issue: shakenfist/ryll #242">ryll#242</a> and #275
+already prove. The phase's remaining work is therefore repair and
+record-keeping, not experiment.</p>
+<p><strong>D5.2. The never-refreshed issue body is recorded and filed, not
+fixed here.</strong> This is the decision most likely to be argued with,
+because the Mission asserted the update behaviour and the "session
+work queue" framing rests on it. Against fixing it in this phase:
+<code>audit-manage-issues.py</code> serves all 55 criteria across every
+repository in the matrix, so teaching it to rewrite bodies changes
+what lands in other people's issue trackers on the next daily run --
+every open consistency issue rewritten at once, notifications with
+it, and any hand-edited body clobbered. That is a change to the
+issue machinery, which <code>PLAN-consistency-audits-v2</code> owns, at this
+repository's own definition of high effort, and it does not belong
+inside a verification phase of the plan that merely noticed it. So
+phase 5 files an issue against shakenfist/development with both
+measurements, corrects the Mission and the documentation to say what
+the machinery does, and adds it to Future work. If that reading is
+wrong the alternative is cheap to take later: it is one <code>gh issue
+edit</code> in <code>process_results()</code>, guarded on the rendered body differing.
+Filed as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/138" title="GitHub Issue: shakenfist/development #138">development#138</a>.</p>
+<p><strong>D5.3. Do not retune the threshold or add hysteresis on this
+evidence.</strong> Two repositories sit 20x over the threshold with an
+issue permanently open, which looks like an alert that has stopped
+carrying signal. But 5 was chosen as "how much review work has piled
+up before a session is warranted", and 120 files genuinely is work
+piled up; hysteresis (open at 5, close at 2) would not close either
+issue. The alert is telling the truth about a backlog that grew
+because the scope grew. Hysteresis stays in Future work against the
+churn case it was written for -- #242, #275 and #282, each open a
+day or two -- which is the evidence that would justify it.</p>
+<p><strong>D5.4. Do not add the "scope config without prune workflow" check
+here.</strong> All five adopting repositories carry
+<code>.github/workflows/prune-reviews.yml</code> today, verified by hand on
+2026-09-17 against the GitHub API. The check exists to catch a drift
+that has not happened, it is a new criterion with fleet blast
+radius, and this phase verifies. It stays in Future work, now with a
+measurement beside it.</p>
+<p><strong>D5.5. Phase 5 repairs the documentation this plan produced.</strong> Phase
+3 wrote the steady-state section of <code>docs/code-review-tracking.md</code>,
+and three of its statements are now false or misleading: the loop
+argument, the location of <code>REVIEW_BACKLOG_THRESHOLD</code>, and the work
+queue's freshness. Fixing the output of an earlier phase in this plan
+is repair, not scope creep -- a verification phase that finds a
+documented claim false and leaves it documented has not verified
+anything.</p>
+<h4 id="step-plan">Step plan<a class="headerlink" href="#step-plan" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5.1</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>In <code>docs/code-review-tracking.md</code>, fix three statements in the "Steady state" section (from line 489). (a) The loop argument at lines 519-521 says "pushes made with the workflow's own token do not trigger workflows, and a second prune would find nothing to do anyway". The first clause is false: ryll's workflow pushes as shakenfist-bot via <code>DEPENDENCIES_TOKEN</code>, because develop's ruleset requires a pull request and GitHub will not make the Actions app a bypass actor, and a PAT push does retrigger the workflow -- observed 2026-09-11 04:57:20 UTC, a run whose <code>displayTitle</code> is "Prune stale review marks." and which committed nothing. Say that the loop terminates because the second run finds nothing to prune, and that a repository pushing with <code>GITHUB_TOKEN</code> instead never retriggers at all. ryll's own <code>.github/workflows/prune-reviews.yml</code> header comment already says this correctly; do not contradict it. (b) Line 542 places <code>REVIEW_BACKLOG_THRESHOLD</code> in <code>scripts/audit-check.py</code>; it is <code>scripts/audit/checks/review.py:97</code>. (c) The "ready-made session work queue" sentence at line 545 must say that the list is written when the issue is filed and is never refreshed afterwards, so a long-lived issue understates the backlog -- name <code>scripts/audit-manage-issues.py</code> as the reason and link the issue filed in step 5.2. Also: the section says the workflow "runs on every push to main", but ryll's default branch is develop; write it so it is true of an adopting repository whatever its default branch is called. Do not touch <code>AGENTS.md</code> (no convention changed) or <code>ARCHITECTURE.md</code> (the system's shape did not change). <em>Superseded on 2026-09-19</em>: review found the same false claim in both files, and a brief that excludes a file cannot make a false statement in it true -- both were corrected. See "What verification found". Wrap at the file's existing width.</td>
+</tr>
+<tr>
+<td>5.2</td>
+<td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td>File one issue on shakenfist/development titled "Consistency audit issues are never updated after they are filed". Body: <code>process_results()</code> in <code>scripts/audit-manage-issues.py</code> (lines 249-266) creates, dedupes and closes but never edits an open issue, so every issue body is frozen at filing time; the two measurements are <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/304" title="GitHub Issue: shakenfist/ryll #304">ryll#304</a>, filed 2026-08-21 saying "63 need review" while the audit measured 120 on 2026-09-17, and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/227" title="GitHub Issue: shakenfist/kerbside #227">kerbside#227</a>, filed 2026-08-03 saying "0 of 152 in-scope files reviewed" while the audit measured 114 of 229. Note the second-order effect: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/304" title="GitHub Issue: shakenfist/ryll #304">ryll#304</a>'s spec link still points at <code>development/audits/review-coverage.md</code>, a path that stopped existing when the specs moved under <code>docs/</code>, and nothing will ever fix it in place. Say it affects every criterion, not only <code>review-coverage</code>, that the suggested fix is a <code>gh issue edit</code> guarded on the rendered body differing from the current one, and that the trade-off to think about first is a fleet-wide body rewrite on the next daily run plus the loss of any hand-edited body. Reference <code>docs/plans/PLAN-review-coverage.md</code> phase 5 D5.2 and <code>docs/plans/PLAN-consistency-audits-v2.md</code>. Record the issue number in this section and in Future work below. Do not fix the script.</td>
+</tr>
+<tr>
+<td>5.3</td>
+<td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Reproduce the audit's numbers locally, which is the one claim in the survey nobody has re-derived from a clone rather than from the compliance page: clone or update a checkout of shakenfist/ryll at <code>origin/develop</code> and one of shakenfist/kerbside at its default branch, then run <code>python3 scripts/audit-check.py --repo-path &lt;clone&gt; --repo-name &lt;name&gt; --github-org shakenfist</code> from this repository and compare the <code>review-coverage</code> entry against <code>docs/audits/compliance.md#review-coverage</code> (ryll: 94 of 214 reviewed, 120 needing review; kerbside: 114 of 229, 115 needing). Numbers move as commits land, so the test is that the check's arithmetic agrees with <code>python3 scripts/review-tracking.py status --json</code> run in the same clone at the same commit, not that it matches the digits written here. Record the commit audited and the result in this section. Do not run <code>audit-manage-issues.py</code> at all, not even with <code>--dry-run</code>, and do not commit any clone.</td>
+</tr>
+<tr>
+<td>5.4</td>
+<td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Record the outcome in this section under a "What verification found" heading: the evidence table from the survey (audit run, prune commit count, the four ryll issues with their dates and which were closed by the bot, the 2026-09-11 retrigger run), step 5.3's reproduction, and step 5.2's issue number. Then set this phase's row in the Execution table to <code>Complete</code> and fill its <code>Merged</code> column when the pull request lands, and update the plan's row in <code>docs/plans/index.md</code> so the Intent line says the steady state is verified in production and names what it found. Leave the index status at <code>In progress</code>: phase 6 has not run.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="what-verification-found">What verification found<a class="headerlink" href="#what-verification-found" title="Permanent link">&para;</a></h4>
+<p>Per D5.1 the phase verified from evidence production had
+already produced, and nothing was staged. The table below is
+what was re-checked on 2026-09-17, against <code>gh</code> and <code>git</code>
+rather than copied from the survey above:</p>
+<table>
+<thead>
+<tr>
+<th>Checked</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Daily audit</td>
+<td>Most recent run at writing: <code>https://github.com/shakenfist/development/actions/runs/35087963103</code> (2026-09-16); the review-coverage table in <code>docs/audits/compliance.md</code> regenerates alongside it.</td>
+</tr>
+<tr>
+<td>Automatic pruning on ryll</td>
+<td>35 <code>Prune stale review marks.</code> commits on <code>origin/develop</code>.</td>
+</tr>
+<tr>
+<td>The retrigger</td>
+<td>Run at 2026-09-11 04:57:20 UTC, <code>displayTitle</code> "Prune stale review marks.", committed nothing -- the evidence that a PAT push retriggers the workflow once into a no-op.</td>
+</tr>
+<tr>
+<td>Issue lifecycle on ryll</td>
+<td>#242 opened 2026-08-03, closed 2026-08-05; #275 opened 2026-08-14, closed 2026-08-15; #282 opened 2026-08-16, closed 2026-08-17; #304 opened 2026-08-21, still open. #242 and #275 carry shakenfist-bot's automated closing comment, so the close path is machine-verified; #282 a human closed. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/hunkydory/issues/10" title="GitHub Issue: shakenfist/hunkydory #10">hunkydory#10</a> is the same lifecycle in a third repository.</td>
+</tr>
+<tr>
+<td>Review sessions</td>
+<td>ryll's develop carries <code>review:</code> commits as recently as 2026-09-17, so the manual half still works alongside the automation.</td>
+</tr>
+</tbody>
+</table>
+<p>Step 5.3 re-derived the numbers from clean clones rather than
+from <code>docs/audits/compliance.md</code>, on 2026-09-17. ryll was
+cloned at <code>develop</code>, full commit
+<code>c868d8b7ee5c982da79588a7396a4a7da7dd6f61</code> (short <code>c868d8b</code>);
+kerbside was cloned at its default branch, also <code>develop</code>,
+full commit <code>9996305745a5f291a8178ad2c6960cd8682786db</code> (short
+<code>9996305</code>). Both clones live under a scratch directory outside
+this repo and were left uncommitted; neither existing local
+checkout under <code>~/src/shakenfist/</code> was touched.</p>
+<p><code>scripts/audit-check.py</code> reported <code>review-coverage</code> as <code>fail</code>
+for both, at the threshold of 5:</p>
+<table>
+<thead>
+<tr>
+<th>Repo</th>
+<th>Commit</th>
+<th>Status</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ryll</td>
+<td><code>c868d8b</code></td>
+<td>fail</td>
+<td>109 of 214 in-scope files reviewed at HEAD; 105 need review (threshold 5)</td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td><code>9996305</code></td>
+<td>fail</td>
+<td>123 of 229 in-scope files reviewed at HEAD; 106 need review (threshold 5)</td>
+</tr>
+</tbody>
+</table>
+<p>At each of those same commits, <code>scripts/review-tracking.py
+status --json</code>, run with the clone as cwd, agreed exactly:
+<code>in_scope</code>, <code>reviewed</code> and <code>needing_review</code> matched the
+details string above for both repositories, and the union of
+<code>stale</code> plus <code>never_reviewed</code> matched the check's <code>missing</code>
+list file for file (105 of 105 entries for ryll, 106 of 106
+for kerbside; both repositories have zero <code>stale</code> files, so
+the whole backlog is <code>never_reviewed</code>). No disagreement was
+found between the two tools at either commit, and
+<code>audit-manage-issues.py</code> was not run.</p>
+<p>What the phase changed, in total, is three corrections in
+<code>docs/code-review-tracking.md</code> -- the loop-safety argument, the
+location of <code>REVIEW_BACKLOG_THRESHOLD</code>, and the claim that a filed
+issue is a ready-made work queue -- plus the four sentences that
+said the prune workflow pushes to "main", corrected to "default
+branch" since ryll's and kerbside's is develop; and
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/138" title="GitHub Issue: shakenfist/development #138">development#138</a>, filed against the issue body never being
+refreshed. No criterion, check or issue-management code was touched,
+and <code>audit-manage-issues.py</code> was never run.</p>
+<p>Review of the pull request added three more edits of the same kind.
+The "pushes to main" claim survived in two places step 5.1's brief
+had ruled out of scope: <code>AGENTS.md</code> and <code>ARCHITECTURE.md</code> both say
+it about <em>adopting</em> repositories, so both were wrong for exactly the
+reason the four corrected sentences were, and both now say "default
+branch". The brief's reasoning -- no convention and no system shape
+changed -- does not reach a statement that is simply false.
+(<code>ARCHITECTURE.md</code>'s other two mentions describe this repository's
+own <code>ci-prune-reviews.sh</code>, whose default branch really is main, and
+are left alone.)</p>
+<p><code>AGENTS.md</code> also claimed that editing a file carrying a review mark
+makes <code>review-tracking-tests</code> fail. It does not: <code>regen</code> counts
+marks rather than validating them against HEAD, so <code>REVIEWS.md</code>
+regenerates unchanged and the suite passes. This pull request proved
+it -- editing <code>docs/code-review-tracking.md</code> staled its mark, the
+suite stayed green, and the review caught what CI could not.
+<code>AGENTS.md</code> now says that nothing in the pull request catches this
+and that <code>prune-reviews</code> heals it only after the merge. The three
+marks these corrections staled -- <code>docs/code-review-tracking.md</code>,
+and <code>AGENTS.md</code> and <code>ARCHITECTURE.md</code> from the corrections above --
+were pruned here rather than left for that workflow, so all three
+return to the human review queue. The totals in <code>REVIEWS.md</code> are not
+quoted here: they move with every merge to main, which is the same
+reason the compliance figures above carry their dates.</p>
+<p>A second review round reached the criterion spec itself.
+<code>docs/audits/review-coverage.md</code> still named ryll and kerbside as
+the only repositories carrying the tooling, which this phase's own
+survey had already disproved -- five carry it -- and it still
+described the filed issue as a standing work queue, the framing step
+5.1 removed from <code>docs/code-review-tracking.md</code>. Both corrected, and
+the spec now points at the compliance page rather than carrying a
+fleet list that has to be maintained by hand. The issue reference in
+<code>docs/code-review-tracking.md</code> also moved from <code>development#138</code> to
+<code>shakenfist/development#138</code>: GitHub autolinks <code>owner/repo#N</code> and a
+bare <code>#N</code> but renders <code>repo#N</code> as plain text, so the short form the
+first round asked for was not a link at all. Editing the spec staled
+its mark too, pruned here like the other three, which is what takes
+this repository past its own threshold.</p>
+<p><strong><code>review-coverage</code> fails against this repository, and that is the
+criterion working.</strong> Rebasing onto main on 2026-09-19 put
+development itself over its own backlog threshold: main already
+needed review on two files (<code>.github/workflows/renovate.yml</code> and
+<code>templates/renovate/renovate.yml</code>) and this branch prunes four more,
+so six in-scope files need review against a threshold of five.
+<code>audit-check.py</code> now reports 30 pass, 1 fail, 24 not-applicable
+rather than the 31/0/24 of 2026-09-17. Nothing regressed: the check
+recomputes against HEAD exactly as phase 2 built it to, and the
+repository that owns the tooling has landed in its own backlog
+queue. The daily audit will file a <code>Consistency: Human review
+coverage</code> issue against development once this merges, and it closes
+itself when a review session clears the six files -- the lifecycle
+phase 5 verified on ryll, now demonstrated at home without staging
+anything, which is what D5.1 and D5.3 declined to manufacture
+elsewhere.</p>
+<h4 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h4>
+<p><strong>The survey's numbers age while the phase is in review.</strong> The
+backlog on ryll and kerbside moves with every merge, so a reviewer
+checking 120 against the compliance page a week later will see a
+different number and may read the plan as wrong. <em>Mitigation:</em> every
+measurement in this section carries its date, and step 5.3's
+acceptance test is internal agreement between two tools at one
+commit rather than a literal digit. The reviewer checks the shape,
+not the value.</p>
+<p><strong>Fixing the documentation's loop argument could leave two
+repositories disagreeing.</strong> ryll's workflow header and this
+repository's <code>docs/code-review-tracking.md</code> both explain the loop,
+and step 5.1 rewrites only the second. <em>Mitigation:</em> the brief names
+ryll's header as the authority and requires the two to agree; the
+management session re-reads ryll's header when reviewing 5.1 rather
+than trusting that it was consulted.</p>
+<p><strong>Filing an issue about the audit machinery invites someone to fix
+it in this branch.</strong> <em>Mitigation:</em> D5.2 states the reasoning and the
+step brief ends with "Do not fix the script". If the operator wants
+it fixed, it is a phase in <code>PLAN-consistency-audits-v2</code>, not a
+commit here.</p>
+<h4 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h4>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>docs/code-review-tracking.md</code> contains no statement that a
+      prune push cannot retrigger the workflow, and its explanation
+      of why the loop terminates matches ryll's
+      <code>.github/workflows/prune-reviews.yml</code> header comment.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>grep -rn 'REVIEW_BACKLOG_THRESHOLD' docs/ | grep -v
+      '^docs/plans/'</code> names <code>scripts/audit/checks/review.py</code> and no
+      other file. The plans are excluded deliberately: they record
+      the old path as part of saying it was wrong.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>docs/code-review-tracking.md</code> says, where it describes the
+      issue as a work queue, that the list is not refreshed after
+      filing.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> An issue exists on shakenfist/development describing the
+      never-updated issue body, and its number appears both in this
+      section and in Future work.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Step 5.3's run is recorded with the commit it audited, and
+      <code>review-tracking.py status</code> and <code>audit-check.py</code> agreed at that
+      commit.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> No issue was filed, edited or closed by anything this phase
+      ran: <code>audit-manage-issues.py</code> was not invoked.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Every status cell in this plan's Execution table is one term
+      from <code>templates/shared-blocks/plan-status-vocabulary.md</code>.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>python3 scripts/review-tracking.py status</code> reports no
+      <code>stale:</code> file: any review mark this phase staled by editing a
+      file has been pruned in the branch rather than left for
+      <code>prune-reviews</code> to heal after the merge.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>pre-commit run --all-files</code> passes, and <code>python3
+      scripts/audit-check.py --repo-path . --repo-name development</code>
+      still reports 31 pass, 0 fail, 24 not-applicable as it did on
+      2026-09-17, or this section says which verdict moved and why.
+      One moved: see below. Run the command with audit credentials
+      -- without a token, <code>delete-branch-on-merge</code> and
+      <code>scope-coverage</code> degrade to <code>fail</code> on permissions rather than
+      on anything in the tree, which is a different two failures
+      from the one recorded here.</li>
+</ul>
+<h4 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h4>
+<p>Before executing any step of this phase, back brief the operator on
+what the phase is for and what it will not do -- in particular that
+it fixes documentation and files an issue, and changes no criterion,
+no check and nothing in <code>audit-manage-issues.py</code>. Step 5.1 is the
+one to raise before editing if its three fixes cannot be made
+without restructuring the "Steady state" section, since a
+restructure is cheap to propose and expensive to redo.</p>
 <h3 id="phase-6-push-audit">Phase 6: Push audit<a class="headerlink" href="#phase-6-push-audit" title="Permanent link">&para;</a></h3>
 <p>Run <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in
 this plan against <code>main</code>, not over the last phase's diff alone --
@@ -14601,49 +15177,49 @@ PR on this branch, the ryll work a separate PR.</p>
 <td>1</td>
 <td>development</td>
 <td><code>status</code> subcommand + tests</td>
-<td>Done</td>
+<td>Complete</td>
 <td><code>b677b61</code> (#11)</td>
 </tr>
 <tr>
 <td>2</td>
 <td>development</td>
 <td><code>check_review_coverage</code> + registration + tests</td>
-<td>Done</td>
+<td>Complete</td>
 <td><code>b677b61</code> (#11)</td>
 </tr>
 <tr>
 <td>3</td>
 <td>development</td>
 <td><code>audit_common.py</code> metadata + <code>audits/review-coverage.md</code></td>
-<td>Done</td>
+<td>Complete</td>
 <td><code>b677b61</code> (#11)</td>
 </tr>
 <tr>
 <td>4</td>
 <td>development</td>
 <td><code>PROJECT-CONSISTENCY-AUDITS.md</code> + <code>PLAN-consistency.md</code> entries</td>
-<td>Done</td>
+<td>Complete</td>
 <td><code>b677b61</code> (#11)</td>
 </tr>
 <tr>
 <td>5</td>
 <td>development</td>
 <td><code>docs/code-review-tracking.md</code> steady-state rewrite</td>
-<td>Done</td>
+<td>Complete</td>
 <td><code>b677b61</code> (#11)</td>
 </tr>
 <tr>
 <td>6</td>
 <td>ryll</td>
 <td>prune workflow + <code>tools/ci-prune-reviews.sh</code> + docs</td>
-<td>Done</td>
+<td>Complete</td>
 <td>ryll <code>1e94d00f</code> (#236)</td>
 </tr>
 <tr>
 <td>7</td>
 <td>both</td>
 <td>end-to-end verification (phase 5)</td>
-<td>Blocked on merge</td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -14655,6 +15231,11 @@ PR on this branch, the ryll work a separate PR.</p>
 </tr>
 </tbody>
 </table>
+<p>Step 7 stopped being blocked when both pull requests merged in
+August; phase 5 above is the plan for it. The statuses were brought
+into the shared vocabulary on 2026-09-17 -- see that phase's survey.
+Step 7 reaches <code>Complete</code> when its own pull request merges and the
+<code>Merged</code> column records that commit, not before.</p>
 <p>The <code>Merged</code> column is what <code>plan-push-audit-phase</code> asks each phase
 to record as it lands, so that phase 6 has a range to audit once
 <code>git diff main</code> for this plan is empty. Steps 1--5 were one pull
@@ -14686,16 +15267,42 @@ proposed; the Python follows the house style (single quotes,
 </ul>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Adopt the tooling (and prune workflow) in kerbside once the
-  ryll experiment stabilises.</li>
+<li>~~Adopt the tooling (and prune workflow) in kerbside once the
+  ryll experiment stabilises.~~ Done, and earlier than this
+  anticipated: kerbside's scope config landed in the same pull
+  request as steps 1--5 (branch <code>kerbside-review-tracking</code>,
+  2026-08-03). Five repositories now carry it -- actions,
+  development, hunkydory, kerbside and ryll.</li>
+<li>An issue against <code>audit-manage-issues.py</code>, which never updates an
+  open issue's body, so every consistency issue is frozen at filing
+  time and a long-lived <code>review-coverage</code> issue understates the
+  backlog it was filed about. Phase 5 D5.2 explains why the fix is
+  not made here; filed as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/138" title="GitHub Issue: shakenfist/development #138">development#138</a>.</li>
 <li>A consistency check that repos with
   <code>.vscode/review-scope.toml</code> also carry the prune workflow, so
   the two halves of the steady state cannot drift apart as more
-  repos adopt.</li>
+  repos adopt. Not yet needed: all five adopters carried it when
+  checked on 2026-09-17 (phase 5 D5.4).</li>
 <li>Hysteresis on the threshold (open at 5, close lower) if the
-  issue churn from routine merges proves noisy.</li>
+  issue churn from routine merges proves noisy. The churn case is
+  real -- <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/242" title="GitHub Issue: shakenfist/ryll #242">ryll#242</a>, #275 and #282 each lived a day or two -- but
+  phase 5 D5.3 declines to act on the <em>current</em> evidence, where two
+  repositories sit far above the threshold for a reason hysteresis
+  would not touch.</li>
+<li>Extend <code>plan-index</code> (or add a sibling criterion) to apply the
+  shared status vocabulary to every status column in a master plan's
+  own phase table, not only the index row. <code>plan-status-vocabulary</code>
+  governs both, but <code>PlanIndex</code> reads <code>docs/plans/index.md</code> and
+  nothing else, which is why this plan's own Execution table drifted
+  to <code>Done</code> and <code>Blocked on merge</code> unnoticed. Not yet urgent:
+  scanning during review on 2026-09-19 -- two days after the phase
+  itself, which is why the date differs from the measurements above
+  -- no other <code>docs/plans/PLAN-*.md</code> phase table carried an
+  out-of-vocabulary status.</li>
 <li>Revisit capping the issue-body file list if a repo much larger
-  than ryll adopts the tooling.</li>
+  than ryll adopts the tooling. Unreached so far: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/304" title="GitHub Issue: shakenfist/ryll #304">ryll#304</a>'s body
+  is 76 lines at 63 files, and because the body is never refreshed
+  it does not grow with the backlog.</li>
 </ul>
 
 

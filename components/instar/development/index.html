@@ -14540,6 +14540,21 @@ itself.</p>
 <p>To move the pin, change <code>DEBIAN_SNAPSHOT</code> only. Do not change
 <code>FROM debian:bullseye</code>, and do not "fix" a future apt failure by
 pointing back at <code>deb.debian.org</code>.</p>
+<p><strong>Both devcontainer images set <code>Acquire::Retries "3"</code>.</strong> Pinning to a
+snapshot removed the 404 failure mode and left the transport one, and
+if anything raised it: <code>snapshot.debian.org</code> is a single origin behind
+a CDN, not the <code>deb.debian.org</code> mirror network. A fetch failure here is
+not an ordinary build failure — the release image is only built in the
+merge queue for a docs-only change, so there is no pull-request run to
+catch it, and the failure ejects the pull request from the queue
+instead (#531). The occurrence on PR #560 was one object out of 150
+dying with a TCP reset ten seconds in, after 125 MB had come down from
+the same host at 15.3 MB/s, with the next object succeeding. apt
+retries the failed object rather than the transaction, so a retry costs
+nothing on a healthy run and still fails promptly against a genuinely
+missing object. If this class of failure returns despite the retries,
+the next step is a local caching apt proxy or a BuildKit cache mount
+over <code>/var/cache/apt</code>, not a longer retry count.</p>
 <h5 id="the-options-that-were-not-taken">The options that were not taken<a class="headerlink" href="#the-options-that-were-not-taken" title="Permanent link">&para;</a></h5>
 <p>No option was free, because "move to the next Debian" is not available:
 bookworm ships glibc 2.36, above both the 2.31 we publish and the 2.34
@@ -14890,30 +14905,54 @@ across the Shaken Fist projects.</p>
 <p>See <code>.github/workflows/</code> for implementation details.</p>
 <h3 id="self-hosted-runners-and-docker">Self-hosted runners and Docker<a class="headerlink" href="#self-hosted-runners-and-docker" title="Permanent link">&para;</a></h3>
 <p>Almost every job in this repository runs on the self-hosted runner pool
-(<code>[self-hosted, debian-12, ...]</code>), and those runners do <strong>not</strong> ship
+(<code>[self-hosted, debian-13, ...]</code>), and those runners do <strong>not</strong> ship
 Docker. Since instar is built and tested inside the devcontainer image,
 any job that runs <code>docker</code>, <code>make instar</code>, <code>make test-rust</code>, <code>make lint</code>
-or any other container-backed Makefile target must install it first:</p>
+or any other container-backed Makefile target must install it first. Do
+not paste an apt block into the workflow -- call the shared installer,
+after the checkout step that puts it on disk:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="w">    </span><span class="nt">env</span><span class="p">:</span>
 <a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">      </span><span class="nt">DOCKER_BUILDKIT</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 <a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
 <a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Install Docker</span>
-<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">          </span><span class="no">sudo apt-get update</span>
-<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">          </span><span class="no">sudo apt-get install -y docker.io</span>
-<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="w">          </span><span class="no">sudo systemctl start docker</span>
-<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="w">          </span><span class="no">sudo chmod 666 /var/run/docker.sock</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Checkout</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v7</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Install Docker</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tools/ci/install-docker.sh</span>
 </code></pre></div>
+<p>Anything else the job needs from the same apt run is passed as an
+argument, which saves a second <code>apt-get update</code>:
+<code>tools/ci/install-docker.sh qemu-utils</code>.</p>
 <p>Omitting the step does not fail at job start -- it fails part way through
 with <code>docker: command not found</code>, whenever the first container command is
 reached.</p>
+<p>The installer exists because the apt block it replaced was pasted into
+fourteen steps across six workflows, and the paste is what broke when the
+fleet moved to <code>debian-13</code>. On bookworm, <code>docker.io</code> shipped one package
+that was client, daemon and builder; on trixie it is the daemon only, and
+the other two live in separate <code>docker-cli</code> and <code>docker-buildx</code> packages
+that <code>docker.io</code> merely <em>Recommends</em> -- which the runners do not install.
+Each omission has its own failure, and both arrive seconds after a step
+named "Install Docker" reported success:</p>
+<ul>
+<li>Without <code>docker-cli</code> there is no <code>/usr/bin/docker</code> at all, and four
+  jobs failed with <code>docker: not found</code>.</li>
+<li>Without <code>docker-buildx</code> the client is present but cannot build. Every
+  job here sets <code>DOCKER_BUILDKIT: 1</code>, and the docker 26 client
+  implements <code>docker build</code> under BuildKit by delegating to the buildx
+  plugin, so the build refuses to run -- "BuildKit is enabled but the
+  buildx component is missing or broken" -- rather than falling back to
+  the legacy builder.</li>
+</ul>
+<p>Neither package exists before trixie, so the installer requires a
+<code>debian-13</code> runner.</p>
 <p>The one exception is <code>mermaid-lint.yml</code>, which runs on
-<code>[self-hosted, vm, debian-12-docker, s]</code>. That is the fleet image that
+<code>[self-hosted, vm, debian-13-docker, s]</code>. That is the fleet image that
 ships <code>docker.io</code>, so it needs no install step -- but the label has to be
 listed in <code>.github/actionlint.yaml</code> or actionlint rejects the workflow.</p>
 <h3 id="self-hosted-runners-and-the-github-cli">Self-hosted runners and the GitHub CLI<a class="headerlink" href="#self-hosted-runners-and-the-github-cli" title="Permanent link">&para;</a></h3>
-<p>The same applies to <code>gh</code>: the <code>[self-hosted, debian-12, ...]</code> runners do
+<p>The same applies to <code>gh</code>: the <code>[self-hosted, debian-13, ...]</code> runners do
 not ship it either, so any job that files an issue, opens a PR or
 otherwise calls the GitHub CLI must install it first. Do not paste an
 apt block into the workflow -- call the shared installer, which is a
@@ -14932,7 +14971,7 @@ entirely on <code>gh api</code> and <code>gh pr comment</code>, so if those runn
 <code>pr-address-comments.yml</code> run 24368074053 (2026-04-13) has that step
 passing on a <code>static</code> runner.</p>
 <p>So the rule is per runner label, not per workflow: add the installer
-step on <code>debian-12</code> (and any new pool that turns out to lack <code>gh</code>), and
+step on <code>debian-13</code> (and any new pool that turns out to lack <code>gh</code>), and
 leave the <code>claude-code</code> and <code>static</code> jobs alone.</p>
 <p>This one bites late rather than early. The <code>gh</code> call is usually the last
 thing a job does -- open the PR, file the issue -- so the job burns its
@@ -15161,10 +15200,22 @@ ICE'd compiling tokio inside <code>cargo install cargo-audit</code> and took out
 CI's "Build devcontainer" step). Renovate cannot bump rustup toolchain
 pins; instead the weekly <code>rust-nightly-bump</code> workflow
 (<code>tools/ci/bump-rust-nightly.sh</code>) rewrites and test-builds <strong>both</strong>
-images, then instar and the Rust test suite, against the newest
-published nightly and opens a bump PR only when everything passes. Do
-not un-pin the toolchain, and do not bump the pin by hand without at
-least building both images. (The lint container is separate and uses a
+images, then instar and the Rust test suite, then <code>make package</code>, the
+glibc floor check and an install of each package on the oldest glibc of
+its family, against the newest published nightly — and opens a bump PR
+only when everything passes. Do not un-pin the toolchain, and do not
+bump the pin by hand without at least building both images.</p>
+<p><strong>Packaging is part of a toolchain change's blast radius, which is why
+the validation goes that far.</strong> <code>cargo-generate-rpm</code> derives the
+<code>.rpm</code>'s dependencies from the built binary's ELF, so a nightly can
+change the package without changing a line of our code, and neither
+building nor testing can see it. <code>nightly-2026-08-17</code> passed the build
+and the whole Rust suite, then produced an <code>.rpm</code> requiring
+<code>libc.so.6(GLIBC_2.18)[WEAK](64bit)</code>; nothing provides that, and all
+three RPM legs of the matrix failed before a test ran (#504). Installing
+the package is the only step that finds an unsatisfiable dependency, so
+if you add validation here, add it before the PR is opened rather than
+relying on the bump PR's own CI. (The lint container is separate and uses a
 stable <code>rust:</code> tag Renovate does manage; the dev image's Debian base is
 pinned by digest and Renovate walks it forward.)</p>
 <h3 id="cargo-tool-pinning">Cargo tool pinning<a class="headerlink" href="#cargo-tool-pinning" title="Permanent link">&para;</a></h3>
@@ -15291,7 +15342,7 @@ so issues are automatically closed when the PR merges.</p>
 <p>The self-hosted runners have no Docker preinstalled, so any job touching
 <code>docker</code> or a container-backed Makefile target needs an "Install Docker"
 step -- see "Self-hosted runners and Docker" in <code>docs/development.md</code>.</p>
-<p>The <code>debian-12</code> runners have no <code>gh</code> preinstalled either, so any job on
+<p>The <code>debian-13</code> runners have no <code>gh</code> preinstalled either, so any job on
 those that calls the GitHub CLI needs a <code>tools/ci/install-gh-cli.sh</code>
 step -- see "Self-hosted runners and the GitHub CLI" in
 <code>docs/development.md</code>.</p>
@@ -15299,6 +15350,7 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 <ul>
 <li><code>scripts/differential-fuzz.py</code> - Differential fuzzing script (instar vs qemu-img + libyal)</li>
 <li><code>scripts/extract-fuzz-corpus.py</code> - Seeds + restores the coverage-fuzz corpus from instar-testdata</li>
+<li><code>tools/ci/install-docker.sh</code> - Installs the Docker client and daemon on a self-hosted runner, plus any extra packages passed as arguments (see "Self-hosted runners and Docker" above)</li>
 <li><code>tools/ci/install-gh-cli.sh</code> - Installs the GitHub CLI on a self-hosted runner if absent (see "Self-hosted runners and the GitHub CLI" above)</li>
 <li><code>tools/ci/fuzz-tier.sh</code> - Computes tiered nightly per-target fuzz durations</li>
 <li><code>tools/ci/report-fuzz-crash.sh</code> - Files the <code>security-audit</code> issue for a coverage-fuzz crash (bounds the log excerpt, dedups against open issues; see "Crash reporting" in <code>docs/testing.md</code>)</li>

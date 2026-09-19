@@ -15673,6 +15673,40 @@ the release binary is built on <code>debian:bullseye</code> (symbol floor
 9's glibc 2.34. <strong>If a matrix entry fails while <em>installing</em> the
 package, that is a glibc-floor regression in the build image, not a
 test failure.</strong></p>
+<p><strong><code>package-smoke</code> is floor coverage, not distro coverage.</strong> It is the
+only packaging signal a pull request gets, because <code>package-build</code> and
+the matrix run in the queue alone. It builds both packages and installs
+each on the <em>oldest</em> glibc of its family in the matrix — the <code>.deb</code> on
+<code>ubuntu:22.04</code> (2.35) and the <code>.rpm</code> on <code>rockylinux:9</code> (2.34) — so a
+package that will not install anywhere fails before enqueue instead of
+ejecting the pull request from the queue. That is the class both
+recorded misses belonged to: #488 raised the binary's floor to
+<code>GLIBC_2.39</code> via a base-image bump, and #501 bumped to a Rust nightly
+that marks glibc version needs <code>WEAK</code>, so the <code>.rpm</code> required
+<code>libc.so.6(GLIBC_2.18)[WEAK](64bit)</code> and no RPM distro could install
+it. Both passed the pull request gate. Neither could have failed here
+before: the <code>.rpm</code> was not built at all, and the <code>.deb</code> was installed
+on <code>debian:trixie</code>, the <em>newest</em> glibc in the matrix, where a floor
+regression cannot fail by construction. Keep both targets at the floor
+if the matrix distro list changes; trixie is still covered by the
+Debian 13 matrix entry.</p>
+<p><strong>Runner size is a merge-queue latency decision, not a comfort one.</strong>
+The <code>xl</code> pool is shared across the whole Shaken Fist fleet and is the
+scarce resource in the queue; the <code>develop</code> ruleset gives a merge group
+<code>check_response_timeout_minutes: 360</code>, after which GitHub ejects the
+pull request even though nothing failed. Merge run 33799289895 spent 75
+minutes executing and 322 minutes queueing, finished green at 397, and
+lost the pull request. So a merge-queue job belongs on <code>xl</code> only if it
+actually needs a VM: <code>package-matrix</code> does, because each entry installs
+a package and runs the suite against a distro's <code>qemu-img</code>, and
+<code>package-build</code> does not, because it only builds. Putting a
+non-VM job on <code>xl</code> does not merely waste a big machine, it inserts an
+unbounded queue wait into the critical path.</p>
+<p>Two things this does not fix, both still open: the <code>xl</code> ceiling itself
+(seven matrix entries measured at no more than three concurrent), and
+the fact that a timeout eject is silent -- a green run whose pull
+request was dropped reports nothing, and the operator finds out by
+noticing the queue is empty.</p>
 <p><code>can_enqueue</code> and <code>can_merge</code> are the two aggregate gates, and they are
 the names configured as required checks — never the individual jobs or
 matrix entries, whose names change whenever the distro list does.
@@ -16609,6 +16643,27 @@ Issues with the <code>security-audit</code> label immediately when found, by
 <code>tools/ci/report-fuzz-crash.sh</code>. New corpus entries are pushed to
 <code>instar-testdata/custom/fuzz-corpus/</code> after nightly runs, and restored
 by target name on the next run so coverage compounds.</p>
+<p><strong>The corpus push must stay cheap, and it is the step that decides
+whether a night counted.</strong> <code>tools/ci/push-fuzz-corpus.sh</code> adds files to
+a repository it never wants to read: instar-testdata is ~12 GB with
+LFS-backed fixtures, and <code>custom/fuzz-corpus/</code> alone is ~2.7 GB across
+~560,000 entries. A plain <code>git clone</code> of that, followed by a per-file
+walk of both trees, measured <strong>22 minutes</strong> — against the 30 minutes of
+headroom <code>NIGHTLY_BUDGET_SECONDS</code> (450 min) leaves under the job's
+480-minute timeout, which also has to cover setup. Five of six
+scheduled runs in August were killed mid-push and threw away the corpus
+they had just spent seven hours building (#519). The script therefore
+clones with <code>--filter=blob:none --sparse</code> and reads the committed entry
+names out of <code>git ls-tree</code>, so no corpus blob is ever fetched, and
+copies only the entries <code>comm</code> says are new. If you change it, keep
+two invariants: the index must stay fully populated (a <code>--no-checkout</code>
+clone would make the commit <em>delete</em> every fixture in the repository),
+and staging must use <code>git add --sparse</code>, because the corpus paths lie
+outside the checked-out cone and plain <code>git add</code> refuses them. Both are
+asserted by <code>tools/ci/test-push-fuzz-corpus.sh</code>, which runs against
+local repositories in the <code>CI tooling guards</code> job. The step also
+carries its own 20-minute <code>timeout-minutes</code>, so a future regression
+fails loudly instead of eating the job.</p>
 <p>These rules make that reporting safe, most of them learned from a month
 of silently broken nightlies:</p>
 <ul>
