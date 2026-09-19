@@ -89,18 +89,26 @@ quotes the expansion and leaves the rest of the path outside it — so a
 reference is resolved against the referring file's own directory
 before the repository root, and one whose head is a variable is read
 as a path rooted in that directory rather than as the absolute path
-its leading `/` would otherwise make it. A workspace variable keeps
-the directories it names, so `${{ github.workspace }}/tools/ci/x.sh`
-is looked for under tools/ci and not at the root. Where the tail
-climbs back out of the referring file's directory the sibling reading
-is dropped, so `${TOOLS}/../shared/x.sh` does not also go looking for
-an unrelated `x.sh` beside the file that named it.
+its leading `/` would otherwise make it. A variable keeps the
+directories that follow it, so `${{ github.workspace }}/tools/ci/x.sh`
+is looked for under tools/ci and not at the root. The sibling reading
+is offered only where nothing follows the variable but a file name:
+`${TOOLS}/../shared/x.sh` and `${DIR}/sub/x.sh` both point somewhere
+other than beside the file that named them, so an unrelated `x.sh`
+sitting there is not read in their place.
 
 A genuine `/etc/x.sh` is still refused, and nothing outside the clone
 is ever read: a path naming something outside it is dropped, and a
 committed symlink that resolves outside it reads as absent. Both
 matter because the paths come out of the audited repository's own
 files, which is to say the repository decides what the audit opens.
+
+What is followed is one file naming another by path. A Python reporter
+that splits through an import rather than a path -- `from tools.ci
+import fuzz_filer` -- is not followed, because the import names a
+module and not a file, and resolving one to the other means knowing
+the package root. A reporter split that way files its issue somewhere
+this criterion cannot see, and will fail it.
 
 Where the nightly is split across a caller and a `workflow_call`
 callee, either side may hold the permission and either may make the

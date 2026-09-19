@@ -227,7 +227,7 @@ needs the same treatment, and phase 6 says so.
 |-------|--------|--------|
 | 1. Alarm on absence | Complete | images acccd2b (#5), images 47ed141 (#6), private-ci ae7b1f8 (#49), private-ci e1f8fb1 (#54), 33fl 6de1764 (#827) |
 | 2. Verify the artifact, not the name | Complete | images 6028647 (#7), images 4800c72 (#8), images b872641 (#9), actions 2ac4a94 (#74), 33fl bbbd842 (#836) |
-| 3. Unblock the migration | In progress | private-ci 392700d (#60) |
+| 3. Unblock the migration | In progress | private-ci 9eace9d (#60), private-ci 2e18c13 (#61), private-ci dbb78ca (#63), actions 8684eec (#78), actions 781d267 (#80), kerbside 79c2506 (#435) |
 | 4. The consumer sweep | Not started | |
 | 5. Retire the end-of-life producers | Not started | |
 | 6. Close the audit's blind spot | Not started | |
@@ -480,6 +480,62 @@ primary mounts at `/srv/ci`, and whose absence blocks *all* CI
 provisioning -- is built from `debian:11`, a base that can no longer
 be built at all: `bullseye-security`'s `Release` expired
 2026-09-08.
+
+**Status: the work is done and running; one correction is in
+review.** Both stuck labels are unstuck. `ci-images/debian-gnome-13`
+first built on 2026-09-17 at 06:53 (529s, blob
+`b9b624c8-713e-440b-ad0f-82b0e5f5ef60`), and the dependencies disk
+now builds on Debian 13 -- verified in production rather than at
+merge, with the conductor deployed at private-ci `ad9863eb` and the
+nightly creating its builder as `disks=['100@debian:13', '50']` on
+2026-09-18, against `['100@debian:11', '50']` the night before.
+private-ci#39 is closed with that evidence. private-ci#45 keeps its
+fourth checkbox for phase 5. Outstanding: kerbside#450, which
+corrects a defect introduced by kerbside#435; the status cell moves
+to `Complete` when it merges.
+
+**Three things this phase got wrong, recorded for phase 7.**
+
+*The survey scoped the gnome move at seven places across two
+repositories. It was about thirteen across four files, in four
+repositories.* `GNOME_LABEL`'s comment, two docstrings, three tests,
+and the marker paragraphs in private-ci's own `AGENTS.md` and
+`ARCHITECTURE.md` all named the release and would have gone
+factually wrong. More importantly, `shakenfist/kerbside` reads the
+cached snapshot off the disk by hardcoded path and was never looked
+at, because the survey grepped only the repositories it expected to
+touch. A consumer you do not grep for is a consumer you do not have.
+
+*A merge is not a deploy, again.* private-ci#61 merged on 2026-09-17
+at 09:52 and that evening's nightly still built on Debian 11,
+because the conductor had not been redeployed -- it had even
+restarted in between, which is not the same thing. This is the same
+distinction that cost phase 2 a night of images, in a different
+component, and neither phase had a check that would have caught it.
+
+*Two ordering gates the plan set were both crossed.* actions#78
+merged ahead of its "must not merge until 3c has built" gate, and
+private-ci#63 merged ahead of actions#80 despite the playbook-first
+rule. Neither caused damage -- the first by luck, since ansible's
+`auto` interpreter discovery handles bullseye unaided, and the
+second because the conductor was not deployed in the window -- but a
+gate stated only in a plan file and a pull request body is not a
+gate. Phase 7 should ask what would actually have enforced them.
+
+**The gnome rename was reconsidered mid-phase, and the second answer
+was better.** The plan called for renaming the cached snapshot from
+`debian-12-gnome-agents` to `debian-13-gnome-agents` and sequencing
+three repositories around it. Review on actions#80 pointed out that
+the disk is reformatted from scratch on every build, so a rename has
+no transition window at all. The published name is now
+`debian-gnome-agents`, carrying no release, with a transitional
+hardlink at the old name; `gnome_release` governs only the label
+lookup and the scratch filename. That removes the release from a
+cross-repository interface entirely, so the next desktop bump is not
+a fleet change. kerbside#435 was written against the abandoned
+design and merged anyway, reading a path that is never published and
+silently taking the legacy hardlink on every run -- which is what
+kerbside#450 fixes.
 
 #### What the survey found
 

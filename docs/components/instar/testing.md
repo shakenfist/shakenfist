@@ -520,6 +520,43 @@ the release binary is built on `debian:bullseye` (symbol floor
 package, that is a glibc-floor regression in the build image, not a
 test failure.**
 
+**`package-smoke` is floor coverage, not distro coverage.** It is the
+only packaging signal a pull request gets, because `package-build` and
+the matrix run in the queue alone. It builds both packages and installs
+each on the *oldest* glibc of its family in the matrix — the `.deb` on
+`ubuntu:22.04` (2.35) and the `.rpm` on `rockylinux:9` (2.34) — so a
+package that will not install anywhere fails before enqueue instead of
+ejecting the pull request from the queue. That is the class both
+recorded misses belonged to: #488 raised the binary's floor to
+`GLIBC_2.39` via a base-image bump, and #501 bumped to a Rust nightly
+that marks glibc version needs `WEAK`, so the `.rpm` required
+`libc.so.6(GLIBC_2.18)[WEAK](64bit)` and no RPM distro could install
+it. Both passed the pull request gate. Neither could have failed here
+before: the `.rpm` was not built at all, and the `.deb` was installed
+on `debian:trixie`, the *newest* glibc in the matrix, where a floor
+regression cannot fail by construction. Keep both targets at the floor
+if the matrix distro list changes; trixie is still covered by the
+Debian 13 matrix entry.
+
+**Runner size is a merge-queue latency decision, not a comfort one.**
+The `xl` pool is shared across the whole Shaken Fist fleet and is the
+scarce resource in the queue; the `develop` ruleset gives a merge group
+`check_response_timeout_minutes: 360`, after which GitHub ejects the
+pull request even though nothing failed. Merge run 33799289895 spent 75
+minutes executing and 322 minutes queueing, finished green at 397, and
+lost the pull request. So a merge-queue job belongs on `xl` only if it
+actually needs a VM: `package-matrix` does, because each entry installs
+a package and runs the suite against a distro's `qemu-img`, and
+`package-build` does not, because it only builds. Putting a
+non-VM job on `xl` does not merely waste a big machine, it inserts an
+unbounded queue wait into the critical path.
+
+Two things this does not fix, both still open: the `xl` ceiling itself
+(seven matrix entries measured at no more than three concurrent), and
+the fact that a timeout eject is silent -- a green run whose pull
+request was dropped reports nothing, and the operator finds out by
+noticing the queue is empty.
+
 `can_enqueue` and `can_merge` are the two aggregate gates, and they are
 the names configured as required checks — never the individual jobs or
 matrix entries, whose names change whenever the distro list does.
@@ -1233,6 +1270,28 @@ Issues with the `security-audit` label immediately when found, by
 `tools/ci/report-fuzz-crash.sh`. New corpus entries are pushed to
 `instar-testdata/custom/fuzz-corpus/` after nightly runs, and restored
 by target name on the next run so coverage compounds.
+
+**The corpus push must stay cheap, and it is the step that decides
+whether a night counted.** `tools/ci/push-fuzz-corpus.sh` adds files to
+a repository it never wants to read: instar-testdata is ~12 GB with
+LFS-backed fixtures, and `custom/fuzz-corpus/` alone is ~2.7 GB across
+~560,000 entries. A plain `git clone` of that, followed by a per-file
+walk of both trees, measured **22 minutes** — against the 30 minutes of
+headroom `NIGHTLY_BUDGET_SECONDS` (450 min) leaves under the job's
+480-minute timeout, which also has to cover setup. Five of six
+scheduled runs in August were killed mid-push and threw away the corpus
+they had just spent seven hours building (#519). The script therefore
+clones with `--filter=blob:none --sparse` and reads the committed entry
+names out of `git ls-tree`, so no corpus blob is ever fetched, and
+copies only the entries `comm` says are new. If you change it, keep
+two invariants: the index must stay fully populated (a `--no-checkout`
+clone would make the commit *delete* every fixture in the repository),
+and staging must use `git add --sparse`, because the corpus paths lie
+outside the checked-out cone and plain `git add` refuses them. Both are
+asserted by `tools/ci/test-push-fuzz-corpus.sh`, which runs against
+local repositories in the `CI tooling guards` job. The step also
+carries its own 20-minute `timeout-minutes`, so a future regression
+fails loudly instead of eating the job.
 
 These rules make that reporting safe, most of them learned from a month
 of silently broken nightlies:
