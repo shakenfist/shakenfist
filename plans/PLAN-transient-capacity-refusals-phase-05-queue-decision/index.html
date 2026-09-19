@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-transient-capacity-refusals/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-transient-capacity-refusals-phase-05-queue-decision/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>A capacity refusal is transient - Shaken Fist</title>
+        <title>Phase 5: Decide on server-side queued placement - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#a-capacity-refusal-is-transient" class="md-skip">
+        <a href="#phase-5-decide-on-server-side-queued-placement" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              A capacity refusal is transient
+              Phase 5: Decide on server-side queued placement
             
           </span>
         </div>
@@ -13922,10 +13922,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prompt" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Prompt
+        Context
       
     </span>
   </a>
@@ -13933,22 +13933,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#situation" class="md-nav__link">
+  <a href="#scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Situation
+        Scope
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Situation">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-survey-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the survey found
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What the survey found">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#the-cost" class="md-nav__link">
+  <a href="#f1-the-clients-ceiling-is-600-s-not-900-s-and-the-method-has-a-different-name" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The cost
+        F1 -- The client's ceiling is 600 s, not 900 s, and the method has a different name
       
     </span>
   </a>
@@ -13956,10 +13967,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#what-the-refusal-actually-is" class="md-nav__link">
+  <a href="#f2-defer_with_backoff-exists-but-its-budget-is-shorter-than-every-wait-ever-measured" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What the refusal actually is
+        F2 -- defer_with_backoff() exists, but its budget is shorter than every wait ever measured
       
     </span>
   </a>
@@ -13967,10 +13978,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#three-real-mechanisms-that-are-not-the-driver" class="md-nav__link">
+  <a href="#f3-ipam-really-is-allocated-before-scheduling-and-the-refusal-path-is-what-frees-it" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Three real mechanisms that are not the driver
+        F3 -- IPAM really is allocated before scheduling, and the refusal path is what frees it
       
     </span>
   </a>
@@ -13978,10 +13989,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#what-has-been-tried" class="md-nav__link">
+  <a href="#f4-an-address-shortage-already-returns-a-507-and-phase-4-deliberately-did-not-mark-it-transient" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What has been tried
+        F4 -- An address shortage already returns a 507, and phase 4 deliberately did not mark it transient
       
     </span>
   </a>
@@ -13989,10 +14000,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#what-this-is-not" class="md-nav__link">
+  <a href="#f5-the-suite-already-waits-client-side-for-420-s" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What this is not
+        F5 -- The suite already waits, client side, for 420 s
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f6-the-reading-tool-is-built-and-needs-no-new-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F6 -- The reading tool is built and needs no new work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#f7-the-gate-is-closed-and-it-is-closed-on-an-operator-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        F7 -- The gate is closed, and it is closed on an operator action
       
     </span>
   </a>
@@ -14005,33 +14038,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#mission-and-problem-statement" class="md-nav__link">
+  <a href="#decisions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Mission and problem statement
+        Decisions
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#open-questions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Open questions
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Open questions">
+    <nav class="md-nav" aria-label="Decisions">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-where-does-the-retry-live" class="md-nav__link">
+  <a href="#d36-the-gate-is-a-step-of-this-phase-not-a-precondition-to-planning-it" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Where does the retry live?
+        D36 -- The gate is a step of this phase, not a precondition to planning it
       
     </span>
   </a>
@@ -14039,10 +14061,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-does-a-retry-hide-the-problem" class="md-nav__link">
+  <a href="#d37-the-rule-is-fixed-now-in-numbers-before-the-data-is-read" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Does a retry hide the problem?
+        D37 -- The rule is fixed now, in numbers, before the data is read
       
     </span>
   </a>
@@ -14050,10 +14072,54 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-why-is-allocation-less-reliable-in-the-first-minutes-and-can-the-window-be-shortened" class="md-nav__link">
+  <a href="#d38-the-burden-of-proof-is-on-building-the-queue-not-on-abandoning-it" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Why is allocation less reliable in the first minutes, and can the window be shortened?
+        D38 -- The burden of proof is on building the queue, not on abandoning it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d39-if-the-decision-is-build-ipam-moves-first-and-that-is-the-phases-real-cost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D39 -- If the decision is Build, IPAM moves first, and that is the phase's real cost
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d40-whichever-way-it-goes-the-record-says-what-the-evidence-could-not-cover" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D40 -- Whichever way it goes, the record says what the evidence could not cover
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d41-correct-open-question-8-at-source-in-this-phases-first-commit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D41 -- Correct open question 8 at source, in this phase's first commit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d42-this-plan-does-not-design-the-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D42 -- This plan does not design the queue
       
     </span>
   </a>
@@ -14062,6 +14128,50 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks and mitigations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#definition-of-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition of done
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#back-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Back brief
+      
+    </span>
+  </a>
   
 </li>
       
@@ -14086,1027 +14196,369 @@
   
 
 
-<h1 id="a-capacity-refusal-is-transient">A capacity refusal is transient<a class="headerlink" href="#a-capacity-refusal-is-transient" title="Permanent link">&para;</a></h1>
-<h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
-<p>Before responding to questions or discussion points in this
-document, explore the shakenfist codebase thoroughly. Read
-relevant source files, understand existing patterns (object
-lifecycle, state machines, MariaDB storage via the three-layer
-direct/gRPC/public pattern, Pydantic schemas, daemon
-architecture, operation queue system, event logging), and
-ground your answers in what the code actually does today. Do
-not speculate about the codebase when you could read it
-instead. Where a question touches on external concepts
-(KVM/libvirt, VXLAN networking, MariaDB/Galera, gRPC/protobuf),
-research as needed to give a confident answer. Flag any
-uncertainty explicitly rather than guessing.</p>
-<p>This plan spans three repositories: this one (the scheduler, the
-cluster and resources daemons, and the <code>shakenfist_ci</code> functional
-suite), <code>client-python</code> (<code>shakenfist_client.apiclient</code>, which is
-what the suite and every operator script calls), and, for one
-step only, <code>shakenfist/actions</code> (where the reusable
-<code>smoke-cluster</code> workflow collects the per-run summary this plan
-adds). It is a sibling of
-<a href="../PLAN-ci-cloud-sizing/">Right-size the CI test clouds</a> and
-<a href="../PLAN-scheduler-reservations/">Atomic scheduling via reservations</a>,
-and deliberately does not own anything either of those already
-owns: topology shape belongs to the first, the admission ledger
-and claims to the second. What is left, and what this plan is, is
-the piece both of them explicitly deferred -- that nothing in the
-system treats "no capacity right now" as the transient condition
-it is.</p>
-<p>Consult <code>ARCHITECTURE.md</code> for the system architecture
-overview, object types, and daemon structure. Consult
-<code>CLAUDE.md</code> for build commands, project conventions, and
-database access patterns. Consult <code>GOALS.md</code> for current
-development priorities. Key references inside the repo
-include <code>shakenfist/scheduler.py</code> (<code>_has_sufficient_cpu</code>, the
-pre-filter that raises the refusal this plan is about),
-<code>shakenfist/external_api/instance.py</code> (the two <code>507</code> branches of
-<code>POST /instances</code>), <code>shakenfist/daemons/cluster/main.py</code>
-(<code>_force_capacity_reconcile_if_unguarded</code> and the anchored
-reconcile), <code>shakenfist/daemons/resources/main.py</code> (the 60 s
-metrics cadence that <code>measured_cpus</code> comes from),
-<code>shakenfist/deploy/shakenfist_ci/base.py</code> and <code>retries.py</code> (the
-suite's await and retry helpers), and
-<code>shakenfist/deploy/shakenfist_ci/load_budget.py</code>
-(<code>HARNESS_DRIVEN_PAIRS</code>, which any new suite-side polling must be
-declared in).</p>
-<!-- shared-block: plan-file-conventions v1 -->
-<p>Plan file conventions (shared block; do not edit -- the canonical
-copy lives in shakenfist/development at
-<code>templates/shared-blocks/plan-file-conventions.md</code>):</p>
+<h1 id="phase-5-decide-on-server-side-queued-placement">Phase 5: Decide on server-side queued placement<a class="headerlink" href="#phase-5-decide-on-server-side-queued-placement" title="Permanent link">&para;</a></h1>
+<p>Parent plan:
+<a href="../PLAN-transient-capacity-refusals/">PLAN-transient-capacity-refusals.md</a>.</p>
+<p><strong>Planning effort:</strong> high, as the master plan specifies -- "the
+fifth because it may be a state-machine design". It may also be no
+design at all, and which of those it is cannot be known until the
+data arrives. What this plan does, therefore, is fix the rule that
+will read the data <em>before</em> the data exists, so the decision is made
+by the rule rather than by whoever is reading the numbers on the day.</p>
+<p>This phase continues the plan's decision sequence at <strong>D36</strong>; phases 1
+to 4 used D1-D35.</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>Master plan open question 8 asks whether the server should queue a
+create that does not fit, and defers the answer to this phase, to be
+read off phase 2's wait data. The master plan's own framing is that
+the machinery already exists, that the change is contained, and that
+the arguments against are fairness, IPAM, and a client deadline that
+bounds any useful server-side wait.</p>
+<p>The phase is a decision, not a build. Its two possible outcomes are
+stated in the master plan: close as <code>Abandoned</code> with the numbers and
+the reasoning, or design the queue and record the reversal of
+scheduler-reservations D8 before any code is written.</p>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
+<p><strong>In scope:</strong></p>
 <ul>
-<li>All planning documents live in <code>docs/plans/</code>.</li>
-<li>Detailed planning gets one plan file per phase. Phase files are
-  named for their master plan, sit in the same directory as it,
-  and append <code>-phase-NN-descriptive</code> before the <code>.md</code> extension.</li>
-<li>The master plan tracks its phases in a table under its Execution
-  section:</li>
+<li>The gate: establishing that the data this phase reads describes the
+  cloud the project intends to run, rather than the one it is
+  replacing (D36).</li>
+<li>Pre-registering the rule that converts wait data into a decision,
+  with numeric thresholds, before the data is read (D37).</li>
+<li>Reading the phase 2 capacity-wait traces over the qualifying merge
+  runs with <code>tools/ci_headroom_report.py --waits</code>, and recording the
+  distribution in this plan.</li>
+<li>Taking the decision, and writing it and its evidence into this plan
+  and into the master plan's open question 8.</li>
+<li>Correcting, at source, the four claims in open question 8 and the
+  phase 5 section that the survey below found to be false (D41).</li>
 </ul>
-<table>
-<thead>
-<tr>
-<th>Phase</th>
-<th>Plan</th>
-<th>Status</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1. Schema migration</td>
-<td>PLAN-thing-phase-01-schema.md</td>
-<td>Not started</td>
-</tr>
-<tr>
-<td>2. Public API</td>
-<td>PLAN-thing-phase-02-api.md</td>
-<td>Not started</td>
-</tr>
-</tbody>
-</table>
+<p><strong>Out of scope, explicitly:</strong></p>
 <ul>
-<li>One commit per logical change, and at minimum one commit per
-  phase. Unrelated changes are not batched into a single commit.
-  Each commit is self-contained: it builds, passes tests, and has
-  a message explaining what changed and why.</li>
+<li><strong>Designing the queue.</strong> If the decision is to build, the design is
+  its own phase, planned at high effort against the state machine.
+  This plan decides; it does not design (D42). A plan that both
+  decided and designed would have written the design before knowing
+  whether it was wanted.</li>
+<li><strong>Implementing anything.</strong> No code change is in scope on either
+  outcome. The only file edits this phase makes are to plan documents.</li>
+<li><strong>The demand guard, the pre-filters, claim enforcement and the
+  guarded <code>UPDATE</code>.</strong> These are scheduler-reservations' (its D11 and
+  phase 5), as the master plan's ordering note says.</li>
+<li><strong>The topology shape.</strong> That is the sizing plan's phase 4, which
+  this phase waits on rather than participates in.</li>
+<li><strong>Re-tuning <code>CLUSTER_HEADROOM_WAIT</code>.</strong> The suite's client-side
+  deadline is phase 2's, and changing it would move the denominator
+  this phase's rule is expressed in. If the data argues for a
+  different value, that is recorded as a finding for phase 6, not
+  applied here.</li>
 </ul>
-<!-- shared-block-end -->
-
-<h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
-<h3 id="the-cost">The cost<a class="headerlink" href="#the-cost" title="Permanent link">&para;</a></h3>
-<p>Issue #3772 is the signature in essentially every failing merge
-group. Over the sixteen days to 2026-09-08 the <code>Functional tests</code>
-workflow's <code>merge_group</code> runs split <strong>108 failures, 45 successes,
-14 cancelled</strong>. Of the thirty most recent failing runs, twenty-four
-failed the <code>Debian 12 tier</code> job (the <code>slim-tier</code> topology). Of
-eighteen of those runs whose failed-job logs were read, <strong>all
-eighteen contain</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>shakenfist_client.apiclient.InsufficientResourcesException: ('API request failed', 'POST',
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>'http://localhost:13000/instances', 507,
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>'{"error": "No nodes remaining at scheduling stage sufficient_idle_cpu", "status": 507}')
-</code></pre></div>
-<p>and in fourteen a known victim of that refusal is the test that
-failed: <code>test_network_plumbing_lifecycle</code> (8),
-<code>test_disappearing_source_instance</code> (3),
-<code>test_stray_torn_down_while_a_hosted_network_survives</code> (3), then
-<code>test_artifact_show</code>, <code>test_lifecycle_power_cycle</code> and the
-affinity tests. The next-largest cause, the database load-budget
-check, appeared in seven of the eighteen -- and in six of those a
-507 was in the same run, so fixing the budget family alone would
-not have turned one of them green.</p>
-<h3 id="what-the-refusal-actually-is">What the refusal actually is<a class="headerlink" href="#what-the-refusal-actually-is" title="Permanent link">&para;</a></h3>
-<p>The evidence below comes from the full CI bundles -- the 15 s
-headroom series, the Loki refusal census and every node's
-<code>journalctl -u 'sf-*'</code> export -- of six failing merge runs after
-PR #4106 landed (34163288637, 34171977552, 34178278720,
-34119030297, 34125365386 on <code>slim-tier</code>; 34168326220 on
-<code>slim-primary</code>), two before it (33991296717, 33948911843), and the
-50 usable <code>slim-tier</code> records of the sizing plan's baseline
-dataset. The reproduction recipe and the analysis script are under
-<a href="../data/transient-capacity-refusals/"><code>docs/plans/data/transient-capacity-refusals/</code></a>.
-<code>+Ns</code> is seconds after the <code>Run functional tests</code> step started.</p>
-<p><strong>Every <code>sufficient_idle_cpu</code> abort in the six post-#4106 runs was
-a <code>force_placement</code> single-candidate create onto a node whose
-capacity ledger was genuinely at its limit, while the cluster as a
-whole held 3-9 of its 12 vCPU.</strong> The ledger reconstructed from the
-<code>instance placed</code> and <code>instance placement released</code> events in
-every node's journal matched the pre-filter's <code>committed_cpus</code>
-exactly in all ten cases. It is not over-counting, not a race, and
-not the warm-up window.</p>
-<table>
-<thead>
-<tr>
-<th>run</th>
-<th>topology</th>
-<th>first capacity row</th>
-<th>cpu abort(s)</th>
-<th>after first row</th>
-<th>forced onto</th>
-<th>measured / committed / limit</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>34163288637</td>
-<td>tier</td>
-<td>+181s</td>
-<td>+309s</td>
-<td>+128s</td>
-<td>sf1</td>
-<td>2 / 3 / 3</td>
-</tr>
-<tr>
-<td>34171977552</td>
-<td>tier</td>
-<td>+166s</td>
-<td>+512s</td>
-<td>+346s</td>
-<td>primary</td>
-<td>3 / 3 / 3</td>
-</tr>
-<tr>
-<td>34178278720</td>
-<td>tier</td>
-<td>+181s</td>
-<td>+200, +201, +202, +314s</td>
-<td>+20..+133s</td>
-<td>sf1, sf1, sf2, sf1</td>
-<td>0/3/3, 0/3/3, 1/6/6, 3/3/3</td>
-</tr>
-<tr>
-<td>34119030297</td>
-<td>tier</td>
-<td>+165s</td>
-<td>+481s</td>
-<td>+316s</td>
-<td>sf1</td>
-<td><strong>6 / 0 / 3</strong></td>
-</tr>
-<tr>
-<td>34125365386</td>
-<td>tier</td>
-<td>+166s</td>
-<td>+696s</td>
-<td>+530s</td>
-<td>sf2</td>
-<td>3 / 6 / 6</td>
-</tr>
-<tr>
-<td>34168326220</td>
-<td>primary</td>
-<td>+166s</td>
-<td>+824s</td>
-<td>+658s</td>
-<td>sf1</td>
-<td>3 / 3 / 3</td>
-</tr>
-<tr>
-<td>33991296717 (pre)</td>
-<td>tier</td>
-<td>+166s</td>
-<td>+519, +542, +565, +725s</td>
-<td>+354..+559s</td>
-<td><em>none: all three nodes</em></td>
-<td>sf2 6/6, sf1 3/3, primary 3/3</td>
-</tr>
-<tr>
-<td>33948911843 (pre)</td>
-<td>tier</td>
-<td>+181s</td>
-<td>+176, +177, +523s</td>
-<td>-5s, -4s, +342s</td>
-<td>primary, primary, primary</td>
-<td><strong>0 / 6 / 3</strong>, 0/6/3, 3/3/3</td>
-</tr>
-</tbody>
-</table>
-<p>(The +200 s trio and the +176 s pair are
-<code>test_duplicate_network_work_is_coalesced</code>, which pins a burst of
-six across the hypervisors and tolerates its own create errors; the
-test that failed each run was a later one.)</p>
-<p>Three things follow from the table.</p>
+<h2 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h2>
+<p>The survey checked every factual claim open question 8 and the phase 5
+section make. <strong>Four of them are wrong</strong>, one of them in the direction
+that matters: the constraint the master plan names as the binding
+ceiling on any queue deadline is 300 seconds larger than the real one.</p>
+<h3 id="f1-the-clients-ceiling-is-600-s-not-900-s-and-the-method-has-a-different-name">F1 -- The client's ceiling is 600 s, not 900 s, and the method has a different name<a class="headerlink" href="#f1-the-clients-ceiling-is-600-s-not-900-s-and-the-method-has-a-different-name" title="Permanent link">&para;</a></h3>
+<p>Open question 8 says "the client's <code>_await_instance_create</code> has a
+900 s ceiling that bounds any useful deadline".</p>
+<p>The method is <code>await_instance_create()</code> -- no leading underscore --
+at <code>client-python/shakenfist_client/apiclient.py:1797</code>, and its
+default timeout is <strong>600</strong>, not 900. There is no 900 anywhere in
+<code>shakenfist_client</code>. The docstring explains the number: "The default
+of ten minutes is generous because on a slow morning it can take over
+two minutes just to download a Ubuntu image."</p>
+<p>The correction is not cosmetic. Any server-side hold must fit inside
+the caller's budget, and the real budget is a third smaller than the
+master plan reasons from.</p>
+<p>Worse for the queue proposal, the same docstring says the budget does
+not compose the way the master plan assumes: "This is a budget for
+this call alone. A caller that created the instance itself should pass
+<code>timeout=0</code> to <code>create_instance</code>, or the two waits run back to back on
+the same condition and the task takes the sum of them while reporting
+only this one." <code>create_instance(timeout=...)</code> at <code>:737-749</code> bounds
+"the whole call -- the dependency retries on the POST as well as the
+wait for the instance to leave its transitional states".</p>
+<p>So the client already has a documented hazard about two budgets on one
+condition, and a server-side queue would add a third.</p>
+<h3 id="f2-defer_with_backoff-exists-but-its-budget-is-shorter-than-every-wait-ever-measured">F2 -- <code>defer_with_backoff()</code> exists, but its budget is shorter than every wait ever measured<a class="headerlink" href="#f2-defer_with_backoff-exists-but-its-budget-is-shorter-than-every-wait-ever-measured" title="Permanent link">&para;</a></h3>
+<p>Open question 8 says "the machinery exists --
+<code>BaseClusterOperation.defer_with_backoff()</code> already re-enqueues with a
+delay for artifact fetches and network operations".</p>
+<p>It exists, at <code>shakenfist/operations/baseoperation.py:708</code>, with four
+callers (<code>artifact_fetch_op.py:148</code> and <code>:217</code>, <code>net_op.py:180</code> and
+<code>:242</code>, <code>node_blob_op.py:151</code>). But its default schedule is
+<code>delays=(15, 30, 60)</code> -- <strong>three defers totalling 105 seconds</strong>, after
+which it returns <code>False</code> and the caller must error the operation out.</p>
+<p>Phase 2 measured three real waits of <strong>190.5 s, 160.4 s and 140.6 s</strong>.
+Every one of them is longer than the entire default budget. Reusing
+this machinery unchanged would give up before the <em>shortest</em> wait the
+project has ever recorded had cleared.</p>
+<p>"The machinery exists" is therefore true and misleading in the same
+sentence. A queue would need its own schedule and its own budget, and
+the sizing of that budget is the expensive question, not the
+re-enqueue.</p>
+<h3 id="f3-ipam-really-is-allocated-before-scheduling-and-the-refusal-path-is-what-frees-it">F3 -- IPAM really is allocated before scheduling, and the refusal path is what frees it<a class="headerlink" href="#f3-ipam-really-is-allocated-before-scheduling-and-the-refusal-path-is-what-frees-it" title="Permanent link">&para;</a></h3>
+<p>Open question 8's IPAM concern -- "waiting instances hold IPAM
+allocations, so a CPU shortage can become an address shortage" -- is
+<strong>confirmed</strong>, and more tightly than the sentence suggests.</p>
+<p><code>_netdesc_allocate_address()</code> (<code>shakenfist/external_api/instance.py:436</code>)
+reserves the address, at <code>:455</code> for a random free one and <code>:466</code> for a
+requested one. It is called from the <code>POST /instances</code> handler at
+<code>:1027</code>. <code>SCHEDULER.find_candidates()</code> is called at <code>:1049</code> -- <strong>22
+lines later</strong>. Every interface is therefore reserved before placement
+is even attempted.</p>
+<p>What frees it today is the refusal itself: every scheduling refusal
+branch calls <code>inst.enqueue_delete_due_error('scheduling failed')</code>
+before returning -- <code>:1062</code> affinity (<code>409</code>), <code>:1069</code> low resource
+(<code>507</code>), <code>:1082</code> candidate not found (<code>404</code>) and <code>:1177</code> the capacity
+guard (<code>507</code>). Deleting the instance is what returns its addresses.</p>
+<p>A queue that holds the instance instead of deleting it therefore holds
+its addresses for the whole hold, by construction. This is not a side
+effect to be engineered around; it is the current design's only release
+path.</p>
+<h3 id="f4-an-address-shortage-already-returns-a-507-and-phase-4-deliberately-did-not-mark-it-transient">F4 -- An address shortage already returns a 507, and phase 4 deliberately did not mark it transient<a class="headerlink" href="#f4-an-address-shortage-already-returns-a-507-and-phase-4-deliberately-did-not-mark-it-transient" title="Permanent link">&para;</a></h3>
+<p>The survey found the consequence of F3 that open question 8 does not
+state. <code>POST /instances</code> has four <code>507</code> branches, not two. Two are the
+scheduling refusals phase 4 routed through <code>capacity_error()</code>
+(<code>:1076</code>, <code>:1184</code>). The other two are <code>exceptions.CongestedNetwork</code>
+at <code>:477</code> and <code>:509</code>, and both return a bare
+<code>sf_api.error(507, str(e), suppress_traceback=True)</code> -- no
+<code>Retry-After</code>, no <code>stage</code>, no <code>transient</code> field.</p>
+<p>That is correct as it stands: phase 4's D29 marked only the scheduling
+refusals. But it means a queue which converted CPU pressure into
+address pressure would convert a refusal a client is told to retry into
+one it is told nothing about. The failure would move from a surface
+that phase 4 just made machine-readable to one that is still prose.</p>
+<h3 id="f5-the-suite-already-waits-client-side-for-420-s">F5 -- The suite already waits, client side, for 420 s<a class="headerlink" href="#f5-the-suite-already-waits-client-side-for-420-s" title="Permanent link">&para;</a></h3>
+<p><code>CLUSTER_HEADROOM_WAIT = 420</code> at
+<code>shakenfist/deploy/shakenfist_ci/base.py:52</code>, polling every
+<code>CAPACITY_POLL_INTERVAL = 10</code> s (<code>:58</code>) with
+<code>MAX_CREATE_ATTEMPTS = CLUSTER_HEADROOM_WAIT // CAPACITY_POLL_INTERVAL + 2</code>
+(<code>:68</code>).</p>
+<p>This is the fact that makes the question a real question rather than a
+formality. The waiting the queue would do is waiting the suite already
+does, in the caller, where D8 said deferral belongs. A server-side
+queue does not add the wait; it moves it, and for the duration of the
+move both exist.</p>
+<h3 id="f6-the-reading-tool-is-built-and-needs-no-new-work">F6 -- The reading tool is built and needs no new work<a class="headerlink" href="#f6-the-reading-tool-is-built-and-needs-no-new-work" title="Permanent link">&para;</a></h3>
+<p><code>tools/ci_headroom_report.py --waits &lt;file&gt;</code> (<code>:2648</code>) reads
+<code>/srv/ci/traces/instance-waits.jsonl</code> from a downloaded bundle and
+prints total seconds waited, the number of waits, the longest wait and
+its test, and the informed/degraded split. <code>docs/developer_guide/ci.md:331</code>
+documents it.</p>
+<p>Two properties of it matter to this phase's rule. An absent or empty
+file reports as <strong>unknown, never as zero</strong> -- so a run that never
+collected the trace cannot be silently counted as a run with no waits.
+And <code>attempt_number</code> is a 1-indexed position rather than a count, so a
+create refused three times writes three lines carrying 1, 2 and 3, and
+summing them would double-count. The rule below is written against
+these two properties.</p>
+<h3 id="f7-the-gate-is-closed-and-it-is-closed-on-an-operator-action">F7 -- The gate is closed, and it is closed on an operator action<a class="headerlink" href="#f7-the-gate-is-closed-and-it-is-closed-on-an-operator-action" title="Permanent link">&para;</a></h3>
+<p>The master plan's ordering note says phase 5 "needs phase 2 to have
+reported over a window of merge runs <em>after</em> the sizing plan's phase 4
+has reshaped <code>slim-tier</code>; until then its data would be measuring the
+wrong cloud".</p>
+<p>That reshape has <strong>not been applied</strong>.
+<code>shakenfist/actions/ansible/ci-topology-slim-tier.yml</code> still carries
+<code>cpu: 4</code> on all three nodes, at <code>:38</code>, <code>:75</code> and <code>:105</code>. The sizing
+plan's phase 4 has the complete diff prepared -- all three to <code>cpu: 6</code>
+-- in its <em>Prepared changes</em> section, and its own Outcome records 4d
+as "<strong>Blocked</strong> on the operator applying 4c to <code>shakenfist/actions</code>
+and on three merge runs after it", with 4e, 4f and 4g blocked behind
+it. That plan is <code>In progress</code>, 4 of 8, in <code>docs/plans/index.md:115</code>.</p>
+<p>So the measurements available today describe the ledger-3 infra nodes
+that the reshape exists to fix. Reading them would answer a question
+about a cloud the project is in the middle of replacing.</p>
+<p><strong>What the survey did not find wrong:</strong> the master plan's
+characterisation of the <em>arguments</em> -- fairness, starvation of pinned
+and large creates, IPAM, and D8's queue-state objection -- all hold,
+and D8's text is as quoted (<code>PLAN-scheduler-reservations-phase-00-decisions.md:431-432</code>:
+"Partial-fill and hold-until-fittable are rejected outright (each adds
+queue-state surface SF doesn't want; deferral lives in the caller, and
+the conductor already has deferral mechanics)").</p>
+<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
+<h3 id="d36-the-gate-is-a-step-of-this-phase-not-a-precondition-to-planning-it">D36 -- The gate is a step of this phase, not a precondition to planning it<a class="headerlink" href="#d36-the-gate-is-a-step-of-this-phase-not-a-precondition-to-planning-it" title="Permanent link">&para;</a></h3>
+<p>The reshape being unapplied blocks the <em>reading</em>, not the <em>rule</em>. This
+plan is written now, with its data steps blocked, exactly as the sizing
+plan's own phase 4 is written with 4d-4g blocked on the operator.</p>
+<p>The alternative -- wait, then plan -- would put the rule and the data
+in the same session, which is the failure mode D37 exists to prevent.</p>
+<p>The gate is discharged when all three hold:</p>
 <ol>
-<li><strong>The binding constraint is the 3 vCPU ledger on the two
-   infra hypervisors.</strong> <code>primary</code> (hypervisor, network node and
-   database node) and <code>sf1</code> (hypervisor and database node) are
-   4-thread VMs carrying the deploy-time reservation of 4 threads
-   (<code>examples/_shared/site.yml</code>, <code>(1 + infra_role) * 2</code>), so
-   <code>cpu_schedulable = max(1, 4 - 4) = 1</code>
-   (<code>shakenfist/daemons/resources/main.py:126</code>) and
-   <code>limit_cpus = floor(1 x 3.0) = 3</code> (<code>shakenfist/mariadb.py</code>,
-   <code>_derive_cpu_memory_limits</code>). <code>sf2</code> gets 6. Cluster 12,
-   confirmed at exactly 12.0 in all 50 baseline records.</li>
-<li><strong>The victim tests pick those nodes deterministically.</strong>
-   <code>test_network_plumbing_lifecycle</code> takes the first two
-   non-network hypervisors (<code>sf1</code>, <code>sf2</code>);
-   <code>test_disappearing_source_instance</code> the first hypervisor;
-   <code>test_stray_torn_down_while_a_hosted_network_survives</code> the first
-   non-network hypervisor (<code>sf1</code>); <code>test_artifact_show</code> its first
-   instance's node. Five stestr workers queue their pinned creates
-   on a node three 1-vCPU instances fill, and the instances that
-   fill it are still fetching images (measured 0, committed 3) when
-   the next one is refused.</li>
-<li><strong>The refusals are not concentrated in the warm-up.</strong> They land
-   between +176 s and +824 s, through the first fourteen minutes
-   of a 25-35 minute step, after the ledger rows exist. In the
-   baseline, the ledger-3 nodes sat at 100% of ledger at p90 in
-   <strong>65%</strong> of node-records (peak at or above 1.0 in 96%); 33 of the
-   37 <code>slim-tier</code> failures had at least one abort; <code>slim-tier</code>
-   passed 13 of 50.</li>
+<li>The <em>Prepared changes</em> diff is applied to <code>shakenfist/actions</code> and
+   merged.</li>
+<li>At least <strong>20</strong> <code>merge_group</code> runs of <code>Functional tests</code> have
+   completed on the reshaped <code>slim-tier</code>, as the master plan requires.</li>
+<li>The sizing plan's step 4d has recorded its three-run reading, so
+   this phase knows whether the reshape did what it predicted. If 4d
+   reports the reshape did <strong>not</strong> move the per-node ledgers, this
+   phase stops and reports rather than reading 20 runs of a change
+   that did not take.</li>
 </ol>
-<p>Per-node saturation across the six post-#4106 runs
-(<code>max(measured, committed) &gt;= limit</code>):</p>
-<table>
-<thead>
-<tr>
-<th>node (ledger)</th>
-<th>share of the run at ledger</th>
-<th>longest stretch</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>sf1 (3)</td>
-<td>7-23%</td>
-<td>90-330 s</td>
-</tr>
-<tr>
-<td>primary (3)</td>
-<td>1-12%</td>
-<td>15-255 s</td>
-</tr>
-<tr>
-<td>sf2 (6)</td>
-<td>0-15%</td>
-<td>0-240 s</td>
-</tr>
-</tbody>
-</table>
-<h3 id="three-real-mechanisms-that-are-not-the-driver">Three real mechanisms that are not the driver<a class="headerlink" href="#three-real-mechanisms-that-are-not-the-driver" title="Permanent link">&para;</a></h3>
-<p><strong>The warm-up window is still open.</strong> Issue #4087 found that
-<code>scheduler_node_capacity</code> has no rows until the reconciler's first
-pass, so every early placement takes P7's fail-open branch and the
-first pass then writes the accumulated ground truth onto a row
-whose limit it exceeds. PR #4106 anchored the reconcile to
-election and added a one-shot
-<code>_force_capacity_reconcile_if_unguarded()</code>
-(<code>shakenfist/daemons/cluster/main.py:741-778</code>, called at <code>:879</code>).
-In all six post-#4106 runs that one-shot fired 130-150 s <em>before</em>
-the test step, and the pass it forced logged <code>nodes=0
-nodes_added=0</code>: no hypervisor had published metrics yet. The table
-then stayed empty until the five-minute cadence created rows at
-+155..+181 s, exactly the 135-210 s the baseline measured before
-the fix. Ten to seventeen placements per run were admitted
-<code>node_not_sized</code>, and the first real pass recorded <code>drift_cpus</code> of
-2-8 (34178278720: sf1 +6 on a limit of 3). The bold rows above are
-this residue. It is real, it is the whole of the sub-three-minute
-exposure, and it is not what fails the runs.</p>
-<p><strong>Measurement lags a delete burst by a metrics period.</strong> The
-34119030297 refusal was <code>measured 6 / committed 0 / limit 3</code>: six
-warm-up instances had been deleted and released 32 s earlier and
-the ledger was correctly zero, but <code>cpu_total_instance_vcpus</code> is
-republished every 60 s (<code>resources/main.py:648, 704</code>) and still
-counted six running domains. The next sample read zero. Because
-<code>_has_sufficient_cpu()</code> charges <code>max(measured, committed)</code>, a node
-refuses forced creates for up to a minute after a teardown even
-though it is empty. The same rule is why "release the ledger
-earlier in <code>Instance.delete()</code>" -- a proposal the research
-considered -- would not help: the measured side keeps charging the
-node until the domain is actually gone, and the journals show no
-deleted instance holding ledger at any refusal.</p>
-<p><strong>The demand guard is pure overhead on this topology.</strong> 114-140
-<code>schedule candidate refused by capacity guard</code> events per run,
-<strong>100% demand-only</strong>: the D13 bound is <code>0.75 x cpu_schedulable</code>,
-which is 0.75 on a 1-thread node against a <code>cpu_load_1</code> near 3.
-Every one was waived on the second walk, so roughly 40% of creates
-pay two guarded transactions at the moment the cluster is busiest.
-It never produced a 507 in these runs. It is owned by the
-scheduler-reservations plan and recorded there.</p>
-<h3 id="what-has-been-tried">What has been tried<a class="headerlink" href="#what-has-been-tried" title="Permanent link">&para;</a></h3>
+<h3 id="d37-the-rule-is-fixed-now-in-numbers-before-the-data-is-read">D37 -- The rule is fixed now, in numbers, before the data is read<a class="headerlink" href="#d37-the-rule-is-fixed-now-in-numbers-before-the-data-is-read" title="Permanent link">&para;</a></h3>
+<p>This is the decision the phase turns on, and the reason the plan is
+written while the gate is closed.</p>
+<p>The master plan's rule is "if total wait per run is small and no test
+waits near its deadline". Neither "small" nor "near" is a number, and a
+phase which reads 20 runs and <em>then</em> decides what those words mean is
+not making a decision, it is narrating one. Phase 2's closeout already
+warned which way the reading will tempt a reader: "Phase 5 should read
+that as the central number rather than the totals, because a deadline
+reached is a failed run and the margin here is smaller than the totals
+suggest."</p>
+<p>The rule, fixed here:</p>
+<p><strong>Denominator.</strong> <code>CLUSTER_HEADROOM_WAIT</code>, 420 s
+(<code>shakenfist_ci/base.py:52</code>). If phase 6 or a later change moves that
+constant, the thresholds move with it and are re-expressed as
+fractions, not frozen as seconds.</p>
+<p><strong>Unit of observation.</strong> One <code>merge_group</code> run of a topology that
+collected a trace. A run whose trace is absent, empty or unparseable is
+recorded as <strong>unknown</strong> and excluded from both numerator and
+denominator (F6). The count of unknowns is reported; if unknowns exceed
+a quarter of qualifying runs, the window is not readable and the phase
+extends it rather than deciding on the rest.</p>
+<p><strong>Statistic.</strong> The <strong>longest single wait in a run</strong>, as a fraction of
+the denominator. Totals per run are recorded but are not the
+discriminator, because a run of four 40-second waits and a run of one
+160-second wait are the same total and a very different distance from
+failure.</p>
+<p><strong>The three outcomes:</strong></p>
 <ul>
-<li><strong>#3724</strong> added the committed-vCPU ledger so placed-but-unbooted
-  instances are charged immediately. Admission became more
-  accurate; an accurate "no" is still a failed test. Three
-  recurrences followed and the six per-test issues were absorbed
-  into #3772.</li>
-<li><strong>#3722</strong> reordered the load-shedding filters below affinity.
-  Cannot help: the node is removed at admission before ranking.</li>
-<li><strong>#4106</strong> closed #4087 in principle and, as above, not in CI.</li>
-<li><strong>#3813</strong> made the demand guard satisfiable; the waiver rate fell
-  from 62% to 4%. Not a 507 cause.</li>
-<li><strong>#3907</strong> and <strong>#3565</strong> were closed test-side, by tolerating the
-  transient refusal and by skipping when the candidate set had
-  collapsed. Both are precedents for the shape of this plan and
-  neither generalised.</li>
+<li><strong>Abandon</strong> if <em>all</em> of: no single wait in the window reaches
+  0.5 x 420 s = <strong>210 s</strong>; fewer than <strong>25%</strong> of qualifying runs record
+  any wait at all; and <strong>no</strong> wait reached the deadline.</li>
+<li><strong>Build</strong> if <em>any</em> of: a wait reached the deadline in a qualifying
+  run (that is a failed run, and the suite's own wait was not enough);
+  or the longest wait exceeds <strong>210 s</strong> in more than <strong>10%</strong> of
+  qualifying runs; or more than <strong>50%</strong> of qualifying runs record any
+  wait.</li>
+<li><strong>Extend the window</strong> if the data falls between the two, <strong>once</strong>,
+  by a further 20 runs. On the second reading the middle ground
+  resolves to Abandon, because a condition that has not shown itself in
+  40 runs is not the condition a new state machine is built for.</li>
 </ul>
-<h3 id="what-this-is-not">What this is not<a class="headerlink" href="#what-this-is-not" title="Permanent link">&para;</a></h3>
-<p>Claims are not the answer to a forced placement. A namespace claim
-is cluster-wide and carries no node affinity (scheduler-reservations
-D14), <code>shakenfist/scheduler.py</code> never reads <code>namespace_claims</code>, and
-the stage that refuses is per-node. Per-test namespaces holding
-claims would starve one another's unclaimed pool, and phase 5's
-hard ceiling caps the holder rather than helping it. The one
-legitimate claim in CI is the conductor holding one per run against
-<em>other</em> merge groups on the under-cloud, which is
-scheduler-reservations phase 4c. Node-scoped claims are considered
-under open question 5 below and declined for now.</p>
-<h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
-<p>Make a capacity refusal something a caller can wait out rather
-than a failure it has to report, without hiding the refusal from
-the people who need to see it. Concretely:</p>
-<ul>
-<li>A cluster's first guarded placement should happen within seconds
-  of its hypervisors publishing metrics, not five minutes after its
-  cluster daemon started.</li>
-<li>A node should stop charging for instances that no longer exist
-  within seconds of their deletion, not within a metrics period.</li>
-<li>The functional suite should treat a 507 at <code>create_instance</code> as
-  "not yet" -- waiting, informed by the cluster's own published
-  headroom, for the node it needs -- and should say, per test and
-  per run, how long it waited, so that a topology that makes the
-  suite wait is visible rather than merely slower.</li>
-<li>The API should tell a client that a refusal is transient and
-  when to try again, and the Python client should be able to act
-  on that when asked to.</li>
-<li>Whether the server itself should queue a create until it fits is
-  decided from measurement, not argued from first principles, and
-  the decision is written down either way.</li>
-</ul>
-<p>The merge-queue outcome this is measured by is the <code>Debian 12
-tier</code> job's pass rate, which is 24% in the baseline and should be
-comparable to the other cluster jobs (78-96%) once this plan and
-the sizing plan's phase 4 have both landed.</p>
-<h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
-<p>These were settled at planning time from the research recorded in
-the Situation section; the reasoning is kept so that a later
-reader can disagree with it on the evidence rather than
-re-deriving it.</p>
-<h3 id="1-where-does-the-retry-live">1. Where does the retry live?<a class="headerlink" href="#1-where-does-the-retry-live" title="Permanent link">&para;</a></h3>
-<p><strong>In the suite first, in the client second, in the server only
-if the data says so.</strong> The scheduler-reservations plan left this
-undecided ("the client SDK, the CI base class, or server-side
-admission queueing") and deliberately held it until #3772 had soak
-data from a <code>develop</code> carrying atomic admission. That soak data
-now exists -- the phase 2 baseline and the journals above -- and
-it says the refusals are correct against the ledger. A suite-side
-wait is the smallest change that stops the bleeding, it is where
-<code>retry_while_transient</code> already lives, and it is the only place a
-wait can be <em>informed</em>: <code>GET /admin/resources</code> publishes per node
-<code>cpu_available = cpu_hard_max - max(measured, committed)</code>, which is
-the pre-filter's own arithmetic, so a pinned test can wait for the
-node it needs rather than for the cluster. The client change is
-next because it is what makes the behaviour available to operators
-and to the downstream repositories' suites. A server-side queue
-reverses scheduler-reservations D8 and is phase 5's decision.</p>
-<h3 id="2-does-a-retry-hide-the-problem">2. Does a retry hide the problem?<a class="headerlink" href="#2-does-a-retry-hide-the-problem" title="Permanent link">&para;</a></h3>
-<p><strong>Only if it is silent, so it will not be.</strong> Both sibling plans
-say a retry would mask whether a bigger cloud or atomic admission
-actually changed the failure rate. The wrapper in phase 2 therefore
-records every wait as a test detail (how long, on which node, what
-the headroom looked like) and the run publishes a summary -- total
-seconds waited, waits per test, longest wait -- through the same
-bundle the headroom probe uses, so the sizing plan's phase 5
-guardrails can warn on it. A cloud that makes the suite wait
-becomes a number in every run instead of a flake in some. The
-sizing plan's phase 3 saturation tests, which assert what a full
-cluster does <em>today</em>, call the raw client and are exempt from the
-wrapper by an explicit marker.</p>
-<h3 id="3-why-is-allocation-less-reliable-in-the-first-minutes-and-can-the-window-be-shortened">3. Why is allocation less reliable in the first minutes, and can the window be shortened?<a class="headerlink" href="#3-why-is-allocation-less-reliable-in-the-first-minutes-and-can-the-window-be-shortened" title="Permanent link">&para;</a></h3>
-<p><strong>Because the one-shot fires before there is anything to
-reconcile; yes, from 135-210 s to roughly a
-minute.</strong> <code>_force_capacity_reconcile_if_unguarded()</code>
-runs once, on the election path, and tests <code>if rows:</code>. On a fresh
-cluster the cluster daemon wins its election within 2.5-7.5 s of
-starting, before <code>sf-resources</code> on any hypervisor has published --
-the pass finds nothing, and nothing re-checks. Phase 1 makes the
-check a property of the elected loop rather than of election:
-compare the set of active hypervisors that have published metrics
-against the set with a capacity row, and make the reconcile due
-when they differ. That also closes the narrower hole</p>
-<h1 id="4106-left-a-node-that-publishes-late-or-whose-row-the">4106 left -- a node that publishes late, or whose row the<a class="headerlink" href="#4106-left-a-node-that-publishes-late-or-whose-row-the" title="Permanent link">&para;</a></h1>
-<p>reconciler removed on stale metrics, admits unguarded for up to
-five minutes today.</p>
-<p>Note what bounds the improvement, because an earlier draft of this
-section claimed seconds. The elected loop polls every
-<code>ELECTED_LOOP_POLL_SECONDS = 5</code>
-(<code>shakenfist/daemons/cluster/main.py:63</code>) but its maintenance body
-sits behind <code>if now - last_loop_run &gt;= 60</code> (<code>:913</code>), and
-<code>_run_due_scheduled_jobs()</code> is inside that gate (<code>:918</code>). Marking
-the job due does not run it any sooner than the next 60 s tick, so
-a check placed inside the gate closes the window to about a
-minute. Closing it faster means running the comparison outside the
-gate on the 5 s poll, which is a fixed-rate database read and is
-not free. Phase 1 decides between those two; see its plan.</p>
-<h3 id="4-why-does-a-node-refuse-for-a-minute-after-its-instances-are-deleted">4. Why does a node refuse for a minute after its instances are deleted?<a class="headerlink" href="#4-why-does-a-node-refuse-for-a-minute-after-its-instances-are-deleted" title="Permanent link">&para;</a></h3>
-<p><strong>Because measurement is a 60 s poll of libvirt and the pre-filter
-charges the larger of measurement and ledger.</strong> The rule is right:
-it is what makes the ledger safe against instances the reconciler
-has not yet counted. What is wrong is the cadence. Phase 3 has
-<code>sf-resources</code> notice a change in the running-domain set cheaply
-(a <code>listDomainsID</code> every few seconds costs one local libvirt call
-and touches no database -- note that <code>get_all_domains()</code> is not
-that call, it is <code>listDomainsID</code> plus a lookup per domain) and
-publish immediately when it changes, keeping the full 60 s publish
-for everything else. That is activity-coupled
-rather than fixed-rate, so it does not move the database load
-budget's idle figure, and it is declared in
-<code>database_load_budget.yaml</code> as such.</p>
-<h3 id="5-should-there-be-node-scoped-claims">5. Should there be node-scoped claims?<a class="headerlink" href="#5-should-there-be-node-scoped-claims" title="Permanent link">&para;</a></h3>
-<p><strong>Not now, and not for this problem.</strong> The question was raised at
-planning time because a claim "on hypervisor X for N vCPU" is the
-shape a pinned test would want: hold the reservation, then create
-against it, with no window between "the node has room" and "my
-create landed" for another worker to take it. Against that:</p>
-<ul>
-<li>For CI it buys one thing over an informed wait -- closing that
-  window -- and the window is small at concurrency 5. Every other
-  property (waiting for the right node, bounded by a deadline,
-  visible in the run) the phase 2 wrapper has already.</li>
-<li>It is a second ledger dimension on every <code>scheduler_node_capacity</code>
-  row (<code>claimed_cpus</code> beside <code>used_cpus</code>, with the unclaimed
-  admission guarded against <code>limit - claimed</code>), which the guarded
-  UPDATE, the reconciler, the cluster singleton's migration on
-  claim create and delete, and the pre-filter all have to learn.
-  That is scheduler-reservations phases 3 and 4 again, one level
-  down, while phase 5 has not decided what enforcement of the
-  existing claims even means.</li>
-<li>The pre-filter is claim-blind today; a node claim only works if
-  <code>_has_sufficient_cpu()</code> consults it, which makes the pre-filter a
-  ledger reader in a way D1 chose not to.</li>
-</ul>
-<p>Where it <em>would</em> earn its place is an operator need, not a test
-need: evacuating or draining a node (#1364) has to know there is
-room on the destinations before it starts moving instances, and a
-live migration wants the same guarantee. When that lifecycle is
-built, a per-node reservation is the primitive it needs, and it
-should be designed then, against the claim machinery as it stands
-after phase 5. Recorded under Future work in the
-scheduler-reservations plan so it is not lost.</p>
-<h3 id="6-should-the-demand-guard-be-changed-here">6. Should the demand guard be changed here?<a class="headerlink" href="#6-should-the-demand-guard-be-changed-here" title="Permanent link">&para;</a></h3>
-<p><strong>No; it is scheduler-reservations' and is recorded there.</strong> The
-bound of <code>0.75 x cpu_schedulable</code> cannot be met on a 1- or 2-thread
-node under any real load, so on the CI topologies the first walk
-never admits and the waiver walk always does. Rescaling or waiving
-it below some <code>cpu_schedulable</code> is a one-line change to the demand
-clause, but it is phase 4a's clause and the load it saves is the
-scheduler-reservations plan's to measure. This plan cites the
-evidence and moves on.</p>
-<h3 id="7-should-the-topology-change-here">7. Should the topology change here?<a class="headerlink" href="#7-should-the-topology-change-here" title="Permanent link">&para;</a></h3>
-<p><strong>No; it is the sizing plan's phase 4, and the evidence here
-sharpens what that phase must choose.</strong> Any shape that leaves an
-infra hypervisor at <code>limit_cpus</code> 3 leaves this failure in place,
-because the pinned tests select those nodes. The sizing plan's
-candidate "tier as 3 x 6 vCPU" gives <code>primary</code> and <code>sf1</code> a ledger
-of 6 each and <code>sf2</code> 12, which is the smallest shape in its table
-that changes the number that binds. The sizing plan is updated to
-say so.</p>
-<h3 id="8-should-the-server-queue-a-create-that-does-not-fit">8. Should the server queue a create that does not fit?<a class="headerlink" href="#8-should-the-server-queue-a-create-that-does-not-fit" title="Permanent link">&para;</a></h3>
-<p><strong>Decide in phase 5, from phase 2's wait data.</strong> The machinery
-exists -- <code>BaseClusterOperation.defer_with_backoff()</code> already
-re-enqueues with a delay for artifact fetches and network
-operations -- and a <code>202</code> with the instance held in <code>initial</code> (or a
-new <code>scheduling</code> state) until placement succeeds or a deadline
-passes looks like a contained change. Against it: it is exactly the
-"hold-until-fittable" that scheduler-reservations D8 rejected as
-queue-state surface the project does not want; it has no fairness
-model (a waiting 4-vCPU create starves behind a stream of 1-vCPU
-ones, and a pinned create starves worst); waiting instances hold
-IPAM allocations, so a CPU shortage can become an address shortage;
-and the client's create-and-await path has a ceiling that bounds any
-useful deadline. If phase 2 shows the suite waits are
-short and few once the topology is right, the answer is no and the
-phase closes as Abandoned with the numbers. If they are long or
-many, the phase designs the queue -- FIFO by request time, pinned
-placements admitted against their node only -- and reverses D8 in
-writing.</p>
-<p>Phase 5's survey corrected four of the sentences above, and the
-corrections move the arithmetic rather than the prose. See
-<a href="../PLAN-transient-capacity-refusals-phase-05-queue-decision/">its <em>What the survey found</em></a>
-for the full readings.</p>
-<ul>
-<li>The client method is <code>await_instance_create()</code>, spelled without a
-  leading underscore, and its default ceiling is <strong>600 s</strong>, not
-  900 (<code>client-python/shakenfist_client/apiclient.py:1797</code>). Its
-  docstring also warns that <code>create_instance(timeout=...)</code> (<code>:737-749</code>)
-  bounds the whole call, so a caller that does not pass <code>timeout=0</code>
-  runs "two independent budgets on the same condition, run back to
-  back" -- a server-side hold would be a third.</li>
-<li><code>defer_with_backoff()</code>'s default schedule is
-  <code>delays=(15, 30, 60)</code> (<code>shakenfist/operations/baseoperation.py:708</code>)
-  -- three defers totalling <strong>105 s</strong>, after which it returns <code>False</code>
-  and the caller must error the operation out. All three waits phase 2
-  actually measured (190.5 s, 160.4 s, 140.6 s) are longer than that
-  entire budget, so "the machinery exists" is true but would give up
-  before the shortest recorded wait had cleared. A queue needs its own
-  schedule; the re-enqueue is not the hard part.</li>
-<li>The IPAM concern is confirmed and is structural rather than
-  incidental. <code>_netdesc_allocate_address()</code> reserves the address and is
-  called at <code>external_api/instance.py:1027</code>; <code>find_candidates()</code> runs at
-  <code>:1049</code>, twenty-two lines later. The only thing that releases those
-  addresses today is the refusal itself -- every scheduling refusal
-  branch calls <code>enqueue_delete_due_error()</code> (<code>:1062</code>, <code>:1069</code>, <code>:1082</code>,
-  <code>:1177</code>). A queue that holds the instance instead of deleting it
-  holds its addresses for the whole hold, by construction.</li>
-<li><code>POST /instances</code> has <strong>four</strong> <code>507</code> branches, not two. The two
-  phase 4 routed through <code>capacity_error()</code> are at <code>:1076</code> and <code>:1184</code>;
-  the other two are <code>exceptions.CongestedNetwork</code> at <code>:477</code> and <code>:509</code>
-  and return a bare <code>sf_api.error(507, ...)</code> with no <code>Retry-After</code>,
-  <code>stage</code> or <code>transient</code> field. So a queue that converted CPU pressure
-  into address pressure would convert a refusal a client is told to
-  retry into one it is told nothing about.</li>
-</ul>
-<h3 id="9-what-should-the-api-say">9. What should the API say?<a class="headerlink" href="#9-what-should-the-api-say" title="Permanent link">&para;</a></h3>
-<p><strong>That it is transient, and when to try again.</strong> Both scheduling
-<code>507</code> bodies from <code>POST /instances</code> (<code>external_api/instance.py:944</code>
-for the pre-filter, <code>:1017</code> for the guard) are bare strings. Phase 4
-adds a <code>Retry-After</code> header and a machine-readable <code>stage</code> and
-<code>transient: true</code> to the error body, so a client does not have to
-parse prose to know which refusal it got. The honest hint is a
-fixed conservative constant (15 s, matching <code>defer()</code>'s default)
-rather than a computed one: the server has no pending-release
-horizon and a number that implies knowledge it lacks is worse than
-one that does not. The client's opt-in retry reuses the shape of
-its existing 406 loop and is bounded by the same deadline. The
-affinity <code>409</code> is deliberately ordered first in the handler and
-must never be retried.</p>
-<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
-<!-- shared-block: plan-status-vocabulary v1 -->
-<p>Plan status vocabulary (shared block; do not edit -- the canonical
-copy lives in shakenfist/development at
-<code>templates/shared-blocks/plan-status-vocabulary.md</code>):</p>
-<p>A status cell -- in the master plan's own Execution phase table, and
-in the row <code>docs/plans/index.md</code> carries for the plan -- holds
-exactly one of these terms and nothing else:</p>
-<ul>
-<li><code>Proposed</code> -- written down as a concept, not yet scheduled.</li>
-<li><code>Not started</code> -- scheduled, but no work has begun.</li>
-<li><code>In progress</code> -- work has begun and has not finished.</li>
-<li><code>Blocked</code> -- cannot proceed until something outside the plan
-  changes. Say what, in the plan.</li>
-<li><code>Complete</code> -- the work is done.</li>
-<li><code>Abandoned</code> -- deliberately dropped without being done.</li>
-<li><code>Superseded</code> -- replaced by another plan, which the plan names.</li>
-</ul>
-<p>The term is the whole cell. No dates, no phase arithmetic, no
-parenthetical qualifiers, no summary of what happened: a status is
-read to decide whether a plan still wants attention, and prose in
-that column has repeatedly grown until it could no longer be read
-either by a person scanning the table or by tooling. Detail belongs
-in the plan file, and a one-line summary belongs in the index's own
-Intent column.</p>
-<p>Matching is case-insensitive, so <code>In Progress</code> is accepted, but the
-spelling above is the one to write.</p>
-<!-- shared-block-end -->
-
-<div class="admonition note">
-<p class="admonition-title">In this project</p>
-<p>The same term is written twice: once in the phase table
-below, and once in the row this plan carries in
-<code>docs/plans/index.md</code>. Keep them in step -- the index row is
-the whole-plan status, so it only reaches <code>Complete</code> once
-every phase has been completed, abandoned or superseded.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Phase</th>
-<th>Plan</th>
-<th>Status</th>
-<th>Merged</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1. Close the warm-up window: reconcile when a hypervisor has metrics and no capacity row</td>
-<td><a href="../PLAN-transient-capacity-refusals-phase-01-warm-up/">PLAN-transient-capacity-refusals-phase-01-warm-up.md</a></td>
-<td>Complete</td>
-<td><code>7cc93750d</code> (#4147), <code>e20dd7d4b</code> (#4153)</td>
-</tr>
-<tr>
-<td>2. The suite waits, and says so: an informed <code>create_instance</code> wrapper and a per-run wait summary</td>
-<td><a href="../PLAN-transient-capacity-refusals-phase-02-suite-wait/">PLAN-transient-capacity-refusals-phase-02-suite-wait.md</a></td>
-<td>Complete</td>
-<td><code>5ad9651ee</code> (#4166), <code>2c6206941</code> (#4187)</td>
-</tr>
-<tr>
-<td>3. Publish metrics when the running-domain set changes</td>
-<td><a href="../PLAN-transient-capacity-refusals-phase-03-metrics-on-change/">PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md</a></td>
-<td>Complete</td>
-<td><code>03cd7be3a</code> (#4200)</td>
-</tr>
-<tr>
-<td>4. <code>Retry-After</code> and a machine-readable transient refusal, with an opt-in client retry</td>
-<td><a href="../PLAN-transient-capacity-refusals-phase-04-retry-after/">PLAN-transient-capacity-refusals-phase-04-retry-after.md</a></td>
-<td>Complete</td>
-<td><code>565e36e6e</code> (#4241), client-python <code>74d6e129b</code> (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/399" title="GitHub Issue: shakenfist/client-python #399">client-python#399</a>)</td>
-</tr>
-<tr>
-<td>5. Decide on server-side queued placement from the phase 2 data</td>
-<td><a href="../PLAN-transient-capacity-refusals-phase-05-queue-decision/">PLAN-transient-capacity-refusals-phase-05-queue-decision.md</a></td>
-<td>In progress</td>
-<td>—</td>
-</tr>
-<tr>
-<td>6. Documentation and close-out</td>
-<td>PLAN-transient-capacity-refusals-phase-06-docs.md</td>
-<td>Not started</td>
-<td>—</td>
-</tr>
-<tr>
-<td>7. Push audit</td>
-<td>PLAN-transient-capacity-refusals-phase-07-push-audit.md</td>
-<td>Not started</td>
-<td>—</td>
-</tr>
-</tbody>
-</table>
-<p>The <code>Merged</code> column records what put each phase on <code>develop</code>: the
-merge commit of its pull request, or an explicit <code>first..last</code>
-range where the phase landed directly. It is filled in as each
-phase lands, so <code>—</code> means the phase has not landed yet, even
-where its phase plan is already written and linked above. Phase 1
-took two: the implementation, and the close-out which recorded its
-measurement. Phase 2 took the same two.</p>
-<p>Phases 1, 2 and 3 are independent of one another and can run in
-parallel. Phase 4 follows 2, because the client retry should match
-the semantics the suite has already proven. Phase 5 needs phase 2
-to have reported over a window of merge runs <em>after</em> the sizing
-plan's phase 4 has reshaped <code>slim-tier</code>; until then its data would
-be measuring the wrong cloud. Phase 6 is the last of the
-implementation phases; phase 7 is the push audit, which reads
-all of them.</p>
-<p>The ordering against the sibling plans: the sizing plan's phase 3
-(saturation coverage) does not gate any phase here, because none
-of them changes what a full cluster does -- but its phase 4
-(reshape) should land before phase 5 here reads its numbers.
-Nothing here touches the demand guard, the pre-filters, claim
-enforcement or the guarded UPDATE, all of which are
-scheduler-reservations' (D11, phase 5).</p>
-<h3 id="phase-1-close-the-warm-up-window">Phase 1 -- Close the warm-up window<a class="headerlink" href="#phase-1-close-the-warm-up-window" title="Permanent link">&para;</a></h3>
-<p>Make <code>_force_capacity_reconcile_if_unguarded()</code> a check the
-elected loop repeats rather than a one-shot at election
-(<code>shakenfist/daemons/cluster/main.py:741</code>, called once at <code>:879</code>).
-The check itself is the same comparison either way: if any active
-hypervisor has published metrics and has no capacity row, make the
-reconcile due now. Keep the
-distinction between a degraded read and an empty result that the
-existing code is careful about (<code>rows</code> is empty for both; only
-<code>degraded</code> says which).</p>
-<p><strong>The decision this phase owns is where the check runs</strong>, and the
-master plan does not pre-empt it. Inside the elected loop's 60 s
-maintenance gate (<code>:913</code>) the check costs nothing new -- it rides
-a pass that already reads the database -- and closes the warm-up
-window to about a minute. Outside the gate, on the
-<code>ELECTED_LOOP_POLL_SECONDS = 5</code> poll, it closes the window to
-seconds but adds a fixed-rate ~0.2/s read that needs a
-<code>cluster_base_qps</code> entry in
-<code>shakenfist/data/database_load_budget.yaml</code>, or
-<code>test_no_unbudgeted_fixed_rate_database_polling</code> fails. The phase
-plan picks one and says why; both are defensible and the 60 s
-version is the smaller change.</p>
-<p>Be accurate about the stability gate rather than repeating the
-elected loop's shorthand comment. <code>cluster_stable()</code>
-(<code>shakenfist/daemons/daemon.py:377</code>) compares object versions
-across nodes and reads no metric freshness at all; it catches a
-just-restarted cluster only incidentally, because no node has
-recorded a version yet and <code>minimum</code> is <code>inf</code>. The pass still
-belongs behind it -- issue #4087's second correction explains why
-a pass with no fresh metrics deletes rows -- but the protection is
-a side effect of the version check, not a freshness check, and the
-phase plan should not assume otherwise.</p>
-<p>Prove it two ways. A unit test in <code>shakenfist/tests/</code> drives the
-elected loop with a fake capacity table and a fake node roster and
-asserts the reconcile becomes due on the iteration a hypervisor
-first appears without a row, and not on later iterations where
-every hypervisor has one. A functional assertion in the CI
-harness reads the headroom probe's own series and requires that
-<code>cpu_committed_row_present</code> is true for every hypervisor before
-the first <code>instance placed</code> event of the run -- the field already
-exists end to end (published at <code>shakenfist/scheduler.py:1073</code>,
-harvested by <code>tools/ci_headroom_harvest.py</code>, reported by
-<code>tools/ci_headroom_report.py:319</code>) and the baseline dataset
-already carries it, so the assertion's premise can be checked
-against it before it is written. That assertion also retires a
-<code>skipTest</code>: <code>cluster_ci_tests/test_nodes.py:136</code> currently skips
-when a node has no capacity row, which is exactly the condition
-this phase makes impossible after start-up. Remove the skip in the
-same change rather than leaving unreachable code behind it. Phase
-1 also comments on #4087 with the finding and closes it. The issue
-is still open -- #4106 never closed it -- so there is nothing to
-reopen.</p>
-<p>Small, server-side, one file plus tests. Plan at high effort: the
-placement decision above, the interaction with the stability gate
-and the degraded-read distinction are the kind of thing a light
-brief gets wrong.</p>
-<h3 id="phase-2-the-suite-waits-and-says-so">Phase 2 -- The suite waits, and says so<a class="headerlink" href="#phase-2-the-suite-waits-and-says-so" title="Permanent link">&para;</a></h3>
-<p>Add <code>BaseTestCase.create_instance()</code> to
-<code>shakenfist/deploy/shakenfist_ci/base.py</code>, route every raw
-<code>test_client.create_instance(...)</code> call site in
-<code>shakenfist/deploy/shakenfist_ci/</code> through it (there are 117 call
-sites across 41 files; a list is a mechanical <code>grep</code>), and add a
-unit test in
-<code>shakenfist/tests/</code> that walks the suite's source with <code>ast</code> and
-fails on any raw call outside an explicit allowlist marker, the way
-<code>test_ci_claims_headroom.py</code> already asserts call sites by name.</p>
-<p><em>Amended by the phase 2 survey: this section originally named only
-<code>cluster_ci_tests/</code> and <code>guest_ci_tests/</code>, which hold 88 of the
-calls. The 115 it quoted was a count over the whole of
-<code>shakenfist/deploy/shakenfist_ci/</code>, which today is 117 across 41
-files. The difference is <code>smoke_ci_tests/</code> (27 calls in 7 files),
-<code>base.py:1227</code> and <code>database_tier.py:275</code>. The smoke tier belongs in
-scope: it runs on the smallest cloud, where one sibling instance is
-the largest fraction of the cluster.</em></p>
-<p>The wrapper: on <code>InsufficientResourcesException</code>, if the deadline
-(420 s, the claims suite's <code>CLUSTER_HEADROOM_WAIT</code>) has not passed,
-emit a tracing event, then wait <em>informed</em>: poll
-<code>system_client.get_cluster_resources()</code> at 10 s and proceed when
-<code>per_node[target]['cpu_available'] &gt;= cpus</code> for a <code>force_placement</code>
-create, or <code>total['cpu_available'] &gt;= cpus</code> otherwise, falling back
-to a blind sleep when <code>total['capacity_degraded']</code> is set. Re-create
-with a fresh uniquified name, because the refused instance is
-<code>enqueue_delete_due_error</code>'d and its name is not reusable
-synchronously. Reuse <code>retries.retry_while_transient</code> by converting
-the exception to a <code>(status, body)</code> pair so the loop stays
-unit-testable against a fake clock. Every wait is attached to the
-test as a detail: seconds waited, the node waited for, and the
-<code>per_node</code> headroom at the first refusal and at admission.</p>
-<p><em>Amended by the phase 2 survey: both halves of the predicate above
-are wrong, and phase 2's D8 replaces them.
-<code>per_node[n]['cpu_available']</code> is derived from the live overcommit
-arithmetic (<code>scheduler.py:1086-1088</code>), not from the capacity row's
-<code>limit_cpus</code> that admission actually refuses against -- the endpoint
-publishes both precisely so a reader can see them disagree. And
-<code>total['cpu_available']</code> is a sum across nodes (<code>:1091-1093</code>) while
-an instance must fit on one, so it is satisfied by a cluster with a
-spare thread on each of ten nodes. <code>retry_while_transient</code> is also
-not reusable as written: it re-issues the request every 10 s, which
-here means a fresh refused create -- and each refused create builds
-an instance and error-deletes it -- and its module deliberately
-imports nothing from the suite so the unit tests can load it by
-path.</em></p>
-<p>The run summary: total seconds waited, number of waits, longest
-wait and its test, written to the bundle beside the headroom
-probe's output and printed in the job log. The collection step is
-in <code>shakenfist/actions</code> (the reusable <code>smoke-cluster</code> workflow),
-so this phase carries the same operator-push obligation the
-sizing plan's phase 1 did, and the summary is designed so that the
-sizing plan's phase 5 guardrail can read it.</p>
-<p><em>Amended by the phase 2 survey: only the job-log print carries that
-obligation. <code>smoke-cluster.yml:212</code> creates <code>/srv/ci/traces</code> on the
-primary and chowns it to the base-image user, and the "Gather logs"
-step at <code>:550</code> scp's the whole directory into the artifact bundle;
-the suite runs on the primary as that user. So a file the suite
-writes there reaches the bundle with no change in
-<code>shakenfist/actions</code> at all, and the report can be run over a
-downloaded bundle -- which is how phase 1 ultimately verified its
-own definition-of-done item 9. Phase 2's D14 puts the cross-repo
-change last and lets nothing depend on it.</em></p>
-<p>Budget the poll. <code>GET /admin/resources</code> reads <code>GetNodeMetrics</code> from
-the <code>api</code> caller, which is already in <code>HARNESS_DRIVEN_PAIRS</code>
-(<code>load_budget.py:309-323</code>) -- but that exemption's prose names the
-headroom probe as the producer and
-<code>test_the_suite_still_probes_cluster_headroom</code> holds it up. Extend
-the comment to name the wrapper as a second, activity-coupled
-producer (it polls only while a create is being retried), or the
-load-budget test's premise rots silently.</p>
-<p>Two test-side changes ride along because they are cheap and reduce
-the number of pinned creates: <code>test_commandline_artifacts.py</code>'s
-second instance and <code>test_imagefetch.py</code>'s first are pinned for
-convenience rather than for the assertion, and can target
-<code>inst1['node']</code> only where co-location is actually load-bearing.
-And <code>test_system_namespace.py</code> subclasses <code>BaseTestCase</code> rather than
-the namespaced base, so a failure between its inline create and
-delete strands a charged instance in the system namespace for the
-rest of the run; give it an <code>addCleanup</code>.</p>
-<p><em>Amended by the phase 2 survey: <code>test_commandline_artifacts.py</code>
-already has the shape asked for -- <code>:182-190</code> pins the second
-instance to <code>inst1['node']</code> and the first is not pinned at all --
-so there is nothing to change there. <code>test_imagefetch.py</code> has four
-pinned creates, not one. In its first test both (<code>:130</code>, <code>:152</code>)
-target an arbitrary first hypervisor, and since the source URL is
-deleted between them the second one's co-location is load-bearing:
-the first's pin comes out, the second's becomes <code>inst1['node']</code>. Its
-second test pins <code>first</code> and <code>second</code> deliberately, to place the
-second instance on a node which has not seen the image, and must be
-left alone. The <code>test_system_namespace.py</code> observation is correct as
-written.</em></p>
-<p>The sizing plan's phase 3 saturation tests must call the raw client
-and assert the refusal; the allowlist marker exists for them.</p>
-<p>Plan at high effort. The wrapper is straightforward; the AST guard,
-the load-budget declaration and the bundle plumbing across two
-repositories are where a light brief goes wrong.</p>
-<h3 id="phase-3-publish-metrics-when-the-running-domain-set-changes">Phase 3 -- Publish metrics when the running-domain set changes<a class="headerlink" href="#phase-3-publish-metrics-when-the-running-domain-set-changes" title="Permanent link">&para;</a></h3>
-<p>In <code>shakenfist/daemons/resources/main.py</code>, beside the 60 s publish,
-poll the set of active libvirt domain ids every few seconds (no
-database access) and, when that set differs from what was last
-published, publish immediately. Keep the 60 s full publish
-unchanged, resetting its clock on any publish. Declare the changed
-load in <code>shakenfist/data/database_load_budget.yaml</code>, and add a unit
-test that a domain disappearing between polls produces a publish
-before the 60 s tick.</p>
-<p>This is what makes "the node is empty" true within seconds of a
-teardown rather than within a minute, and it is the only change in
-this plan outside the scheduler, the API and the test suite.
-Plan at medium effort; the pattern is the existing loop.</p>
-<p>Three things this section originally got wrong, corrected when
-phase 3 was planned and set out in full under <em>What the survey
-found</em> there. A publish is not a single write: it is a fifteen
-round-trip <code>_get_stats()</code> sweep, twelve of them queue-depth reads,
-so the cadence change has a bill worth bounding. There is no
-<code>UpsertNodeMetrics</code> entry in the budget file to amend -- entries
-must be added -- and <code>activity_coupled</code> does not refine the model,
-it switches enforcement off (<code>load_budget.py:443-450</code>), so it is
-applied only to the pairs the publish path actually reaches. And a
-vCPU total is not a second trigger worth watching: with no CPU
-hotplug it can only move when the domain set does.</p>
-<h3 id="phase-4-retry-after-and-a-machine-readable-transient-refusal">Phase 4 -- <code>Retry-After</code> and a machine-readable transient refusal<a class="headerlink" href="#phase-4-retry-after-and-a-machine-readable-transient-refusal" title="Permanent link">&para;</a></h3>
-<p>Server: on the two <em>scheduling</em> <code>507</code> branches of
-<code>POST /instances</code> (<code>external_api/instance.py:944</code>, the filter
-pre-check, and <code>:1017</code>, every candidate refused by the capacity
-guard), set <code>Retry-After: 15</code> and extend the error body with
-<code>stage</code> and <code>transient: true</code>. <code>POST /instances</code> has four <code>507</code>
-branches, not two: the other two are the <code>CongestedNetwork</code>
-clauses at <code>:428</code> and <code>:451</code>, and phase 4's D29 leaves those bare
-because an exhausted address pool has a different and much longer
-horizon. Phase 4's review round refined this further: the filter
-branch is not one fact either. A structural stage such as
-<code>cpu_max_per_instance</code> gets a <code>507</code> carrying its <code>stage</code> but
-<code>transient: false</code> and no header, because no wait clears it. See
-phase 4's D35. <code>sf_api.error()</code> returns a bare <code>flask.Response</code>, so the
-header is set on the returned object -- but note it is
-<code>shakenfist_utilities.api.error()</code>, a third-party function pinned
-in <code>pyproject.toml</code>, so the <em>body</em> is built in another repository
-and phase 4 rewrites the returned response rather than changing
-that package. The stage is carried on the exception from
-<code>scheduler.py</code>'s raise site rather than parsed out of the message.
-The <code>409</code> affinity branch is untouched. Update the OpenAPI
-declaration, within what its three-tuple response format can
-express -- it cannot declare a response header, which phase 4's
-D32 records as a filed gap rather than fixing here.</p>
-<p>The contract this changes already has an owner:
-<code>BaseTestCase.assertRefusedAtStage()</code>
-(<code>shakenfist/deploy/shakenfist_ci/base.py:1464</code>), landed by the
-sizing plan's phase 3a and used by four assertions in
-<code>cluster_ci_tests/test_saturation.py</code>. Its docstring names this
-phase as the single place to change when the contract moves.</p>
-<p>Client (<code>client-python</code>): carry response headers on
-<code>APIException</code>, and add an opt-in retry policy for <code>507</code> bodies
-carrying <code>transient: true</code>, bounded by the existing async-strategy
-deadline and reusing the shape of the 406 loop in <code>_request_url</code>.
-Off by default, and <strong>the CI suite leaves it off</strong>: the suite's
-clients use <code>ASYNC_PAUSE</code>, so a blind retry would spend up to 60 s
-inside each call the phase 2 wrapper makes, invisible to the wait
-records phase 5 reads as its denominator, and the saturation tests
-must never retry the refusal they are asserting. See phase 4's D33
-for the full reasoning; an earlier draft of this section said the
-suite turns it on, and that was wrong.</p>
-<p>Plan at medium effort; each half is small, and the coordination is
-a version pin between the two repositories.</p>
-<h3 id="phase-5-decide-on-server-side-queued-placement">Phase 5 -- Decide on server-side queued placement<a class="headerlink" href="#phase-5-decide-on-server-side-queued-placement" title="Permanent link">&para;</a></h3>
-<p>A decision phase, not a build phase. Read the phase 2 wait
-summaries over at least twenty merge runs after the sizing plan's
-phase 4 has landed. If total wait per run is small and no test
-waits near its deadline, close this phase as Abandoned with the
-numbers and the reasoning in the phase file. Otherwise, design the
-queue against open question 8's constraints -- FIFO by request
-time, pinned creates admitted against their node only, IPAM
-allocated at placement rather than at request, a deadline the
-client's create ceiling can contain -- and record the
-reversal of scheduler-reservations D8 in that plan's decisions
-file before any code is written.</p>
-<p>Plan at high effort if it goes ahead; the state-machine and
-fairness questions are the expensive kind.</p>
-<p>Planned in
-<a href="../PLAN-transient-capacity-refusals-phase-05-queue-decision/">PLAN-transient-capacity-refusals-phase-05-queue-decision.md</a>,
-which fixes the numeric decision rule <em>before</em> the data is read,
-because "small" and "near its deadline" above are not numbers and a
-phase which reads twenty runs and then decides what those words meant
-is narrating a decision rather than taking one. That plan's gate is
-closed as written: the sizing plan's phase 4 reshape has not been
-applied to <code>shakenfist/actions</code>, whose <code>ci-topology-slim-tier.yml</code>
-still carries <code>cpu: 4</code> on all three nodes, so the data available today
-describes the cloud the reshape exists to replace.</p>
-<h3 id="phase-6-documentation-and-close-out">Phase 6 -- Documentation and close-out<a class="headerlink" href="#phase-6-documentation-and-close-out" title="Permanent link">&para;</a></h3>
-<p>Document the transient-refusal contract in
-<code>docs/operator_guide/scheduler.md</code> and the API reference, the suite
-wrapper and its allowlist marker in <code>docs/developer_guide/ci.md</code>,
-and the wait summary beside the headroom probe's documentation.
-Update <code>docs/plans/index.md</code> and the sibling plans' cross-references
-to their final state. Comment on #3772 with the before-and-after
-pass rate and close it only if the <code>Debian 12 tier</code> job's failures
-are no longer <code>sufficient_idle_cpu</code>; otherwise leave it open with
-the numbers.</p>
-<h3 id="phase-7-push-audit">Phase 7 -- Push audit<a class="headerlink" href="#phase-7-push-audit" title="Permanent link">&para;</a></h3>
-<p>Runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in
-this plan, not the last phase's diff alone. Auditing one phase at a
-time would miss what the phases did to each other, which matters
-here more than it looks: phases 1, 2 and 3 are explicitly allowed
-to run in parallel, and phase 4's client retry is meant to carry
-the same semantics phase 2 proved, so a divergence between them is
-exactly the kind of defect no single phase can see.</p>
-<p>By the time this runs its phases will have merged, and a diff
-against <code>develop</code> will be empty and would read as a clean audit.
-The baseline is therefore the <code>Merged</code> column in the Execution
-table above, not <code>develop...HEAD</code>. Findings land as their own pull
-request, and the plan is not complete until each is resolved or
-declined in writing here. If the audit finds nothing, that is
-recorded in one sentence.</p>
-<p>Phase 2 may land partly outside this repository: its suite wrapper
-touches the CI harness. Where it does, its row names the
-repository, and that half is audited against that repository's
-default branch as part of the pull request that lands it, with this
-phase citing that audit rather than re-running it.</p>
-<p>Phase 5 is a different situation needing a different response. It
-is a decision phase which may produce no code at all, and if it
-closes as Abandoned there is nothing here for the audit to read.
-That is recorded as such -- an audit which says what it had no
-diff to scope over is a result; one which reports a clean run over
-an empty range is not.</p>
-<h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
-<h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
-<!-- shared-block: subagent-execution-model v1 -->
-<p>Sub-agent execution model (shared block; do not edit -- the
-canonical copy lives in shakenfist/development at
-<code>templates/shared-blocks/subagent-execution-model.md</code>):</p>
-<p>All implementation work is done by sub-agents, never in the
-management session. The management session is reserved for
-planning, review, and decision-making. This keeps the management
-context lean and avoids drowning it in implementation diffs.</p>
-<p>The workflow is:</p>
+<p>The single extension is bounded deliberately. An unbounded "gather
+more data" is how a decision phase never closes.</p>
+<p><strong>The unreadable case is not one of the three.</strong> Too many unknown runs
+is a collection defect, not a quiet cluster, and it does not resolve to
+Abandon on the second reading the way the middle ground does. If the
+window is still unreadable after the extension, the phase reports that
+the trace is not reaching the bundles reliably, and that becomes a
+finding against phase 2's plumbing rather than an answer to open
+question 8. Deciding "no queue needed" from runs that never reported is
+the one outcome here that would be worse than not deciding.</p>
+<p><strong>Recorded either way:</strong> the full distribution, the informed/degraded
+split, the <code>binding_dimension</code> census, and whether pinned
+(<code>force_placement</code>) creates are over-represented among the long waits.
+That last one is recorded whatever the decision, because it is the
+fairness question's only empirical input and open question 8 asserts
+it ("a pinned create starves worst") without evidence.</p>
+<h3 id="d38-the-burden-of-proof-is-on-building-the-queue-not-on-abandoning-it">D38 -- The burden of proof is on building the queue, not on abandoning it<a class="headerlink" href="#d38-the-burden-of-proof-is-on-building-the-queue-not-on-abandoning-it" title="Permanent link">&para;</a></h3>
+<p><strong>This is the decision a reviewer is most likely to disagree with</strong>, so
+the reasoning is given at length.</p>
+<p>D37's thresholds are not symmetric: Abandon requires a quiet window,
+Build requires a single clear signal, and the middle resolves to
+Abandon. That asymmetry is deliberate, and it rests on three things the
+survey established rather than on a preference for doing less.</p>
 <ol>
-<li><strong>Plan</strong> at high effort in the management session.</li>
-<li><strong>Spawn a sub-agent</strong> for each implementation step with the
-   brief from the plan, at the recommended effort level and model.</li>
-<li><strong>Review</strong> the sub-agent's output in the management session.
-   Check the actual files -- the sub-agent's summary describes
-   what it intended, not necessarily what it did.</li>
-<li><strong>Fix or retry</strong> if the output is wrong. Diagnose whether the
-   brief was insufficient (improve it) or the model was too light
-   (upgrade it), then re-run.</li>
-<li><strong>Commit</strong> once the management session is satisfied.</li>
+<li>
+<p><strong>The wait already exists, in the caller, which is where D8 put
+   it.</strong> F5: the suite waits 420 s client-side and records every wait.
+   A server-side queue does not introduce the wait, it relocates it
+   -- and during the relocation both exist, on the same condition, in
+   the shape <code>create_instance</code>'s own docstring warns about (F1). The
+   project would be running two deferral mechanisms against one
+   shortage.</p>
+</li>
+<li>
+<p><strong>Phase 4 just chose the other direction, one phase ago.</strong> It
+   shipped <code>Retry-After</code> and a machine-readable <code>transient</code> marker
+   precisely so the <em>client</em> can decide to retry, and its D33
+   deliberately ships the client retry switched off. Adopting a
+   server-side hold now would reverse an architectural direction the
+   plan committed to within the same plan, on evidence gathered before
+   that direction had a chance to be used by anything.</p>
+</li>
+<li>
+<p><strong>The cheap fix is being applied concurrently and has not been
+   measured.</strong> F7: the reshape exists, is written, and is waiting on
+   one pull request. The refusals this plan is about were traced to
+   infra nodes with a ledger of 3. Building a state machine to survive
+   a shortage that a three-line YAML change may remove is the
+   expensive answer to a question the cheap answer has not been allowed
+   to attempt.</p>
+</li>
 </ol>
-<p>This applies to all steps, including high-effort ones. If a
-sub-agent cannot succeed even with a detailed brief and the right
-model, that is a signal the brief needs improving, not that the
-management session should do the implementation itself.</p>
-<p>Use <code>isolation: "worktree"</code> for sub-agents when the change is
-risky or experimental; the worktree is discarded if the output is
-unsatisfactory. For safe, well-understood changes, sub-agents can
-work directly in the main tree.</p>
-<!-- shared-block-end -->
-
-<h3 id="planning-effort">Planning effort<a class="headerlink" href="#planning-effort" title="Permanent link">&para;</a></h3>
-<!-- shared-block: plan-planning-effort v1 -->
-<p>Planning effort (shared block; do not edit -- the canonical copy
-lives in shakenfist/development at
-<code>templates/shared-blocks/plan-planning-effort.md</code>):</p>
-<p>The master plan itself is always created at <strong>high effort</strong> -- it
-requires broad codebase understanding, cross-referencing several
-source files, and judgment calls about scope and sequencing.</p>
-<p>Each phase plan states the recommended effort level for planning
-that phase. Phases that turn on design decisions, cross-component
-coordination, protocol changes, or subtle correctness questions
-should be planned at high effort. Phases that are mechanical, or
-that follow a pattern already established elsewhere in the
-codebase, can be planned at medium effort.</p>
-<!-- shared-block-end -->
-
-<div class="admonition note">
-<p class="admonition-title">In this project</p>
-<p>Phases 1, 2 and 5 are planned at high effort: the first for
-its interaction with the stability gate and the degraded-read
-distinction, the second for its two-repository plumbing and
-the load-budget declaration, the fifth because it may be a
-state-machine design. Phases 3, 4 and 6 follow patterns that
-already exist and are planned at medium effort.</p>
-</div>
-<h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
-<!-- shared-block: subagent-step-guidance v1 -->
-<p>Sub-agent step guidance (shared block; do not edit -- the
-canonical copy lives in shakenfist/development at
-<code>templates/shared-blocks/subagent-step-guidance.md</code>):</p>
-<p>Each phase plan includes a table like this:</p>
+<p>The counter-argument, stated fairly: a CI suite is not the only
+client, and an operator script hitting a genuinely full production
+cluster gets a refusal where a queue would get an instance. That is
+true, and it is the strongest case for building. It is not answered by
+this phase's data, which is all CI. If the decision is Abandon, that
+limitation is written into the record explicitly (D40), because an
+Abandon justified by CI numbers must not be read later as a finding
+about production.</p>
+<h3 id="d39-if-the-decision-is-build-ipam-moves-first-and-that-is-the-phases-real-cost">D39 -- If the decision is Build, IPAM moves first, and that is the phase's real cost<a class="headerlink" href="#d39-if-the-decision-is-build-ipam-moves-first-and-that-is-the-phases-real-cost" title="Permanent link">&para;</a></h3>
+<p>F3 and F4 together mean the queue is not the contained change open
+question 8 describes. Holding an instance holds its addresses, because
+deletion is the only path that releases them today, and converting a
+CPU shortage into an address shortage converts a refusal phase 4 made
+machine-readable into one that is still prose.</p>
+<p>So a Build outcome's first step is not the queue. It is moving address
+allocation from <code>:1027</code> to placement time, which means unpicking the
+ordering in <code>POST /instances</code> and finding a new release path for the
+refusal branches that currently rely on <code>enqueue_delete_due_error()</code>.</p>
+<p>This is recorded as a decision rather than left to the design phase
+because it changes the <em>cost estimate</em> the Build/Abandon choice is made
+against. A reader weighing D37's thresholds should weigh them knowing
+that Build is an IPAM re-ordering plus a state machine, not a
+<code>defer_with_backoff()</code> call.</p>
+<h3 id="d40-whichever-way-it-goes-the-record-says-what-the-evidence-could-not-cover">D40 -- Whichever way it goes, the record says what the evidence could not cover<a class="headerlink" href="#d40-whichever-way-it-goes-the-record-says-what-the-evidence-could-not-cover" title="Permanent link">&para;</a></h3>
+<p>The phase writes its outcome into three places: this plan's Outcome,
+the master plan's open question 8 (which currently says "Decide in
+phase 5"), and the <code>docs/plans/index.md</code> row.</p>
+<p>On an Abandon, the record states the three limits of the evidence: it
+is CI-only (D38's counter-argument); it is post-reshape, so it says
+nothing about whether the queue would have helped the cloud that
+produced #3772; and it was gathered with the client retry switched off
+(phase 4 D33), so no client in the window was retrying on its own
+behalf.</p>
+<p>An Abandon that does not say what it did not measure reads, a year
+later, as "we established a queue is unnecessary". It would have
+established that one topology of one test suite did not need one.</p>
+<h3 id="d41-correct-open-question-8-at-source-in-this-phases-first-commit">D41 -- Correct open question 8 at source, in this phase's first commit<a class="headerlink" href="#d41-correct-open-question-8-at-source-in-this-phases-first-commit" title="Permanent link">&para;</a></h3>
+<p><strong>Done, in the same commit that registers this phase.</strong> F1, F2, F3 and
+F4 are corrected in the master plan's open question 8 and its phase 5
+section rather than deferred to phase 6's documentation sweep. The next
+reader of open question 8 should not have to rediscover that the 900 s
+ceiling is 600 s.</p>
+<p>What changed there: the method name and its 600 s default, plus the
+two-budgets warning (F1); the 105 s default budget of
+<code>defer_with_backoff()</code> and the note that every measured wait exceeds it
+(F2); the two line numbers that make the IPAM ordering checkable, and
+the fact that <code>enqueue_delete_due_error()</code> on the refusal path is the
+only thing that releases an address today (F3); and the two
+<code>CongestedNetwork</code> <code>507</code>s, so the IPAM argument names its real
+consequence (F4). The <em>arguments</em> in open question 8 are untouched --
+they survived the survey. F5, F6 and F7 are true as written and needed
+no source change.</p>
+<p><strong>No step below redoes this.</strong> The Definition of done still checks it,
+because a correction made at planning time is as capable of being wrong
+as one made later.</p>
+<h3 id="d42-this-plan-does-not-design-the-queue">D42 -- This plan does not design the queue<a class="headerlink" href="#d42-this-plan-does-not-design-the-queue" title="Permanent link">&para;</a></h3>
+<p>If the decision is Build, this phase produces the decision, the
+reversal of scheduler-reservations D8 written into that plan's
+decisions file, and a statement of what the design phase must cover
+(the IPAM re-ordering of D39, the fairness model, the deadline
+arithmetic against F1's 600 s, and the interaction with the suite's
+existing 420 s wait). The design itself is a new phase, inserted into the
+master plan's Execution table as a row of its own -- not a step here.</p>
+<p>Writing the design here would mean writing it before knowing it is
+wanted, at high effort, with a better-than-even chance of discarding
+it.</p>
+<h2 id="step-plan">Step plan<a class="headerlink" href="#step-plan" title="Permanent link">&para;</a></h2>
+<p>The source corrections D41 describes are already made, in the commit
+that registers this phase, so they are not a step here.</p>
 <table>
 <thead>
 <tr>
@@ -15119,369 +14571,145 @@ canonical copy lives in shakenfist/development at
 </thead>
 <tbody>
 <tr>
-<td>1a</td>
+<td>5b</td>
+<td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>Gate check (D36).</strong> Establish whether the gate is open. Read <code>shakenfist/actions/ansible/ci-topology-slim-tier.yml</code> and check whether the three <code>cpu:</code> values at <code>:38</code>, <code>:75</code> and <code>:105</code> are 6 rather than 4. Read the sizing plan's phase 4 Outcome table and check whether 4d is still Blocked. If either says the reshape has not landed, stop and report -- do not proceed to 5c. If it has landed, count the completed <code>merge_group</code> runs of <code>Functional tests</code> since the merge commit and report whether the count has reached 20. This step is expected to run more than once, at intervals, and to report "not yet" most times.</td>
+</tr>
+<tr>
+<td>5c</td>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>One-sentence summary of what to do and which files to touch</td>
+<td><strong>Gather (gated behind 5b).</strong> For each qualifying <code>merge_group</code> run on the reshaped <code>slim-tier</code>, download the bundle and run <code>tools/ci_headroom_report.py --waits &lt;bundle&gt;/srv/ci/traces/instance-waits.jsonl</code>. Record per run: the number of waits, the total, the longest wait and its test id, the informed/degraded split, the <code>binding_dimension</code> of each wait, and whether the create was pinned (<code>node</code> set). A run whose trace is absent, empty or unparseable is recorded as <strong>unknown</strong> and excluded from the rule's denominator (F6) -- the tool already distinguishes these from zero, do not collapse them. Do <strong>not</strong> sum <code>attempt_number</code>; it is a 1-indexed position, not a count. Produce a table and the raw per-wait records, and nothing else: this step does not interpret.</td>
 </tr>
 <tr>
-<td>1b</td>
+<td>5d</td>
 <td>high</td>
 <td>opus</td>
-<td>worktree</td>
-<td>Why this needs high effort: requires understanding X to do Y</td>
+<td>none</td>
+<td><strong>Decide (D37).</strong> Apply the pre-registered rule in D37 to 5c's table -- do not re-derive or adjust the thresholds, and if you believe one is wrong, say so and apply it anyway, recording the objection. Report which of Abandon, Build or Extend the data selects, with the arithmetic shown for each of the three clauses. Additionally report, whatever the outcome: the pinned-versus-unpinned split among waits longer than 210 s (D37's fairness input), and the count of unknown runs. If the outcome is Extend, say so and stop; the window extends once only.</td>
+</tr>
+<tr>
+<td>5e</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td><strong>Record the outcome (D40, D42).</strong> Write this plan's Outcome section: the distribution, the rule's arithmetic, the decision, and the three evidence limits D40 requires (CI-only, post-reshape, client retry off). Answer open question 8 in the master plan -- replace "Decide in phase 5, from phase 2's wait data" with the answer and a link here. On an <strong>Abandon</strong>: set this phase <code>Abandoned</code> in the master plan's Execution table and note in <code>docs/plans/index.md</code> that the plan's phase count now reads against six live phases. On a <strong>Build</strong>: set this phase <code>Complete</code>, write the reversal of D8 into <code>PLAN-scheduler-reservations-phase-00-decisions.md</code> as an amendment beside D8 (do not edit D8's text in place -- amend below it, which is how that file records reversals), add a design-phase row to the Execution table, and state what the design phase must cover per D42. Do not design it.</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Effort levels</strong>, from cheapest to most thorough:</p>
-<ul>
-<li><strong>low</strong> -- Purely mechanical changes: rename, reformat, add a
-  log line, regenerate generated code. The brief is a complete
-  instruction.</li>
-<li><strong>medium</strong> -- The plan provides enough context to follow a clear
-  brief. The sub-agent may read a few files, but the approach is
-  already decided.</li>
-<li><strong>high</strong> -- Requires reading several files, making judgment
-  calls, or understanding non-obvious invariants. The sub-agent
-  needs to think about edge cases.</li>
-<li><strong>xhigh</strong> -- The setting for hard coding and agentic steps:
-  long-horizon changes, or steps where the sub-agent must both
-  research and implement.</li>
-<li><strong>max</strong> -- Correctness matters more than cost. Expect
-  diminishing returns and occasional overthinking; reserve it for
-  steps where a wrong answer would be expensive to detect.</li>
-</ul>
-<p><strong>Brief for sub-agent:</strong> this is the key field. Write it as if
-briefing a colleague who has never seen the codebase. Include what
-to change, which files to touch, what patterns to follow, and any
-non-obvious constraints.</p>
-<p>A good brief front-loads the research the planner already did, so
-the implementing agent does not repeat it. Instead of "add storage
-functions for the new object", name the functions to add, the file
-they belong in, the existing equivalent to mirror (with line
-numbers), and any registration the change also needs.</p>
-<p>The better the brief, the lower the effort level needed and the
-lighter the model that can succeed.</p>
-<!-- shared-block-end -->
-
-<div class="admonition note">
-<p class="admonition-title">In this project</p>
-<p>The invariants a brief in this plan must carry, because none
-of them is inferable from the code being edited:</p>
-<ul>
-<li>Placement transactions open with a guarded <code>UPDATE</code>, never a
-  <code>SELECT</code> (the snapshot-isolation invariant, <code>AGENTS.md</code>).
-  No phase here touches one, and a brief should say so
-  explicitly so a sub-agent does not "improve" one in passing.</li>
-<li>Attribute writes carry a field mask (<code>CLAUDE.md</code>, common
-  pitfall 3).</li>
-<li>Any new suite-side or daemon-side polling is declared in
-  <code>shakenfist/data/database_load_budget.yaml</code> or
-  <code>HARNESS_DRIVEN_PAIRS</code>, with prose naming the producer, or
-  <code>test_no_unbudgeted_fixed_rate_database_polling</code> will fail
-  the next merge group (#3975, #4028).</li>
-<li>The reconcile pass stays behind <code>cluster_stable()</code>.</li>
-<li>The <code>409</code> affinity refusal is never retried.</li>
-</ul>
-</div>
-<h3 id="model-choice">Model choice<a class="headerlink" href="#model-choice" title="Permanent link">&para;</a></h3>
-<!-- shared-block: subagent-model-roster v1 -->
-<p>Sub-agent model roster (shared block; do not edit -- the canonical
-copy lives in shakenfist/development at
-<code>templates/shared-blocks/subagent-model-roster.md</code>):</p>
-<p>The planner recommends which model is best suited to each step.
-This is a judgment call, not a rigid rule -- the right model
-depends on what the step requires, not on whether it is "planning"
-or "implementation". The models available to sub-agents are:</p>
-<ul>
-<li><strong>fable</strong> -- The most capable model available, for the hardest
-  reasoning and the longest-horizon work: multi-step changes a
-  single sub-agent must carry end to end, or steps whose
-  correctness depends on holding a whole subsystem in mind at
-  once. It costs materially more than opus, so reserve it for
-  steps that have already defeated opus or are expected to.</li>
-<li><strong>opus</strong> -- The default for steps needing deep reasoning,
-  architectural understanding, subtle correctness judgment
-  (locking, state machines, migrations), or intricate
-  implementation that would be costly to debug if it were wrong.</li>
-<li><strong>sonnet</strong> -- A good default for well-briefed implementation
-  work. Faster and cheaper than opus, and effective when the plan
-  front-loads the research and the brief leaves no broad judgment
-  calls to make.</li>
-<li><strong>haiku</strong> -- Suitable for purely mechanical tasks:
-  search-and-replace, regenerating generated code, adding log
-  lines, running commands. The brief must be a near-complete
-  instruction.</li>
-</ul>
-<p>Model choice interacts with effort level and brief quality. A
-detailed brief compensates for a lighter model -- sonnet at medium
-effort with a thorough brief often matches opus at medium effort
-with a vague brief. The planner's job is to write briefs good
-enough that the recommended model can succeed.</p>
-<p>The model also determines the context window: fable, opus and
-sonnet have 1M tokens, haiku has 200K. A step that must hold many
-files in context at once may need one of the larger-context models
-for that reason alone, even when the reasoning itself is
-straightforward.</p>
-<p><strong>When in doubt, skew to the more capable model.</strong> Saving money
-only matters if the outcome is still acceptable. A failed or
-low-quality implementation wastes more time -- and therefore more
-money -- than the heavier model would have cost. Recommend a
-lighter model only when you are confident the brief is detailed
-enough for it to succeed.</p>
-<!-- shared-block-end -->
-
-<h3 id="management-session-review-checklist">Management session review checklist<a class="headerlink" href="#management-session-review-checklist" title="Permanent link">&para;</a></h3>
-<!-- shared-block: plan-review-checklist v1 -->
-<p>Management session review checklist (shared block; do not edit --
-the canonical copy lives in shakenfist/development at
-<code>templates/shared-blocks/plan-review-checklist.md</code>):</p>
-<p>After a sub-agent completes, the management session verifies:</p>
-<ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The files that were supposed to change actually changed --
-      read them, do not trust the summary.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No unrelated files were modified.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The changes match the intent of the brief: not merely
-      syntactically correct, but semantically right.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The project's own pre-merge checks pass, including any
-      generated code that has to be regenerated and committed
-      (see the project-specific checks below).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The commit message follows project conventions, including
-      the <code>Co-Authored-By</code> line recording model, context window,
-      and effort level.</li>
-</ul>
-<!-- shared-block-end -->
-
-<div class="admonition note">
-<p class="admonition-title">In this project</p>
-<p>The project-specific checks referred to above are:</p>
-<ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The code passes <code>pre-commit run --all-files</code> (flake8,
-      stestr unit tests, mypy).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>python3 tools/check-plan-status.py</code> passes after any
-      edit to a plan or to <code>docs/plans/index.md</code>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A change that adds polling has its budget entry, and
-      <code>test_no_unbudgeted_fixed_rate_database_polling</code> has
-      been reasoned about, not merely run.</li>
-</ul>
-</div>
-<h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
-<h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
-<p>We will know when this plan has been successfully implemented
-because the following statements will be true:</p>
-<ul>
-<li>In every merge-run bundle, every hypervisor has a capacity row
-  before the run's first <code>instance placed</code> event, and no first
-  reconcile pass records a <code>drift_cpus</code> above zero.</li>
-<li>A node's published <code>cpu_total_instance_vcpus</code> falls within ten
-  seconds of its last instance being undefined.</li>
-<li>No functional test fails with <code>507 sufficient_idle_cpu</code> at
-  <code>create_instance</code>; a test that waits for capacity records how
-  long, and the run's summary reports it.</li>
-<li><code>POST /instances</code> refusals for capacity carry <code>stage</code> and a
-  <code>transient</code> boolean, with <code>Retry-After</code> on the refusals a retry
-  can actually clear, and <code>shakenfist_client</code> can be told to
-  honour them.</li>
-<li>The decision on server-side queued placement is written down in
-  the phase 5 file with the data it was made from, whichever way
-  it went.</li>
-<li>The <code>Debian 12 tier</code> job's pass rate is comparable to the other
-  cluster jobs, and its remaining failures are not
-  <code>sufficient_idle_cpu</code>.</li>
-<li>The code passes <code>pre-commit run --all-files</code> (flake8, stestr
-  unit tests, and mypy type checking).</li>
-<li>Lines are wrapped at 120 characters, single quotes for strings,
-  double quotes for docstrings.</li>
-<li>Documentation in <code>docs/</code> has been updated. <code>ARCHITECTURE.md</code>
-  and <code>AGENTS.md</code> are updated only if a convention or the shape
-  of the system changed; a transient-refusal contract is an
-  operator-guide and API-reference matter.</li>
-</ul>
-<h3 id="documentation-index-maintenance">Documentation index maintenance<a class="headerlink" href="#documentation-index-maintenance" title="Permanent link">&para;</a></h3>
-<p>This plan is registered in <code>docs/plans/index.md</code> (one row, in the
-<em>Master plans</em> table) and in <code>docs/plans/order.yml</code>. Phase files
-are linked from the Execution table above and appear in neither,
-which is what <code>tools/check-plan-status.py</code> enforces.</p>
-<!-- shared-block: plan-closeout-sections v1 -->
-<p>Plan close-out sections (shared block; do not edit -- the
-canonical copy lives in shakenfist/development at
-<code>templates/shared-blocks/plan-closeout-sections.md</code>):</p>
-<h3 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h3>
-<p>We should list obvious extensions, known issues, unrelated bugs we
-encountered, and anything else we should one day do but have
-chosen to defer to here, so that we do not forget them.</p>
-<ul>
-<li>
-<p><strong>Re-derive the load budget once the change-triggered publish has
-  run for a measurement window.</strong> Phase 3 marks the
-  <code>(operation, caller_daemon)</code> pairs on the metrics publish path
-  <code>activity_coupled</code>, which switches their enforcement off
-  (<code>shakenfist/deploy/shakenfist_ci/load_budget.py:443-450</code>),
-  because the publish rate is now coupled to instance churn and the
-  existing fit was made against a fixed 60 s cadence. That is the
-  honest declaration and it costs regression detection on the two
-  of the four pairs which had it before -- <code>GetQueueLength</code> and
-  <code>GetNodeByFqdn</code>; the other two are new entries which were
-  unbudgeted rather than enforced. Running
-  <code>tools/derive-database-load-budget.py</code> over a window that
-  includes the new behaviour would give those pairs fitted
-  activity-coupled rates again. It needs the change running on
-  <code>sfcbr</code> for days, so it could not be part of phase 3. The marks
-  survive re-derivation
-  (<code>tools/derive-database-load-budget.py:476</code>), so this is an
-  addition rather than a repair. Tracked as
-  <a href="https://github.com/shakenfist/shakenfist/issues/4197">#4197</a>.
-  Found at phase 3's planning survey; see D23 there, and phase 3's
-  Outcome for the pre-change figure the re-derivation has to be
-  compared against.</p>
-</li>
-<li>
-<p><strong>Make the metrics-drop test's rise attributable to its own
-  instance.</strong>
-  <code>test_cluster_resources_measured_drops_after_delete</code>
-  (<code>cluster_ci_tests/test_nodes.py</code>) waits for a node's
-  <code>cpu_measured</code> to rise before it takes the baseline it later
-  asserts a drop against, but the rise predicate is a threshold on
-  a shared node: in two of the three topologies read at phase 3's
-  closeout it was already satisfied 0.34 s and 1.05 s after the
-  domain started, which is sooner than any publish carrying that
-  domain could arrive. The baseline can therefore include a vCPU
-  the test did not create, and the drop can be satisfied by a
-  sibling's instance going away. This is a false pass and not a
-  false failure, so it does not destabilise CI. No <code>node_metrics</code>
-  timestamp is published over REST, so the cheap fix is to ignore
-  any rise read before a full 5 s domain-poll interval has elapsed
-  since the create. Found at phase 3's closeout; see that phase's
-  Outcome.</p>
-</li>
-<li>
-<p><strong>Make <code>get_all_domains()</code> one libvirt call.</strong>
-  <code>LibvirtConnection.get_all_domains()</code>
-  (<code>shakenfist/util/libvirt.py:192</code>) is <code>listDomainsID()</code> followed
-  by a <code>lookupByID()</code> and a <code>name()</code> per domain, where
-  <code>listAllDomains(VIR_CONNECT_LIST_DOMAINS_ACTIVE)</code> would return
-  the objects in one round trip. It has three callers
-  (<code>daemons/cleaner/scheduled_tasks.py:222</code>,
-  <code>daemons/resources/main.py:401</code>, <code>util/libvirt.py:183</code>), so it is
-  a small change with a blast radius rather than a free one, and
-  phase 3 deliberately added a separate id-only helper instead of
-  reworking it. Found at phase 3's planning survey; see D22 there.</p>
-</li>
-<li>
-<p><strong>Stop re-scheduling an already-charged placement.</strong>
-  <code>NodeInstNetdescOp._instance_preflight()</code>
-  (<code>shakenfist/operations/node_inst_netdesc_op.py:156-162</code>)
-  constructs a fresh <code>Scheduler</code> -- a full <code>refresh_metrics()</code>,
-  one <code>get_node_metrics</code> RPC per node -- and re-runs
-  <code>find_candidates(inst, candidates=[config.NODE_UUID])</code> for an
-  instance the API already admitted on this node. The ledger term
-  cannot refuse it (the self-charge is subtracted), but the
-  60-second-old <code>measured_cpus</code> can, and when it does the op
-  redirects to another node and re-enqueues the artifact fetches.
-  Replacing that with "is my placement still recorded here and is
-  the node healthy" removes a distinct CI failure family (<code>Too
-  many start attempts</code>) and halves per-create scheduler load. Not
-  a 507 cause, so not in this plan.</p>
-</li>
-<li><strong>Suite concurrency denominated in ledger.</strong> The sizing plan's
-  Future work already records this; phase 2's wait summary is the
-  measurement that would justify it.</li>
-<li><strong>The queue-depth stage.</strong> <code>_has_reasonable_queue_state</code>
-  refuses any node with more than twenty waiting jobs. Under
-  suite concurrency queue depth is exactly what spikes; it did not
-  fire in the runs read here but it is untracked and worth a
-  census line.</li>
-<li><strong>An absent waits file reads as "unknown", not as zero.</strong> The
-  phase 2 wrapper creates
-  <code>/srv/ci/traces/instance-waits.jsonl</code> on its first write, so a run
-  which was refused nothing leaves no file, and
-  <code>tools/ci_headroom_report.py --waits</code> declines to call that zero
-  waits -- correctly, since it is also what a component ref predating
-  the wrapper and a run whose writes all failed look like. Phase 5
-  harvests over many bundles and cannot tell the three apart. Writing
-  an empty file once at suite start-up would make "empty" mean zero
-  and leave "absent" meaning the other two. Found at phase 2's
-  closeout; see that phase's Outcome.</li>
-<li><strong>Every refused create is a full create-and-delete.</strong>
-  <code>enqueue_delete_due_error</code> at the 507 site means each refusal
-  costs an object, IPAM allocations, an event trail and a delete
-  op, at the moment the cluster is busiest. Phase 5's queue, if it
-  is built, removes this; if it is not, the cost stands and should
-  be measured. Phase 4's client review found the sharper version of
-  it: because the client replays a marked request byte for byte,
-  every replay pays that cost again, and an <code>ASYNC_BLOCK</code> caller
-  with no timeout of its own had an hour of budget against a fixed
-  fifteen second hint. The client now caps replays at
-  <code>TRANSIENT_RETRY_MAXIMUM_ATTEMPTS = 5</code> for that reason, which
-  bounds the damage without removing it.</li>
-<li><strong>The transient marker is a promise the server has not written
-  anything.</strong> A client which replays a request byte for byte can
-  only do so safely if the refusal committed no part of it. The
-  create path is the marked endpoint today and it does commit --
-  see the bullet above -- so the promise currently rests on the
-  delete that follows the refusal. The obligation matters most for
-  the <em>second</em> endpoint anyone marks: <code>send_upload()</code>'s natural
-  refusal is also a <code>507</code>, and marking it transient without
-  thinking about partial writes would be a data bug rather than a
-  latency bug. Recorded in client-python's <code>AGENTS.md</code> and its
-  retry documentation. Found at phase 4's client review.</li>
-<li><strong>Split claim denials out of the transient marker.</strong> Phase 4
-  publishes <code>capacity_guard</code> as transient, which is honest only
-  while <code>mariadb.CLAIM_ENFORCEMENT_HARD</code> is <code>False</code> and a namespace
-  claim therefore cannot refuse a placement at all. When
-  PLAN-scheduler-reservations phase 5 flips that constant, a claim
-  denial becomes namespace quota exhaustion -- not something
-  fifteen seconds fixes -- and it must stop inheriting
-  <code>capacity_guard</code>'s classification. The constraint is recorded at
-  <code>TRANSIENT_CAPACITY_STAGES</code> in <code>shakenfist/external_api/base.py</code>,
-  where the person making that change will be reading. Found at
-  phase 4's review; see D35 there.</li>
-<li><strong>Name the minimum client version, and retire two workarounds
-  with it.</strong> <code>APIException.headers</code> is unreleased: the latest
-  <code>shakenfist-client</code> release is v0.8.3 and no tag contains commit
-  <code>80019a0</code>. Until one does, <code>assertRefusedAtStage()</code> asserts the
-  <code>Retry-After</code> header only when the exception exposes one, and
-  <code>docs/operator_guide/capacity_refusals.md</code> warns operators that
-  the <code>retry_transient_capacity</code> flag it documents is in no client
-  they can install. Both are one edit each once a release exists.</li>
-<li><strong>A transient marker for address-pool exhaustion.</strong> The two
-  <code>CongestedNetwork</code> <code>507</code>s are left bare by phase 4's D29. They
-  probably do deserve a marker, with a horizon derived from the
-  deletion halo rather than from <code>defer()</code>'s default, and the
-  deletion halo is a much longer and differently-shaped wait. Needs
-  its own evidence about how long the halo actually holds an
-  address in practice, which is why phase 4 declined to guess.</li>
-</ul>
-<h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>This section should list any bugs we encounter during development
-that we fixed. You should also scan the project's issue tracker,
-where one exists, for directly related issues that we should
-either resolve as part of this master plan or at least be aware of
-while planning it.</p>
-<ul>
-<li><strong>#3772</strong> (open, umbrella) -- the refusal this plan is about.
-  Stays open until phase 6 has the before-and-after numbers.</li>
-<li><strong>#4087</strong> (open; #4106 attempted it and did not close it) -- the
-  warm-up window. Phase 1 fixes it, comments with what #4106 did and
-  did not cover, and closes it.</li>
-<li><strong>#3498, #3602, #3670, #3728, #3749, #3767</strong> (closed into #3772)
-  -- the per-test victims. Do not file another; the umbrella exists
-  because per-test tracking stopped paying for itself.</li>
-<li><strong>#3907, #3565</strong> (closed test-side) -- precedents for tolerating
-  a transient refusal in the suite; phase 2 generalises what they
-  did once.</li>
-<li><strong>#3975, #4028</strong> (closed) -- the headroom probe failing the
-  load-budget check. The obligation they left is why phase 2 and
-  phase 3 each carry a budget declaration.</li>
-<li><strong>#1364</strong> (open) -- lame-duck and evacuate. Where node-scoped
-  reservations would earn their place; see open question 5.</li>
-</ul>
-<h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
-<p>Before executing any step of this plan, please back brief the
-operator as to your understanding of the plan and how the work you
-intend to do aligns with that plan.</p>
-<!-- shared-block-end -->
+<p>5b gates 5c, which gates 5d, which gates 5e. 5b is expected to be
+re-run over weeks, and to report "not yet" most times.</p>
+<h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+<th>Who checks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The reshape is never applied, and this phase blocks the plan indefinitely.</td>
+<td>5b reports "not yet" cheaply and repeatedly rather than silently stalling, and this plan names the single pull request that unblocks it (the sizing plan's <em>Prepared changes</em>). If the operator decides not to reshape, that is a different input and D36's gate condition 3 catches it: the phase would then read the current cloud and say so.</td>
+<td>The operator, at 5b.</td>
+</tr>
+<tr>
+<td>The rule is applied loosely once real numbers are in front of a reader.</td>
+<td>D37 fixes the thresholds before the data exists, and 5d is instructed to apply them even over its own objection, recording the objection rather than acting on it. The step split puts gathering (5c, sonnet, no interpretation) and deciding (5d, opus, no re-derivation) in different agents.</td>
+<td>5d's report, read against D37.</td>
+</tr>
+<tr>
+<td>The window is dominated by runs with no trace, and the quiet result is an artefact of collection rather than of capacity.</td>
+<td>F6: the tool reports absent, empty and unparseable as <em>unknown</em>, never zero. D37 excludes them from the denominator and aborts the reading if they exceed a quarter of runs. Phase 2's closeout already saw this: both <code>slim-primary</code> bundles in its two runs had no waits file at all.</td>
+<td>5c records the unknown count; 5d reports it.</td>
+</tr>
+<tr>
+<td>Abandon is later read as "a placement queue is unnecessary" rather than "CI did not need one".</td>
+<td>D40 requires the three evidence limits in the Outcome, and 5e's brief names them.</td>
+<td>5e, and the phase 6 documentation sweep which reads this.</td>
+</tr>
+<tr>
+<td>A Build outcome is costed as a <code>defer_with_backoff()</code> call and turns out to be an IPAM re-ordering.</td>
+<td>D39 states the real first step and the reason (F3, F4), before the choice is made rather than after.</td>
+<td>5d's cost framing; 5e's statement of what the design phase covers.</td>
+</tr>
+<tr>
+<td>The reshape removes the refusals entirely, and phase 6 then has nothing to document about a transient contract that no longer fires in CI.</td>
+<td>That is a good outcome, not a risk to this phase, but it is a real input to phase 6 and to the #3772 comment phase 6 owes. Recorded here so phase 6 inherits it rather than rediscovering it.</td>
+<td>5e, in <em>What phase 6 inherits</em>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
+<p>Each item is checked by running it, not by reading it. Three of phase
+4's items were wrong and executing them is what found that, the second
+phase in a row -- and two of the items below were wrong when first
+written here, found the same way while this plan was being verified:
+item 1 was falsified by this plan's own correction text repeating the
+name it was checking for, and item 2 by the sentence it greps for
+being line-wrapped.</p>
+<ol>
+<li><code>grep -n '_await_instance_create\|900 s ceiling' docs/plans/PLAN-transient-capacity-refusals.md</code>
+   returns nothing.</li>
+<li>The master plan says <code>await_instance_create()</code>'s ceiling is 600 s.
+   Checked with whitespace flattened, because the sentence wraps and a
+   line-oriented grep returns a misleading nothing -- the same trap
+   phase 4's item 13 hit:
+   <code>tr '\n' ' ' &lt; docs/plans/PLAN-transient-capacity-refusals.md | tr -s ' ' | grep -c 'default ceiling is \*\*600 s\*\*'</code>
+   returns 1. The <code>tr -s ' '</code> is not optional: flattening newlines
+   alone leaves the markdown indent as a run of spaces and the match
+   fails.</li>
+<li>Open question 8 names <code>defer_with_backoff()</code>'s 105 s budget, and
+   <code>grep -c '105'</code> over that section is at least 1.</li>
+<li>Open question 8 names four <code>507</code> branches, not two:
+   <code>awk '/^### 8\./,/^### 9\./' docs/plans/PLAN-transient-capacity-refusals.md | grep -c 'has \*\*four\*\*</code>507<code>branches'</code>
+   returns 1.</li>
+<li>Open question 8's answer is no longer "Decide in phase 5" -- it
+   states the decision and links to this plan.</li>
+<li>This plan's Outcome contains a per-run table whose row count equals
+   the qualifying-run count 5c reported, and the unknown count is
+   stated as a number rather than omitted.</li>
+<li>For each of D37's three clauses, the Outcome shows the arithmetic
+   that selected or rejected it.</li>
+<li>The Outcome states the pinned-versus-unpinned split among waits
+   longer than 210 s, even if that split is "no wait exceeded 210 s".</li>
+<li>The Outcome contains all three of D40's evidence limits, findable
+   by grep for <code>CI-only</code>, <code>post-reshape</code> and <code>retry</code> in that section.</li>
+<li>The master plan's Execution table row for phase 5 reads exactly
+    one of <code>Abandoned</code> or <code>Complete</code>, and the <code>docs/plans/index.md</code>
+    row's phase arithmetic agrees.</li>
+<li>On a Build outcome only:
+    <code>grep -n 'D8' docs/plans/PLAN-scheduler-reservations-phase-00-decisions.md</code>
+    shows an amendment recording the reversal, and D8's original text
+    is unchanged.</li>
+<li><code>python3 tools/check-plan-status.py</code> passes.</li>
+<li><code>pre-commit run --all-files</code> passes.</li>
+</ol>
+<h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
+<p><strong>Gate before 5c.</strong> Do not begin gathering until 5b has confirmed all
+three of D36's conditions. Reading the pre-reshape cloud would produce
+a number that looks like an answer and is not one.</p>
+<p><strong>Gate before 5e on a Build outcome.</strong> Reversing a project-level
+decision from another plan is the expensive-to-undo kind of change, and
+D38 argues against it at length. If 5d selects Build, stop and get
+agreement before 5e writes the reversal into
+<code>PLAN-scheduler-reservations-phase-00-decisions.md</code>. An Abandon needs
+no such gate; it is the direction the project is already pointed.</p>
+<p><strong>No design.</strong> D42. If the temptation arises during 5e to sketch the
+state machine "while it is fresh", it is out of scope and belongs to
+the design phase this one would create.</p>
+<p><strong>Invariants a step here must not violate</strong>, from the master plan's
+step-level guidance: placement transactions open with a guarded
+<code>UPDATE</code>; attribute writes carry a field mask; new polling is declared
+in <code>database_load_budget.yaml</code> or <code>HARNESS_DRIVEN_PAIRS</code>; the
+reconcile pass stays behind <code>cluster_stable()</code>; the <code>409</code> affinity
+refusal is never retried. No step in this phase touches any of them --
+the phase edits plan documents only -- and that is itself worth
+stating so a sub-agent does not improve one in passing.</p>
 
 
 
@@ -15502,7 +14730,7 @@ intend to do aligns with that plan.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-transient-capacity-refusals.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-transient-capacity-refusals.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-transient-capacity-refusals/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-transient-capacity-refusals-phase-05-queue-decision.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-transient-capacity-refusals-phase-05-queue-decision.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-transient-capacity-refusals-phase-05-queue-decision/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>
