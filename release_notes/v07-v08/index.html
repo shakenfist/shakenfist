@@ -15044,6 +15044,21 @@
   named.</li>
 </ul>
 </li>
+<li>You can now reserve a specific address in a network with
+  <code>POST /networks/...networkref.../addresses/...address...</code>, and release it
+  again with the matching <code>DELETE</code>. A reservation takes the address out of
+  the pool and does nothing else -- no interface, no DHCP entry, no routing --
+  so that an address something outside Shaken Fist owns, such as a keepalived
+  VIP inside a guest, is never allocated to an interface. Reserving an address
+  which is already in use answers <code>409</code>, and only reservations made this way
+  can be released this way: releasing a gateway or an instance's address
+  answers <code>403</code>. Clusters supporting this advertise the <code>reserve-addresses</code>
+  capability in the <code>networks</code> family. An optional <code>comment</code> of up to 255
+  characters records what the address is being held for. Reservations work in
+  the floating network as well as in a virtual network, which is how a
+  floating address is held for a device Shaken Fist does not manage; the
+  floating IP reaper will not release one. See the
+  <a href="/operator_guide/networking/overview/">networking operator guide</a>.</li>
 </ul>
 <h2 id="supported-distributions">Supported distributions<a class="headerlink" href="#supported-distributions" title="Permanent link">&para;</a></h2>
 <ul>
@@ -15270,6 +15285,19 @@ own is refreshed exactly as it always was.</p>
   normal schema migration path, so <code>sf-ctl ensure-mariadb-schema</code> or a routine
   upgrade will add them; there is no manual step. The two abuse resistance
   tables are swept by the cluster daemon and need no operator attention.</li>
+<li>Manual address reservations add a <code>manual</code> value to the
+  <code>ipam_reservations.reservation_type</code> ENUM. A MariaDB ENUM's permitted
+  values are frozen at <code>CREATE TABLE</code> time, so an existing database rejects
+  the new value with error 1265 ("Data truncated for column ...") until the
+  column is widened. <code>sf-ctl ensure-mariadb-schema</code> widens it, along with
+  every other native ENUM column whose Python enum has grown. <strong>Run
+  <code>sf-ctl ensure-mariadb-schema</code> before rolling the daemons, even though no
+  table version changed in this release.</strong> Enum growth deliberately does not
+  move a table version -- widening is reconciled from the Python enums on
+  every <code>ensure-mariadb-schema</code> run rather than needing a hand written
+  migration -- which also means <code>sf-database</code> will start happily against a
+  database which has not been reconciled, and every reservation attempt will
+  fail at runtime instead.</li>
 </ul>
 <h2 id="bring-your-own-mariadb">Bring your own MariaDB<a class="headerlink" href="#bring-your-own-mariadb" title="Permanent link">&para;</a></h2>
 <p>Earlier in the v0.8 cycle the Shaken Fist deployer installed and

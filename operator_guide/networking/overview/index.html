@@ -13831,6 +13831,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#reserved-addresses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reserved addresses
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#interface-naming-conventions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14150,6 +14161,17 @@
     <span class="md-ellipsis">
       
         Routed IPs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reserved-addresses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reserved addresses
       
     </span>
   </a>
@@ -14609,6 +14631,44 @@ the root namespace and the one inside the network's namespace. An address
 missing either is re-routed, which installs both, so a network which is
 otherwise healthy is not dragged through a rebuild to recover one route.
 Removing a routed IP deletes both routes, and tolerates either being absent.</p>
+<h2 id="reserved-addresses">Reserved addresses<a class="headerlink" href="#reserved-addresses" title="Permanent link">&para;</a></h2>
+<p>Shaken Fist hands out addresses from a network's block at random, and it only
+knows about the addresses it allocated itself. An address a guest configures
+without asking -- a keepalived or VRRP virtual IP shared between instances, a
+load balancer address written into a deployment's configuration file -- is
+free as far as IPAM is concerned, so sooner or later it will be allocated to
+an interface and two things will answer for it.</p>
+<p>Reserve it instead:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>debian@test:~$<span class="w"> </span>sf-client<span class="w"> </span>network<span class="w"> </span>reserve-address<span class="w"> </span>demo<span class="w"> </span><span class="m">172</span>.16.0.3<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">                   </span>--comment<span class="w"> </span><span class="s2">"kolla VIP"</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>debian@test:~$<span class="w"> </span>sf-client<span class="w"> </span>network<span class="w"> </span>addresses<span class="w"> </span>demo
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>address<span class="w">      </span><span class="nb">type</span><span class="w">     </span>user<span class="w">                                          </span>comment
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="m">172</span>.16.0.0<span class="w">   </span>network<span class="w">  </span>network<span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="m">172</span>.16.0.1<span class="w">   </span>gateway<span class="w">  </span>network<span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="m">172</span>.16.0.3<span class="w">   </span>manual<span class="w">   </span>network<span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3<span class="w">  </span>kolla<span class="w"> </span>VIP
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="m">172</span>.16.0.255<span class="w"> </span>broadcast<span class="w"> </span>network<span class="w"> </span>17be6538-8f96-4ccb-b71e-a7e3022fead3
+</code></pre></div>
+<p>A manual reservation takes the address out of the pool and does nothing else:
+no interface is created, dnsmasq is not told about it, and no traffic is
+routed. Shaken Fist is recording that something it does not manage owns the
+address, so that nothing else is given it. It is therefore also the one
+reservation type nothing releases implicitly -- an instance's address returns
+to the pool when the instance goes away, but a manual reservation is held
+until it is released:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>debian@test:~$<span class="w"> </span>sf-client<span class="w"> </span>network<span class="w"> </span>release-address<span class="w"> </span>demo<span class="w"> </span><span class="m">172</span>.16.0.3
+</code></pre></div>
+<p>Released addresses go to the deletion halo like any other, so the address is
+not immediately re-allocatable. A reservation for an address which is already
+in use is refused rather than taking it over, and only a manual reservation
+can be released this way -- asking to release a gateway or an instance's
+address is refused, because handing that address out again while it is still
+in use is exactly the collision this exists to prevent.</p>
+<p>An administrator can reserve in the floating network too, which is how you
+hold a floating address for a device Shaken Fist does not manage -- a hardware
+load balancer, or a router's virtual IP. The floating IP reaper releases
+floating addresses whose owner has gone away, and a manual reservation has no
+owner in the cluster by definition, so it is protected there explicitly:
+nothing but an explicit release will free it.</p>
 <h2 id="interface-naming-conventions">Interface naming conventions<a class="headerlink" href="#interface-naming-conventions" title="Permanent link">&para;</a></h2>
 <p>The interface names in the examples above are a contract, not a
 coincidence: the privexec daemon derives them independently when adding
@@ -14740,7 +14800,7 @@ never-ending <code>Extra vxlan present!</code> warning was, in effect, the
 standing notification that this residue existed; now the single audit
 event is the only record, so if you see a <code>reaped stray vxlan</code> event on
 your network node, check for a leftover namespace:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>sudo<span class="w"> </span>ip<span class="w"> </span>netns<span class="w"> </span>list
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>sudo<span class="w"> </span>ip<span class="w"> </span>netns<span class="w"> </span>list
 </code></pre></div>
 <p>Namespaces are named with the virtual network's UUID, so any name which
 does not correspond to a network in <code>sf-client network list</code> is residue
@@ -14956,8 +15016,8 @@ It also checks whether each rung of the back-off ladder was actually
 honoured, and reports whether any part of the window it read hit
 Loki's 5000 line query ceiling, since a truncated window otherwise
 looks exactly like a complete one:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>tools/operation-timeline.py --tenant sfcbr \
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>    --start 2026-08-29T00:00:00Z --end 2026-08-30T00:00:00Z
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>tools/operation-timeline.py --tenant sfcbr \
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>    --start 2026-08-29T00:00:00Z --end 2026-08-30T00:00:00Z
 </code></pre></div>
 
 
