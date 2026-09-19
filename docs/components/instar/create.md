@@ -158,8 +158,14 @@ Accepted but no size effect:
 Rejected (future work):
 - `backing_file`, `backing_fmt` — a VHDX child with a parent needs
   the `HasParent` file-parameter bit and a populated parent locator
-  metadata item, which `plan_vhdx` refuses with
-  `BackingFileUnsupported`. See [Future work](#future-work).
+  metadata item, which the create operation refuses with
+  `BackingFileUnsupported`. The refusal is in the operation rather
+  than in the planner, exactly as for vpc above: instar can now build
+  the metadata for a differencing VHDX, but it cannot yet read the
+  parent's active-header `DataWriteGuid` off the parent, and a child
+  recording the wrong parent identity is worse than no child at all.
+  See [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) and
+  [Future work](#future-work).
 
 ### raw
 

@@ -429,15 +429,17 @@ negative identity test must be built against a **third-party**
 parent either way, because an instar-created parent cannot fail
 it.
 
-Phase 8 carries one debt from phase 5, recorded here because the
-phase 5 plan is not where phase 8's planner will look. `create -f
-vpc -b` is still refused at the guest by an explicit guard that
-phase 7 removes, and that refusal has **no committed test**:
-the guard is in the guest binary and `crates/create`'s harness
-cannot reach it. Phase 5 verified it by hand against a built
-binary. Phase 8's brief must add the integration test that pins
-it, and phase 7's must not remove the guard without noticing that
-nothing would fail if it did.
+Phase 8 carried one debt from phase 5, **now discharged** and
+recorded here because the phase 5 plan is not where phase 8's
+planner will look. `create -f vpc -b` is still refused at the guest
+by an explicit guard that phase 7 removes, and that refusal had no
+committed test: the guard is in the guest binary and
+`crates/create`'s harness cannot reach it, so phase 5 verified it
+by hand against a built binary. Phase 6's review round added
+`test_create_vhd_and_vhdx_reject_backing` to `tests/test_create.py`,
+covering vpc and vhdx together, so phase 8's brief no longer needs
+to and phase 7 gets a failing test if it removes either guard too
+early.
 
 Phases 8 and 15 both build fixtures with partially populated
 blocks, and both must account for a libvhdi defect step 1a found
@@ -541,13 +543,23 @@ Phase 5 added an explicit backing refusal to the create
 operation's `ImageFormat::Vhd` arm and phase 6 adds the matching
 one for `ImageFormat::Vhdx`, because each emitter became able to
 write a child whose parent identity is all zeros before the guest
-could read a real one. Neither guard has a committed test -- both
-live in the guest binary, which `crates/create`'s harness cannot
-reach -- so phase 7 must not rely on a failing test to notice if
-it removes one too early. Issue #570 (POSIX paths emitted under
-Windows-only platform codes and the `absolute_win32_path` key)
-must be settled before either guard comes off, since removing
-them is what first exposes that choice to a user.
+could read a real one. Both guards are covered by
+`test_create_vhd_and_vhdx_reject_backing` in `tests/test_create.py`,
+added during phase 6's review round: it asserts each format refuses
+`-b` with "invalid option for target format" and writes no child
+file. So phase 7 *will* get a failing test if it removes a guard too
+early -- which was not true when this paragraph was first written.
+Issue #570 (POSIX paths emitted under Windows-only platform codes
+and the `absolute_win32_path` key) must be settled before either
+guard comes off, since removing them is what first exposes that
+choice to a user. Phase 6's review raised one more decision for the
+same moment: neither `plan_vhd` nor `plan_vhdx` validates
+`backing.format`, so a direct crate caller can ask for a
+differencing VHDX naming a qcow2 parent and get a well-formed image
+no consumer can compose. The guards make that unreachable today;
+lifting them is what makes the hint reachable, so phase 7 should
+either refuse a mismatched hint or state in the planner's contract
+that format compatibility is the caller's business.
 
 ### Constraints that apply throughout
 
