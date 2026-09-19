@@ -14809,6 +14809,14 @@ capacity row's own <code>limit_cpus</code> as <code>cpu_limit</code>, so a reade
 it against the live-derived <code>cpu_hard_max</code> and see the two ledgers
 disagree; a node with no capacity row reports <code>cpu_limit</code> as <code>None</code>
 rather than falling back to <code>cpu_hard_max</code>.</p>
+<p>The disk dimension of the same row is published as <code>disk_limit_gb</code> and
+<code>disk_committed_gb</code>, beside the measurement-derived <code>disk_available</code>.
+The distinction matters because <code>disk_available</code> is headroom -- it moves
+whenever a sibling creates or deletes an instance -- where the ledger's
+ceiling is stable under load, so it is the figure to reason about "what
+could this node ever accept?" against (issue 4208). The same
+conventions apply: <code>cpu_committed_row_present</code> speaks for the whole row,
+and an absent row reports <code>disk_limit_gb</code> as <code>None</code> with no fallback.</p>
 <p>Those per-node fields cannot, on their own, tell you <em>why</em> a node is
 uncounted. An empty read of the capacity table looks identical whether
 the table is genuinely unpopulated -- a cluster the reconciler has not
@@ -15255,7 +15263,9 @@ tells the whole story:</p>
 <code>cpu_schedulable</code>, <code>memory_reserved_mb</code>, <code>cpu_available</code> and RAM
 headroom using the same pre-filter arithmetic as the pipeline above.
 It also breaks the CPU decision out into <code>cpu_hard_max</code>,
-<code>cpu_measured</code>, <code>cpu_committed</code> and <code>cpu_limit</code> -- see <a href="#admission-is-a-guarded-capacity-claim">Admission is a
+<code>cpu_measured</code>, <code>cpu_committed</code> and <code>cpu_limit</code>, and publishes the
+capacity row's disk counters as <code>disk_limit_gb</code> and <code>disk_committed_gb</code>
+beside the headroom-only <code>disk_available</code> -- see <a href="#admission-is-a-guarded-capacity-claim">Admission is a
 guarded capacity claim</a> for what
 <code>cpu_committed</code> and its <code>cpu_committed_row_present</code> companion actually
 mean.</p>

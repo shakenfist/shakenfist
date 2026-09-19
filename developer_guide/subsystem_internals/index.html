@@ -14201,6 +14201,13 @@ is <code>None</code> exactly when there is no row to disagree with. Both inputs 
 the charge are published (<code>cpu_measured</code>, <code>cpu_committed</code>, and
 <code>cpu_committed_row_present</code> to say whether a zero means "unsized" or
 "idle"), so which of the two binds is answerable from the response.
+The row's disk counters are published under the same conventions, as
+<code>disk_limit_gb</code> and <code>disk_committed_gb</code> (issue 4208): <code>disk_available</code>
+alone is headroom, which moves under load, so without the ledger's
+ceiling nothing in the response bounded what a node could ever accept
+on disk -- the gap that kept the CI saturation suite's disk case from
+being load-proof. The disk pre-filter still reads only live metrics,
+so publishing the counters moved nothing about admission.
 The reconciler maintains the
 <code>scheduler_node_capacity</code>, <code>namespace_claims</code> and <code>cluster_capacity</code>
 tables from the elected cluster node every five minutes. Rows exist
