@@ -64,6 +64,13 @@ them and was stored. They are value tests now, which is why
 ``video.model.null`` and ``video.memory.null`` are refused in every
 column.
 
+Six more rows moved at ``warn`` after the phase, when the issue #4223
+fix taught ``from_db_by_ref`` to answer "not found" for a null or
+non-string ref: the ``net.uuid``/``hotplug.uuid`` ``int``, ``dict``
+and ``bool`` arms answer the handler's own 404 where
+``util_general.valid_uuid4`` used to fault. That guard lives in the
+lookup layer, so no validation-mode rollback restores the 500.
+
 Mutation coverage lives in ``tools/mutate-nested-sweep.sh``, which
 breaks each schema and each guard on purpose and names the row which
 must fail. Reading a guard cannot distinguish "this holds" from "this
@@ -107,7 +114,10 @@ ACCEPTED_ON_HOTPLUG = Answer(200, False, None)
 #: handler could not cope with: a bare ``server error``, an exception
 #: record under /srv/shakenfist/exceptions/, and nothing naming the key
 #: which caused it. Eleven rows of finding F5 answered this before the
-#: phase, and the warn column is where they still do.
+#: phase, and the warn column is where most still do -- the six
+#: non-string network_uuid rows answer a 404 there since the issue
+#: #4223 fix, whose guard sits in from_db_by_ref below the validation
+#: layer.
 FAULTED = Answer(500, True, 'server error')
 
 
@@ -393,18 +403,23 @@ CASES = [
     # ---------------------------------------------------------------
     Case('net.uuid.int', CREATE, 'networkspec', 'network_uuid',
          {'network': [{'network_uuid': 5}]},
-         refused('network[0].network_uuid: Not a valid string.'), FAULTED,
-         "F5 row 3: AttributeError: 'int' object has no attribute 'replace' "
-         'in util_network.valid_uuid4. Item 3 of issue #4167, as filed, '
-         'eleven months on'),
+         refused('network[0].network_uuid: Not a valid string.'),
+         refused('network 5 not found', status=404),
+         "F5 row 3, moves at warn: this was AttributeError: 'int' object "
+         "has no attribute 'replace' in util_general.valid_uuid4 (item 3 "
+         'of issue #4167). The issue #4223 fix made from_db_by_ref answer '
+         '"not found" for any non-string ref, and that guard is below the '
+         'validation layer, so a rollback keeps it'),
     Case('net.uuid.dict', CREATE, 'networkspec', 'network_uuid',
          {'network': [{'network_uuid': {'a': 1}}]},
-         refused('network[0].network_uuid: Not a valid string.'), FAULTED,
-         'F5 row 3, the dict arm'),
+         refused('network[0].network_uuid: Not a valid string.'),
+         refused("network {'a': 1} not found", status=404),
+         'F5 row 3, the dict arm, moves at warn (issue #4223)'),
     Case('net.uuid.bool', CREATE, 'networkspec', 'network_uuid',
          {'network': [{'network_uuid': True}]},
-         refused('network[0].network_uuid: Not a valid string.'), FAULTED,
-         'F5 row 3, the bool arm'),
+         refused('network[0].network_uuid: Not a valid string.'),
+         refused('network True not found', status=404),
+         'F5 row 3, the bool arm, moves at warn (issue #4223)'),
     Case('net.uuid.null', CREATE, 'networkspec', 'network_uuid',
          {'network': [{'network_uuid': None}]},
          refused('network[0].network_uuid: Missing data for required '
@@ -574,18 +589,23 @@ CASES = [
     # ---------------------------------------------------------------
     Case('hotplug.uuid.int', HOTPLUG, 'networkspec', 'network_uuid',
          {'network': {'network_uuid': 5}},
-         refused('network.network_uuid: Not a valid string.'), FAULTED,
+         refused('network.network_uuid: Not a valid string.'),
+         refused('network 5 not found', status=404),
          'F5 row 3 on the hotplug route: same guard, same construction, same '
          'answer, and the finding names network.network_uuid rather than '
-         'network[0].network_uuid because here the netdesc is the parameter'),
+         'network[0].network_uuid because here the netdesc is the parameter. '
+         'Moves at warn (issue #4223): the from_db_by_ref non-string guard '
+         'answers "not found" where valid_uuid4 used to fault'),
     Case('hotplug.uuid.dict', HOTPLUG, 'networkspec', 'network_uuid',
          {'network': {'network_uuid': {'a': 1}}},
-         refused('network.network_uuid: Not a valid string.'), FAULTED,
-         'F5 row 3, the dict arm'),
+         refused('network.network_uuid: Not a valid string.'),
+         refused("network {'a': 1} not found", status=404),
+         'F5 row 3, the dict arm, moves at warn (issue #4223)'),
     Case('hotplug.uuid.bool', HOTPLUG, 'networkspec', 'network_uuid',
          {'network': {'network_uuid': True}},
-         refused('network.network_uuid: Not a valid string.'), FAULTED,
-         'F5 row 3, the bool arm'),
+         refused('network.network_uuid: Not a valid string.'),
+         refused('network True not found', status=404),
+         'F5 row 3, the bool arm, moves at warn (issue #4223)'),
     Case('hotplug.uuid.null', HOTPLUG, 'networkspec', 'network_uuid',
          {'network': {'network_uuid': None}},
          refused('network.network_uuid: Missing data for required field.'),

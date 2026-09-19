@@ -248,8 +248,16 @@ class Artifact(dbowo):
         UUID lookups short-circuit to from_db. Name lookups push
         state + namespace + name down to a single indexed SQL
         query via mariadb.find_artifacts.
+
+        A null or otherwise non-string ref answers "not found" here:
+        handed to ObjectFilterCriteria as a name, None would read as
+        *no name filter* and resolve to an arbitrary active artifact in
+        the namespace (issue 4223).
         """
-        if object_ref and util_general.valid_uuid4(object_ref):
+        if not baseobject.valid_object_ref(object_ref):
+            return None
+
+        if util_general.valid_uuid4(object_ref):
             return cls.from_db(object_ref)
 
         # namespace='system' or namespace=None means "look across

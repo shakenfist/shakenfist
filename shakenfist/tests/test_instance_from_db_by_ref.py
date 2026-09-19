@@ -170,3 +170,19 @@ class InstanceFromDbByRefTestCase(base.ShakenFistTestCase):
         msg = str(ctx.exception)
         self.assertIn('foo', msg)
         self.assertIn('tenant-a', msg)
+
+    # ------------------------------------------------------------------
+    # Test 8: A null or non-string ref answers "not found" (issue 4223)
+    # ------------------------------------------------------------------
+
+    @mock.patch('shakenfist.instance.mariadb.find_instances')
+    @mock.patch.object(Instance, 'from_db')
+    def test_null_or_non_string_ref_returns_none(
+            self, mock_from_db, mock_find_instances):
+        """A null ref must never widen into "no name filter" (issue 4223)."""
+        for object_ref in (None, '', False, 0, uuid.uuid4()):
+            result = Instance.from_db_by_ref(object_ref, namespace='tenant-a')
+            self.assertIsNone(result)
+
+        mock_from_db.assert_not_called()
+        mock_find_instances.assert_not_called()
