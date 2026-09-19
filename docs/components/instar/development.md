@@ -112,6 +112,22 @@ To move the pin, change `DEBIAN_SNAPSHOT` only. Do not change
 `FROM debian:bullseye`, and do not "fix" a future apt failure by
 pointing back at `deb.debian.org`.
 
+**Both devcontainer images set `Acquire::Retries "3"`.** Pinning to a
+snapshot removed the 404 failure mode and left the transport one, and
+if anything raised it: `snapshot.debian.org` is a single origin behind
+a CDN, not the `deb.debian.org` mirror network. A fetch failure here is
+not an ordinary build failure — the release image is only built in the
+merge queue for a docs-only change, so there is no pull-request run to
+catch it, and the failure ejects the pull request from the queue
+instead (#531). The occurrence on PR #560 was one object out of 150
+dying with a TCP reset ten seconds in, after 125 MB had come down from
+the same host at 15.3 MB/s, with the next object succeeding. apt
+retries the failed object rather than the transaction, so a retry costs
+nothing on a healthy run and still fails promptly against a genuinely
+missing object. If this class of failure returns despite the retries,
+the next step is a local caching apt proxy or a BuildKit cache mount
+over `/var/cache/apt`, not a longer retry count.
+
 ##### The options that were not taken
 
 No option was free, because "move to the next Debian" is not available:
@@ -505,36 +521,62 @@ See `.github/workflows/` for implementation details.
 ### Self-hosted runners and Docker
 
 Almost every job in this repository runs on the self-hosted runner pool
-(`[self-hosted, debian-12, ...]`), and those runners do **not** ship
+(`[self-hosted, debian-13, ...]`), and those runners do **not** ship
 Docker. Since instar is built and tested inside the devcontainer image,
 any job that runs `docker`, `make instar`, `make test-rust`, `make lint`
-or any other container-backed Makefile target must install it first:
+or any other container-backed Makefile target must install it first. Do
+not paste an apt block into the workflow -- call the shared installer,
+after the checkout step that puts it on disk:
 
 ```yaml
     env:
       DOCKER_BUILDKIT: 1
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
       - name: Install Docker
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker.io
-          sudo systemctl start docker
-          sudo chmod 666 /var/run/docker.sock
+        run: tools/ci/install-docker.sh
 ```
+
+Anything else the job needs from the same apt run is passed as an
+argument, which saves a second `apt-get update`:
+`tools/ci/install-docker.sh qemu-utils`.
 
 Omitting the step does not fail at job start -- it fails part way through
 with `docker: command not found`, whenever the first container command is
 reached.
 
+The installer exists because the apt block it replaced was pasted into
+fourteen steps across six workflows, and the paste is what broke when the
+fleet moved to `debian-13`. On bookworm, `docker.io` shipped one package
+that was client, daemon and builder; on trixie it is the daemon only, and
+the other two live in separate `docker-cli` and `docker-buildx` packages
+that `docker.io` merely *Recommends* -- which the runners do not install.
+Each omission has its own failure, and both arrive seconds after a step
+named "Install Docker" reported success:
+
+- Without `docker-cli` there is no `/usr/bin/docker` at all, and four
+  jobs failed with `docker: not found`.
+- Without `docker-buildx` the client is present but cannot build. Every
+  job here sets `DOCKER_BUILDKIT: 1`, and the docker 26 client
+  implements `docker build` under BuildKit by delegating to the buildx
+  plugin, so the build refuses to run -- "BuildKit is enabled but the
+  buildx component is missing or broken" -- rather than falling back to
+  the legacy builder.
+
+Neither package exists before trixie, so the installer requires a
+`debian-13` runner.
+
 The one exception is `mermaid-lint.yml`, which runs on
-`[self-hosted, vm, debian-12-docker, s]`. That is the fleet image that
+`[self-hosted, vm, debian-13-docker, s]`. That is the fleet image that
 ships `docker.io`, so it needs no install step -- but the label has to be
 listed in `.github/actionlint.yaml` or actionlint rejects the workflow.
 
 ### Self-hosted runners and the GitHub CLI
 
-The same applies to `gh`: the `[self-hosted, debian-12, ...]` runners do
+The same applies to `gh`: the `[self-hosted, debian-13, ...]` runners do
 not ship it either, so any job that files an issue, opens a PR or
 otherwise calls the GitHub CLI must install it first. Do not paste an
 apt block into the workflow -- call the shared installer, which is a
@@ -557,7 +599,7 @@ entirely on `gh api` and `gh pr comment`, so if those runners lacked
 passing on a `static` runner.
 
 So the rule is per runner label, not per workflow: add the installer
-step on `debian-12` (and any new pool that turns out to lack `gh`), and
+step on `debian-13` (and any new pool that turns out to lack `gh`), and
 leave the `claude-code` and `static` jobs alone.
 
 This one bites late rather than early. The `gh` call is usually the last
@@ -790,10 +832,23 @@ ICE'd compiling tokio inside `cargo install cargo-audit` and took out
 CI's "Build devcontainer" step). Renovate cannot bump rustup toolchain
 pins; instead the weekly `rust-nightly-bump` workflow
 (`tools/ci/bump-rust-nightly.sh`) rewrites and test-builds **both**
-images, then instar and the Rust test suite, against the newest
-published nightly and opens a bump PR only when everything passes. Do
-not un-pin the toolchain, and do not bump the pin by hand without at
-least building both images. (The lint container is separate and uses a
+images, then instar and the Rust test suite, then `make package`, the
+glibc floor check and an install of each package on the oldest glibc of
+its family, against the newest published nightly — and opens a bump PR
+only when everything passes. Do not un-pin the toolchain, and do not
+bump the pin by hand without at least building both images.
+
+**Packaging is part of a toolchain change's blast radius, which is why
+the validation goes that far.** `cargo-generate-rpm` derives the
+`.rpm`'s dependencies from the built binary's ELF, so a nightly can
+change the package without changing a line of our code, and neither
+building nor testing can see it. `nightly-2026-08-17` passed the build
+and the whole Rust suite, then produced an `.rpm` requiring
+`libc.so.6(GLIBC_2.18)[WEAK](64bit)`; nothing provides that, and all
+three RPM legs of the matrix failed before a test ran (#504). Installing
+the package is the only step that finds an unsatisfiable dependency, so
+if you add validation here, add it before the PR is opened rather than
+relying on the bump PR's own CI. (The lint container is separate and uses a
 stable `rust:` tag Renovate does manage; the dev image's Debian base is
 pinned by digest and Renovate walks it forward.)
 
@@ -937,7 +992,7 @@ The self-hosted runners have no Docker preinstalled, so any job touching
 `docker` or a container-backed Makefile target needs an "Install Docker"
 step -- see "Self-hosted runners and Docker" in `docs/development.md`.
 
-The `debian-12` runners have no `gh` preinstalled either, so any job on
+The `debian-13` runners have no `gh` preinstalled either, so any job on
 those that calls the GitHub CLI needs a `tools/ci/install-gh-cli.sh`
 step -- see "Self-hosted runners and the GitHub CLI" in
 `docs/development.md`.
@@ -946,6 +1001,7 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 
 - `scripts/differential-fuzz.py` - Differential fuzzing script (instar vs qemu-img + libyal)
 - `scripts/extract-fuzz-corpus.py` - Seeds + restores the coverage-fuzz corpus from instar-testdata
+- `tools/ci/install-docker.sh` - Installs the Docker client and daemon on a self-hosted runner, plus any extra packages passed as arguments (see "Self-hosted runners and Docker" above)
 - `tools/ci/install-gh-cli.sh` - Installs the GitHub CLI on a self-hosted runner if absent (see "Self-hosted runners and the GitHub CLI" above)
 - `tools/ci/fuzz-tier.sh` - Computes tiered nightly per-target fuzz durations
 - `tools/ci/report-fuzz-crash.sh` - Files the `security-audit` issue for a coverage-fuzz crash (bounds the log excerpt, dedups against open issues; see "Crash reporting" in `docs/testing.md`)

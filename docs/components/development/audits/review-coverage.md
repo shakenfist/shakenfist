@@ -7,7 +7,8 @@ Repositories that have the human review tracking tooling deployed
 should keep the review backlog small: fewer than 5 in-scope files
 needing review. Repositories without a `.vscode/review-scope.toml`
 scope config do not have the tooling deployed and are reported as
-not applicable; currently ryll and kerbside do.
+not applicable; see the compliance page for which repositories
+currently carry it.
 
 The check runs `scripts/review-tracking.py status` against the
 clone. A file needs review if it has never received a whole-file
@@ -22,7 +23,9 @@ Expect routine churn near the threshold: a single feature PR can
 touch five in-scope files, so the issue this audit files acts as a
 standing work-queue nudge -- it lists the files needing review,
 and closes automatically once a review session brings the backlog
-back under the threshold.
+back under the threshold. That list is written when the issue is
+filed and is not refreshed afterwards, so a long-lived issue
+understates the backlog it names (shakenfist/development#138).
 
 ## Template
 
