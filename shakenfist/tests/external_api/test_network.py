@@ -661,6 +661,11 @@ class NetworkDNSAddressEndpointTestCase(base.ShakenFistTestCase):
     """Regression tests for step 4f: REST handlers call raise_for_error()
     after update_dns_entry / remove_dns_entry."""
 
+    #: The API_VALIDATION_MODE requests in this class run at. The guard
+    #: subclasses below re-run at the rollback modes, where the handler
+    #: is all that stands between the request and its sink.
+    validation_mode = 'enforce'
+
     def setUp(self):
         super().setUp()
 
@@ -679,6 +684,7 @@ class NetworkDNSAddressEndpointTestCase(base.ShakenFistTestCase):
             NODE_EGRESS_NIC='eth0',
             NODE_MESH_NIC='eth1',
             NODE_IS_NETWORK_NODE=True,
+            API_VALIDATION_MODE=self.validation_mode,
         )
         self.config = mock.patch(
             'shakenfist.external_api.base.config', fake_config)
@@ -769,6 +775,86 @@ class NetworkDNSAddressEndpointTestCase(base.ShakenFistTestCase):
             headers={'Authorization': self.auth_token},
             data=json.dumps({'name': 'fail.example'}))
         self.assertEqual(500, resp.status_code)
+
+
+class NetworkDNSAddressValueGuardTestCase(NetworkDNSAddressEndpointTestCase):
+    """The issue 4248 handler guard, measured at the rollback.
+
+    The DNS value is stored on the network's hosteddns attribute and
+    rendered raw as ``{{value}} {{name}}`` into the addn-hosts file this
+    network's dnsmasq serves, through a jinja2.Template with autoescape
+    off -- so a value carrying a newline injects extra host entries into
+    that file. The schema's ipv4 declaration refuses it at enforce, but
+    API_VALIDATION_MODE=warn and off are the operator's rollback
+    (decision D42 of PLAN-api-input-validation), and until issue 4248
+    the rollback was the only thing between this value and dnsmasq.
+    These tests run at warn, where only the handler guard can refuse,
+    and the subclass below re-runs them at off, where check() does not
+    run at all.
+
+    The inherited tests run again here too, which is worth having: the
+    valid-value round trips prove the guard is no narrower than the
+    handler was.
+    """
+
+    validation_mode = 'warn'
+
+    @mock.patch('shakenfist.network.network.Network.update_dns_entry')
+    def test_post_dns_value_injection_refused(self, mock_update):
+        resp = self.client.post(
+            '/networks/%s/dns' % self.network_id,
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({
+                'name': 'probe',
+                'value': '10.0.0.1 innocent\n10.0.0.2 victim.example.com'}))
+        self.assertEqual(406, resp.status_code)
+        self.assertEqual('invalid DNS value', resp.get_json()['error'])
+        mock_update.assert_not_called()
+
+    @mock.patch('shakenfist.network.network.Network.update_dns_entry')
+    def test_post_dns_value_non_string_refused(self, mock_update):
+        # ip_address() accepts an integer, so the guard has to refuse
+        # non-strings before asking it. A null is the phase 6 sweep's
+        # measured omission behaviour -- a DNS record pointing at null
+        # -- and is refused by the same arm.
+        for value in (167772161, None, {'address': '10.0.0.1'}):
+            resp = self.client.post(
+                '/networks/%s/dns' % self.network_id,
+                headers={'Authorization': self.auth_token},
+                data=json.dumps({'name': 'probe', 'value': value}))
+            self.assertEqual(
+                406, resp.status_code,
+                'value %r was not refused' % (value,))
+            self.assertEqual('invalid DNS value', resp.get_json()['error'])
+        mock_update.assert_not_called()
+
+    @mock.patch('shakenfist.network.network.Network.update_dns_entry')
+    def test_post_dns_value_v6_still_accepted(self, mock_update):
+        # A hosts file takes an IPv6 address perfectly well, and the
+        # schema's own validator accepts one, so a guard refusing it
+        # would be narrower than the server (phase 6's width rule).
+        fake_op = mock.MagicMock()
+        fake_op.raise_for_error.return_value = None
+        mock_update.return_value = fake_op
+
+        resp = self.client.post(
+            '/networks/%s/dns' % self.network_id,
+            headers={'Authorization': self.auth_token},
+            data=json.dumps({'name': 'probe', 'value': 'fd00::1'}))
+        self.assertEqual(200, resp.status_code)
+        mock_update.assert_called_once_with('probe', 'fd00::1')
+
+
+class NetworkDNSAddressValueGuardOffTestCase(
+        NetworkDNSAddressValueGuardTestCase):
+    """The same guard with validation switched off entirely.
+
+    warn runs check() and discards the findings; off does not run it at
+    all. Different code paths to the same promise, measured rather than
+    reasoned about -- the same doubling test_nested_sweep.py does.
+    """
+
+    validation_mode = 'off'
 
 
 class NetworkUnrouteAddressEndpointTestCase(base.ShakenFistTestCase):

@@ -934,8 +934,6 @@ class NetworkDNSAddressEndpoint(api_base.Resource):
             ('namespace', 'body', 'namespace',
              api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False),
             ('name', 'body', 'string', 'The DNS entry', True),
-            # Required, although the handler does not refuse the omission today:
-            # it stores the DNS name pointing at null (phase 6 sweep).
             ('value', 'body', 'ipv4',
              'The IP address the DNS entry resolves to', True)
         ],
@@ -955,6 +953,25 @@ class NetworkDNSAddressEndpoint(api_base.Resource):
             name, skip_ipv4_addr=True, skip_ipv6_addr=True, may_have_port=False)
         if not valid_hostname:
             return sf_api.error(406, 'invalid DNS name')
+
+        # The value is stored on the network's hosteddns attribute and
+        # rendered raw into the addn-hosts file this network's dnsmasq
+        # serves, through a template with autoescape off, so a value
+        # carrying whitespace injects extra host entries into that file
+        # (issue 4248). The schema's ipv4 declaration refuses it at
+        # enforce, but API_VALIDATION_MODE=warn and off are the
+        # operator's rollback (decision D42) and must not hand back the
+        # injection, so this guard holds at every mode. ip_address()
+        # rather than IPv4Address, mirroring the declaration's
+        # validator: a hosts file takes an IPv6 address perfectly well.
+        # The isinstance arm matters because ip_address() also accepts
+        # an integer, and only a string was ever a hosts file entry.
+        if not isinstance(value, str):
+            return sf_api.error(406, 'invalid DNS value')
+        try:
+            ipaddress.ip_address(value)
+        except ValueError:
+            return sf_api.error(406, 'invalid DNS value')
 
         op = network_from_db.update_dns_entry(name, value)
         if op is not None:

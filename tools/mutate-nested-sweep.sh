@@ -276,6 +276,19 @@ mutate "${HANDLER}" \
 check "size or base guard" "disk.empty"
 
 # ---------------------------------------------------------------------
+# 10b. The negative-size guard is removed. Caught at warn and off, not
+#      at enforce: the schema's minimum still refuses the value there,
+#      which is exactly why the guard exists (issue 4248) -- a
+#      warn/off rollback must not hand back the negative request that
+#      deflates the capacity ledger across namespaces.
+# ---------------------------------------------------------------------
+run "a negative disk size is admitted again (issue 4248, the warn rollback)"
+mutate "${HANDLER}" \
+    "            if size_is_negative:" \
+    "            if False and size_is_negative:" || exit 1
+check "negative size guard" "disk.size.negative"
+
+# ---------------------------------------------------------------------
 # 11. The videospec guards test presence again, which is what they did
 #     until the review of #4232 -- so an explicit null passes them, is
 #     stored on the instance, and is rendered into the domain XML as
