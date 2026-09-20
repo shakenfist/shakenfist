@@ -13966,6 +13966,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#handler-guards-and-where-a-new-one-goes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handler guards, and where a new one goes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-is-not-checked-yet" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14434,6 +14445,30 @@ narrower than the handler behind it; <code>url</code>, which has to accept the
 scheme-less <code>cirros</code> image shortcut and <code>label:</code> NVRAM templates as
 well as <code>https://</code>, is the instructive case. So <code>type</code>, <code>format</code>,
 <code>pattern</code>, <code>minimum</code> and <code>maximum</code> are what constrain anything.</p>
+<h2 id="handler-guards-and-where-a-new-one-goes">Handler guards, and where a new one goes<a class="headerlink" href="#handler-guards-and-where-a-new-one-goes" title="Permanent link">&para;</a></h2>
+<p>Not every check can be a declaration. A rule spanning two parameters
+(secure boot requires UEFI), an "at least one of" the schema language
+cannot express (a diskspec needs a <code>size</code> or a <code>base</code>), or a check
+that consults the database (does <code>placed_on</code> name a node?) lives in
+the handler as a guard answering through <code>sf_api.error</code>, and holds at
+every <code>API_VALIDATION_MODE</code> — schema checks roll back with
+<code>API_VALIDATION_MODE=warn</code>, handler guards do not.</p>
+<p>The largest chain of them is <code>InstancesEndpoint.post</code> in
+<code>shakenfist/external_api/instance.py</code>, assembled a block at a time by
+four phases of the validation plan. Its organising rule: <strong>one block
+per body parameter, in the order the handler consumes the
+parameters, and every block answers before <code>Instance.new()</code></strong> so a
+refused request creates nothing. That consumption order is not the
+declaration order in the <code>swag_from</code> list above the handler —
+<code>network</code> is declared before <code>disk</code>, but disks are processed first,
+because resolving their artifacts can refuse the request on its own.</p>
+<p>So a guard for a new body key goes in — or, for a new parameter,
+becomes — the block for that parameter, at the point in the chain
+where the handler first consumes it, and before anything is created.
+Do not append a new loop or check at the end of the chain: a second
+pass over an already-guarded parameter is how the handler once
+carried an IDE-bus check that a guard forty lines earlier had already
+made unreachable.</p>
 <h2 id="what-is-not-checked-yet">What is not checked yet<a class="headerlink" href="#what-is-not-checked-yet" title="Permanent link">&para;</a></h2>
 <p>Enforcement checks every request against its published declarations,
 but a declaration is only as good as what the derivation could see
