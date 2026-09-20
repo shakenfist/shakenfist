@@ -7524,6 +7524,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-use-case-docs-phase-02-openstack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: `docs/use-cases/openstack.md`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-test-harness-phase-02-static-hypervisor/" class="md-nav__link">
         
   
@@ -9082,6 +9110,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../use-cases/openstack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside for OpenStack
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -14439,6 +14495,10 @@ connection to the hypervisor.</p>
 <td>The password for the service account</td>
 </tr>
 <tr>
+<td>verify</td>
+<td>Optional: how to verify TLS certificates on the session Kerbside uses to reach this cloud -- both the Keystone authentication and the Nova console token validation call, since they share one session. It does not affect <code>ca_cert</code>, which is the hypervisor VDI leg. Accepts a boolean, the strings <code>true</code>/<code>false</code> case-insensitively, or a path to a CA bundle on the Kerbside container's filesystem, which is what a deployment with a private Keystone CA usually wants. Defaults to true. Any other string is passed through as a bundle path and fails at connection time, so a typo disables nothing and breaks the exchange</td>
+</tr>
+<tr>
 <td>project_name</td>
 <td>The OpenStack project name for the service account</td>
 </tr>
@@ -14452,7 +14512,7 @@ connection to the hypervisor.</p>
 </tr>
 <tr>
 <td>ca_cert</td>
-<td>Optional: the SSL CA public key certificate to validate connections against</td>
+<td>Optional: inline PEM text for the CA which validates the hypervisor's VDI TLS port, used by the proxy on the backend leg. This is not the Keystone CA -- see <code>verify</code> above</td>
 </tr>
 </tbody>
 </table>
@@ -14622,6 +14682,7 @@ venv setup, config file generation, and test execution.</p>
 <li><a href="/components/kerbside/configuration/">Configuration</a> - General configuration reference</li>
 <li><a href="/components/kerbside/proxy-architecture/">Proxy Architecture</a> - Internal proxy design</li>
 <li><a href="/components/kerbside/use-cases/shaken-fist/">Kerbside for Shaken Fist</a> - The Shaken Fist use-case guide: value proposition, setup, and the sf-e2e worked example</li>
+<li><a href="/components/kerbside/use-cases/openstack/">Kerbside for OpenStack</a> - The OpenStack use-case guide: the spice-direct token exchange, setup, and the openstack_matrix worked example</li>
 </ul>
 
 

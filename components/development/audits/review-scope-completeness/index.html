@@ -7487,6 +7487,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-use-case-docs-phase-02-openstack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2: `docs/use-cases/openstack.md`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor/" class="md-nav__link">
         
   
@@ -9045,6 +9073,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/use-cases/openstack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside for OpenStack
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -14139,6 +14195,11 @@ themselves) both live in that script.</p>
 one and then dropped anyway because <code>include</code> does not name it is
 reported: the config asks for that file to be reviewed and it is not
 being reviewed.</p>
+<p>A run that cannot be started at all is reported as a failure of this
+criterion against that repository, naming the error, for the same
+reason <a href="/components/development/audits/review-coverage/">review-coverage.md</a> gives: every
+criterion for a repository runs in one process, so an exception here
+would cost that repository all of the others.</p>
 <h2 id="why-this-is-separate-from-review-coverage">Why this is separate from review-coverage<a class="headerlink" href="#why-this-is-separate-from-review-coverage" title="Permanent link">&para;</a></h2>
 <p><a href="/components/development/audits/review-coverage/">review-coverage.md</a> measures the backlog against
 the scope. This measures the scope. The two fail in opposite
