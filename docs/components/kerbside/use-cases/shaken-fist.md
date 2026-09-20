@@ -22,8 +22,12 @@ it *is* the second half of it:
   exchange URL at Kerbside; a single client call
   (`get_vdi_console_proxy_file()`) returns a `.vv` file pointed
   at the proxy. There is no portal to write and no ticket
-  plumbing to build, which is not true of the oVirt or
-  OpenStack paths.
+  plumbing to build, which is not true of the oVirt path.
+  OpenStack embeds the broker too — Nova mints the token and
+  Kerbside serves the exchange itself at `/nova-console.vv` —
+  but there Kerbside validates every token by calling Nova's
+  `/os-console-auth-tokens/` API, where Shaken Fist's token is
+  checked offline against a cached signing key.
 - **Verification is offline, and single use.** Kerbside checks
   the token's signature against the cluster's published signing
   public keys, which it caches when the source is initialised.
@@ -45,10 +49,17 @@ it *is* the second half of it:
   and can terminate in flight.
 - **The hypervisors are never reachable from the client
   network.** Clients reach Kerbside; Kerbside reaches the nodes.
-- **The backend leg is pinned.** Kerbside verifies the node's
-  SPICE certificate against the cluster CA and pins the
-  certificate subject the node publishes, so a redirected
-  backend connection fails rather than succeeding quietly.
+- **The backend leg is pinned when the node demands TLS.**
+  Kerbside dials the node's plaintext VDI port first and
+  escalates to `vdi_tls_port` only when the node answers the
+  link handshake with `NEED_SECURED`. On that escalated
+  connection it verifies the node's SPICE certificate against
+  the cluster CA and pins the certificate subject the node
+  publishes, so a redirected backend connection fails rather
+  than succeeding quietly. A node whose qemu does not require
+  TLS is relayed over the plaintext port instead, where there
+  is no certificate to verify and no subject to pin; that is
+  the node's configuration rather than Kerbside's.
 - **One entry point across clouds.** A single Kerbside can
   broker Shaken Fist alongside oVirt and OpenStack sources;
   users keep one console entry point as workloads move.
@@ -78,7 +89,7 @@ flowchart TD
     kerbside -- "4. .vv file" --> client
     client -- "5. connect, token as password" --> kerbside
     kerbside <-- "A. scrape (per minute)" --> sfapi
-    kerbside -- "6. TLS to the node's VDI port:<br/>cluster CA verified, subject pinned" --> hypervisor
+    kerbside -- "6. vdi_port → NEED_SECURED → vdi_tls_port TLS:<br/>cluster CA verified, subject pinned" --> hypervisor
 ```
 
 **Discovery (A).** Once a minute the `type: shakenfist` source
@@ -125,15 +136,24 @@ and uses a short-lived Kerbside console token as the SPICE
 password. The client authenticates to *Kerbside*; the Shaken
 Fist token never leaves the exchange.
 
-**The backend leg (6).** Kerbside connects to the node's VDI
-ports, verifying the node's certificate against the cluster CA
-configured on the source. Where the node publishes a
-`spice_server_cert_subject`, that subject was captured at scrape
-time and is pinned for this connection, so a backend that
-answers with the wrong identity is refused. Where it publishes
-none, the subject is unset and the proxy relays without
-host-subject enforcement for that backend — see the limitations
-table below.
+**The backend leg (6).** Kerbside dials the node's plaintext
+`vdi_port` first. Where the node's qemu answers the link
+handshake with `NEED_SECURED`, Kerbside retries on
+`vdi_tls_port`, verifying the node's certificate against the
+cluster CA configured on the source. Where the node also
+publishes a `spice_server_cert_subject`, that subject was
+captured at scrape time and is pinned for that connection, so a
+backend that answers with the wrong identity is refused; where
+it publishes none, the subject is unset and the proxy relays
+without host-subject enforcement for that backend — see the
+limitations table below.
+
+Whether that escalation happens at all is the node's decision,
+not Kerbside's: a node whose qemu does not require a secure
+channel answers on the plaintext port and the leg stays there,
+with no certificate to verify and no subject to pin. That is
+why Kerbside needs both ports reachable, and it is worth
+knowing which of your nodes are which.
 
 **No per-connection call to the cloud.** Unlike the oVirt path,
 which acquires a ticket from the engine at the moment a `.vv` is
@@ -183,9 +203,11 @@ for any SPICE console — they are what give you clipboard
 sharing, display resizing, and clean resolution changes.
 Kerbside relays the agent channel; it does not decode it.
 
-**Nodes.** A node that publishes its SPICE server certificate
-subject gets a pinned backend leg for free. A cluster where the
-nodes do not publish one still works, with enforcement skipped
+**Nodes.** A node that both requires a secure channel and
+publishes its SPICE server certificate subject gets a pinned
+backend leg for free. A node that does not require one is
+relayed over its plaintext port instead, and a cluster whose
+nodes publish no subject still works, with enforcement skipped
 for those backends.
 
 ### Network
@@ -307,7 +329,7 @@ Not covered, and worth knowing before you deploy:
 | Limitation | Detail |
 |------------|--------|
 | Single-node clusters only, in testing | The `sf-e2e` lane builds a one-node Shaken Fist, so the node map, the per-node certificate subjects, and consoles spread across hypervisors are each proven against exactly one node. Multi-node clusters should work — the node map is rebuilt every pass and the subject is pinned per console — but no lane covers them. A multinode lane is listed as future work in [PLAN-two-tier-ci.md](/components/kerbside/plans/PLAN-two-tier-ci/). |
-| Backend pinning depends on the cluster | A node that publishes no `spice_server_cert_subject` leaves `host_subject` unset, and the proxy relays that backend without host-subject enforcement rather than refusing it. Whether your cluster publishes one depends on its version and node configuration. The optional knob for turning enforcement on anyway, and the PKI assumption it makes, are in [console-sources.md](/components/kerbside/console-sources/#shaken-fist). |
+| Backend pinning depends on the cluster | Two conditions have to hold, and either can fail quietly. Pinning only happens on a leg that escalated to TLS, so a node whose qemu does not require a secure channel is relayed over its plaintext port with nothing to verify or pin. Where the escalation does happen, a node that publishes no `spice_server_cert_subject` leaves `host_subject` unset, and the proxy relays that backend without host-subject enforcement rather than refusing it. Whether your cluster publishes one depends on its version and node configuration. The optional knob for turning enforcement on anyway, and the PKI assumption it makes, are in [console-sources.md](/components/kerbside/console-sources/#shaken-fist). |
 | Off-box deployment untested in CI | The lane runs Kerbside on the Shaken Fist primary over loopback. The real topology — Kerbside on its own host, reaching the API by name and the nodes by address — is the shape the oVirt lane proves, not this one. |
 | Token exchange can be unavailable while scraping is fine | A cluster Kerbside scrapes happily is not necessarily one it can exchange tokens for; the two capabilities fail independently by design. The causes and the operator fix are in [console-sources.md](/components/kerbside/console-sources/#shaken-fist). |
 | Non-`system` namespaces | A source configured with any other namespace is untested and is not expected to work: only the instance listing uses the configured namespace, while the CA fetch, the signing-key fetch and the node listing are always made as `system` with the same key. The unit tests cover the branch with a namespace-to-mock map, which proves the branch and not that a non-`system` credential works against a real cluster. Tracked as #444. |
@@ -329,4 +351,6 @@ Not covered, and worth knowing before you deploy:
 - [Testing](/components/kerbside/testing/#the-shaken-fist-end-to-end-lane-sf-e2e)
   — the CI lanes, including the Shaken Fist end-to-end lane
   described above
-- [Kerbside for oVirt](/components/kerbside/use-cases/ovirt/) — the sibling deployment guide
+- [Kerbside for oVirt](/components/kerbside/use-cases/ovirt/) and
+  [Kerbside for OpenStack](/components/kerbside/use-cases/openstack/) — the sibling
+  deployment guides

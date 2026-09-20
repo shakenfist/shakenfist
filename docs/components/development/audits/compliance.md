@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-19T10:32:43.235741+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-20T10:54:41.735616+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -255,7 +255,7 @@ Criterion: [eol-distro.md](/components/development/audits/eol-distro/)
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | non-compliant | shakenfist/actions#69 |
+| actions | compliant | - |
 | agent-python | non-compliant | shakenfist/agent-python#137 |
 | client-python | non-compliant | shakenfist/client-python#396 |
 | client-python-k3s | non-compliant | shakenfist/client-python-k3s#61 |
@@ -279,7 +279,6 @@ Criterion: [eol-distro.md](/components/development/audits/eol-distro/)
 
 Details for non-compliant projects:
 
-- **actions** (Status): 3 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
 - **agent-python** (Status): 2 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
 - **client-python** (Status): 1 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
 - **client-python-k3s** (Status): 4 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
@@ -1181,7 +1180,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | compliant | - |
+| actions | non-compliant | shakenfist/actions#91 |
 | agent-python | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
@@ -1189,7 +1188,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 | cloudgood | N/A | - |
 | development | non-compliant | shakenfist/development#147 |
 | divergulent | N/A | - |
-| hunkydory | compliant | - |
+| hunkydory | non-compliant | shakenfist/hunkydory#24 |
 | instar | N/A | - |
 | kerbside | non-compliant | shakenfist/kerbside#227 |
 | kerbside-client | N/A | - |
@@ -1205,9 +1204,11 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **development** (Status): 175 of 190 in-scope files reviewed at HEAD; 15 need review (threshold 5)
-- **kerbside** (Status): 100 of 230 in-scope files reviewed at HEAD; 130 need review (threshold 5)
-- **ryll** (Status): 178 of 214 in-scope files reviewed at HEAD; 36 need review (threshold 5)
+- **actions** (Status): 92 of 105 in-scope files reviewed at HEAD; 13 need review (threshold 5)
+- **development** (Status): 157 of 191 in-scope files reviewed at HEAD; 34 need review (threshold 5)
+- **hunkydory** (Status): 16 of 27 in-scope files reviewed at HEAD; 11 need review (threshold 5)
+- **kerbside** (Status): 99 of 231 in-scope files reviewed at HEAD; 132 need review (threshold 5)
+- **ryll** (Status): 177 of 214 in-scope files reviewed at HEAD; 37 need review (threshold 5)
 
 ## review-scope-completeness
 

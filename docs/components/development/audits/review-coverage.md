@@ -19,6 +19,13 @@ committed `REVIEWS.md`: that file is only accurate immediately
 after a prune, so a missed prune run cannot inflate the coverage
 this audit sees.
 
+A run that cannot be started at all -- an unusable checkout, an
+interpreter that will not execute -- is reported as a failure of
+this criterion against that repository, naming the error. It is
+not allowed to raise, because the audit runs every criterion for a
+repository in one process and an exception would take every other
+criterion for that repository down with it.
+
 Expect routine churn near the threshold: a single feature PR can
 touch five in-scope files, so the issue this audit files acts as a
 standing work-queue nudge -- it lists the files needing review,

@@ -305,6 +305,7 @@ nav:
                 - "Phase 1: `docs/use-cases/shaken-fist.md`": components/kerbside/plans/PLAN-use-case-docs-phase-01-shaken-fist.md
                 - "Phase 1: package the migrations and add `kerbside db upgrade`": components/kerbside/plans/PLAN-demo-install-phase-01-db-upgrade.md
                 - "Phase 1: Shared visual-digest crate": components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate.md
+                - "Phase 2: `docs/use-cases/openstack.md`": components/kerbside/plans/PLAN-use-case-docs-phase-02-openstack.md
                 - "Phase 2: Static source driver": components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor.md
                 - "Phase 2: write the missing `etc/kerbside.conf.example`": components/kerbside/plans/PLAN-demo-install-phase-02-conf-example.md
                 - "Phase 3: Control socket on Ryll": components/kerbside/plans/PLAN-test-harness-phase-03-control-socket.md
@@ -359,6 +360,7 @@ nav:
                 - "USB Redirection Protocol": components/kerbside/spice/usb-redirection.md
                 - "VD Agent Protocol": components/kerbside/spice/vd-agent-protocol.md
             - Use Cases:
+                - "Kerbside for OpenStack": components/kerbside/use-cases/openstack.md
                 - "Kerbside for oVirt": components/kerbside/use-cases/ovirt.md
                 - "Kerbside for Shaken Fist": components/kerbside/use-cases/shaken-fist.md
         - Occystrap:
