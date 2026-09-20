@@ -14731,6 +14731,16 @@ is here.</p>
   <a href="../PLAN-transient-capacity-refusals/">PLAN-transient-capacity-refusals.md</a>
   should land before the re-run or it will not be able to separate
   a warm-up artefact from genuine contention either.</p>
+<p>A third gate, recorded here because the flip is where it is
+  read: <strong>a CI topology growth must land before hard enforcement,
+  or carry a claim-size bump with it.</strong> Claim sizes are a
+  decaying maximum over previously measured peaks, so the first
+  run of a job whose topology just grew is sized from the old
+  peaks. Today that is admitted and audited; after the flip it is
+  a refusal. <code>PLAN-ci-cloud-sizing.md</code> phase 4 is the live
+  instance -- it takes <code>slim-tier</code> from 12 to 18 under-cloud
+  vCPU -- and its <em>claim layer sitting above that budget</em> section
+  carries the other direction of the same coupling.</p>
 <p>The back brief item that was outstanding at the deploy (the
   sizing formula never evaluated against real cost data, because
   <code>ssh</code> to <code>maui</code> was refused from the development host) was

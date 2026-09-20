@@ -14066,6 +14066,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-claim-layer-sitting-above-that-budget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The claim layer sitting above that budget
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-headroom-band-with-numbers" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15215,6 +15226,52 @@ measured figures above: an inner node's committed vRAM reaches
 tier, so that 356 GB is not obviously over-provisioned per node --
 any saving has to come from having fewer nodes, which is what phase
 4 will weigh.</p>
+<h3 id="the-claim-layer-sitting-above-that-budget">The claim layer sitting above that budget<a class="headerlink" href="#the-claim-layer-sitting-above-that-budget" title="Permanent link">&para;</a></h3>
+<p><strong>Also not measured by this instrument, and owned by a different
+plan.</strong> The under-cloud instances a topology creates live in a
+per-job namespace which the private-ci conductor covers with a
+capacity <em>claim</em>, and the size of that claim is set by
+<code>PLAN-claim-coverage-and-sizing.md</code> in the <code>shakenfist/private-ci</code>
+repository -- phases 0 and 1 complete at the time of writing. The two
+plans are the same capacity question one layer apart: this one sizes
+the nested cluster, that one sizes the under-cloud claim which pays
+for it. Neither referenced the other until this section was written.</p>
+<p>Three couplings, in the order they are likely to bite:</p>
+<ol>
+<li><strong>A topology change is an input to claim sizing.</strong> The conductor's
+   <code>claim_size_for()</code> (<code>conductor/provisioner.py:350</code>) takes <code>max(runner
+   footprint, ceil(CLAIM_HEADROOM x worst observed peak))</code> with
+   <code>CLAIM_HEADROOM</code> 1.2, and the peak is the measured footprint of
+   previous runs of the same <code>(repo, job_name)</code>. Phase 4's reshape
+   therefore raises <code>debian-12-slim-tier</code>'s under-cloud footprint from
+   12 to 18 vCPU <em>before</em> the aggregate that sizes its claim has seen
+   the new number.</li>
+<li><strong>That is harmless only while claims are advisory.</strong> The first run
+   on a grown topology is sized from the old peaks, so it is admitted
+   over its claim and audited as <code>placement admitted over namespace
+   capacity claim</code>, which is what <code>CLAIM_ENFORCEMENT_HARD</code> being false
+   intends. Once <code>PLAN-scheduler-reservations</code> phase 5 flips that
+   constant, the same first run becomes a refusal. <strong>A topology growth
+   must land before hard enforcement, or carry a claim-size bump with
+   it.</strong> The current order satisfies this by accident rather than by
+   management: phase 4 here is blocked on the operator, and
+   scheduler-reservations phase 5 is gated behind claim-plan phases 0,
+   1 and 4.</li>
+<li><strong>The claim measurement is blindest on exactly these jobs.</strong> That
+   plan's sixth and seventh findings record that the peak is
+   reconstructed from instances surviving at teardown, so anything
+   hard-deleted mid-run is invisible -- and a nested-cloud job creates
+   and deletes instances throughout its run. The measured
+   under-statement is 1.75x, and 2.12x over the closed window, worst
+   on <code>shakenfist / Smoke tests (collection)</code>. So the claim plan's
+   phase 3 right-sizing pass cannot honestly size the clouds this plan
+   reshapes until that measurement is fixed, and a reader of either
+   plan should not treat the other's peak figures as independent.</li>
+</ol>
+<p>Note the dimensions agree from both sides, which is mild evidence both
+are looking at one thing: this plan finds RAM rather than vCPU is the
+scarce under-cloud resource, and the claim plan finds the over-claim
+exceedances are overwhelmingly <code>memory_mb</code>.</p>
 <h3 id="the-headroom-band-with-numbers">The headroom band, with numbers<a class="headerlink" href="#the-headroom-band-with-numbers" title="Permanent link">&para;</a></h3>
 <p>Phase 0's D3 fixed the band's <em>form</em> and left its numbers to this
 phase, with provisional bounds of 0.35 and 0.70. Phase 2's D21 added
