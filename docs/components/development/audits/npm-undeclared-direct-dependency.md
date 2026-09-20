@@ -60,8 +60,10 @@ always the same one.
 
 ## False positives, and why there are few
 
-Four kinds of import are not packages, and all four appear in
-`hunkydory` today:
+Four kinds of import are not packages. Three of them appear in
+`hunkydory` today; the fourth, an import of something already
+declared, does not, because nothing `hunkydory` declares is imported
+at all:
 
 * **Node builtins, in both spellings.** `node:fs` needs no table -- npm
   forbids a colon in a package name, so a specifier carrying a scheme

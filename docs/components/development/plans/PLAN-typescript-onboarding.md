@@ -358,30 +358,33 @@ one CI will never run, which is worth revisiting in phase 5.
 
 Three checks per D4, following the shape
 `docs/audits/README.md` and the template's worked brief describe. A
-criterion has six parts here, not four:
+criterion is five files, and there is a sixth here because the tests
+are their own module:
 
 - a `Check` subclass with `id`, `spec` and `issue_title` as class
   attributes;
-- registration in `scripts/audit/registry.py`;
+- registration in `CHECKS` in `scripts/audit/registry.py`;
 - a specification page under `docs/audits/`;
 - a line in `docs/audits/README.md`;
-- a line each in `FROZEN_METADATA`, `FROZEN_ISSUE_TITLES` and the
-  frozen column table in `scripts/tests/test_metadata.py`, which
-  `test_audit_metadata_matches_the_frozen_table`,
-  `test_issue_titles_match_the_frozen_table` and
-  `test_column_names_match_the_frozen_table` assert equality
-  against;
-- tests in `scripts/tests/test_packaging.py`, where the existing
-  dependency criteria are tested, covering pass, fail and
-  not-applicable. `test_metadata.py` also asserts that every check
-  is reachable from some test module.
+- a line each in `FROZEN_METADATA` and `FROZEN_ISSUE_TITLES` in
+  `scripts/tests/test_metadata.py`, which
+  `test_audit_metadata_matches_the_frozen_table` and
+  `test_issue_titles_match_the_frozen_table` assert equality
+  against. No `FROZEN_COLUMN_NAMES` line: that table is keyed off
+  `Check.column`, which a criterion declares only where it shares a
+  spec page with another, and each of these three has its own;
+- tests in `scripts/tests/test_npm_dependencies.py`, their own
+  module rather than an addition to `test_packaging.py`, covering
+  pass, fail and not-applicable. `test_metadata.py` also asserts
+  that every check is reachable from some test module.
 
 Adding three checks without touching the frozen tables fails
 `pre-commit run --all-files`, which is the first item on this plan's
 own review checklist, so the phase would fail its own gate. This is
 the same staleness `PLAN-scope-coverage.md:433` corrected in
 `PUSH-AUDIT.md`; the four-part framing survived into an earlier draft
-of this plan.
+of this plan, and into `PLAN-TEMPLATE.md` until phase 8's findings
+pull request corrected it there too.
 
 **How many repositories this newly fails: one.** Every default-branch
 tree of all twenty in-scope repositories was listed recursively
@@ -658,9 +661,11 @@ container mounts. Future work carries the generalisation.
 **Phases 4, 5 and 6 had landed but the Execution table still read
 `In progress`, `In progress` and `Not started`.** Corrected at
 source as part of this planning commit, with merge references. The
-audit against hunkydory now reports 28 pass, 1 fail, 26
-not-applicable, the single failure being the `review-coverage`
-backlog phase 6 deliberately opened.
+audit against hunkydory reported 28 pass, 1 fail, 26
+not-applicable when that was written on 2026-09-14, the single
+failure being the `review-coverage` backlog phase 6 deliberately
+opened. That count moves with the review queue rather than with
+this plan; see phase 8's Audit outcome.
 
 #### Decisions
 
@@ -740,8 +745,8 @@ all of 7a is now done. 7b waits on the decisions in 7b.0, which
 |------|--------|-------|-----------|---------------------|
 | 7a.1 | low | sonnet | none | In hunkydory: add `@vscode/vsce` to `devDependencies` and refresh `package-lock.json` with `npm install`. Verify `npm ci && npm run package` produces `hunkydory-0.1.0.vsix` on a clean checkout with no network fetch of vsce itself. Check vsce's own `engines.node` against the repository's `engines.node: ">=20"` and against the node the static runners carry (Debian 13's packaged node, per D1) -- if vsce needs newer, say so and stop rather than raising `engines.node`. Re-run the three npm criteria: they read imports, so they should not move. |
 | 7a.2 | medium | sonnet | none | Write `.github/workflows/release.yml` with the three jobs from D7.2 and D7.4. Adapt `templates/release-automation/release.yml` rather than copying it: the publish job moves off `[self-hosted, static]`, and the header comment says the template is the source and why this file deviates. `permissions: {}` at the top, least privilege per job. Scripts longer than about five lines go in `tools/`, per the fleet convention. actionlint runs from pre-commit against `.github/actionlint.yaml`; 7a needs no new labels, because `[self-hosted, vm, debian-13, s]` is already declared there, so do not add any. (This scopes 7a, and is not a standing prohibition: 7b's option 2 adds a label deliberately.) |
-| 7a.3 | low | sonnet | none | Write `RELEASE-SETUP.md` covering every one-time step: the Azure DevOps publisher account for the `shakenfist` publisher id already in `package.json`, generating a `VSCE_PAT` with Marketplace publish scope, creating the tag-protected `release` environment, and adding the secret to that environment rather than to the repository. Model the structure on `templates/release-automation/RELEASE-SETUP.md`, but write the VS Code Marketplace steps rather than the PyPI trusted-publisher ones. The file goes at the repository root, `RELEASE-SETUP.md`, as it is in every other repository in the fleet -- `ReleaseProcess` tests `repo.exists('RELEASE-SETUP.md')` (`scripts/audit/checks/packaging.py:819`) and the template is root-destined. That criterion skips for hunkydory today, so nothing would catch a divergence, which is exactly why the path is stated here rather than inferred. Separately: reference it from `AGENTS.md` only if a convention changes. |
-| 7a.4 | low | sonnet | none | Re-run `pre-commit run --all-files` in hunkydory and the audit (`scripts/audit-check.py --repo-path <clone> --repo-name hunkydory --github-org shakenfist`). The verdict must still be 28 pass / 1 fail / 26 not-applicable, the failure being `review-coverage`. Anything else moved is a finding, not a rounding error. |
+| 7a.3 | low | sonnet | none | Write `RELEASE-SETUP.md` covering every one-time step: the Azure DevOps publisher account for the `shakenfist` publisher id already in `package.json`, generating a `VSCE_PAT` with Marketplace publish scope, creating the tag-protected `release` environment, and adding the secret to that environment rather than to the repository. Model the structure on `templates/release-automation/RELEASE-SETUP.md`, but write the VS Code Marketplace steps rather than the PyPI trusted-publisher ones. The file goes at the repository root, `RELEASE-SETUP.md`, as it is in every other repository in the fleet -- `ReleaseProcess` tests `repo.exists('RELEASE-SETUP.md')` (`scripts/audit/checks/packaging.py:818`) and the template is root-destined. That criterion skips for hunkydory today, so nothing would catch a divergence, which is exactly why the path is stated here rather than inferred. Separately: reference it from `AGENTS.md` only if a convention changes. |
+| 7a.4 | low | sonnet | none | Re-run `pre-commit run --all-files` in hunkydory and the audit (`scripts/audit-check.py --repo-path <clone> --repo-name hunkydory --github-org shakenfist`). The verdict must not move, and the only failure must still be `review-coverage`. Anything else moved is a finding, not a rounding error. |
 | 7a.5 | low | sonnet | none | Dispatch `release.yml` on `develop` once 7a has merged. Confirm the `build` job produces the `.vsix` artifact on `[self-hosted, static]`, that `vscode:prepublish` compiles on a real runner with a real `npm_config_cache`, and that both publishing jobs correctly decline to run. Record the run URL here. This is the run D7.1's argument rests on, and it cannot answer the publish-lane question above, because the guard stops a dispatch reaching that job by design. |
 | 7a.6 | low | sonnet | none | **Measure whether `[self-hosted, vm, debian-13, s]` carries node, and record the answer in *Answered: the publish lane has neither node nor npm* above.** Add a dispatch-only throwaway workflow to hunkydory -- `permissions: {}`, **no `environment:` key**, so it can reach no secret -- whose single job runs on that lane and executes `node --version; npm --version; command -v node npm` without `set -e` stopping at the first absence. `secret-scan.yml` already uses this lane and `workflow_dispatch`, so no new actionlint label is needed. Dispatch it, record the output and the run URL, then delete the workflow in the same PR chain: it is a probe, not a fixture. The point is to reduce 7b.0's question (b) from a three-way guess to either "nothing to do" or "option 2". Do not fold this into `release.yml`'s publish job -- the dispatch guard means that job cannot run until 7b, which is the whole reason the question is open. |
 | 7b.0 | -- | operator | -- | **Decide two things before 7b.1 does any work.** (a) PAT or Entra federated credential: Azure DevOps retires global PATs on 1 December 2026, so a PAT bought now lasts about ten weeks and the Entra path has to be walked either way. The plan leans to going straight to `--azure-credential` and never minting a PAT, on the grounds that the setup cost is paid once rather than twice. (b) How the publish lane gets node. **7a.6 has measured it: the lane carries neither node nor npm.** So there is something to decide, option 3 is eliminated, and the decision is no longer only about 7b -- it has to repair `release.yml`'s publish job, which runs `npm ci` on that lane today, and delete the false node-20 comment inside it. The plan leans to option 2, the `debian-13-docker` lane with a pinned `node:22` container, because it settles the `engines.node` risk in the same move and needs no work in another repository. |
@@ -816,7 +821,7 @@ states the ordering.
 * `RELEASE-SETUP.md` names the publisher id, the environment name,
   the PAT scope and the tag rule, and states that the environment
   must exist before the first tag is pushed.
-* The audit against hunkydory reports one failure and it is
+* The audit against hunkydory reports no failure other than
   `review-coverage`.
 * Either hunkydory is listed on the VS Code Marketplace, or this
   section records why it is not and the `.vsix` is attached to a
@@ -903,13 +908,13 @@ discovered later:
   "dependenc" returns nothing, so no wording became false. The
   extension does still have no runtime dependencies as a matter of
   fact.
-* **The audit after 7a reports 28 pass, 1 fail, 26 not-applicable**
-  -- identical to the pre-7a figures, with `review-coverage` still
-  the only failure. Nothing moved, which for this phase is the
-  expected result: 7a added a workflow, a runbook and a dependency,
-  and the criteria that would notice any of those are the Python
-  ones that skip, and the five release-safety helpers that go dark
-  behind the same `pyproject.toml` skip.
+* **The audit after 7a reported 28 pass, 1 fail, 26
+  not-applicable** -- identical to the pre-7a figures, with
+  `review-coverage` still the only failure. Nothing moved, which for
+  this phase is the expected result: 7a added a workflow, a runbook
+  and a dependency, and the criteria that would notice any of those
+  are the Python ones that skip, and the five release-safety helpers
+  that go dark behind the same `pyproject.toml` skip.
 
 **`github-release` was already clean of the workspace.** `43b7f59`
 downloads the artifact into `${{ runner.temp }}/vsix/` and points
@@ -1219,21 +1224,31 @@ right way, the remaining five cells hold: `a7f4798`, `b8e8fd2` and
 `b86f2bb` merged to `main` here, `73cdca7` and `6da49c1` to
 hunkydory's `develop`.
 
-**Three development pull requests this plan landed are not in the
+**Two development pull requests this plan landed are not in the
 `Merged` column at all.** `decaa4d` (#118, which created the plan
-file), `d102e9f` (#128, "Correct what phase 2 asserts, and record
-phase 1") and `9fe50ee` (#130, the phase 7 plan). All three are
-plan-document changes rather than phases, which is why no cell
-claimed them, but the audit's documentation wave reads plan prose
-and they are this plan's work on this repository. They are named in
-the ranges below rather than added to the table, which tracks
-phases.
+file) and `9fe50ee` (#130, the phase 7 plan). Both are plan-document
+changes rather than phases, which is why no cell claimed them, but
+the audit's documentation wave reads plan prose and they are this
+plan's work on this repository. They are named in the ranges below
+rather than added to the table, which tracks phases.
+
+This survey said three, and named `d102e9f` (#128, "Correct what
+phase 2 asserts, and record phase 1") as the third on the strength
+of its branch name, `phase2-correction`. It is not this plan's
+work: it touches only `PLAN-image-supply-chain.md` and
+`docs/plans/index.md`, and this plan's real phase-2 correction is
+`b86f2bb` (#127), separately in the range. The error reached the
+range table and stayed there; see DEV-1 in the Audit outcome.
 
 The rule that puts them there, stated so the next reader can check
 the range against it rather than against a list: **every merge to a
 default branch that this plan caused, phase or prose alike, is in
-the range.** Two consequences worth naming, because each looks like
-an omission otherwise. The review-mark merges `aa2c55d` (#129),
+the range.** Applying it means reading what each merge changed, not
+what its branch was called: a sha that exists and is an ancestor of
+the default branch has been shown to be a merge, not to be *this
+plan's* merge, and `d102e9f` above is what the difference costs.
+Two further consequences worth naming, because each looks like an
+omission otherwise. The review-mark merges `aa2c55d` (#129),
 `9b158f0` (#131) and `0210d1c` (#134) are *not* in the range: each
 touches only `.vscode/mikal.weaudit`, its shas file and `REVIEWS.md`,
 which is the review-tracking tooling recording that a human read
@@ -1279,22 +1294,23 @@ already on a default branch, so the ranges have to be reconstructed
 from merge commits and the commands rewritten. D8.2 says how.
 
 **Phase 7 is `In progress`, and one of its statements is false.**
-7a.5 and 7a.6 have since both run, and 7b is operator-held. Line
-987 asserts that "`43b7f59` runs `node --version && npm --version`
-as the first step of the publish job". It does not: the commit that
-added that step, `8351a5b`, was authored eight minutes after #9
-merged and sits orphaned on `origin/typescript-onboarding-phase7`.
-Corrected at source. This phase does not wait on 7b -- see Scope --
-but it does depend on 7a.5 and 7a.6 having run, because their
-results are text this audit reads. D8.4.
+7a.5 and 7a.6 have since both run, and 7b is operator-held. Phase
+7's *What implementation found* asserted that "`43b7f59` runs `node
+--version && npm --version` as the first step of the publish job".
+It does not: the commit that added that step, `8351a5b`, was
+authored eight minutes after #9 merged and sits orphaned on
+`origin/typescript-onboarding-phase7`. Corrected at source, which
+is why no line here cites a line number for it. This phase does not
+wait on 7b -- see Scope -- but it does depend on 7a.5 and 7a.6
+having run, because their results are text this audit reads. D8.4.
 
 **The Situation section's figures are start-state and still
 correct as history.** "51 checks: 6 pass, 9 fail, 36 not
 applicable" was the pre-plan verdict. Today hunkydory reports 55
-checks, 28 pass, 1 fail, 26 not-applicable, the failure being the
-`review-coverage` backlog phase 6 opened deliberately. Nothing to
-correct; recorded so the next reader does not think the Situation
-has drifted.
+checks with no failure other than `review-coverage`, which phase 6
+opened deliberately and which reopens whenever a reviewed file
+changes. Nothing to correct; recorded so the next reader does not
+think the Situation has drifted.
 
 #### Decisions
 
@@ -1354,9 +1370,15 @@ The ranges, from the `Merged` column plus the omissions above:
 
 | Repository | Default | Merges to audit |
 |---|---|---|
-| `shakenfist/development` | `main` | `decaa4d` (#118), `a7f4798` (#125), `b8e8fd2` (#126), `b86f2bb` (#127), `d102e9f` (#128), `9fe50ee` (#130), and this planning pull request's merge, which step 8.1 fills in |
-| `shakenfist/hunkydory` | `develop` | `73cdca7` (#1), `3d556a6` (#7), `6da49c1` (#9), `19733c2` (#14), and the probe-deletion merge from step 8.0 |
+| `shakenfist/development` | `main` | `decaa4d` (#118), `a7f4798` (#125), `b8e8fd2` (#126), `b86f2bb` (#127), `d102e9f` (#128), `9fe50ee` (#130), and `254bb83` (#137) |
+| `shakenfist/hunkydory` | `develop` | `73cdca7` (#1), `3d556a6` (#7), `6da49c1` (#9), `19733c2` (#14), and `43beb85` (#17) |
 | `mach33labs/33fl` | `master` | `bc50c52a` (direct, not a merge -- diff against its single parent) |
+
+`d102e9f` (#128) is in the development row **in error**: its branch
+name reads like this plan's phase 2 but it belongs to the
+image-supply-chain plan. The row is left as the range the audit
+actually used, because that is a fact about what was covered; see
+DEV-1 in the Audit outcome below.
 
 `e216f93` (#8) is deliberately absent from hunkydory's row: it
 merged into `typescript-onboarding-phase5`, so `3d556a6` already
@@ -1418,7 +1440,8 @@ unchanged. This is a gap in the record, not a blocked phase.
 | 8.7 | high | opus | none | Wave 2b and 2c (tests, documentation) against `shakenfist/development`. 2c has the most to do: this plan changed `docs/plans/index.md`, `PLAN-TEMPLATE.md` adjacent prose, four `docs/audits/` specs and its own 1,300-line plan file, and the documentation brief is the one that catches a page phase 2 made wrong and phase 5 never revisited. Check the plan's own internal consistency too -- the survey above found a head commit recorded as a merge and a false claim about `43b7f59`, both of which a documentation wave should have caught. Report findings; fix nothing. |
 | 8.8 | high | opus | none | Wave 2 against hunkydory, all four briefs, using hunkydory's `PUSH-AUDIT.md`. This is where D8.3's four unaudited pull requests actually get read: phases 2, 5, 6 and 7a built the entire repository's fleet integration and none of it has had a judgment pass. Highest-value targets are `release.yml` (a token-holding publish job), `.vscodeignore` (an allow-list that can ship too little), and `tools/`. Report findings; fix nothing. |
 | 8.9 | medium | opus | none | **Management session, not a sub-agent.** Collect every finding from 8.3 to 8.8, deduplicate across repositories, and triage each into fix / decline / defer-to-Future-work. Write the outcome into this section: what was audited, what the ranges were, what was found, and -- if nothing was -- say so in one sentence, which the shared block calls a real result. Record that hunkydory's per-pull-request audits did not happen (D8.3) and that 33fl got the mechanical wave only (D8.5). |
-| 8.10 | medium | sonnet | none | Land the findings as their own pull request per repository, separate from this planning commit. The plan is not complete until each is resolved or declined in writing, and a declined finding says why, here, where the next reader will find it. If 8.9 found nothing anywhere, this step is skipped and 8.9's sentence stands instead. |
+| 8.10 | high | opus | worktree | **Findings pull request, `shakenfist/development`.** Fix DEV-1 to DEV-13 and DEV-15 from the Audit outcome table as one pull request onto `main`, separate from this planning commit. Start with DEV-3, `PLAN-TEMPLATE.md:508-513` -- the bullet beginning "Any new or changed criterion has all four of its parts in step", which is the text to grep for if the template has shifted again by the time you read this: it is the root cause and DEV-4 is it reappearing, so correct the template first and then make this plan's `:369`, `:374`, `:1725` and `:1828` agree with it -- a criterion is five files, and `AUDIT_METADATA`, `ISSUE_TITLES` and the column table are derived views rather than tables anyone edits. DEV-11 and DEV-12 are code with tests: in `scripts/test_audit_snapshot.py`, widen `:245`'s `class (\w+)\(Check\):` so an intermediate base class such as `NpmPackageCheck` is matched, or derive the map from `registry.CHECKS` instead of by regex, and **add** a coverage assertion that `set(scheduled)` equals `{check.id for check in registry.CHECKS}`, which is the assertion that would have caught this -- add it alongside `:250`'s read guard and `:255`'s existing `assertEqual(derived, set(audit_snapshot.NETWORK_CHECKS))`, replacing neither, because the existing equality is not what is broken; route `scripts/audit-manage-issues.py:169`'s `details` append through the same `ISSUE_BODY_BUDGET` accounting `render_issue_items` already uses. DEV-15 is test-only. DEV-5 touches two fleet templates, so word it as "the static runners" and say nothing about the VM lanes, which is what `mermaid-lint.yml:86` actually uses. DEV-1 corrects the rule's application, not the range history: D8.2's table stays as the range the audit used. Every `:NNNN` pointer in this table was resolved against the merge result and is correct at that commit, but your own edits shift every line below the first one you make: re-resolve each pointer by grepping the quoted text rather than trusting the number, and work bottom-up through the file. DEV-10 is this defect in its previous incarnation. Also add DEV-14, DEV-16 and hunkydory's five deferred findings -- HD-1, HD-2, HD-9, HD-11 and HD-12, but not HD-14, whose repair 7b.0 already carries -- to this plan's Future work section, filing each issue against the repository that carries the defect -- Future work lives here even where the defect does not. Leave the hunkydory fixes to 8.11. Commit subject: `Fix what the phase 8 audit found.` |
+| 8.11 | high | opus | worktree | **Findings pull request, `shakenfist/hunkydory`.** Fix HD-3 to HD-8, HD-10 and HD-13 from the Audit outcome table as one pull request onto `develop`. HD-7 is the only source change: `src/diff.ts:8`'s `HUNK_RE` ends `@@(.*)$`, and neither `.` nor `$` copes with a `\r`, so every CRLF patch file is a silent no-op -- fix the expression and add a CRLF case, because the corpus has none and a fix with no test here is how this survived four pull requests. HD-4 needs a glob that crosses a directory separator, plus a test that a nested module survives `vsce ls`, since 8.8 proved the current one drops it. HD-5 and HD-6 are the two documents that instruct or ship: reconcile `RELEASE-SETUP.md` against `release.yml` as it actually is -- three jobs, `publish-marketplace`, and `npm ci --ignore-scripts` rather than no `npm ci` -- and delete `README.md:55-57`'s claim of a git oracle rather than softening it, because no test invokes git at all. HD-3 wants the fork guard `pr-re-review.yml` already carries. HD-10 is a hand edit of `REVIEWS.md:31`; `prune-reviews` cannot do it, because HD-9 is why that workflow has never once succeeded. Leave HD-1, HD-2, HD-9, HD-11, HD-12 and HD-14 alone: they are deferred, and each needs an operator decision or an issue rather than a patch. Commit subject: `Fix what the push audit found.` |
 
 #### Risks and mitigations
 
@@ -1474,8 +1497,11 @@ contemplated ending rather than a failure.
   work -- or this section says in one sentence that the audit found
   nothing.
 * `pre-commit run --all-files` passes in this repository, and the
-  audit against hunkydory still reports one failure and it is
-  `review-coverage`.
+  audit against hunkydory reports no failure other than
+  `review-coverage`. This bullet originally pinned "one failure,
+  and it is `review-coverage`", which is the wrong shape: the count
+  moves whenever the review queue does, and it moved twice while
+  this phase ran. What has to hold is that nothing else fails.
 
 #### Back brief gate
 
@@ -1485,6 +1511,230 @@ the diffs built from them, and a wrong range produces an audit that
 looks complete and is not. That is the failure the shared block
 spent a paragraph on, and the survey found one instance of it
 already in the column this table is built from.
+
+#### Audit outcome
+
+Run on 2026-09-19. Steps 8.0 to 8.8 executed as written, with the
+sub-agents and models the step table names. This section is step
+8.9's record, written by the management session rather than by a
+sub-agent, as that step requires.
+
+**What was audited.** Three repositories against the ranges in
+D8.2's table, which step 8.1 completed with `254bb83` (#137) and
+`43beb85` (#17). Step 8.2 built seven diff files rather than
+three, because four of the mechanical checks are pathspec-scoped
+and D8.2 requires each to read its own file: development
+277,778 bytes flat plus `*.py` (88,217), `scripts/*.py`,
+`docs/audits/compliance.md` (empty) and `docs/audits/*.md`
+(20,945); hunkydory 243,739 bytes; 33fl 1,475 bytes over 34
+lines. All three of 8.2's file-presence sanity checks passed.
+Wave 1 then ran over all three trees -- 8.3 development, 8.4
+hunkydory against hunkydory's own runbook, 8.5 33fl mechanical
+only -- and wave 2 over development in two sub-agent pairs (8.6
+code quality and security, 8.7 tests and documentation) and over
+hunkydory with all four briefs (8.8).
+
+**The headline is that the code is sound and the documentation is
+not.** No defect was found in any shipped logic this plan
+introduced. development's 1,093 tests pass, at 92% branch
+coverage over the new module; hunkydory's suite and its 187 of
+187 corpus cases pass; 33fl produced no findings at all. Both
+questions 8.6 was given came back clean with proof: the npm
+criteria cannot file against a repository with no
+`package.json`, because all three inherit a shared
+`NpmPackageCheck.applies()` gate that `registry.run_check` calls
+before `run()` (`scripts/audit/checks/npm_dependencies.py:754`;
+verified against twenty fleet repositories, zero failures), and
+nothing phase 3 added reads the network -- its one subprocess
+call is `git ls-files` with an argv list, no shell, a `--`
+terminator and a timeout.
+
+What the audit did find is a documentation-integrity problem with
+a single root cause, plus the pre-existing defects in hunkydory's
+fleet integration that D8.3 predicted would be there.
+
+**The root cause is one stale paragraph in `PLAN-TEMPLATE.md`.**
+`PLAN-TEMPLATE.md:508-513` still carries the "all four of its
+parts" rule for a criterion, which `PUSH-AUDIT.md` was corrected
+away from: a criterion spans five files, and `AUDIT_METADATA`,
+`ISSUE_TITLES` and the column table are derived views rather than
+tables anyone edits. This plan *diagnosed* that staleness at line
+355 and fixed it downstream without fixing the template it came
+from, so the template kept emitting it -- three of the findings
+below are that paragraph reappearing in this plan's own prose.
+Fixing the template is therefore the highest-value item in 8.10,
+because it is the only one that stops the next plan inheriting
+the same error.
+
+**The range this audit used was itself wrong, and the audit
+caught it.** `d102e9f` (#128) is in D8.2's development row on the
+strength of its branch name, `phase2-correction`, which reads
+like this plan's phase 2. It is not this plan's work: it touches
+only `PLAN-image-supply-chain.md` (+155/-13) and `index.md`, and
+belongs to the image-supply-chain plan. This plan's real phase-2
+correction is `b86f2bb` (#127), which is separately in the row.
+So `phase8-development.diff` carried 155 lines of another plan's
+prose, in violation of D8.2's own rule that the range holds every
+merge *this plan* caused. The consequence is a superset, not a
+gap: the audit read more than it needed to and no finding arose
+from those lines. The range is left as it was used, with a
+pointer above, because what a completed audit actually covered is
+a fact worth recording accurately; 8.10 corrects the rule's
+application, not the history. The management session had verified
+that every sha existed and was an ancestor of the default branch
+and called the ranges sound -- existence and ancestry, but never
+provenance. That is the check the back brief gate should have
+made and did not.
+
+**One Definition of done item is unsatisfiable because the
+outcome was better than planned.** The last bullet required that
+"the audit against hunkydory still reports one failure and it is
+`review-coverage`". Re-run on 2026-09-19 the audit reports 55
+checks, **29 pass, 0 fail, 26 not-applicable**: the operator
+worked the review queue and `review-coverage` now passes at 25 of
+25 files reviewed. The bullet is corrected in place below, since
+leaving a knowingly false criterion in the section that records
+the audit would be the same defect this audit is reporting. The
+five other places that assert the old figures are elsewhere in the
+plan and are 8.10's work. The plan-wide success criterion -- "no
+failures other than `review-coverage`" -- stays true and needs no
+change.
+
+**And the count moved again before the findings landed.** Step
+8.11 changed nine files and ran the repository's own review prune,
+which expired their marks: `REVIEWS.md` now reads 16 of 27 and
+`review-coverage` fails again, putting hunkydory back at 28 pass,
+1 fail, 26 not-applicable -- the figure this plan asserted all
+along, arrived at from the other direction. That is the review
+system working rather than a regression, and it is the argument
+for pinning no verdict triple anywhere: what is durable is that
+nothing other than `review-coverage` fails.
+
+**D8.3: hunkydory #1, #7, #8 and #9 were not push-audited when
+they landed, and this phase audited them instead.** The shared
+block expects a phase landing in another repository to be audited
+against that repository's default branch as part of the pull
+request that lands it, with this phase citing that audit rather
+than re-running it. No such record exists in any of the four pull
+request bodies. Four pull requests built hunkydory's entire fleet
+integration -- the local tooling, CI, review onboarding and the
+release workflow -- and none had a judgment pass until 8.8 today.
+That is recorded here, as D8.3 asked, because it is a process
+finding about this plan rather than a defect in hunkydory's code,
+and because it is the kind of omission that recurs silently: the
+step that would have caught it is the one nobody is blocked by.
+The critical finding and two of the three high ones below are in
+code those four pull requests shipped; the third is a repository
+setting none of them could have set.
+
+**D8.5: 33fl received the mechanical wave only, and found
+nothing.** Wave 1's language-agnostic greps over the 34-line
+diff, plus one reader checking `bc50c52a` against
+`static_runner.yml`'s surrounding conventions and against what D1
+said phase 4 would do. No judgment sub-agent ran and there is no
+`PUSH-AUDIT.md` in that repository, so the runbook used was this
+one's mechanical section. The sixteen added lines are
+alphabetical, unpinned, idempotent, match the file's conventions
+and do exactly what D1 promised. One piece of context the reader
+surfaced for 7b.0 rather than as a finding: the commit's own
+comment ties the node version to `static_runner_debian_release`,
+so a static runner still on Debian 12 carries node 18, which
+reached end of life in April 2025. Node on the static pool is
+rollover-dependent rather than guaranteed.
+
+##### Findings
+
+Thirty-one findings survived deduplication, across two
+repositories. Severities are the auditing sub-agent's, kept
+rather than renormalised so that a reader can tell which brief
+raised what. Every bare `:NNN` below is a line of this file as it
+stood at `6db89f6`, the commit that recorded this section; 8.10's
+fixes moved them, and the table is left citing what the audit
+actually read.
+
+| ID | Repo | Severity | Finding | Disposition |
+|---|---|---|---|---|
+| DEV-1 | development | factual | `d102e9f` (#128) is in D8.2's range on the strength of a misleading branch name; it belongs to the image-supply-chain plan. Range covered a superset; no finding arose from it. | Fix (8.10) |
+| DEV-2 | development | factual | The hunkydory verdict is asserted as 28 pass / 1 fail / 26 not-applicable at `:661`, `:744`, `:906` and `:1294`, and `:819` asserts the single `review-coverage` failure without counts. Phase 8's DoD required that failure to exist. It is now 29 / 0 / 26 -- so the four sites need their arithmetic corrected and `:819` needs its meaning changed, since dropping the failure empties the bullet rather than renumbering it. | Fix: DoD bullet corrected here, the other five in 8.10 |
+| DEV-3 | development | blocking-grade | `PLAN-TEMPLATE.md:508-513` -- the bullet beginning "Any new or changed criterion has all four of its parts in step" -- carries the superseded four-part criterion rule. Root cause of DEV-4, and still propagating into new plans. | Fix (8.10) |
+| DEV-4 | development | factual | Inherited from DEV-3: `:369` and `:1725` require a frozen column-table line that correctly does not exist, and `:374`, `:1725` and `:1828` say the npm tests live in `test_packaging.py` when they are in a new 777-line `test_npm_dependencies.py`. | Fix (8.10) |
+| DEV-5 | development | cross-page, ships to fleet | Four mermaid-lint pages promise the runners carry node, in two wordings: `templates/mermaid-lint/README.md:44` and `docs/audits/mermaid-lint-ci.md:120` say "node 20", while `templates/mermaid-lint/mermaid-lint.sh:21` and `tools/mermaid-lint.sh:21` say "the runners carry node" with no version. Both wordings imply a pool-wide guarantee phase 4 did not create, so grepping for "node 20" finds only half the sites. But `mermaid-lint.yml:86` runs on `[self-hosted, vm, debian-13-docker, s]` and phase 4 put node on the **static** pool only. Two of the four are fleet templates. | Fix (8.10) |
+| DEV-6 | development | factual | Future-work bullet `:1855` says `33fl/static_runner.yml:630` is still `debian:12`. There is no `debian:12` anywhere in that file; the executor image is at line 736 and reads `debian:{{ static_runner_debian_release }}`. The plan's own phase 4 contradicts the bullet at `:479`. | Fix (8.10) |
+| DEV-7 | development | factual | The consolidated Risks section restates two risks phase 4 records as resolved, and `:1776` cites line 229 of `static_runner.yml`, which is a `set_fact`; the loop it means is at 268. | Fix (8.10) |
+| DEV-8 | development | spec vs reality | Three criterion specs diverge from their code: the undeclared-dependency spec claims all four false-positive kinds appear in hunkydory when only three do; the pin spec documents `npm install` while the regex also matches `npm i` and `npm add`, and is silent on workspace roots where both siblings are explicit; the `README.md` index row says the lockfile is checked "current" while the spec says currency is explicitly not checked. | Fix (8.10) |
+| DEV-9 | development | factual | "sixteen other repositories" at `PUSH-AUDIT.md:7` and `AGENTS.md:82`, and "access to sixteen repositories" at `PUSH-AUDIT.md:449`. The matrix in `consistency-audit.yml:21-46` has 21 entries, so 20 others. `:449` is a different sentence from the other two -- it is about a token's blast radius, not about what this repository audits -- so it needs its own rewording. Phase 1 added hunkydory and left the prose. | Fix (8.10) |
+| DEV-10 | development | factual | Stale self-citations: `:1283` narrates a pre-correction line 987, and `:743` cites `packaging.py:819` where the expression is at 818. | Fix (8.10) |
+| DEV-11 | development | medium, in-window | `scripts/test_audit_snapshot.py:245` derives the network-check set with `class (\w+)\(Check\):`, which matches **zero** classes in `npm_dependencies.py` because all three inherit `NpmPackageCheck` (`npm_dependencies.py:754`). It covers 52 of 55 criteria. The test does assert `derived == set(NETWORK_CHECKS)` at `:255`, but the three missing ids are absent from **both** sides of that equality, so it holds vacuously for them and the test passes green. `:250`'s `assertTrue(scheduled)` is a could-we-read-the-schedule guard, not the coverage assertion. This window opened the hole: phase 3 is the first criteria family to use an intermediate base class. | Fix (8.10): widen the regex **and** add a coverage assertion that the id map covers every registered check |
+| DEV-12 | development | low, in-window | `scripts/audit-manage-issues.py:169` appends `check_result['details']` unbounded and unfenced; `ISSUE_BODY_BUDGET` (`:118`, added the same window) guards only `render_issue_items`. The npm criteria route per-item lists through `details` and embed a workflow's `run:` line verbatim, so a body can exceed GitHub's 65,536-character limit, `gh_create_issue` returns `None`, and the criterion silently stops filing while the audit reports success. (This row says "unbounded **and unfenced**"; only the bound was fixed. Fencing `details` would change every issue body, and most criteria write markdown into it deliberately -- backticked paths, bold headings -- so a fence would break the ones that are correct today to harden against a repository crafting its own issue text, which is DEV-17's ground. The escaping half is declined below rather than left implied.) | Fix (8.10), bound only |
+| DEV-13 | development | runbook defect | `PUSH-AUDIT.md:50` scopes the new-imports grep with `'scripts/*.py'`. Git's fnmatch without `:(glob)` magic lets `*` cross `/`, so that pathspec selects exactly what `'*.py'` selects and the two scopes are indistinguishable -- both return all 56 files. `:(glob)scripts/*.py` matched nothing over this audit's range, because every changed `.py` file sat in a subdirectory, but against the tree it matches the 13 files directly under `scripts/`: the intended scope is `:(glob)scripts/**/*.py`. | Fix (8.10) |
+| DEV-14 | development | design gap | `templates/mermaid-lint/` carries no staleness or version mechanism, unlike `templates/shared-blocks/*.md`, which carry a `shared-block: <name> vN` marker and a `validate_shared_blocks()` check. `MermaidLintCi` checks presence and wiring, never content freshness. Phase 4 edited that template's prose and no adopting repository can detect it. `tools/mermaid-lint.sh` and the template copy are byte-identical today with nothing enforcing it. | Future work + issue |
+| DEV-15 | development | test coverage | `manifest_line()` is untested -- replacing its body with `return 1` leaves all 91 tests passing, yet that number is published into every filed issue. `npm i` and `npm add` are enforced but untested. Two `not_applicable` branches are uncovered in two of three criteria. There is no `lockfileVersion: 1` case for the unused-dependency criterion, which would false-fail. Two tests are byte-identical and one assertion is loose. | Fix (8.10) |
+| DEV-16 | development | medium, pre-existing | `scripts/audit/checks/docs_content.py:183` opens files bare inside an `os.walk`. A dangling committed `*.md` symlink raises an uncaught `FileNotFoundError` and every one of the 55 criteria dies for that repository. Predates this plan (`c46afd5`, before `decaa4d~1`), so it is outside the audit range. | Future work + issue |
+| DEV-17 | development | informational | `tsconfig` `outDir` join is not proved contained (no traversal found, but self-evasion is possible); a `RecursionError` can escape `read_json`. | Declined -- see below |
+| HD-1 | hunkydory | critical | No `release` environment exists (`gh api ... /environments` returns `total_count: 0`) and no secrets are set, while `release.yml:106` declares `environment: release`. GitHub auto-creates a referenced environment **unprotected** on first use, so the first tag push creates exactly the unprotected state `RELEASE-SETUP.md:165-174` warns against -- and that document's recovery path is to add `VSCE_PAT` to it. | Defer to 7b.0 + issue |
+| HD-2 | hunkydory | high | Zero rulesets, `develop` unprotected (branch-protection API returns 404), repository public. Any `v*` tag on any ref starts a publish under the `shakenfist` publisher id. | Defer to 7b.0 + issue |
+| HD-3 | hunkydory | high | `ci.yml` runs `on: pull_request` and executes untrusted pull request code -- its own lockfile, its own pre-commit hooks -- on `[self-hosted, static]`, the shared persistent pool serving both `shakenfist` and `mach33labs`. `pr-re-review.yml` guards against fork pull requests; `ci.yml` does not. | Fix (8.11) |
+| HD-4 | hunkydory | high | `.vscodeignore`'s `!out/src/*.js` is a single-segment glob. Proven empirically by 8.8: `out/src/sub/probe.js` is excluded from `vsce ls`. The first nested module under `src/` ships a broken extension, silently. | Fix (8.11) |
+| HD-5 | hunkydory | blocking | `RELEASE-SETUP.md` contradicts `release.yml` on the job count (two versus three), the job name (`publish` versus `publish-marketplace`, including in the troubleshooting section) and, at `:131-136`, on the security control: it states the job "runs no `npm ci` and no package lifecycle scripts of any kind" when `release.yml:151` runs `npm ci --ignore-scripts`. The security property holds; the described mechanism is wrong. | Fix (8.11) |
+| HD-6 | hunkydory | blocking | `README.md:55-57` claims a test suite that uses git as an oracle. No test invokes git at all; every fixture is hand-typed. This README ships as the Marketplace listing. | Fix (8.11) |
+| HD-7 | hunkydory | medium | CRLF patch files are a silent no-op through the string API. `src/diff.ts:8`'s `HUNK_RE` ends `@@(.*)$`; `.` does not match `\r` and `$` is not multiline. Verified: a CRLF header does not match. No CRLF test exists. (This row originally said *every* CRLF patch file is a no-op. 8.11 established that the editor paths were fine -- they all read `document.lineAt(i).text`, which excludes the terminator -- so what was broken is `recountText` and `looksLikeDiff`, which is to say the regression harness and any non-editor caller. Root cause was `recountText` splitting on `\n` alone, not the expression.) | Fix (8.11), with a regression test |
+| HD-8 | hunkydory | medium | `isPatch` matches any `*.patch` by filename regardless of language id, which is wider than `activationEvents: onLanguage:diff`; under `hunkydory.mode: onSave` that rewrites bytes on disk in a file the user never opened as a diff. | Fix (8.11) |
+| HD-9 | hunkydory | medium | `prune-reviews.yml` has failed 6 of 6 runs since 2026-09-15 and `renovate.yml` 4 of 4, both for missing token secrets. Review pruning and dependency updates are inert, and have been since they were installed. | Defer to 7b.0 + issue |
+| HD-10 | hunkydory | factual | `REVIEWS.md:31` still attests `.github/workflows/runner-probe.yml`, deleted by #17, and claims "26 of 26 in-scope files are currently reviewed". Confirmed still present on `develop`. This corrects PR #17's body, which said `prune-reviews` would drop the row automatically: that run (`35413757830`) failed, per HD-9. | Fix (8.11), by hand |
+| HD-11 | hunkydory | medium | `release.yml`'s `github-release` job calls a reusable workflow at `@main` with `secrets: inherit`, and third-party actions are unpinned. This is fleet convention rather than a hunkydory choice, so fixing it here alone would diverge without improving the fleet. | Future work + issue, fleet-wide |
+| HD-12 | hunkydory | medium | The `build` job runs a bare `npm ci` on the shared static pool. The token is not present in that job, but the `.vsix` the publish job later signs and ships is produced there. Tightening it needs the devDependency install-script question settled first. | Future work + issue |
+| HD-13 | hunkydory | low | The publish step's `.vsix` glob guard passes when the glob matches nothing. | Fix (8.11) |
+| HD-14 | hunkydory | latent | `release.yml`'s publish job runs on `[self-hosted, vm, debian-13, s]`, a lane that carries neither node nor npm, and the workflow header's comment claiming otherwise is false. Found by 7a.6, already recorded; the repair is 7b.0's, not this phase's. | 7b.0 (already assigned) |
+
+##### Declined, with reasons
+
+**DEV-17, the two informational items from 8.6.** The `outDir`
+join is not *proved* contained, but no traversal exists and the
+only way to exploit it is for a repository to evade its own
+audit, which it can do by deleting the file. A `RecursionError`
+escaping `read_json` requires a hand-crafted several-thousand-deep
+`package.json`; the audit already fails loudly rather than
+silently passing in that case. Both are hardening against an
+adversary who is auditing themselves, which is not the threat
+model -- `PUSH-AUDIT.md`'s preamble frames the blast radius as
+accidental fleet-wide damage, not a hostile repository.
+
+**The escaping half of DEV-12.** The row names `details` as
+unbounded *and* unfenced, and 8.10's brief scoped the repair to the
+bound. Escaping it is declined on DEV-17's ground and for a second
+reason of its own: `details` is written by the criteria as markdown
+on purpose, so fencing or stripping it would degrade every issue the
+fleet files today in order to harden against a repository injecting
+markdown into an issue on itself. If it is worth doing it is a change
+to how every criterion writes `details`, which is a separate pull
+request rather than a wider version of this one.
+
+**The remaining advisory items from 8.8.** 8.8 raised a further
+set of stylistic and consistency observations in hunkydory's
+documentation below the severity of HD-5 and HD-6. They are
+declined as a group: each is a wording preference rather than a
+statement that is false, and 8.11 is already rewriting the two
+documents most of them touch. If any survives that rewrite it is
+a new finding against the new text, which is the right place to
+catch it.
+
+**No finding was rejected under the superseded-hunk rule.** The
+risks section anticipated that the concatenated diff would show
+an auditor an intermediate state as the shipped one --
+`.vscodeignore`'s deny-list and allow-list both appear in
+hunkydory's diff. 8.8 read the current tree for that file, as
+D8.2 requires, and HD-4 is against the shipped allow-list. One
+apparent finding *was* rejected: 8.7 reported the range table's
+sha placeholders as still present, which was an artefact of
+reading `main` while step 8.1's fill-in was an uncommitted edit in
+the audit worktree.
+
+**Calibration.** 8.7 was pointed at the two defects the survey had
+already found -- the head commit recorded as a merge, and the
+false claim about `43b7f59` running `node --version` -- and
+confirmed both are correctly fixed in the current tree. Its other
+findings are therefore worth what they claim to be, which is the
+mitigation the risks section named.
 
 ## Agent guidance
 
@@ -1511,7 +1761,7 @@ patterns already worked out elsewhere in the fleet.
 |------|--------|-------|-----------|---------------------|
 | 1 | medium | sonnet | none | Add `hunkydory` to the matrix in `.github/workflows/consistency-audit.yml` and to the in-scope list in `docs/audits/README.md`, and confirm it is absent from the excluded list. Those are the three statements `audit/scope.py` parses and `AuditScopeIsStatedOnceTest` holds them to each other, so all three change together. Do **not** add a `REPO_OVERRIDES` entry: per D4 the Python criteria already skip on the absence of `pyproject.toml`, and `detect_repo_properties()` has no per-criterion not-applicable key to carry a reason in. |
 | 2 | medium | sonnet | none | In hunkydory: add Biome with a `biome.json` set to 100 columns, single quotes, semicolons; write `tools/check-node.sh` mirroring ryll's `scripts/check-rust.sh`; add `.pre-commit-config.yaml` calling it as a `language: script` hook alongside shellcheck, gitleaks and skillsaw; fix four relative links; align `@types/node` and add `engines.node`; copy `PUSH-AUDIT.md` in and reference it from `AGENTS.md`. |
-| 3 | high | opus | worktree | Add three `Check` subclasses for npm dependency auditing to `scripts/audit/checks/`, following the worked brief in `PLAN-TEMPLATE.md`. Register in `scripts/audit/registry.py`, write a spec page each under `docs/audits/`, add them to the index in `docs/audits/README.md`, add their lines to `FROZEN_METADATA`, `FROZEN_ISSUE_TITLES` and the frozen column table in `scripts/tests/test_metadata.py`, and add tests in `scripts/tests/test_packaging.py` covering pass, fail and not-applicable. They must report not-applicable with a reason where there is no `package.json`, including against this repository -- hunkydory is the only repository in the fleet that has one. Read the phase 3 section for the five exemptions the dependency checks must carry (node builtins in both spellings, the host-provided `vscode` module, relative imports, `@types/*`, and devDependencies invoked from `scripts`); without them the first run files three false issues on hunkydory. |
+| 3 | high | opus | worktree | Add three `Check` subclasses for npm dependency auditing to `scripts/audit/checks/`, following the worked brief in `PLAN-TEMPLATE.md`. Register in `CHECKS` in `scripts/audit/registry.py`, write a spec page each under `docs/audits/`, add them to the index in `docs/audits/README.md`, add their lines to `FROZEN_METADATA` and `FROZEN_ISSUE_TITLES` in `scripts/tests/test_metadata.py` -- but not to `FROZEN_COLUMN_NAMES`, which only carries a criterion that shares a spec page -- and add tests covering pass, fail and not-applicable in their own module, `scripts/tests/test_npm_dependencies.py`. They must report not-applicable with a reason where there is no `package.json`, including against this repository -- hunkydory is the only repository in the fleet that has one. Read the phase 3 section for the five exemptions the dependency checks must carry (node builtins in both spellings, the host-provided `vscode` module, relative imports, `@types/*`, and devDependencies invoked from `scripts`); without them the first run files three false issues on hunkydory. |
 | 4 | high | opus | worktree | Done bar this plan file; most of it had already landed in `33fl`, see the phase 4 section. Includes rewording the node half of the mermaid-lint rationale in the four files the phase 4 section names. |
 | 5 | medium | sonnet | none | Copy the fleet workflow templates into hunkydory, including `secret-scan.yml`, substituting TypeScript for Python in CodeQL, and write `ci.yml` calling `tools/check-node.sh` on `[self-hosted, static]` with `npm_config_cache` under `runner.temp`, plus a job running `pre-commit run --all-files`. Read the phase 5 section for the four criteria that go live when `.github/workflows/` first appears. |
 | 6 | medium | sonnet | none | Deploy review tracking per `docs/code-review-tracking.md`, scoped to `src/` and `test/`. |
@@ -1552,25 +1802,29 @@ The material below is stated in the phases too; it is gathered here
 because somebody deciding whether to approve phase 4 should not have
 to reassemble it from three sections.
 
-**Trixie regressions the runner phase has not verified.** Phase 4
-moves the static runner image from `debian:12` to `debian:13` without
-having confirmed that the playbook's `yq` install via `pip
---break-system-packages`, the shared `docker.yml`, the claude CLI
-install, or `python3-venv` and the rest of the base package list
-behave the same on trixie. *Mitigation:* those four are named as
-must-verify in phase 4 and are a precondition for proposing the
-change, not a follow-up. The gradual rollout means a bad image
-surfaces on one runner rather than all of them.
+**Trixie regressions the runner phase has not verified. Resolved.**
+Phase 4 planned to move the static runner image from `debian:12` to
+`debian:13` without having confirmed that the playbook's `yq`
+install via `pip --break-system-packages`, the shared `docker.yml`,
+the claude CLI install, or `python3-venv` and the rest of the base
+package list behave the same on trixie. *Outcome:* another session
+had already made the move, the operator replaced every static runner
+on 2026-09-12, and the fleet has been serving jobs on Debian 13
+since -- which answers all four empirically rather than by
+inspection. See phase 4.
 
-**A mixed node-18 and node-20 pool for about a week.** Line 229 is
-inside the loop over `missing_runners`, so only newly created
-instances get the new image and the weekly retire-and-rebuild cycle
-replaces the fleet over roughly a week. A job could land on either.
-*Mitigation:* hunkydory was verified to build and pass its 20 tests
-on Debian 12's node 18.20.4, so both halves of the pool can run it;
-and phase 5 waits for the rollout to finish rather than for phase 4
-to land. "Landed" and "rolled out" are a week apart and the plan says
-so.
+**A mixed node-18 and node-20 pool for about a week. Resolved, and
+it never arose.** The instance-creation task takes its image from
+`33fl/static_runner.yml:249` and loops over `missing_runners` at
+`:268`, so only newly created instances would have got the new image
+and the weekly retire-and-rebuild cycle would have replaced the
+fleet over roughly a week, with a job able to land on either half.
+*Outcome:* the fleet was replaced with Debian 13 before `nodejs`
+joined the package list, so the package change landed on node 20
+everywhere at once. The mitigation held anyway -- hunkydory was
+verified to build and pass its 20 tests on Debian 12's node 18.20.4
+-- and a future release bump reopens the window, which is why
+`static_runner.yml` carries the warning beside the package list.
 
 **Phase 3's criteria are measured against the whole fleet the next
 morning.** A wrong criterion files issues in twenty repositories
@@ -1609,12 +1863,15 @@ because the following statements will be true:
   which stays open until the human review queue has been worked.
 * `scope-coverage` passes against `development` again.
 * `pre-commit run --all-files` passes in both repositories.
-* The three npm criteria have every part in step: the check, its
-  registration in `scripts/audit/registry.py`, the specification
-  under `docs/audits/`, the line in `docs/audits/README.md`, their
-  lines in `FROZEN_METADATA`, `FROZEN_ISSUE_TITLES` and the frozen
-  column table in `scripts/tests/test_metadata.py`, and tests in
-  `scripts/tests/test_packaging.py`.
+* The three npm criteria have all five of their files in step: the
+  check, its registration in `CHECKS` in
+  `scripts/audit/registry.py`, the specification under
+  `docs/audits/`, the line in `docs/audits/README.md`, and their
+  lines in `FROZEN_METADATA` and `FROZEN_ISSUE_TITLES` in
+  `scripts/tests/test_metadata.py`. None carries a
+  `FROZEN_COLUMN_NAMES` line, because each has its own spec page.
+  Tests are their own module,
+  `scripts/tests/test_npm_dependencies.py`.
 * No `REPO_OVERRIDES` entry was needed, or any that was added
   carries a stated reason.
 * A push to `hunkydory` runs `npm ci` and its tests on a static
@@ -1641,9 +1898,15 @@ been superseded.
 * `release-process` measures a Python package. A TypeScript arm --
   or a language-neutral restatement -- is worth considering once
   there is more than one non-Python release to describe.
-* The GitLab docker executor image at `33fl/static_runner.yml:630`
-  is still `debian:12` after phase 4. Somebody should decide whether
-  it follows.
+* ~~The GitLab docker executor image is still `debian:12` after
+  phase 4.~~ Not true, and it was not true when written. There is no
+  `debian:12` anywhere in `33fl/static_runner.yml`: the executor
+  image is at `:736` and reads `--docker-image debian:{{
+  static_runner_debian_release }}`, so it follows the fleet rather
+  than needing a decision. Phase 4's own verification questions say
+  so. Kept struck through rather than deleted, because a future-work
+  item nobody can find again reads as work that was silently
+  dropped.
 * hunkydory's `test/corpus.ts` points by default at a sibling
   `kerbside-patches` checkout, so the corpus check's verdict depends
   on which branch that checkout happens to be on. It degrades
@@ -1698,6 +1961,68 @@ been superseded.
   repository infrastructure alongside the 6 that belonged in it. The
   `.vscodeignore` allow-list fixes this repository; nothing stops the
   next one.
+
+The phase 8 audit deferred seven findings to here rather than
+fixing them in 8.10 or 8.11, because each needs an operator
+decision, a repository setting, or a change wider than this plan.
+Each names the repository its issue belongs against, which is the
+one carrying the defect rather than the one carrying this plan.
+
+* **DEV-14: `templates/mermaid-lint/` has no staleness mechanism**
+  (`shakenfist/development`). `templates/shared-blocks/*.md` carry a
+  `shared-block: <name> vN` marker and `validate_shared_blocks()`
+  measures adopting repositories against it. The mermaid-lint
+  template has nothing equivalent: `MermaidLintCi` checks presence
+  and wiring, never content freshness. Phase 4 edited that
+  template's prose and no adopting repository can detect it.
+  `tools/mermaid-lint.sh` and the template copy are byte-identical
+  today with nothing enforcing it, and phase 8 had to check that by
+  hand.
+* **DEV-16: one dangling symlink kills the whole audit for a
+  repository** (`shakenfist/development`).
+  `scripts/audit/checks/docs_content.py:183` opens files bare inside
+  an `os.walk`, and `registry.run_check` has no handler, so a
+  committed `*.md` symlink to a missing target raises
+  `FileNotFoundError` and all 55 criteria die for that repository.
+  It predates this plan (`c46afd5`, before `decaa4d~1`) and so is
+  outside the audit range, which is the only reason it is here
+  rather than in 8.10.
+* **HD-1: the `release` environment does not exist**
+  (`shakenfist/hunkydory`). `release.yml` declares `environment:
+  release`, `gh api .../environments` returns `total_count: 0`, and
+  no secrets are set. GitHub auto-creates a referenced environment
+  **unprotected** on first use, so the first tag push creates
+  exactly the state `RELEASE-SETUP.md` warns against -- and that
+  document's recovery path is to add `VSCE_PAT` to it. 7b.0 is
+  where this is decided; the issue is so that an abandoned 7b
+  leaves a record.
+* **HD-2: the repository has no branch protection and no rulesets**
+  (`shakenfist/hunkydory`). `develop` is unprotected (the
+  branch-protection API answers 404), there are zero rulesets, and
+  the repository is public, so any `v*` tag on any ref starts a
+  publish under the `shakenfist` publisher id. This is a repository
+  setting; nothing in a pull request can fix it.
+* **HD-9: `prune-reviews.yml` and `renovate.yml` have never
+  succeeded** (`shakenfist/hunkydory`). Six of six runs and four of
+  four runs have failed since 2026-09-15, both for missing token
+  secrets. Review pruning and dependency updates have been inert
+  since they were installed, which is also why `REVIEWS.md` still
+  attests a file #17 deleted. Needs an operator to add the secrets.
+* **HD-11: reusable workflows at `@main` with `secrets: inherit`**
+  (`shakenfist/development`). `release.yml`'s `github-release` job
+  calls a reusable workflow at a moving ref while inheriting every
+  secret, and third-party actions are unpinned. This is fleet
+  convention rather than a hunkydory choice -- the templates here
+  are where it comes from -- so fixing it in one repository would
+  diverge without improving the fleet.
+* **HD-12: a bare `npm ci` on the shared static pool**
+  (`shakenfist/hunkydory`). The `build` job runs it on
+  `[self-hosted, static]`, the persistent pool serving both
+  `shakenfist` and `mach33labs`. The publish token is not present
+  in that job, but the `.vsix` the publish job later signs and
+  ships is produced there. Tightening it needs the devDependency
+  install-script question settled first, which is a decision rather
+  than a patch.
 
 ### Bugs fixed during this work
 

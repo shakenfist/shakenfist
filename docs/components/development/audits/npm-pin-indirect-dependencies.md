@@ -26,7 +26,8 @@ reported as a package manager we do not parse.
 * It is committed. A lockfile that only ever existed in the working
   copy that generated it pins nothing for anybody else.
 * Its `lockfileVersion` is 2 or later.
-* No workflow installs the project's dependencies with `npm install`.
+* No workflow installs the project's dependencies with `npm install`,
+  or either of its aliases, `npm i` and `npm add`.
 
 ## Why this is shaped differently to the Python criterion
 
@@ -68,6 +69,12 @@ doing that tests a tree that nothing pinned and nobody reviewed, which
 is the exact failure this criterion exists to prevent, reached from
 the other direction.
 
+`npm i` and `npm add` are the same command under npm's own aliases,
+and are read as `npm install` wherever it is read. Spelling the
+resolving install differently does not make it a different install,
+and a criterion that only knew the long form would be evaded by a
+habit rather than by a decision.
+
 `npm install -g` is not that. A global install puts a tool on the
 runner's path beside the project -- the way several workflows in the
 fleet install the Claude Code CLI -- and touches no lockfile, so it is
@@ -85,6 +92,20 @@ install here", an `echo` saying the same thing, and a comment at the
 end of a `npm ci` line are a workflow describing the mistake rather
 than making it, and failing a compliant repository for saying so is
 the expensive direction to be wrong in.
+
+## Workspace roots
+
+Unlike its two siblings --
+[npm-unused-declared-dependency.md](/components/development/audits/npm-unused-declared-dependency/)
+and
+[npm-undeclared-direct-dependency.md](/components/development/audits/npm-undeclared-direct-dependency/),
+which report a workspace root not applicable because the dependencies
+of such a tree are spread across several manifests -- this criterion
+applies to one. A workspace root has exactly one lockfile, at the
+root, pinning the whole tree, and a workflow that installs with `npm
+install` undoes that pinning for every workspace at once. The
+questions this criterion asks are all answerable from the root, so it
+asks them.
 
 ## What we deliberately do not check
 
