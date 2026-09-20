@@ -442,15 +442,20 @@ def _check_instance(client, existing, params, log):
 
     instance_args.append(requested_disks)
 
-    # Single string values (passed positionally to create_instance).
+    # Single string values (passed positionally to create_instance). The
+    # server does not distinguish "no value" from an explicit empty string
+    # for these fields: both are stored the same way and reported back as
+    # null. A parameter of "" compared against that null was therefore
+    # perpetually dirty, and the instance was silently replaced on every
+    # run (issue 4276). Normalise both sides so "no user data" has one
+    # spelling whether the caller wrote "" or omitted the parameter.
     for key in ['ssh_key', 'user_data']:
-        if params.get(key) is not None:
-            if existing.get(key) != params[key]:
+        value = params.get(key) or None
+        if value is not None:
+            if (existing.get(key) or None) != value:
                 log.append('Instance dirty: %s has changed' % key)
                 dirty = True
-            instance_args.append(params[key])
-        else:
-            instance_args.append(None)
+        instance_args.append(value)
 
     # Optional single string keyword values.
     for key in ['placement', 'video', 'nvram_template', 'configdrive', 'namespace']:

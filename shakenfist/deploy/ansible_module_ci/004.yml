@@ -103,6 +103,13 @@
     # a slow uplink that fetch alone has been observed to take 578 seconds
     # (issue 4000), which leaves the default 600 second await_timeout with no
     # headroom, so give this create a larger budget.
+    #
+    # NOTE(mikal): ssh_key and user_data are set to explicit empty strings
+    # because the idempotency assertion below is also the regression coverage
+    # for issue 4276: the server stores "no value" for these fields the same
+    # way whether the caller wrote "" or omitted the parameter, and reports
+    # it back as null, so the module's comparison of "" against that null was
+    # perpetually dirty and the instance was silently replaced on every run.
     - name: Create a test instance that uses those networks
       sf_instance:
         name: "ansibleci-004"
@@ -117,6 +124,8 @@
           - "{{ ci_network_a['meta']['uuid'] }}"
         networkspecs:
           - "network_uuid={{ ci_network_b['meta']['uuid'] }},address=10.1.0.5,float=True"
+        ssh_key: ""
+        user_data: ""
         uefi: false
         secure_boot: false
         state: present
@@ -163,6 +172,8 @@
           - "{{ ci_network_a['meta']['uuid'] }}"
         networkspecs:
           - "network_uuid={{ ci_network_b['meta']['uuid'] }},address=10.1.0.5,float=True"
+        ssh_key: ""
+        user_data: ""
         uefi: false
         secure_boot: false
         state: present
