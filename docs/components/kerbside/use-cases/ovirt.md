@@ -291,5 +291,6 @@ Not covered, and worth knowing before you deploy:
   firewall, the connection state machine, and the relay
 - [Testing](/components/kerbside/testing/) — the CI lanes, including the oVirt
   end-to-end lane described above
-- [Kerbside for Shaken Fist](/components/kerbside/use-cases/shaken-fist/) — the sibling
-  deployment guide
+- [Kerbside for Shaken Fist](/components/kerbside/use-cases/shaken-fist/) and
+  [Kerbside for OpenStack](/components/kerbside/use-cases/openstack/) — the sibling
+  deployment guides

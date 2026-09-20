@@ -33,6 +33,12 @@ one and then dropped anyway because `include` does not name it is
 reported: the config asks for that file to be reviewed and it is not
 being reviewed.
 
+A run that cannot be started at all is reported as a failure of this
+criterion against that repository, naming the error, for the same
+reason [review-coverage.md](/components/development/audits/review-coverage/) gives: every
+criterion for a repository runs in one process, so an exception here
+would cost that repository all of the others.
+
 ## Why this is separate from review-coverage
 
 [review-coverage.md](/components/development/audits/review-coverage/) measures the backlog against

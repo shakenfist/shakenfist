@@ -155,7 +155,7 @@ column names the CI lane that exercises the scenario end to end; see
 | Scenario | Description | Tested in Kerbside CI |
 |----------|-------------|-----------------------|
 | Multi-cloud aggregation | One Kerbside brokering several sources at once, so users keep a single console entry point as workloads move between providers | Not covered |
-| OpenStack | Nova 2025.1 spice-direct consoles, deployed alongside the cluster with Kolla-Ansible via kerbside-patches | `openstack_matrix`, merge tier |
+| [OpenStack](/components/kerbside/use-cases/openstack/) | Nova 2025.1 spice-direct consoles, deployed alongside the cluster with Kolla-Ansible via kerbside-patches | `openstack_matrix`, merge tier |
 | [oVirt](/components/kerbside/use-cases/ovirt/) | Replaces oVirt's SPICE proxy (squid) with a protocol-aware front door: discovery via the engine API, host-subject pinned TLS to the hypervisor, and the engine, network, and account prerequisites | `ovirt_matrix`, merge tier |
 | Placement topologies | Kerbside instances placed by user population rather than by cloud — one per regional office, close to its users, with the WAN hop as the inspected backend leg | Not covered |
 | Proxmox | Deferred until a Proxmox source driver exists | No source yet |
