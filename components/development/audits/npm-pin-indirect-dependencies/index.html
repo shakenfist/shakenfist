@@ -2338,6 +2338,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#workspace-roots" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workspace roots
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-we-deliberately-do-not-check" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14067,6 +14078,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#workspace-roots" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workspace roots
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-we-deliberately-do-not-check" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14132,7 +14154,8 @@ reported as a package manager we do not parse.</p>
 <li>It is committed. A lockfile that only ever existed in the working
   copy that generated it pins nothing for anybody else.</li>
 <li>Its <code>lockfileVersion</code> is 2 or later.</li>
-<li>No workflow installs the project's dependencies with <code>npm install</code>.</li>
+<li>No workflow installs the project's dependencies with <code>npm install</code>,
+  or either of its aliases, <code>npm i</code> and <code>npm add</code>.</li>
 </ul>
 <h2 id="why-this-is-shaped-differently-to-the-python-criterion">Why this is shaped differently to the Python criterion<a class="headerlink" href="#why-this-is-shaped-differently-to-the-python-criterion" title="Permanent link">&para;</a></h2>
 <p><a href="/components/development/audits/pin-indirect-dependencies/">pin-indirect-dependencies.md</a> asks a
@@ -14167,6 +14190,11 @@ versions it finds back into the lockfile, and carries on. A workflow
 doing that tests a tree that nothing pinned and nobody reviewed, which
 is the exact failure this criterion exists to prevent, reached from
 the other direction.</p>
+<p><code>npm i</code> and <code>npm add</code> are the same command under npm's own aliases,
+and are read as <code>npm install</code> wherever it is read. Spelling the
+resolving install differently does not make it a different install,
+and a criterion that only knew the long form would be evaded by a
+habit rather than by a decision.</p>
 <p><code>npm install -g</code> is not that. A global install puts a tool on the
 runner's path beside the project -- the way several workflows in the
 fleet install the Claude Code CLI -- and touches no lockfile, so it is
@@ -14182,6 +14210,18 @@ install here", an <code>echo</code> saying the same thing, and a comment at the
 end of a <code>npm ci</code> line are a workflow describing the mistake rather
 than making it, and failing a compliant repository for saying so is
 the expensive direction to be wrong in.</p>
+<h2 id="workspace-roots">Workspace roots<a class="headerlink" href="#workspace-roots" title="Permanent link">&para;</a></h2>
+<p>Unlike its two siblings --
+<a href="/components/development/audits/npm-unused-declared-dependency/">npm-unused-declared-dependency.md</a>
+and
+<a href="/components/development/audits/npm-undeclared-direct-dependency/">npm-undeclared-direct-dependency.md</a>,
+which report a workspace root not applicable because the dependencies
+of such a tree are spread across several manifests -- this criterion
+applies to one. A workspace root has exactly one lockfile, at the
+root, pinning the whole tree, and a workflow that installs with <code>npm
+install</code> undoes that pinning for every workspace at once. The
+questions this criterion asks are all answerable from the root, so it
+asks them.</p>
 <h2 id="what-we-deliberately-do-not-check">What we deliberately do not check<a class="headerlink" href="#what-we-deliberately-do-not-check" title="Permanent link">&para;</a></h2>
 <p>Whether the lockfile is <em>in step</em> with <code>package.json</code>. Answering that
 means resolving the declared ranges, which means reaching the registry,

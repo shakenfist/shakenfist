@@ -14178,8 +14178,10 @@ that is installed but not imported, which has several legitimate
 explanations, an import with no declaration has one fix and it is
 always the same one.</p>
 <h2 id="false-positives-and-why-there-are-few">False positives, and why there are few<a class="headerlink" href="#false-positives-and-why-there-are-few" title="Permanent link">&para;</a></h2>
-<p>Four kinds of import are not packages, and all four appear in
-<code>hunkydory</code> today:</p>
+<p>Four kinds of import are not packages. Three of them appear in
+<code>hunkydory</code> today; the fourth, an import of something already
+declared, does not, because nothing <code>hunkydory</code> declares is imported
+at all:</p>
 <ul>
 <li><strong>Node builtins, in both spellings.</strong> <code>node:fs</code> needs no table -- npm
   forbids a colon in a package name, so a specifier carrying a scheme
