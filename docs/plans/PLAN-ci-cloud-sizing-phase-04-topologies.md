@@ -768,9 +768,9 @@ Falsifiable, in order:
 
 ## Outcome
 
-**In progress.** Four of seven steps have landed. The reshape is
-applied and measured; the remaining three are decisions this plan can
-now take, and none of them is blocked on the operator any more.
+**Complete.** All seven steps have landed. The reshape was applied,
+measured against its predictions and closed out; `slim-primary` was
+answered with a decision not to reshape rather than with a deferral.
 
 | Step | State |
 |---|---|
@@ -778,9 +778,9 @@ now take, and none of them is blocked on the operator any more.
 | 4b | **Done**, though not as the step table specifies -- see the deviation below. |
 | 4c | **Done.** The diff is in *Prepared changes*, with predictions, a three-way falsification statement and the operator's checklist. |
 | 4d | **Done.** `shakenfist/actions#88` merged as `f78576e`; six merge runs read. Ledgers are 6, 6, 12 as predicted, the allocation bound was relieved and the demand refusals did not move. See *4d -- what the merge runs measured*. |
-| 4e | **Ready.** 4d's evidence is in; D4 is now a decision rather than a wait. |
-| 4f | **Ready.** Six runs is past D5's five, and the durations are recorded in 4d. |
-| 4g | Blocked: its Definition of done items depend on 4d-4f. |
+| 4e | **Done.** D4 answered: `slim-primary` is not reshaped, with the three-run evidence in *4e*. No diff prepared for either of its files. |
+| 4f | **Done.** `timeout_minutes` 70 -> 60 on the `Debian 12 tier` entry, with the comment rewritten and the six observed durations recorded. |
+| 4g | **Done.** This close-out. |
 
 **Deviation from the step plan, declared rather than buried.** 4b is
 listed as a `sonnet` sub-agent step. It was done inline by the
@@ -900,6 +900,118 @@ instance` / `Create sf-1` / `Create sf-2` tasks across six runs. The
 prediction this section adds to the record is the one 4c did not make:
 that relieving the ledger would leave the demand refusal count
 unmoved.
+
+### 4e -- `slim-primary` is not reshaped, and why
+
+D4 asked whether `slim-primary` should follow `slim-tier`. It should
+not, and 4d's evidence is what decides it. This is a decision, not a
+deferral: Definition of done item 8 is satisfied by recording the
+evidence, and no diff is prepared for either file.
+
+`slim-primary` is five nodes, of which the primary carries
+`database_node,primary_node` and is **not** a hypervisor, sf-1 carries
+`hypervisors, network_node`, and sf-2 to sf-5 are plain hypervisors
+(`ci-topology-slim-primary.yml:84`, `:114`, `:144`, `:174`, `:204`).
+By 4a's formula that is one node at ledger 3 and four at 6, a cluster
+ledger of 27. Three merge runs of `Debian 12 cluster` from the same
+window 4d read report:
+
+| Run | Ledgers | Node-runs at `peak frac` 1.000 | Guard refusals | Dimension | `sufficient_idle_cpu` drops |
+|---|---|---|---|---|---|
+| `35485863474` | 3, 6, 6, 6, 6 | 1 of 5 | 225 | demand, 225 alone | 12 |
+| `35490705886` | 3, 6, 6, 6, 6 | 1 of 5 | 210 | demand, 210 alone | 8 |
+| `35495432148` | 3, 6, 6, 6, 6 | 2 of 5 | 203 | demand, 203 alone | 17 |
+
+Three things in that table rule the reshape out:
+
+1. **There is no allocation problem to fix.** `p90 frac` sits at 0.33
+   to 0.50 on most nodes and the `sufficient_idle_cpu` drops are 8 to
+   17 -- already the level `slim-tier` only reached *after* its
+   reshape, and a third of what `slim-tier` showed before it. The
+   ledger is not what is binding here, so raising it buys nothing.
+2. **Its refusals are 100% demand-dimension and higher in absolute
+   count than the reshaped tier's** -- 203 to 225 against 147 to 185
+   on a *smaller* cluster ledger. That is 4d's invariance restated on
+   a second topology: refusal count tracks the guard's accumulator,
+   not the node size.
+3. **The spend is larger for the same predicted non-result.** Five
+   nodes at +2 vCPU is 10 more under-cloud vCPU against `slim-tier`'s
+   6, and F4 records that the two `slim-primary` files are not
+   structurally identical, so it is two hand-checked diffs rather than
+   one mechanical one.
+
+One thing is worth carrying to phase 5 rather than acting on here:
+sf-1, the network node, sits at ledger 3 and reached `peak frac` and
+`p90 frac` 1.000 in run `35495432148`. That is 4a's infra-reservation
+pathology on a `slim-primary` node, and it is real -- but it is one
+node of five in a cluster with slack elsewhere, and the census says
+the refusals are demand rather than `cpus`, so it is not what is
+refusing. Reshaping the whole topology to relieve one node that is
+not the constraint is the risk this phase's own risk table names
+first.
+
+### 4f -- the tier timeout drops to 60
+
+D5 made this conditional on five merge runs and on the wall clock
+supporting it. Six runs have landed and `Run functional tests` took
+42, 29, 36, 27, 32 and 30 minutes, a mean of 32.7 and a worst case of
+42. Sixty minutes leaves 30% headroom over the worst observed run,
+which is the same margin the other three matrix entries run with, so
+`timeout_minutes` on the `Debian 12 tier` entry moves from 70 to 60
+(`.github/workflows/functional-tests.yml`).
+
+The comment above it is rewritten rather than deleted. It explained
+the bump by the tier having half `slim-primary`'s hypervisor
+capacity, which was true of the ledger before the reshape and is no
+longer: the tier is still the slower topology because it runs the
+same suite on three nodes instead of five, but its nodes are no
+longer allocation-starved. The replacement says that, and records the
+observed durations so the next reader can see what the 60 is sized
+against.
+
+### What phase 5 inherits
+
+Phase 5 writes the headroom band and the structural-minimum
+assertion. Four things from this phase change what it can assert.
+
+1. **The band cannot be written against node size.** This phase
+   doubled a cluster ledger and the guard refused at the same rate
+   afterwards. `expected_demand` accumulates
+   `cpus x SCHEDULER_DEMAND_PER_VCPU` per admitted placement, so the
+   guard admits until demand fills the bound and then refuses; the
+   bound is a rate limit that a bigger cloud raises and then fills. A
+   band expressed as "refusals below N" is therefore a statement
+   about the estimator's calibration, not about whether the cloud is
+   big enough, and phase 5 should say which of the two it is
+   asserting.
+2. **The allocation side now has slack, and that is assertable.**
+   `peak frac` on `slim-tier` fell from 1.000 on every node in every
+   run to 3 node-runs in 18, and `sufficient_idle_cpu` drops fell
+   from a mean of 28.8 to 6.7. Master plan question 3's proposed
+   upper bound -- peak committed vCPU at or below 70% of ledger at
+   p90 -- is now met with room on this topology, where before the
+   reshape it was violated in every run. The `p90 frac` readings are
+   0.17 to 0.58 across the six runs, with one outlier at 1.000.
+3. **The infra-reservation pathology survives on `slim-primary`.**
+   Its network node sits at ledger 3 and reached `p90 frac` 1.000 in
+   one of the three runs read here. 4e declined to reshape the
+   topology for it because the census says demand rather than `cpus`
+   is what refuses, but a per-node upper bound of the kind the phase
+   2 baseline proposed would flag that node, and phase 5 should
+   decide whether flagging it is the intent.
+4. **The structural minimum held and is now checkable.**
+   `slim-tier`'s three nodes still satisfy both `>=3 nodes` scheduler
+   tests and `test_network_lifecycle`'s two-non-network-hypervisor
+   minimum, verified across six runs by verdict rather than by job
+   colour. There is no slack left there: the assertion phase 5 writes
+   should fail if a topology drops below it, because this phase has
+   confirmed nothing above it is spare.
+
+The sibling coupling is unchanged and still recorded in the master
+plan's *claim layer sitting above that budget* section: `slim-tier`
+grew from 12 to 18 under-cloud vCPU while claim sizes are still
+derived from previously observed peaks, which is safe only while
+`CLAIM_ENFORCEMENT_HARD` is false.
 
 **What the operator owed is discharged.** *Prepared changes* was
 applied to `shakenfist/actions` as pull request #88 and merged as
