@@ -680,6 +680,17 @@ class InstancesEndpoint(api_base.Resource):
         if not namespace_is_trusted(namespace, request_namespace()):
             return sf_api.error(404, 'namespace not found')
 
+        # What follows is a chain of handler guards, one block per body
+        # parameter, run in the order the handler consumes the parameters
+        # rather than in the declaration order of the swag_from list above
+        # (network is declared before disk; disks are processed first
+        # because resolving their artifacts can refuse the request on its
+        # own). Every block answers before Instance.new(), so a refused
+        # request creates nothing. A guard for a new body key belongs in
+        # or beside the block for its parameter, not appended to the end
+        # of the chain -- see "Handler guards" in
+        # docs/developer_guide/writing_an_endpoint.md.
+
         # A name has to be a string before anything can ask whether it is a
         # good one. `name` is declared required, but required-ness is
         # deliberately not enforced (decision D17 of
@@ -769,7 +780,11 @@ class InstancesEndpoint(api_base.Resource):
                     400, 'disk specification must specify at least one of '
                     'size or base')
 
-            # Ensure we're using a known disk bus
+            # Ensure we're using a known disk bus. This is also what
+            # refuses 'ide', which left _get_disk_device's table when
+            # support was removed in v0.7 -- a later IDE-specific guard
+            # was dead code on that account and was deleted, so do not
+            # add one back.
             disk_bus = instance._get_defaulted_disk_bus(d)
             try:
                 instance._get_disk_device(disk_bus, 0)
@@ -909,11 +924,6 @@ class InstancesEndpoint(api_base.Resource):
                     'original_template': original_template,
                     'blob': nvram_template
                 }).info('NVRAM template URL converted')
-
-        # We no longer support IDE.
-        for d in disk:
-            if d.get('bus') == 'ide':
-                return sf_api.error(400, 'IDE disks are no longer supported')
 
         if network:
             for netdesc in network:

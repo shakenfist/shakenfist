@@ -470,6 +470,34 @@ scheme-less `cirros` image shortcut and `label:` NVRAM templates as
 well as `https://`, is the instructive case. So `type`, `format`,
 `pattern`, `minimum` and `maximum` are what constrain anything.
 
+## Handler guards, and where a new one goes
+
+Not every check can be a declaration. A rule spanning two parameters
+(secure boot requires UEFI), an "at least one of" the schema language
+cannot express (a diskspec needs a `size` or a `base`), or a check
+that consults the database (does `placed_on` name a node?) lives in
+the handler as a guard answering through `sf_api.error`, and holds at
+every `API_VALIDATION_MODE` — schema checks roll back with
+`API_VALIDATION_MODE=warn`, handler guards do not.
+
+The largest chain of them is `InstancesEndpoint.post` in
+`shakenfist/external_api/instance.py`, assembled a block at a time by
+four phases of the validation plan. Its organising rule: **one block
+per body parameter, in the order the handler consumes the
+parameters, and every block answers before `Instance.new()`** so a
+refused request creates nothing. That consumption order is not the
+declaration order in the `swag_from` list above the handler —
+`network` is declared before `disk`, but disks are processed first,
+because resolving their artifacts can refuse the request on its own.
+
+So a guard for a new body key goes in — or, for a new parameter,
+becomes — the block for that parameter, at the point in the chain
+where the handler first consumes it, and before anything is created.
+Do not append a new loop or check at the end of the chain: a second
+pass over an already-guarded parameter is how the handler once
+carried an IDE-bus check that a guard forty lines earlier had already
+made unreachable.
+
 ## What is not checked yet
 
 Enforcement checks every request against its published declarations,

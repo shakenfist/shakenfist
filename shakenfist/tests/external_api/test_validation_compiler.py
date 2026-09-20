@@ -1072,8 +1072,9 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
                 ({'bus': 'banana'},
                  ('spec.bus',
                   'Must be one of: sata, scsi, usb, virtio, nvme.')),
-                # Removed in v0.7, and refused by the handler with a
-                # message of its own which D42 keeps.
+                # Removed in v0.7, and refused by the handler's bus
+                # check like any other unknown bus (its IDE-specific
+                # guard was dead code and has been deleted).
                 ({'bus': 'ide'},
                  ('spec.bus',
                   'Must be one of: sata, scsi, usb, virtio, nvme.')),

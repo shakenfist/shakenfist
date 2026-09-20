@@ -265,8 +265,10 @@ CASES = [
                  'nvme.'),
          refused('invalid disk bus ide'),
          'ide is absent from the enum deliberately: support was removed in '
-         'v0.7 and the bus check refuses it before the IDE-specific message '
-         'at external_api/instance.py:825 can ever be reached'),
+         'v0.7 and the bus check refuses it like any other unknown bus. The '
+         'IDE-specific guard later in the handler was dead code on that '
+         'account and has been deleted; this row pins that neither mode '
+         'ever answered with its message'),
     Case('disk.bus.int', CREATE, 'diskspec', 'bus',
          {'disk': [{'size': 8, 'bus': 5}]},
          refused('disk[0].bus: Not a valid string.'),
