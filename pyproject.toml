@@ -113,13 +113,13 @@ dependencies = [
     # our channel factory. Fixed by disabling Watch-based client-side
     # health checking in shakenfist/util/grpc_channel.py.
     "protobuf==7.36.1",                   # bsd
-    "grpcio==1.83.1",                     # apache2
-    "grpcio-health-checking==1.83.1",     # apache2
+    "grpcio==1.84.0",                     # apache2
+    "grpcio-health-checking==1.84.0",     # apache2
 
     # not-imported: grpcio-tools -- protos/_make_stubs.sh runs it as
     # "python3 -m grpc_tools.protoc", from the same environment, so
     # that generated stubs match the runtime protobuf and grpcio pins.
-    "grpcio-tools==1.83.1",               # apache2
+    "grpcio-tools==1.84.0",               # apache2
     "googleapis-common-protos==1.75.3",   # apache2
 
     "requests==2.34.2",                   # apache2
