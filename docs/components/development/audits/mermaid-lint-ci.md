@@ -116,7 +116,7 @@ plain node throws `DOMPurify.addHook is not a function` for
 fleet, so it reports false failures on exactly the diagrams that
 matter -- a question of needing a DOM at all rather than of which
 node supplies one. Supplying one with jsdom was excluded because
-jsdom pulls in an undici newer than the runners' node, and the
+jsdom pulls in an undici newer than the runners' node, and the static
 runners now carry node 20, so that parse-only path is untested rather
 than closed. Nobody has measured it, and the decision does not change
 today.

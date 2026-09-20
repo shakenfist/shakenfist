@@ -240,7 +240,7 @@ this repository's convention.
 | 2. Fleet sweep | Complete | `ff92357` (#50), `ac34b76..240d278` |
 | 3. Review point | Complete | `81dc421` (#83) |
 | 4. Fleet backfill | Complete | `fd0678c` (#113), `a19b706` (#133) |
-| 5. Push audit | In progress | |
+| 5. Push audit | Complete | |
 
 The `Merged` column is the convention this plan introduces, applied
 to the plan that introduces it. It goes last so that a row which
@@ -1721,13 +1721,26 @@ again, which no agent could do. `REVIEWS.md` now reports 189 of 189
 in-scope files reviewed, and `review-coverage` passes with 0 needing
 review, so the phase leaves nothing outstanding on that front.
 
-**The repository is clean going in.** `scripts/audit-check.py`
-against this tree, with `gh` authenticated, reports 55 checks:
-31 pass, 0 fail, 24 `not_applicable`. Two of them --
+**The repository is nearly clean going in, and this claim went
+stale between planning and running -- see A4 under *Outcome*.** As
+planned, `scripts/audit-check.py` against this tree with `gh`
+authenticated reported 55 checks: 31 pass, 0 fail, 24
+`not_applicable`. When the audit actually ran, five days later, it
+reported 30 pass, 1 fail and 24 `not_applicable`: `review-coverage`
+had begun failing, at 180 of 189 in-scope files reviewed with 9
+needing review against a threshold of 5, measured on `main` at
+`0e16ef1` on 2026-09-19. `0e16ef1` "Prune stale review marks."
+landed that backlog, and 5a's own prune of the `PUSH-AUDIT.md` mark
+took it to 179 of 189 the same day. Every count here is quoted with
+the commit and date it was taken at, because this paragraph has now
+gone stale twice: by `5861c0a` on 2026-09-20 `main` reported 175 of
+190 with 15 needing review. The direction is what is durable -- the
+criterion fails, and it failed before this phase touched anything --
+and an undated count in a plan is a claim with a shelf life. Two other checks --
 `delete-branch-on-merge` and `scope-coverage` -- query the GitHub
 API and fail closed without credentials, so an unauthenticated
-re-run reporting 29 pass and 2 fail is the environment rather than
-a contradiction. `push-audit` passes -- "PUSH-AUDIT.md carries
+re-run reporting two further failures is the environment rather
+than a contradiction. `push-audit` passes -- "PUSH-AUDIT.md carries
 current shared blocks and is referenced from AGENTS.md" -- which is
 phase 1's own done-criterion still holding six weeks later.
 
@@ -1930,6 +1943,288 @@ work bullet that would move the mechanical waves into `tools/`
 altogether. Both are cheap to agree now and expensive to redo after
 four agents have read the wrong diff.
 
+#### Outcome
+
+The audit ran on 2026-09-19 over the six diffs of decision 1: 5a as
+one commit, wave 1, and the four wave 2 agents in parallel. It found
+**two blocking defects, both in `scripts/audit/checks/plans.py`, both
+reachable from a commit in any of the sixteen audited repositories**.
+The disposition table below carries ten rows: those two, wave 1's
+one true positive, and seven advisory items. The runbook defect 5a
+fixed is not among them -- it was found by the survey that planned
+this phase rather than by the run, and it was fixed before anything
+ran.
+
+**The range gate passed.** Every one of the five reports states the
+per-diff totals it read, and all five match the figures the
+management session measured independently before any agent started:
+1,060 / 289 / 3,161 / 402 / 274 / 340 insertions, summing to 5,526
+against 411 deletions over a union of 30 paths. No report quoted the
+11,579-line span as its range and none ran against an empty
+`origin/main...HEAD`, so no report needed re-running. Wave 2c
+reproduced the 11,579 / 9,279 span figure as well, as a contrast
+rather than as its range.
+
+One report's arithmetic did not survive the gate, which is the
+argument for the gate being arithmetic rather than an attestation.
+Wave 2b reported `scripts/tests/test_plans.py` at 1,576 insertions
+against the plan's 1,568, and `scripts/test_audit_check.py` at 239
+against 238, then declined to reconcile the difference -- "close
+enough that I'm confident this is the right file". Re-measured here:
+1,294 in `81dc421` plus 274 in `fd0678c` is 1,568, and 189 in
+`5b1fb74` plus 49 in the sixth range is 238. The plan's figures are
+right and the agent's were wrong. The step that waved away its own
+discrepancy is the step whose numbers did not reproduce.
+
+**Wave 1** ran all eight checks against all six diffs and returned a
+verdict for each of the forty-eight pairs. Five checks were empty
+across all six -- long lines, hand-edited `compliance.md`, a
+generated block in a criterion spec, `FROZEN_ISSUE_TITLES` renames,
+and TODO markers -- and for two of those the agent went past "the
+grep found nothing" to confirm the files were genuinely in the diff:
+`docs/audits/compliance.md` is absent from all six ranges, while
+three ranges touch `docs/audits/*.md` non-trivially and the check
+read them. That is the empty-versus-unrun distinction this phase
+required, done properly rather than asserted.
+
+Wave 1's one true positive is recorded as W1 below. Two checks
+over-fired and are recorded as A5 and A6.
+
+**Findings, with a disposition for each.** B1, B2, A1, A3 and A7 are fixed
+in the findings pull request, [#155]. A2 was declined on reading
+the code, and A5 and A6 on the merits.
+
+| # | Finding | Disposition |
+|---|---|---|
+| B1 | Symlink escape in `plan_index_target_path` | Fixed in [#155] |
+| B2 | Quadratic `PLAN_LINK_RE` with no size cap and no job timeout | Fixed in [#155] |
+| W1 | `ff92357` edits the shared block with no version bump | Accepted, no fix |
+| A1 | Raw `details` spliced into issue bodies | Fixed in [#155] |
+| A2 | `iter_markdown_table_rows` carries a header across a table boundary | Declined, test added |
+| A3 | A docstring that is false about its own code path | Fixed in [#155] |
+| A4 | Two stale claims in this plan's own survey | Fixed here |
+| A5 | New-third-party-import check over-fires on first-party imports | Declined |
+| A6 | New-suppression check over-fires on carried-over `# noqa` | Declined |
+| A7 | `markdown_table_cells()` has no direct test | Fixed in [#155] |
+
+**B1 -- the audit reads files outside the checkout, and quotes them
+into an issue it files.** `plan_index_target_path`
+(`scripts/audit/checks/plans.py:513-518`) proves containment with
+`os.path.normpath`, which is textual. It correctly rejects a
+`../../` link target -- confirmed -- and does not stop a symlink
+committed inside `docs/plans/`, because `os.path.isfile()` follows
+it. The `paths.get(name)` fallback on the next line has no
+containment check at all. Reproduced directly: a symlink at
+`docs/plans/PLAN-leak.md` pointing outside the tree is accepted and
+resolves outside `docs/plans/`, and the file's content reaches the
+criterion's details string, which `audit-manage-issues.py` posts to
+GitHub. Exfiltration is narrow, and wave 2d was careful to say so:
+the target must parse as a plan for its content to be quoted, and
+`/proc/self/environ` and `.git/config` were both read and neither
+parsed. The primitive is real; weaponising it for the `AUDIT_TOKEN`
+is not straightforward.
+
+What makes this blocking rather than theoretical is that the fix is
+already in the process and was not used. `Repo.contains()`
+(`scripts/audit/repo.py:206-208`) is `realpath`-based and its
+docstring gives this exact reasoning -- "Public because `read()` is
+not the only way a check opens a file... One implementation of it,
+called from both, rather than a second realpath comparison that
+drifts." It is called from one place in the entire checks package,
+`npm_dependencies.py:448`. `PlanAuditPhase.run` already holds the
+`Repo`. This is the `path-traversal-review` block's own third bullet
+-- a helper that cannot be forgotten -- forgotten at three sites.
+
+**B2 -- one markdown file can stop the whole fleet's audit.**
+`PLAN_LINK_RE` (`plans.py:148`) is `\[([^\]]*)\]\(([^)]+)\)`, which
+backtracks quadratically on a run of `[` with no closing paren.
+Measured here at 0.057s, 0.159s and 0.676s for n of 2,000, 4,000 and
+8,000 -- 2.8x then 4.3x per doubling, against the 4x a quadratic
+predicts. Wave 2d measured the same curve end to end through the
+real checks and extrapolated a 2 MB `index.md` to roughly five and a
+half hours per check, with both `plan-index` and `plan-audit-phase`
+reading it.
+
+Neither read is bounded: `plans.py:422` and `plans.py:1306` are both
+a bare `open(path, 'r', errors='replace')`. The bound exists --
+`PLAN_SOURCE_MAX_BYTES` is defined at `plans.py:58` and used at
+`plans.py:1004` by a sibling check in the same module. The
+amplification is what raises this above a slow check:
+`consistency-audit.yml` sets no `timeout-minutes` on the `audit`
+job, so the ceiling is the 360-minute default; `manage-issues` is
+`needs: audit` with no `if:`, and `update-docs` needs both. One slow
+matrix leg therefore skips issue filing and compliance-page
+regeneration for all sixteen repositories. `report-failure` does
+fire, so the outage is loud rather than silent, but the page still
+shows yesterday's verdicts.
+
+Both blocking findings share a root cause worth naming: `plans.py`
+reimplements two bounds this codebase already has -- containment and
+a read size cap -- and gets both weaker than the originals.
+
+**W1 -- the unbumped shared block, accepted.** `ff92357` adds six
+lines of rule text to
+`templates/shared-blocks/plan-push-audit-phase.md` and leaves the
+marker at v1. Wave 1 reported it as a genuine hit rather than as
+expected, which is what its brief demanded, and it is the one check
+in wave 1 whose blast radius is sixteen repositories. Accepted, for
+reasons that are a verdict rather than a dismissal: `ff92357` lands
+32 minutes after `5b1fb74` on 2026-08-24, before any repository had
+embedded the block; `ac34b76` superseded that wording the next day
+at 02:33 UTC; and the 06:00 UTC run on 25 August therefore already
+saw v2. Zero mornings of wrong issues -- by luck rather than design.
+
+Wave 2d was asked what the detection gap is, and corrected the
+question's premise, which is the most useful thing any agent did
+here. An unbumped wording change is **not** undetected.
+`validate_shared_blocks` (`scripts/audit/checks/shared_blocks.py:109-118`)
+compares versions and wording in an `if`/`elif`, so when versions
+are equal it compares text -- and every repository already carrying
+v1 would be told its copy had **drifted**. The failure is loud but
+misattributed: it accuses sixteen maintainers of editing a block
+they never touched, and points them at a local edit that does not
+exist, when the true fix is to pull the canonical file. Nothing in
+this repository compares a canonical block's text against its own
+version, and the wave 1 tripwire is two independent greps a human
+must correlate -- the runbook never says that a non-empty first
+output beside an empty second one *is* the finding. Recorded in
+Future work rather than fixed here: it is a new check, not an audit
+finding.
+
+**A1 -- attacker-controlled text reaches issue bodies unescaped.**
+`audit-manage-issues.py:169` splices `check_result['details']`
+directly into the body. This range adds a criterion whose details
+quote plan filenames and heading text read from another
+repository's markdown, uncapped and unescaped -- `plans.py:874`
+builds `the plan has a "{near[-1]}" heading` from any heading
+matching `^push[-\s]audit\b`. The mitigation already exists on the
+other publication path: `defuse()` in `audit-update-docs.py:179-206`
+collapses newlines and escapes comment markers, and its docstring
+states this threat precisely. The compliance page gets it; the issue
+body does not. Bounded honestly by wave 2d: `@org/team` in an issue
+body does notify and the issue is authored by the `AUDIT_TOKEN`
+identity, but closing keywords do not work in issue bodies -- tested,
+a verified negative rather than an assumption -- HTML is sanitised
+by GitHub's renderer, and the issue lands on the attacker's own
+repository. Advisory rather than blocking because it widens a
+pre-existing class rather than opening one: `PlanIndex` already
+quoted uncapped cell text. Fixed in the findings pull request
+alongside B1 and B2, since it is the same file and the same review.
+
+**A2 -- declined on reading the code.** Wave 2a raised
+`iter_markdown_table_rows` not resetting `header` at a table
+boundary: a `|`-prefixed line directly under a table, with no blank
+line between, is read as a data row of it. That is not a
+misattribution, because it is what the renderer does -- a table
+ends at the first line that is not a row, so there is no second
+table for the header to leak into, and GitHub renders those two
+lines as one table. Fixing it would have moved the parser away from
+the renderer. [#155] pins the behaviour and the blank-line boundary
+in a test instead, so the next reader does not make that change.
+This is the one finding whose disposition changed between triage
+and fix, which is an argument for writing the fix before writing
+that a finding is real.
+
+**A3 and A7 -- fixed in the findings pull request.** A3:
+`test_abandoned_plan_without_the_phase_passes` carries a docstring
+that is false about its own code path -- it claims "the check
+genuinely reads it and passes on the status rather than passing
+because there was nothing to judge", and wave 2b proved by mutation
+that making `plan_audit_phase_state()` raise unconditionally leaves
+the test passing, because the terminal-status check short-circuits
+before the file is opened. The test is sound; its docstring will
+mislead the next person debugging a phase-ordering regression. A7:
+`markdown_table_cells()` has no direct unit test.
+
+**A4 -- this plan's own survey had gone stale, fixed here.** The
+paragraph "The repository is clean going in" claimed `REVIEWS.md`
+reported 189 of 189 in-scope files reviewed with `review-coverage`
+passing at 0 needing review, and 31 pass / 0 fail / 24
+`not_applicable`. Both were true when phase 5 was planned and
+neither is true now: `main` reports 180 of 189 with 9 needing review
+against a threshold of 5, so `review-coverage` **fails**, and the
+audit reports 30 pass / 1 fail / 24 `not_applicable`. Found
+independently by the management session and by wave 2c. This is the
+failure mode phase 4 spent an entire step on, recurring one section
+later in the same plan, which is the argument for the survey step
+rather than against it. Corrected at source above.
+
+**A5 and A6 -- declined.** Wave 1's new-third-party-import check
+fires on an expanded first-party import
+(`from audit.text.markdown import ...`) and its new-suppression
+check fires on a pre-existing `# noqa: E402` riding along on a line
+rewritten for an unrelated reason. Both are real limitations of
+line-based greps and both were correctly triaged by the agent that
+hit them. Declined rather than fixed: a grep that over-fires costs a
+reviewer one glance, and tightening these to distinguish first-party
+from third-party, or a new suppression from a moved one, would make
+wave 1 harder to read and easier to make silently wrong. The
+runbook's greps are deliberately blunt and the verdict column is
+where the judgement goes.
+
+**5a's commit, reviewed by the management session.** `4873e95` is
+the one change in this phase no audit range contains, so nothing
+else reads it. It was first recorded here as `4a7c4f2`, which was
+the same work before this branch was rebased and is now a dead
+object -- resolvable in the clone that wrote it and nowhere else.
+That is the defect this plan's own `Merged` convention exists to
+prevent, so the rule it implies is written down rather than left
+as an embarrassment: a SHA measured on a branch is re-checked with
+`git merge-base --is-ancestor <sha> origin/main` before it is
+recorded, because a rebase silently invalidates every one already
+written. Verified directly rather than from its subject line:
+all sixteen `main...HEAD` occurrences became
+`"${AUDIT_RANGE:-origin/main...HEAD}"`; every grep pattern and path
+filter is byte-identical on both sides, so the "the runbook fix
+changes what a check looks for" risk did not fire; and none of the
+49 changed lines falls inside any of the file's eight
+`<!-- shared-block: -->` regions, so the fleet-wide risk did not
+fire either. The wave 2 brief prose survived the rewrapping intact.
+`grep -nE '(^|[^/])main\.\.\.HEAD' PUSH-AUDIT.md` produces no
+output, and `push-audit` -- the criterion that reads the file 5a
+edited -- still passes.
+
+Two notes on how 5a got there, recorded because this phase's whole
+argument is that measurements are reproducible. It committed the two
+`.vscode/` prune artifacts beyond its brief's file list, which is
+the right action -- they are the state `REVIEWS.md` is generated
+from -- but justified it by citing a test,
+`test_reviews_md_is_reproducible_from_the_committed_state`, that
+does not exist in this repository. And it briefly used
+`--no-verify` on a throwaway commit before undoing it; 5a's own
+commit is a single one that went through the hooks, so nothing
+escaped, but the runbook sanctions `--no-verify` nowhere.
+
+**Management checklist.** Wave 1 passed with `pre-commit run
+--all-files` clean on a clean tree. Wave 2 findings are reviewed and
+dispositioned above. The blocking findings are security findings and
+are not fixed on this branch by decision 5; they are the findings
+pull request, and the phase does not close until it merges. Every
+shared-block version movement in the range was checked: `5b1fb74`
+creates the block at v1, `ac34b76` takes it to v2, `fd0678c` to v3,
+and `ff92357` is the one edit without a bump, accepted as W1 with
+its fleet-wide consequence set out above. Generated files are
+generated: `docs/audits/compliance.md` is absent from all six ranges
+and was not hand-edited, and `REVIEWS.md` moved only through
+`review-tracking.py prune`. Stale review marks were pruned and said
+so -- 5a dropped `PUSH-AUDIT.md | mikal | 2026-09-09 | 30723ce58eff`,
+which now needs a human to read that file again; it was not
+re-stamped, because the mark attests that a person read that exact
+content. Commit history is clean: three commits -- the runbook fix
+and two that record this outcome -- with no fixups, no WIP and
+nothing accidental. The branch was rebased onto `main`, which is
+what moved 5a's SHA above.
+
+**What the audit says about the runbook.** Four executed audits in
+this repository have now each found something, which retires the
+"the phase becomes ceremony" risk phase 3 was built to test. This
+run is the first to find a defect in the runbook rather than in the
+work under review, and the first whose most valuable output was an
+agent correcting the brief it was given -- wave 2d on the detection
+gap. Both are arguments for the wave 2 briefs being written against
+what a plan actually changed rather than against the repository in
+general, which was decision 4.
+
 **Merged:**
 
 ## Risks and mitigations
@@ -2117,6 +2412,38 @@ four agents have read the wrong diff.
   identity so every run re-reports the same pile, and the
   whole-codebase niche is deliberately occupied by
   `docs/code-review-tracking.md` -- human, file by file, attested.
+* **Check a canonical shared block's text against its own version.**
+  Phase 5's wave 2d found that an unbumped wording change is not
+  undetected, which is what everyone assumed -- it is
+  *misattributed*. `validate_shared_blocks`
+  (`scripts/audit/checks/shared_blocks.py:109-118`) compares
+  versions and wording in an `if`/`elif`, so when the versions match
+  it compares text and every repository still carrying the old
+  wording is told its copy has **drifted**: accused of editing a
+  block it never touched, and pointed at a local edit that does not
+  exist, when the fix is to pull the canonical file. Nothing
+  compares a canonical block's text against the version in its own
+  marker. A criterion that did would name the real fault -- an
+  unbumped canonical block -- and would also catch an edit to a
+  block no repository has adopted yet, which the drift path is
+  structurally blind to because every repository reports "missing"
+  either way. `ff92357` is the worked example, recorded as W1 in
+  phase 5's Outcome.
+* **The range rule reaches one of the eight runbooks.** Phase 5's
+  step 5a fixed `main...HEAD` in this repository's `PUSH-AUDIT.md`.
+  Seven other repositories carry their own copy, and the range rule
+  is prose in each rather than one of the files in
+  `templates/shared-blocks/` -- `push-audit` verifies only that the
+  eight required blocks are present and current
+  (`PUSH_AUDIT_BLOCKS`, `scripts/audit/checks/plans.py:104-110`).
+  So the other seven still say every diff command is against
+  `main...HEAD`, and each will audit an empty diff the first time it
+  is pointed at landed work, which reads as a clean audit rather
+  than as no audit. Two shapes: sweep the seven, or promote the
+  range rule to a shared block so `push-audit` carries it to the
+  fleet the way it carries the other eight. The second is the reason
+  this is a Future work item rather than a seven-repository sweep
+  appended to phase 5.
 
 ## Back brief
 
@@ -2124,3 +2451,5 @@ Before phase 2 begins, the management session confirms with Mikal:
 the canonical wording of the shared block, and `development`'s
 `PUSH-AUDIT.md`. Both are cheap to propose and expensive to redo
 across thirty-six plan files and eight repositories.
+
+[#155]: https://github.com/shakenfist/development/pull/155
