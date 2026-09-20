@@ -204,13 +204,14 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
                                schema.fields[name].validators))
 
         # The rule above is vacuous if nothing is bounded, so the count
-        # is pinned. Twenty nine, from two sources which both have to
-        # work: sixteen carrying an explicit constraints element (the
+        # is pinned. Thirty, from two sources which both have to
+        # work: seventeen carrying an explicit constraints element (the
         # seven events `limit` caps, the two `key_ttl` ranges, the two
-        # namespace claim `expires_in_seconds` minimums, and the five
+        # namespace claim `expires_in_seconds` minimums, the five
         # agent operation timing parameters -- `deadline_seconds` on
         # all three creating endpoints plus `progress_timeout_seconds`
-        # on get and put), and thirteen whose bound comes from the type
+        # on get and put -- and the namespace-create name pattern of
+        # issue #4250), and thirteen whose bound comes from the type
         # token alone -- `minimum: 0` rendered by `unsignedinteger` on
         # max_versions, offset, blob limit, cpus, memory and the six
         # namespace claim limits. A change in either is meant to fail
@@ -226,7 +227,7 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
         # published bound is honest whatever API_VALIDATION_MODE is set
         # to. They compile into validators here as well, which is
         # belt and braces rather than the mechanism.
-        self.assertEqual(29, constrained)
+        self.assertEqual(30, constrained)
 
         # And the thirteen semantic format declarations, named rather
         # than merely counted: this is F3's table, which is the list

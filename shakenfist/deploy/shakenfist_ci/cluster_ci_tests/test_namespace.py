@@ -5,6 +5,7 @@ import time
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_client import apiclient
 
 
 class TestNamespace(base.BaseNamespacedTestCase):
@@ -39,6 +40,20 @@ class TestNamespace(base.BaseNamespacedTestCase):
         self.assertNotIn('c', namespaces)
         self.assertIn('d', namespaces)
         self.assertNotIn('e', namespaces)
+
+    def test_namespace_create_rejects_invalid_names(self):
+        # A namespace name is rendered verbatim into dnsmasq's
+        # conf-file on the network node (domain=<namespace>.<zone>), so
+        # creation refuses any name which is not inert there: a newline
+        # would inject arbitrary dnsmasq directives (issue 4250), a dot
+        # would silently add DNS domain levels, and 63 characters is
+        # the DNS label limit.
+        for name in ['evil\ndhcp-script=/tmp/pwn',
+                     'dotted.name',
+                     'a' * 64]:
+            self.assertRaises(
+                apiclient.RequestMalformedException,
+                self.system_client.create_namespace, name)
 
     def test_namespace_clean(self):
         """Check that instances and networks are cleaned from namespace
