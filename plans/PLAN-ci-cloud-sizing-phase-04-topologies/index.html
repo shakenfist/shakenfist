@@ -14329,6 +14329,56 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Outcome">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#4d-what-the-merge-runs-measured" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4d -- what the merge runs measured
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4e-slim-primary-is-not-reshaped-and-why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4e -- slim-primary is not reshaped, and why
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4f-the-tier-timeout-drops-to-60" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4f -- the tier timeout drops to 60
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-phase-5-inherits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What phase 5 inherits
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -15272,9 +15322,9 @@ push to.</p>
     --all-files</code> passes in the main repository.</li>
 </ol>
 <h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
-<p><strong>In progress.</strong> Three of seven steps have landed; the remaining four
-are blocked on the operator and on merge runs, not on work this
-session can do.</p>
+<p><strong>Complete.</strong> All seven steps have landed. The reshape was applied,
+measured against its predictions and closed out; <code>slim-primary</code> was
+answered with a decision not to reshape rather than with a deferral.</p>
 <table>
 <thead>
 <tr>
@@ -15297,19 +15347,19 @@ session can do.</p>
 </tr>
 <tr>
 <td>4d</td>
-<td><strong>Blocked</strong> on the operator applying 4c to <code>shakenfist/actions</code> and on three merge runs after it.</td>
+<td><strong>Done.</strong> <code>shakenfist/actions#88</code> merged as <code>f78576e</code>; six merge runs read. Ledgers are 6, 6, 12 as predicted, the allocation bound was relieved and the demand refusals did not move. See <em>4d -- what the merge runs measured</em>.</td>
 </tr>
 <tr>
 <td>4e</td>
-<td>Blocked behind 4d.</td>
+<td><strong>Done.</strong> D4 answered: <code>slim-primary</code> is not reshaped, with the three-run evidence in <em>4e</em>. No diff prepared for either of its files.</td>
 </tr>
 <tr>
 <td>4f</td>
-<td>Blocked: D5 requires five merge runs on the new shape first.</td>
+<td><strong>Done.</strong> <code>timeout_minutes</code> 70 -&gt; 60 on the <code>Debian 12 tier</code> entry, with the comment rewritten and the six observed durations recorded.</td>
 </tr>
 <tr>
 <td>4g</td>
-<td>Blocked: its Definition of done items depend on 4d-4f.</td>
+<td><strong>Done.</strong> This close-out.</td>
 </tr>
 </tbody>
 </table>
@@ -15321,12 +15371,285 @@ changed: 4a had shown that the text 4b was meant to correct was text
 same three files the session was already holding open. Dispatching it
 would have raced those edits for no benefit. 4a and 4c went to
 sub-agents as the table specifies.</p>
-<p><strong>What the operator owes, in order.</strong> Apply <em>Prepared changes</em> to
-<code>shakenfist/actions</code> as its own pull request, when the merge queue is
-quiet -- <code>.github/workflows/functional-tests.yml:485</code> references
-<code>shakenfist/actions/.../smoke-cluster.yml@main</code> unpinned, so the new
-shape takes effect on the next run, including runs already in flight.
-Then 4d reads the first three merge runs.</p>
+<h3 id="4d-what-the-merge-runs-measured">4d -- what the merge runs measured<a class="headerlink" href="#4d-what-the-merge-runs-measured" title="Permanent link">&para;</a></h3>
+<p><code>shakenfist/actions#88</code> merged as <code>f78576e</code> at 2026-09-19T21:39:54Z,
+taking all three <code>slim-tier</code> nodes from <code>cpu: 4</code> to <code>cpu: 6</code> exactly as
+<em>Prepared changes</em> specified. Because <code>functional-tests.yml:485</code> calls
+<code>smoke-cluster.yml@main</code> unpinned, the new shape was live for the next
+merge-queue run; the first unambiguously on it is run <code>35472090760</code>
+(22:00:54Z). Six <code>Debian 12 tier</code> jobs have since completed, so this
+section reads six after and four before rather than the three the step
+brief asked for -- the extra runs cost nothing and Definition of done
+item 7 wants three of each.</p>
+<p><strong>The ledger prediction was exactly right, in every run.</strong> <em>Committed
+vCPU, per node</em> reports 6, 6 and 12 in all six post-reshape runs, for a
+cluster ledger of 24, against 3, 3 and 6 for 12 in all four before.
+That is falsification reading 1 ruled out: the infra-role reservation
+is the absolute 4 threads 4a measured, <code>cpu_schedulable</code> moved 1 -&gt; 2
+on the two infra nodes and 2 -&gt; 4 on sf-2, and a larger guest does
+raise it.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Ledger (primary, sf-1, sf-2)</th>
+<th>Node-runs at <code>peak frac</code> 1.000</th>
+<th>Guard refusals</th>
+<th><code>sufficient_idle_cpu</code> drops</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Before (4 runs)</td>
+<td>3, 3, 6</td>
+<td><strong>12 of 12</strong></td>
+<td>179, 181, 173, 182</td>
+<td>30, 23, 34, 28</td>
+</tr>
+<tr>
+<td>After (6 runs)</td>
+<td>6, 6, 12</td>
+<td><strong>3 of 18</strong></td>
+<td>147, 153, 164, 176, 185, 172</td>
+<td>5, 4, 9, 4, 4, 14</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The allocation bound was relieved and the demand bound was not.</strong>
+Two of those columns moved decisively and one did not, and the
+difference is the finding:</p>
+<ul>
+<li>Ledger saturation is gone. Before the reshape every node in every
+  run hit <code>peak frac</code> 1.000 -- the tier ran with its allocation ledger
+  pinned. After, 15 of 18 node-runs sit below it, typically at 0.33 to
+  0.92.</li>
+<li>Scheduler drops at <code>sufficient_idle_cpu</code> ("would exceed hard max
+  CPUs") fell from a mean of 28.8 to 6.7, a factor of 4.3. That is the
+  allocation predicate, and it is the one the ledger governs.</li>
+<li><em>Capacity guard census</em> refusals did <strong>not</strong> fall: a mean of 178.8
+  before against 166.2 after, about 7%, inside the run-to-run spread.
+  They remain <code>demand</code>-dimension and almost entirely <code>alone</code> -- the
+  <code>cpus</code> dimension contributed a single refusal in one run on each
+  side of the change.</li>
+</ul>
+<p>That is falsification <strong>reading 2</strong>: the model is right and F3's bound
+is what binds. The recorded next action for reading 2 is D3's revision
+to 8 vCPU or the sibling plan's guard work -- and the split below is
+the reason to prefer the second.</p>
+<p><strong>The refusals did not merely persist, they changed character.</strong> The
+census reports, for each demand refusal, whether measured CPU load was
+already over the bound by itself or whether the D13 feedforward
+estimate is what carried it over:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Load alone already over</th>
+<th>Feedforward carried it over</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Before</td>
+<td>152, 170, 160, 156 (<strong>85-94%</strong>)</td>
+<td>27, 11, 13, 25</td>
+</tr>
+<tr>
+<td>After</td>
+<td>53, 89, 48, 114, 116, 101 (<strong>29-65%</strong>)</td>
+<td>93, 64, 116, 62, 69, 71</td>
+</tr>
+</tbody>
+</table>
+<p>Doubling the bound did what the arithmetic said it would: measured
+load is now under it far more often. The refusal count held steady
+anyway, because <code>expected_demand</code> is a feedforward accumulator --
+every admitted placement adds <code>cpus x SCHEDULER_DEMAND_PER_VCPU</code>, so
+the guard keeps admitting until demand fills whatever bound it is
+given, and then refuses at the same rate as before. <strong>The refusal
+count is close to invariant under node size; more vCPU changes which
+placements are refused, not how many.</strong> Buying the 8 vCPU shape would
+buy another inversion of this table rather than fewer refusals, which
+is an argument for the sibling plan's guard work over D3's revision.
+This is a finding about the estimator, not about sizing, and it is
+what phase 5 should inherit.</p>
+<p><strong>No structural minimum was broken (F6).</strong> <code>test_network_lifecycle</code>,
+<code>test_affinity</code>, <code>test_binary_affinity_prefers_the_tagged_node</code> and
+<code>test_database_tier</code> each report a verdict other than <code>SKIPPED</code> in all
+six runs, read from the stestr output rather than inferred from the
+job colour. Across the six runs the only skips are
+<code>test_floating_ips.test_simple</code> (disabled as unreliable),
+<code>test_placement.test_local_placement_works</code> and
+<code>test_remote_placement_works</code> (target node does not exist),
+<code>test_vdi_tokens</code> (<code>KERBSIDE_URL</code> unset),
+<code>test_coalescing.test_per_node_mesh_work_is_coalesced</code> (dedup events
+observed) and
+<code>test_database_tier.test_no_unbudgeted_fixed_rate_database_polling</code>
+(the tier ran too level a rate to measure). None is a node-count skip,
+and none of the four named tests skips in any run.</p>
+<p><strong>Two of the six jobs failed, both on the same pre-existing flake.</strong>
+Runs <code>35482487953</code> and <code>35485863474</code> failed only
+<code>test_nodes.TestNodes.test_cluster_resources_measured_drops_after_delete</code>,
+asserting that a node publishing <code>cpu_measured</code> 1 did not rise to 4
+within 20s (<code>test_nodes.py:294</code>, <code>:356</code>). The same test failed before
+the reshape in run <code>35415369050</code>, so it is not attributable to this
+change: 2 of 6 after against 1 of 4 before. It is a measurement-latency
+assertion, not a capacity one.</p>
+<p><strong>Durations, recorded for 4f.</strong> The <code>Run functional tests</code> step took
+42, 29, 36, 27, 32 and 30 minutes across the six runs. Six runs is
+past D5's threshold of five, and a 42-minute worst case leaves 30%
+headroom under a 60-minute timeout, so 4f's precondition is met; the
+decision itself is 4f's.</p>
+<p><strong>What 4c predicted, and what it got wrong.</strong> Nothing. The per-node
+ledger, <code>cpu_schedulable</code> and demand-bound predictions all held, and
+the "one thing 4c found that the plan did not anticipate" -- the
+under-cloud feedforward charge rising from 2.4 to 3.6 per tier node --
+did not produce a single ansible failure in the <code>Create a primary
+instance</code> / <code>Create sf-1</code> / <code>Create sf-2</code> tasks across six runs. The
+prediction this section adds to the record is the one 4c did not make:
+that relieving the ledger would leave the demand refusal count
+unmoved.</p>
+<h3 id="4e-slim-primary-is-not-reshaped-and-why">4e -- <code>slim-primary</code> is not reshaped, and why<a class="headerlink" href="#4e-slim-primary-is-not-reshaped-and-why" title="Permanent link">&para;</a></h3>
+<p>D4 asked whether <code>slim-primary</code> should follow <code>slim-tier</code>. It should
+not, and 4d's evidence is what decides it. This is a decision, not a
+deferral: Definition of done item 8 is satisfied by recording the
+evidence, and no diff is prepared for either file.</p>
+<p><code>slim-primary</code> is five nodes, of which the primary carries
+<code>database_node,primary_node</code> and is <strong>not</strong> a hypervisor, sf-1 carries
+<code>hypervisors, network_node</code>, and sf-2 to sf-5 are plain hypervisors
+(<code>ci-topology-slim-primary.yml:84</code>, <code>:114</code>, <code>:144</code>, <code>:174</code>, <code>:204</code>).
+By 4a's formula that is one node at ledger 3 and four at 6, a cluster
+ledger of 27. Three merge runs of <code>Debian 12 cluster</code> from the same
+window 4d read report:</p>
+<table>
+<thead>
+<tr>
+<th>Run</th>
+<th>Ledgers</th>
+<th>Node-runs at <code>peak frac</code> 1.000</th>
+<th>Guard refusals</th>
+<th>Dimension</th>
+<th><code>sufficient_idle_cpu</code> drops</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>35485863474</code></td>
+<td>3, 6, 6, 6, 6</td>
+<td>1 of 5</td>
+<td>225</td>
+<td>demand, 225 alone</td>
+<td>12</td>
+</tr>
+<tr>
+<td><code>35490705886</code></td>
+<td>3, 6, 6, 6, 6</td>
+<td>1 of 5</td>
+<td>210</td>
+<td>demand, 210 alone</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>35495432148</code></td>
+<td>3, 6, 6, 6, 6</td>
+<td>2 of 5</td>
+<td>203</td>
+<td>demand, 203 alone</td>
+<td>17</td>
+</tr>
+</tbody>
+</table>
+<p>Three things in that table rule the reshape out:</p>
+<ol>
+<li><strong>There is no allocation problem to fix.</strong> <code>p90 frac</code> sits at 0.33
+   to 0.50 on most nodes and the <code>sufficient_idle_cpu</code> drops are 8 to
+   17 -- already the level <code>slim-tier</code> only reached <em>after</em> its
+   reshape, and a third of what <code>slim-tier</code> showed before it. The
+   ledger is not what is binding here, so raising it buys nothing.</li>
+<li><strong>Its refusals are 100% demand-dimension and higher in absolute
+   count than the reshaped tier's</strong> -- 203 to 225 against 147 to 185
+   on a <em>smaller</em> cluster ledger. That is 4d's invariance restated on
+   a second topology: refusal count tracks the guard's accumulator,
+   not the node size.</li>
+<li><strong>The spend is larger for the same predicted non-result.</strong> Five
+   nodes at +2 vCPU is 10 more under-cloud vCPU against <code>slim-tier</code>'s
+   6, and F4 records that the two <code>slim-primary</code> files are not
+   structurally identical, so it is two hand-checked diffs rather than
+   one mechanical one.</li>
+</ol>
+<p>One thing is worth carrying to phase 5 rather than acting on here:
+sf-1, the network node, sits at ledger 3 and reached <code>peak frac</code> and
+<code>p90 frac</code> 1.000 in run <code>35495432148</code>. That is 4a's infra-reservation
+pathology on a <code>slim-primary</code> node, and it is real -- but it is one
+node of five in a cluster with slack elsewhere, and the census says
+the refusals are demand rather than <code>cpus</code>, so it is not what is
+refusing. Reshaping the whole topology to relieve one node that is
+not the constraint is the risk this phase's own risk table names
+first.</p>
+<h3 id="4f-the-tier-timeout-drops-to-60">4f -- the tier timeout drops to 60<a class="headerlink" href="#4f-the-tier-timeout-drops-to-60" title="Permanent link">&para;</a></h3>
+<p>D5 made this conditional on five merge runs and on the wall clock
+supporting it. Six runs have landed and <code>Run functional tests</code> took
+42, 29, 36, 27, 32 and 30 minutes, a mean of 32.7 and a worst case of
+42. Sixty minutes leaves 30% headroom over the worst observed run,
+which is the same margin the other three matrix entries run with, so
+<code>timeout_minutes</code> on the <code>Debian 12 tier</code> entry moves from 70 to 60
+(<code>.github/workflows/functional-tests.yml</code>).</p>
+<p>The comment above it is rewritten rather than deleted. It explained
+the bump by the tier having half <code>slim-primary</code>'s hypervisor
+capacity, which was true of the ledger before the reshape and is no
+longer: the tier is still the slower topology because it runs the
+same suite on three nodes instead of five, but its nodes are no
+longer allocation-starved. The replacement says that, and records the
+observed durations so the next reader can see what the 60 is sized
+against.</p>
+<h3 id="what-phase-5-inherits">What phase 5 inherits<a class="headerlink" href="#what-phase-5-inherits" title="Permanent link">&para;</a></h3>
+<p>Phase 5 writes the headroom band and the structural-minimum
+assertion. Four things from this phase change what it can assert.</p>
+<ol>
+<li><strong>The band cannot be written against node size.</strong> This phase
+   doubled a cluster ledger and the guard refused at the same rate
+   afterwards. <code>expected_demand</code> accumulates
+   <code>cpus x SCHEDULER_DEMAND_PER_VCPU</code> per admitted placement, so the
+   guard admits until demand fills the bound and then refuses; the
+   bound is a rate limit that a bigger cloud raises and then fills. A
+   band expressed as "refusals below N" is therefore a statement
+   about the estimator's calibration, not about whether the cloud is
+   big enough, and phase 5 should say which of the two it is
+   asserting.</li>
+<li><strong>The allocation side now has slack, and that is assertable.</strong>
+   <code>peak frac</code> on <code>slim-tier</code> fell from 1.000 on every node in every
+   run to 3 node-runs in 18, and <code>sufficient_idle_cpu</code> drops fell
+   from a mean of 28.8 to 6.7. Master plan question 3's proposed
+   upper bound -- peak committed vCPU at or below 70% of ledger at
+   p90 -- is now met with room on this topology, where before the
+   reshape it was violated in every run. The <code>p90 frac</code> readings are
+   0.17 to 0.58 across the six runs, with one outlier at 1.000.</li>
+<li><strong>The infra-reservation pathology survives on <code>slim-primary</code>.</strong>
+   Its network node sits at ledger 3 and reached <code>p90 frac</code> 1.000 in
+   one of the three runs read here. 4e declined to reshape the
+   topology for it because the census says demand rather than <code>cpus</code>
+   is what refuses, but a per-node upper bound of the kind the phase
+   2 baseline proposed would flag that node, and phase 5 should
+   decide whether flagging it is the intent.</li>
+<li><strong>The structural minimum held and is now checkable.</strong>
+   <code>slim-tier</code>'s three nodes still satisfy both <code>&gt;=3 nodes</code> scheduler
+   tests and <code>test_network_lifecycle</code>'s two-non-network-hypervisor
+   minimum, verified across six runs by verdict rather than by job
+   colour. There is no slack left there: the assertion phase 5 writes
+   should fail if a topology drops below it, because this phase has
+   confirmed nothing above it is spare.</li>
+</ol>
+<p>The sibling coupling is unchanged and still recorded in the master
+plan's <em>claim layer sitting above that budget</em> section: <code>slim-tier</code>
+grew from 12 to 18 under-cloud vCPU while claim sizes are still
+derived from previously observed peaks, which is safe only while
+<code>CLAIM_ENFORCEMENT_HARD</code> is false.</p>
+<p><strong>What the operator owed is discharged.</strong> <em>Prepared changes</em> was
+applied to <code>shakenfist/actions</code> as pull request #88 and merged as
+<code>f78576e</code> on 2026-09-19, three lines in one file, with the
+<code>slim-primary</code> topologies and <code>timeout_minutes: 70</code> left alone as
+checklist items 4 and 7 required. Nothing in this phase now waits on a
+repository this session cannot push to.</p>
 <p><strong>One thing 4c found that the plan did not anticipate</strong>, recorded here
 because it is a cost of this specific change rather than of reshaping
 in general: the under-cloud charges each instance a feedforward demand
