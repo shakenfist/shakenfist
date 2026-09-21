@@ -339,6 +339,90 @@ class SfInstanceParameterDirtinessTestCase(base.ShakenFistTestCase):
         self.assertNotIn('secureboot', instance_kwargs)
 
 
+class SfInstanceEmptyStringDirtinessTestCase(base.ShakenFistTestCase):
+    """An explicit empty ssh_key or user_data means "none", like the server.
+
+    Issue 4276: the server does not distinguish "no user data" from an
+    explicit empty string -- both are stored the same way and reported
+    back as null. The module compared the caller's "" against that null,
+    so an instance created with user_data: "" was perpetually dirty and
+    silently replaced on every run. ssh_key has the same shape.
+    """
+
+    def _existing(self, **kwargs):
+        existing = {
+            'name': 'test',
+            'cpus': 1,
+            'memory': 1024,
+            'interfaces': [],
+            'disk_spec': []
+        }
+        existing.update(kwargs)
+        return existing
+
+    def _params(self, **kwargs):
+        params = {
+            'name': 'test',
+            'cpu': 1,
+            'ram': 1024
+        }
+        params.update(kwargs)
+        return params
+
+    def _check(self, existing, params):
+        log = []
+        dirty, instance_args, _ = sf_instance._check_instance(
+            mock.MagicMock(), existing, params, log)
+        return dirty, instance_args, log
+
+    def test_empty_strings_against_stored_null_are_clean(self):
+        # The exact signature from issue 4276: the caller wrote "" and
+        # the server reports null for both fields.
+        dirty, _, log = self._check(
+            self._existing(ssh_key=None, user_data=None),
+            self._params(ssh_key='', user_data=''))
+        self.assertFalse(dirty, log)
+
+    def test_empty_strings_against_stored_empty_strings_are_clean(self):
+        # Defensive symmetry: a server which reported '' rather than null
+        # must compare clean too.
+        dirty, _, log = self._check(
+            self._existing(ssh_key='', user_data=''),
+            self._params(ssh_key='', user_data=''))
+        self.assertFalse(dirty, log)
+
+    def test_unset_against_stored_empty_strings_is_clean(self):
+        dirty, _, log = self._check(
+            self._existing(ssh_key='', user_data=''), self._params())
+        self.assertFalse(dirty, log)
+
+    def test_empty_strings_are_passed_as_none(self):
+        # The server treats '' and None identically on create, so the
+        # normalised spelling is what gets passed. Force dirtiness with a
+        # cpu change to observe the args of a create that would happen.
+        # ssh_key and user_data are positional: (name, cpus, memory,
+        # networks, disks, ssh_key, user_data).
+        dirty, instance_args, _ = self._check(
+            self._existing(), self._params(cpu=2, ssh_key='', user_data=''))
+        self.assertTrue(dirty)
+        self.assertIsNone(instance_args[5])
+        self.assertIsNone(instance_args[6])
+
+    def test_real_values_against_stored_null_are_still_dirty(self):
+        dirty, _, _ = self._check(
+            self._existing(ssh_key=None, user_data=None),
+            self._params(ssh_key='ssh-rsa AAAA', user_data='dXNlcg=='))
+        self.assertTrue(dirty)
+
+    def test_real_values_are_still_passed(self):
+        dirty, instance_args, _ = self._check(
+            self._existing(ssh_key=None, user_data=None),
+            self._params(ssh_key='ssh-rsa AAAA', user_data='dXNlcg=='))
+        self.assertTrue(dirty)
+        self.assertEqual('ssh-rsa AAAA', instance_args[5])
+        self.assertEqual('dXNlcg==', instance_args[6])
+
+
 class _Succeeded(SystemExit):
     """The module called exit_json()."""
 
