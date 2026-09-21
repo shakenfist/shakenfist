@@ -220,17 +220,22 @@ The static source driver (`type: static`) reads its VM-to-console
 mapping entirely from an inline `consoles:` list in the sources.yaml
 entry.  No external API calls are made and no control plane is needed.
 
-**Intended use-cases:**
+The list is re-read at startup and once per 60-second maintenance
+cycle, so adding or removing an entry takes effect without a restart.
+Editing the `ticket` of an entry which already exists does not: it is
+discarded rather than applied (issue #463), and changing one means
+removing the entry, letting the removal land, and adding it back.
 
-- **CI pipelines** that boot a QEMU guest directly and need kerbside
-  to front it.  The direct-qemu CI workflow uses this driver.
-- **Ad-hoc debugging** where you want to point kerbside at a hand-
-  rolled QEMU without spinning up a full Shaken Fist or oVirt
-  deployment.
+It is intended for CI pipelines that boot a QEMU guest directly and
+need kerbside to front it — the direct-qemu CI workflow uses this
+driver — and for ad-hoc debugging against a hand-rolled QEMU.  The
+case for the deployment, and what it can and cannot do, is in
+[Kerbside standalone](/components/kerbside/use-cases/standalone/).
 
-**Not intended for production use.**  The console list is static —
-kerbside must be restarted to pick up changes, there is no polling,
-and there is no liveness check on the QEMU process behind the ticket.
+**Not intended for production use.**  There is no liveness check on
+the QEMU process behind the ticket, so kerbside will mint a `.vv`
+file for a target which is not listening and the user discovers it
+by failing to connect.
 
 The following options are used to configure a static console source
 (`type: static`).
@@ -239,6 +244,7 @@ The following options are used to configure a static console source
 |--------|-------------|
 | source | The name of the source (used as an identifier) |
 | type | The type of the source: `static` |
+| ca_cert | PEM CA certificate used to verify the target's TLS certificate when the proxy escalates to the secure port.  Required for any console in this source which declares a `secure_port`; without it the target is verified against the public web trust store, which an internal certificate will not satisfy |
 | consoles | A list of console entry dicts (see fields below) |
 
 Each entry in the `consoles` list requires the following fields:
@@ -337,3 +343,4 @@ An example configuration follows:
 - [Proxy Architecture](/components/kerbside/proxy-architecture/) - Internal proxy design
 - [Kerbside for Shaken Fist](/components/kerbside/use-cases/shaken-fist/) - The Shaken Fist use-case guide: value proposition, setup, and the sf-e2e worked example
 - [Kerbside for OpenStack](/components/kerbside/use-cases/openstack/) - The OpenStack use-case guide: the spice-direct token exchange, setup, and the openstack_matrix worked example
+- [Kerbside standalone](/components/kerbside/use-cases/standalone/) - The standalone use-case guide: the static source's no-control-plane model, setup, and the direct-qemu worked example

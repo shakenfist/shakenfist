@@ -15,6 +15,11 @@ Repositories that carry a pre-push audit runbook must:
   `plan-phase-references` audits for the policies they enforce);
 * embed the current **`comment-proportion`** shared block in its
   code-quality review section;
+* embed the current **`source-file-size`** shared block alongside it
+  -- the advisory guidance on how long a source file gets before its
+  size is itself worth raising in review, framed as the cost of
+  re-reading a whole file rather than as taste, because where review
+  is tracked per file every change discards the review of all of it;
 * embed the current **`path-traversal-review`**,
   **`python-version-discipline`** and **`functional-test-coverage`**
   shared blocks, which carry the three criteria delegated to the
@@ -77,6 +82,19 @@ This audit exists because the pre-push audit files drifted
 independently in each repository -- several still told the
 documentation reviewer that "`README.md` reflects any new features",
 which is the exact feedback loop that bloats READMEs.
+
+### Recently enforced
+
+**`source-file-size` became a required block on 2026-09-20**, and the
+repositories that do not yet embed it are non-compliant on the
+generated compliance page from that date rather than from any change
+of their own. The fix is a verbatim copy of
+`templates/shared-blocks/source-file-size.md` from
+`shakenfist/development`, markers included;
+`templates/shared-blocks/README.md` describes the copy
+discipline, and the reasoning for enforcing it with a backlog
+open rather than after the sweep is D1 and D2 of
+[PLAN-review-unit-size.md](/components/development/plans/PLAN-review-unit-size/).
 
 ## Template
 

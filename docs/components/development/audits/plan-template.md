@@ -31,7 +31,7 @@ version of each of:
 * **`plan-review-checklist`** -- what the management session verifies
   after a sub-agent completes;
 * **`plan-closeout-sections`** -- the Future work, Bugs fixed and Back
-  brief sections; and
+  brief sections;
 * **`plan-push-audit-phase`** -- that every master plan ends with a
   phase running the repository's `PUSH-AUDIT.md` over the whole plan's
   work. This is what gives the pre-push audit a trigger; see the
@@ -45,7 +45,17 @@ version of each of:
   where the Execution phases are a table, added last so a row which
   omits it still reaches `Status`, or a `Merged:` line where they are
   prose sections. It never goes in the `Status` cell, which
-  `plan-status-vocabulary` reserves for a single term.
+  `plan-status-vocabulary` reserves for a single term; and
+* **`plan-phase-landing`** -- that a phase is closed out in the first
+  commit of the next phase rather than in a pull request of its own,
+  so that the merge commit the `Merged` cell records is known by the
+  time it is written; that the push-audit phase, being last, closes
+  itself out and is the one row permitted to omit that cell; and that
+  `REVIEWS.md` is not pruned or regenerated in a pull request that
+  changes code or documentation, because the `prune-reviews` workflow
+  heals it on the next push to the default branch. It amends the
+  block above, whose account of the `Merged` column it states the
+  single exception to.
 
 Every embedded block must be verbatim and at the current version.
 
@@ -99,6 +109,19 @@ repositories between `<!-- shared-block: <name> v<N> -->` and
 `templates/shared-blocks/`, whose `README.md` describes the
 mechanism. The check fails when a required block is missing, stale,
 drifted from the canonical wording, unknown, or missing its end marker.
+
+### Recently enforced
+
+**`plan-phase-landing` became a required block on 2026-09-20**, and the
+repositories that do not yet embed it are non-compliant on the
+generated compliance page from that date rather than from any change
+of their own. The fix is a verbatim copy of
+`templates/shared-blocks/plan-phase-landing.md` from
+`shakenfist/development`, markers included;
+`templates/shared-blocks/README.md` describes the copy
+discipline, and the reasoning for enforcing it with a backlog
+open rather than after the sweep is D1 and D2 of
+[PLAN-review-unit-size.md](/components/development/plans/PLAN-review-unit-size/).
 
 ## Template
 
