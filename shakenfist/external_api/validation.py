@@ -867,8 +867,9 @@ MAX_UNKNOWN_PARAMETER_FINDINGS = 20
 # enough array puts one log line per bad element into centralised
 # logging -- exactly the property MAX_UNKNOWN_PARAMETER_FINDINGS exists
 # to bound, arriving by a different route once phase 4 taught the
-# flattener to name elements. Nothing bounds a request body's size, so
-# a thousand-element disk list is a thousand findings without this.
+# flattener to name elements. The body's overall size is capped by
+# app.py's limit_request_body_size (issue 4249), but within that cap a
+# thousand-element disk list is still a thousand findings without this.
 # The overflow is summarised in one finding carrying the count, in the
 # same shape as the unknown-parameter overflow above.
 MAX_TYPE_MISMATCH_FINDINGS = 20
