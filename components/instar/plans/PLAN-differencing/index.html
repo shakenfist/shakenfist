@@ -14817,13 +14817,13 @@ records <code>instar-testdata &lt;sha&gt; (#pr)</code> and is audited there.</p>
 <tr>
 <td>6. <code>plan_vhdx</code> differencing emitter</td>
 <td><a href="/components/instar/plans/PLAN-differencing-phase-06-vhdx-emitter/">PLAN-differencing-phase-06-vhdx-emitter.md</a></td>
-<td>Planned</td>
-<td></td>
+<td>Complete</td>
+<td><code>882d098</code> (#577)</td>
 </tr>
 <tr>
 <td>7. Guest create op and host CLI wiring</td>
-<td>PLAN-differencing-phase-07-guest-host.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-differencing-phase-07-guest-host/">PLAN-differencing-phase-07-guest-host.md</a></td>
+<td>Planned</td>
 <td></td>
 </tr>
 <tr>
@@ -15031,13 +15031,13 @@ backing-chain depth composition for qcow2 as well, so VHD/VHDX
 depth may reasonably follow qcow2's rather than lead it.</p>
 <p>Phase 7 is the smallest of the implementation phases: the host
 already attaches the backing file as input device 0 when <code>-b</code> is
-given (<code>run_create_nonraw</code>, <code>src/vmm/src/main.rs:16815</code>), so the
+given (<code>run_create_nonraw</code>, <code>src/vmm/src/main.rs:16816</code>), so the
 guest can read the parent's footer for its unique id and
 timestamp without any new call-table primitive. That is the fact
 that makes this plan tractable, and phase 1 confirmed it still
 holds: step 1b read the same function and found that it opens the
 host-resolved parent but embeds <code>typed_backing.as_bytes()</code>
-verbatim in what the guest receives (<code>:16913-16963</code>). That single
+verbatim in what the guest receives (<code>:16914-16964</code>). That single
 typed string is also what forces the single-locator-entry answer
 in open question 3.</p>
 <p>Phase 7 also inherits two guards it must not remove blindly.
@@ -15054,19 +15054,25 @@ early -- which was not true when this paragraph was first written.
 Issue #570 (POSIX paths emitted under Windows-only platform codes
 and the <code>absolute_win32_path</code> key) must be settled before either
 guard comes off, since removing them is what first exposes that
-choice to a user. Phase 6's review raised one more decision for the
-same moment: neither <code>plan_vhd</code> nor <code>plan_vhdx</code> validates
+choice to a user. Phase 6's review raised the same point from the
+planner's side: neither <code>plan_vhd</code> nor <code>plan_vhdx</code> validates
 <code>backing.format</code>, so a direct crate caller can ask for a
 differencing VHDX naming a qcow2 parent and get a well-formed image
-no consumer can compose. The guards make that unreachable today;
-lifting them is what makes the hint reachable, so phase 7 should
-either refuse a mismatched hint or state in the planner's contract
-that format compatibility is the caller's business.</p>
+no consumer can compose. That is not an open choice -- open
+question 7 above resolved it on 2026-09-05 ("yes, with a typed
+error otherwise"), and phase 7 wires that error. Phase 7's plan
+also improves on the framing: <code>config.backing_format</code> is only
+populated when the user passes <code>-F</code>
+(<code>src/vmm/src/main.rs:16975-16977</code>), while the guest can detect the
+parent's real format from its header, so the check is on the
+detected format rather than on the hint.</p>
 <h3 id="constraints-that-apply-throughout">Constraints that apply throughout<a class="headerlink" href="#constraints-that-apply-throughout" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Guest binaries stay under the 768KB per-operation cap
-  (<code>make check-binary-sizes</code>). The create op has room, but the
-  locator table walk is new guest code and wants budgeting.</li>
+  (<code>make check-binary-sizes</code>). Measured during phase 7's survey,
+  the create op uses 65,224 bytes of it -- 8.5% -- and already
+  depends on both the <code>vhd</code> and <code>vhdx</code> crates, so this is a
+  regression check rather than a budget question.</li>
 <li>The format crates are <code>no_std</code> and panic-free. Every offset and
   length taken from an image is bounds-checked before use; the
   existing qcow2 and vmdk crates are the pattern.</li>

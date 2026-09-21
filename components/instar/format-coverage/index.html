@@ -16002,6 +16002,13 @@ qed images; instar refuses those by scope, not by inability (note 15).</p>
     in-place op refuse; qemu-img cannot open a LUKS container for these without
     key material (<code>--object secret</code>) either, so on a bare LUKS fixture both
     tools refuse (R=). Measured 2026-07-20.</li>
+<li><strong>vpc / vhdx differencing create — instar-only</strong> — instar creates
+    differencing VHD and VHDX children (<code>create -f vpc -b parent.vhd -F vpc</code>,
+    <code>create -f vhdx -b parent.vhdx -F vhdx</code>); qemu-img refuses to create
+    either ("Backing file not supported for file format 'vpc'" / <code>'vhdx'</code>),
+    so there is no qemu-img oracle for this output. See the "VHD/VHDX
+    differencing (parent composition)" section below and the "VHD/VHDX
+    differencing" section of quirks.md. Measured 2026-09-20.</li>
 </ol>
 <h3 id="vvfat">vvfat<a class="headerlink" href="#vvfat" title="Permanent link">&para;</a></h3>
 <p>vvfat is a directory-backed qemu <strong>pseudo-format</strong>: it synthesises a FAT
@@ -16044,6 +16051,11 @@ filed over on the instar side before this refusal existed. See
 <a href="/components/instar/quirks/#vhdvhdx-differencing-instar-refuses-where-qemu-img-silently-misreads">quirks.md</a>
 for the full command transcripts, the exact refusal wording, and the
 per-op record before and after the fix (commit <code>10ab838</code>).</p>
+<p>The write side is the opposite divergence: <code>create -f vpc -b
+parent.vhd -F vpc</code> and <code>create -f vhdx -b parent.vhdx -F vhdx</code> now
+produce differencing children, which qemu-img refuses outright at
+create time and can therefore never validate against — see note 17
+above.</p>
 <hr />
 <h2 id="conversion-output-format-support">Conversion Output Format Support<a class="headerlink" href="#conversion-output-format-support" title="Permanent link">&para;</a></h2>
 <p>The <code>instar convert</code> operation supports writing output in the following formats:</p>

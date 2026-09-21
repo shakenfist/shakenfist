@@ -14664,7 +14664,7 @@ this repository's convention.</p>
 <tr>
 <td>5. Push audit</td>
 <td>Complete</td>
-<td></td>
+<td><code>1806a7c</code> (#154), <code>fc723f3</code> (#155)</td>
 </tr>
 </tbody>
 </table>
@@ -16916,7 +16916,15 @@ agent correcting the brief it was given -- wave 2d on the detection
 gap. Both are arguments for the wave 2 briefs being written against
 what a plan actually changed rather than against the repository in
 general, which was decision 4.</p>
-<p><strong>Merged:</strong></p>
+<p><strong>Merged:</strong> <code>1806a7c</code> (#154), carrying steps 5a to 5g and the audit
+record, and <code>fc723f3</code> (#155), carrying the fixes the audit produced.
+Decision 6 named the findings pull request as the carrier of this
+cell, on the assumption that it would land second. It landed first,
+and so could not name a commit that did not yet exist; the fallback
+the step plan wrote for the no-findings case -- a follow-up commit --
+carried it instead. A phase cannot name the commit that lands it, and
+this is the last phase, so no later planning commit exists to do it.
+That is what the fallback was for.</p>
 <h2 id="risks-and-mitigations_3">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations_3" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>The audit finds nothing and the phase becomes ceremony.</strong> This

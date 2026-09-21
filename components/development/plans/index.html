@@ -14106,8 +14106,8 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <tr>
 <td>2026-08-24</td>
 <td><a href="/components/development/plans/PLAN-push-audit-phase/">Push audit phase</a></td>
-<td>Give the pre-push audit a trigger: a mandatory final phase in every master plan, and a consistency check that nothing drops the reference. The review point confirmed the phase stays mandatory; the fleet backfill swept six repositories and recorded each plan's landing commits in those and this one, and found that the survey's repository list was narrower than the fleet. The push audit is planned and running, over the union of the phases' merge commits and direct landings rather than a span</td>
-<td>In progress</td>
+<td>Give the pre-push audit a trigger: a mandatory final phase in every master plan, and a consistency check that nothing drops the reference. The review point confirmed the phase stays mandatory; the fleet backfill swept six repositories and recorded each plan's landing commits in those and this one, and found that the survey's repository list was narrower than the fleet. The push audit ran over the union of the phases' merge commits and direct landings rather than a span; it found two blocking defects in the plan checks -- a symlink escape and a quadratic link regex, both fixed -- and a defect in the runbook it was reading, which assumed the work under audit had not yet merged</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>2026-08-27</td>

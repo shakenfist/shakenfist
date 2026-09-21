@@ -25695,8 +25695,11 @@ into a "(before phase 4)" and an "(after phase 4, commit <code>10ab838</code>)" 
 recording what changed. A "Known limitations after phase 4" subsection
 near the end of this section records what phase 4 deliberately left
 unfixed.</p>
-<h3 id="qemu-img-creates-neither-differencing-vhd-nor-differencing-vhdx">qemu-img creates neither differencing VHD nor differencing VHDX<a class="headerlink" href="#qemu-img-creates-neither-differencing-vhd-nor-differencing-vhdx" title="Permanent link">&para;</a></h3>
-<p><strong>Classification: Not applicable</strong> (there is no output to diverge from qemu)</p>
+<h3 id="qemu-img-creates-neither-differencing-vhd-nor-differencing-vhdx-instar-now-creates-both">qemu-img creates neither differencing VHD nor differencing VHDX; instar now creates both<a class="headerlink" href="#qemu-img-creates-neither-differencing-vhd-nor-differencing-vhdx-instar-now-creates-both" title="Permanent link">&para;</a></h3>
+<p><strong>Classification: Not applicable, for qemu-img's unchanged side</strong> — there
+is still no qemu-img write path for either format. instar's own output
+is a recorded divergence (an instar-only capability with no qemu-img
+oracle); see <a href="/components/instar/format-coverage/">format-coverage.md</a>.</p>
 <h4 id="observed-behavior_51">Observed Behavior<a class="headerlink" href="#observed-behavior_51" title="Permanent link">&para;</a></h4>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>$ qemu-img create -f vpc base.vhd 16M
 <a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>Formatting 'base.vhd', fmt=vpc size=16777216
@@ -25718,30 +25721,113 @@ other instar write path has been. This is why the differencing plan spends
 its whole first phase establishing an external oracle (libvhdi, see below)
 before writing an emitter at all.</p>
 <h4 id="instar-behavior_50">instar Behavior<a class="headerlink" href="#instar-behavior_50" title="Permanent link">&para;</a></h4>
-<p>instar does not create differencing output either today: <code>instar create
--f vpc -b parent.vhd child.vhd</code> and its vhdx equivalent both fail with
-<code>create failed: invalid option for target format</code>. Not a divergence —
-instar matches qemu-img's refusal to create either format.</p>
-<p>The refusal moved, though, and the distinction matters to anyone reading
-the source. <code>plan_vhdx</code> still rejects a backing reference outright.
-<code>plan_vhd</code> no longer does: it can build the metadata for a differencing
-VHD, and the refusal a user meets comes from a guard in the create
-operation instead, which is there because the guest cannot yet read the
-parent's identity off the parent and a child recording the wrong parent
-identity is worse than no child at all.</p>
-<p>Two things about that emitter are worth recording while nothing can
-reach it, because no tool available to this project can contradict
-either. Its parent locator entry writes the path the user typed —
-a POSIX path — under <code>W2ku</code> / <code>W2ru</code> platform codes that SPEC(VHD)
-defines as <em>Windows</em> paths, where measured Hyper-V output writes
-<code>.\fat-parent.vhd</code> and <code>C:\Projects\...</code>; that divergence is issue</p>
-<h1 id="570-and-must-be-settled-before-the-guard-is-removed-and-every-vhd">570 and must be settled before the guard is removed. And every VHD<a class="headerlink" href="#570-and-must-be-settled-before-the-guard-is-removed-and-every-vhd" title="Permanent link">&para;</a></h1>
-<p>instar creates carries an all-zero footer unique id, so a differencing
-child of an instar parent records an all-zero parent identity and any
-instar parent satisfies any instar child; that is issue #566. Neither
-affects the parent <em>unicode name</em> field, which is what libvhdi and
-qemu's <code>block/vpc.c</code> actually read to resolve a VHD parent — neither
-of them parses the locator table at all.</p>
+<p>instar now creates differencing output for both formats. <code>instar
+create -f vpc -b parent.vhd -F vpc child.vhd</code> and <code>instar create -f
+vhdx -b parent.vhdx -F vhdx child.vhdx</code> both exit 0 and write a
+differencing child: <code>plan_vhd</code>'s emitter output (footer <code>disk_type=4</code>
+plus a populated parent locator entry in the dynamic header) and
+<code>plan_vhdx</code>'s (the <code>HasParent</code> file-parameter bit plus a populated
+parent locator metadata item) are now reachable rather than merely
+buildable. The guest reads the parent's identity off the parent
+itself — a VHD parent's footer <code>uuid</code> and <code>timestamp</code>; a VHDX parent's
+active-header <code>DataWriteGuid</code> — instead of being handed a placeholder.</p>
+<p>A differencing child's parent must be the same format as the child:
+format detection decides, not the <code>-F</code> hint, and a parent that detects
+as anything else — or a hint that contradicts detection — is refused
+with a typed error (<code>ERROR_PARENT_FORMAT_MISMATCH</code>). qcow2 and vmdk
+are unaffected and continue to accept a parent of any format they can
+detect.</p>
+<p>This settles both things the pre-creation text above once left
+unresolved. <strong>Issue #570</strong> — the parent locator writing the path the
+user typed, a POSIX path, under <code>W2ku</code> / <code>W2ru</code> / <code>relative_path</code> /
+<code>absolute_win32_path</code> keys that SPEC(VHD) and SPEC(VHDX) define as
+<em>Windows</em> paths — is settled by a split: a <strong>relative</strong> parent path is
+normalised into the Hyper-V convention before being written to the
+locator (<code>/</code> becomes <code>\</code>, prefixed <code>.\</code>), matching what the measured
+Hyper-V fixtures actually contain (<code>.\fat-parent.vhd</code>,
+<code>C:\Projects\...</code>); a <strong>POSIX-absolute</strong> parent path is kept verbatim
+under the Windows-defined locator key, because no honest Windows-style
+rendering of it exists and SPEC(VHDX) 2.6.2.6.3 requires at least one
+of the three path keys (the third, <code>volume_path</code>, needs a Windows
+volume GUID no Linux producer can obtain). Neither case touches the
+VHD parent <em>unicode name</em> field, which always keeps the path exactly
+as typed — that is the field qemu's <code>block/vpc.c</code> and libvhdi actually
+resolve a VHD parent through, and normalising it would make it
+disagree with the file the user meant.</p>
+<p>One consequence of the split: a relative parent path caps two code
+units shorter than an absolute one, because the <code>.\</code> prefix comes out
+of the same length budget as the path itself, and only the relative
+case is normalised. VHD has two separate limits — 255 UTF-16 code
+units on the parent unicode name field, which carries the path as
+typed and is unaffected by normalisation, and 256 (one sector) on the
+locator, which carries the normalised string — so the smaller binds
+and a relative VHD path caps at 254 typed code units versus 255 for an
+absolute one. VHDX has a single 260-code-unit cap on the emitted
+string, so a relative VHDX path caps at 258 versus 260 absolute.</p>
+<p>A second consequence: <strong>a relative parent path containing a literal
+backslash is refused.</strong> The normalisation is what gives <code>\</code> its
+meaning in the emitted string, so a <code>\</code> the user typed cannot be told
+apart from one the normalisation produced — <code>a\b.vhd</code> (one file, a
+legal POSIX name) and <code>a/b.vhd</code> (<code>b.vhd</code> inside <code>a/</code>) would emit the
+same locator, and a reader resolving it opens the wrong file in
+exactly one of the two cases without being able to tell which. VHD
+would survive that, because the parent unicode name field keeps the
+typed bytes and that is the field qemu's <code>block/vpc.c</code> and libvhdi
+resolve through, but VHDX has no equivalent field: the locator is its
+only record of the path. Both formats therefore refuse, with
+<code>ERROR_PARENT_PATH_NOT_REPRESENTABLE</code>, so the rule is one rule rather
+than two. <code>\</code> is the only character that is <em>refused</em> on this account — and an
+absolute path keeps its POSIX bytes and is not normalised, so it is
+unconstrained.</p>
+<p>The rewrite is POSIX-equivalent rather than byte-for-byte. Beyond
+mapping <code>/</code> to <code>\</code>, redundant leading <code>./</code> components and repeated
+separators are collapsed, so <code>./sub//parent.vhdx</code> and
+<code>.././/sub/parent.vhdx</code> both emit <code>.\sub\parent.vhdx</code>; a path that
+collapses to nothing at all (<code>./</code>, <code>.//</code>) is refused with
+<code>ERROR_INVALID_OPTION</code>, since a bare <code>.\</code> names the containing
+directory rather than a file. The consequence for VHDX is
+visible to users, because the locator is the string <code>info</code> reports
+back: <code>create -f vhdx -b ./sub//parent.vhdx</code> then <code>info</code> reports
+<code>sub/parent.vhdx</code>. That path resolves to the same file, but it is not
+the one that was typed.</p>
+<p><strong><code>instar info</code> reports a parent path in POSIX convention, whichever
+format it came from.</strong> The normalisation above is a property of what is
+<em>written</em>, not of what instar reports back. A VHD child's parent is
+read from the parent unicode name field, which keeps the typed bytes,
+so it reported the typed path already. A VHDX child's parent is read
+from the locator, so <code>info</code> renders the <code>relative_path</code> key back --
+dropping the leading <code>.\</code> and mapping <code>\</code> to <code>/</code> -- and the two formats
+agree: <code>create -f vhdx -b parent.vhdx</code> then <code>info child.vhdx</code> reports
+<code>parent.vhdx</code>, not <code>.\parent.vhdx</code>. Rendering back matters beyond
+symmetry, because <code>backing-filename</code> is a machine-read JSON field and
+<code>.\parent.vhdx</code> is a path no POSIX resolver can open. The other two
+locator keys hold absolute paths and are reported verbatim: instar
+writes a POSIX absolute path under <code>absolute_win32_path</code> unchanged, and
+rewriting a genuine Windows absolute path's separators would produce
+something that is neither a Win32 path nor a POSIX one. A genuine
+Hyper-V child benefits by the same rule, which is the read half of what
+<a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> decision 6 assigns
+to the composition phases.</p>
+<p><strong>A child's block size is independent of its parent's, deliberately.</strong>
+instar gives a differencing child the same defaults as any other new
+image — 2 MiB blocks for VHD, 32 MiB for VHDX — rather than inheriting
+the parent's, and for VHDX the chunk ratio can differ too. This is
+legal and it is what Hyper-V tolerates: composition resolves a read by
+<em>virtual offset</em>, not by block index, so the two images need only agree
+on the virtual size (which instar enforces; see
+<a href="/components/instar/create/">create.md</a>). Recording it here because a later reader
+comparing a child to its parent would otherwise reasonably take the
+asymmetry for an oversight, and because the compose work has to handle
+it either way.</p>
+<p><strong>Issue #566 is not closed by this.</strong> Every VHD instar creates still
+carries an all-zero footer unique id, so a differencing child of an
+instar-created parent records an all-zero parent identity and any
+instar parent satisfies any instar child. Closing it needs a real
+identity for created images, which needs a host-side entropy source
+through the call table — an ABI change out of scope here. What changed
+is that the gap is now user-reachable rather than only visible to
+crate-level callers, since a user can actually produce such a child
+today.</p>
 <h3 id="how-qemu-img-reads-a-differencing-image-and-what-instar-used-to-do">How qemu-img reads a differencing image, and what instar used to do<a class="headerlink" href="#how-qemu-img-reads-a-differencing-image-and-what-instar-used-to-do" title="Permanent link">&para;</a></h3>
 <p><strong>Classification: closes an Unsafe Quirk</strong> (qemu-img's side — silently
 wrong output, exit 0 — is unchanged and not deliberate policy on its part;
