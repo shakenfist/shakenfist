@@ -3164,6 +3164,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/plans/PLAN-review-unit-size/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: the size of a review unit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -7626,6 +7654,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-use-case-docs-phase-03-standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: `docs/use-cases/standalone.md`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
         
   
@@ -9228,6 +9284,34 @@
     
   
     Kerbside for Shaken Fist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../use-cases/standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside standalone
   
 
     
@@ -14620,47 +14704,47 @@ span, not a link. Phases 3 and 4 inherit this.</p>
 <h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
 <p>Each of these is falsifiable from the tree:</p>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>docs/use-cases/openstack.md</code> exists, and its <code>^##</code>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>docs/use-cases/openstack.md</code> exists, and its <code>^##</code>
       headings match <code>docs/use-cases/ovirt.md</code>'s exactly, in
       order.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Its "How it works" section contains a mermaid <code>flowchart
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Its "How it works" section contains a mermaid <code>flowchart
       TD</code>, and <code>tools/mermaid-lint.sh</code> exits zero.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> None of the eight option names from
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> None of the eight option names from
       <code>docs/console-sources.md:197-207</code> (<code>source</code>, <code>type</code>, <code>url</code>,
       <code>username</code>, <code>password</code>, <code>project_name</code>, <code>user_domain_id</code>,
       <code>project_domain_id</code>) appears in the new page. It links to
       the table instead.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The page states that there is no OpenStack source driver and
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The page states that there is no OpenStack source driver and
       that <code>type: openstack</code> entries are skipped by the scrape
       loop.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The absent backend <code>host_subject</code> appears both in the value
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The absent backend <code>host_subject</code> appears both in the value
       proposition and as a row in the Status and limitations
       table, and the page distinguishes it from
       <code>PROXY_HOST_SUBJECT</code>, which pins a different leg.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A limitations row names <code>openstack_matrix</code> as merge-tier
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A limitations row names <code>openstack_matrix</code> as merge-tier
       only, and says what that means for when regressions surface.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The page names at least one Gerrit change number with a
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The page names at least one Gerrit change number with a
       status and the date it was checked.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -n 'no portal to write' docs/use-cases/shaken-fist.md</code>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>grep -n 'no portal to write' docs/use-cases/shaken-fist.md</code>
       returns nothing, or returns a sentence scoped to oVirt
       alone.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -in 'need.secured' docs/use-cases/shaken-fist.md</code>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>grep -in 'need.secured' docs/use-cases/shaken-fist.md</code>
       returns at least one hit, and the page no longer says the
       backend leg is unconditionally pinned.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>verify</code> appears in the OpenStack option table in
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>verify</code> appears in the OpenStack option table in
       <code>docs/console-sources.md</code>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -rln 'openstack\.md' docs/ README.md</code> lists
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>grep -rln 'openstack\.md' docs/ README.md</code> lists
       <code>docs/index.md</code>, <code>docs/console-sources.md</code>,
       <code>docs/use-cases/ovirt.md</code>, <code>docs/use-cases/shaken-fist.md</code>
       and <code>README.md</code>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>pre-commit run --all-files</code> passes, which includes
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>pre-commit run --all-files</code> passes, which includes
       <code>tox -e py3</code> and therefore <code>test_docs_links.py</code>.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> An open GitHub issue exists for survey finding 6: #451,
       filed by step 2d. Phase 1's two review findings were never
       auto-filed, which is why this phase had to carry them, so
       the issue number is recorded here rather than left to the
       filing.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>The rule forbidding duplication has not been read as
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <strong>The rule forbidding duplication has not been read as
       licence to deny.</strong> No sentence in either page asserts the
       <em>absence</em> of a mechanism merely because this plan forbade
       describing it. Forbidding a description is not permission to

@@ -3178,6 +3178,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-review-unit-size/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: the size of a review unit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -7479,6 +7507,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-use-case-docs-phase-03-standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: `docs/use-cases/standalone.md`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
         
   
@@ -9081,6 +9137,34 @@
     
   
     Kerbside for Shaken Fist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/use-cases/standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside standalone
   
 
     
@@ -14088,8 +14172,8 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <tr>
 <td>2026-08-02</td>
 <td><a href="/components/development/plans/PLAN-review-coverage/">Review coverage steady state</a></td>
-<td>Take review tracking from a manual loop to a steady state: CI pruning on the default branch, and coverage alerting from the daily audit. Both halves have been running in five repositories since August; the verification phase has run, verified both halves from production evidence, and tracked the filed issue's staleness as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/138" title="GitHub Issue: shakenfist/development #138">development#138</a></td>
-<td>In progress</td>
+<td>Take review tracking from a manual loop to a steady state: CI pruning on the default branch, and coverage alerting from the daily audit. Both halves have been running in five repositories since August; the verification phase and the push audit have both run, and the audit's six findings have all landed -- three in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/158" title="GitHub Issue: shakenfist/development #158">development#158</a> and three in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/389" title="GitHub Issue: shakenfist/ryll #389">ryll#389</a></td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>2026-08-15</td>
@@ -14138,6 +14222,12 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <td><a href="/components/development/plans/PLAN-image-supply-chain/">Image supply chain</a></td>
 <td>Close the end-of-life migration and the five silent image-production failures behind it, in an order that does not break CI, and stop the audit being blind to the producers. Detection landed in phase 1 and artifact verification in phase 2, the latter at the cost of a night's images when its own self-update met a checkout git would not open. Phase 3 unstuck both labels and is complete, having found its gnome move was twice the size the survey thought and reached into a fourth repository nobody had grepped. Phase 4 is planned: roughly half the fleet's Debian 12 references cleared themselves through ordinary repository work while the plan waited, and what remains is the visible half -- the guest images the CI clusters boot are invisible to the criterion and are what gates retiring the producers</td>
 <td>In progress</td>
+</tr>
+<tr>
+<td>2026-09-20</td>
+<td><a href="/components/development/plans/PLAN-review-unit-size/">Review unit size</a></td>
+<td>Cut what a whole-file review session has to re-read: a source-file-size shared block framed as re-review cost, enforcement of it and of plan-phase-landing across the fleet, then finishing the CheckTestCase migration that PLAN-audit-scripts-restructure left half done</td>
+<td>Complete</td>
 </tr>
 </tbody>
 </table>

@@ -2489,6 +2489,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#recently-enforced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recently enforced
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3267,6 +3278,34 @@
     
   
     Plan: the image supply chain, from end-of-life migration to production that reports its own failures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-review-unit-size/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: the size of a review unit
   
 
     
@@ -7588,6 +7627,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-use-case-docs-phase-03-standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: `docs/use-cases/standalone.md`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/plans/PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
         
   
@@ -9190,6 +9257,34 @@
     
   
     Kerbside for Shaken Fist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/use-cases/standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside standalone
   
 
     
@@ -14179,6 +14274,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#recently-enforced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recently enforced
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -14242,6 +14348,11 @@
   <code>plan-phase-references</code> audits for the policies they enforce);</li>
 <li>embed the current <strong><code>comment-proportion</code></strong> shared block in its
   code-quality review section;</li>
+<li>embed the current <strong><code>source-file-size</code></strong> shared block alongside it
+  -- the advisory guidance on how long a source file gets before its
+  size is itself worth raising in review, framed as the cost of
+  re-reading a whole file rather than as taste, because where review
+  is tracked per file every change discards the review of all of it;</li>
 <li>embed the current <strong><code>path-traversal-review</code></strong>,
   <strong><code>python-version-discipline</code></strong> and <strong><code>functional-test-coverage</code></strong>
   shared blocks, which carry the three criteria delegated to the
@@ -14295,6 +14406,17 @@ drifted from the canonical wording, unknown, or missing its end marker.</p>
 independently in each repository -- several still told the
 documentation reviewer that "<code>README.md</code> reflects any new features",
 which is the exact feedback loop that bloats READMEs.</p>
+<h3 id="recently-enforced">Recently enforced<a class="headerlink" href="#recently-enforced" title="Permanent link">&para;</a></h3>
+<p><strong><code>source-file-size</code> became a required block on 2026-09-20</strong>, and the
+repositories that do not yet embed it are non-compliant on the
+generated compliance page from that date rather than from any change
+of their own. The fix is a verbatim copy of
+<code>templates/shared-blocks/source-file-size.md</code> from
+<code>shakenfist/development</code>, markers included;
+<code>templates/shared-blocks/README.md</code> describes the copy
+discipline, and the reasoning for enforcing it with a backlog
+open rather than after the sweep is D1 and D2 of
+<a href="/components/development/plans/PLAN-review-unit-size/">PLAN-review-unit-size.md</a>.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>Template: <code>templates/shared-blocks/</code>
 See: <code>templates/shared-blocks/README.md</code></p>

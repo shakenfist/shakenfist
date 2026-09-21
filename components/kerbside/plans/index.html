@@ -3164,6 +3164,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-review-unit-size/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: the size of a review unit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -7538,6 +7566,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-use-case-docs-phase-03-standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: `docs/use-cases/standalone.md`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
         
   
@@ -9140,6 +9196,34 @@
     
   
     Kerbside for Shaken Fist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../use-cases/standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside standalone
   
 
     
@@ -14192,9 +14276,9 @@ repo root. For pre-push audits of our own work see
 <tr>
 <td>2026-08-02</td>
 <td><a href="/components/kerbside/plans/PLAN-use-case-docs/">Use case documentation</a></td>
-<td>One docs page per deployment permutation, each covering value proposition, how it works, and setup. The oVirt page landed 2026-08-10 as two-tier CI phase 4 and settles the format, the <code>docs/use-cases/</code> directory and the index placement; four writable pages remain and Proxmox stays deferred until a source driver exists. Promoted from a standalone plan on 2026-09-18 when phase 1 was planned, which brings the mandatory push-audit phase with it</td>
+<td>One docs page per deployment permutation, each covering value proposition, how it works, and setup. The oVirt page landed 2026-08-10 as two-tier CI phase 4 and settles the format, the <code>docs/use-cases/</code> directory and the index placement; three writable pages remain and Proxmox stays deferred until a source driver exists. Promoted from a standalone plan on 2026-09-18 when phase 1 was planned, which brings the mandatory push-audit phase with it</td>
 <td>In progress</td>
-<td><a href="/components/kerbside/plans/PLAN-use-case-docs-phase-01-shaken-fist/">phase 1</a> (complete, merged 2f0e526 -- the Shaken Fist page, chosen ahead of OpenStack so the format's second instance has the least unsettled ground under it: the VDI tokens plan is complete and <code>sf-e2e</code> gates it on every pull request, where the OpenStack deployment story is still moving upstream on Gerrit. The survey found the master plan's "remaining six pages are unblocked" wrong by its own table, the static-source row's precondition since met by the install rewrite, and the multi-cloud row's "stated nowhere" now one sentence and one bullet wide; all three corrected at source. It also found the index scaffolding already built -- <code>docs/index.md</code> carries a seven-row Use Cases table, so each page phase links an existing row rather than adding one. The load-bearing finding is not a staleness: <code>docs/console-sources.md:67-146</code> already documents the Shaken Fist flow in eighty accurate lines, so the phase's central decision is what the page does <em>not</em> say, and six specifics are named in the definition of done as forbidden to duplicate. Review caught two factual errors that were not auto-filed as issues, so phase 2 carries them: the page asserted the backend leg is unconditionally TLS-pinned, where the proxy dials the insecure port first and escalates only on NEED_SECURED, and it claimed OpenStack has a portal to write, where Nova embeds the broker exactly as Shaken Fist does), <a href="/components/kerbside/plans/PLAN-use-case-docs-phase-02-openstack/">phase 2</a> (in progress -- the OpenStack page. The survey corrected nothing at source, unusually: the master plan's row and this description both hold. Its load-bearing findings are structural instead. There is no <code>kerbside/sources/openstack.py</code> at all -- the scrape loop skips <code>type: openstack</code> at <code>main.py:175-178</code> and the whole implementation is <code>class NovaToken</code> inline in <code>api.py:571-700</code> -- so this is the first page that cannot borrow either existing page's scrape-then-exchange shape. And OpenStack consoles are never subject-pinned on the backend leg, because Nova's token validation response carries no certificate subject and <code>api.py:665</code> therefore leaves <code>host_subject</code> at its default; the decision most likely to be argued with is putting that in the value proposition rather than only in the limitations table. The Kolla-Ansible deployment change 976889 is still open upstream, rechecked 2026-09-20, so the index's claim about it survives), phases 3-5 (not started -- standalone/static, multi-cloud plus placement topologies, then the index slim-down and closeout), phase 6 (not started -- push audit)</td>
+<td><a href="/components/kerbside/plans/PLAN-use-case-docs-phase-01-shaken-fist/">phase 1</a> (complete, merged 2f0e526 -- the Shaken Fist page, chosen ahead of OpenStack so the format's second instance has the least unsettled ground under it: the VDI tokens plan is complete and <code>sf-e2e</code> gates it on every pull request, where the OpenStack deployment story is still moving upstream on Gerrit. The survey found the master plan's "remaining six pages are unblocked" wrong by its own table, the static-source row's precondition since met by the install rewrite, and the multi-cloud row's "stated nowhere" now one sentence and one bullet wide; all three corrected at source. It also found the index scaffolding already built -- <code>docs/index.md</code> carries a seven-row Use Cases table, so each page phase links an existing row rather than adding one. The load-bearing finding is not a staleness: <code>docs/console-sources.md:67-146</code> already documents the Shaken Fist flow in eighty accurate lines, so the phase's central decision is what the page does <em>not</em> say, and six specifics are named in the definition of done as forbidden to duplicate. Review caught two factual errors that were not auto-filed as issues, so phase 2 carries them: the page asserted the backend leg is unconditionally TLS-pinned, where the proxy dials the insecure port first and escalates only on NEED_SECURED, and it claimed OpenStack has a portal to write, where Nova embeds the broker exactly as Shaken Fist does), <a href="/components/kerbside/plans/PLAN-use-case-docs-phase-02-openstack/">phase 2</a> (complete, merged a7df5e5 -- the OpenStack page. The survey corrected nothing at source, unusually: the master plan's row and this description both hold. Its load-bearing findings are structural instead. There is no <code>kerbside/sources/openstack.py</code> at all -- the scrape loop skips <code>type: openstack</code> at <code>main.py:175-178</code> and the whole implementation is <code>class NovaToken</code> inline in <code>api.py:571-700</code> -- so this is the first page that cannot borrow either existing page's scrape-then-exchange shape. And OpenStack consoles are never subject-pinned on the backend leg, because Nova's token validation response carries no certificate subject and <code>api.py:665</code> therefore leaves <code>host_subject</code> at its default; the decision most likely to be argued with is putting that in the value proposition rather than only in the limitations table. The Kolla-Ansible deployment change 976889 is still open upstream, rechecked 2026-09-20, so the index's claim about it survives. Review found one defect the page had introduced about TLS: it said that configuring only Kerbside's own certificate leaves the backend leg unverified, where ryll's <code>create_tls_connector</code> falls back to the public web trust store with hostname verification, so an internal hypervisor certificate fails the handshake instead. Corrected before landing; the lesson for later pages is that a claim about the backend TLS leg is only checkable in ryll, not in this repository. Three issues were filed from the survey and the review rounds: #451, #454 and #456), <a href="/components/kerbside/plans/PLAN-use-case-docs-phase-03-standalone/">phase 3</a> (in progress -- the standalone page, for the static driver. The survey corrected nothing in the master plan's row, which held in every particular, but found the hazard phases 1 and 2 met in its sharpest form: <code>docs/console-sources.md:217-298</code> already carries the <em>framing</em> -- an intended use-cases list and a "not intended for production use" paragraph -- that PLAN-demo-install.md decision 2 assigns to this page, so the phase has to move material rather than merely decline to duplicate it. The load-bearing finding is that the framing is wrong: the static console list is re-read every sixty seconds in both directions, with audit events either way, where <code>console-sources.md</code> and <code>static.py</code>'s own header both say a restart is required. Two other files, <code>demo/sources.yaml</code> and a comment in <code>main.py</code>, already had it right. The decision most likely to be argued with is correcting a code comment inside a documentation phase), phases 4-5 (not started -- multi-cloud plus placement topologies, then the index slim-down and closeout), phase 6 (not started -- push audit)</td>
 </tr>
 <tr>
 <td>2026-08-08</td>

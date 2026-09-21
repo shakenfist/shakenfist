@@ -2450,6 +2450,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#recently-enforced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recently enforced
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3256,6 +3267,34 @@
     
   
     Plan: the image supply chain, from end-of-life migration to production that reports its own failures
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-review-unit-size/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: the size of a review unit
   
 
     
@@ -7577,6 +7616,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-use-case-docs-phase-03-standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: `docs/use-cases/standalone.md`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/plans/PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
         
   
@@ -9179,6 +9246,34 @@
     
   
     Kerbside for Shaken Fist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/use-cases/standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside standalone
   
 
     
@@ -14157,6 +14252,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#recently-enforced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recently enforced
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -14235,7 +14341,7 @@ version of each of:</p>
 <li><strong><code>plan-review-checklist</code></strong> -- what the management session verifies
   after a sub-agent completes;</li>
 <li><strong><code>plan-closeout-sections</code></strong> -- the Future work, Bugs fixed and Back
-  brief sections; and</li>
+  brief sections;</li>
 <li><strong><code>plan-push-audit-phase</code></strong> -- that every master plan ends with a
   phase running the repository's <code>PUSH-AUDIT.md</code> over the whole plan's
   work. This is what gives the pre-push audit a trigger; see the
@@ -14249,7 +14355,17 @@ version of each of:</p>
   where the Execution phases are a table, added last so a row which
   omits it still reaches <code>Status</code>, or a <code>Merged:</code> line where they are
   prose sections. It never goes in the <code>Status</code> cell, which
-  <code>plan-status-vocabulary</code> reserves for a single term.</li>
+  <code>plan-status-vocabulary</code> reserves for a single term; and</li>
+<li><strong><code>plan-phase-landing</code></strong> -- that a phase is closed out in the first
+  commit of the next phase rather than in a pull request of its own,
+  so that the merge commit the <code>Merged</code> cell records is known by the
+  time it is written; that the push-audit phase, being last, closes
+  itself out and is the one row permitted to omit that cell; and that
+  <code>REVIEWS.md</code> is not pruned or regenerated in a pull request that
+  changes code or documentation, because the <code>prune-reviews</code> workflow
+  heals it on the next push to the default branch. It amends the
+  block above, whose account of the <code>Merged</code> column it states the
+  single exception to.</li>
 </ul>
 <p>Every embedded block must be verbatim and at the current version.</p>
 <p>Repositories with no <code>PLAN-TEMPLATE.md</code> are N/A. Whether every project
@@ -14295,6 +14411,17 @@ repositories between <code>&lt;!-- shared-block: &lt;name&gt; v&lt;N&gt; --&gt;<
 <code>templates/shared-blocks/</code>, whose <code>README.md</code> describes the
 mechanism. The check fails when a required block is missing, stale,
 drifted from the canonical wording, unknown, or missing its end marker.</p>
+<h3 id="recently-enforced">Recently enforced<a class="headerlink" href="#recently-enforced" title="Permanent link">&para;</a></h3>
+<p><strong><code>plan-phase-landing</code> became a required block on 2026-09-20</strong>, and the
+repositories that do not yet embed it are non-compliant on the
+generated compliance page from that date rather than from any change
+of their own. The fix is a verbatim copy of
+<code>templates/shared-blocks/plan-phase-landing.md</code> from
+<code>shakenfist/development</code>, markers included;
+<code>templates/shared-blocks/README.md</code> describes the copy
+discipline, and the reasoning for enforcing it with a backlog
+open rather than after the sweep is D1 and D2 of
+<a href="/components/development/plans/PLAN-review-unit-size/">PLAN-review-unit-size.md</a>.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p><code>templates/shared-blocks/</code> holds the canonical copy of each block
 listed above. Copy each one verbatim, markers included, into the

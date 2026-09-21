@@ -3307,6 +3307,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-review-unit-size/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan: the size of a review unit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -7608,6 +7636,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-use-case-docs-phase-03-standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: `docs/use-cases/standalone.md`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-test-harness-phase-03-control-socket/" class="md-nav__link">
         
   
@@ -9210,6 +9266,34 @@
     
   
     Kerbside for Shaken Fist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/use-cases/standalone/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside standalone
   
 
     
@@ -14510,6 +14594,34 @@ Individually, which is quicker while iterating:</p>
 <a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>python3 scripts/test_check_audit_smoke.py
 <a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>python3 scripts/test_issue_fix_extraction.py
 </code></pre></div>
+<p>A test for a check subclasses <code>CheckTestCase</code> from
+<code>scripts/tests/base.py</code> rather than building its own fixture and
+assertion scaffolding. It provides <code>self.fixture</code>, a <code>FixtureRepo</code>
+over a throwaway checkout (<code>write()</code>, <code>write_all()</code>, <code>workflow()</code>,
+<code>workflows()</code>, <code>init_git()</code>, <code>commit()</code>); <code>self.fresh_fixture()</code>,
+which replaces it with an empty one; <code>self.check(**props)</code>,
+which runs <code>check_class</code> against the fixture with repository
+properties supplied directly rather than detected; <code>check_args=</code> on
+<code>self.check()</code> for the three checks whose constructors take an
+argument (<code>PushAudit</code>, <code>PlanTemplate</code> and <code>SfuiVendor</code> -- a set
+<code>ContractTest</code> pins against the registry, so a fourth cannot
+appear without this sentence failing); and the
+<code>assert_pass(result)</code> / <code>assert_fail(result, containing=)</code> /
+<code>assert_skip(result, containing=)</code> triple in place of a bare
+<code>assertEqual</code> against <code>result['status']</code>. A class that tests a pure
+helper rather than a <code>Check</code> subclass -- a regex, a parsing function,
+a spec-page comparison -- correctly does not use it; it stays a plain
+<code>unittest.TestCase</code>, since there is no check to run and nothing
+<code>CheckTestCase</code> would add.</p>
+<p>Two conventions in <code>write_all()</code> are worth knowing before writing a
+fixture. A <code>None</code> content means the file is <em>absent</em> and is skipped;
+an empty file is spelled <code>''</code>. Both readings were in use before the
+helper existed, and absence is the one that fails silently if a
+caller guesses wrong -- a check that distinguishes a missing file
+from an empty one would quietly pass. And a helper that runs the
+check more than once in a single test method must rebuild the
+fixture first, by calling <code>self.fresh_fixture()</code>, or the first
+call's files are still on disk for the second.</p>
 <p>The tests cover the machinery, not what a check <em>decides</em> about a real
 repository. Test that half against local clones:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>python3 scripts/audit-check.py --repo-path ~/src/shakenfist/&lt;repo&gt; \
