@@ -14752,6 +14752,19 @@ placement-writing methods.</p>
 be valid (e.g., when a node's cleaner daemon calls <code>observe()</code> on local blobs).
 This enables detection of stale references for cleanup.</p>
 <h2 id="rest-api-surface">REST API surface<a class="headerlink" href="#rest-api-surface" title="Permanent link">&para;</a></h2>
+<p><strong>Request body size is capped before anything reads it.</strong> The
+<code>limit_request_body_size</code> hook in <code>external_api/app.py</code> refuses a body
+larger than <code>API_MAX_REQUEST_BODY_BYTES</code> (default 1 MiB) with a 413,
+and a body with a <code>Transfer-Encoding</code> header but no <code>Content-Length</code>
+with a 411, on every route before authentication, logging or parsing
+run. This bounds the cost of the request validation pass, which walks
+everything the body parser produces (issue 4249), and follows the
+shape <code>limit_federated_body_size</code> established for <code>/auth/federated</code>
+(which keeps its own much tighter bound). Routes declaring the raw
+request body — the upload data endpoint, whose chunks are streamed to
+disk rather than parsed — are exempt via <code>RAW_BODY_URL_RULES</code>; a unit
+test derives that set from the published specification so a new
+raw-body endpoint cannot silently gain or dodge the cap.</p>
 <p><strong>202+poll contract for delete endpoints.</strong> <code>DELETE /networks/&lt;uuid&gt;</code> and
 <code>DELETE /networks</code> return HTTP 202 (Accepted). The response body carries
 the cluster-operation handle so clients can poll for completion:</p>
