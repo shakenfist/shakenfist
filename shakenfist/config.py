@@ -297,6 +297,24 @@ class SFConfig(BaseSettings):
             'docs/developer_guide/writing_an_endpoint.md.'
         )
     )
+    API_MAX_REQUEST_BODY_BYTES: int = Field(
+        1048576,
+        description=(
+            'The largest request body the API accepts on JSON-carrying '
+            'routes, in bytes. Refused with a 413 before any reader: '
+            'the request validation layer walks everything the body '
+            'parser produces, so its cost is bounded by bounding what '
+            'is parsed (issue 4249). Routes which declare the raw '
+            'request body (the upload data endpoint) are exempt, '
+            'because their bodies are binary chunks streamed to disk '
+            'rather than JSON walked in memory. A request carrying a '
+            'Transfer-Encoding header but no Content-Length is refused '
+            'with 411, so chunked encoding cannot opt out of the '
+            'limit; a bodyless request without a declared length still '
+            'passes. The default comfortably exceeds any request the '
+            'shipped client sends.'
+        )
+    )
     AGENT_OPERATION_DEFAULT_DEADLINE: int = Field(
         600,
         description=(

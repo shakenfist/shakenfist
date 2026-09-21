@@ -551,6 +551,20 @@ This enables detection of stale references for cleanup.
 
 ## REST API surface
 
+**Request body size is capped before anything reads it.** The
+`limit_request_body_size` hook in `external_api/app.py` refuses a body
+larger than `API_MAX_REQUEST_BODY_BYTES` (default 1 MiB) with a 413,
+and a body with a `Transfer-Encoding` header but no `Content-Length`
+with a 411, on every route before authentication, logging or parsing
+run. This bounds the cost of the request validation pass, which walks
+everything the body parser produces (issue 4249), and follows the
+shape `limit_federated_body_size` established for `/auth/federated`
+(which keeps its own much tighter bound). Routes declaring the raw
+request body — the upload data endpoint, whose chunks are streamed to
+disk rather than parsed — are exempt via `RAW_BODY_URL_RULES`; a unit
+test derives that set from the published specification so a new
+raw-body endpoint cannot silently gain or dodge the cap.
+
 **202+poll contract for delete endpoints.** `DELETE /networks/<uuid>` and
 `DELETE /networks` return HTTP 202 (Accepted). The response body carries
 the cluster-operation handle so clients can poll for completion:

@@ -2,6 +2,7 @@
 
 import json
 
+import requests
 from testtools import content
 
 from shakenfist_ci import base
@@ -793,3 +794,36 @@ class TestEveryDocumentedSpecKeyStillBoots(base.BaseNamespacedTestCase):
             content.text_content(json.dumps(results, indent=4, sort_keys=True)))
         self.assertEqual(0, results['return-code'])
         self.assertIn('vda', results['stdout'])
+
+
+class TestOversizedBodyRefused(base.BaseTestCase):
+    """Issue 4249: the general request body cap.
+
+    The validation layer walks everything the body parser produces, so
+    a large malformed body used to buy seconds of single-threaded work
+    per gunicorn worker. The limit_request_body_size hook refuses an
+    oversized body before anything reads it, on every route.
+
+    These requests use ``requests`` directly rather than the client:
+    the cap runs before authentication, so no credentials are carried,
+    and no public client method sends a body this large. The size is
+    the server-side default of API_MAX_REQUEST_BODY_BYTES, hardcoded
+    because the CI cluster deploys the default configuration and this
+    suite cannot read the server's config.
+    """
+
+    def test_an_oversized_body_is_refused(self):
+        r = requests.post(
+            f'{self.system_client.base_url}/instances',
+            data='x' * (1048576 + 1))
+        self.addDetail('response', content.text_content(r.text))
+        self.assertEqual(413, r.status_code)
+
+    def test_a_body_under_the_cap_reaches_authentication(self):
+        # The control: the same unauthenticated request with a small
+        # body is answered by the JWT layer, which proves the 413 above
+        # is the size hook and not any later refusal.
+        r = requests.post(
+            f'{self.system_client.base_url}/instances', json={})
+        self.addDetail('response', content.text_content(r.text))
+        self.assertEqual(401, r.status_code)

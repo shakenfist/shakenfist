@@ -229,6 +229,48 @@ def limit_federated_body_size():
         return sf_api.error(413, 'request body too large')
 
 
+# The url rules whose endpoints declare the raw request body
+# (api_base.RAW_BODY_PARAMETER with type 'binary') and so legitimately
+# receive bodies far larger than any JSON request -- an upload arrives
+# as a sequence of multi-megabyte binary chunks streamed to disk, never
+# parsed. Keyed by matched url rule rather than by path prefix so an
+# exemption cannot cover a route it never meant to.
+# test_body_size_limit.py derives the raw-body routes from the
+# published specification and fails if this set drifts from them.
+RAW_BODY_URL_RULES = frozenset({'/upload/<upload_uuid>'})
+
+
+# The general request body cap: the same shape as
+# limit_federated_body_size above, applied to every route rather than
+# one, and registered ahead of every reader of the body for the same
+# reason -- by the time a flask_restful method runs, log_request has
+# already parsed the whole body and the validation pass has walked
+# everything the parse produced. The validation layer bounds what it
+# emits but nothing bounded what it consumed: a 2MB body of malformed
+# nested elements cost about two seconds inside validation.check() per
+# gunicorn worker (issue 4249). Authentication has not run yet, which
+# is the point -- parsing an oversized body is work done on the
+# sender's behalf.
+#
+# Unlike the federated hook, a missing content-length is only refused
+# when the request claims a body to measure (a Transfer-Encoding
+# header): a bodyless request with no declared length is fine, and
+# refusing it would break every client that POSTs without a body.
+@app.before_request
+def limit_request_body_size():
+    rule = flask.request.url_rule
+    if rule is not None and rule.rule in RAW_BODY_URL_RULES:
+        return
+
+    if flask.request.content_length is None:
+        if flask.request.headers.get('Transfer-Encoding'):
+            return sf_api.error(411, 'a content-length is required')
+        return
+
+    if flask.request.content_length > config.API_MAX_REQUEST_BODY_BYTES:
+        return sf_api.error(413, 'request body too large')
+
+
 @app.before_request
 def log_request_info():
     if _is_health_probe():
