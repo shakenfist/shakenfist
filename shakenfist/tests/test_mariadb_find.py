@@ -1958,3 +1958,112 @@ class DirectSetStateInterfaceDeletedHookTestCase(base.ShakenFistTestCase):
         self.assertFalse(mariadb._direct_set_state(
             ObjectType.INSTANCE, str(uuid.uuid4()),
             State(value='creating-error', update_time=0.0)))
+
+
+class DirectSetStateRetryableErrorTestCase(base.ShakenFistTestCase):
+    """A deadlock on the state write is retried, not treated as permanent.
+
+    Issue 4273: a single un-retried InnoDB deadlock (errno 1213, whose
+    own message says "try restarting transaction") on a cluster
+    operation's state write left that operation orphaned in 'queued'
+    forever. 1213 and 1205 (lock wait timeout) are retried with a short
+    bounded backoff; every other write failure keeps degrading to a
+    False return immediately, as before.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.config = mock.patch('shakenfist.mariadb.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.sleep = mock.patch('shakenfist.mariadb.time.sleep')
+        self.mock_sleep = self.sleep.start()
+        self.addCleanup(self.sleep.stop)
+
+    def _make_engine(self):
+        mock_engine = mock.MagicMock()
+        mock_conn = mock.MagicMock()
+        mock_engine.connect.return_value.__enter__ = mock.Mock(
+            return_value=mock_conn)
+        mock_engine.connect.return_value.__exit__ = mock.Mock(
+            return_value=False)
+        return mock_engine, mock_conn
+
+    def _operational_error(self, errno, message):
+        # The DBAPI-level errno is args[0] on the wrapped exception,
+        # which is where _is_retryable_operational_error reads it.
+        return OperationalError('statement', {}, Exception(errno, message))
+
+    def _set_state(self):
+        from shakenfist.schema.object_state import State
+        from shakenfist.schema.object_types import ObjectType
+
+        return mariadb._direct_set_state(
+            ObjectType.NET_OP, str(uuid.uuid4()),
+            State(value='executing', update_time=0.0))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_deadlock_is_retried_then_succeeds(self, mock_get_engine):
+        engine, conn = self._make_engine()
+        conn.execute.side_effect = [
+            self._operational_error(
+                1213, 'Deadlock found when trying to get lock; try '
+                'restarting transaction'),
+            mock.DEFAULT]
+        mock_get_engine.return_value = engine
+
+        self.assertTrue(self._set_state())
+        self.assertEqual(2, conn.execute.call_count)
+        self.mock_sleep.assert_called_once_with(
+            mariadb.STATE_WRITE_RETRY_DELAY)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_lock_wait_timeout_is_retried(self, mock_get_engine):
+        engine, conn = self._make_engine()
+        conn.execute.side_effect = [
+            self._operational_error(
+                1205, 'Lock wait timeout exceeded; try restarting '
+                'transaction'),
+            mock.DEFAULT]
+        mock_get_engine.return_value = engine
+
+        self.assertTrue(self._set_state())
+        self.assertEqual(2, conn.execute.call_count)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_persistent_deadlock_exhausts_retries(self, mock_get_engine):
+        engine, conn = self._make_engine()
+        conn.execute.side_effect = self._operational_error(
+            1213, 'Deadlock found when trying to get lock; try '
+            'restarting transaction')
+        mock_get_engine.return_value = engine
+
+        self.assertFalse(self._set_state())
+        self.assertEqual(
+            mariadb.STATE_WRITE_ATTEMPTS, conn.execute.call_count)
+        self.assertEqual(
+            mariadb.STATE_WRITE_ATTEMPTS - 1, self.mock_sleep.call_count)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_non_retryable_operational_error_fails_immediately(
+            self, mock_get_engine):
+        engine, conn = self._make_engine()
+        conn.execute.side_effect = self._operational_error(
+            2006, 'MySQL server has gone away')
+        mock_get_engine.return_value = engine
+
+        self.assertFalse(self._set_state())
+        self.assertEqual(1, conn.execute.call_count)
+        self.mock_sleep.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_data_error_fails_immediately(self, mock_get_engine):
+        engine, conn = self._make_engine()
+        conn.execute.side_effect = DataError(
+            'statement', {}, Exception("Data too long for column 'message'"))
+        mock_get_engine.return_value = engine
+
+        self.assertFalse(self._set_state())
+        self.assertEqual(1, conn.execute.call_count)
+        self.mock_sleep.assert_not_called()

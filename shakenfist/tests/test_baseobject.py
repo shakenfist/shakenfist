@@ -137,6 +137,42 @@ class DatabaseBackedObjectTestCase(base.ShakenFistTestCase):
         d.error = 'bad error'
         mock_mariadb_set_state.assert_not_called()
 
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=False)
+    @mock.patch('shakenfist.mariadb.get_state',
+                return_value=State(value=DatabaseBackedObject.STATE_INITIAL,
+                                   update_time=4))
+    def test_failed_state_write_raises_typed_exception(
+            self, mock_mariadb_get_state, mock_mariadb_set_state,
+            mock_add_event):
+        """A failed state write raises StateWriteFailed, not RuntimeError.
+
+        Issue 4273: the dispatchers key their leave-it-for-the-reaper
+        recovery on the exception type, so an untyped RuntimeError here
+        meant a transiently failed write resolved the work item and
+        orphaned the operation in 'queued'.
+        """
+        d = DatabaseBackedObject('12345678-1234-4321-8234-123456789012')
+        with testtools.ExpectedException(exceptions.StateWriteFailed):
+            d._state_update(DatabaseBackedObject.STATE_ERROR,
+                            skip_transition_validation=True)
+        # The dispatchers catch it alongside DatabaseUnavailable, so it
+        # must stay within the DatabaseException hierarchy.
+        self.assertTrue(issubclass(exceptions.StateWriteFailed,
+                                   exceptions.DatabaseException))
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=False)
+    @mock.patch('shakenfist.mariadb.get_state',
+                return_value=State(value=DatabaseBackedObject.STATE_ERROR,
+                                   update_time=4, message='bad error'))
+    def test_failed_error_message_write_raises_typed_exception(
+            self, mock_mariadb_get_state, mock_mariadb_set_state,
+            mock_add_event):
+        d = DatabaseBackedObject('12345678-1234-4321-8234-123456789012')
+        with testtools.ExpectedException(exceptions.StateWriteFailed):
+            d.error = 'a new error message'
+
 
 class ErrorMessageRoundTripTestCase(base.ShakenFistTestCase):
     """The error message must survive a database round trip for object

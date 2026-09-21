@@ -216,6 +216,17 @@ class WriteException(DatabaseException):
     ...
 
 
+class StateWriteFailed(WriteException):
+    """Raised when the database service answered but reported an object
+    state write as failed. The common cause is transient (an InnoDB
+    deadlock or lock wait timeout whose bounded server-side retries were
+    exhausted), so dispatchers treat this like DatabaseUnavailable and
+    leave the work item claimed for the stuck-row reaper to re-queue.
+    Resolving the item instead orphans the operation in 'queued', where
+    the enqueue-side dedup adopts it forever (issue 4273)."""
+    ...
+
+
 class ReadException(DatabaseException):
     ...
 

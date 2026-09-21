@@ -14,6 +14,7 @@ from shakenfist.daemons.daemon import IdlePollBackoff
 from shakenfist import mariadb
 from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import InvalidStateException
+from shakenfist.exceptions import StateWriteFailed
 from shakenfist.config import config
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
@@ -201,15 +202,19 @@ class Job(util_concurrency.Job):
             try:
                 self._cluster_operation_execute(
                     queue_name, op, batch_size, defer_delays)
-            except DatabaseUnavailable:
-                # The database went away mid-operation. Leave the work
-                # item claimed rather than resolving it: the stuck-row
-                # reaper re-queues it once the database returns, exactly
-                # as for a worker crash, so the op is retried rather
-                # than silently dropped.
+            except (DatabaseUnavailable, StateWriteFailed):
+                # The database went away mid-operation, or answered but
+                # reported a state write as failed (issue 4273: an
+                # InnoDB deadlock whose retries were exhausted). Leave
+                # the work item claimed rather than resolving it: the
+                # stuck-row reaper re-queues it once the database
+                # recovers, exactly as for a worker crash, so the op is
+                # retried rather than orphaned in 'queued' where the
+                # enqueue-side dedup adopts it forever.
                 LOG.warning(
-                    f'Database service unavailable, abandoning work item '
-                    f'{jobname} for the stuck-row reaper')
+                    f'Database write failed or service unavailable, '
+                    f'abandoning work item {jobname} for the stuck-row '
+                    f'reaper')
                 resolve = False
             except Exception as e:
                 util_exceptions.ignore_exception(
