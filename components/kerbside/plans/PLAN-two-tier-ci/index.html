@@ -7721,6 +7721,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-proxmox-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox console source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -14694,6 +14722,16 @@ through the tunnel — kerbside remains the protocol-aware
 middle, so full inspection is preserved. The proxy's
 backend dialer will need HTTP CONNECT support; assess
 that when planning the source.</p>
+<p><strong>Updated 2026-09-20.</strong> Both halves of the research above
+have since been validated against a live single-node PVE
+9.2.20, and the detail has moved to its own standalone plan:
+<a href="/components/kerbside/plans/PLAN-proxmox-source/">Proxmox console source</a>. In short —
+the install judgement held, the <code>spiceproxy</code> architecture is
+confirmed rather than inferred, and the proxy's backend
+dialer does indeed have no CONNECT support, which makes the
+transport work the gating item for a Proxmox source rather
+than the driver. The Proxmox lane this section proposes is
+that plan's phase 5.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <p>All implementation work is done by sub-agents, never in

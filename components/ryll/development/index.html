@@ -7717,6 +7717,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxmox-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox console source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -14698,12 +14726,20 @@ shared helper in the
 repository. In a clone it is run by hand, not from git hooks:
 <code>prune</code> after a pull to discard reviews of files that have since
 changed, <code>stamp</code> before committing new review marks, <code>regen</code> to
-rebuild <code>REVIEWS.md</code>, <code>next</code> to pick an unreviewed file, and
-<code>status</code> to report effective coverage at HEAD. On develop itself
-the <code>prune-reviews</code> workflow runs <code>prune</code> automatically after every
+rebuild <code>REVIEWS.md</code>, <code>next</code> to pick an unreviewed file, <code>status</code>
+to report effective coverage at HEAD, and <code>scope-orphans</code> to list
+tracked files that are in neither <code>include</code> nor <code>exclude</code>, which
+nobody has made a decision about. On develop itself the
+<code>prune-reviews</code> workflow runs <code>prune</code> automatically after every
 push, committing the result back as shakenfist-bot, and the daily
 consistency audit in shakenfist/development files an issue when
 five or more in-scope files need review.</p>
+<p><code>REVIEWS.md</code> is generated. Never edit it by hand: <code>stamp</code>, <code>prune</code>
+and <code>regen</code> all rewrite it from the marks in <code>.vscode/*.weaudit</code>
+and the stamped blob SHAs beside them, so a hand edit is discarded
+by the next run of any of the three -- silently, because the file
+that replaces it looks like a normal regeneration. Change the
+review state and let the tooling render it.</p>
 <h2 id="ci-and-automation">CI and automation<a class="headerlink" href="#ci-and-automation" title="Permanent link">&para;</a></h2>
 <p>GitHub Actions CI builds and tests ryll on Linux (x86_64 + aarch64),
 macOS (Apple Silicon), and Windows (x86_64 + aarch64) in two tiers. A

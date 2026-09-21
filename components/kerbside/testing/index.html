@@ -8022,6 +8022,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-proxmox-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox console source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -14964,6 +14992,16 @@ which CI checks out alongside this one:</p>
 <li><code>tools/ovirt-gather-artifacts.sh</code> — collects RPM lists and logs for
   CI artifacts</li>
 </ul>
+<p>The lane's own <code>tools/ovirt-e2e/gather-diagnostics.sh</code> runs on the runner
+and drives that last script. It exists because the script is delivered to
+the guest several steps into the job, so a run which failed during
+provisioning had nothing to run, exited 127, and — under <code>bash -e</code> —
+uploaded no artifacts at all. When the guest-side bundle is unavailable
+the wrapper collects a fallback set over ssh instead: cloud-init state
+and logs, the sshd journal, the interpreter and OS versions, disk and
+memory. It always leaves a bundle behind, with a <code>gather.log</code> recording
+every command and its exit code, and it exits zero by design — the runs
+where it matters are the ones that have already failed.</p>
 <h2 id="the-direct-qemu-lane">The direct-qemu lane<a class="headerlink" href="#the-direct-qemu-lane" title="Permanent link">&para;</a></h2>
 <p>The direct-qemu lane publishes a <code>Can enqueue: direct-qemu</code> gate job,
 which is a required status check; see

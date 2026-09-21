@@ -7790,6 +7790,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-proxmox-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox console source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -14192,7 +14220,25 @@ repo root. For pre-push audits of our own work see
 </tbody>
 </table>
 <h2 id="standalone-plans">Standalone plans<a class="headerlink" href="#standalone-plans" title="Permanent link">&para;</a></h2>
-<p>None at present. The last one, <a href="/components/kerbside/plans/PLAN-use-case-docs/">Use case documentation</a>, was promoted to a master plan on
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Plan</th>
+<th>Intent</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-09-20</td>
+<td><a href="/components/kerbside/plans/PLAN-proxmox-source/">Proxmox console source</a></td>
+<td>A Proxmox VE source driver and the transport work it needs: PVE reaches qemu's SPICE listener only through an HTTP CONNECT to its <code>spiceproxy</code>, which the backend dialer cannot do, and mints both credentials per request, which the authorize path has no way to ask for. Carries the feasibility research promoted out of PLAN-two-tier-ci.md's future-work section on 2026-09-20, now validated against a live PVE 9.2.20 node. Standalone because two open questions about ticket semantics can move the design before any of it is written; it becomes a master plan when its first phase is planned</td>
+<td>Proposed</td>
+</tr>
+</tbody>
+</table>
+<p>The previous standalone plan, <a href="/components/kerbside/plans/PLAN-use-case-docs/">Use case documentation</a>, was promoted to a master plan on
 2026-09-18.</p>
 
 
