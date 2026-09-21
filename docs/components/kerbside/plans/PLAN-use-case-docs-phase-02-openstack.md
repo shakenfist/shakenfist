@@ -316,47 +316,47 @@ span, not a link. Phases 3 and 4 inherit this.
 
 Each of these is falsifiable from the tree:
 
-- [ ] `docs/use-cases/openstack.md` exists, and its `^##`
+- [x] `docs/use-cases/openstack.md` exists, and its `^##`
       headings match `docs/use-cases/ovirt.md`'s exactly, in
       order.
-- [ ] Its "How it works" section contains a mermaid `flowchart
+- [x] Its "How it works" section contains a mermaid `flowchart
       TD`, and `tools/mermaid-lint.sh` exits zero.
-- [ ] None of the eight option names from
+- [x] None of the eight option names from
       `docs/console-sources.md:197-207` (`source`, `type`, `url`,
       `username`, `password`, `project_name`, `user_domain_id`,
       `project_domain_id`) appears in the new page. It links to
       the table instead.
-- [ ] The page states that there is no OpenStack source driver and
+- [x] The page states that there is no OpenStack source driver and
       that `type: openstack` entries are skipped by the scrape
       loop.
-- [ ] The absent backend `host_subject` appears both in the value
+- [x] The absent backend `host_subject` appears both in the value
       proposition and as a row in the Status and limitations
       table, and the page distinguishes it from
       `PROXY_HOST_SUBJECT`, which pins a different leg.
-- [ ] A limitations row names `openstack_matrix` as merge-tier
+- [x] A limitations row names `openstack_matrix` as merge-tier
       only, and says what that means for when regressions surface.
-- [ ] The page names at least one Gerrit change number with a
+- [x] The page names at least one Gerrit change number with a
       status and the date it was checked.
-- [ ] `grep -n 'no portal to write' docs/use-cases/shaken-fist.md`
+- [x] `grep -n 'no portal to write' docs/use-cases/shaken-fist.md`
       returns nothing, or returns a sentence scoped to oVirt
       alone.
-- [ ] `grep -in 'need.secured' docs/use-cases/shaken-fist.md`
+- [x] `grep -in 'need.secured' docs/use-cases/shaken-fist.md`
       returns at least one hit, and the page no longer says the
       backend leg is unconditionally pinned.
-- [ ] `verify` appears in the OpenStack option table in
+- [x] `verify` appears in the OpenStack option table in
       `docs/console-sources.md`.
-- [ ] `grep -rln 'openstack\.md' docs/ README.md` lists
+- [x] `grep -rln 'openstack\.md' docs/ README.md` lists
       `docs/index.md`, `docs/console-sources.md`,
       `docs/use-cases/ovirt.md`, `docs/use-cases/shaken-fist.md`
       and `README.md`.
-- [ ] `pre-commit run --all-files` passes, which includes
+- [x] `pre-commit run --all-files` passes, which includes
       `tox -e py3` and therefore `test_docs_links.py`.
 - [x] An open GitHub issue exists for survey finding 6: #451,
       filed by step 2d. Phase 1's two review findings were never
       auto-filed, which is why this phase had to carry them, so
       the issue number is recorded here rather than left to the
       filing.
-- [ ] **The rule forbidding duplication has not been read as
+- [x] **The rule forbidding duplication has not been read as
       licence to deny.** No sentence in either page asserts the
       *absence* of a mechanism merely because this plan forbade
       describing it. Forbidding a description is not permission to

@@ -60,12 +60,14 @@ readme-discipline policy).
 The oVirt page landed 2026-08-10 as PLAN-two-tier-ci.md
 phase 4's deliverable, and settles the format. The Shaken
 Fist page followed on 2026-09-18 as phase 1, merge commit
-2f0e526, and confirms it: both pages carry identical
-section headings. The remaining four writable pages are
+2f0e526, and the OpenStack page on 2026-09-20 as phase 2,
+merge commit a7df5e5: all three carry identical section
+headings, so the format is a convention rather than a
+coincidence. The remaining three writable pages are
 unblocked; Proxmox is not, and still has no source driver
 (`kerbside/sources/` holds `base.py`, `ovirt.py`,
-`shakenfist.py` and `static.py` and nothing else, checked
-2026-09-19).
+`shakenfist.py` and `static.py` and nothing else, rechecked
+2026-09-20).
 
 A third thing landed since this plan was written, and the
 plan did not know it: **the index scaffolding already
@@ -111,8 +113,8 @@ the range is not reliably reconstructable afterwards.
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. Shaken Fist | [PLAN-use-case-docs-phase-01-shaken-fist.md](/components/kerbside/plans/PLAN-use-case-docs-phase-01-shaken-fist/) | Complete | 2f0e526 |
-| 2. OpenStack | [PLAN-use-case-docs-phase-02-openstack.md](/components/kerbside/plans/PLAN-use-case-docs-phase-02-openstack/) | In progress | |
-| 3. Standalone / static source | | Not started | |
+| 2. OpenStack | [PLAN-use-case-docs-phase-02-openstack.md](/components/kerbside/plans/PLAN-use-case-docs-phase-02-openstack/) | Complete | a7df5e5 |
+| 3. Standalone / static source | [PLAN-use-case-docs-phase-03-standalone.md](/components/kerbside/plans/PLAN-use-case-docs-phase-03-standalone/) | In progress | |
 | 4. Multi-cloud aggregation and placement topologies | | Not started | |
 | 5. Index slim-down and closeout | | Not started | |
 | 6. Push audit | | Not started | |

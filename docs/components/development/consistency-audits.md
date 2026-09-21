@@ -273,6 +273,36 @@ python3 scripts/test_check_audit_smoke.py
 python3 scripts/test_issue_fix_extraction.py
 ```
 
+A test for a check subclasses `CheckTestCase` from
+`scripts/tests/base.py` rather than building its own fixture and
+assertion scaffolding. It provides `self.fixture`, a `FixtureRepo`
+over a throwaway checkout (`write()`, `write_all()`, `workflow()`,
+`workflows()`, `init_git()`, `commit()`); `self.fresh_fixture()`,
+which replaces it with an empty one; `self.check(**props)`,
+which runs `check_class` against the fixture with repository
+properties supplied directly rather than detected; `check_args=` on
+`self.check()` for the three checks whose constructors take an
+argument (`PushAudit`, `PlanTemplate` and `SfuiVendor` -- a set
+`ContractTest` pins against the registry, so a fourth cannot
+appear without this sentence failing); and the
+`assert_pass(result)` / `assert_fail(result, containing=)` /
+`assert_skip(result, containing=)` triple in place of a bare
+`assertEqual` against `result['status']`. A class that tests a pure
+helper rather than a `Check` subclass -- a regex, a parsing function,
+a spec-page comparison -- correctly does not use it; it stays a plain
+`unittest.TestCase`, since there is no check to run and nothing
+`CheckTestCase` would add.
+
+Two conventions in `write_all()` are worth knowing before writing a
+fixture. A `None` content means the file is *absent* and is skipped;
+an empty file is spelled `''`. Both readings were in use before the
+helper existed, and absence is the one that fails silently if a
+caller guesses wrong -- a check that distinguishes a missing file
+from an empty one would quietly pass. And a helper that runs the
+check more than once in a single test method must rebuild the
+fixture first, by calling `self.fresh_fixture()`, or the first
+call's files are still on disk for the second.
+
 The tests cover the machinery, not what a check *decides* about a real
 repository. Test that half against local clones:
 

@@ -165,6 +165,7 @@ nav:
                 - "Plan: split the generated compliance tables out of the audit specifications": components/development/plans/PLAN-audit-compliance-split.md
                 - "Plan: stestr / testtools version pin": components/development/plans/PLAN-stestr-testtools.md
                 - "Plan: the image supply chain, from end-of-life migration to production that reports its own failures": components/development/plans/PLAN-image-supply-chain.md
+                - "Plan: the size of a review unit": components/development/plans/PLAN-review-unit-size.md
                 - "Review coverage steady state": components/development/plans/PLAN-review-coverage.md
                 - "Shaken Fist Project Consistency Plan": components/development/plans/PLAN-consistency.md
                 - "Systematic whole-codebase review tracking": components/development/plans/PLAN-code-review-tracking.md
@@ -308,6 +309,7 @@ nav:
                 - "Phase 2: `docs/use-cases/openstack.md`": components/kerbside/plans/PLAN-use-case-docs-phase-02-openstack.md
                 - "Phase 2: Static source driver": components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor.md
                 - "Phase 2: write the missing `etc/kerbside.conf.example`": components/kerbside/plans/PLAN-demo-install-phase-02-conf-example.md
+                - "Phase 3: `docs/use-cases/standalone.md`": components/kerbside/plans/PLAN-use-case-docs-phase-03-standalone.md
                 - "Phase 3: Control socket on Ryll": components/kerbside/plans/PLAN-test-harness-phase-03-control-socket.md
                 - "Phase 3: the `docker compose` demo stack": components/kerbside/plans/PLAN-demo-install-phase-03-compose-demo.md
                 - "Phase 4: a CI lane for the compose demo": components/kerbside/plans/PLAN-demo-install-phase-04-ci-lane.md
@@ -364,6 +366,7 @@ nav:
                 - "Kerbside for OpenStack": components/kerbside/use-cases/openstack.md
                 - "Kerbside for oVirt": components/kerbside/use-cases/ovirt.md
                 - "Kerbside for Shaken Fist": components/kerbside/use-cases/shaken-fist.md
+                - "Kerbside standalone": components/kerbside/use-cases/standalone.md
         - Occystrap:
             - "Introduction": components/occystrap/index.md
             - "Command Reference": components/occystrap/command-reference.md
