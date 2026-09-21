@@ -4218,9 +4218,12 @@ recording what changed. A "Known limitations after phase 4" subsection
 near the end of this section records what phase 4 deliberately left
 unfixed.
 
-### qemu-img creates neither differencing VHD nor differencing VHDX
+### qemu-img creates neither differencing VHD nor differencing VHDX; instar now creates both
 
-**Classification: Not applicable** (there is no output to diverge from qemu)
+**Classification: Not applicable, for qemu-img's unchanged side** — there
+is still no qemu-img write path for either format. instar's own output
+is a recorded divergence (an instar-only capability with no qemu-img
+oracle); see [format-coverage.md](/components/instar/format-coverage/).
 
 #### Observed Behavior
 
@@ -4249,32 +4252,121 @@ before writing an emitter at all.
 
 #### instar Behavior
 
-instar does not create differencing output either today: `instar create
--f vpc -b parent.vhd child.vhd` and its vhdx equivalent both fail with
-`create failed: invalid option for target format`. Not a divergence —
-instar matches qemu-img's refusal to create either format.
+instar now creates differencing output for both formats. `instar
+create -f vpc -b parent.vhd -F vpc child.vhd` and `instar create -f
+vhdx -b parent.vhdx -F vhdx child.vhdx` both exit 0 and write a
+differencing child: `plan_vhd`'s emitter output (footer `disk_type=4`
+plus a populated parent locator entry in the dynamic header) and
+`plan_vhdx`'s (the `HasParent` file-parameter bit plus a populated
+parent locator metadata item) are now reachable rather than merely
+buildable. The guest reads the parent's identity off the parent
+itself — a VHD parent's footer `uuid` and `timestamp`; a VHDX parent's
+active-header `DataWriteGuid` — instead of being handed a placeholder.
 
-The refusal moved, though, and the distinction matters to anyone reading
-the source. `plan_vhdx` still rejects a backing reference outright.
-`plan_vhd` no longer does: it can build the metadata for a differencing
-VHD, and the refusal a user meets comes from a guard in the create
-operation instead, which is there because the guest cannot yet read the
-parent's identity off the parent and a child recording the wrong parent
-identity is worse than no child at all.
+A differencing child's parent must be the same format as the child:
+format detection decides, not the `-F` hint, and a parent that detects
+as anything else — or a hint that contradicts detection — is refused
+with a typed error (`ERROR_PARENT_FORMAT_MISMATCH`). qcow2 and vmdk
+are unaffected and continue to accept a parent of any format they can
+detect.
 
-Two things about that emitter are worth recording while nothing can
-reach it, because no tool available to this project can contradict
-either. Its parent locator entry writes the path the user typed —
-a POSIX path — under `W2ku` / `W2ru` platform codes that SPEC(VHD)
-defines as *Windows* paths, where measured Hyper-V output writes
-`.\fat-parent.vhd` and `C:\Projects\...`; that divergence is issue
-#570 and must be settled before the guard is removed. And every VHD
-instar creates carries an all-zero footer unique id, so a differencing
-child of an instar parent records an all-zero parent identity and any
-instar parent satisfies any instar child; that is issue #566. Neither
-affects the parent *unicode name* field, which is what libvhdi and
-qemu's `block/vpc.c` actually read to resolve a VHD parent — neither
-of them parses the locator table at all.
+This settles both things the pre-creation text above once left
+unresolved. **Issue #570** — the parent locator writing the path the
+user typed, a POSIX path, under `W2ku` / `W2ru` / `relative_path` /
+`absolute_win32_path` keys that SPEC(VHD) and SPEC(VHDX) define as
+*Windows* paths — is settled by a split: a **relative** parent path is
+normalised into the Hyper-V convention before being written to the
+locator (`/` becomes `\`, prefixed `.\`), matching what the measured
+Hyper-V fixtures actually contain (`.\fat-parent.vhd`,
+`C:\Projects\...`); a **POSIX-absolute** parent path is kept verbatim
+under the Windows-defined locator key, because no honest Windows-style
+rendering of it exists and SPEC(VHDX) 2.6.2.6.3 requires at least one
+of the three path keys (the third, `volume_path`, needs a Windows
+volume GUID no Linux producer can obtain). Neither case touches the
+VHD parent *unicode name* field, which always keeps the path exactly
+as typed — that is the field qemu's `block/vpc.c` and libvhdi actually
+resolve a VHD parent through, and normalising it would make it
+disagree with the file the user meant.
+
+One consequence of the split: a relative parent path caps two code
+units shorter than an absolute one, because the `.\` prefix comes out
+of the same length budget as the path itself, and only the relative
+case is normalised. VHD has two separate limits — 255 UTF-16 code
+units on the parent unicode name field, which carries the path as
+typed and is unaffected by normalisation, and 256 (one sector) on the
+locator, which carries the normalised string — so the smaller binds
+and a relative VHD path caps at 254 typed code units versus 255 for an
+absolute one. VHDX has a single 260-code-unit cap on the emitted
+string, so a relative VHDX path caps at 258 versus 260 absolute.
+
+A second consequence: **a relative parent path containing a literal
+backslash is refused.** The normalisation is what gives `\` its
+meaning in the emitted string, so a `\` the user typed cannot be told
+apart from one the normalisation produced — `a\b.vhd` (one file, a
+legal POSIX name) and `a/b.vhd` (`b.vhd` inside `a/`) would emit the
+same locator, and a reader resolving it opens the wrong file in
+exactly one of the two cases without being able to tell which. VHD
+would survive that, because the parent unicode name field keeps the
+typed bytes and that is the field qemu's `block/vpc.c` and libvhdi
+resolve through, but VHDX has no equivalent field: the locator is its
+only record of the path. Both formats therefore refuse, with
+`ERROR_PARENT_PATH_NOT_REPRESENTABLE`, so the rule is one rule rather
+than two. `\` is the only character that is *refused* on this account — and an
+absolute path keeps its POSIX bytes and is not normalised, so it is
+unconstrained.
+
+The rewrite is POSIX-equivalent rather than byte-for-byte. Beyond
+mapping `/` to `\`, redundant leading `./` components and repeated
+separators are collapsed, so `./sub//parent.vhdx` and
+`.././/sub/parent.vhdx` both emit `.\sub\parent.vhdx`; a path that
+collapses to nothing at all (`./`, `.//`) is refused with
+`ERROR_INVALID_OPTION`, since a bare `.\` names the containing
+directory rather than a file. The consequence for VHDX is
+visible to users, because the locator is the string `info` reports
+back: `create -f vhdx -b ./sub//parent.vhdx` then `info` reports
+`sub/parent.vhdx`. That path resolves to the same file, but it is not
+the one that was typed.
+
+**`instar info` reports a parent path in POSIX convention, whichever
+format it came from.** The normalisation above is a property of what is
+*written*, not of what instar reports back. A VHD child's parent is
+read from the parent unicode name field, which keeps the typed bytes,
+so it reported the typed path already. A VHDX child's parent is read
+from the locator, so `info` renders the `relative_path` key back --
+dropping the leading `.\` and mapping `\` to `/` -- and the two formats
+agree: `create -f vhdx -b parent.vhdx` then `info child.vhdx` reports
+`parent.vhdx`, not `.\parent.vhdx`. Rendering back matters beyond
+symmetry, because `backing-filename` is a machine-read JSON field and
+`.\parent.vhdx` is a path no POSIX resolver can open. The other two
+locator keys hold absolute paths and are reported verbatim: instar
+writes a POSIX absolute path under `absolute_win32_path` unchanged, and
+rewriting a genuine Windows absolute path's separators would produce
+something that is neither a Win32 path nor a POSIX one. A genuine
+Hyper-V child benefits by the same rule, which is the read half of what
+[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) decision 6 assigns
+to the composition phases.
+
+**A child's block size is independent of its parent's, deliberately.**
+instar gives a differencing child the same defaults as any other new
+image — 2 MiB blocks for VHD, 32 MiB for VHDX — rather than inheriting
+the parent's, and for VHDX the chunk ratio can differ too. This is
+legal and it is what Hyper-V tolerates: composition resolves a read by
+*virtual offset*, not by block index, so the two images need only agree
+on the virtual size (which instar enforces; see
+[create.md](/components/instar/create/)). Recording it here because a later reader
+comparing a child to its parent would otherwise reasonably take the
+asymmetry for an oversight, and because the compose work has to handle
+it either way.
+
+**Issue #566 is not closed by this.** Every VHD instar creates still
+carries an all-zero footer unique id, so a differencing child of an
+instar-created parent records an all-zero parent identity and any
+instar parent satisfies any instar child. Closing it needs a real
+identity for created images, which needs a host-side entropy source
+through the call table — an ABI change out of scope here. What changed
+is that the gap is now user-reachable rather than only visible to
+crate-level callers, since a user can actually produce such a child
+today.
 
 ### How qemu-img reads a differencing image, and what instar used to do
 
