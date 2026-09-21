@@ -3999,6 +3999,27 @@ def _direct_get_state(object_type: ObjectType, object_uuid: str) -> Optional[Sta
         return None
 
 
+# MariaDB errno values where the server explicitly asks the client to
+# retry the transaction: 1213 (ER_LOCK_DEADLOCK, "Deadlock found when
+# trying to get lock; try restarting transaction") and 1205
+# (ER_LOCK_WAIT_TIMEOUT). A single un-retried 1213 on a cluster
+# operation's state write left the operation orphaned in 'queued'
+# forever (issue 4273).
+RETRYABLE_MARIADB_ERRNOS = frozenset({1205, 1213})
+STATE_WRITE_ATTEMPTS = 3
+STATE_WRITE_RETRY_DELAY = 0.2
+
+
+def _is_retryable_operational_error(e: OperationalError) -> bool:
+    """Whether MariaDB explicitly asked us to retry this transaction.
+
+    The driver-level errno is the first element of the wrapped DBAPI
+    exception's args tuple; see RETRYABLE_MARIADB_ERRNOS for the codes.
+    """
+    orig_args: 'tuple[Any, ...]' = getattr(e.orig, 'args', ())
+    return bool(orig_args) and orig_args[0] in RETRYABLE_MARIADB_ERRNOS
+
+
 def _direct_set_state(object_type: ObjectType, object_uuid: str, state: State) -> bool:
     """Write state for an object directly to MariaDB.
 
@@ -4010,43 +4031,58 @@ def _direct_set_state(object_type: ObjectType, object_uuid: str, state: State) -
     ``deleted``. The flag is part of the composite UNIQUE constraint
     on macaddr — clearing it lets the MAC be reused immediately
     while the soft-deleted row remains in place for audit.
+
+    A deadlock or lock wait timeout is retried with a short escalating
+    sleep before degrading to a failed write (issue 4273); the worst
+    case adds ~0.6s inside the servicer, well within GRPC_TIMEOUT.
     """
     engine = _get_engine()
     table = _get_object_states_table()
 
-    try:
-        with engine.connect() as conn:
-            # Use MySQL's INSERT ... ON DUPLICATE KEY UPDATE for upsert
-            stmt = sa.dialects.mysql.insert(table).values(
-                object_uuid=object_uuid,
-                object_type=object_type,
-                state_value=state.value,
-                update_time=state.update_time,
-                message=state.message
-            )
-            stmt = stmt.on_duplicate_key_update(
-                state_value=state.value,
-                update_time=state.update_time,
-                message=state.message
-            )
-            conn.execute(stmt)
+    for attempt in range(STATE_WRITE_ATTEMPTS):
+        try:
+            with engine.connect() as conn:
+                # Use MySQL's INSERT ... ON DUPLICATE KEY UPDATE for upsert
+                stmt = sa.dialects.mysql.insert(table).values(
+                    object_uuid=object_uuid,
+                    object_type=object_type,
+                    state_value=state.value,
+                    update_time=state.update_time,
+                    message=state.message
+                )
+                stmt = stmt.on_duplicate_key_update(
+                    state_value=state.value,
+                    update_time=state.update_time,
+                    message=state.message
+                )
+                conn.execute(stmt)
 
-            if (object_type == ObjectType.INTERFACE
-                    and state.value == 'deleted'):
-                ni_table = _get_network_interfaces_table()
-                conn.execute(sa.update(ni_table).where(
-                    ni_table.c.uuid == UUID(object_uuid)
-                ).values(active=None))
+                if (object_type == ObjectType.INTERFACE
+                        and state.value == 'deleted'):
+                    ni_table = _get_network_interfaces_table()
+                    conn.execute(sa.update(ni_table).where(
+                        ni_table.c.uuid == UUID(object_uuid)
+                    ).values(active=None))
 
-            conn.commit()
-            return True
-    except (DataError, OperationalError) as e:
-        # DataError (e.g. 1406 "Data too long") must degrade to a False
-        # return like any other failed write, not escape the servicer
-        # (issue 4112).
-        LOG.warning(
-            f'MariaDB write failed for {object_type}/{object_uuid}: {e}')
-        return False
+                conn.commit()
+                return True
+        except (DataError, OperationalError) as e:
+            if (isinstance(e, OperationalError)
+                    and _is_retryable_operational_error(e)
+                    and attempt + 1 < STATE_WRITE_ATTEMPTS):
+                LOG.warning(
+                    f'MariaDB write hit retryable error for '
+                    f'{object_type}/{object_uuid} (attempt {attempt + 1} '
+                    f'of {STATE_WRITE_ATTEMPTS}): {e}')
+                time.sleep(STATE_WRITE_RETRY_DELAY * (attempt + 1))
+                continue
+            # DataError (e.g. 1406 "Data too long") must degrade to a False
+            # return like any other failed write, not escape the servicer
+            # (issue 4112).
+            LOG.warning(
+                f'MariaDB write failed for {object_type}/{object_uuid}: {e}')
+            return False
+    return False
 
 
 def _direct_delete_state(object_type: ObjectType, object_uuid: str) -> bool:

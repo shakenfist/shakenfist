@@ -9,6 +9,7 @@ from shakenfist.daemons import daemon
 from shakenfist import mariadb
 from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import InvalidStateException
+from shakenfist.exceptions import StateWriteFailed
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
 from shakenfist.util import concurrency as util_concurrency
@@ -71,18 +72,20 @@ class Job(util_concurrency.Job):
         resolve = True
         try:
             self._cluster_operation_execute()
-        except DatabaseUnavailable:
+        except (DatabaseUnavailable, StateWriteFailed):
             # The database went away during the operation lookup or the
-            # operation itself. Leave the work item claimed rather than
+            # operation itself, or answered but reported a state write
+            # as failed (issue 4273: an InnoDB deadlock whose retries
+            # were exhausted). Leave the work item claimed rather than
             # resolving it: the stuck-row reaper re-queues it once the
-            # database returns, exactly as for a worker crash, so the op
+            # database recovers, exactly as for a worker crash, so the op
             # is retried rather than silently dropped (issue 3716 -- a
             # "Too many connections" storm made this path discard 596
             # queued cluster operations, permanently leaking hypervisor
             # state).
             self.log.warning(
-                'Database service unavailable, abandoning work item for '
-                'the stuck-row reaper')
+                'Database write failed or service unavailable, abandoning '
+                'work item for the stuck-row reaper')
             resolve = False
         finally:
             if resolve:

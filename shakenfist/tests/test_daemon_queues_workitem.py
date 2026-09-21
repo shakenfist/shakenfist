@@ -2,6 +2,7 @@
 
 from unittest import mock
 
+from shakenfist import exceptions
 from shakenfist.daemons.queues import workitem
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
@@ -188,3 +189,47 @@ class DependencyWaitDeferTest(base.ShakenFistTestCase):
 
         mock_op.defer.assert_not_called()
         mock_op.execute.assert_called_once()
+
+
+class WorkItemResolutionTest(base.ShakenFistTestCase):
+    """Which failures resolve the work item and which leave it claimed.
+
+    Issue 3716 established the DatabaseUnavailable half: resolving a
+    work item whose operation never ran silently drops the operation.
+    Issue 4273 added StateWriteFailed: a state write the database
+    reported as failed used to surface as an untyped RuntimeError,
+    resolve the work item, and orphan the operation in 'queued' where
+    the enqueue-side dedup adopted it forever.
+    """
+
+    def _run_job(self, side_effect):
+        job = workitem.Job.__new__(workitem.Job)
+        job.queue_name = QUEUE_NAME
+        job.jobname = 'test-job'
+        job.log = mock.MagicMock()
+        # Instance attribute shadows the method, as elsewhere in this
+        # file.
+        job._cluster_operation_execute = mock.MagicMock(
+            side_effect=side_effect)
+
+        with mock.patch(
+                'shakenfist.daemons.queues.workitem.mariadb'
+        ) as mock_mariadb:
+            job.execute()
+        return mock_mariadb
+
+    def test_success_resolves_work_item(self):
+        mock_mariadb = self._run_job(None)
+        mock_mariadb.resolve_work_item.assert_called_once_with(
+            QUEUE_NAME, 'test-job')
+
+    def test_database_unavailable_leaves_item_claimed(self):
+        mock_mariadb = self._run_job(
+            exceptions.DatabaseUnavailable('down'))
+        mock_mariadb.resolve_work_item.assert_not_called()
+
+    def test_state_write_failed_leaves_item_claimed(self):
+        mock_mariadb = self._run_job(
+            exceptions.StateWriteFailed(
+                'Failed to write state executing for net_op/x to MariaDB'))
+        mock_mariadb.resolve_work_item.assert_not_called()

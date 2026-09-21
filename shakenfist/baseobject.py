@@ -628,7 +628,11 @@ class DatabaseBackedObject:
                     'object_uuid': str(self.uuid),
                     'new_state': new_value,
                 }).error('Failed to write state to MariaDB')
-                raise RuntimeError(
+                # Typed rather than a RuntimeError so the cluster
+                # operation dispatchers can leave the work item claimed
+                # for the stuck-row reaper -- the write may have failed
+                # for a transient reason (issue 4273).
+                raise exceptions.StateWriteFailed(
                     f'Failed to write state {new_value} for '
                     f'{self.object_type}/{self.uuid} to MariaDB'
                 )
@@ -667,7 +671,7 @@ class DatabaseBackedObject:
         if self.__in_memory_only:
             self.__in_memory_state = new_state
         elif not mariadb.set_state(self.object_type, str(self.uuid), new_state):
-            raise RuntimeError(
+            raise exceptions.StateWriteFailed(
                 f'Failed to write error message for '
                 f'{self.object_type}/{self.uuid} to MariaDB')
         self._log_attribute_mutation('error', {'message': msg})

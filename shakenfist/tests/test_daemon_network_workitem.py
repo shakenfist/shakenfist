@@ -705,6 +705,37 @@ class DatabaseUnavailableTest(base.ShakenFistTestCase):
 
         self.assertEqual(['op-1', 'op-2'], executed)
 
+    def test_worker_abandons_item_on_state_write_failed(self):
+        """StateWriteFailed from an op leaves its work item claimed for
+        the stuck-row reaper, exactly like DatabaseUnavailable. Issue
+        4273: this used to surface as an untyped RuntimeError, fall
+        through to the generic ignore_exception path, and resolve the
+        work item with the operation still 'queued' -- where the
+        enqueue-side dedup adopted the orphan forever."""
+        executed = []
+
+        def fake_execute(queue_name, op, batch_size, defer_delays):
+            executed.append(op.uuid)
+            if op.uuid == 'op-1':
+                raise exceptions.StateWriteFailed(
+                    'Failed to write state executing for net_op/op-1 '
+                    'to MariaDB')
+
+        items = [
+            (QUEUE_NAME, 'job-op-1', FakeNetOp('op-1', 'net-a'), 1),
+            (QUEUE_NAME, 'job-op-2', FakeNetOp('op-2', 'net-a'), 1),
+        ]
+
+        with mock.patch(
+                'shakenfist.daemons.network.workitem.mariadb') as mock_mariadb:
+            self._run_worker_loop(items, fake_execute)
+
+            # op-1's work item stays claimed; only op-2 resolves.
+            mock_mariadb.resolve_work_item.assert_called_once_with(
+                QUEUE_NAME, 'job-op-2')
+
+        self.assertEqual(['op-1', 'op-2'], executed)
+
     def test_worker_survives_database_unavailable_during_resolve(self):
         """DatabaseUnavailable from resolve_work_item itself must not
         kill the worker thread; the next item is still processed."""
