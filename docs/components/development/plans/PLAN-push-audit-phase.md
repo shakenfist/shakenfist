@@ -240,7 +240,7 @@ this repository's convention.
 | 2. Fleet sweep | Complete | `ff92357` (#50), `ac34b76..240d278` |
 | 3. Review point | Complete | `81dc421` (#83) |
 | 4. Fleet backfill | Complete | `fd0678c` (#113), `a19b706` (#133) |
-| 5. Push audit | Complete | |
+| 5. Push audit | Complete | `1806a7c` (#154), `fc723f3` (#155) |
 
 The `Merged` column is the convention this plan introduces, applied
 to the plan that introduces it. It goes last so that a row which
@@ -2225,7 +2225,15 @@ gap. Both are arguments for the wave 2 briefs being written against
 what a plan actually changed rather than against the repository in
 general, which was decision 4.
 
-**Merged:**
+**Merged:** `1806a7c` (#154), carrying steps 5a to 5g and the audit
+record, and `fc723f3` (#155), carrying the fixes the audit produced.
+Decision 6 named the findings pull request as the carrier of this
+cell, on the assumption that it would land second. It landed first,
+and so could not name a commit that did not yet exist; the fallback
+the step plan wrote for the no-findings case -- a follow-up commit --
+carried it instead. A phase cannot name the commit that lands it, and
+this is the last phase, so no later planning commit exists to do it.
+That is what the fallback was for.
 
 ## Risks and mitigations
 

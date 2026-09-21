@@ -362,8 +362,8 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 | 3. Parent-locator parsing in `crates/vhd` and `crates/vhdx` | [PLAN-differencing-phase-03-parse.md](/components/instar/plans/PLAN-differencing-phase-03-parse/) | Complete | `42e879f` (#558) |
 | 4. Read-side policy: close the silent parent-ignoring read | [PLAN-differencing-phase-04-read-policy.md](/components/instar/plans/PLAN-differencing-phase-04-read-policy/) | Complete | `f981374` (#563) |
 | 5. `plan_vhd` differencing emitter | [PLAN-differencing-phase-05-vhd-emitter.md](/components/instar/plans/PLAN-differencing-phase-05-vhd-emitter/) | Complete | `9a80776` (#568) |
-| 6. `plan_vhdx` differencing emitter | [PLAN-differencing-phase-06-vhdx-emitter.md](/components/instar/plans/PLAN-differencing-phase-06-vhdx-emitter/) | Planned | |
-| 7. Guest create op and host CLI wiring | PLAN-differencing-phase-07-guest-host.md | Not started | |
+| 6. `plan_vhdx` differencing emitter | [PLAN-differencing-phase-06-vhdx-emitter.md](/components/instar/plans/PLAN-differencing-phase-06-vhdx-emitter/) | Complete | `882d098` (#577) |
+| 7. Guest create op and host CLI wiring | [PLAN-differencing-phase-07-guest-host.md](/components/instar/plans/PLAN-differencing-phase-07-guest-host/) | Planned | |
 | 8. Rust unit tests and Python integration tests | PLAN-differencing-phase-08-tests.md | Not started | |
 | 9. Coverage fuzzing of the locator parsers | PLAN-differencing-phase-09-fuzz.md | Not started | |
 | 10. Documentation | PLAN-differencing-phase-10-docs.md | Not started | |
@@ -528,13 +528,13 @@ depth may reasonably follow qcow2's rather than lead it.
 
 Phase 7 is the smallest of the implementation phases: the host
 already attaches the backing file as input device 0 when `-b` is
-given (`run_create_nonraw`, `src/vmm/src/main.rs:16815`), so the
+given (`run_create_nonraw`, `src/vmm/src/main.rs:16816`), so the
 guest can read the parent's footer for its unique id and
 timestamp without any new call-table primitive. That is the fact
 that makes this plan tractable, and phase 1 confirmed it still
 holds: step 1b read the same function and found that it opens the
 host-resolved parent but embeds `typed_backing.as_bytes()`
-verbatim in what the guest receives (`:16913-16963`). That single
+verbatim in what the guest receives (`:16914-16964`). That single
 typed string is also what forces the single-locator-entry answer
 in open question 3.
 
@@ -552,20 +552,26 @@ early -- which was not true when this paragraph was first written.
 Issue #570 (POSIX paths emitted under Windows-only platform codes
 and the `absolute_win32_path` key) must be settled before either
 guard comes off, since removing them is what first exposes that
-choice to a user. Phase 6's review raised one more decision for the
-same moment: neither `plan_vhd` nor `plan_vhdx` validates
+choice to a user. Phase 6's review raised the same point from the
+planner's side: neither `plan_vhd` nor `plan_vhdx` validates
 `backing.format`, so a direct crate caller can ask for a
 differencing VHDX naming a qcow2 parent and get a well-formed image
-no consumer can compose. The guards make that unreachable today;
-lifting them is what makes the hint reachable, so phase 7 should
-either refuse a mismatched hint or state in the planner's contract
-that format compatibility is the caller's business.
+no consumer can compose. That is not an open choice -- open
+question 7 above resolved it on 2026-09-05 ("yes, with a typed
+error otherwise"), and phase 7 wires that error. Phase 7's plan
+also improves on the framing: `config.backing_format` is only
+populated when the user passes `-F`
+(`src/vmm/src/main.rs:16975-16977`), while the guest can detect the
+parent's real format from its header, so the check is on the
+detected format rather than on the hint.
 
 ### Constraints that apply throughout
 
 * Guest binaries stay under the 768KB per-operation cap
-  (`make check-binary-sizes`). The create op has room, but the
-  locator table walk is new guest code and wants budgeting.
+  (`make check-binary-sizes`). Measured during phase 7's survey,
+  the create op uses 65,224 bytes of it -- 8.5% -- and already
+  depends on both the `vhd` and `vhdx` crates, so this is a
+  regression check rather than a budget question.
 * The format crates are `no_std` and panic-free. Every offset and
   length taken from an image is bounds-checked before use; the
   existing qcow2 and vmdk crates are the pattern.

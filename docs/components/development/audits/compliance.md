@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-20T10:54:41.735616+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-21T12:18:56.731916+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -231,7 +231,7 @@ Criterion: [docs-external-links.md](/components/development/audits/docs-external
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
-| instar | compliant | - |
+| instar | non-compliant | shakenfist/instar#585 |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | compliant | - |
@@ -247,6 +247,7 @@ Criterion: [docs-external-links.md](/components/development/audits/docs-external
 Details for non-compliant projects:
 
 - **cloudgood** (Status): 2 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/index.md -> more-fundamentals.md, docs/virtualization-history.md -> more-fundamentals.md
+- **instar** (Status): 1 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/plans/PLAN-differencing-phase-07-guest-host.md -> docs/plans/PLAN-differencing.md
 - **uncalibrated-sextant** (Status): 67 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/plans/PLAN-audit-cleanup-phase-02-structural.md -> ../../src/bootloader.rs, docs/plans/PLAN-audit-cleanup-phase-02-structural.md -> ../../src/renderer/mod.rs, docs/plans/PLAN-audit-cleanup-phase-02-structural.md -> ../../src/scene.rs, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -> ../../Makefile, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -> ../../scripts/screenshot.sh, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -> ../../scripts/verify-release.sh, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -> ../../src/scene.rs, docs/plans/PLAN-audit-cleanup.md -> ../../AGENTS.md, docs/plans/PLAN-audit-cleanup.md -> ../../ARCHITECTURE.md, docs/plans/PLAN-audit-cleanup.md -> ../../PUSH-AUDIT.md (+57 more)
 
 ## eol-distro
@@ -782,7 +783,7 @@ Criterion: [plan-audit-phase.md](/components/development/audits/plan-audit-phase
 Details for non-compliant projects:
 
 - **instar** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-differencing.md (ends with a push audit phase that never names PUSH-AUDIT.md)
-- **kerbside** (Status): 1 of 2 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-use-case-docs.md (ends with a push audit phase that never names PUSH-AUDIT.md)
+- **kerbside** (Status): 2 of 3 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-use-case-docs.md (ends with a push audit phase that never names PUSH-AUDIT.md), PLAN-proxmox-source.md (no push audit phase; phase 6 is "6. Docs")
 - **uncalibrated-sextant** (Status): 5 of 5 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-locked-bootloader.md (no push audit phase; phase 3 is "3. Iteration, documentation, inventory closeout"), PLAN-display-mode-keystrokes.md (no push audit phase; phase 3 is "3. Iteration against ryll display-mode-ui, documentation,..."), PLAN-audit-cleanup.md (no push audit phase; phase 3 is "3. Test coverage and release verification"), PLAN-visual-digest.md (no push audit phase; phase 3 is "3. Repaint integration, format spec, closeout"), PLAN-continuous-digest.md (no push audit phase; phase 3 is "3. Docs, decoder coordination, closeout"); 2 plan(s) with no phases this check can read, not judged: PLAN-language-probes.md, PLAN-headless-readback-bug.md
 
 ## plan-index
@@ -850,8 +851,8 @@ Details for non-compliant projects:
 
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121
 - **client-python-k3s** (Status): 4 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/library-api.md:54, docs/library-api.md:65, docs/library-api.md:180, docs/library-api.md:182
-- **instar** (Status): 17 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/chain-discovery.md:207, docs/quirks.md:4199, docs/quirks.md:4208, docs/quirks.md:4216, docs/quirks.md:4217, docs/quirks.md:4218, docs/quirks.md:4357, docs/quirks.md:4401, docs/quirks.md:4413, docs/quirks.md:4416 (+7 more)
-- **private-ci** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/dashboard-freshness.md:287
+- **instar** (Status): 17 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/chain-discovery.md:207, docs/quirks.md:4199, docs/quirks.md:4208, docs/quirks.md:4216, docs/quirks.md:4217, docs/quirks.md:4218, docs/quirks.md:4449, docs/quirks.md:4493, docs/quirks.md:4505, docs/quirks.md:4508 (+7 more)
+- **private-ci** (Status): 12 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/dashboard-freshness.md:287, docs/gerrit-reviews.md:15, docs/gerrit-reviews.md:68, docs/gerrit-reviews.md:70, docs/gerrit-reviews.md:75, docs/gerrit-reviews.md:206, docs/gerrit-reviews.md:218, docs/gerrit-reviews.md:242, docs/gerrit-reviews.md:293 (+2 more)
 - **shakenfist** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/operator_guide/capacity_refusals.md:116
 - **uncalibrated-sextant** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137, ARCHITECTURE.md:236 (+12 more)
 - **visual-digest-rust** (Status): 7 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): README.md:25, README.md:30, README.md:107, AGENTS.md:99, AGENTS.md:101, ARCHITECTURE.md:22, ARCHITECTURE.md:68
@@ -887,7 +888,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 Details for non-compliant projects:
 
 - **client-python** (Status): 2 of 4 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist_client/apiclient.py:185 -> docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md, shakenfist_client/tests/test_client_apiclient.py:2320 -> docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md
-- **instar** (Status): 2 of 251 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): scripts/create-vhd-testdata.sh:46 -> docs/plans/PLAN-extra-coverage.md, scripts/create-vhd-testdata.sh:463 -> instar-testdata/docs/plans/PLAN-extra-coverage.md
+- **instar** (Status): 2 of 267 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): scripts/create-vhd-testdata.sh:46 -> docs/plans/PLAN-extra-coverage.md, scripts/create-vhd-testdata.sh:463 -> instar-testdata/docs/plans/PLAN-extra-coverage.md
 - **visual-digest-rust** (Status): 1 of 1 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist-visual-digest/tests/qr.rs:7 -> PLAN-test-harness-phase-01-digest-crate.md
 
 ## plan-template
@@ -1206,9 +1207,9 @@ Details for non-compliant projects:
 
 - **actions** (Status): 92 of 105 in-scope files reviewed at HEAD; 13 need review (threshold 5)
 - **development** (Status): 157 of 191 in-scope files reviewed at HEAD; 34 need review (threshold 5)
-- **hunkydory** (Status): 16 of 27 in-scope files reviewed at HEAD; 11 need review (threshold 5)
-- **kerbside** (Status): 99 of 231 in-scope files reviewed at HEAD; 132 need review (threshold 5)
-- **ryll** (Status): 177 of 214 in-scope files reviewed at HEAD; 37 need review (threshold 5)
+- **hunkydory** (Status): 15 of 29 in-scope files reviewed at HEAD; 14 need review (threshold 5)
+- **kerbside** (Status): 99 of 232 in-scope files reviewed at HEAD; 133 need review (threshold 5)
+- **ryll** (Status): 174 of 214 in-scope files reviewed at HEAD; 40 need review (threshold 5)
 
 ## review-scope-completeness
 
