@@ -26,5 +26,9 @@ repo root. For pre-push audits of our own work see
 
 ## Standalone plans
 
-None at present. The last one, [Use case documentation](/components/kerbside/plans/PLAN-use-case-docs/), was promoted to a master plan on
+| Date | Plan | Intent | Status |
+|------|------|--------|--------|
+| 2026-09-20 | [Proxmox console source](/components/kerbside/plans/PLAN-proxmox-source/) | A Proxmox VE source driver and the transport work it needs: PVE reaches qemu's SPICE listener only through an HTTP CONNECT to its `spiceproxy`, which the backend dialer cannot do, and mints both credentials per request, which the authorize path has no way to ask for. Carries the feasibility research promoted out of PLAN-two-tier-ci.md's future-work section on 2026-09-20, now validated against a live PVE 9.2.20 node. Standalone because two open questions about ticket semantics can move the design before any of it is written; it becomes a master plan when its first phase is planned | Proposed |
+
+The previous standalone plan, [Use case documentation](/components/kerbside/plans/PLAN-use-case-docs/), was promoted to a master plan on
 2026-09-18.

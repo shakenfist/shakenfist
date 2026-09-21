@@ -362,6 +362,17 @@ which CI checks out alongside this one:
 - `tools/ovirt-gather-artifacts.sh` — collects RPM lists and logs for
   CI artifacts
 
+The lane's own `tools/ovirt-e2e/gather-diagnostics.sh` runs on the runner
+and drives that last script. It exists because the script is delivered to
+the guest several steps into the job, so a run which failed during
+provisioning had nothing to run, exited 127, and — under `bash -e` —
+uploaded no artifacts at all. When the guest-side bundle is unavailable
+the wrapper collects a fallback set over ssh instead: cloud-init state
+and logs, the sshd journal, the interpreter and OS versions, disk and
+memory. It always leaves a bundle behind, with a `gather.log` recording
+every command and its exit code, and it exits zero by design — the runs
+where it matters are the ones that have already failed.
+
 ## The direct-qemu lane
 
 The direct-qemu lane publishes a `Can enqueue: direct-qemu` gate job,

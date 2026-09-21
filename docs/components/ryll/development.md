@@ -250,12 +250,21 @@ shared helper in the
 repository. In a clone it is run by hand, not from git hooks:
 `prune` after a pull to discard reviews of files that have since
 changed, `stamp` before committing new review marks, `regen` to
-rebuild `REVIEWS.md`, `next` to pick an unreviewed file, and
-`status` to report effective coverage at HEAD. On develop itself
-the `prune-reviews` workflow runs `prune` automatically after every
+rebuild `REVIEWS.md`, `next` to pick an unreviewed file, `status`
+to report effective coverage at HEAD, and `scope-orphans` to list
+tracked files that are in neither `include` nor `exclude`, which
+nobody has made a decision about. On develop itself the
+`prune-reviews` workflow runs `prune` automatically after every
 push, committing the result back as shakenfist-bot, and the daily
 consistency audit in shakenfist/development files an issue when
 five or more in-scope files need review.
+
+`REVIEWS.md` is generated. Never edit it by hand: `stamp`, `prune`
+and `regen` all rewrite it from the marks in `.vscode/*.weaudit`
+and the stamped blob SHAs beside them, so a hand edit is discarded
+by the next run of any of the three -- silently, because the file
+that replaces it looks like a normal regeneration. Change the
+review state and let the tooling render it.
 
 ## CI and automation
 

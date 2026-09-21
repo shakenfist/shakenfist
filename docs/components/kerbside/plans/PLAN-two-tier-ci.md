@@ -390,6 +390,17 @@ middle, so full inspection is preserved. The proxy's
 backend dialer will need HTTP CONNECT support; assess
 that when planning the source.
 
+**Updated 2026-09-20.** Both halves of the research above
+have since been validated against a live single-node PVE
+9.2.20, and the detail has moved to its own standalone plan:
+[Proxmox console source](/components/kerbside/plans/PLAN-proxmox-source/). In short —
+the install judgement held, the `spiceproxy` architecture is
+confirmed rather than inferred, and the proxy's backend
+dialer does indeed have no CONNECT support, which makes the
+transport work the gating item for a Proxmox source rather
+than the driver. The Proxmox lane this section proposes is
+that plan's phase 5.
+
 ## Agent guidance
 
 ### Execution model
