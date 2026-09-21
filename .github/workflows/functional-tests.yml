@@ -468,10 +468,12 @@ jobs:
             timeout_minutes: 60
           },
           {
-            # slim-tier runs the same cluster suite on roughly half
-            # slim-primary's hypervisor capacity, so it needs more wall-clock
-            # headroom under under-cloud contention: the suite passes, it
-            # just runs slower (observed 30-50 minutes depending on load).
+            # slim-tier runs the same cluster suite on three nodes rather
+            # than slim-primary's five, so it is still the slower of the
+            # two, but its nodes are no longer allocation-starved: the
+            # 6 vCPU reshape took its cluster ledger from 12 to 24.
+            # Six merge runs on that shape took 27 to 42 minutes, so 60
+            # carries the same headroom the other entries have.
             name: 'Debian 12 tier',
             job_name: 'debian-12-slim-tier',
             base_image: 'sf://label/ci-images/debian-12',
@@ -479,7 +481,7 @@ jobs:
             topology: 'slim-tier',
             concurrency: 5,
             stestr_config: 'cluster-ci.conf',
-            timeout_minutes: 70
+            timeout_minutes: 60
           }
         ]
     uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
