@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-21T12:18:56.731916+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-22T11:12:19.773840+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -852,7 +852,7 @@ Details for non-compliant projects:
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121
 - **client-python-k3s** (Status): 4 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/library-api.md:54, docs/library-api.md:65, docs/library-api.md:180, docs/library-api.md:182
 - **instar** (Status): 17 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/chain-discovery.md:207, docs/quirks.md:4199, docs/quirks.md:4208, docs/quirks.md:4216, docs/quirks.md:4217, docs/quirks.md:4218, docs/quirks.md:4449, docs/quirks.md:4493, docs/quirks.md:4505, docs/quirks.md:4508 (+7 more)
-- **private-ci** (Status): 12 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/dashboard-freshness.md:287, docs/gerrit-reviews.md:15, docs/gerrit-reviews.md:68, docs/gerrit-reviews.md:70, docs/gerrit-reviews.md:75, docs/gerrit-reviews.md:206, docs/gerrit-reviews.md:218, docs/gerrit-reviews.md:242, docs/gerrit-reviews.md:293 (+2 more)
+- **private-ci** (Status): 10 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/dashboard-freshness.md:287, docs/gerrit-reviews.md:15, docs/gerrit-reviews.md:76, docs/gerrit-reviews.md:78, docs/gerrit-reviews.md:83, docs/gerrit-reviews.md:319, docs/gerrit-reviews.md:486, docs/gerrit-reviews.md:493, docs/gerrit-reviews.md:525
 - **shakenfist** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/operator_guide/capacity_refusals.md:116
 - **uncalibrated-sextant** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137, ARCHITECTURE.md:236 (+12 more)
 - **visual-digest-rust** (Status): 7 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): README.md:25, README.md:30, README.md:107, AGENTS.md:99, AGENTS.md:101, ARCHITECTURE.md:22, ARCHITECTURE.md:68
@@ -900,28 +900,36 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 | actions | N/A | - |
 | agent-python | N/A | - |
 | client-python | N/A | - |
-| client-python-k3s | compliant | - |
+| client-python-k3s | non-compliant | shakenfist/client-python-k3s#66 |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
-| divergulent | compliant | - |
+| divergulent | non-compliant | shakenfist/divergulent#116 |
 | hunkydory | N/A | - |
-| instar | compliant | - |
-| kerbside | compliant | - |
+| instar | non-compliant | shakenfist/instar#587 |
+| kerbside | non-compliant | shakenfist/kerbside#471 |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
-| occystrap | compliant | - |
-| private-ci | compliant | - |
-| ryll | compliant | - |
+| occystrap | non-compliant | shakenfist/occystrap#142 |
+| private-ci | non-compliant | shakenfist/private-ci#76 |
+| ryll | non-compliant | shakenfist/ryll#392 |
 | sfui | N/A | - |
-| shakenfist | compliant | - |
+| shakenfist | non-compliant | shakenfist/shakenfist#4299 |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#12 |
 | visual-digest-rust | N/A | - |
 
 Details for non-compliant projects:
 
-- **uncalibrated-sextant** (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository)
+- **client-python-k3s** (Status): missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
+- **divergulent** (Status): missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
+- **instar** (Status): missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
+- **kerbside** (Status): missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
+- **occystrap** (Status): missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
+- **private-ci** (Status): missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
+- **ryll** (Status): missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
+- **shakenfist** (Status): missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
+- **uncalibrated-sextant** (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository); missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
 
 ## push-audit
 
@@ -936,26 +944,33 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
-| divergulent | compliant | - |
-| hunkydory | compliant | - |
-| instar | compliant | - |
-| kerbside | compliant | - |
+| divergulent | non-compliant | shakenfist/divergulent#115 |
+| hunkydory | non-compliant | shakenfist/hunkydory#36 |
+| instar | non-compliant | shakenfist/instar#586 |
+| kerbside | non-compliant | shakenfist/kerbside#470 |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
-| occystrap | compliant | - |
+| occystrap | non-compliant | shakenfist/occystrap#141 |
 | private-ci | N/A | - |
-| ryll | compliant | - |
+| ryll | non-compliant | shakenfist/ryll#391 |
 | sfui | non-compliant | shakenfist/sfui#15 |
-| shakenfist | compliant | - |
+| shakenfist | non-compliant | shakenfist/shakenfist#4298 |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#11 |
 | visual-digest-rust | N/A | - |
 
 Details for non-compliant projects:
 
-- **client-python-k3s** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository)
-- **sfui** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
-- **uncalibrated-sextant** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block comment-proportion (copy it verbatim from templates/shared-blocks/comment-proportion.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
+- **client-python-k3s** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
+- **divergulent** (Status): missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
+- **hunkydory** (Status): missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
+- **instar** (Status): missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
+- **kerbside** (Status): missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
+- **occystrap** (Status): missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
+- **ryll** (Status): missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
+- **sfui** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
+- **shakenfist** (Status): missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
+- **uncalibrated-sextant** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block comment-proportion (copy it verbatim from templates/shared-blocks/comment-proportion.md in the development repository); missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
 
 ## pyproject-usage
 
@@ -1189,7 +1204,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 | cloudgood | N/A | - |
 | development | non-compliant | shakenfist/development#147 |
 | divergulent | N/A | - |
-| hunkydory | non-compliant | shakenfist/hunkydory#24 |
+| hunkydory | non-compliant | shakenfist/hunkydory#37 |
 | instar | N/A | - |
 | kerbside | non-compliant | shakenfist/kerbside#227 |
 | kerbside-client | N/A | - |
@@ -1206,9 +1221,9 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 Details for non-compliant projects:
 
 - **actions** (Status): 92 of 105 in-scope files reviewed at HEAD; 13 need review (threshold 5)
-- **development** (Status): 157 of 191 in-scope files reviewed at HEAD; 34 need review (threshold 5)
-- **hunkydory** (Status): 15 of 29 in-scope files reviewed at HEAD; 14 need review (threshold 5)
-- **kerbside** (Status): 99 of 232 in-scope files reviewed at HEAD; 133 need review (threshold 5)
+- **development** (Status): 146 of 192 in-scope files reviewed at HEAD; 46 need review (threshold 5)
+- **hunkydory** (Status): 29 of 38 in-scope files reviewed at HEAD; 9 need review (threshold 5)
+- **kerbside** (Status): 98 of 233 in-scope files reviewed at HEAD; 135 need review (threshold 5)
 - **ryll** (Status): 174 of 214 in-scope files reviewed at HEAD; 40 need review (threshold 5)
 
 ## review-scope-completeness
