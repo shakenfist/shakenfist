@@ -735,6 +735,21 @@ class InstancesEndpoint(api_base.Resource):
                       'That is, less than 63 characters and in the character set: '
                       'a-z, A-Z, 0-9, or hyphen (-).' % name))
 
+        # Not a bare truthiness test on the raw body, for the reason
+        # _netdesc_allocate_address gives for `float`: these two are
+        # published as booleans, marshmallow reads 'false', 'no', 'off'
+        # and '0' as False, and every one of those spellings is a
+        # non-empty string Python reads as True. The stored value
+        # happened to survive that -- InstanceData's lax pydantic bool
+        # coerces the same spellings -- but the guard below did not:
+        # {"secure_boot": "false"} was refused for not enabling UEFI,
+        # and {"secure_boot": "true", "uefi": "false"} sailed past it
+        # to store the exact combination it exists to refuse.
+        # declared_boolean() is the one reading, keyed on marshmallow's
+        # own sets so the check and the read cannot drift.
+        uefi = validation.declared_boolean(uefi)
+        secure_boot = validation.declared_boolean(secure_boot)
+
         # Secure boot requires UEFI
         if secure_boot and not uefi:
             return sf_api.error(400, 'secure boot requires UEFI be enabled')
