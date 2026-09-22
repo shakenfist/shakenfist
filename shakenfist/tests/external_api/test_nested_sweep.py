@@ -492,8 +492,11 @@ CASES = [
     Case('net.address.null', CREATE, 'networkspec', 'address',
          {'network': [{'network_uuid': NETWORK, 'address': None}]},
          ACCEPTED, ACCEPTED,
-         'width, census N1: guest_ci_tests/test_cloudinit.py sends an '
-         'explicit null address'),
+         'width: still accepted, but what it *means* moved with the issue '
+         '4252 fix -- a null used to fall into the no-address special case '
+         'reserved for the literal string "none", and now allocates exactly '
+         'as an omission does. This table cannot see that; '
+         'test_null_absent_sweep.py is what pins it'),
     Case('net.address.in_range', CREATE, 'networkspec', 'address',
          {'network': [{'network_uuid': NETWORK, 'address': '10.9.8.55'}]},
          ACCEPTED, ACCEPTED,
@@ -666,8 +669,10 @@ CASES = [
          {'network': {'network_uuid': NETWORK, 'macaddress': None,
                       'address': None}},
          ACCEPTED, ACCEPTED,
-         'width, census N1: exactly what the shipped CLI\'s add-interface '
-         'puts on the wire'),
+         'width, census N1: the shipped CLI\'s add-interface sends a null '
+         'macaddress on every call. Since the issue 4252 fix both nulls '
+         'read as "not supplied", so this row is allocated a MAC *and* an '
+         'address'),
     Case('hotplug.model.int', HOTPLUG, 'networkspec', 'model',
          {'network': {'network_uuid': NETWORK, 'model': 5}},
          refused('network.model: Not a valid string.'), FAULTED,

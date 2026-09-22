@@ -1,5 +1,6 @@
 # Copyright 2019 Michael Still and contributors
 
+import ipaddress
 import json
 
 import requests
@@ -827,3 +828,73 @@ class TestOversizedBodyRefused(base.BaseTestCase):
             f'{self.system_client.base_url}/instances', json={})
         self.addDetail('response', content.text_content(r.text))
         self.assertEqual(401, r.status_code)
+
+
+class TestNullMeansNotSupplied(base.BaseNamespacedTestCase):
+    """Issue 4252: a JSON null inside a structured spec means "not
+    supplied", exactly as the API reference promises.
+
+    The one live divergence the null-equals-absent differential
+    (shakenfist/tests/external_api/test_null_absent_sweep.py) found was
+    the networkspec's address: noneish() reads a null truthily, so an
+    explicit null took the addressless special case reserved for the
+    literal string 'none', and a caller the published schema promised a
+    random address got an interface with no address at all. This drives
+    the fixed contract against a real cluster: a null allocates exactly
+    as an omission does, and the literal 'none' still does not.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'nullabsent'
+        super().__init__(*args, **kwargs)
+
+    def setUp(self):
+        super().setUp()
+        self.net = self.test_client.allocate_network(
+            '192.168.240.0/24', True, True, '%s-net' % self.namespace)
+        self._await_networks_ready([self.net['uuid']])
+
+    def test_null_address_allocates_and_none_does_not(self):
+        inst = self.create_instance(
+            'nulladdress', 1, 1024,
+            [
+                {
+                    'network_uuid': self.net['uuid'],
+                    'address': None
+                },
+                {
+                    'network_uuid': self.net['uuid'],
+                    'address': 'none'
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': base.CLUSTER_CI_IMAGE,
+                    'type': 'disk'
+                }
+            ], None, None)
+        self.assertIsNotNone(inst['uuid'])
+
+        # Interfaces and their addresses are allocated by the create
+        # API call itself, before scheduling, so there is nothing to
+        # await beyond the create returning.
+        interfaces = self.test_client.get_instance_interfaces(inst['uuid'])
+        self.addDetail('interfaces', content.text_content(
+            json.dumps(interfaces, indent=4, sort_keys=True)))
+        by_order = {i['order']: i for i in interfaces}
+        self.assertEqual({0, 1}, set(by_order))
+
+        allocated = by_order[0]['ipv4']
+        self.assertTrue(
+            allocated,
+            'an explicit null address was not allocated an address, '
+            'which is the pre-issue-4252 behaviour the published schema '
+            'contradicts')
+        self.assertIn(
+            ipaddress.ip_address(allocated),
+            ipaddress.ip_network('192.168.240.0/24'))
+        self.assertFalse(
+            by_order[1]['ipv4'],
+            "the literal string 'none' must still mean an interface "
+            'with no address')
