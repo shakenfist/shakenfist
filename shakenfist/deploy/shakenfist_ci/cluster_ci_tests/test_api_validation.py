@@ -827,3 +827,62 @@ class TestOversizedBodyRefused(base.BaseTestCase):
             f'{self.system_client.base_url}/instances', json={})
         self.addDetail('response', content.text_content(r.text))
         self.assertEqual(401, r.status_code)
+
+
+class TestStringSpelledBooleanBootsBIOS(base.BaseNamespacedTestCase):
+    """Issue 4253's companion case, at the real API.
+
+    `uefi` is published as a boolean, and the published vocabulary
+    includes string spellings: marshmallow's Boolean reads 'false' as
+    False, so `{"uefi": "false"}` is a request the specification calls
+    a valid ask for BIOS boot. A shell-script caller genuinely sends
+    it -- a flag variable interpolated into a curl body is exactly
+    this shape. The handler now decodes it through
+    validation.declared_boolean(), the same single reading the
+    networkspec's `float` already had; before that fix the spelling
+    survived to storage only because the persistence model's lax
+    pydantic field happened to coerce the same set, while the
+    handler's own secure-boot guard read it truthily and got it
+    wrong.
+
+    The unit half (test_instance_create_validation.py's
+    InstanceCreateBooleanSpellingTestCase) asserts on the exact value
+    handed to Instance.new(); this half pins the contract against a
+    deployed cluster, storing and reporting the decoded value. The
+    stored value is what the domain XML's firmware choice is keyed on
+    (`if self.uefi:` in instance.py), so asserting it *is* asserting
+    which firmware a boot would use, one hop earlier and without
+    spending a boot on it.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'apivalidbool'
+        super().__init__(*args, **kwargs)
+
+    def test_uefi_string_false_means_bios(self):
+        # The public client sends real JSON booleans, which is why the
+        # string spelling is passed through create_instance()'s kwargs
+        # verbatim: the client body-builds `'uefi': uefi` untouched, so
+        # this is the raw `{"uefi": "false"}` request a hand-rolled
+        # caller sends, still with the wrapper's capacity waiting.
+        #
+        # A minimal empty disk, no network: the instance never has to
+        # boot for this test, it just has to exist so its stored uefi
+        # value can be read back.
+        minimal_disk = [{'size': 1, 'type': 'disk'}]
+        inst = self.create_instance(
+            'uefi-string-false', 1, 128, None, minimal_disk, None, None,
+            uefi='false')
+        self.addDetail(
+            'inst',
+            content.text_content(json.dumps(inst, indent=4, sort_keys=True)))
+        self._await_instance_create(inst['uuid'])
+
+        fetched = self.test_client.get_instance(inst['uuid'])
+        self.addDetail(
+            'fetched',
+            content.text_content(json.dumps(fetched, indent=4, sort_keys=True)))
+        # assertIs rather than assertFalse: the pre-fix failure mode is
+        # the string 'false' stored verbatim, and a truthiness-blind
+        # assertion is exactly the mistake under test.
+        self.assertIs(False, fetched['uefi'])
