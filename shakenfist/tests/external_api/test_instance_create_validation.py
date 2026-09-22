@@ -294,3 +294,149 @@ class InstanceCreateNameRollbackTestCase(InstanceCreateNameTestCase):
             response.get_json())
         self.assertNoInterpreterText(response)
         recorded.assert_not_called()
+
+
+class InstanceCreateBooleanSpellingTestCase(AuthenticatedStackTestCase):
+    """The declared booleans, read the way the schema publishes them.
+
+    `uefi` and `secure_boot` are published as booleans, and
+    marshmallow's Boolean accepts a set of *string* spellings --
+    'false', 'no', 'off' and '0' are all valid and all mean False. The
+    compiled path is check-only (decision D14), so the handler is
+    handed the raw body, and until issue 4253's fix it read both keys
+    with a bare truthiness test. The stored value happened to survive
+    that -- InstanceData's `uefi: bool` is a lax pydantic field which
+    coerces the same spellings -- but the guard between the handler
+    and that rescue did not: {"secure_boot": "false"} was refused with
+    `secure boot requires UEFI be enabled`, and {"secure_boot":
+    "true", "uefi": "false"} sailed past the guard to store secure
+    boot without UEFI, the exact combination it exists to refuse.
+    validation.declared_boolean() is now the one reading at the API
+    boundary, exactly as it already was for the networkspec's `float`
+    (issue 4223's review finding, the first instance of this class),
+    so the contract no longer depends on two libraries' spelling sets
+    happening to agree.
+
+    The reading under test is the handler's own, so it holds in every
+    API_VALIDATION_MODE; the rollback subclass at the bottom re-runs
+    every test at 'warn' to pin that.
+    """
+
+    mode = 'enforce'
+
+    def _post_spying_on_new(self, body):
+        """POST /instances, capturing what reaches Instance.new().
+
+        The spy raises rather than returning: everything these tests
+        assert is in the call arguments, and a create which continued
+        past Instance.new() would need a scheduler and a placement to
+        succeed. The resulting 500 is the sentinel's, not the code
+        under test's, so no test here asserts on the response of a
+        request which was expected to reach the spy. SCHEDULER is
+        reset and record_exception stubbed for the reasons
+        InstanceCreateNameTestCase._post documents.
+        """
+        with mock.patch.object(instance_api, 'SCHEDULER', None), \
+                mock.patch.object(
+                    api_base.util_exceptions, 'record_exception',
+                    return_value={'exception-record': 'test'}), \
+                mock.patch.object(
+                    instance_api.instance.Instance, 'new',
+                    side_effect=AssertionError(
+                        'halted at instance creation by the test spy')) as new:
+            response = self.client.post(
+                '/instances', data=json.dumps(body),
+                content_type='application/json',
+                headers={'Authorization': self.token})
+        return response, new
+
+    def test_uefi_string_false_means_bios(self):
+        """Issue 4253's companion case, at the unit level.
+
+        The cluster CI half
+        (test_api_validation.TestStringSpelledBooleanBootsBIOS) shows a
+        real cluster storing False; this half asserts on the exact
+        value handed to Instance.new(). Before the fix that value was
+        the string 'false', and only pydantic's lax coercion inside
+        the persistence model turned it into the False the caller
+        meant -- a rescue by accident, one strict=True away from a
+        recorded 500.
+        """
+        body = dict(VALID_REMAINDER)
+        body['name'] = 'uefistringfalse'
+        body['uefi'] = 'false'
+        _, new = self._post_spying_on_new(body)
+
+        new.assert_called_once()
+        self.assertIs(False, new.call_args.kwargs['uefi'])
+
+    def test_uefi_string_true_means_uefi(self):
+        """The other spelling, so the fix is a reading rather than a
+        constant."""
+        body = dict(VALID_REMAINDER)
+        body['name'] = 'uefistringtrue'
+        body['uefi'] = 'true'
+        _, new = self._post_spying_on_new(body)
+
+        new.assert_called_once()
+        self.assertIs(True, new.call_args.kwargs['uefi'])
+
+    def test_json_booleans_are_unchanged(self):
+        """The dominant callers send real JSON booleans -- the shipped
+        CLI and the ansible collection both do -- and their values must
+        come through untouched."""
+        body = dict(VALID_REMAINDER)
+        body['name'] = 'uefijsonbool'
+        body['uefi'] = True
+        body['secure_boot'] = False
+        _, new = self._post_spying_on_new(body)
+
+        new.assert_called_once()
+        self.assertIs(True, new.call_args.kwargs['uefi'])
+        self.assertIs(False, new.call_args.kwargs['secure_boot'])
+
+    def test_secure_boot_string_false_does_not_demand_uefi(self):
+        """The sharpest consequence of the truthiness read.
+
+        Before the fix, {"secure_boot": "false"} with no uefi at all
+        was refused with `secure boot requires UEFI be enabled` -- a
+        caller explicitly declining secure boot was told to turn UEFI
+        on. The guard now sees the value the caller meant.
+        """
+        body = dict(VALID_REMAINDER)
+        body['name'] = 'securebootoff'
+        body['secure_boot'] = 'false'
+        _, new = self._post_spying_on_new(body)
+
+        new.assert_called_once()
+        self.assertIs(False, new.call_args.kwargs['secure_boot'])
+
+    def test_secure_boot_guard_reads_the_spellings(self):
+        """And the guard itself now speaks for the decoded values:
+        secure boot genuinely requested, UEFI genuinely declined, is
+        still the refusal it has always been."""
+        body = dict(VALID_REMAINDER)
+        body['name'] = 'securebootguard'
+        body['secure_boot'] = 'true'
+        body['uefi'] = 'false'
+        response, new = self._post_spying_on_new(body)
+
+        self.assertEqual(400, response.status_code, response.get_json())
+        self.assertEqual(
+            {'error': 'secure boot requires UEFI be enabled', 'status': 400},
+            response.get_json())
+        new.assert_not_called()
+
+
+class InstanceCreateBooleanSpellingRollbackTestCase(
+        InstanceCreateBooleanSpellingTestCase):
+    """The same properties at 'warn'.
+
+    declared_boolean() is a handler read, not a validation-layer
+    refusal, so the rollback must change nothing here -- these
+    spellings pass the compiled boolean field at enforce anyway, which
+    is exactly why the handler has to do its own reading (decision D42:
+    warn and off must not hand back a newly unguarded API).
+    """
+
+    mode = 'warn'

@@ -121,6 +121,61 @@ for uuid in $(sf-client --json network list | jq --raw-output ".[] | .uuid"); do
     sf-client network delete ${uuid}
 done
 
+# Exercise the documented API_VALIDATION_MODE rollback (issue 4253). The
+# rollback flips a cluster-wide config value and restarts sf-api, which is
+# why it lives in this job rather than in the stestr cluster suite: that
+# suite runs many tests concurrently against one shared cluster, and a
+# mode flip or an API restart mid-suite would fail unrelated tests, while
+# this job disturbs its cluster by design. The assertions themselves are
+# in apivalidationrollbacktests.py.
+echo
+log "=== API validation rollback checks ==="
+
+function sf_ctl_config {
+    # sf-ctl reads its configuration -- the database gateway address in
+    # particular -- from the environment; /etc/sf/config is the systemd
+    # EnvironmentFile carrying it. Exported in a subshell so the outer
+    # script's environment is unchanged.
+    ( set -a; . /etc/sf/config; set +a; sf-ctl "$@" )
+}
+
+function restart_local_sf_api {
+    # sfrc's SHAKENFIST_API_URL points at this node's own gunicorn (the
+    # collection's api_url default is localhost), so restarting the
+    # local sf-api restarts the API instance the assertions talk to.
+    # The assertion script waits for /readyz itself before asserting.
+    sudo systemctl restart sf-api
+}
+
+log "The enforce default refuses an undeclared parameter"
+if ! python3 apivalidationrollbacktests.py --mode enforce; then
+    log "API validation enforce assertions failed"
+    exit 1
+fi
+
+log "Rolling back: set API_VALIDATION_MODE=warn and restart sf-api"
+if ! sf_ctl_config set-config API_VALIDATION_MODE warn; then
+    log "sf-ctl set-config failed"
+    exit 1
+fi
+restart_local_sf_api
+if ! python3 apivalidationrollbacktests.py --mode warn; then
+    log "API validation warn rollback assertions failed"
+    exit 1
+fi
+
+log "Rolling forward: unset API_VALIDATION_MODE and restart sf-api"
+if ! sf_ctl_config unset-config API_VALIDATION_MODE; then
+    log "sf-ctl unset-config failed"
+    exit 1
+fi
+restart_local_sf_api
+if ! python3 apivalidationrollbacktests.py --mode enforce; then
+    log "API validation enforce assertions failed after the roll forward"
+    exit 1
+fi
+log "API validation rollback checks complete"
+
 # Launch two instances on each hypervisor, each on its own network
 echo
 for hypervisor in ${hypervisors}; do
