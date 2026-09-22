@@ -15098,7 +15098,7 @@ needs the same treatment, and phase 6 says so.</p>
 </tr>
 <tr>
 <td>4. The consumer sweep</td>
-<td>Not started</td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -15891,7 +15891,12 @@ effort: high, because the inventory the master plan carried is a
 fortnight stale in both directions, and because the criterion that
 produced it cannot see the half of the migration that actually
 gates phase 5.</p>
-<p><strong>Status: planned, not started.</strong></p>
+<p><strong>Status: in progress, and its guest-image half is blocked.</strong>
+One step landed out of band, one marker the phase was going to
+add turned out to be already there and broken, and a bug in
+another repository blocks the under-cloud half. All three are
+recorded under <em>Amended 2026-09-21</em> at the end of the survey, and
+the affected steps carry the correction inline.</p>
 <p><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/38" title="GitHub Issue: shakenfist/private-ci #38">private-ci#38</a> is the collated inventory of where the fleet uses
 obsolete base images. It is a reference rather than a task, and it
 closes when the thing it inventories is gone: this phase clears the
@@ -16128,6 +16133,89 @@ nothing is being missed right now -- but nothing is watching them
 either, and "we grepped it once" is the state phase 3 said was not
 good enough. Widening the matrix is phase 6's work, and decision 4.6
 says why it is not done here.</p>
+<p><strong>Amended 2026-09-21, after this plan merged, and anchored
+2026-09-22.</strong> Three things moved in the day after #148 landed. The
+survey above is left exactly as it was read on 2026-09-19, because it
+is the record of what the phase was planned against; the corrections
+are here, and the steps they affect carry them inline as well. Every
+date in this block and in the steps it amends is the day the thing
+was read, which is why some of them are later than this heading: the
+2026-09-21 pass found the three corrections below, and a second pass
+on 2026-09-22 re-read the counts, the line numbers and the greps
+before any of it was relied on.</p>
+<p><strong><code>shakenfist/actions</code> migrated itself, twenty-five minutes after
+this plan merged.</strong> <code>e2a56bd</code> ("Move off Debian 12 runners and guest
+images.", 2026-09-20 02:08) answers <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/69" title="GitHub Issue: shakenfist/actions #69">actions#69</a> -- the daily audit's
+own issue, not this phase. It moved all three <code>runs-on:</code> lines to
+<code>debian-13</code> and deleted both retired declarations from
+<code>.github/actionlint.yaml</code>, including the stray <code>debian-12-docker</code> the
+survey flagged: step 4b's third repository, done. The fleet is now 42
+references in 12 repositories, and <code>actions</code> is off the compliance
+page. Step 4b covers two repositories now. This is the fourth time
+this plan has watched the daily audit clear work it had scheduled --
+after development's own four via #119, <code>instar</code> and <code>kerbside</code> --
+which is the argument for 4j grepping the fleet rather than reading
+the table above.</p>
+<p><strong><code>instar</code> already carries its marker, and it has never worked.</strong> The
+survey recorded instar's <code>image: 'debian:12'</code> as needing decision
+4.3's exception, and step 4d as written says to add one. One is
+already there, with a better reason than 4d proposed, at
+<code>.github/workflows/functional-tests.yml:588</code> -- nine lines above the
+finding at <code>:597</code>, written against the whole matrix entry.
+<code>is_excepted()</code> reads the finding's own line and exactly one line
+above it (<code>scripts/audit/checks/distros.py:275-279</code>), so it has never
+applied, which is why instar is still on the compliance page having
+moved its runner pool on 2026-09-16. That file last changed
+2026-09-18, so this was true when the survey ran: the survey read the
+scan's output, which reports the finding, and did not read the lines
+around it. A scan that filters exceptions silently cannot tell a
+missing marker from a misplaced one, and neither could the survey.
+Step 4d moves the marker rather than adding a second.</p>
+<p><strong>A trixie under-cloud breaks every instance's agent, which blocks
+half this phase.</strong> <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a>, filed 2026-09-20 03:53 out of the
+canary <code>actions</code> ran for its own migration. Instances booted on a
+Debian 13 hypervisor never reach agent ready -- <code>agent_state: "not
+ready (no contact)"</code>, <code>agent_start_time: null</code> -- and the three
+<code>test_agentop_deadlines</code> tests went from 137, 192 and 207 seconds to
+roughly 1820 each, consuming the step's whole 45-minute budget so
+that the rest of the suite never ran. Two canary runs six hours
+apart on the same topology, <code>35471083618</code> green and <code>35483225701</code>
+red, with the under-cloud image the only difference between them.
+<code>actions</code> reverted its own default in <code>2e0d32a</code> ("Keep the
+under-cloud on bookworm.") and wrote the evidence into the input's
+comment at <code>.github/workflows/smoke-cluster.yml:55-65</code>. This plan
+does not fix it: D5's reasoning applies, and a plan that closes a
+migration is not the place to debug a hypervisor's side channel.</p>
+<p><strong>The blocker splits the guest-image half in two, and only one half
+is stuck.</strong> The survey treated "the guest images the CI clusters
+boot" as one thing. #4280's evidence separates them, and that
+separation is the useful part of it:</p>
+<ul>
+<li><strong>The under-cloud image</strong> -- <code>base_image</code>, what the hypervisor VMs
+  themselves boot -- is blocked. That is 4f's two defaults
+  (<code>build-smoke-cluster/action.yml:32</code> and
+  <code>.github/workflows/smoke-cluster.yml:67</code>, both renumbered since the
+  survey) and 4g's item (1), the six <code>base_image</code> sites in
+  <code>shakenfist</code>. None of them moves until #4280 closes.</li>
+<li><strong>The uploaded guest artifact</strong> -- <code>sf://upload/system/debian-12</code>,
+  what instances inside the nested cluster boot -- is not known to
+  be blocked. #4280 says so explicitly, and the shape of its evidence
+  is what makes the separation usable: both canary runs uploaded the
+  same bookworm artifact, so the guest was the controlled variable
+  rather than the suspect. Read what that does and does not settle.
+  It rules the guest out as the cause of #4280; it says nothing about
+  whether a <em>trixie</em> guest works, because no canary ran one. So what
+  is unblocked is the rename -- 4f's release-neutral upload, 4g's
+  items (2) to (4), and 4h -- and not, on this evidence, the content
+  change 4f currently carries with it by sourcing the new name from
+  <code>/srv/ci/debian:13</code>. Whether those two should land together is back
+  brief question 4, which is where it is decided rather than here.</li>
+</ul>
+<p>Decision 4.5 is what makes that separation survivable.
+<code>sf://upload/system/debian</code> asserts no release, so the 43 references
+can be renamed while #4280 is open and the artifact's contents can
+follow later without a second fleet-wide edit. The decision was
+argued for the next desktop bump; it earns its keep sooner than that.</p>
 <h4 id="decisions_2">Decisions<a class="headerlink" href="#decisions_2" title="Permanent link">&para;</a></h4>
 <p>Numbered <code>4.N</code> for the same reason phase 3's are numbered <code>3.N</code>:
 this plan has a top-level <code>D1</code> to <code>D6</code>, and "decision 4.2" and "D2"
@@ -16228,7 +16316,7 @@ block in <code>PLAN-TEMPLATE.md</code>).</p>
 <td>low</td>
 <td>sonnet</td>
 <td>worktree</td>
-<td>Three more repositories, same shape as 4a, separated only because each has more than two lines. <code>shakenfist/sfui</code> (<code>functional-tests.yml:18</code>, <code>:51</code>), <code>client-python-k3s</code> (<code>functional-tests.yml:103</code>, <code>:225</code>, <code>release.yml:73</code>, <code>supply-chain.yml:67</code>), <code>actions</code> (<code>ci.yml:150</code>, <code>:191</code>, <code>smoke-cluster.yml:128</code>). All three already declare <code>debian-13</code>; delete <code>debian-12</code> from each <code>actionlint.yaml</code>, and in <code>actions</code> delete <code>debian-12-docker</code> as well -- it is declared there with no workflow naming it, so deleting only <code>debian-12</code> leaves a retired label declared and the phase's second definition-of-done bullet unticked. <strong>In <code>actions</code>, change nothing outside those three <code>runs-on:</code> lines.</strong> That repository also carries the guest-image defaults at <code>build-smoke-cluster/action.yml:29</code> and <code>:249</code> and <code>.github/workflows/smoke-cluster.yml:56</code>, which are steps 4f and 4h and have an ordering constraint this step must not pre-empt. Same commit subject and same verification as 4a.</td>
+<td>Two repositories, same shape as 4a, separated only because each has more than two lines. <code>shakenfist/sfui</code> (<code>functional-tests.yml:18</code>, <code>:51</code>) and <code>client-python-k3s</code> (<code>functional-tests.yml:103</code>, <code>:225</code>, <code>release.yml:73</code>, <code>supply-chain.yml:67</code>). Both already declare <code>debian-13</code>; delete <code>debian-12</code> from each <code>actionlint.yaml</code>. Same commit subject and same verification as 4a. <strong><code>shakenfist/actions</code> was the third repository here and is already done</strong> -- <code>e2a56bd</code> moved its three <code>runs-on:</code> lines and deleted both retired declarations, the stray <code>debian-12-docker</code> included, on 2026-09-20 in answer to <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/69" title="GitHub Issue: shakenfist/actions #69">actions#69</a>. Confirm that rather than assume it, because this step's original brief is the record of what was needed. The check is <code>grep -rn 'debian-12' .github/</code> in a fresh clone, and the one hit it should return is the under-cloud default at <code>.github/workflows/smoke-cluster.yml:67</code>, which is a guest image rather than a runner label and is blocked by <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a> -- do not "finish" the migration by moving it. That was still one hit on 2026-09-21: <code>2e0d32a</code> wrote an eleven-line reason above that input at <code>:55-65</code>, and it quotes <code>ci-images/debian-13</code>, the move it is refusing, rather than the <code>-12</code> default below it, which is the convention 4g's item (1) carries to the other six sites. Read the hit rather than the count, though: a hit in a <code>runs-on:</code> line, or a <code>debian-12</code> list item in <code>.github/actionlint.yaml</code>, is what a partial label migration looks like and is what this step completes. A hit inside a comment is a reason, not a finding. Do not re-edit what is already correct.</td>
 </tr>
 <tr>
 <td>4c</td>
@@ -16242,7 +16330,7 @@ block in <code>PLAN-TEMPLATE.md</code>).</p>
 <td>low</td>
 <td>sonnet</td>
 <td>worktree</td>
-<td><strong>The repositories no other step edits</strong>, as two pull requests. First, one line in <code>shakenfist/instar</code>. <code>.github/workflows/functional-tests.yml:597</code> is <code>image: 'debian:12'</code>, deliberate test input in a matrix that covers several releases (decision 4.3). Add the marker on the line above, matching the shape the specification gives in <code>docs/audits/eol-distro.md</code>: <code># audit-ok: eol-distro -- test input, we measure old images</code>, indented to match. Change nothing else: instar moved its runner labels on 2026-09-16 and this is its only remaining finding. Its <code>.github/actionlint.yaml</code> declared <code>debian-13</code>, <code>debian-13-docker</code> and neither retired label on 2026-09-19, so there is nothing to delete -- but read it rather than trusting that sentence, and if a retired label is declared, delete it in this commit and say so, since no other step in the phase touches this repository. Commit subject: "Mark the bookworm test image as deliberate." Second, <code>shakenfist/kerbside-patches</code>: it has fourteen workflows, every one of them already on <code>debian-13</code>, and its <code>.github/actionlint.yaml</code> still declares <code>debian-12</code>. It is not one of the thirteen, because a declaration produces no finding -- it is decision 4.2's failure state in the repository that most recently migrated, and nothing else in this phase looks at it. Delete the declaration; there is no workflow line to change. Commit subject: "Stop declaring a retired runner label." <code>private-ci</code> also declares it and is deliberately left alone: it has no workflows at all, so the declaration governs nothing, and the repository is excluded from this criterion. Say that in the pull request rather than leaving it looking unnoticed.</td>
+<td><strong>The repositories no other step edits</strong>, as two pull requests. First, one line in <code>shakenfist/instar</code>. <code>.github/workflows/functional-tests.yml:597</code> is <code>image: 'debian:12'</code>, deliberate test input in a matrix that covers several releases (decision 4.3). <strong>A marker already exists and does not work; move it, do not add a second.</strong> <code>:588-595</code> is a comment beginning <code># audit-ok: eol-distro -- Debian 12 is a SUPPORTED TARGET here,</code> which explains the matrix entry better than any wording this plan would have proposed. A range rather than a length, because the range is self-checking against the <code>:596</code>/<code>:597</code> anchors below it: re-read on 2026-09-21 at instar <code>e3239f5</code>, it is eight lines, and an earlier draft of this brief said eleven, which is <code>actions</code>' block at <code>smoke-cluster.yml:55-65</code> and would have swallowed both anchors. It has never taken effect, because <code>is_excepted()</code> reads the finding's own line and exactly one line above it (<code>scripts/audit/checks/distros.py:275-279</code>) and this marker sits nine lines up. Keep the prose where it is -- a reader needs it at the top of the entry -- and move a marker <strong>carrying its own short reason</strong> onto <code>:596</code>, the <code>- name: 'Debian 12'</code> line, or directly above <code>:597</code>, indented to match: <code># audit-ok: eol-distro -- supported target, see the note above</code> or similar. Not the bare token. <code>docs/audits/eol-distro.md:169-176</code> specifies the shape as "Mark the line, or the line above it, with the reason", and its worked example carries one; a dangling <code>--</code> satisfies <code>EXCEPTION_RE</code> and would leave the fleet's canonical instance of this marker as a token with nothing after it. Check the result with the criterion rather than by eye: re-run this plan's scan snippet against the edited clone and confirm instar returns zero findings. Change nothing else: instar moved its runner labels on 2026-09-16 and this is its only remaining finding. Its <code>.github/actionlint.yaml</code> declared <code>debian-13</code>, <code>debian-13-docker</code> and neither retired label on 2026-09-19, so there is nothing to delete -- but read it rather than trusting that sentence, and if a retired label is declared, delete it in this commit and say so, since no other step in the phase touches this repository. Commit subject: "Put the eol-distro marker where the audit reads it." -- the image has been marked deliberate since before this phase was planned, and what this commit changes is where the mark sits, which is also the general lesson and the second time the fleet has hit it. Second, <code>shakenfist/kerbside-patches</code>: it has fourteen workflows, every one of them already on <code>debian-13</code>, and its <code>.github/actionlint.yaml</code> still declares <code>debian-12</code>. It is not one of the repositories the criterion lists, because a declaration produces no finding -- it is decision 4.2's failure state in the repository that most recently migrated, and nothing else in this phase looks at it. Delete the declaration; there is no workflow line to change. Commit subject: "Stop declaring a retired runner label." <code>private-ci</code> also declares it and is deliberately left alone: it has no workflows at all, so the declaration governs nothing, and the repository is excluded from this criterion. Say that in the pull request rather than leaving it looking unnoticed.</td>
 </tr>
 <tr>
 <td>4e</td>
@@ -16256,14 +16344,14 @@ block in <code>PLAN-TEMPLATE.md</code>).</p>
 <td>high</td>
 <td>opus</td>
 <td>worktree</td>
-<td><strong>Additive, and it must merge before 4g.</strong> In <code>shakenfist/actions</code>, <code>build-smoke-cluster/action.yml</code>. The action uploads the cached image into the cluster it just built as artifact <code>debian-12</code>, and 43 references in <code>shakenfist</code> read it back as <code>sf://upload/system/debian-12</code>. Decision 4.5 moves that name to <code>debian</code>, with no release in it. <strong>The upload line does not read the way a grep for the command would expect.</strong> <code>build-smoke-cluster/action.yml</code> assembles <code>sf-client artifact upload</code> into a <code>${setup}</code> shell variable at <code>:246</code> and invokes it at <code>:249</code>, which literally reads <code>"${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"</code>. The artifact name and the source path are on <code>:249</code>; the verb is not. Do it in two landings so neither repository is ever reading a name the other does not write: this step adds a <em>second</em> upload under the name <code>debian</code>, sourced from <code>/srv/ci/debian:13</code>, which phase 3 put on the cache disk (<code>ansible/ci-dependencies.yml:194</code>); 4h removes the old one after 4g has landed. <strong><code>/srv/ci/debian:13</code> is the right path and <code>/srv/ci/cached/debian:13</code> is not</strong>: the builder mounts the dependencies disk at <code>/srv/ci/cached</code> and writes <code>{{item.name}}</code> into it, while the cluster nodes that run this upload mount the same disk at <code>/srv/ci</code> (the <code>Mount /srv/ci</code> tasks in the <code>ci-topology-*.yml</code> playbooks), so the file the builder wrote as <code>/srv/ci/cached/debian:13</code> is <code>/srv/ci/debian:13</code> on the node doing the uploading. Do not "correct" the path to the builder's spelling. <strong>Leave the existing <code>debian-12</code> upload exactly as it is, source path included.</strong> Additive has to mean the content too: repointing <code>:249</code> at <code>/srv/ci/debian:13</code> would leave an artifact called <code>debian-12</code> containing trixie, and the 43 references in <code>shakenfist</code> would start exercising Debian 13 one merge before the repository whose tests would explain a failure. Decision 4.7 keeps <code>/srv/ci/debian:12</code> cached for exactly this. Separately, move the two guest-image defaults in this repository to <code>sf://label/ci-images/debian-13</code> -- <code>build-smoke-cluster/action.yml:29</code> and <code>.github/workflows/smoke-cluster.yml:56</code>. Those defaults are safe to move now and are what two callers take today (<code>shakenfist</code> <code>functional-tests.yml:558</code>, <code>kerbside</code> <code>sf-e2e-functional.yml:104</code>). <strong>Confirm before editing, not after</strong>: <code>ci-images/debian-13</code> must have a blob newer than the last nightly -- read the conductor's <code>sf-client label update "ci-images/debian-13"</code> line rather than the <code>IMAGE_BUILDS</code> entry, because an entry is not a blob and phase 3 lost a night to exactly that distinction. Every consumer of this repository pins <code>@main</code>, so this lands for the whole fleet the moment it merges; say so in the pull request. <strong>The default move is not additive, and two consumers take the default.</strong> 4g sets <code>shakenfist</code>'s base images explicitly at <code>functional-tests.yml:443</code>, <code>:463</code>, <code>:477</code> and <code>:515</code>, but <code>:558</code> -- the node-lifecycle job -- passes no <code>base_image</code> at all and is not in 4g's edit list, so it changes guest image here and stays changed; and <code>kerbside</code> <code>sf-e2e-functional.yml:104</code> passes none either, in a repository no step in this phase touches. After merging, trigger both on their default branches and read each run to completion: <code>kerbside</code>'s <code>sf-e2e-functional</code>, and <code>shakenfist</code>'s <code>functional-tests</code> for the node-lifecycle job. Waiting for whenever 4g's pull request happens to run is not the same thing -- that may be days, and on <code>shakenfist</code>'s default branch the lane has already moved. A failure is a revert of the "Boot smoke clusters on Debian 13." commit rather than a fix-forward, which is the whole reason it is its own commit. The transitional double upload the second commit creates is bounded by 4h, and 4j check (5) is what proves 4h happened. It is not free while it lasts: every smoke cluster build uploads the cached image twice instead of once, against the same primary, so the window costs one extra image copy per cluster rather than one extra name. That is an argument for 4g and 4h following 4f promptly, not for skipping the transition -- the alternative is a flag day across two repositories that pin <code>@main</code>. The line numbers here were read on 2026-09-19 and no consistency issue lists these sites -- they are the half the criterion cannot see -- so locate them with <code>grep -rn 'ci-images/debian-12' .</code> and <code>grep -rn '/srv/ci/debian:12' .</code>, and treat the two defaults and the one upload as the expected result rather than the instruction. Grep the source path rather than the command: the literal string <code>artifact upload debian-12</code> appears nowhere in the fleet, for the <code>${setup}</code> reason above, so a grep for it returns nothing and would license the conclusion that this step has nothing to do. Two commits: "Boot smoke clusters on Debian 13." and "Upload the cluster base image under a release-neutral name.".</td>
+<td><strong>Additive, and it must merge before 4g. Reduced by <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a>: the guest-image defaults this step was also going to move are blocked, and only the release-neutral upload remains.</strong> In <code>shakenfist/actions</code>, <code>build-smoke-cluster/action.yml</code>. The action uploads the cached image into the cluster it just built as artifact <code>debian-12</code>, and 43 references in <code>shakenfist</code> read it back as <code>sf://upload/system/debian-12</code>. Decision 4.5 moves that name to <code>debian</code>, with no release in it. <strong>The upload line does not read the way a grep for the command would expect.</strong> <code>build-smoke-cluster/action.yml</code> assembles <code>sf-client artifact upload</code> into a <code>${setup}</code> shell variable at <code>:260</code> and invokes it at <code>:263</code>, which literally reads <code>"${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"</code>. The artifact name and the source path are on <code>:263</code>; the verb is not. Those numbers are from 2026-09-21 and moved by fourteen lines when <code>e2a56bd</code> rewrote the comment above them, which is the reminder that they are a grep target rather than an address. Do it in two landings so neither repository is ever reading a name the other does not write: this step adds a <em>second</em> upload under the name <code>debian</code>, sourced from <code>/srv/ci/debian:13</code>, which phase 3 put on the cache disk (<code>ansible/ci-dependencies.yml:194</code>); 4h removes the old one after 4g has landed. <strong><code>/srv/ci/debian:13</code> is the right path and <code>/srv/ci/cached/debian:13</code> is not</strong>: the builder mounts the dependencies disk at <code>/srv/ci/cached</code> and writes <code>{{item.name}}</code> into it, while the cluster nodes that run this upload mount the same disk at <code>/srv/ci</code> (the <code>Mount /srv/ci</code> tasks in the <code>ci-topology-*.yml</code> playbooks), so the file the builder wrote as <code>/srv/ci/cached/debian:13</code> is <code>/srv/ci/debian:13</code> on the node doing the uploading. Do not "correct" the path to the builder's spelling. <strong>Leave the existing <code>debian-12</code> upload exactly as it is, source path included.</strong> Additive has to mean the content too: repointing <code>:263</code> at <code>/srv/ci/debian:13</code> would leave an artifact called <code>debian-12</code> containing trixie, and the 43 references in <code>shakenfist</code> would start exercising Debian 13 one merge before the repository whose tests would explain a failure. Decision 4.7 keeps <code>/srv/ci/debian:12</code> cached for exactly this. <strong>The two guest-image defaults this step was also going to move are blocked and must not be touched.</strong> <code>build-smoke-cluster/action.yml:32</code> and <code>.github/workflows/smoke-cluster.yml:67</code> stay on <code>sf://label/ci-images/debian-12</code> until <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a> closes, and a pull request that removes their comments while moving the default is the mistake this sentence exists to prevent. <strong>The two comments are not the same comment, and this step levels them up.</strong> <code>2e0d32a</code> wrote the full evidence above the workflow input at <code>.github/workflows/smoke-cluster.yml:55-65</code>, naming <code>shakenfist/shakenfist#4280</code>; the same commit wrote a three-line pointer above the action input at <code>build-smoke-cluster/action.yml:28-30</code> which says to see the workflow for the evidence and <strong>does not name the issue</strong>. Verified on 2026-09-21: <code>grep -rn 4280</code> over a fresh <code>actions</code> clone returns the workflow comment and <code>docs/actions.md</code>, and nothing in <code>action.yml</code>. Bare rather than anchored there on purpose -- the substring trap the risks section documents is in <code>shakenfist</code>, not in this repository, and a bare grep over one clone is the wider net. The set check across the fleet is the anchored one. Add the issue reference to that pointer comment in this step's landing -- a comment-only edit that does not move the default, so it does not touch the blocked half. <strong>Name <code>shakenfist/shakenfist#4280</code>, and do not quote the image string in the comment</strong>, which is 4g item (1)'s rule and is here for 4g's reason: the definition of done counts these sites with a <code>ci-images/debian-12</code> grep that counts lines, so a comment repeating the name reports a compliant site as the ninth one that fails. It is not cosmetic: the definition of done requires each of the eight deferred sites to carry a comment naming the issue, and the risks section's mitigation is that the eight are greppable as a set -- with <code>grep -rn --exclude='*.md' --exclude-dir=.git 'shakenfist#4280' .</code>, and not with the bare <code>grep -rn 4280</code>. Both halves of that command matter for the reasons the risks section gives: the anchor because the bare form matches an epoch timestamp in <code>agentoperation.py</code>, and the <code>--exclude</code> because <code>development</code> is in the clone set and this plan names the issue a couple of dozen times. Seven of the eight are covered by 4g's item (1) and by the comment <code>2e0d32a</code> already wrote at <code>smoke-cluster.yml:55-65</code>; this site is the eighth, and 4f is the only step that reaches it. Leave it pointing at the issue by hop rather than by name and the bullet is unsatisfiable whatever else lands, which is the shape of miss the whole deferral depends on not happening. The blocked half is the under-cloud; the upload below is the guest artifact, which #4280's own evidence holds constant. Every consumer of this repository pins <code>@main</code>, so what does land here lands for the whole fleet the moment it merges; say so in the pull request. <strong>After this merges, trigger <code>kerbside</code>'s <code>sf-e2e-functional</code> on its default branch and read the run to completion.</strong> It takes the guest-image default, and no other step in this phase touches that repository, so it is the one consumer whose breakage this landing could cause and nothing else in the phase would surface; a failure is a revert of this commit. That run is a definition-of-done bullet and this sentence is what causes it -- the deferred paragraph below re-triggers the same workflow when the defaults move, which is a second run and not this one. <strong>What the deferred default move will need, recorded here so it is not re-derived.</strong> When #4280 closes, moving those two defaults is not additive and two consumers take them: <code>shakenfist</code> <code>functional-tests.yml:558</code>, the node-lifecycle job, which passes no <code>base_image</code> and is not in 4g's edit list, and <code>kerbside</code> <code>sf-e2e-functional.yml:104</code>, in a repository no step in this phase touches. Both must be re-triggered on their default branches after that merge and read to completion, because waiting for whenever a pull request happens to run them is not the same thing. The gate before editing is a published blob: read the conductor's <code>sf-client label update "ci-images/debian-13"</code> line rather than the <code>IMAGE_BUILDS</code> entry, because an entry is not a blob and phase 3 lost a night to exactly that distinction. Keep the upload a single commit so its revert is one commit. The transitional double upload this step creates is bounded by 4h, and 4j check (5) is what proves 4h happened. It is not free while it lasts: every smoke cluster build uploads the cached image twice instead of once, against the same primary, so the window costs one extra image copy per cluster rather than one extra name. That is an argument for 4g and 4h following 4f promptly, not for skipping the transition -- the alternative is a flag day across two repositories that pin <code>@main</code>. The line numbers in this brief were re-read on 2026-09-21, and no consistency issue lists these sites -- they are the half the criterion cannot see -- so locate them with <code>grep -rn 'ci-images/debian-12' .</code> and <code>grep -rn '/srv/ci/debian:12' .</code>, and treat the one upload as the expected result rather than the instruction, and the two defaults as sites to leave alone. Grep the source path rather than the command: the literal string <code>artifact upload debian-12</code> appears nowhere in the fleet, for the <code>${setup}</code> reason above, so a grep for it returns nothing and would license the conclusion that this step has nothing to do. Two commits in one pull request, split the way 4g splits its comment-only item out under its own subject: "Upload the cluster base image under a release-neutral name." for the upload, and "Name the blocking issue at the under-cloud default." for the comment edit. The upload stays one commit, so its revert stays one commit; the comment is the one edit in this step that touches a line adjacent to the blocked default, which is the change a later reader is most likely to go looking for by subject. The "Boot smoke clusters on Debian 13." commit this step used to carry is deferred with the defaults.</td>
 </tr>
 <tr>
 <td>4g</td>
 <td>high</td>
 <td>opus</td>
 <td>worktree</td>
-<td><strong>After 4f has merged.</strong> <code>shakenfist/shakenfist</code>, the guest-image half, in one pull request but not one commit. (1) The four <code>base_image: 'sf://label/ci-images/debian-12'</code> in <code>.github/workflows/functional-tests.yml</code> (<code>:443</code>, <code>:463</code>, <code>:477</code>, <code>:515</code>) and the two in <code>.github/workflows/scheduled-tests.yml</code> (<code>:42</code>, <code>:52</code>) become <code>debian-13</code>; <code>base_image_user</code> stays <code>debian</code>. (2) The matrix lane names at <code>functional-tests.yml:441</code> and <code>:475</code> are "Debian 12 cluster" and "Debian 12 tier", and <code>tools/ci_headroom_harvest.py:134</code> and <code>:141</code> key <code>BUNDLE_TOPOLOGIES</code> off those strings <em>and</em> off the derived GitHub job names in the same entries; that file's own comment says the derivation would break silently if the names changed. Rename lanes and tool in the same commit, and update <code>tests/test_ci_headroom_harvest.py:61-62</code>. (3) Replace the 43 <code>sf://upload/system/debian-12</code> references with <code>sf://upload/system/debian</code> -- 12 files under <code>deploy/shakenfist_ci/</code> and <code>tests/</code>, plus <code>deploy/nodelifecycletests.sh:132</code> -- and route them through <code>CLUSTER_CI_IMAGE</code> (<code>deploy/shakenfist_ci/base.py:37</code>) wherever the file already imports from <code>base</code>, so the next release is one line. A literal that the constant does not reach is the phase 3 failure this step is repeating on purpose; the definition of done greps for the old name, so leaving any is not passing. (4) <code>functional-tests.yml:583</code> uploads the image itself for the node-lifecycle job, the same command as the action's <code>:249</code>: move it to <code>debian</code> and <code>/srv/ci/debian:13</code> too. Commit subjects, one per numbered item, beginning "Boot the cluster lanes on Debian 13.". <strong>Every line number in this brief was read on 2026-09-19, and none of these sites appears in any consistency issue, because they are the half the criterion cannot see.</strong> 4g runs after 4e has edited two of the same files and after however much ordinary work has landed in between, so locate the work with <code>grep -rn 'ci-images/debian-12' .github/workflows/</code>, <code>grep -rn 'sf://upload/system/debian-12' .</code> and <code>grep -rn 'Debian 12 cluster\|Debian 12 tier' .</code>, and read the counts here -- six <code>base_image</code> sites, 43 references, two lane names -- as the expected result of those greps. A count that disagrees is a finding to report, not a number to reconcile silently. High effort because item (3) is 43 sites in a test suite whose failures are slow to read, and because item (2) fails silently rather than loudly.</td>
+<td><strong>After 4f has merged, and item (1) is blocked by <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a>.</strong> <code>shakenfist/shakenfist</code>, the guest-image half, in one pull request but not one commit. (1) <strong>Deferred, not dropped.</strong> The four <code>base_image: 'sf://label/ci-images/debian-12'</code> in <code>.github/workflows/functional-tests.yml</code> (<code>:443</code>, <code>:463</code>, <code>:477</code>, <code>:515</code>) and the two in <code>.github/workflows/scheduled-tests.yml</code> (<code>:42</code>, <code>:52</code>) are the under-cloud the hypervisor VMs boot, and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a> is the bug that stops them moving: on a trixie under-cloud every instance's agent reports no contact. They become <code>debian-13</code> when #4280 closes, <code>base_image_user</code> staying <code>debian</code>; they do not move in this phase. Leave a comment at each site naming the issue, in the shape <code>actions</code> used at <code>.github/workflows/smoke-cluster.yml:55-65</code>, so that the next reader of a bookworm reference here finds the reason rather than an apparent audit miss. <strong>The comment is for human readers and is not an <code>eol-distro</code> exception; do not write an <code>audit-ok</code> token here.</strong> An earlier draft of this brief claimed it would serve as one, and neither half of that held. The criterion's exception is the literal token <code>audit-ok: eol-distro</code> (<code>EXCEPTION_RE</code>, <code>scripts/audit/checks/distros.py:197</code>), which this brief does not ask for; and <code>is_excepted()</code> reads only the finding's own line and the one above it, so a multi-line block in the shape <code>actions</code> used would sit out of range -- which is the instar defect this same amendment discovered, re-specified for six new sites. It is also moot: <code>docs/audits/eol-distro.md</code>'s "What this does not cover" puts guest images outside the criterion deliberately, so widening it is a specification change phase 6 would have to argue for, and phase 5 cannot start until these six have moved anyway, so a marker here would guard a window this plan's own ordering closes first. If phase 6 does widen the criterion, the marker shape for a guest-image site is that phase's decision to make. <strong>Name <code>shakenfist/shakenfist#4280</code>, and do not quote the image string in the comment.</strong> The definition of done counts sites with a <code>ci-images/debian-12</code> grep that counts lines, so a comment that repeats the name a second time turns a passing site into an apparent ninth one; naming only the issue keeps each site exactly one hit of that grep and exactly one hit of the risks section's set check, which is <code>grep -rn --exclude='*.md' --exclude-dir=.git 'shakenfist#4280' .</code> -- anchored on the <code>shakenfist#</code> prefix, because the bare <code>grep -rn 4280</code> also matches the epoch timestamp <code>1787428090</code> in three docstrings of <code>shakenfist/external_api/agentoperation.py</code>, which is a file in the repository you are editing. Run the anchored form; the bare one will look like it found four extra sites. The model comment obeys this already -- it names <code>ci-images/debian-13</code>, the move it is refusing, rather than the <code>-12</code> default it sits above. That comment is this item's whole content for now, and it is the one part of item (1) that lands. (2) The matrix lane names at <code>functional-tests.yml:441</code> and <code>:475</code> are "Debian 12 cluster" and "Debian 12 tier", and <code>tools/ci_headroom_harvest.py:134</code> and <code>:141</code> key <code>BUNDLE_TOPOLOGIES</code> off those strings <em>and</em> off the derived GitHub job names in the same entries; that file's own comment says the derivation would break silently if the names changed. Rename lanes and tool in the same commit, and update <code>tests/test_ci_headroom_harvest.py:61-62</code>. (3) Replace the 43 <code>sf://upload/system/debian-12</code> references with <code>sf://upload/system/debian</code> -- 12 files under <code>deploy/shakenfist_ci/</code> and <code>tests/</code>, plus <code>deploy/nodelifecycletests.sh:132</code> -- and route them through <code>CLUSTER_CI_IMAGE</code> (<code>deploy/shakenfist_ci/base.py:37</code>) wherever the file already imports from <code>base</code>, so the next release is one line. A literal that the constant does not reach is the phase 3 failure this step is repeating on purpose; the definition of done greps for the old name, so leaving any is not passing. (4) <code>functional-tests.yml:583</code> uploads the image itself for the node-lifecycle job, the same command as the action's upload line (<code>:263</code> on 2026-09-21, and a grep target rather than an address -- <code>e2a56bd</code> moved it by fourteen lines): move it to <code>debian</code> and <code>/srv/ci/debian:13</code> too. Commit subjects, one per numbered item that lands, beginning "Boot the cluster lanes on Debian 13." -- except that item (1) no longer boots anything on Debian 13, so its commit is "Say why the under-cloud is still bookworm.". <strong>Every line number in this brief was read on 2026-09-19 in <code>shakenfist</code>, and no commit in this phase renumbers them -- but ordinary work in that repository does: <code>functional-tests.yml:477</code> and <code>:515</code> had become <code>:479</code> and <code>:517</code> by 2026-09-22, which is why the definition of done lists them at the later numbers. They are a grep target rather than an address, and that matters most in item (1), whose whole remaining content is adding a comment at each of six sites. The one <code>actions</code> number, in item (4), was re-read on 2026-09-21 after <code>e2a56bd</code> moved it. None of these sites appears in any consistency issue, because they are the half the criterion cannot see.</strong> 4g runs after 4e has edited two of the same files and after however much ordinary work has landed in between, so locate the work with <code>grep -rn 'ci-images/debian-12' .github/workflows/</code>, <code>grep -rn 'sf://upload/system/debian-12' .</code> and <code>grep -rn 'Debian 12 cluster\|Debian 12 tier' .</code>, and read the counts here -- six <code>base_image</code> sites, 43 references, two lane names -- as the expected result of those greps. A count that disagrees is a finding to report, not a number to reconcile silently. <strong>Report what it disagrees by, though, and do not stop on growth alone</strong>: these counts were read on 2026-09-19 and the reference count had reached 48 in 13 files by 2026-09-22, because a test suite under active development keeps adding readers of a name this step is renaming. More references than expected means the survey aged and the edit is larger; <em>fewer</em>, or a <code>base_image</code> or lane-name count that moves at all, means something else edited these sites and is the finding worth halting for. High effort because item (3) is 43 sites in a test suite whose failures are slow to read, and because item (2) fails silently rather than loudly. Item (1)'s deferral does not reduce that: items (2) to (4) rename what the tests boot and what the tool keys off, and #4280 leaves both untouched.</td>
 </tr>
 <tr>
 <td>4h</td>
@@ -16277,14 +16365,14 @@ block in <code>PLAN-TEMPLATE.md</code>).</p>
 <td>low</td>
 <td>haiku</td>
 <td>none</td>
-<td>Housekeeping, no commit in this repository. Close <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/123" title="GitHub Issue: shakenfist/development #123">development#123</a> with the merge commits, noting that 38 of its 80 references were cleared by ordinary repository work answering the daily audit rather than by this phase, and that three new ones arrived in the same fortnight, for a net of 80 to 45. The net is the less interesting half: a fleet that grows references while clearing them is why decision 4.2 deletes the declaration with the last user. Comment on <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/38" title="GitHub Issue: shakenfist/private-ci #38">private-ci#38</a> with the guest-image inventory this survey found, since #38 is the collated reference and did not have it: the eight <code>sf://label/ci-images/debian-12</code> sites, the upload name, and the eight references in <code>private-ci</code>'s own <code>conductor/tests/test_imagebuilder.py</code> (seven naming the label, one the <code>-docker</code> variant) that follow <code>IMAGE_BUILDS</code> in phase 5. Leave #38 open; it closes at the end of phase 5. Do not close the 13 per-repository consistency issues by hand -- the audit closes them itself when the repository goes compliant, and closing one by hand hides a repository that did not.</td>
+<td>Housekeeping, no commit in this repository. Close <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/123" title="GitHub Issue: shakenfist/development #123">development#123</a> with the merge commits, noting that the fleet cleared 38 of its 80 references through ordinary repository work answering the daily audit before this phase began, and grew new ones in the same fortnight. That is a statement about the period before the phase, which no later merge can falsify; do not turn it into a claim about the final split, because the compliance page the next sentence sends you to shows the current count and not who cleared what, and by the time 4i runs this phase will have cleared most of the remainder itself. <strong>Read the closing number off <code>docs/audits/compliance.md</code> when this step runs rather than from this plan</strong>, per the survey's own rule that the inventory is the compliance page and never a number in this document: the survey counted 45 references in 13 repositories on 2026-09-19, the 2026-09-21 amendment made that 42 in 12 when <code>actions</code> cleared itself, and 4i runs after the eight remaining steps -- sixteen pull requests, by those steps' own briefs -- have merged. The net is the less interesting half: a fleet that grows references while clearing them is why decision 4.2 deletes the declaration with the last user. Comment on <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/38" title="GitHub Issue: shakenfist/private-ci #38">private-ci#38</a> with the guest-image inventory this survey found, since #38 is the collated reference and did not have it: the eight <code>sf://label/ci-images/debian-12</code> sites, the upload name, and the eight references in <code>private-ci</code>'s own <code>conductor/tests/test_imagebuilder.py</code> (seven naming the label, one the <code>-docker</code> variant) that follow <code>IMAGE_BUILDS</code> in phase 5. Leave #38 open; it closes at the end of phase 5. Do not close the per-repository consistency issues by hand -- the audit closes them itself when the repository goes compliant, and closing one by hand hides a repository that did not. <code>actions</code>' own issue will already have been closed that way, on 2026-09-20, before this step runs.</td>
 </tr>
 <tr>
 <td>4j</td>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td><strong>Confirms the phase, which nothing else does.</strong> Medium and sonnet rather than the mechanical pair its first draft had: five checks, three of which read a run log or a live grep across twenty-nine clones and decide whether the answer agrees with a diff. Observation step, no commit, run after every pull request above has merged and at least one morning's audit has run. (1) Read <code>docs/audits/compliance.md</code> on this repository's <code>main</code> and confirm the <code>eol-distro</code> table has no <code>non-compliant</code> row, and that its generation timestamp is after the last merge -- a stale page looks healthy, which the page's own header warns about. (2) Confirm a smoke cluster built after 4f actually booted Debian 13: find a completed <code>shakenfist</code> functional-tests run and read the base image out of its log, rather than reading the workflow file, which only proves what was asked for. (3) Confirm <code>tools/ci_headroom_harvest.py</code> still matches its bundles after the lane rename, by running it against a merge run that completed after 4g. (4) <code>grep -E "^[[:space:]]*-[[:space:]]*['\"]?debian-12" &lt;clone&gt;/.github/actionlint.yaml</code>, the quote optional because <code>- "debian-12"</code> and <code>- 'debian-12'</code> are both valid YAML and these very files already quote their shellcheck entries that way, across fresh clones of <strong>every</strong> non-archived repository in the organisation, not the thirteen -- a stale declaration produces no finding in any criterion, so this is the only check in the phase that would catch one, and the repositories most likely to carry one are the ones that already migrated and so are not in the thirteen. The list-item anchor is load-bearing: this repository and <code>hunkydory</code> both name <code>debian-12</code> in a comment explaining why it is <em>not</em> declared, and a plain substring grep reports both. <code>private-ci</code> is the one expected hit and is step 4d's stated exception, for having no workflows at all. (5) <code>grep -rn --exclude='*.md' --exclude-dir=.git '/srv/ci/debian:12' .</code> over the same clones must return nothing, and <code>build-smoke-cluster/action.yml</code> must carry exactly one line naming <code>/srv/ci/debian:13</code>. The <code>--exclude</code> scoping is 4h's, for 4h's reason and in 4h's shape -- exclude prose, do not allow-list extensions: this plan file is in one of those clones and names the path several times, and a gate that halts on its own plan file is a gate an agent learns to override. It does not collide with decision 4.7, which was checked rather than assumed: <code>ci-dependencies.yml</code> spells its cache list as <code>name: "debian:12"</code> against an <code>images.shakenfist.com</code> URL, and checked against <code>actions</code> at the same commit as the rest of this survey, <code>build-smoke-cluster/action.yml:249</code> was the only line in that repository naming a <code>/srv/ci/debian</code> path at all, so the bookworm cache entry 4.7 keeps is not a hit. Grep the source path, not the command: the upload is assembled from a <code>${setup}</code> variable, so the literal string <code>artifact upload debian-12</code> appears nowhere in the fleet and a check looking for it passes whether or not 4h ran -- which is the shape of silent skip this step exists to catch, found by running the grep rather than reading it -- nothing else in the phase can tell whether 4h ran, because the definition of done's other greps match the reader spelling in <code>shakenfist</code> rather than the writer line in <code>actions</code>, and a skipped 4h leaves every smoke cluster in the fleet uploading a bookworm image forever with no finding anywhere. The <code>exactly one</code> half catches the inverse mistake 4h's brief warns about. Report all five; if (2) to (5) disagrees with the diff, say so rather than filing it, because the phase is not over until they agree.</td>
+<td><strong>Confirms the phase, which nothing else does.</strong> Medium and sonnet rather than the mechanical pair its first draft had: five checks, three of which read a run log or a live grep across twenty-nine clones and decide whether the answer agrees with a diff. Observation step, no commit, run after every pull request above has merged and at least one morning's audit has run. (1) Read <code>docs/audits/compliance.md</code> on this repository's <code>main</code> and confirm the <code>eol-distro</code> table has no <code>non-compliant</code> row, and that its generation timestamp is after the last merge -- a stale page looks healthy, which the page's own header warns about. (2) Confirm the renamed artifact is both written and read, which takes two different runs because 4f and 4g land in different repositories. <strong>Writing:</strong> in a smoke cluster build after 4f, an upload line names the artifact <code>debian</code> with nothing after it. <strong>Booting:</strong> in a completed <code>shakenfist</code> functional-tests run after 4g, an instance boots <code>sf://upload/system/debian</code> with nothing after <code>debian</code>. <strong>Anchor both ends, because the old names contain the new ones</strong>: <code>debian-12</code> contains <code>debian</code> and <code>sf://upload/system/debian-12</code> contains <code>sf://upload/system/debian</code>, so an unanchored read passes on the pre-rename line. Between 4f and 4h the expected state of the build log is <em>two</em> upload lines, the old name and the new one, which is worth counting: finding one is itself a finding, and which one it is says whether 4f has not landed or 4h has landed early. Read both out of run logs rather than out of the workflow files, which only prove what was asked for. Keep the halves apart: 4f adds an upload in <code>actions</code> and renames nothing that <code>shakenfist</code> reads, so a run between 4f and 4g shows the write and cannot show the boot, and reporting the upload line as if it were the boot is a pass on the wrong assertion. The definition of done states the booting half only, and after 4g. This check used to read the under-cloud image and expect <code>debian-13</code>; <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a> blocks that move, so the under-cloud in either log should still say <code>debian-12</code> and a run that says otherwise is a finding, not a pass. (3) Confirm <code>tools/ci_headroom_harvest.py</code> still matches its bundles after the lane rename, by running it against a merge run that completed after 4g. (4) <code>grep -E "^[[:space:]]*-[[:space:]]*['\"]?debian-12" &lt;clone&gt;/.github/actionlint.yaml</code>, the quote optional because <code>- "debian-12"</code> and <code>- 'debian-12'</code> are both valid YAML and these very files already quote their shellcheck entries that way, across fresh clones of <strong>every</strong> non-archived repository in the organisation, not the ones the criterion lists -- a stale declaration produces no finding in any criterion, so this is the only check in the phase that would catch one, and the repositories most likely to carry one are the ones that already migrated and so are not listed at all. The list-item anchor is load-bearing: this repository and <code>hunkydory</code> both name <code>debian-12</code> in a comment explaining why it is <em>not</em> declared, and a plain substring grep reports both. <code>private-ci</code> is the one expected hit and is step 4d's stated exception, for having no workflows at all. (5) <code>grep -rn --exclude='*.md' --exclude-dir=.git '/srv/ci/debian:12' .</code> over the same clones must return nothing, and <code>build-smoke-cluster/action.yml</code> must carry exactly one line naming <code>/srv/ci/debian:13</code>. The <code>--exclude</code> scoping is 4h's, for 4h's reason and in 4h's shape -- exclude prose, do not allow-list extensions: this plan file is in one of those clones and names the path several times, and a gate that halts on its own plan file is a gate an agent learns to override. It does not collide with decision 4.7, which was checked rather than assumed: <code>ci-dependencies.yml</code> spells its cache list as <code>name: "debian:12"</code> against an <code>images.shakenfist.com</code> URL, and checked against <code>actions</code> at the same commit as the rest of this survey, <code>build-smoke-cluster/action.yml:249</code> as the survey read it -- <code>:263</code> since <code>e2a56bd</code>, and found by grep rather than by line -- was the only line in that repository naming a <code>/srv/ci/debian</code> path at all, so the bookworm cache entry 4.7 keeps is not a hit. Grep the source path, not the command: the upload is assembled from a <code>${setup}</code> variable, so the literal string <code>artifact upload debian-12</code> appears nowhere in the fleet and a check looking for it passes whether or not 4h ran -- which is the shape of silent skip this step exists to catch, found by running the grep rather than reading it -- nothing else in the phase can tell whether 4h ran, because the definition of done's other greps match the reader spelling in <code>shakenfist</code> rather than the writer line in <code>actions</code>, and a skipped 4h leaves every smoke cluster in the fleet uploading a bookworm image forever with no finding anywhere. The <code>exactly one</code> half catches the inverse mistake 4h's brief warns about. Report all five; if (2) to (5) disagrees with the diff, say so rather than filing it, because the phase is not over until they agree.</td>
 </tr>
 </tbody>
 </table>
@@ -16301,19 +16389,53 @@ them in two days without a follow-up fix.</p>
 <p><strong>The guest-image change lands for the whole fleet at once.</strong>
 <code>build-smoke-cluster@main</code> is what every consumer pins, so 4f is
 live everywhere the moment it merges, including for <code>kerbside</code>,
-which takes the default. Two halves with different mitigations. The
-upload is additive -- the old name and its bookworm source stay
-untouched until 4h -- so no consumer changes underneath. The default
-move is not additive: it changes what <code>kerbside</code>'s e2e tests boot at
-merge time, and <code>kerbside</code> is the one consumer no other step re-runs.
-Two consumers take it: <code>kerbside</code>'s
-<code>sf-e2e-functional</code>, and <code>shakenfist</code>'s node-lifecycle job at
-<code>functional-tests.yml:558</code>, which passes no <code>base_image</code> and which
-4g does not edit. Mitigated by the gate on a published
-<code>ci-images/debian-13</code> blob, by 4f triggering both workflows after
-merge and reading each run to completion, and by the default move
-being its own commit so the revert is one commit -- which stays true
-only while it is the newest landing in that file.</p>
+which takes the default. Amended 2026-09-21: the sharp half of this
+risk is deferred with the default move, because <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a>
+blocks it. What 4f still lands is additive -- the old name and its
+bookworm source stay untouched until 4h -- so no consumer changes
+underneath, and the residual risk is the cost of the transitional
+window rather than a behaviour change. Mitigated by 4h closing the
+window, by 4j check (5) proving it closed, and by 4f triggering
+<code>kerbside</code>'s <code>sf-e2e-functional</code> on its default branch after merge
+-- the only run in the phase that exercises a consumer taking the
+default, in the only repository no step here edits.</p>
+<p><strong>The blocker is load bearing and nothing in this plan watches it.</strong>
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a> now gates 4f's defaults, 4g's item (1) and phase
+5's Debian 12 half -- not phase 5 entire, whose <code>debian-11</code> bullet
+has been startable since phase 1 -- and it is an open bug in another
+repository with no owner named here. The failure mode is not that
+it stays open -- it is that it closes and nobody notices, so the
+eight deferred sites
+sit on a retired image with a comment explaining a reason that has
+expired. Mitigated by the definition of done requiring a comment at
+every one of the eight, which makes them greppable as a set -- <strong>as
+<code>grep -rn --exclude='*.md' --exclude-dir=.git 'shakenfist#4280' .</code>,
+anchored and scoped off prose, and not as <code>grep -rn 4280</code></strong>. Both
+halves are load bearing. The <code>--exclude</code> is 4h's and the definition
+of done's, for their reason: <code>development</code> is in the clone set and
+this plan names the issue a couple of dozen times, so the unscoped
+form returns its own plan file before it returns any of the eight,
+and a gate that halts on its own plan file is a gate an agent
+learns to override. The anchor is for a different collision: run
+bare over <code>shakenfist</code> on 2026-09-22, the unanchored form returns
+one real hit and three lines of
+<code>shakenfist/external_api/agentoperation.py</code>, where the epoch
+timestamp <code>1787428090</code> in three docstrings contains the digits, in
+the file this bug is about. It is the same substring trap 4j check
+(4) anchors around for <code>debian-12</code> and the same one the
+<code>ci-images/debian-12</code> bullet notes for <code>hunkydory</code>. Mitigated
+further by phase 5's first step reading the issue before it reads
+this plan. That is a weaker mitigation than a check that fails, and
+phase 7 should ask whether the plan index needs a blocked-on column
+rather than a sentence. The analysis to inherit rather than redo is
+that a term already exists and does not fit: <code>plan-status-vocabulary</code>
+defines <code>Blocked</code> as "cannot proceed until something outside the plan
+changes", and <code>scripts/audit/checks/plans.py</code> accepts it, but phase 4
+is half blocked and most of it moves, so <code>In progress</code> is the right
+cell, and phase 5's <code>debian-11</code> half is genuinely startable, so
+<code>Not started</code> is right there too. What is missing is nowhere to say
+<em>what</em> the block is, because the vocabulary's rule is that the term
+is the whole cell. A column is what that argues for.</p>
 <p><strong>A silent stop, not a failure.</strong> <code>ci_headroom_harvest.py</code> keys off
 job names, and 4g renames them. Nothing fails if the tool is missed:
 it matches nothing and reports empty. Mitigated by putting the
@@ -16328,7 +16450,15 @@ regenerated compliance page rather than against this plan's table.</p>
 consumers, and the guest-image half is the part that makes that
 ordering real. Mitigated by 4j being the gate: phase 5's first step
 should refuse to start until 4j has reported every check it
-runs agreeing.</p>
+runs agreeing. Amended 2026-09-21: 4j agreeing is no longer
+sufficient. Phase 5 removes <code>debian-12</code> from <code>IMAGE_BUILDS</code> and
+<code>CI_IMAGES</code>, and eight under-cloud sites will still name
+<code>ci-images/debian-12</code> when this phase closes, so phase 5's Debian
+12 follow-up cannot start until <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a> closes <em>and</em> those
+eight have moved -- which is a piece of work this phase no longer
+contains. Where it goes is the back brief's fifth question. The
+<code>debian-11</code> bullet is unaffected and startable now; this gate is on
+one bullet of phase 5, not on the phase.</p>
 <h4 id="definition-of-done_1">Definition of done<a class="headerlink" href="#definition-of-done_1" title="Permanent link">&para;</a></h4>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>docs/audits/compliance.md</code>'s <code>eol-distro</code> table has no
@@ -16339,22 +16469,54 @@ runs agreeing.</p>
       workflows for a declaration to govern. The anchor matters:
       this repository and <code>hunkydory</code> name the label in a comment
       saying why it is absent, and a substring grep reports both.
-      The scope is the whole organisation rather than the thirteen,
-      because a repository that has already migrated is where a
-      declaration outlives its last user -- <code>kerbside-patches</code> was
-      exactly that when this phase was planned.</li>
+      The scope is the whole organisation rather than the
+      repositories the criterion lists, because a repository that
+      has already migrated is where a declaration outlives its
+      last user -- <code>kerbside-patches</code> was exactly that when this
+      phase was planned.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -rn --exclude='*.md' --exclude-dir=.git
-      "ci-images/debian-12"</code> over fresh clones of
-      every non-archived repository returns nothing outside
+      "ci-images/debian-12"</code> over fresh clones of every non-archived
+      repository returns nothing outside
       <code>private-ci/conductor/tests/test_imagebuilder.py</code>, whose eight
       references -- seven naming the label and one the <code>-docker</code>
-      variant -- phase 5 moves with the <code>IMAGE_BUILDS</code> entries. The
-      substring rather than the <code>sf://label/</code> form so that both
-      spellings are caught; that file happens to use the prefixed
-      one. The <code>--exclude</code> is what keeps the grep off prose -- this
-      plan names the string a dozen times, and <code>development</code> is in
-      the clone set -- and it is the same exemption <code>eol-distro</code>
-      makes for a document describing a migration. It excludes prose
+      variant -- phase 5 moves with the <code>IMAGE_BUILDS</code> entries,
+      <strong>and the eight under-cloud sites <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a> blocks</strong>:
+      <code>actions</code> <code>build-smoke-cluster/action.yml:32</code> and
+      <code>.github/workflows/smoke-cluster.yml:67</code>, and <code>shakenfist</code>
+      <code>functional-tests.yml:443</code>, <code>:463</code>, <code>:479</code>, <code>:517</code> and
+      <code>scheduled-tests.yml:42</code>, <code>:52</code>. Two of those <code>shakenfist</code>
+      numbers were <code>:477</code> and <code>:515</code> when the survey read them on
+      2026-09-19 and had moved two lines by 2026-09-22, which is
+      what the file and the count are for: this bullet asserts two
+      sites in <code>actions</code> and six in <code>shakenfist</code>, found by the grep
+      it names, and the line numbers locate them on the day rather
+      than addressing them. Each must carry a comment naming the
+      issue, which is what makes this bullet falsifiable rather than
+      an exemption list: a ninth site, or one of these eight without
+      the comment, fails it. <strong>The comment names <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a> and
+      not the image string</strong>, so that each site stays exactly one
+      hit of this grep -- the bullet counts sites and the grep
+      counts lines, and a comment that quotes the name again reports
+      a compliant site as the ninth one that fails. Naming only the
+      issue also makes the risks section's <code>grep -rn
+      'shakenfist#4280'</code> a one-to-one set check -- the anchor is
+      load-bearing there for the reason that section gives -- and
+      under the same <code>--exclude</code> scoping as this bullet it returns
+      exactly these eight lines, and a hit elsewhere is a finding to
+      report rather than a failure. 4f's landing is what brings
+      <code>build-smoke-cluster/action.yml:28-30</code> up to this: <code>2e0d32a</code>
+      left it pointing at <code>smoke-cluster.yml</code> for the evidence
+      instead of naming the issue, so it is the one site of the
+      eight that no other step reaches. Read that as coverage and
+      not as a running count: 4g writes six of the eight and lands
+      after 4f, so the set grep returns one before 4f, two after
+      it and eight after 4g, and never seven. The substring
+      rather than the <code>sf://label/</code> form so that both spellings are
+      caught; that file happens to use the prefixed one. The
+      <code>--exclude</code> is what keeps the grep off prose -- this plan
+      names the string a dozen times, and <code>development</code> is in the
+      clone set -- and it is the same exemption <code>eol-distro</code> makes
+      for a document describing a migration. It excludes prose
       rather than allow-listing extensions, so a reference in a
       <code>.j2</code> template or an extensionless script is still read.
       <code>private-ci</code> is in the clone set deliberately: it is excluded
@@ -16375,23 +16537,40 @@ runs agreeing.</p>
       spells its cache list as <code>name: "debian:12"</code> against an
       <code>images.shakenfist.com</code> URL, not as a <code>/srv/ci/</code> path.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>kerbside</code>'s <code>sf-e2e-functional</code> workflow has completed
-      successfully on its default branch after 4f merged. It is the
-      one consumer that takes the guest-image default and that no
-      other step re-runs.</li>
+      successfully on its default branch after 4f merged, triggered
+      by 4f, which is the step that owns this bullet. It is the
+      one consumer that no other step re-runs. It took the
+      guest-image default this step was going to move, which
+      <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a> has deferred, so what this now proves is the
+      narrower thing: that the release-neutral upload did not break
+      a consumer nobody else exercises.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>instar</code>'s <code>functional-tests.yml</code> carries the <code>audit-ok:
-      eol-distro</code> marker with a reason, and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/564" title="GitHub Issue: shakenfist/instar #564">instar#564</a> is closed by
-      the audit rather than by hand.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A completed <code>shakenfist</code> functional-tests run after 4f shows a
-      cluster booted from <code>ci-images/debian-13</code>, read from the run's
-      log.</li>
+      eol-distro</code> marker <strong>within one line of the finding, and with
+      a reason after it</strong>, and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/564" title="GitHub Issue: shakenfist/instar #564">instar#564</a> is closed by the audit
+      rather than by hand. The two requirements are independent and
+      this phase only had to add the first: a marker with a reason
+      has been in that file since before this phase was planned,
+      nine lines away, so proximity is what was missing and the
+      reason is what <code>docs/audits/eol-distro.md:169-176</code> has always
+      asked for. Dropping either leaves the fleet's canonical
+      instance of this marker wrong in one of the two ways.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A completed <code>shakenfist</code> functional-tests run after 4g shows
+      instances booting <code>sf://upload/system/debian</code>, read from the
+      run's log. The under-cloud in that same log still reads
+      <code>ci-images/debian-12</code> and that is correct until
+      <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a> closes; this bullet asserted the opposite
+      before that bug was found.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>tools/ci_headroom_harvest.py</code> matches its bundles on a merge
       run completed after 4g.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/123" title="GitHub Issue: shakenfist/development #123">development#123</a> is closed; <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/38" title="GitHub Issue: shakenfist/private-ci #38">private-ci#38</a> is still open and
       carries the guest-image inventory.</li>
 </ul>
 <h4 id="back-brief_1">Back brief<a class="headerlink" href="#back-brief_1" title="Permanent link">&para;</a></h4>
-<p>Three things to agree before the phase starts, because each is
-cheap to propose and expensive to redo:</p>
+<p>Five things to agree before the remaining steps run, because each
+is cheap to propose and expensive to redo. The first three were
+written when the phase was planned; the last two come from the
+2026-09-21 amendment, and they are the ones that decide what this
+phase now is:</p>
 <ol>
 <li><strong>Decision 4.5, the release-neutral artifact name.</strong> It is a
    43-site edit in a test suite, and doing it as <code>debian-13</code>
@@ -16409,9 +16588,45 @@ cheap to propose and expensive to redo:</p>
    of work in one section. Splitting the guest-image half into its
    own phase is reasonable; what is not reasonable is running phase
    5 without it.</li>
+<li><strong>Whether 4f should rename the artifact and change its contents
+   in one landing.</strong> As written it adds the <code>debian</code> upload sourced
+   from <code>/srv/ci/debian:13</code>, so the rename carries a bookworm to
+   trixie guest change with it. That was fine when the under-cloud
+   was moving in the same phase and a failure had one obvious
+   suspect. With <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a> open it conflates two variables in
+   a suite whose failures take an hour to read, and #4280 was found
+   precisely because someone held the guest constant and moved one
+   thing. Both source paths are on the dependencies cache disk
+   (<code>actions</code> <code>ansible/ci-dependencies.yml:186-195</code>), so sourcing
+   the neutral name from <code>/srv/ci/debian:12</code> and moving it to
+   <code>:13</code> in a separate later landing costs one commit and buys a
+   controlled experiment. <strong>The plan as amended still says
+   <code>/srv/ci/debian:13</code></strong>; this is the change I would make and did
+   not, because it revises a decision rather than correcting a fact,
+   and 4h and 4j's greps are written against the <code>:13</code> spelling.
+   Priced, so the answer is a decision rather than a flag: 4h's
+   gate, 4j check (5)'s "exactly one line naming
+   <code>/srv/ci/debian:13</code>" and the definition-of-done bullet that
+   pairs with it are all written against <code>:13</code> and move with this
+   choice, decision 4.7's bookworm cache entry stops being a
+   retired path and becomes the one this phase ships, and a later
+   landing is needed to move the artifact's contents from <code>:12</code> to
+   <code>:13</code> once #4280 has been excluded as a suspect. Three cells,
+   one decision, and one extra commit in a phase that does not
+   exist yet.</li>
+<li><strong>Where the eight deferred under-cloud sites go.</strong> They are not
+   in this phase any more and they are not in phase 5, which is
+   producers. Three options: reopen this phase when #4280 closes,
+   add a phase 4b, or fold them into phase 5's first step as its
+   entry gate. The third is tempting and I think wrong -- it makes
+   a producer phase start with a consumer edit, which is the exact
+   blurring D4 exists to prevent -- but it is the cheapest, and the
+   choice belongs to whoever is holding the plan when #4280 closes
+   rather than to this amendment.</li>
 </ol>
 <h3 id="5-retire-the-end-of-life-producers">5. Retire the end-of-life producers<a class="headerlink" href="#5-retire-the-end-of-life-producers" title="Permanent link">&para;</a></h3>
-<p>Closes: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/40" title="GitHub Issue: shakenfist/private-ci #40">private-ci#40</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/33fl/issues/826" title="GitHub Issue: shakenfist/33fl #826">33fl#826</a>. Depends on: phase 4, for the
+<p>Closes: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/40" title="GitHub Issue: shakenfist/private-ci #40">private-ci#40</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/33fl/issues/826" title="GitHub Issue: shakenfist/33fl #826">33fl#826</a>. Depends on: phase 4, and on
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a> plus the eight deferred under-cloud sites, for the
 Debian 12 half only.</p>
 <ul>
 <li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/40" title="GitHub Issue: shakenfist/private-ci #40">private-ci#40</a>, <code>debian-11</code></strong>: remove from <code>IMAGE_BUILDS</code> and
@@ -16419,7 +16634,16 @@ Debian 12 half only.</p>
   phase 1 lands -- it also removes the permanent <code>False</code> in every
   nightly cycle summary.</li>
 <li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/40" title="GitHub Issue: shakenfist/private-ci #40">private-ci#40</a> follow-up, <code>debian-12</code> and <code>debian-12-docker</code></strong>:
-  only after phase 4, per D4.</li>
+  only after phase 4, per D4 -- and, since 2026-09-21, only after
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a> as well. Phase 4 now closes with eight
+  under-cloud sites still naming <code>ci-images/debian-12</code>, because a
+  trixie under-cloud leaves every instance's agent with no contact.
+  Removing the producer while those eight still name it is the
+  breakage D4 exists to prevent, so this bullet's gate is "phase 4
+  complete <em>and</em> the eight moved", not "phase 4 complete". Phase
+  4's back brief asks where that work is scheduled; whatever the
+  answer, this bullet waits for it. The <code>debian-11</code> bullet above is
+  unaffected and has been unblocked since phase 1 completed.</li>
 <li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/33fl/issues/826" title="GitHub Issue: shakenfist/33fl #826">33fl#826</a></strong>: delete the two GitLab static runner instances so
   <code>static_runner.yml</code> rebuilds them on <code>debian:13</code>, and confirm
   the six GitHub runners have rolled over. Consider a retire tool
@@ -16604,16 +16828,21 @@ likely failure of this plan is that phases 3-5 close visible
 issues, phases 1, 2 and 6 close none, and the plan is declared
 finished. That is the ordering D1 exists to prevent, and it is why
 phases 1 and 2 come first despite closing nothing.</p>
-<p><strong>Phase 4 is long and boring, and that is the half that is going
-well.</strong> Thirteen repositories with an actionlint edit each, and the
-daily audit files and closes the per-repository issues itself, so
-progress is externally visible rather than tracked by hand -- the
+<p><strong>Phase 4's label half is long and boring, and that is the half
+that moves.</strong> Twelve repositories with an actionlint edit each, and
+the daily audit files and closes the per-repository issues itself,
+so progress is externally visible rather than tracked by hand -- the
 fleet cleared 38 of the original 80 references that way before the
-phase started, and grew three new ones while doing it. The risk
-moved next door: phase 4's survey found a second class of consumer
-the criterion cannot see, and being
-boring is what made it easy to believe the criterion's count was
-the whole job.</p>
+phase started, grew three new ones while doing it, and cleared a
+thirteenth repository, <code>shakenfist/actions</code>, twenty-five minutes
+after this plan merged. The risk moved next door twice. Phase 4's
+survey found a second class of consumer the criterion cannot see,
+and being boring is what made it easy to believe the criterion's
+count was the whole job; then <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4280" title="GitHub Issue: shakenfist/shakenfist #4280">shakenfist#4280</a> stopped that second
+class moving at all, so the phase will close with eight under-cloud
+sites still naming the retired image and phase 5 waiting on a bug
+rather than on a phase. The label half is still going well. It is
+no longer the whole phase.</p>
 <p><strong>Retiring a label early breaks CI fleet-wide.</strong> D4 and the phase 5
 ordering exist for this. A <code>debian-12</code> retirement before phase 4
 completes takes runners out from under jobs still requesting them.</p>
