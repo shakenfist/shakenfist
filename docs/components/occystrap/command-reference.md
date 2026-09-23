@@ -588,6 +588,12 @@ Create overlay mount-based extraction using extended attributes.
 mounts:///path/to/directory
 ```
 
+This runs `mount -t overlay` and so must be run as root. Each layer is passed
+as a separate `lowerdir+=` option, which avoids the kernel's 256 byte limit on
+a single `lowerdir=` value when util-linux 2.39 or later uses the new mount
+API. On kernels older than 6.8, which do not support `lowerdir+=`, occystrap
+falls back to a single colon-separated `lowerdir=`.
+
 ### docker://
 
 Load images into the local Docker or Podman daemon.
