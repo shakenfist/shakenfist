@@ -12,8 +12,8 @@ The full design rationale is in
 The automation lives in this repository:
 `scripts/review-tracking.py` (subcommands `stamp`, `prune`, `regen`,
 `next`, `status`, and `scope-orphans`), with tests in
-`scripts/test_review_tracking.py`. In a developer's clone it is run
-by hand -- deliberately not from git hooks. An earlier iteration
+`scripts/tests/test_review_tracking.py`. In a developer's clone it is
+run by hand -- deliberately not from git hooks. An earlier iteration
 wired `stamp` and `prune` into the pre-commit, post-merge,
 post-checkout, and post-rewrite hooks, but review state silently
 changing in the middle of unrelated git operations proved more

@@ -141,6 +141,19 @@ A check that starts passing closes its issue. A check that becomes
 `not_applicable` closes it too: "we decided this does not apply" and
 "this now complies" are both reasons not to keep a work item open.
 
+A check that raises is reported as `error`, which is not a verdict and
+touches no issue either way: filing one would blame the audited
+repository for a bug in the audit, and closing one would read as the
+repository having fixed it. `registry.run_check()` is the boundary --
+one raising criterion costs that criterion rather than all of them for
+the repository -- and prints the traceback to the audit step's log. The
+leg then fails on its *Fail if any check raised* step, after the
+results are uploaded, so `manage-issues` still manages every other
+criterion for that repository while `report-failure` makes the bug
+visible and `update-docs` holds back the compliance page until it is
+fixed. The tests call `run()` directly and assert a verdict, so a check
+that raises still fails them.
+
 ## Adding a criterion
 
 Two files: the check and its specification.
@@ -161,6 +174,16 @@ Two files: the check and its specification.
    without paying for it -- several of them query the GitHub API, and
    on a private repository those calls fail for reasons that say
    nothing about compliance.
+
+   Read the audited repository through the helpers rather than around
+   them. `audit.files.tracked_paths(path, *pathspec)` is how to ask git
+   what the index holds: it lists with `-z`, because `git ls-files`
+   otherwise C-quotes any non-ASCII path into a name that opens
+   nothing, and it returns `None` for a listing that failed, which is
+   not the same answer as an empty index. `repo.read()` is how to open
+   a repository file: it returns `None` for anything that is not a
+   regular file inside the checkout, so a dangling or escaping symlink
+   is skipped rather than raised on or followed.
 
 2. **`docs/audits/<check-id>.md`** -- the specification, following the
    structure in `docs/audits/README.md`, and a line for it in that
@@ -192,7 +215,7 @@ stand between that and a repeat. `column_name()` prints an ugly
 heading and a warning rather than raising, because a run that
 publishes a bad label beats a run that publishes nothing;
 `test_multi_check_specs_have_a_heading_for_every_check` in
-`scripts/test_audit_update_docs.py` fails on the omission; and
+`scripts/tests/test_audit_update_docs.py` fails on the omission; and
 `test_criteria_sharing_a_spec_page_all_declare_a_column` in
 `scripts/tests/test_metadata.py` fails on it from the other direction,
 reading the registry rather than the documentation.
@@ -257,20 +280,30 @@ The full gate, which `ci.yml` also runs on every pull request:
 pre-commit run --all-files
 ```
 
-Every test suite under `scripts/` runs as a `local` pre-commit hook.
-Most are triggered by any change under `scripts/`;
-`review-tracking-tests` always runs, and `issue-fix-extraction-tests`
-runs only for its own file and the template files it covers.
-Individually, which is quicker while iterating:
+Every test suite lives in `scripts/tests/`, including the suites for
+the scripts around the package -- `test_review_tracking.py`,
+`test_audit_update_docs.py`, `test_audit_snapshot.py`,
+`test_check_audit_smoke.py`, `test_issue_fix_extraction.py` and
+`test_audit_seams.py`. They sat in `scripts/` until there were two
+directories with no rule telling them apart. A suite written anywhere
+else is a suite no hook runs, and `SuiteLocationTest` in
+`scripts/tests/test_hooks.py` fails on one.
+
+Two `local` pre-commit hooks run them. `audit-package-tests` discovers
+the directory and runs all of it, on any change under `scripts/`,
+`tools/`, `templates/`, the workflows, `.pre-commit-config.yaml` or
+any `.md`. `review-tracking-tests` runs that one suite again, on
+everything else: it is the only hook with `always_run`, because it
+asserts properties of the whole tree and a review-only commit matches
+nothing the other pattern names.
+
+One module at a time, which is quicker while iterating, and each runs
+standalone:
 
 ```
 python3 -m unittest discover -s scripts/tests -t scripts
-python3 scripts/test_audit_seams.py
-python3 scripts/test_audit_snapshot.py
-python3 scripts/test_audit_update_docs.py
-python3 scripts/test_review_tracking.py
-python3 scripts/test_check_audit_smoke.py
-python3 scripts/test_issue_fix_extraction.py
+python3 scripts/tests/test_review_tracking.py
+python3 scripts/tests/test_plans.py
 ```
 
 A test for a check subclasses `CheckTestCase` from
@@ -355,9 +388,9 @@ Six checks reach the network -- `default-branch-naming`,
 `merge-group-cancellation` and `sfui-vendor` -- so they can differ
 between two runs because a repository setting changed rather than
 because the code did. They are reported under their own heading and do
-not affect the exit code. `scripts/test_audit_snapshot.py` re-derives
-that list from `audit-check.py` and fails if a check grows a `gh` call
-without joining it.
+not affect the exit code. `scripts/tests/test_audit_snapshot.py`
+re-derives that list from `audit-check.py` and fails if a check grows
+a `gh` call without joining it.
 
 The snapshots are not committed. Generated JSON under `scripts/` or
 `docs/` would land in review scope and sit permanently stale in the

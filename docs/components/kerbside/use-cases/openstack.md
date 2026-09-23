@@ -62,16 +62,10 @@ someone else:
   `.vv` file for the client to check. That is a different leg:
   client to Kerbside, not Kerbside to hypervisor. See the
   limitations table.
-- **One entry point across clouds.** A single Kerbside can
-  broker OpenStack alongside oVirt and Shaken Fist sources;
-  users keep one console entry point as workloads move. More
-  than one OpenStack cloud can be configured at once — a
-  presented token is offered to each in turn, in `sources.yaml`
-  order, until one validates it. That means every configured
-  cloud sees tokens minted by the others, and that one broken
-  cloud stops the exchange for the rest, so this suits clouds
-  under one operator rather than clouds in separate trust
-  domains. See the limitations table.
+- **[One entry point across clouds.](/components/kerbside/use-cases/multi-cloud/)** A
+  single Kerbside can broker OpenStack alongside oVirt and
+  Shaken Fist sources; users keep one console entry point as
+  workloads move.
 
 Users get the SPICE features an HTML5 console cannot offer:
 high-resolution and multi-monitor desktops, USB passthrough,
@@ -410,8 +404,7 @@ Not covered, and worth knowing before you deploy:
 | The backend leg is not driven end to end in CI | The Tempest test completes a SPICE link handshake against Kerbside but does not authenticate through to a hypervisor console, so the relay, the TLS escalation and the firewall are proven on this cloud's traffic only as far as the front door. They are driven end to end by the oVirt, Shaken Fist and direct-qemu lanes, against other sources. |
 | Least-privilege accounts untested | Only the deployment's admin account has been exercised. Validating another user's console token is an administrative call, so a project-scoped account is not expected to work; no minimal role has been built. |
 | Console rows are never reconciled | Nothing scrapes this cloud, so nothing ever removes a console it can no longer see. A row for a deleted instance stays listed until the cloud is removed from `sources.yaml`. Nova will not mint a token for it, so it is unreachable through the `spice-direct` path — but Kerbside's own administrative `.vv` download mints a token from the stored row without calling Nova, and will still open it. Since libvirt reuses console ports, the recorded address and ports may by then belong to a different instance, possibly another tenant's. Remove a decommissioned cloud from `sources.yaml` rather than leaving it configured. |
-| A token is offered to every configured cloud | The exchange presents the token it was handed to each configured OpenStack cloud in turn, in `sources.yaml` order, until one validates it. Every cloud therefore sees console tokens minted by the others, and a cloud earlier in the file sees every token destined for one later in it. Configuring clouds that are under separate operational control means each one's operators can observe the others' tokens. |
-| One broken cloud breaks the others | The exchange moves on to the next cloud only when a cloud cleanly reports the token as unknown. Any other failure — bad credentials, an unreachable Keystone, a certificate error — ends the request instead of being skipped, so a cloud that is down or misconfigured denies console access to every cloud after it in `sources.yaml`. Order therefore matters, and a cloud being removed from service should be removed from the file rather than left to fail. |
+| Configured clouds share one token exchange | Every configured cloud is asked to validate tokens minted by the others, so each cloud's operators can observe tokens destined for their neighbours, and a cloud which fails for any reason other than cleanly disowning a token — bad credentials, an unreachable Keystone, a certificate error — denies console access to the clouds after it rather than being skipped. Order therefore matters (the token is offered to each configured cloud in file order until one validates it), and a cloud being taken out of service should be removed from the file rather than left to fail. How the exchange reaches that behaviour, and when several clouds behind one Kerbside is the right shape, are in [multi-cloud.md](/components/kerbside/use-cases/multi-cloud/). |
 | Single-node deployments only, in testing | The lane is all-in-one, so one compute node. Multiple compute nodes should work — the address and ports come from the token validation on every exchange rather than from a cached inventory — but no lane covers them. |
 | Deployment support is not upstream yet | As of 2026-09-20 the Kolla image build has merged and kolla-ansible change 976889 is still open, so a stock Kolla-Ansible cannot deploy Kerbside. `kerbside-patches` is the supported route until it lands. |
 | Certificate verification for the cloud | The Kolla-Ansible role in `kerbside-patches` turns `verify` off, which is how a deployment using an internal CA the Kerbside container does not trust is made to work at all. One session carries both the Keystone authentication and the Nova validation call, so turning it off also means the answer that decides a caller may reach a hypervisor console is accepted over an unverified connection. Turning it off is not the only way to solve the CA problem: `verify` also accepts a path to a CA bundle, so pointing it at the internal CA is a security fix rather than tidiness. See [console-sources.md](/components/kerbside/console-sources/#openstack). |
@@ -433,8 +426,12 @@ Not covered, and worth knowing before you deploy:
   — the CI lanes, including the Kolla-Ansible lane described
   above
 - [Kerbside for oVirt](/components/kerbside/use-cases/ovirt/),
-  [Kerbside for Shaken Fist](/components/kerbside/use-cases/shaken-fist/) and
+  [Kerbside for Shaken Fist](/components/kerbside/use-cases/shakenfist/) and
   [Kerbside standalone](/components/kerbside/use-cases/standalone/) — the sibling
   deployment guides
+- [Multi-cloud aggregation](/components/kerbside/use-cases/multi-cloud/) and
+  [Placement topologies](/components/kerbside/use-cases/placement/) — the two topology
+  pages: several sources behind one Kerbside, and several
+  Kerbsides in front of one cloud
 - [kerbside-patches](https://github.com/shakenfist/kerbside-patches)
   — the Kolla and Kolla-Ansible changes, until they are upstream

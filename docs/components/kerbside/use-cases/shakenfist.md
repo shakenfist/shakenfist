@@ -49,20 +49,23 @@ it *is* the second half of it:
   and can terminate in flight.
 - **The hypervisors are never reachable from the client
   network.** Clients reach Kerbside; Kerbside reaches the nodes.
-- **The backend leg is pinned when the node demands TLS.**
-  Kerbside dials the node's plaintext VDI port first and
-  escalates to `vdi_tls_port` only when the node answers the
-  link handshake with `NEED_SECURED`. On that escalated
-  connection it verifies the node's SPICE certificate against
-  the cluster CA and pins the certificate subject the node
-  publishes, so a redirected backend connection fails rather
-  than succeeding quietly. A node whose qemu does not require
-  TLS is relayed over the plaintext port instead, where there
-  is no certificate to verify and no subject to pin; that is
-  the node's configuration rather than Kerbside's.
-- **One entry point across clouds.** A single Kerbside can
-  broker Shaken Fist alongside oVirt and OpenStack sources;
-  users keep one console entry point as workloads move.
+- **The backend leg is pinned when the node demands TLS and
+  publishes a subject.** Kerbside dials the node's plaintext
+  VDI port first and escalates to `vdi_tls_port` only when the
+  node answers the link handshake with `NEED_SECURED`. On that
+  escalated connection it verifies the node's SPICE certificate
+  against the cluster CA, and where the node publishes a
+  certificate subject it pins that subject too, so a redirected
+  backend connection fails rather than succeeding quietly;
+  where the node publishes none the subject is left unset and
+  that leg is relayed unpinned. A node whose qemu does not
+  require TLS is relayed over the plaintext port instead, where
+  there is no certificate to verify and no subject to pin; that
+  is the node's configuration rather than Kerbside's.
+- **[One entry point across clouds.](/components/kerbside/use-cases/multi-cloud/)** A
+  single Kerbside can broker Shaken Fist alongside oVirt and
+  OpenStack sources; users keep one console entry point as
+  workloads move.
 
 Users get the SPICE features an HTML5 console cannot offer:
 high-resolution and multi-monitor desktops, USB passthrough,
@@ -213,9 +216,21 @@ for those backends.
 ### Network
 
 Kerbside needs direct L3 reachability to **every hypervisor
-node's VDI ports** — both the plaintext and TLS ports the
-instance record reports — and to the Shaken Fist API URL, whose
-certificate it verifies against the configured CA.
+node's VDI ports**, both the plaintext and TLS ports the
+instance record reports.
+
+It also needs the Shaken Fist API URL, which is a separate
+endpoint but not a separate trust decision. Kerbside hands the
+API client no CA at all (`_build_client` in
+`kerbside/sources/shakenfist.py`), so that connection is
+verified against whatever trust store the client defaults to.
+
+The `ca_cert` in the source configuration does two other jobs.
+It is compared for equality against the cluster CA the API
+publishes, and the source is marked errored if the two differ.
+And where a backend leg escalates to TLS, it is the CA the
+proxy verifies the hypervisor's certificate against — the same
+value, carried through as `Target.ca_cert`.
 
 This is the prerequisite most likely to be missed, because
 discovery works over the API alone: a firewall between Kerbside
@@ -355,3 +370,7 @@ Not covered, and worth knowing before you deploy:
   [Kerbside for OpenStack](/components/kerbside/use-cases/openstack/) and
   [Kerbside standalone](/components/kerbside/use-cases/standalone/) — the sibling
   deployment guides
+- [Multi-cloud aggregation](/components/kerbside/use-cases/multi-cloud/) and
+  [Placement topologies](/components/kerbside/use-cases/placement/) — the two topology
+  pages: several sources behind one Kerbside, and several
+  Kerbsides in front of one cloud
