@@ -708,6 +708,93 @@ class InstanceRebootTestCase(base.ShakenFistTestCase):
             self.inst.reboot(hard=True)
 
 
+class InstancePowerStateTestCase(base.ShakenFistTestCase):
+    """A missing domain is not powered on, and create() must not mark an
+    instance created when every power on attempt failed (issue 4280).
+    """
+
+    def setUp(self):
+        super().setUp()
+        fake_config = SFConfig(
+            STORAGE_PATH='/a/b/c',
+            DISK_BUS='virtio',
+            ZONE='sfzone',
+            NODE_NAME='node01',
+        )
+
+        self.config = mock.patch('shakenfist.instance.config', fake_config)
+        self.mock_config = self.config.start()
+        self.addCleanup(self.config.stop)
+
+        self.gmov = mock.patch(
+            'shakenfist.baseobject.get_minimum_object_version', return_value=6)
+        self.mock_gmov = self.gmov.start()
+        self.addCleanup(self.gmov.stop)
+
+        self.mock_mariadb = MockMariaDB(self, node_count=4)
+        self.mock_mariadb.setup()
+
+        self.instance_uuid = str(uuid.uuid4())
+        self.mock_mariadb.create_instance(
+            'cirros', self.instance_uuid,
+            set_state=instance.Instance.STATE_PREFLIGHT)
+        self.inst = instance.Instance.from_db(self.instance_uuid)
+
+    def _mock_libvirt(self, domain, power_state='on'):
+        conn = FakeLibvirtConnection(domain)
+        conn.extract_power_state = lambda d: power_state
+        lc = mock.patch(
+            'shakenfist.instance.util_libvirt.LibvirtConnection',
+            return_value=conn)
+        lc.start()
+        self.addCleanup(lc.stop)
+
+    def test_is_powered_on_no_domain(self):
+        self._mock_libvirt(None)
+        self.assertIs(False, self.inst.is_powered_on())
+
+    def test_is_powered_on_running_domain(self):
+        self._mock_libvirt(FakeDomain(), power_state='on')
+        self.assertIs(True, self.inst.is_powered_on())
+
+    def test_is_powered_on_shutoff_domain(self):
+        self._mock_libvirt(FakeDomain(active=False), power_state='off')
+        self.assertIs(False, self.inst.is_powered_on())
+
+    @mock.patch('shakenfist.instance.os.makedirs')
+    @mock.patch('shakenfist.instance.Instance._configure_block_devices')
+    @mock.patch('shakenfist.instance.Instance.power_on')
+    @mock.patch('shakenfist.instance.Instance._record_domain_xml')
+    @mock.patch('shakenfist.instance.Instance.enqueue_delete_due_error')
+    def test_create_power_on_failure_is_not_created(
+            self, mock_enqueue_delete, mock_record_xml, mock_power_on,
+            mock_configure, mock_makedirs):
+        # Every power on attempt failed and the domain was undefined, which
+        # is what happens when libvirt refuses the domain definition.
+        self._mock_libvirt(None)
+        self.inst.create()
+
+        self.assertNotEqual(
+            instance.Instance.STATE_CREATED, self.inst.state.value)
+        mock_enqueue_delete.assert_called_once_with(
+            'instance failed to power on')
+
+    @mock.patch('shakenfist.instance.os.makedirs')
+    @mock.patch('shakenfist.instance.Instance._configure_block_devices')
+    @mock.patch('shakenfist.instance.Instance.power_on')
+    @mock.patch('shakenfist.instance.Instance._record_domain_xml')
+    @mock.patch('shakenfist.instance.Instance.enqueue_delete_due_error')
+    def test_create_power_on_success_is_created(
+            self, mock_enqueue_delete, mock_record_xml, mock_power_on,
+            mock_configure, mock_makedirs):
+        self._mock_libvirt(FakeDomain(), power_state='on')
+        self.inst.create()
+
+        self.assertEqual(
+            instance.Instance.STATE_CREATED, self.inst.state.value)
+        mock_enqueue_delete.assert_not_called()
+
+
 class InstanceDomainXMLEscapingTestCase(base.ShakenFistTestCase):
     """A caller-supplied model value must stay data in the domain XML.
 
