@@ -353,8 +353,8 @@ enumerate is a shape nothing checks.
 
 The declarations are compiled into marshmallow schemas at startup
 (`shakenfist/external_api/validation.py`) and checked against every
-request. `API_VALIDATION_MODE` defaults to `enforce`: a finding other
-than `missing-required` answers `400` in the usual
+request. `API_VALIDATION_MODE` defaults to `enforce`: a finding
+answers `400` in the usual
 `{"error": "<parameter>: <reason>", "status": ...}` shape, naming the
 offending parameter, before the handler or any of its per-method
 decorators ever run. A refusal names the **first** finding only, so a
