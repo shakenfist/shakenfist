@@ -4,7 +4,23 @@ import time
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_ci import retries
+from shakenfist_ci import sizing
 from shakenfist_client import apiclient
+
+
+# How long a reading below the structural minimum is waited out before it
+# is believed. Phase 2 of PLAN-ci-cloud-sizing measured a contiguous
+# prefix of 9 to 14 samples -- 135 to 210 seconds -- at the start of
+# every one of 204 job-runs in which every node's capacity row read
+# absent at once; separately, a node which has not yet published fresh
+# metrics is missing from /admin/resources altogether. Both make a young
+# cluster read smaller than it is and both resolve on their own, so the
+# assertion must not be able to fire inside that window. Comfortably
+# longer than the longest prefix measured and far shorter than the job
+# timeout, at the cost that a genuinely undersized cloud takes this long
+# to say so.
+STRUCTURAL_MINIMUM_WAIT = 420
 
 
 class TestNodes(base.BaseNamespacedTestCase):
@@ -105,6 +121,100 @@ class TestNodes(base.BaseNamespacedTestCase):
         if infra_schedulable and plain_schedulable:
             self.assertLessEqual(
                 max(infra_schedulable), min(plain_schedulable))
+
+    def test_cluster_topology_meets_the_structural_minimum(self):
+        """The deployed cluster is big enough for this suite to mean anything.
+
+        Four tests in this directory read a topology precondition and
+        skip when it is not met: test_network_lifecycle.py:53 needs two
+        hypervisors which are not the network node, test_scheduler.py's
+        test_affinity (:128) and
+        test_binary_affinity_prefers_the_tagged_node (:291) each need
+        three nodes, and test_database_tier.py:37 needs two sf-database
+        instances. A skip reports as a pass, so a topology edit which
+        removes capacity fails nothing -- it silently stops proving
+        scheduler affinity and network teardown while every job stays
+        green. This test is where that is asserted instead
+        (PLAN-ci-cloud-sizing-phase-05-guardrails.md's D6).
+
+        It deliberately fails rather than skipping, for the reason
+        database_tier.py:130-142 gives for its own _database_nodes():
+        skipping would turn the assertion into a silent no-op, which is
+        the same vacuous pass this check exists to prevent -- and a
+        check which skips on precisely the topologies it was written to
+        catch would be worse than not having it. There is no cluster
+        this test does not apply to: it runs only under
+        cluster-ci.conf, which only slim-primary and slim-tier deploy,
+        and both clear every bound asserted here (27 and 24 of ledger
+        against a floor of 24). A cluster reading below one of them is
+        either smaller than the plan agreed to run or is not reporting
+        its node roles, and both are findings rather than a
+        configuration to skip on.
+
+        Database-node count is the one precondition not asserted:
+        slim-primary deploys exactly one, so test_database_tier.py's
+        skip there is by design.
+
+        The bounds and the ledger arithmetic live in
+        shakenfist_ci/sizing.py, so shakenfist/tests/
+        test_ci_structural_minimum.py exercises their boundaries on
+        every pull request -- cluster CI only runs in the merge queue,
+        where a bug in this arithmetic would be expensive to find.
+        """
+        # A young cluster reads smaller than it is, so an unmet minimum
+        # is treated as transient until STRUCTURAL_MINIMUM_WAIT has
+        # passed, at which point the last reading is handed back and
+        # asserted on as it stands. Nothing else is transient here: a
+        # topology which is really too small stays too small, so this
+        # cannot wait a real failure out into a pass.
+        deadline = time.time() + STRUCTURAL_MINIMUM_WAIT
+
+        def _reading():
+            try:
+                nodes = self.system_client.get_nodes()
+                resources = self.system_client.get_cluster_resources()
+            except Exception as e:
+                # The poll starts while the cluster is still settling, so
+                # a read which fails says nothing about the topology --
+                # the same judgement retries.wait_for_capacity() makes
+                # about a poll which raises. It is waited out too, and is
+                # what the failure reports if it is still the last thing
+                # seen at the deadline.
+                return 'unreadable', {
+                    'error': '%s: %s' % (e.__class__.__name__, e)}
+
+            violations = sizing.structural_minimum_violations(
+                resources.get('per_node') or {}, nodes)
+            return ('unmet' if violations else 'met',
+                    {'nodes': nodes, 'resources': resources,
+                     'violations': violations})
+
+        status, reading = retries.retry_while_transient(
+            _reading, ('unmet', 'unreadable'), deadline,
+            interval=base.CAPACITY_POLL_INTERVAL)
+
+        for detail in ('nodes', 'resources', 'violations', 'error'):
+            if detail in reading:
+                self.addDetail(
+                    'structural minimum %s' % detail,
+                    content.text_content(json.dumps(
+                        reading[detail], indent=4, sort_keys=True,
+                        default=str)))
+
+        if status == 'unreadable':
+            self.fail(
+                'The cluster topology could not be read at all in %d '
+                'seconds, so the structural minimum could not be '
+                'checked: %s' % (STRUCTURAL_MINIMUM_WAIT, reading['error']))
+
+        if status != 'met':
+            self.fail(
+                'The deployed topology is below the structural minimum '
+                'every cluster CI topology meets, still so after %d '
+                'seconds of waiting for node metrics and capacity rows '
+                'to populate: %s'
+                % (STRUCTURAL_MINIMUM_WAIT,
+                   '; '.join(v['message'] for v in reading['violations'])))
 
     def test_cluster_resources_charges_unbooted_placements(self):
         # A node's cpu_total_instance_vcpus metric counts only *running*

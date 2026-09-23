@@ -352,6 +352,23 @@ Database-node count is excluded because F6 measured the asymmetry:
 `slim-primary` has one. Asserting two would fail the `Debian 12
 cluster` and `Ubuntu 24.04 cluster` jobs immediately.
 
+**Where the roles are read, decided during 5d.** Node roles come from
+`is_hypervisor` / `is_network_node` on the `GET /nodes` record
+(`shakenfist/node.py:554`), which is what `base._hypervisor_nodes()`
+and all four F6 skip sites already filter on. They are **not** inferred
+from presence in `/admin/resources`'s `per_node`, which is a
+*liveness* statement: `scheduler.py:1052-1057` requires both fresh
+metrics and a queue under `UNREASONABLE_QUEUE_LENGTH`, so a hypervisor
+with a briefly stale metrics row would read as a missing hypervisor and
+fail the assertion on a healthy cluster. Only the ledger comes from
+`per_node`, because that is the only place it is published.
+
+**What the retry costs.** The assertion retries for 420 seconds before
+failing, to clear the 135-to-210-second warm-up window phase 2
+measured. A genuinely undersized cloud therefore takes seven minutes to
+say so, once per cluster job. That is the price of not flaking on a
+cold cluster, and it is paid only on the failing path.
+
 **Where the constant lives:** `shakenfist_ci/sizing.py`, beside the
 ledger arithmetic that is already there. Its docstring explains that
 the module imports nothing from the rest of the suite so
