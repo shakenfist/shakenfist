@@ -955,9 +955,15 @@ class SfInstanceMakeClientTestCase(base.ShakenFistTestCase):
                 self.assertRaises(
                     _Failed, sf_instance._make_client, module)
 
-            # The message names what was passed, so the operator can see
-            # which of the three the playbook forgot.
+            # Assert against the variable part of the message only. Every
+            # name appears in the fixed prefix, so an assertIn over the
+            # whole message passes even if "Got only" were built from the
+            # missing parameters rather than the supplied ones.
             msg = module.fail_json.call_args[1]['msg']
-            for name in params:
-                self.assertIn(name, msg, params)
+            detail = msg.split('Got only ', 1)[1]
+            for name in ('api_url', 'namespace', 'key'):
+                if name in params:
+                    self.assertIn(name, detail, params)
+                else:
+                    self.assertNotIn(name, detail, params)
             client.assert_not_called()

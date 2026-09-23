@@ -156,7 +156,11 @@ options:
     required: false
     type: str
   namespace:
-    description: The namespace the instance belongs to / authenticate as.
+    description:
+      - The namespace the instance belongs to, which is also the namespace
+        authenticated as. Because it names the object and not just an
+        identity it may be supplied on its own, unlike O(api_url) and
+        O(key).
     required: false
     type: str
   key:
@@ -244,15 +248,17 @@ def _make_client(module):
     # parameters are supplied we suppress configuration lookup and use them
     # verbatim; otherwise we auto-discover from the environment / sfrc config
     # exactly like the sf-client CLI.
-    # api_url and key are connection parameters and nothing else, so either
-    # of them arriving without the full set is a mistake rather than a
-    # request to discover: the values passed would be discarded and the
-    # module pointed at whatever cloud discovery found, with nothing said
-    # about it. namespace is deliberately not held to that rule. It names
-    # the namespace to operate in as well as the one to authenticate as, so
-    # it is legitimate on its own and keeps meaning "work here, and find
-    # the credentials the usual way" -- which is how the deployment
-    # playbooks have always called this.
+    # api_url and key are connection parameters and nothing else, so either of
+    # them arriving without the full set is a mistake rather than a request to
+    # discover: the values passed would be discarded and the module pointed at
+    # whatever cloud discovery found, with nothing said about it. namespace is
+    # deliberately not held to that rule in this module. It names the namespace
+    # to operate in -- it is passed to get_instance() and delete_instance() --
+    # as well as the one to authenticate as, so it is legitimate on its own and
+    # keeps meaning "work here, and find the credentials the usual way", which
+    # is how the deployment playbooks have always called this. sf_claim,
+    # sf_namespace and sf_snapshot hold all three to the rule because their
+    # identity parameter is an identity and nothing else.
     api_url = module.params.get('api_url')
     namespace = module.params.get('namespace')
     key = module.params.get('key')

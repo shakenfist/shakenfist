@@ -36,16 +36,19 @@ options:
   api_url:
     description:
       - Base URL of the Shaken Fist API (for example
-        C(http://sf-1:13000)). This and O(key) are only used when they and
-        O(namespace) are all supplied; passing either of them without the
-        other two is an error rather than a silent fall back. When they are
-        omitted the module auto-discovers credentials from the environment
-        and C(sfrc)/C(~/.shakenfist)/C(/etc/sf/shakenfist.json) exactly like
-        the C(sf-client) CLI, which is the usual way to call this.
+        C(http://sf-1:13000)). This, O(namespace) and O(key) are all
+        supplied together or not at all, and supplying only some of them is
+        an error rather than a silent fall back. When all three are omitted
+        the module auto-discovers credentials from the environment and
+        C(sfrc)/C(~/.shakenfist)/C(/etc/sf/shakenfist.json) exactly like the
+        C(sf-client) CLI, which is the usual way to call this.
     required: false
     type: str
   namespace:
-    description: The namespace to authenticate as. See O(api_url).
+    description:
+      - The namespace to authenticate as. This is an identity only; the
+        namespace created or deleted is O(name). See O(api_url) for the
+        all-or-nothing rule it shares with O(api_url) and O(key).
     required: false
     type: str
   key:
@@ -96,28 +99,28 @@ def _make_client(module):
     # parameters are supplied we suppress configuration lookup and use them
     # verbatim; otherwise we let the client auto-discover from the environment
     # and sfrc config exactly like the sf-client CLI does.
-    # api_url and key are connection parameters and nothing else, so either
-    # of them arriving without the full set is a mistake rather than a
-    # request to discover: the values passed would be discarded and the
-    # module pointed at whatever cloud discovery found, with nothing said
-    # about it. namespace is deliberately not held to that rule. It names
-    # the namespace to operate in as well as the one to authenticate as, so
-    # it is legitimate on its own and keeps meaning "work here, and find
-    # the credentials the usual way" -- which is how the deployment
-    # playbooks have always called this.
+    # None of the three is a connection parameter that can stand alone, so any
+    # of them arriving without the other two is a mistake rather than a request
+    # to discover: the values passed would be discarded and the module pointed
+    # at whatever cloud discovery found, with nothing said about it. namespace
+    # is held to that rule here because in this module it is an identity and
+    # nothing else: the namespace acted on is named by name. So namespace on its
+    # own says only "authenticate as this", which is exactly the instruction
+    # that would be silently discarded. sf_instance and sf_network exempt
+    # namespace because there it also names the object to operate on, and their
+    # deployment playbooks pass it alone.
     api_url = module.params.get('api_url')
     namespace = module.params.get('namespace')
     key = module.params.get('key')
 
-    if (api_url or key) and not (api_url and namespace and key):
-        supplied = [n for n, v in (('api_url', api_url),
-                                   ('namespace', namespace),
-                                   ('key', key)) if v]
+    supplied = [n for n, v in (('api_url', api_url),
+                               ('namespace', namespace),
+                               ('key', key)) if v]
+    if supplied and len(supplied) != 3:
         module.fail_json(
-            msg=('api_url and key are only used when api_url, namespace and '
-                 'key are all supplied. Got only %s, so the connection '
-                 'details passed here would be silently discarded in favour '
-                 'of discovered configuration.' % ', '.join(supplied)),
+            msg=('api_url, namespace and key must be supplied together or not '
+                 'at all. Got only %s, which would be discarded in favour of '
+                 'discovered configuration.' % ', '.join(supplied)),
             meta=None, log=[])
 
     kwargs = {
@@ -125,7 +128,7 @@ def _make_client(module):
         'sync_request_timeout': 1800,
         'async_strategy': apiclient.ASYNC_BLOCK,
     }
-    if api_url and namespace and key:
+    if supplied:
         kwargs.update({
             'base_url': api_url,
             'namespace': namespace,

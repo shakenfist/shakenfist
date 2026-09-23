@@ -282,7 +282,11 @@ def _make_client(module):
     # Supplying only some of the three is an error rather than a silent fall
     # back to discovery: the client that would produce can be pointed at an
     # entirely different cloud than the playbook named, with nothing said
-    # about it.
+    # about it. run_module() declares required_together for the same three,
+    # so a play never reaches this guard and an operator report of a partial
+    # set quotes Ansible's wording rather than ours. It stays because
+    # _make_client() is also called directly, by the tests today and by
+    # anything which imports the module tomorrow.
     api_url = module.params.get('api_url')
     auth_namespace = module.params.get('auth_namespace')
     key = module.params.get('key')

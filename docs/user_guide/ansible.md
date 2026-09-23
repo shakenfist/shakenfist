@@ -79,21 +79,45 @@ collection name (FQCN), for example `shakenfist.shakenfist.sf_network`.
 
 ## Authentication
 
-Every module accepts optional `api_url`, `namespace` and `key` connection
-parameters. When all three are supplied they are used verbatim; when
-omitted, the module auto-discovers credentials from the environment and
-`sfrc` / `~/.shakenfist` / `/etc/sf/shakenfist.json` exactly like the
-`sf-client` command line client does (see
+Every module accepts three optional connection parameters: `api_url`, a
+key, and an identity naming the namespace to authenticate as. Supply all
+three and they are used verbatim. Supply none and the module
+auto-discovers credentials from the environment and `sfrc` /
+`~/.shakenfist` / `/etc/sf/shakenfist.json` exactly like the `sf-client`
+command line client does (see
 [Authentication and Namespaces](../developer_guide/authentication.md)).
 
-`sf_claim` is the exception, because claim management is administrator
-only and the caller is therefore acting on somebody else's namespace:
-there `namespace` names the namespace the claim covers, and the namespace
-to authenticate as is `auth_namespace`. Because that rename makes it easy
-to supply `api_url` and `key` while leaving `auth_namespace` unset,
-`sf_claim` treats a partly specified connection as an error rather than
-quietly falling back to the control node's ambient credentials — which
-might be pointed at another cluster entirely.
+Supplying `api_url` or `key` without the full set is an error. There is
+nothing sensible a module can do with half a connection: the values
+cannot be used on their own, so falling back to discovery would point the
+play at whatever cluster the control node happens to be configured for
+while the playbook says otherwise. Failing is the only honest answer.
+
+Which parameter carries the identity, and whether it may be supplied on
+its own, depends on the module:
+
+| Module | Identity parameter | Identity alone |
+|---|---|---|
+| `sf_claim` | `auth_namespace` | An error |
+| `sf_namespace` | `namespace` | An error |
+| `sf_snapshot` | `namespace` | An error |
+| `sf_instance` | `namespace` | Allowed |
+| `sf_network` | `namespace` | Allowed |
+
+In `sf_instance` and `sf_network`, `namespace` does double duty: as well
+as naming the identity it names the namespace the instance or network
+belongs to, and it is passed to the API as such. Supplying it alone
+therefore means something — "work in this namespace, and find the
+credentials the usual way" — and is how the deployment playbooks have
+always called these modules.
+
+In the other three it is an identity and nothing else. `sf_namespace`
+acts on `name`, `sf_snapshot` on `instance_uuid`, and `sf_claim` uses
+`namespace` for the namespace the claim covers, which is why its identity
+parameter is renamed to `auth_namespace` in the first place. Supplying
+the identity alone in these modules says only "authenticate as this",
+which is precisely the instruction discovery would discard, so it is
+held to the same all-or-nothing rule as `api_url` and `key`.
 
 ## Namespaces
 
