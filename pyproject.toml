@@ -165,7 +165,7 @@ dependencies = [
     "oslo.utils==10.2.0",
     "pbr==7.0.3",
     "pycparser==3.0",
-    "pyparsing==3.3.2",
+    "pyparsing==3.3.3",
     "python-dotenv==1.2.3",
     "pytz==2026.3.post1",
     "referencing==0.37.0",
