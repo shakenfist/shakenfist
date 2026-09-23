@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-22T11:12:19.773840+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-23T11:05:48.072644+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -30,7 +30,7 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | compliant | - |
-| agent-python | non-compliant | shakenfist/agent-python#126 |
+| agent-python | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#121 |
@@ -53,7 +53,6 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 
 Details for non-compliant projects:
 
-- **agent-python** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml); it is unused, and its workflow holds contents: write on the pull request branch
 - **clingwrap** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **cloudgood** (Status): Missing workflows: pr-re-review.yml
 - **kerbside-client** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
@@ -68,7 +67,7 @@ Criterion: [console-logging.md](/components/development/audits/console-logging/)
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | N/A | - |
-| agent-python | non-compliant | shakenfist/agent-python#128 |
+| agent-python | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | N/A | - |
 | clingwrap | N/A | - |
@@ -88,10 +87,6 @@ Criterion: [console-logging.md](/components/development/audits/console-logging/)
 | shakenfist | compliant | - |
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
-
-Details for non-compliant projects:
-
-- **agent-python** (Status): 1 of 1 console entry point(s) calling setup_console() do not configure the root logger -- shakenfist_agent/main.py: missing logging.basicConfig() (INFO from every other module reaches a root logger with no handler and is dropped); propagate = False on its own logger (its own lines are emitted twice once root has a handler)
 
 ## default-branch-naming
 
@@ -147,13 +142,12 @@ Criterion: [delete-branch-on-merge.md](/components/development/audits/delete-bra
 | sfui | compliant | - |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#21 |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#21 |
+| visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
 - **kerbside-client** (Status): Delete branch on merge is not enabled
 - **uncalibrated-sextant** (Status): Delete branch on merge is not enabled
-- **visual-digest-rust** (Status): Delete branch on merge is not enabled
 
 ## dependency-name-normalization
 
@@ -257,39 +251,32 @@ Criterion: [eol-distro.md](/components/development/audits/eol-distro/)
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | compliant | - |
-| agent-python | non-compliant | shakenfist/agent-python#137 |
-| client-python | non-compliant | shakenfist/client-python#396 |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#61 |
-| clingwrap | non-compliant | shakenfist/clingwrap#133 |
+| agent-python | compliant | - |
+| client-python | compliant | - |
+| client-python-k3s | compliant | - |
+| clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
-| divergulent | non-compliant | shakenfist/divergulent#112 |
+| divergulent | compliant | - |
 | hunkydory | compliant | - |
 | instar | non-compliant | shakenfist/instar#564 |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | compliant | - |
-| library-utilities | non-compliant | shakenfist/library-utilities#57 |
+| library-utilities | compliant | - |
 | occystrap | non-compliant | shakenfist/occystrap#138 |
 | private-ci | N/A | - |
 | ryll | non-compliant | shakenfist/ryll#378 |
-| sfui | non-compliant | shakenfist/sfui#32 |
+| sfui | compliant | - |
 | shakenfist | non-compliant | shakenfist/shakenfist#4204 |
 | uncalibrated-sextant | compliant | - |
 | visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#22 |
 
 Details for non-compliant projects:
 
-- **agent-python** (Status): 2 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
-- **client-python** (Status): 1 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
-- **client-python-k3s** (Status): 4 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
-- **clingwrap** (Status): 2 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
-- **divergulent** (Status): 1 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
 - **instar** (Status): 1 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
-- **library-utilities** (Status): 1 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
 - **occystrap** (Status): 5 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
 - **ryll** (Status): 17 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
-- **sfui** (Status): 2 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
 - **shakenfist** (Status): 5 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
 - **visual-digest-rust** (Status): 1 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
 
@@ -300,7 +287,7 @@ Criterion: [expensive-lane-path-filter.md](/components/development/audits/expens
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | compliant | - |
-| agent-python | non-compliant | shakenfist/agent-python#123 |
+| agent-python | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#118 |
@@ -323,7 +310,6 @@ Criterion: [expensive-lane-path-filter.md](/components/development/audits/expens
 
 Details for non-compliant projects:
 
-- **agent-python** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
 - **clingwrap** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
 - **sfui** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
 - **visual-digest-rust** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: ci.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
@@ -398,7 +384,7 @@ Criterion: [github-security.md](/components/development/audits/github-security/)
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | compliant | - |
-| agent-python | non-compliant | shakenfist/agent-python#81 |
+| agent-python | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
 | clingwrap | compliant | - |
@@ -421,11 +407,10 @@ Criterion: [github-security.md](/components/development/audits/github-security/)
 
 Details for non-compliant projects:
 
-- **agent-python** (Status): Secret scanning not enabled; Secret scanning push protection not enabled
 - **cloudgood** (Status): Secret scanning not enabled; Secret scanning push protection not enabled
 - **kerbside-client** (Status): Missing .github/workflows/codeql-analysis.yml; Secret scanning not enabled; Secret scanning push protection not enabled
 - **uncalibrated-sextant** (Status): Missing .github/workflows/codeql-analysis.yml; Secret scanning not enabled; Secret scanning push protection not enabled
-- **visual-digest-rust** (Status): Missing .github/workflows/codeql-analysis.yml; Secret scanning not enabled; Secret scanning push protection not enabled
+- **visual-digest-rust** (Status): Missing .github/workflows/codeql-analysis.yml
 
 ## llm-context-lint-ci
 
@@ -434,7 +419,7 @@ Criterion: [llm-context-lint-ci.md](/components/development/audits/llm-context-l
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | compliant | - |
-| agent-python | non-compliant | shakenfist/agent-python#125 |
+| agent-python | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#120 |
@@ -457,7 +442,6 @@ Criterion: [llm-context-lint-ci.md](/components/development/audits/llm-context-l
 
 Details for non-compliant projects:
 
-- **agent-python** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **clingwrap** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **cloudgood** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **sfui** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
@@ -491,6 +475,42 @@ Criterion: [llm-context-lint.md](/components/development/audits/llm-context-lint
 | shakenfist | compliant | - |
 | uncalibrated-sextant | compliant | - |
 | visual-digest-rust | compliant | - |
+
+## llm-doc-naming
+
+Criterion: [llm-doc-naming.md](/components/development/audits/llm-doc-naming/)
+
+| Project | Status | Issue |
+|---------|--------|--------|
+| actions | compliant | - |
+| agent-python | compliant | - |
+| client-python | non-compliant | shakenfist/client-python#406 |
+| client-python-k3s | compliant | - |
+| clingwrap | compliant | - |
+| cloudgood | compliant | - |
+| development | compliant | - |
+| divergulent | compliant | - |
+| hunkydory | compliant | - |
+| instar | compliant | - |
+| kerbside | non-compliant | shakenfist/kerbside#475 |
+| kerbside-client | compliant | - |
+| kerbside-patches | non-compliant | shakenfist/kerbside-patches#1739 |
+| library-utilities | compliant | - |
+| occystrap | non-compliant | shakenfist/occystrap#144 |
+| private-ci | N/A | - |
+| ryll | compliant | - |
+| sfui | compliant | - |
+| shakenfist | non-compliant | shakenfist/shakenfist#4312 |
+| uncalibrated-sextant | compliant | - |
+| visual-digest-rust | compliant | - |
+
+Details for non-compliant projects:
+
+- **client-python** (Status): 1 agent instruction file is named for a single tool rather than AGENTS.md (CLAUDE.md); AGENTS.md is tracked beside it, so it is a second set of instructions loaded with equal authority: merge what is still true into AGENTS.md and delete the original
+- **kerbside** (Status): 1 agent instruction file is named for a single tool rather than AGENTS.md (.claude/CLAUDE.md); AGENTS.md is tracked beside it, so it is a second set of instructions loaded with equal authority: merge what is still true into AGENTS.md and delete the original
+- **kerbside-patches** (Status): 1 agent instruction file is named for a single tool rather than AGENTS.md (CLAUDE.md); AGENTS.md is tracked beside it, so it is a second set of instructions loaded with equal authority: merge what is still true into AGENTS.md and delete the original
+- **occystrap** (Status): 1 agent instruction file is named for a single tool rather than AGENTS.md (CLAUDE.md); AGENTS.md is tracked beside it, so it is a second set of instructions loaded with equal authority: merge what is still true into AGENTS.md and delete the original
+- **shakenfist** (Status): 1 agent instruction file is named for a single tool rather than AGENTS.md (CLAUDE.md); AGENTS.md is tracked beside it, so it is a second set of instructions loaded with equal authority: merge what is still true into AGENTS.md and delete the original
 
 ## llm-doc-structure
 
@@ -850,7 +870,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 Details for non-compliant projects:
 
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121
-- **client-python-k3s** (Status): 4 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/library-api.md:54, docs/library-api.md:65, docs/library-api.md:180, docs/library-api.md:182
+- **client-python-k3s** (Status): 4 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/library-api.md:98, docs/library-api.md:109, docs/library-api.md:230, docs/library-api.md:232
 - **instar** (Status): 17 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/chain-discovery.md:207, docs/quirks.md:4199, docs/quirks.md:4208, docs/quirks.md:4216, docs/quirks.md:4217, docs/quirks.md:4218, docs/quirks.md:4449, docs/quirks.md:4493, docs/quirks.md:4505, docs/quirks.md:4508 (+7 more)
 - **private-ci** (Status): 10 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/dashboard-freshness.md:287, docs/gerrit-reviews.md:15, docs/gerrit-reviews.md:76, docs/gerrit-reviews.md:78, docs/gerrit-reviews.md:83, docs/gerrit-reviews.md:319, docs/gerrit-reviews.md:486, docs/gerrit-reviews.md:493, docs/gerrit-reviews.md:525
 - **shakenfist** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/operator_guide/capacity_refusals.md:116
@@ -945,7 +965,7 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 | cloudgood | N/A | - |
 | development | compliant | - |
 | divergulent | non-compliant | shakenfist/divergulent#115 |
-| hunkydory | non-compliant | shakenfist/hunkydory#36 |
+| hunkydory | compliant | - |
 | instar | non-compliant | shakenfist/instar#586 |
 | kerbside | non-compliant | shakenfist/kerbside#470 |
 | kerbside-client | N/A | - |
@@ -963,7 +983,6 @@ Details for non-compliant projects:
 
 - **client-python-k3s** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
 - **divergulent** (Status): missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
-- **hunkydory** (Status): missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
 - **instar** (Status): missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
 - **kerbside** (Status): missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
 - **occystrap** (Status): missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository)
@@ -1039,7 +1058,7 @@ Criterion: [readme-absolute-links.md](/components/development/audits/readme-abso
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | compliant | - |
-| agent-python | non-compliant | shakenfist/agent-python#107 |
+| agent-python | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#108 |
@@ -1062,7 +1081,6 @@ Criterion: [readme-absolute-links.md](/components/development/audits/readme-abso
 
 Details for non-compliant projects:
 
-- **agent-python** (Status): 5 relative link target(s) in README.md (use absolute URLs so the README renders off the repo landing page): AGENTS.md, ARCHITECTURE.md, docs/developer-guide.md, docs/index.md, docs/protocol.md
 - **clingwrap** (Status): 5 relative link target(s) in README.md (use absolute URLs so the README renders off the repo landing page): AGENTS.md, ARCHITECTURE.md, RELEASE-SETUP.md, docs/, docs/index.md
 
 ## readme-structure
@@ -1160,7 +1178,7 @@ Criterion: [renovate.md](/components/development/audits/renovate/)
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | compliant | - |
-| agent-python | non-compliant | shakenfist/agent-python#122 |
+| agent-python | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#117 |
@@ -1183,7 +1201,6 @@ Criterion: [renovate.md](/components/development/audits/renovate/)
 
 Details for non-compliant projects:
 
-- **agent-python** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
 - **clingwrap** (Status): renovate.json does not enable the pre-commit manager, so the hook revisions in .pre-commit-config.yaml are unmanaged and drift silently
 - **cloudgood** (Status): Missing: .github/workflows/renovate.yml, renovate.json
 - **kerbside-client** (Status): Missing: .github/workflows/renovate.yml, renovate.json
@@ -1196,15 +1213,15 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | non-compliant | shakenfist/actions#91 |
+| actions | non-compliant | shakenfist/actions#95 |
 | agent-python | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
-| development | non-compliant | shakenfist/development#147 |
+| development | non-compliant | shakenfist/development#173 |
 | divergulent | N/A | - |
-| hunkydory | non-compliant | shakenfist/hunkydory#37 |
+| hunkydory | compliant | - |
 | instar | N/A | - |
 | kerbside | non-compliant | shakenfist/kerbside#227 |
 | kerbside-client | N/A | - |
@@ -1212,7 +1229,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
 | private-ci | N/A | - |
-| ryll | non-compliant | shakenfist/ryll#304 |
+| ryll | compliant | - |
 | sfui | N/A | - |
 | shakenfist | N/A | - |
 | uncalibrated-sextant | N/A | - |
@@ -1220,11 +1237,9 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **actions** (Status): 92 of 105 in-scope files reviewed at HEAD; 13 need review (threshold 5)
-- **development** (Status): 146 of 192 in-scope files reviewed at HEAD; 46 need review (threshold 5)
-- **hunkydory** (Status): 29 of 38 in-scope files reviewed at HEAD; 9 need review (threshold 5)
-- **kerbside** (Status): 98 of 233 in-scope files reviewed at HEAD; 135 need review (threshold 5)
-- **ryll** (Status): 174 of 214 in-scope files reviewed at HEAD; 40 need review (threshold 5)
+- **actions** (Status): 95 of 109 in-scope files reviewed at HEAD; 14 need review (threshold 5)
+- **development** (Status): 175 of 194 in-scope files reviewed at HEAD; 19 need review (threshold 5)
+- **kerbside** (Status): 98 of 238 in-scope files reviewed at HEAD; 140 need review (threshold 5)
 
 ## review-scope-completeness
 
@@ -1322,7 +1337,7 @@ Criterion: [secret-handling.md](/components/development/audits/secret-handling/)
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | compliant | - |
-| agent-python | non-compliant | shakenfist/agent-python#113 |
+| agent-python | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#111 |
@@ -1345,7 +1360,6 @@ Criterion: [secret-handling.md](/components/development/audits/secret-handling/)
 
 Details for non-compliant projects:
 
-- **agent-python** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 - **clingwrap** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 - **uncalibrated-sextant** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 - **visual-digest-rust** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
@@ -1408,9 +1422,9 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 
 Details for non-compliant projects:
 
-- **kerbside** (Status): kerbside/api/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
-- **private-ci** (Status): conductor/static/sfui: 4 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
-- **ryll** (Status): ryll/src/web/assets/sfui: 4 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **kerbside** (Status): kerbside/api/static/sfui: 4 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **private-ci** (Status): conductor/static/sfui: 6 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **ryll** (Status): ryll/src/web/assets/sfui: 6 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 
 ## undeclared-direct-dependency
 
@@ -1447,7 +1461,7 @@ Criterion: [unused-declared-dependency.md](/components/development/audits/unused
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | N/A | - |
-| agent-python | non-compliant | shakenfist/agent-python#131 |
+| agent-python | compliant | - |
 | client-python | non-compliant | shakenfist/client-python#383 |
 | client-python-k3s | non-compliant | shakenfist/client-python-k3s#50 |
 | clingwrap | compliant | - |
@@ -1470,7 +1484,6 @@ Criterion: [unused-declared-dependency.md](/components/development/audits/unused
 
 Details for non-compliant projects:
 
-- **agent-python** (Status): Declared but never imported: grpcio-status (pyproject.toml:29), grpcio-tools (pyproject.toml:30). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
 - **client-python** (Status): Declared but never imported: chardet (pyproject.toml:23), pyyaml (pyproject.toml:27), requests_toolbelt (pyproject.toml:22). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
 - **client-python-k3s** (Status): Declared but never imported: prettytable (pyproject.toml:33). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
 
@@ -1481,7 +1494,7 @@ Criterion: [version-file-gitignore.md](/components/development/audits/version-fi
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | N/A | - |
-| agent-python | non-compliant | shakenfist/agent-python#103 |
+| agent-python | compliant | - |
 | client-python | compliant | - |
 | client-python-k3s | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#106 |
@@ -1504,7 +1517,6 @@ Criterion: [version-file-gitignore.md](/components/development/audits/version-fi
 
 Details for non-compliant projects:
 
-- **agent-python** (Status): shakenfist_agent/_version.py is not covered by .gitignore
 - **clingwrap** (Status): clingwrap/_version.py is not covered by .gitignore
 
 ## workflow-standards
@@ -1514,7 +1526,7 @@ Criterion: [workflow-standards.md](/components/development/audits/workflow-stand
 | Project | flake8wrap | Runners | Static tags | VM size | Permissions | Linting | devpi fallback | devpi IP | Review marks | Issue |
 |---------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|
 | actions | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | compliant | - |
-| agent-python | non-compliant | non-compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/agent-python#105, shakenfist/agent-python#130, shakenfist/agent-python#82 |
+| agent-python | compliant | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 | client-python | compliant | compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/client-python#378 |
 | client-python-k3s | compliant | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 | clingwrap | compliant | compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/clingwrap#125 |
@@ -1537,11 +1549,8 @@ Criterion: [workflow-standards.md](/components/development/audits/workflow-stand
 
 Details for non-compliant projects:
 
-- **agent-python** (flake8wrap): Missing shellcheck disable=SC2086 directive
-- **agent-python** (Runners): 2 unmarked GitHub-hosted runner reference(s): functional-tests.yml:103 (ubuntu-latest), functional-tests.yml:114 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment
-- **agent-python** (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:25 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
 - **client-python** (VM size): 3 "vm" runner job(s) naming no size: code-formatting.yml:19 (self-hosted, vm), functional-tests.yml:23 (self-hosted, vm), supply-chain.yml:81 (self-hosted, vm). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
-- **clingwrap** (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:22 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
+- **clingwrap** (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:22 (self-hosted, vm, debian-13). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
 - **kerbside-client** (flake8wrap): Missing shellcheck disable=SC2086 directive
 - **kerbside-client** (Linting): Missing .pre-commit-config.yaml
 - **uncalibrated-sextant** (Runners): 1 unmarked GitHub-hosted runner reference(s): pre-commit.yml:10 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment
