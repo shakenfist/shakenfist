@@ -225,6 +225,46 @@ def hypervisor_ledger(per_node):
     return sum(effective_cpu_ceiling(entry) for entry in per_node.values())
 
 
+def is_single_machine(nodes):
+    """Whether a reading is a single-machine deployment, not a shrunken cluster.
+
+    ``cluster-ci.conf`` is not only run against cluster topologies.
+    ``.github/workflows/scheduled-tests.yml``'s "develop branch on debian
+    12 single machine" entry runs it against the ``localhost`` topology,
+    deliberately, to find anything in the cluster suite which breaks on
+    one node. Every structural minimum here is unmeetable there, so an
+    assertion which fails on an unmet minimum has to know the difference
+    between a cluster that shrank and a deployment that was never a
+    cluster.
+
+    The count is the load-bearing half, and it means more than it looks
+    like it does. ``nodes`` is the roster ``GET /nodes`` publishes, and a
+    roster does not shrink when a node goes quiet -- that is what
+    ``per_node``'s liveness filtering is for, and why the ledger is read
+    from ``per_node`` and the counts from here. A node record survives
+    its node going away. So a roster of one is not "one node survived",
+    it is "one node ever joined", which is a deploy that never built a
+    cluster rather than a cluster that lost its members.
+
+    The role check on top is belt and braces, and it is deliberately not
+    justified by the topologies: ``slim-tier``'s primary carries
+    ``database_node``, ``network_node`` and ``hypervisors`` all at once
+    (``ansible/ci-topology-slim-tier.yml:65``), so "no cluster node holds
+    every role" would be false if anyone said it. What the check buys is
+    narrower and still worth having -- a one-node reading which is *not*
+    the single-machine shape is something nobody deployed on purpose, and
+    is reported rather than excused.
+    """
+    nodes = nodes or []
+    if len(nodes) != 1:
+        return False
+
+    node = nodes[0]
+    return bool(node.get('is_hypervisor')
+                and node.get('is_network_node')
+                and node.get('is_database_node'))
+
+
 def _violation(requirement, observed, minimum, consequence):
     """One unmet minimum, as a record which can be both counted and printed."""
     return {
@@ -266,6 +306,29 @@ def structural_minimum_violations(per_node, nodes):
     non_network_hypervisors = [
         n for n in hypervisors if not n.get('is_network_node')]
 
+    # The ledger is the one figure summed over per_node rather than over
+    # the roster, and per_node is a liveness statement: a hypervisor whose
+    # metrics have gone stale, or whose queue is over
+    # UNREASONABLE_QUEUE_LENGTH, is simply absent from it
+    # (shakenfist/scheduler.py:1052-1057). The sum is then a true reading
+    # of what the scheduler can see and a misleading one about the
+    # topology, and the two are indistinguishable from the total alone.
+    # The cluster suite runs five stestr workers with no group_regex while
+    # test_saturation deliberately fills a hypervisor, so long queues and
+    # late metrics are a condition this suite creates for itself. Naming
+    # the gap in the message is the difference between an operator looking
+    # at the topology file and looking for a missing node.
+    reporting = [n for n in hypervisors if n.get('uuid') in per_node]
+    ledger_consequence = (
+        'the cluster publishes less schedulable vCPU than the smaller '
+        'of the two cluster CI topologies does today')
+    if len(reporting) < len(hypervisors):
+        ledger_consequence += (
+            ', and it is summed over %d of %d rostered hypervisors -- the '
+            'rest published no fresh metrics, so this may be a node '
+            'missing rather than a topology shrinking'
+            % (len(reporting), len(hypervisors)))
+
     checks = (
         ('nodes', len(nodes), MINIMUM_NODES,
          "test_scheduler.py's test_affinity and "
@@ -280,9 +343,7 @@ def structural_minimum_violations(per_node, nodes):
          'test_stray_vxlan.py below one), so network teardown stops '
          'being checked'),
         ('hypervisor_ledger', hypervisor_ledger(per_node),
-         MINIMUM_HYPERVISOR_LEDGER,
-         'the cluster publishes less schedulable vCPU than the smaller '
-         'of the two cluster CI topologies does today'),
+         MINIMUM_HYPERVISOR_LEDGER, ledger_consequence),
     )
 
     return [_violation(*check) for check in checks if check[1] < check[2]]

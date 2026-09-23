@@ -1152,7 +1152,7 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
         code, output = self._run('--series', path, '--label', 'slim-tier')
         self.assertEqual(0, code)
         self.assertIn(
-            '::warning title=CI headroom: cluster OVERSUBSCRIBED::', output,
+            '::warning title=CI headroom%3A cluster OVERSUBSCRIBED::', output,
             'An OVERSUBSCRIBED band verdict did not raise a GitHub '
             'annotation (D3).')
         self.assertIn('above the upper bound of 0.70', output)
@@ -1168,7 +1168,7 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
         code, output = self._run('--series', path)
         self.assertEqual(0, code)
         self.assertIn(
-            '::warning title=CI headroom: cluster OVERSIZED::', output,
+            '::warning title=CI headroom%3A cluster OVERSIZED::', output,
             'An OVERSIZED band verdict did not raise a GitHub annotation '
             '(D3).')
         self.assertIn('below the lower bound of 0.35', output)
@@ -1192,7 +1192,7 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
         code, output = self._run('--series', path)
         self.assertEqual(0, code)
         self.assertIn(
-            '::warning title=CI headroom: per-node maximum above band::',
+            '::warning title=CI headroom%3A per-node maximum above band::',
             output,
             'A per-node maximum above PER_NODE_BAND_UPPER did not raise a '
             'GitHub annotation (D4).')
@@ -1216,7 +1216,7 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
         code, output = self._run('--series', path, '--census', census)
         self.assertEqual(0, code)
         self.assertIn(
-            '::warning title=CI headroom: capacity-stage refusals observed::',
+            '::warning title=CI headroom%3A capacity-stage refusals observed::',
             output,
             'A capacity-stage refusal did not raise its own GitHub '
             'annotation (D3).')
@@ -2548,3 +2548,121 @@ class CapacityWaitsTestCase(HeadroomReportTestCase):
         self.assertEqual('not requested', not_requested['state'])
         self.assertFalse(not_requested['available'])
         self.assertIsNone(not_requested['count'])
+
+
+class OutputOrderingTestCase(HeadroomReportTestCase):
+    """The record is the dataset; the annotation is a convenience.
+
+    ``emit_github_annotations()`` and ``write_github_step_summary()``
+    are not guarded locally, so a raise in either is caught by
+    ``main()``'s global handler -- which, when they ran first, silently
+    cost the run its ``--json`` record while the tool still exited 0 and
+    said nothing was wrong. ``ci_headroom_harvest.py`` reads those
+    records, so that failure mode costs the dataset rather than one
+    annotation.
+    """
+
+    def _series_with_a_verdict(self):
+        return self._series([
+            sample({NODE_ONE: node_payload(cpu_measured=10, cpu_committed=10,
+                                           cpu_limit=10, cpu_hard_max=12)}),
+        ])
+
+    def test_the_record_survives_an_annotation_which_raises(self):
+        path = self._series_with_a_verdict()
+        record_path = os.path.join(self.tempdir, 'record.json')
+
+        original = report.emit_github_annotations
+
+        def _explode(record):
+            raise RuntimeError('annotation code is unguarded on purpose')
+
+        report.emit_github_annotations = _explode
+        try:
+            code, _ = self._run('--series', path, '--json', record_path)
+        finally:
+            report.emit_github_annotations = original
+
+        self.assertEqual(0, code)
+        self.assertTrue(
+            os.path.exists(record_path),
+            'The --json record was not written because the annotation code '
+            'raised first. The record is what the harvest reads; an '
+            'annotation failing must not cost a run its data.')
+        with open(record_path) as f:
+            self.assertEqual(3, json.load(f)['record_version'])
+
+    def test_the_record_survives_a_step_summary_which_raises(self):
+        path = self._series_with_a_verdict()
+        record_path = os.path.join(self.tempdir, 'record.json')
+
+        original = report.write_github_step_summary
+
+        def _explode(record):
+            # write_github_step_summary() catches only OSError, and it
+            # builds the lines inside the try, so a TypeError or KeyError
+            # from step_summary_lines() escapes it.
+            raise TypeError('step summary code is unguarded on purpose')
+
+        report.write_github_step_summary = _explode
+        try:
+            code, _ = self._run('--series', path, '--json', record_path)
+        finally:
+            report.write_github_step_summary = original
+
+        self.assertEqual(0, code)
+        self.assertTrue(os.path.exists(record_path))
+
+
+class WorkflowCommandPropertyTestCase(HeadroomReportTestCase):
+    """A property value needs two escapes an ordinary value does not.
+
+    ':' ends a workflow command's property list and ',' separates its
+    properties, so both have to be encoded inside one. Every title this
+    tool emits contains a colon.
+    """
+
+    def test_property_encoding_covers_colon_and_comma(self):
+        self.assertEqual(
+            '%3A%2C',
+            report._encode_workflow_command_property(':,'))
+
+    def test_property_encoding_still_covers_what_a_value_needs(self):
+        # It must not lose the percent-first ordering it builds on: a
+        # literal '%3A' in the input has to survive as '%253A'.
+        self.assertEqual(
+            '%253A%0A100%25',
+            report._encode_workflow_command_property('%3A\n100%'))
+
+    def test_emitted_titles_are_property_encoded(self):
+        path = self._series([
+            sample({NODE_ONE: node_payload(cpu_measured=10, cpu_committed=10,
+                                           cpu_limit=10, cpu_hard_max=12)}),
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+
+        titles = [line.split('::')[1][len('warning title='):]
+                  for line in output.splitlines()
+                  if line.startswith('::warning title=')]
+        self.assertNotEqual([], titles, 'no annotation was emitted at all')
+        for title in titles:
+            with self.subTest(title=title):
+                self.assertNotIn(':', title)
+                self.assertNotIn(',', title)
+                self.assertIn('%3A', title)
+
+
+class PerNodeNoVerdictTestCase(HeadroomReportTestCase):
+    def test_the_per_node_no_verdict_reaches_stdout_as_well(self):
+        # The step summary covered this; the job log did not. A reader
+        # looking at the log would have seen a per-node bound printed with
+        # nothing said about whether it was met.
+        path = self._series([])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'NO VERDICT: no sample produced a per-node committed-vCPU-',
+            output,
+            'print_verdict() printed the D4 per-node bound without saying '
+            'that no verdict could be reached against it.')

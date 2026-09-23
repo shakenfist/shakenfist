@@ -344,6 +344,30 @@ than 3 hypervisors, fewer than 2 hypervisors that are not the network
 node, or a total hypervisor ledger below 24. Database-node count is
 **not** asserted.
 
+**Amended during review of #4308.** The decision above assumed
+`cluster-ci.conf` runs only on cluster topologies. It does not:
+`scheduled-tests.yml`'s "develop branch on debian 12 single machine"
+entry runs it against `localhost`, deliberately, to find whatever in
+the cluster suite breaks on one node. Every minimum here is
+unmeetable there, so the assertion would have waited out
+`STRUCTURAL_MINIMUM_WAIT` and then failed that job by name the moment
+anyone dispatched the workflow -- which is `workflow_dispatch`-only
+today, which is why it was not caught by running anything.
+
+The one carve-out is therefore a single-machine deployment: a roster
+of exactly one node, which holds the hypervisor, network and database
+roles. It does not reopen the vacuous pass, and the reason is the
+roster rather than the roles -- `GET /nodes` does not drop a node
+which has gone quiet, which is what `per_node`'s liveness filtering is
+for, so one node in the roster means one node ever joined. A cluster
+which lost members still reports them and still fails. (The role check
+is belt and braces and is not justified by the topologies:
+`slim-tier`'s primary carries all three roles at once.) The premise is
+checked rather than trusted this time:
+`test_ci_structural_minimum.py` reads every workflow, finds every
+matrix entry running `cluster-ci.conf`, and asserts each topology is
+one this assertion applies to or the one it skips.
+
 **Reasoning:** the first three are exactly the preconditions the four
 tests in F6 skip on, so a topology that violates one of them currently
 turns those tests into silent passes -- the vacuous pass F7's
@@ -532,9 +556,14 @@ Falsifiable, in order:
    `shakenfist/deploy/shakenfist_ci/sizing.py` and are exercised by a
    test under `shakenfist/tests/` that runs in `pre-commit`, including
    a case where a node's `cpu_limit` is `None`.
-8. The new `test_nodes.py` assertion calls `self.fail` and never
-   `self.skipTest`, and its docstring says why. `grep -A40 '<new test
-   name>' cluster_ci_tests/test_nodes.py | grep -c skipTest` is 0.
+8. The new `test_nodes.py` assertion calls `self.fail` for every
+   unmet minimum, and its docstring says why skipping would be a
+   vacuous pass. It calls `self.skipTest` exactly once, for the
+   single-machine carve-out D6 was amended to add, and no unmet
+   minimum reaches it: `grep -c skipTest` over the test body is 1, and
+   `test_ci_structural_minimum.py`'s `WorkflowTopologyTestCase`
+   asserts every topology running `cluster-ci.conf` is either one the
+   assertion applies to or that one.
 9. A merge run on `slim-primary` and one on `slim-tier` both report
    the new assertion passing, read from stestr output rather than
    inferred from job colour.

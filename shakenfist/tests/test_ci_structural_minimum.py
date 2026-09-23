@@ -34,6 +34,8 @@ below the floor is supposed to require a deliberate edit.
 import importlib.util
 import os
 
+import yaml
+
 from shakenfist.tests import base
 
 
@@ -337,3 +339,185 @@ class EmptyReadingTestCase(base.ShakenFistTestCase):
         # report what it saw.
         self.assertEqual(
             4, len(sizing.structural_minimum_violations(None, None)))
+
+
+class SingleMachineTestCase(base.ShakenFistTestCase):
+    """The one reading the assertion declines to judge.
+
+    ``cluster-ci.conf`` is not run only against cluster topologies --
+    ``scheduled-tests.yml`` runs it against ``localhost`` on purpose --
+    and every minimum here is unmeetable on one node. The carve-out is
+    the whole single-machine signature rather than a node count, so a
+    cluster which has lost every node but one still fails.
+    """
+
+    def test_one_node_holding_every_role_is_a_single_machine(self):
+        self.assertTrue(sizing.is_single_machine(
+            [_node('sf1', hypervisor=True, network=True, database=True)]))
+
+    def test_a_cluster_is_not_a_single_machine(self):
+        per_node, nodes = _topology([6, 6, 12], network_node=0,
+                                    database_nodes=(1, 2))
+        self.assertFalse(sizing.is_single_machine(nodes))
+
+    def test_one_node_which_is_not_the_whole_shape_is_not_excused(self):
+        # A one-node reading that is not the single-machine shape is
+        # something nobody deployed on purpose, so it is reported rather
+        # than excused. (This is belt and braces: the roster is what
+        # actually carries the argument, since it does not shrink when a
+        # node goes quiet. slim-tier's primary does hold all three roles.)
+        for node in (_node('sf2', hypervisor=True),
+                     _node('sf1', hypervisor=True, network=True),
+                     _node('primary', database=True),
+                     _node('sf3', hypervisor=True, database=True)):
+            with self.subTest(node=node['uuid']):
+                self.assertFalse(sizing.is_single_machine([node]))
+
+    def test_an_empty_or_absent_roster_is_not_a_single_machine(self):
+        # An unreadable cluster must not be excused as a single machine.
+        self.assertFalse(sizing.is_single_machine([]))
+        self.assertFalse(sizing.is_single_machine(None))
+
+    def test_a_single_machine_would_otherwise_violate_everything(self):
+        # The carve-out is load-bearing: without it this reading fails the
+        # job by name on every bound.
+        nodes = [_node('sf1', hypervisor=True, network=True, database=True)]
+        per_node = {'sf1': _entry(3)}
+        self.assertEqual(
+            ['nodes', 'hypervisors', 'non_network_hypervisors',
+             'hypervisor_ledger'],
+            _requirements(
+                sizing.structural_minimum_violations(per_node, nodes)))
+
+
+class LedgerDiagnosticsTestCase(base.ShakenFistTestCase):
+    """A short ledger has two causes and the message has to separate them.
+
+    ``per_node`` is a liveness statement, so a hypervisor whose metrics
+    have gone stale is simply absent from it and its ledger with it. The
+    total alone reads identically to a topology which really did shrink,
+    and the two send an operator to different places.
+    """
+
+    def _ledger_message(self, violations):
+        for violation in violations:
+            if violation['requirement'] == 'hypervisor_ledger':
+                return violation['message']
+        self.fail('no hypervisor_ledger violation was reported')
+
+    def test_a_missing_hypervisor_is_named_in_the_message(self):
+        per_node, nodes = _topology([6, 6, 12], network_node=0,
+                                    database_nodes=(1, 2),
+                                    roster_omits=(2,))
+        message = self._ledger_message(
+            sizing.structural_minimum_violations(per_node, nodes))
+        self.assertIn('hypervisor_ledger: 12', message)
+        self.assertIn('summed over 2 of 3 rostered hypervisors', message)
+        self.assertIn('node missing rather than a topology shrinking',
+                      message)
+
+    def test_a_complete_roster_says_nothing_about_missing_nodes(self):
+        # A topology which really is too small must not be reported as a
+        # possible metrics gap, or the message stops meaning anything.
+        per_node, nodes = _topology([3, 3, 6], network_node=0,
+                                    database_nodes=(1, 2))
+        message = self._ledger_message(
+            sizing.structural_minimum_violations(per_node, nodes))
+        self.assertIn('hypervisor_ledger: 12', message)
+        self.assertNotIn('rostered hypervisors', message)
+
+    def test_the_ledger_total_is_unchanged_by_the_extra_wording(self):
+        # The message gained a clause; the observed figure and the verdict
+        # are the same reading they were.
+        per_node, nodes = _topology([6, 6, 12], network_node=0,
+                                    database_nodes=(1, 2),
+                                    roster_omits=(2,))
+        violations = sizing.structural_minimum_violations(per_node, nodes)
+        ledger = [v for v in violations
+                  if v['requirement'] == 'hypervisor_ledger'][0]
+        self.assertEqual(12, ledger['observed'])
+        self.assertEqual(sizing.MINIMUM_HYPERVISOR_LEDGER, ledger['minimum'])
+
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__))))
+
+# Every topology which deploys a cluster the structural minimum applies
+# to, and every topology which deploys something that is not a cluster at
+# all and is carved out by sizing.is_single_machine(). A topology running
+# cluster-ci.conf and named in neither is the defect this pair of tests
+# exists to catch: the assertion fails the job, by name, after waiting
+# seven minutes, on a deployment it was never written about.
+CLUSTER_TOPOLOGIES = {'slim-primary', 'slim-tier'}
+SINGLE_MACHINE_TOPOLOGIES = {'localhost'}
+
+
+def _cluster_ci_matrix_entries():
+    """Every workflow matrix entry which runs the cluster test config.
+
+    Found by shape rather than by path -- any mapping anywhere in a
+    workflow which names both a topology and a stestr config -- because
+    the matrices are nested differently in each workflow and a new one
+    should be picked up without being registered here.
+    """
+    workflows = os.path.join(REPO_ROOT, '.github', 'workflows')
+    entries = []
+
+    def walk(node, source):
+        if isinstance(node, dict):
+            if 'topology' in node and 'stestr_config' in node:
+                entries.append((source, node))
+            for value in node.values():
+                walk(value, source)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value, source)
+
+    for name in sorted(os.listdir(workflows)):
+        if not name.endswith(('.yml', '.yaml')):
+            continue
+        with open(os.path.join(workflows, name)) as f:
+            walk(yaml.safe_load(f), name)
+
+    return [(source, entry) for source, entry in entries
+            if entry.get('stestr_config') == 'cluster-ci.conf']
+
+
+class WorkflowTopologyTestCase(base.ShakenFistTestCase):
+    """What the deployed assertion will actually meet.
+
+    ``test_cluster_topology_meets_the_structural_minimum`` fails rather
+    than skips, so what it is run against is part of its correctness and
+    not a detail of the workflows. This is the check which would have
+    caught it being run against ``localhost``.
+    """
+
+    def test_the_entries_are_found_at_all(self):
+        # Guards every assertion below against passing vacuously if the
+        # matrices move or the parse silently returns nothing.
+        self.assertNotEqual([], _cluster_ci_matrix_entries())
+
+    def test_every_cluster_ci_topology_is_one_this_assertion_handles(self):
+        known = CLUSTER_TOPOLOGIES | SINGLE_MACHINE_TOPOLOGIES
+        for source, entry in _cluster_ci_matrix_entries():
+            with self.subTest(source=source,
+                              description=entry.get('description')):
+                self.assertIn(
+                    entry['topology'], known,
+                    '%s runs cluster-ci.conf against the %s topology, which '
+                    'test_cluster_topology_meets_the_structural_minimum '
+                    'neither applies to nor carves out. It will wait out '
+                    'STRUCTURAL_MINIMUM_WAIT and then fail that job by '
+                    'name. Add the topology to CLUSTER_TOPOLOGIES if it '
+                    'meets the minimums, or to SINGLE_MACHINE_TOPOLOGIES '
+                    'and sizing.is_single_machine() if it is not a cluster.'
+                    % (source, entry['topology']))
+
+    def test_the_single_machine_carve_out_is_still_load_bearing(self):
+        # If this fails, nothing runs cluster-ci.conf on a single machine
+        # any more and sizing.is_single_machine() has become dead code --
+        # which is a thing to notice deliberately, not to discover later.
+        single_machine = [
+            entry for _, entry in _cluster_ci_matrix_entries()
+            if entry['topology'] in SINGLE_MACHINE_TOPOLOGIES]
+        self.assertNotEqual([], single_machine)

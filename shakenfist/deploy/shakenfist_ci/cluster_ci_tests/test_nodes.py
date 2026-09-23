@@ -20,6 +20,14 @@ from shakenfist_client import apiclient
 # longer than the longest prefix measured and far shorter than the job
 # timeout, at the cost that a genuinely undersized cloud takes this long
 # to say so.
+#
+# Deliberately the same number as base.CLUSTER_HEADROOM_WAIT and not
+# derived from it: that one is how long a 507 is waited out before a
+# create is believed to have failed, this one is how long a small
+# reading is waited out before the topology is believed. They agree
+# today by coincidence of scale rather than by construction, so they
+# are free to move apart -- but a change to either is worth a look at
+# the other, which is why each now names the one it is not.
 STRUCTURAL_MINIMUM_WAIT = 420
 
 
@@ -142,14 +150,29 @@ class TestNodes(base.BaseNamespacedTestCase):
         skipping would turn the assertion into a silent no-op, which is
         the same vacuous pass this check exists to prevent -- and a
         check which skips on precisely the topologies it was written to
-        catch would be worse than not having it. There is no cluster
-        this test does not apply to: it runs only under
-        cluster-ci.conf, which only slim-primary and slim-tier deploy,
-        and both clear every bound asserted here (27 and 24 of ledger
-        against a floor of 24). A cluster reading below one of them is
-        either smaller than the plan agreed to run or is not reporting
-        its node roles, and both are findings rather than a
-        configuration to skip on.
+        catch would be worse than not having it. Both cluster topologies
+        clear every bound asserted here (27 and 24 of ledger against a
+        floor of 24), so a cluster reading below one of them is either
+        smaller than the plan agreed to run or is not reporting its node
+        roles, and both are findings rather than a configuration to skip
+        on.
+
+        There is one reading it does not apply to, and it is not a
+        cluster. cluster-ci.conf is not run only against cluster
+        topologies: scheduled-tests.yml's "develop branch on debian 12
+        single machine" entry runs it against localhost, on purpose, to
+        find whatever in this suite breaks on one node. Every minimum
+        here is unmeetable there, so sizing.is_single_machine() carves
+        that case out and this test skips on it -- the one skip it
+        allows itself. It does not reopen the vacuous pass: the roster
+        this reads does not shrink when a node goes quiet, so one node
+        in it means one node ever joined rather than one node left
+        alive. A cluster which lost members still reports them, still
+        reads below the minimums, and still fails. That carve-out is
+        checked in both directions by
+        shakenfist/tests/test_ci_structural_minimum.py, which reads the
+        workflows and asserts every topology running cluster-ci.conf is
+        one of the two this applies to or the one it skips.
 
         Database-node count is the one precondition not asserted:
         slim-primary deploys exactly one, so test_database_tier.py's
@@ -183,6 +206,12 @@ class TestNodes(base.BaseNamespacedTestCase):
                 return 'unreadable', {
                     'error': '%s: %s' % (e.__class__.__name__, e)}
 
+            if sizing.is_single_machine(nodes):
+                # Terminal, not transient: a single machine does not
+                # become a cluster by being waited on.
+                return 'single machine', {'nodes': nodes,
+                                          'resources': resources}
+
             violations = sizing.structural_minimum_violations(
                 resources.get('per_node') or {}, nodes)
             return ('unmet' if violations else 'met',
@@ -200,6 +229,14 @@ class TestNodes(base.BaseNamespacedTestCase):
                     content.text_content(json.dumps(
                         reading[detail], indent=4, sort_keys=True,
                         default=str)))
+
+        if status == 'single machine':
+            self.skipTest(
+                'This is a single-machine deployment -- one node holding '
+                'every role -- not a cluster, so the structural minimum '
+                'has nothing to say about it. scheduled-tests.yml runs '
+                'cluster-ci.conf against the localhost topology on '
+                'purpose; see this test\'s docstring.')
 
         if status == 'unreadable':
             self.fail(

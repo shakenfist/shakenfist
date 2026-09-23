@@ -2626,6 +2626,23 @@ def _encode_workflow_command_value(text):
     return text
 
 
+def _encode_workflow_command_property(text):
+    """Escape a string for use as a workflow command's *property* value.
+
+    A property value sits inside the command's parameter list, where ':'
+    ends the properties and ',' separates them, so the documented
+    encoding adds '%3A' and '%2C' on top of what an ordinary value needs.
+    Every title this tool emits contains a colon ("CI headroom: cluster
+    OVERSUBSCRIBED"), which is the case that made this worth having: a
+    single colon happens to parse today, but the escaping is the
+    contract rather than the observed behaviour.
+    """
+    text = _encode_workflow_command_value(text)
+    text = text.replace(':', '%3A')
+    text = text.replace(',', '%2C')
+    return text
+
+
 def band_annotations(record):
     """Return a (title, message) pair for each D3 band violation in record.
 
@@ -2707,7 +2724,8 @@ def emit_github_annotations(record):
     """
     for title, message in band_annotations(record):
         print('::warning title=%s::%s'
-              % (title, _encode_workflow_command_value(message)))
+              % (_encode_workflow_command_property(title),
+                 _encode_workflow_command_value(message)))
 
 
 def step_summary_lines(record):
@@ -2821,12 +2839,6 @@ def report(args):
                             census_limit=args.census_limit)
     waits = waits_record(read_waits(args.waits))
     print_report(record, waits=waits)
-    # Additional output, not a replacement (D3): the stdout prose above is
-    # unchanged from before this phase, and the annotations below are read
-    # by GitHub from the same stdout stream regardless of this step's exit
-    # code (F4). No new flag gates either call (F5).
-    emit_github_annotations(record)
-    write_github_step_summary(record)
     if args.json:
         # Deliberately silent on success. The printed report must read
         # identically whether or not a summary record was also written, so
@@ -2835,6 +2847,20 @@ def report(args):
         # summary is not written here (see print_report()'s docstring): it
         # is not part of the versioned record.
         write_record(record, args.json)
+
+    # Written before these two, and the order is the point. Neither call
+    # below is guarded locally, so a raise in either is caught by main()'s
+    # global handler -- which would have cost this run its record while the
+    # report still exited 0 and said nothing was wrong. The record is the
+    # dataset ci_headroom_harvest.py reads; the annotation is a convenience
+    # for whoever is looking at this one job.
+    #
+    # Additional output, not a replacement (D3): the stdout prose above is
+    # unchanged from before this phase, and the annotations below are read
+    # by GitHub from the same stdout stream regardless of this step's exit
+    # code (F4). No new flag gates either call (F5).
+    emit_github_annotations(record)
+    write_github_step_summary(record)
 
 
 def main(argv=None):
