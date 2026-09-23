@@ -14766,14 +14766,16 @@ metrics endpoint:</p>
 from <code>sf-api</code> in your log stream. Each records a request which did not
 match its endpoint's published parameter declarations.</p>
 <p><code>API_VALIDATION_MODE</code> decides what happens to such a request, and
-since v0.8.0 it defaults to <strong><code>enforce</code></strong>: a finding other than
-<code>missing-required</code> refuses the request with a 400 in the usual
+since v0.8.0 it defaults to <strong><code>enforce</code></strong>: a finding refuses the
+request with a 400 in the usual
 <code>{"error": "&lt;parameter&gt;: &lt;reason&gt;", "status": 400}</code> shape, and the
 finding line records the refusal. A refusal names the first finding
 only, so a request with several problems is fixed one round trip at a
 time — but every finding is logged, so the log has the whole picture
 even when the caller does not. A parameter declared required but not
-supplied is recorded and never enforced.</p>
+supplied is refused the same way: omitting it, or sending it as an
+explicit JSON <code>null</code>, answers
+<code>400 &lt;parameter&gt;: declared required but not supplied</code>.</p>
 <p>The other two modes are the rollback, in order of severity:</p>
 <ul>
 <li><code>warn</code> restores the pre-v0.8.0 behaviour: findings are recorded and

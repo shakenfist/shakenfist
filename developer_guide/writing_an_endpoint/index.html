@@ -14506,8 +14506,8 @@ enumerate is a shape nothing checks.</p>
 <h2 id="what-validation-does-with-them">What validation does with them<a class="headerlink" href="#what-validation-does-with-them" title="Permanent link">&para;</a></h2>
 <p>The declarations are compiled into marshmallow schemas at startup
 (<code>shakenfist/external_api/validation.py</code>) and checked against every
-request. <code>API_VALIDATION_MODE</code> defaults to <code>enforce</code>: a finding other
-than <code>missing-required</code> answers <code>400</code> in the usual
+request. <code>API_VALIDATION_MODE</code> defaults to <code>enforce</code>: a finding
+answers <code>400</code> in the usual
 <code>{"error": "&lt;parameter&gt;: &lt;reason&gt;", "status": ...}</code> shape, naming the
 offending parameter, before the handler or any of its per-method
 decorators ever run. A refusal names the <strong>first</strong> finding only, so a
