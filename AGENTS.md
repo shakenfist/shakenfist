@@ -82,9 +82,9 @@ metrics. The headlines:
 - **A guarded UPDATE must be the transaction's first statement.** From
   MariaDB 11.6.2 `innodb_snapshot_isolation` defaults ON, and a
   transaction whose read view was opened by a plain `SELECT` aborts with
-  ER_CHECKREAD rather than blocking and re-evaluating. CI runs 10.11,
-  where the variable does not exist, so this fails only in production —
-  see
+  ER_CHECKREAD rather than blocking and re-evaluating. The live MariaDB
+  suite runs against 11.8 in the merge queue and catches it there, not
+  on the pull request — see
   [docs/developer_guide/standards.md](docs/developer_guide/standards.md#a-guarded-update-must-be-the-transactions-first-statement).
 
 - **Protobuf enums are generated, not hand-written.**

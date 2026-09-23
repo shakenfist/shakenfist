@@ -81,8 +81,10 @@ The structural regression tests are `SnapshotIsolationInvariantTestCase`
 in `shakenfist/tests/test_mariadb_capacity_admission.py`; the
 behavioural one is `PlacementAdmissionConcurrencyLiveTestCase` in the
 matching `_live` module, which only bites against a server with the
-variable ON — CI's `debian-12` runner has MariaDB 10.11, where it does
-not exist, so this is a rule CI cannot enforce for you. See
+variable ON. The `schema_enum_widening` job runs the live modules on a
+`debian-13` runner against Debian 13's MariaDB 11.8, where it is ON, so
+CI does enforce this in the merge queue — but not on a pull request,
+where that job does not run. See
 `docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md` step 6a.
 
 ## Secret-carrying fields are `SecretStr`

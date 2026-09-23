@@ -725,6 +725,12 @@ jobs:
     # apt-installs a real MariaDB server and then runs the live test
     # modules against it, which is the same shape that ran out of
     # memory on xs in node_lifecycle_collection above.
+    #
+    # The distro label also picks the MariaDB version: the install
+    # script takes whatever the distro archive ships, which on Debian 13
+    # is 11.8, with innodb_snapshot_isolation ON. That is what gives the
+    # live capacity suite's ER_CHECKREAD cases teeth (issue #3759), so
+    # moving this job to a distro with an older MariaDB drops that.
     runs-on: [self-hosted, vm, debian-13, s]
     timeout-minutes: 30
     concurrency:

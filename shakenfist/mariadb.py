@@ -473,9 +473,10 @@ CLUSTER_CAPACITY_VERSION = 1
 # the native INET4 type, which only exists from MariaDB 10.10 -- so schema
 # creation on 10.6 fails and that floor had silently stopped being real
 # (found by scheduler-reservations phase 2 validation). 10.11 is the oldest
-# in-support LTS above 10.10 (itself a short-term release, EOL 2023), is the
-# version the debian-12 cluster CI functional tests actually exercise, and
-# ships with Debian 12/13 and Ubuntu 24.04.
+# in-support LTS above 10.10 (itself a short-term release, EOL 2023), ships
+# with Debian 12 and Ubuntu 24.04, and is the version the cluster CI
+# functional tests exercise through their Debian 12 guest images. The live
+# MariaDB tests run on a Debian 13 runner and so exercise 11.8 instead.
 MIN_MARIADB_VERSION: tuple[int, int, int] = (10, 11, 0)
 
 

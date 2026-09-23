@@ -79,9 +79,9 @@ any schema work, the server is checked against these requirements:
   not available in MySQL.
 - **Version 10.11.0 or later.** The `ipam_reservations` table uses the
   `INET4` column type, which only exists from MariaDB 10.10, and 10.11
-  is the oldest in-support LTS above that. It is also the version the
-  functional CI suite exercises, and ships with Debian 12/13 and
-  Ubuntu 24.04.
+  is the oldest in-support LTS above that. It ships with Debian 12 and
+  Ubuntu 24.04, and is the version the cluster functional CI suite
+  exercises. Debian 13 ships 11.8.
 - **Default storage engine: InnoDB.** Shaken Fist relies on row-level
   locking and transactional semantics provided by InnoDB.
 - **Default character set: utf8mb4.** Required for full Unicode support,
