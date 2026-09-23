@@ -347,3 +347,46 @@ def structural_minimum_violations(per_node, nodes):
     )
 
     return [_violation(*check) for check in checks if check[1] < check[2]]
+
+
+# What one poll of the deployed topology reads as. The test in
+# cluster_ci_tests/test_nodes.py waits out the transient ones and asserts
+# on the rest, so the transient set lives beside the statuses rather than
+# as a string tuple at the call site, where a misspelt member would make
+# the assertion fire on the first poll of a cold cluster and be found
+# only in the merge queue.
+READING_MET = 'met'
+READING_UNMET = 'unmet'
+READING_UNREADABLE = 'unreadable'
+READING_SINGLE_MACHINE = 'single machine'
+READING_UNCONFIRMED_SINGLE_MACHINE = 'unconfirmed single machine'
+TRANSIENT_READINGS = (READING_UNMET, READING_UNREADABLE,
+                      READING_UNCONFIRMED_SINGLE_MACHINE)
+
+
+def classify_reading(per_node, nodes, previous=None):
+    """What a poll of the deployed topology says, and why.
+
+    Returns a ``(status, violations)`` pair: one of the ``READING_*``
+    statuses above, and the list ``structural_minimum_violations()``
+    returned (empty unless the status is ``READING_UNMET``). ``previous``
+    is the status the last poll classified as, or None on the first.
+
+    A single-machine reading is the only one which ends the wait without
+    the minimums being met, so it is not believed on sight. It is
+    reported as ``READING_UNCONFIRMED_SINGLE_MACHINE`` -- transient --
+    until a second consecutive poll reads the same way. A roster does not
+    shrink, but it does grow: ``slim-tier``'s primary alone carries every
+    role, so a first poll which caught only the primary registered would
+    otherwise skip the assertion on a real cluster, which is the vacuous
+    pass it exists to prevent. The confirmation costs a real single
+    machine one poll interval.
+    """
+    if is_single_machine(nodes):
+        if previous in (READING_SINGLE_MACHINE,
+                        READING_UNCONFIRMED_SINGLE_MACHINE):
+            return READING_SINGLE_MACHINE, []
+        return READING_UNCONFIRMED_SINGLE_MACHINE, []
+
+    violations = structural_minimum_violations(per_node, nodes)
+    return (READING_UNMET if violations else READING_MET), violations

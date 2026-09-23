@@ -48,6 +48,8 @@ import os
 import shutil
 import tempfile
 
+import fixtures
+
 from shakenfist.tests import base
 
 
@@ -184,6 +186,15 @@ class HeadroomReportTestCase(base.ShakenFistTestCase):
         super().setUp()
         self.tempdir = tempfile.mkdtemp()
         self.addCleanup(self._remove_tempdir)
+
+        # GitHub Actions sets $GITHUB_STEP_SUMMARY for every step, and
+        # main() appends a verdict block to whatever file it names. Left
+        # ambient, every test here which produces a record would write to
+        # the unit-test job's own summary page when run in CI, and would
+        # behave differently there than it does locally. Unset it for
+        # every test; the ones which exercise the summary point it at a
+        # file of their own with _set_step_summary().
+        self.useFixture(fixtures.EnvironmentVariable('GITHUB_STEP_SUMMARY'))
 
     def _remove_tempdir(self):
         shutil.rmtree(self.tempdir, ignore_errors=True)
@@ -1108,19 +1119,23 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
     """
 
     def _set_step_summary(self, path):
-        """Point $GITHUB_STEP_SUMMARY at path for one test, then restore it."""
-        old = os.environ.get('GITHUB_STEP_SUMMARY')
+        """Point $GITHUB_STEP_SUMMARY at path for one test, or unset it.
 
-        def _restore():
-            if old is None:
-                os.environ.pop('GITHUB_STEP_SUMMARY', None)
-            else:
-                os.environ['GITHUB_STEP_SUMMARY'] = old
-        self.addCleanup(_restore)
-        if path is None:
-            os.environ.pop('GITHUB_STEP_SUMMARY', None)
-        else:
-            os.environ['GITHUB_STEP_SUMMARY'] = path
+        setUp() has already unset it for every test in this file; this
+        layers on top of that, and the fixture restores whatever the
+        process started with.
+        """
+        self.useFixture(fixtures.EnvironmentVariable(
+            'GITHUB_STEP_SUMMARY', path))
+
+    def test_the_ambient_step_summary_is_never_inherited(self):
+        """setUp() unsets it, so no test here writes to CI's own summary."""
+        self.assertNotIn(
+            'GITHUB_STEP_SUMMARY', os.environ,
+            'A test in this file can see the $GITHUB_STEP_SUMMARY GitHub '
+            'Actions sets for the unit-test step, so every test which '
+            'produces a record appends a verdict block to that job\'s '
+            'real summary page.')
 
     def test_encode_workflow_command_value_escapes_percent_cr_and_newline(self):
         """Percent must be escaped first, or the escapes re-escape themselves."""
@@ -1279,6 +1294,26 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
             'Opening $GITHUB_STEP_SUMMARY truncated a section an earlier '
             'step in the same job had already written.')
         self.assertIn('CI headroom band verdict', contents)
+
+    def test_the_heading_is_not_glued_to_an_unterminated_last_line(self):
+        """An earlier writer need not have ended its section with a newline."""
+        summary_path = os.path.join(self.tempdir, 'step-summary.md')
+        with open(summary_path, 'w') as f:
+            f.write('Some other content without a newline')
+        self._set_step_summary(summary_path)
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, _ = self._run('--series', path)
+        self.assertEqual(0, code)
+        with open(summary_path) as f:
+            lines = f.read().split('\n')
+        self.assertIn(
+            'Some other content without a newline', lines,
+            'The verdict heading was appended onto the last line an '
+            'earlier step left unterminated, so it will not render as a '
+            'heading.')
+        self.assertTrue(
+            any(line.startswith('### CI headroom band verdict')
+                for line in lines))
 
     def test_an_unwritable_step_summary_path_does_not_raise(self):
         """A path whose parent directory does not exist is tolerated (D15)."""

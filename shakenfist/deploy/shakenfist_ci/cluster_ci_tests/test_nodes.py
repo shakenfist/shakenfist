@@ -168,7 +168,10 @@ class TestNodes(base.BaseNamespacedTestCase):
         this reads does not shrink when a node goes quiet, so one node
         in it means one node ever joined rather than one node left
         alive. A cluster which lost members still reports them, still
-        reads below the minimums, and still fails. That carve-out is
+        reads below the minimums, and still fails. Nor does a roster
+        which has not finished growing get the skip: the reading is only
+        believed once two consecutive polls agree on it
+        (sizing.classify_reading()). That carve-out is
         checked in both directions by
         shakenfist/tests/test_ci_structural_minimum.py, which reads the
         workflows and asserts every topology running cluster-ci.conf is
@@ -192,6 +195,10 @@ class TestNodes(base.BaseNamespacedTestCase):
         # cannot wait a real failure out into a pass.
         deadline = time.time() + STRUCTURAL_MINIMUM_WAIT
 
+        # classify_reading() needs the previous poll's status to confirm
+        # a single-machine reading rather than believe it on sight.
+        last = {'status': None}
+
         def _reading():
             try:
                 nodes = self.system_client.get_nodes()
@@ -203,23 +210,19 @@ class TestNodes(base.BaseNamespacedTestCase):
                 # about a poll which raises. It is waited out too, and is
                 # what the failure reports if it is still the last thing
                 # seen at the deadline.
-                return 'unreadable', {
+                last['status'] = sizing.READING_UNREADABLE
+                return sizing.READING_UNREADABLE, {
                     'error': '%s: %s' % (e.__class__.__name__, e)}
 
-            if sizing.is_single_machine(nodes):
-                # Terminal, not transient: a single machine does not
-                # become a cluster by being waited on.
-                return 'single machine', {'nodes': nodes,
-                                          'resources': resources}
-
-            violations = sizing.structural_minimum_violations(
-                resources.get('per_node') or {}, nodes)
-            return ('unmet' if violations else 'met',
-                    {'nodes': nodes, 'resources': resources,
-                     'violations': violations})
+            status, violations = sizing.classify_reading(
+                resources.get('per_node') or {}, nodes,
+                previous=last['status'])
+            last['status'] = status
+            return status, {'nodes': nodes, 'resources': resources,
+                            'violations': violations}
 
         status, reading = retries.retry_while_transient(
-            _reading, ('unmet', 'unreadable'), deadline,
+            _reading, sizing.TRANSIENT_READINGS, deadline,
             interval=base.CAPACITY_POLL_INTERVAL)
 
         for detail in ('nodes', 'resources', 'violations', 'error'):
@@ -230,7 +233,7 @@ class TestNodes(base.BaseNamespacedTestCase):
                         reading[detail], indent=4, sort_keys=True,
                         default=str)))
 
-        if status == 'single machine':
+        if status == sizing.READING_SINGLE_MACHINE:
             self.skipTest(
                 'This is a single-machine deployment -- one node holding '
                 'every role -- not a cluster, so the structural minimum '
@@ -238,13 +241,24 @@ class TestNodes(base.BaseNamespacedTestCase):
                 'cluster-ci.conf against the localhost topology on '
                 'purpose; see this test\'s docstring.')
 
-        if status == 'unreadable':
+        if status == sizing.READING_UNREADABLE:
             self.fail(
                 'The cluster topology could not be read at all in %d '
                 'seconds, so the structural minimum could not be '
                 'checked: %s' % (STRUCTURAL_MINIMUM_WAIT, reading['error']))
 
-        if status != 'met':
+        if status == sizing.READING_UNCONFIRMED_SINGLE_MACHINE:
+            # Only reachable if the one single-machine reading was the
+            # last poll before the deadline, after something else: a
+            # roster which changed shape at the very end of the wait is
+            # not one this test can vouch for either way.
+            self.fail(
+                'The cluster read as a single machine only on the last '
+                'poll before the %d second deadline, so it could not be '
+                'confirmed as one, and it is not a cluster meeting the '
+                'structural minimum either.' % STRUCTURAL_MINIMUM_WAIT)
+
+        if status != sizing.READING_MET:
             self.fail(
                 'The deployed topology is below the structural minimum '
                 'every cluster CI topology meets, still so after %d '

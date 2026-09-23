@@ -55,6 +55,18 @@ def _load_sizing():
 sizing = _load_sizing()
 
 
+RETRIES_PATH = os.path.join(os.path.dirname(SIZING_PATH), 'retries.py')
+
+
+def _load_retries():
+    """The suite's retry loop, loaded by path for the same reason sizing is."""
+    spec = importlib.util.spec_from_file_location(
+        'shakenfist_ci_retries_structural_under_test', RETRIES_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _node(uuid, hypervisor=False, network=False, database=False):
     """One entry as ``GET /nodes`` publishes it, cut down to the role flags."""
     return {
@@ -390,6 +402,98 @@ class SingleMachineTestCase(base.ShakenFistTestCase):
                 sizing.structural_minimum_violations(per_node, nodes)))
 
 
+class ClassifyReadingTestCase(base.ShakenFistTestCase):
+    """The decision test_nodes.py makes on each poll, made here instead.
+
+    Which status a poll reads as, and which statuses are waited out, is
+    the part of the deployed assertion most likely to be wrong and the
+    part a cluster job is the worst place to find wrong: a status missing
+    from the transient set fails a cold cluster on its first poll, and a
+    status wrongly in it waits a real answer out for seven minutes.
+    """
+
+    SINGLE = [_node('sf1', hypervisor=True, network=True, database=True)]
+
+    def test_a_topology_meeting_every_minimum_is_met(self):
+        per_node, nodes = SLIM_TIER
+        self.assertEqual((sizing.READING_MET, []),
+                         sizing.classify_reading(per_node, nodes))
+
+    def test_a_short_topology_is_unmet_and_carries_its_violations(self):
+        per_node, nodes = _topology([6, 6, 11], network_node=0)
+        status, violations = sizing.classify_reading(per_node, nodes)
+        self.assertEqual(sizing.READING_UNMET, status)
+        self.assertEqual(['hypervisor_ledger'], _requirements(violations))
+
+    def test_a_first_single_machine_reading_is_not_believed(self):
+        # slim-tier's primary alone has this exact shape, so the first
+        # poll of a roster still growing must not end the wait.
+        for previous in (None, sizing.READING_UNMET,
+                         sizing.READING_UNREADABLE, sizing.READING_MET):
+            with self.subTest(previous=previous):
+                self.assertEqual(
+                    (sizing.READING_UNCONFIRMED_SINGLE_MACHINE, []),
+                    sizing.classify_reading({}, self.SINGLE,
+                                            previous=previous))
+
+    def test_a_second_consecutive_single_machine_reading_is_believed(self):
+        for previous in (sizing.READING_UNCONFIRMED_SINGLE_MACHINE,
+                         sizing.READING_SINGLE_MACHINE):
+            with self.subTest(previous=previous):
+                self.assertEqual(
+                    (sizing.READING_SINGLE_MACHINE, []),
+                    sizing.classify_reading({}, self.SINGLE,
+                                            previous=previous))
+
+    def test_a_roster_which_grew_is_judged_as_a_cluster(self):
+        per_node, nodes = SLIM_TIER
+        self.assertEqual(
+            sizing.READING_MET,
+            sizing.classify_reading(
+                per_node, nodes,
+                previous=sizing.READING_UNCONFIRMED_SINGLE_MACHINE)[0])
+
+    def test_only_the_readings_which_can_change_are_waited_out(self):
+        self.assertEqual(
+            {sizing.READING_UNMET, sizing.READING_UNREADABLE,
+             sizing.READING_UNCONFIRMED_SINGLE_MACHINE},
+            set(sizing.TRANSIENT_READINGS))
+        for terminal in (sizing.READING_MET, sizing.READING_SINGLE_MACHINE):
+            with self.subTest(status=terminal):
+                self.assertNotIn(terminal, sizing.TRANSIENT_READINGS)
+
+    def test_the_wait_ends_on_a_confirmed_single_machine(self):
+        # Driven through the real retry loop with a fake clock, so the
+        # transient set and the classifier are checked together as the
+        # deployed test wires them.
+        retries = _load_retries()
+        last = {'status': None}
+        polls = []
+
+        def reading():
+            status, _ = sizing.classify_reading(
+                {}, self.SINGLE, previous=last['status'])
+            last['status'] = status
+            polls.append(status)
+            return status, {}
+
+        # The clock advances one interval per sleep, so a classifier
+        # which never confirms runs into the deadline and fails here
+        # rather than looping forever.
+        now = {'t': 0}
+
+        def sleep(interval):
+            now['t'] += interval
+
+        status, _ = retries.retry_while_transient(
+            reading, sizing.TRANSIENT_READINGS, deadline=100,
+            clock=lambda: now['t'], sleep=sleep)
+        self.assertEqual(sizing.READING_SINGLE_MACHINE, status)
+        self.assertEqual(
+            [sizing.READING_UNCONFIRMED_SINGLE_MACHINE,
+             sizing.READING_SINGLE_MACHINE], polls)
+
+
 class LedgerDiagnosticsTestCase(base.ShakenFistTestCase):
     """A short ledger has two causes and the message has to separate them.
 
@@ -511,6 +615,24 @@ class WorkflowTopologyTestCase(base.ShakenFistTestCase):
                     'name. Add the topology to CLUSTER_TOPOLOGIES if it '
                     'meets the minimums, or to SINGLE_MACHINE_TOPOLOGIES '
                     'and sizing.is_single_machine() if it is not a cluster.'
+                    % (source, entry['topology']))
+
+    def test_no_cluster_ci_entry_has_an_unresolvable_topology(self):
+        # A with: block which hardcodes cluster-ci.conf but passes the
+        # topology through from a matrix cannot be checked from here --
+        # which topology it deploys is not written in it. The assertion
+        # above would fail on it too, but saying it does not know
+        # '${{ ... }}' as a topology is not the useful message.
+        for source, entry in _cluster_ci_matrix_entries():
+            with self.subTest(source=source,
+                              description=entry.get('description')):
+                self.assertNotIn(
+                    '${{', str(entry['topology']),
+                    '%s runs cluster-ci.conf literally against a templated '
+                    'topology (%s), so this file cannot tell which '
+                    'topology test_cluster_topology_meets_the_structural_'
+                    'minimum will meet. Put stestr_config in the matrix '
+                    'entry beside the topology it runs against.'
                     % (source, entry['topology']))
 
     def test_the_single_machine_carve_out_is_still_load_bearing(self):

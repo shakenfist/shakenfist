@@ -204,7 +204,12 @@ PER_NODE_BAND_UPPER = 0.85
 # against PER_NODE_BAND_UPPER (D4). A consumer reading a version 2 record
 # already tolerates per_node_band being None, so that half is additive;
 # the dropped flag is the one non-additive change and is why the version
-# bumped rather than the record growing a field in place.
+# bumped rather than the record growing a field in place. Additive is not
+# the same as unchanged, though: None no longer means one thing. Below
+# version 3 it means "not judged"; from version 3 it means "no sample
+# produced a per-node fraction". A harvest over a window which mixes
+# versions (5e's does) must read per_node_band together with
+# record_version, or it pools the two.
 RECORD_VERSION = 3
 
 # Loki's own max_entries_limit_per_query, and the value
@@ -2790,7 +2795,10 @@ def write_github_step_summary(record):
         return
     try:
         with open(path, 'a') as f:
-            f.write('\n'.join(step_summary_lines(record)) + '\n')
+            # Led by a blank line: an earlier writer may have left its
+            # last line unterminated, and a heading appended onto it
+            # does not render as one.
+            f.write('\n' + '\n'.join(step_summary_lines(record)) + '\n')
     except OSError:
         pass
 
