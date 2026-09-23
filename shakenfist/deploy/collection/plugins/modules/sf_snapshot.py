@@ -134,6 +134,13 @@ def _make_client(module):
     # the instruction that would be silently discarded. sf_instance and
     # sf_network exempt namespace because there it also names the object to
     # operate on, and their deployment playbooks pass it alone.
+    # The argument spec declares the same rule as required_together, and that
+    # is where a play meets it: Ansible checks it while AnsibleModule is being
+    # built, so it holds on every path through run_module() -- including check
+    # mode, which returns before a client is ever needed -- and the failure is
+    # reported in Ansible's own wording. This guard is the backstop for callers
+    # reaching _make_client() directly, the tests today and anything importing
+    # the module tomorrow.
     api_url = module.params.get('api_url')
     namespace = module.params.get('namespace')
     key = module.params.get('key')
@@ -146,7 +153,7 @@ def _make_client(module):
             msg=('api_url, namespace and key must be supplied together or not '
                  'at all. Got only %s, which would be discarded in favour of '
                  'discovered configuration.' % ', '.join(supplied)),
-            meta=None, log=[])
+            meta=None)
 
     kwargs = {
         'verbose': False,
@@ -155,7 +162,7 @@ def _make_client(module):
     }
     if module.params.get('async'):
         kwargs['async_strategy'] = apiclient.ASYNC_CONTINUE
-    if supplied:
+    if len(supplied) == 3:
         kwargs.update({
             'base_url': api_url,
             'namespace': namespace,
@@ -188,7 +195,14 @@ def run_module():
     }
 
     module = AnsibleModule(
-        argument_spec=argument_spec, supports_check_mode=True)
+        argument_spec=argument_spec, supports_check_mode=True,
+        # All three connection parameters or none of them. A partial set is
+        # otherwise ignored in favour of whatever ambient credentials the
+        # control node holds, which may be a different cluster entirely.
+        # Declaring it here as well as in _make_client() is what makes the
+        # rule hold on every path: Ansible checks it while AnsibleModule is
+        # built, before run_module() branches on check mode.
+        required_together=[['api_url', 'namespace', 'key']])
 
     state = module.params['state']
 

@@ -259,6 +259,12 @@ def _make_client(module):
     # is how the deployment playbooks have always called this. sf_claim,
     # sf_namespace and sf_snapshot hold all three to the rule because their
     # identity parameter is an identity and nothing else.
+    # The argument spec declares the same rule as required_by, and that is
+    # where a play meets it: Ansible checks it while AnsibleModule is being
+    # built, so it holds on every path through run_module() -- including check
+    # mode -- and the failure is reported in Ansible's own wording. This guard
+    # is the backstop for callers reaching _make_client() directly, which is
+    # also why it passes an empty log: nothing has accumulated one by then.
     api_url = module.params.get('api_url')
     namespace = module.params.get('namespace')
     key = module.params.get('key')
@@ -615,7 +621,15 @@ def run_module():
     }
 
     module = AnsibleModule(
-        argument_spec=argument_spec, supports_check_mode=True)
+        argument_spec=argument_spec, supports_check_mode=True,
+        # api_url and key are connection parameters and nothing else, so
+        # each drags in the other two. namespace also names the namespace to
+        # operate in, so it stands alone. Declaring the rule here as well as
+        # in _make_client() is what makes it hold on every path: Ansible
+        # checks it while AnsibleModule is built, before run_module()
+        # branches on check mode.
+        required_by={'api_url': ('namespace', 'key'),
+                     'key': ('namespace', 'api_url')})
 
     log = []
     state = module.params['state']

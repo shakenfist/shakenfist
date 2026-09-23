@@ -13,7 +13,7 @@ test_ansible_sf_claim.py and test_ansible_sf_instance.py each carry their
 own copy of this, predating it. They keep their copies for now because the
 exception hierarchies they stub are specific to what those files exercise;
 folding them in belongs with the larger deduplication of _make_client()
-itself, tracked separately.
+itself, which is issue 4314.
 """
 import importlib.util
 import os

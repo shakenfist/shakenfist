@@ -282,11 +282,14 @@ def _make_client(module):
     # Supplying only some of the three is an error rather than a silent fall
     # back to discovery: the client that would produce can be pointed at an
     # entirely different cloud than the playbook named, with nothing said
-    # about it. run_module() declares required_together for the same three,
-    # so a play never reaches this guard and an operator report of a partial
-    # set quotes Ansible's wording rather than ours. It stays because
-    # _make_client() is also called directly, by the tests today and by
-    # anything which imports the module tomorrow.
+    # about it.
+    # The argument spec declares the same rule as required_together, and that
+    # is where a play meets it: Ansible checks it while AnsibleModule is being
+    # built, so it holds on every path through run_module() -- including check
+    # mode, which returns before a client is ever needed -- and the failure is
+    # reported in Ansible's own wording. This guard is the backstop for callers
+    # reaching _make_client() directly, the tests today and anything importing
+    # the module tomorrow.
     api_url = module.params.get('api_url')
     auth_namespace = module.params.get('auth_namespace')
     key = module.params.get('key')
@@ -306,7 +309,7 @@ def _make_client(module):
         'sync_request_timeout': 1800,
         'async_strategy': apiclient.ASYNC_BLOCK,
     }
-    if supplied:
+    if len(supplied) == 3:
         kwargs.update({
             'base_url': api_url,
             'namespace': auth_namespace,

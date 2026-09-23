@@ -1,5 +1,6 @@
 # Copyright 2026 Michael Still and contributors
 import itertools
+import os
 from unittest import mock
 
 from shakenfist.tests import ansible_module_loader
@@ -27,6 +28,17 @@ class FakeModule(object):
         raise _Failed()
 
 
+class ForgivingModule(FakeModule):
+    """A module whose fail_json() records and returns, as a stub's might.
+
+    Used to assert that the code after a guard is safe on its own rather
+    than relying on the caller never coming back.
+    """
+
+    def fail_json(self, **kwargs):
+        self.failure = kwargs
+
+
 # The connection rule differs between modules, and the difference is
 # deliberate. Where the identity parameter is also the object to operate on
 # it is legitimate on its own -- sf_instance and sf_network pass namespace
@@ -48,6 +60,12 @@ MODULES = [
     ('sf_network', 'namespace', True),
 ]
 
+# The operator-facing statement of the same table, which the tests below
+# hold to this one.
+ANSIBLE_DOC = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), '..', '..', 'docs', 'user_guide',
+    'ansible.md'))
+
 API_URL = 'https://api.example.com'
 KEY = 'a-key'
 IDENTITY = 'a-namespace'
@@ -56,13 +74,35 @@ DISCOVERY_KWARGS = ('base_url', 'namespace', 'key',
                     'suppress_configuration_lookup')
 
 
+def _spec_rejects(declared, supplied):
+    """Would Ansible refuse this parameter set, given the declaration?
+
+    required_together refuses a group that is partly present;
+    required_by refuses a parameter present without everything it names.
+    Both are reimplemented here rather than called, because ansible is not
+    a test dependency of this repository -- ansible_module_loader stubs it
+    out to load the modules at all. The two behaviours were checked
+    against ansible 2.19.11's ArgumentSpecValidator before being written
+    down.
+    """
+    supplied = set(supplied)
+    for group in declared.get('required_together') or []:
+        present = supplied & set(group)
+        if present and present != set(group):
+            return True
+    for param, needs in (declared.get('required_by') or {}).items():
+        if param in supplied and not set(needs) <= supplied:
+            return True
+    return False
+
+
 class MakeClientConnectionRuleTestCase(base.ShakenFistTestCase):
     """Every collection module's _make_client(), against one rule table.
 
     These modules are copy-pasted from each other and have already started
-    to diverge, so the guard is asserted here once per module rather than in
-    the two per-module test files, which cover three of the five between
-    them.
+    to diverge -- issue 4314 tracks folding _make_client() into the
+    collection's module_utils -- so the rule is asserted here once per
+    module, against one table, rather than in the per-module test files.
     """
 
     def setUp(self):
@@ -81,6 +121,101 @@ class MakeClientConnectionRuleTestCase(base.ShakenFistTestCase):
             except _Failed:
                 pass
         return fake, client
+
+    def _declared(self, name):
+        """The connection rule as run_module() declares it to Ansible."""
+        mod = self.modules[name]
+        captured = {}
+
+        def _capture(**kwargs):
+            captured.update(kwargs)
+            raise _Failed()
+
+        with mock.patch.object(mod, 'AnsibleModule', side_effect=_capture):
+            self.assertRaises(_Failed, mod.run_module)
+
+        return captured
+
+    def test_the_spec_and_the_guard_refuse_the_same_sets(self):
+        # _make_client()'s guard only runs when a client is wanted, and
+        # sf_snapshot returns for check mode before wanting one -- so a
+        # partial set there used to pass --check and fail the real run.
+        # Declaring the rule on the argument spec closes that, because
+        # Ansible checks it while AnsibleModule is built. Asserting the two
+        # agree, rather than that a declaration merely exists, is what
+        # keeps them from drifting apart into two different rules.
+        for name, identity, _optional in MODULES:
+            declared = self._declared(name)
+            names = ('api_url', identity, 'key')
+            for count in range(len(names) + 1):
+                for subset in itertools.combinations(names, count):
+                    params = {n: {'api_url': API_URL, 'key': KEY}.get(
+                        n, IDENTITY) for n in subset}
+                    fake, _client = self._call(name, **params)
+                    case = (name, subset)
+
+                    self.assertEqual(_spec_rejects(declared, subset),
+                                     fake.failure is not None, case)
+
+    def test_a_refused_set_never_reaches_the_client(self):
+        # The kwargs branch has to stand on its own rather than on
+        # fail_json() exiting. The real AnsibleModule.fail_json() calls
+        # sys.exit(), so in production nothing runs after the guard -- but
+        # that is a property of the caller, not of this code. A stub, a
+        # shim, or a future refactor whose fail_json() returns would
+        # otherwise fall through and build a client from half a connection,
+        # which is worse than the discovery it replaced: it fails deep
+        # inside the API client instead of doing something.
+        for name, identity, _optional in MODULES:
+            mod = self.modules[name]
+            for supplied in (('api_url', ), ('key', ),
+                             ('api_url', 'key'), ('api_url', identity)):
+                params = {n: {'api_url': API_URL, 'key': KEY}.get(
+                    n, IDENTITY) for n in supplied}
+                fake = ForgivingModule(**params)
+                case = (name, supplied)
+
+                with mock.patch.object(mod.apiclient, 'Client') as client:
+                    mod._make_client(fake)
+
+                self.assertIsNotNone(fake.failure, case)
+                for unwanted in DISCOVERY_KWARGS:
+                    self.assertNotIn(unwanted, client.call_args[1], case)
+
+    def test_the_table_covers_every_collection_module(self):
+        # The comment above MODULES says a new module belongs here. Until
+        # this test, nothing checked it: a sixth module could land with no
+        # coverage of its connection rule and every check still green,
+        # because the collection's own ansible module CI is merge tier and
+        # does not run on a pull request.
+        on_disk = {f[:-len('.py')]
+                   for f in os.listdir(ansible_module_loader.MODULE_DIR)
+                   if f.endswith('.py') and not f.startswith('_')}
+
+        self.assertEqual(
+            on_disk, {name for name, _identity, _optional in MODULES},
+            'plugins/modules/ and the MODULES table above disagree. A new '
+            'collection module needs a row in that table, and a row in the '
+            'table in docs/user_guide/ansible.md.')
+
+    def test_the_documented_table_says_the_same_thing(self):
+        # Operators read docs/user_guide/ansible.md, not this file. The two
+        # tables are the same statement written twice, so hold them
+        # together rather than trusting that both get updated.
+        documented = {}
+        with open(ANSIBLE_DOC) as f:
+            for line in f:
+                cells = [c.strip().strip('`')
+                         for c in line.strip().split('|')[1:-1]]
+                if len(cells) == 3 and cells[0].startswith('sf_'):
+                    documented[cells[0]] = (cells[1], cells[2])
+
+        expected = {name: (identity, 'Allowed' if optional else 'An error')
+                    for name, identity, optional in MODULES}
+
+        self.assertEqual(expected, documented,
+                         'the table in docs/user_guide/ansible.md and the '
+                         'MODULES table above disagree')
 
     def test_nothing_supplied_auto_discovers(self):
         for name, _identity, _optional in MODULES:
