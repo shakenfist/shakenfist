@@ -447,8 +447,17 @@ def _netdesc_allocate_address(inst, netdesc, order):
     # (thanks OpenStack Kolla), which are special cased here. To not
     # have an address, you use a detailed netdesc and specify
     # address=none.
+    #
+    # The literal string 'none' (or an empty string), not a JSON null:
+    # noneish() reads a null truthily too, so without the is-not-None
+    # arm an explicit null walked into this special case and produced
+    # an addressless interface, where the published schema and the API
+    # reference both promise a null "means not supplied" and allocates
+    # a random address exactly as omitting the key does (issue 4252's
+    # null-equals-absent differential is what caught it).
     try:
-        if 'address' in netdesc and util_general.noneish(netdesc['address']):
+        if (netdesc.get('address') is not None
+                and util_general.noneish(netdesc['address'])):
             netdesc['address'] = None
         else:
             if 'address' not in netdesc or not netdesc['address']:

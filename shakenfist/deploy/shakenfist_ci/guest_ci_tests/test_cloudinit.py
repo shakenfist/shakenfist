@@ -82,7 +82,13 @@ sudo echo 'banana' >  /tmp/output"""
                 },
                 {
                     'network_uuid': self.net_two['uuid'],
-                    'address': None
+                    # The literal string 'none' is the documented way to
+                    # ask for an interface with no address, which is what
+                    # this test exercises cloud-init against. A JSON null
+                    # used to mean the same thing by accident; since the
+                    # issue 4252 fix it means "not supplied" as the API
+                    # reference promises, and allocates an address.
+                    'address': 'none'
                 }
             ],
             [
