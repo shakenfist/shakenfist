@@ -2204,11 +2204,16 @@ class Instance(dbowo):
 
         return x
 
-    def is_powered_on(self):
+    def is_powered_on(self) -> bool:
         with util_libvirt.LibvirtConnection() as lc:
             inst = lc.get_domain_from_sf_uuid(self.uuid)
             if not inst:
-                return 'off'
+                # A missing domain is not powered on. This once returned the
+                # string 'off', which is truthy, so create() marked instances
+                # whose every power on attempt had failed as created and left
+                # callers waiting for an agent that would never start (issue
+                # 4280).
+                return False
 
             return lc.extract_power_state(inst) == 'on'
 
