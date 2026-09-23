@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://shakenfist.com/components/kerbside/use-cases/openstack/">
       
       
-        <link rel="prev" href="../../spice/vd-agent-protocol/">
+        <link rel="prev" href="../multi-cloud/">
       
       
         <link rel="next" href="../ovirt/">
@@ -1393,6 +1393,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/audits/llm-doc-naming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Agent instruction file naming
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -7579,6 +7607,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-use-case-docs-phase-04-multi-cloud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: `multi-cloud.md` and `placement.md`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-demo-install-phase-04-ci-lane/" class="md-nav__link">
         
   
@@ -9060,6 +9116,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-cloud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside across several clouds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -9282,7 +9366,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../shaken-fist/" class="md-nav__link">
+      <a href="../shakenfist/" class="md-nav__link">
         
   
   
@@ -9290,6 +9374,34 @@
     
   
     Kerbside for Shaken Fist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../placement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside placement topologies
   
 
     
@@ -14459,16 +14571,10 @@ someone else:</p>
   <code>.vv</code> file for the client to check. That is a different leg:
   client to Kerbside, not Kerbside to hypervisor. See the
   limitations table.</li>
-<li><strong>One entry point across clouds.</strong> A single Kerbside can
-  broker OpenStack alongside oVirt and Shaken Fist sources;
-  users keep one console entry point as workloads move. More
-  than one OpenStack cloud can be configured at once — a
-  presented token is offered to each in turn, in <code>sources.yaml</code>
-  order, until one validates it. That means every configured
-  cloud sees tokens minted by the others, and that one broken
-  cloud stops the exchange for the rest, so this suits clouds
-  under one operator rather than clouds in separate trust
-  domains. See the limitations table.</li>
+<li><strong><a href="/components/kerbside/use-cases/multi-cloud/">One entry point across clouds.</a></strong> A
+  single Kerbside can broker OpenStack alongside oVirt and
+  Shaken Fist sources; users keep one console entry point as
+  workloads move.</li>
 </ul>
 <p>Users get the SPICE features an HTML5 console cannot offer:
 high-resolution and multi-monitor desktops, USB passthrough,
@@ -14816,12 +14922,8 @@ SPICE link handshake against the proxy over TLS.</p>
 <td>Nothing scrapes this cloud, so nothing ever removes a console it can no longer see. A row for a deleted instance stays listed until the cloud is removed from <code>sources.yaml</code>. Nova will not mint a token for it, so it is unreachable through the <code>spice-direct</code> path — but Kerbside's own administrative <code>.vv</code> download mints a token from the stored row without calling Nova, and will still open it. Since libvirt reuses console ports, the recorded address and ports may by then belong to a different instance, possibly another tenant's. Remove a decommissioned cloud from <code>sources.yaml</code> rather than leaving it configured.</td>
 </tr>
 <tr>
-<td>A token is offered to every configured cloud</td>
-<td>The exchange presents the token it was handed to each configured OpenStack cloud in turn, in <code>sources.yaml</code> order, until one validates it. Every cloud therefore sees console tokens minted by the others, and a cloud earlier in the file sees every token destined for one later in it. Configuring clouds that are under separate operational control means each one's operators can observe the others' tokens.</td>
-</tr>
-<tr>
-<td>One broken cloud breaks the others</td>
-<td>The exchange moves on to the next cloud only when a cloud cleanly reports the token as unknown. Any other failure — bad credentials, an unreachable Keystone, a certificate error — ends the request instead of being skipped, so a cloud that is down or misconfigured denies console access to every cloud after it in <code>sources.yaml</code>. Order therefore matters, and a cloud being removed from service should be removed from the file rather than left to fail.</td>
+<td>Configured clouds share one token exchange</td>
+<td>Every configured cloud is asked to validate tokens minted by the others, so each cloud's operators can observe tokens destined for their neighbours, and a cloud which fails for any reason other than cleanly disowning a token — bad credentials, an unreachable Keystone, a certificate error — denies console access to the clouds after it rather than being skipped. Order therefore matters (the token is offered to each configured cloud in file order until one validates it), and a cloud being taken out of service should be removed from the file rather than left to fail. How the exchange reaches that behaviour, and when several clouds behind one Kerbside is the right shape, are in <a href="/components/kerbside/use-cases/multi-cloud/">multi-cloud.md</a>.</td>
 </tr>
 <tr>
 <td>Single-node deployments only, in testing</td>
@@ -14863,9 +14965,13 @@ SPICE link handshake against the proxy over TLS.</p>
   — the CI lanes, including the Kolla-Ansible lane described
   above</li>
 <li><a href="/components/kerbside/use-cases/ovirt/">Kerbside for oVirt</a>,
-  <a href="/components/kerbside/use-cases/shaken-fist/">Kerbside for Shaken Fist</a> and
+  <a href="/components/kerbside/use-cases/shakenfist/">Kerbside for Shaken Fist</a> and
   <a href="/components/kerbside/use-cases/standalone/">Kerbside standalone</a> — the sibling
   deployment guides</li>
+<li><a href="/components/kerbside/use-cases/multi-cloud/">Multi-cloud aggregation</a> and
+  <a href="/components/kerbside/use-cases/placement/">Placement topologies</a> — the two topology
+  pages: several sources behind one Kerbside, and several
+  Kerbsides in front of one cloud</li>
 <li><a href="https://github.com/shakenfist/kerbside-patches">kerbside-patches</a>
   — the Kolla and Kolla-Ansible changes, until they are upstream</li>
 </ul>

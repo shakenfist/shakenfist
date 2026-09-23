@@ -1401,6 +1401,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/llm-doc-naming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Agent instruction file naming
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/llm-doc-structure/" class="md-nav__link">
         
   
@@ -7581,6 +7609,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-use-case-docs-phase-04-multi-cloud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: `multi-cloud.md` and `placement.md`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-demo-install-phase-04-ci-lane/" class="md-nav__link">
         
   
@@ -9154,6 +9210,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../use-cases/multi-cloud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside across several clouds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../use-cases/openstack/" class="md-nav__link">
         
   
@@ -9210,7 +9294,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../use-cases/shaken-fist/" class="md-nav__link">
+      <a href="../../use-cases/shakenfist/" class="md-nav__link">
         
   
   
@@ -9218,6 +9302,34 @@
     
   
     Kerbside for Shaken Fist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../use-cases/placement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside placement topologies
   
 
     
@@ -14312,11 +14424,11 @@ same structure:</p>
 </tr>
 <tr>
 <td>Multi-cloud aggregation</td>
-<td>One kerbside brokering several sources at once — the distinctive value proposition. Surveyed 2026-09-18: no longer stated <em>nowhere</em>, but stated in one sentence — the <code>docs/index.md</code> Use Cases row, and one bullet of <code>docs/use-cases/ovirt.md</code> ("One entry point across clouds"). Covers the consequences: users keep one console entry point while workloads move between providers (cloud migration without retraining or re-plumbing client access), and multiple clouds in different regions present as a single VDI estate</td>
+<td>One kerbside brokering several sources at once — the distinctive value proposition. Resurveyed 2026-09-22 and corrected: it is no longer one sentence. It is the <code>docs/index.md</code> Use Cases row plus a "One entry point across clouds" bullet on each of the three cloud pages — <code>ovirt.md:40</code>, <code>shakenfist.md:63</code> and <code>openstack.md:65</code> — and the last of those has grown to nine lines carrying the substantive material phase 2 found: several OpenStack clouds may be configured at once, a presented token is offered to each in <code>sources.yaml</code> order until one validates it, and the coupling that follows. The page therefore decides which of four places owns each fact rather than writing on a blank sheet. Covers the consequences: users keep one console entry point while workloads move between providers (cloud migration without retraining or re-plumbing client access), and multiple clouds in different regions present as a single VDI estate</td>
 </tr>
 <tr>
 <td>Placement topologies</td>
-<td>The inverse of aggregation: kerbside instances placed by user population rather than by cloud — e.g. a kerbside per regional office, close to its users, so SPICE over the WAN is exactly the kerbside-to-hypervisor backend leg: TLS'd (with host-subject pinning), firewall-inspected, audited, and a single controllable egress point at the office edge. Multiple kerbsides against one cloud is natural for scraped sources (SF, oVirt); the OpenStack flow assumes one kerbside URL per Nova deployment, so per-group placement there needs the broker to route — document as a caveat</td>
+<td>The inverse of aggregation: kerbside instances placed by user population rather than by cloud — e.g. a kerbside per regional office, close to its users, so SPICE over the WAN is exactly the kerbside-to-hypervisor backend leg: firewall-inspected, audited, a single controllable egress point at the office edge, and — conditionally — TLS'd. Corrected 2026-09-22, having said "TLS'd (with host-subject pinning)" unconditionally: <code>rust/kerbside-proxy/src/backend.rs:92</code> dials the insecure port first and escalates only when the hypervisor rejects plaintext with NEED_SECURED <em>and</em> a secure port is configured, and <code>:198-211</code> maps an empty <code>host_subject</code> or <code>ca_cert</code> to <code>None</code>, so pinning happens only when the source supplied a subject. OpenStack never does — <code>kerbside/api.py:665-671</code> is the only <code>add_console()</code> on that path and passes neither field. Multiple kerbsides against one cloud is natural for scraped sources (SF, oVirt); the OpenStack flow assumes one kerbside URL per Nova deployment, so per-group placement there needs the broker to route — document as a caveat</td>
 </tr>
 <tr>
 <td>Standalone / static source</td>
@@ -14407,13 +14519,13 @@ the range is not reliably reconstructable afterwards.</p>
 <tr>
 <td>3. Standalone / static source</td>
 <td><a href="/components/kerbside/plans/PLAN-use-case-docs-phase-03-standalone/">PLAN-use-case-docs-phase-03-standalone.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>28efa6c</td>
 </tr>
 <tr>
 <td>4. Multi-cloud aggregation and placement topologies</td>
-<td></td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-use-case-docs-phase-04-multi-cloud/">PLAN-use-case-docs-phase-04-multi-cloud.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>

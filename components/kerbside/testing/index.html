@@ -1401,6 +1401,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/llm-doc-naming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Agent instruction file naming
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/llm-doc-structure/" class="md-nav__link">
         
   
@@ -6814,6 +6842,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#documentation-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#merge-queue-concurrency" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7862,6 +7901,34 @@
     
   
     Phase 3: the `docker compose` demo stack
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-use-case-docs-phase-04-multi-cloud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: `multi-cloud.md` and `placement.md`
   
 
     
@@ -9364,6 +9431,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../use-cases/multi-cloud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside across several clouds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../use-cases/openstack/" class="md-nav__link">
         
   
@@ -9420,7 +9515,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../use-cases/shaken-fist/" class="md-nav__link">
+      <a href="../use-cases/shakenfist/" class="md-nav__link">
         
   
   
@@ -9428,6 +9523,34 @@
     
   
     Kerbside for Shaken Fist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../use-cases/placement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside placement topologies
   
 
     
@@ -14435,6 +14558,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#documentation-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#merge-queue-concurrency" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14757,6 +14891,11 @@ change.</p>
 <td>smoke</td>
 </tr>
 <tr>
+<td><code>functional-tests.yml</code> (<code>docs_checks</code>)</td>
+<td>pull_request, merge_group, never path-filtered</td>
+<td>smoke</td>
+</tr>
+<tr>
 <td><code>functional-tests.yml</code> (<code>ovirt_matrix</code>, <code>openstack_matrix</code>)</td>
 <td>merge_group, workflow_dispatch</td>
 <td>merge</td>
@@ -14914,6 +15053,58 @@ asserts every required context in the exported ruleset
 (<code>.github/exported-config/ruleset-*.json</code>, archived daily by
 <code>export-repo-config.yml</code>) still matches a job name in
 <code>.github/workflows/</code>.</p>
+<h3 id="documentation-checks">Documentation checks<a class="headerlink" href="#documentation-checks" title="Permanent link">&para;</a></h3>
+<p><code>docs_checks</code> runs <code>tools/check-backend-tls-claims.py</code>, which fails
+when a sentence in <code>docs/use-cases/</code> or the Use Cases table in
+<code>docs/index.md</code> claims the Kerbside-to-hypervisor leg is TLS'd or
+certificate-pinned without naming the condition that makes it so.
+Five consecutive phases of
+<a href="/components/kerbside/plans/PLAN-use-case-docs/">PLAN-use-case-docs.md</a> overstated that
+leg and three were caught by review rather than by writing, so the
+check exists to trip on the sixth.</p>
+<p><strong>It is its own job, and that is the point.</strong> <code>sanity_checks</code> is
+gated on <code>check_paths</code>, whose filter excludes <code>docs/**</code>, so a
+documentation-only pull request skips it entirely -- which is every
+pull request this check exists to police. It lived there for one
+review round before that was noticed. <code>docs_checks</code> is ungated for
+the same class of reason <code>credential_scan</code> is.</p>
+<p>It is a tripwire and not a proof, and its limit is worth stating
+concretely rather than as a caveat. It works on blocks -- a bullet, a
+paragraph or a table row -- and any conditional word anywhere in the
+block satisfies it. So it catches a bald claim in a block of its own,
+which is what the first of those five phases wrote, and it does not
+catch a claim mixed into a block that names some <em>other</em> condition.
+Measured against the real case: the version of
+<code>docs/use-cases/shakenfist.md</code> that said Kerbside "pins the
+certificate subject the node publishes" -- false when the node
+publishes none -- passes this check, because the same bullet
+correctly conditions the TLS escalation on <code>NEED_SECURED</code>.</p>
+<p>That makes the conditional vocabulary load-bearing, because a word
+in it that does not actually name a condition exempts every block it
+appears in. Review found <code>configured</code> doing exactly that, on pages
+that say "configured cloud" and "configured source" constantly, and
+it was dropped along with <code>should</code> and <code>none</code>. Anything added back
+needs a case in
+<code>kerbside/tests/unit/test_check_backend_tls_claims.py</code> that fails
+without it. That file is the reason a regex edit here cannot quietly
+neuter the check: it asserts the known-bad sentences still fail and
+the current tree still passes. <code>tools/mutate-backend-tls-claims.py</code>
+is what proves that file -- it breaks the guard once per rule and
+asserts the suite notices each one, so a vocabulary change is only
+covered once a mutation for it fails without the test. Four of its
+mutations exist because a run reported them uncaught.</p>
+<p><strong>It is a manual proof and no CI lane runs it</strong>, which matters
+because the point of the section above is that a claim of
+enforcement should name where. Run it by hand whenever you change
+the guard's vocabulary or its matching, and add a mutation for the
+rule you changed. What CI enforces is the unit test; the mutation
+tool is how you find out whether that test would have failed.</p>
+<p>A green run means nobody wrote a careless sentence, not that the
+prose is right. The conditions themselves are in
+<code>rust/kerbside-proxy/src/backend.rs</code>: TLS happens when the hypervisor
+rejects plaintext and a secure port is configured, the subject is
+pinned when the source supplied one, and a private CA has to be
+supplied or the handshake fails against the public web trust store.</p>
 <h3 id="merge-queue-concurrency">Merge queue concurrency<a class="headerlink" href="#merge-queue-concurrency" title="Permanent link">&para;</a></h3>
 <p>Every job in <code>functional-tests.yml</code> carries a <code>concurrency</code> group so a
 superseded run is cancelled rather than left to finish. Keying that

@@ -1401,6 +1401,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../development/audits/llm-doc-naming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Agent instruction file naming
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../development/audits/llm-doc-structure/" class="md-nav__link">
         
   
@@ -7919,6 +7947,34 @@
   
   
     <li class="md-nav__item">
+      <a href="plans/PLAN-use-case-docs-phase-04-multi-cloud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: `multi-cloud.md` and `placement.md`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="plans/PLAN-demo-install-phase-04-ci-lane/" class="md-nav__link">
         
   
@@ -9401,6 +9457,34 @@
   
   
     <li class="md-nav__item">
+      <a href="use-cases/multi-cloud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside across several clouds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="use-cases/openstack/" class="md-nav__link">
         
   
@@ -9457,7 +9541,7 @@
   
   
     <li class="md-nav__item">
-      <a href="use-cases/shaken-fist/" class="md-nav__link">
+      <a href="use-cases/shakenfist/" class="md-nav__link">
         
   
   
@@ -9465,6 +9549,34 @@
     
   
     Kerbside for Shaken Fist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="use-cases/placement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside placement topologies
   
 
     
@@ -14899,7 +15011,7 @@ column names the CI lane that exercises the scenario end to end; see
 </thead>
 <tbody>
 <tr>
-<td>Multi-cloud aggregation</td>
+<td><a href="/components/kerbside/use-cases/multi-cloud/">Multi-cloud aggregation</a></td>
 <td>One Kerbside brokering several sources at once, so users keep a single console entry point as workloads move between providers</td>
 <td>Not covered</td>
 </tr>
@@ -14910,11 +15022,11 @@ column names the CI lane that exercises the scenario end to end; see
 </tr>
 <tr>
 <td><a href="/components/kerbside/use-cases/ovirt/">oVirt</a></td>
-<td>Replaces oVirt's SPICE proxy (squid) with a protocol-aware front door: discovery via the engine API, host-subject pinned TLS to the hypervisor, and the engine, network, and account prerequisites</td>
+<td>Replaces oVirt's SPICE proxy (squid) with a protocol-aware front door: discovery via the engine API, TLS to the hypervisor with the engine-supplied subject pinned where the engine supplies one, and the engine, network, and account prerequisites</td>
 <td><code>ovirt_matrix</code>, merge tier</td>
 </tr>
 <tr>
-<td>Placement topologies</td>
+<td><a href="/components/kerbside/use-cases/placement/">Placement topologies</a></td>
 <td>Kerbside instances placed by user population rather than by cloud — one per regional office, close to its users, with the WAN hop as the inspected backend leg</td>
 <td>Not covered</td>
 </tr>
@@ -14924,7 +15036,7 @@ column names the CI lane that exercises the scenario end to end; see
 <td>No source yet</td>
 </tr>
 <tr>
-<td><a href="/components/kerbside/use-cases/shaken-fist/">Shaken Fist</a></td>
+<td><a href="/components/kerbside/use-cases/shakenfist/">Shaken Fist</a></td>
 <td>Broker embedded in Shaken Fist itself; Ed25519 VDI console tokens exchanged offline at <code>/sf-console.vv</code></td>
 <td><code>sf-e2e</code>, smoke tier and nightly</td>
 </tr>

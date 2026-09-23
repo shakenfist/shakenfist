@@ -16,7 +16,7 @@
         <link rel="prev" href="../openstack/">
       
       
-        <link rel="next" href="../shaken-fist/">
+        <link rel="next" href="../shakenfist/">
       
       
         
@@ -1393,6 +1393,34 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/audits/llm-doc-naming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Agent instruction file naming
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -7579,6 +7607,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-use-case-docs-phase-04-multi-cloud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 4: `multi-cloud.md` and `placement.md`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-demo-install-phase-04-ci-lane/" class="md-nav__link">
         
   
@@ -9063,6 +9119,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../multi-cloud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside across several clouds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../openstack/" class="md-nav__link">
         
   
@@ -9282,7 +9366,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../shaken-fist/" class="md-nav__link">
+      <a href="../shakenfist/" class="md-nav__link">
         
   
   
@@ -9290,6 +9374,34 @@
     
   
     Kerbside for Shaken Fist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../placement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kerbside placement topologies
   
 
     
@@ -14429,14 +14541,20 @@ sending anything the hypervisor will accept.</p>
 <li><strong>The hypervisor is never reachable from the client network.</strong>
   Clients reach kerbside; kerbside reaches oVirt. The SPICE
   ports do not need a route to users at all.</li>
-<li><strong>The backend leg is pinned.</strong> Kerbside verifies the
-  hypervisor's certificate against the engine CA <em>and</em> pins the
-  certificate subject it discovered from the engine, so a
-  redirected backend connection fails rather than succeeding
-  quietly.</li>
-<li><strong>One entry point across clouds.</strong> A single kerbside can
-  broker oVirt alongside Shaken Fist and OpenStack sources;
-  users keep one console entry point as workloads move.</li>
+<li><strong>The backend leg is pinned where the engine supplies a
+  subject.</strong> Kerbside verifies the hypervisor's certificate
+  against the engine CA <em>and</em> pins the certificate subject it
+  discovered from the engine, so a redirected backend
+  connection fails rather than succeeding quietly. A VM the
+  engine reports with no host leaves that subject unset
+  (<code>kerbside/sources/ovirt.py:99-117</code>), and an unset subject
+  relays the leg unpinned rather than erroring. In an ordinary
+  cluster every running VM has a host, so this is the edge
+  rather than the case.</li>
+<li><strong><a href="/components/kerbside/use-cases/multi-cloud/">One entry point across clouds.</a></strong> A
+  single kerbside can broker oVirt alongside Shaken Fist and
+  OpenStack sources; users keep one console entry point as
+  workloads move.</li>
 </ul>
 <p>Users get the SPICE features an HTML5 console cannot offer:
 high-resolution and multi-monitor desktops, USB passthrough,
@@ -14504,10 +14622,11 @@ authenticates to <em>kerbside</em>; the oVirt ticket never leaves the
 server side.</p>
 <p><strong>The backend leg (5).</strong> Kerbside connects to the hypervisor's
 plaintext port, which answers the link handshake with
-<code>NEED_SECURED</code>, and escalates to <code>tls_port</code>, verifying against
-the engine CA and pinning the subject discovered in step A. It
-then authenticates with the oVirt ticket and relays — inspecting
-as it goes.</p>
+<code>NEED_SECURED</code>, and escalates to <code>tls_port</code> where the engine
+gave one, verifying against the engine CA and pinning the
+subject discovered in step A where there is one. It then
+authenticates with the oVirt ticket and relays — inspecting as
+it goes.</p>
 <p><strong>One proxy layer, not two.</strong> The chain people expect when they
 hear "SPICE proxy plus kerbside" —
 <code>client -&gt; kerbside -&gt; squid -&gt; hypervisor</code> — never forms.
@@ -14694,10 +14813,14 @@ relayed SPICE session, and API-driven termination.</p>
   firewall, the connection state machine, and the relay</li>
 <li><a href="/components/kerbside/testing/">Testing</a> — the CI lanes, including the oVirt
   end-to-end lane described above</li>
-<li><a href="/components/kerbside/use-cases/shaken-fist/">Kerbside for Shaken Fist</a>,
+<li><a href="/components/kerbside/use-cases/shakenfist/">Kerbside for Shaken Fist</a>,
   <a href="/components/kerbside/use-cases/openstack/">Kerbside for OpenStack</a> and
   <a href="/components/kerbside/use-cases/standalone/">Kerbside standalone</a> — the sibling
   deployment guides</li>
+<li><a href="/components/kerbside/use-cases/multi-cloud/">Multi-cloud aggregation</a> and
+  <a href="/components/kerbside/use-cases/placement/">Placement topologies</a> — the two topology
+  pages: several sources behind one Kerbside, and several
+  Kerbsides in front of one cloud</li>
 </ul>
 
 
