@@ -208,7 +208,11 @@ Two things this is *not*:
   Within the tier, failing job-runs are not longer than passing ones
   (28.8 against 29.3 minutes). The `test_timeout_minutes: 70` and
   the comment in `functional-tests.yml` claiming the tier "runs
-  slower" are not borne out.
+  slower" were not borne out, and phase 4 acted on that: 4f dropped
+  the timeout to 60 and rewrote the comment once six merge runs on
+  the reshaped tier supported it
+  ([PLAN-ci-cloud-sizing-phase-04-topologies.md](PLAN-ci-cloud-sizing-phase-04-topologies.md),
+  *4f -- the tier timeout drops to 60*).
 - It is not the #3813 demand guard, which was fixed on 2026-08-22.
   This claim is **not re-measured**: the baseline window lies
   entirely after that fix, so it cannot split on it. The earlier
@@ -1203,19 +1207,29 @@ guard at `:291`);
 `functional-tests.yml` is in *this* repository
 (`.github/workflows/functional-tests.yml:436`) and holds no
 hardcoded node lists -- only topology names, concurrency and a
-per-job timeout. What it does hold is `slim-tier` at
-`timeout_minutes: 70` against `slim-primary`'s 60, justified by a
-comment (`:471`) that the tier runs the same suite on half the
-hypervisor capacity. If a reshape works, that premise weakens and
-the timeout coming back down is a falsifiable way to say so.
+per-job timeout. At the time this section was written, it held
+`slim-tier` at `timeout_minutes: 70` against `slim-primary`'s 60,
+justified by a comment (`:471`) that the tier runs the same suite on
+half the hypervisor capacity. Phase 4 reshaped the tier and, once six
+merge runs supported it, dropped the tier's timeout to 60 and
+rewrote the comment; all four matrix entries now read
+`timeout_minutes: 60`
+(`.github/workflows/functional-tests.yml:448`, `:458`, `:468`,
+`:484`). See
+[PLAN-ci-cloud-sizing-phase-04-topologies.md](PLAN-ci-cloud-sizing-phase-04-topologies.md),
+*4f -- the tier timeout drops to 60*.
 
 The number that binds is per node, not per cluster, and phase 3's
 first merge run measures it directly rather than reconstructing it
-from journals: `slim-tier`'s three hypervisors publish ledgers of
-3, 3 and 6, and `slim-primary`'s five publish 3, 6, 6, 6 and 6.
+from journals: at the time this section was written, `slim-tier`'s
+three hypervisors published ledgers of 3, 3 and 6, and
+`slim-primary`'s five published 3, 6, 6, 6 and 6.
 `slim-tier`'s cluster-wide p90 committed/ledger was 0.833 while
 its two small nodes sat at 1.000 peak, which is the whole argument
-for sizing per node.
+for sizing per node. Phase 4 reshaped the tier on that argument:
+its three hypervisors now publish ledgers of 6, 6 and 12
+([PLAN-ci-cloud-sizing-phase-04-topologies.md](PLAN-ci-cloud-sizing-phase-04-topologies.md),
+*4d -- what the merge runs measured*).
 
 **Those ledger-3 nodes are the infra hypervisors, and the cause is
 now pinned to a line.** The per-host CPU thread reservation is
@@ -1591,10 +1605,12 @@ which is what `tools/check-plan-status.py` enforces.
   shape, while four other workers are creating. If phase 2 shows
   it dominates the peak, isolating it (or lowering `BURST` and
   raising it again once the topology grows) is a cheap lever.
-- **Retire the `test_timeout_minutes: 70` special case.** The
-  tier's extra ten minutes was granted for slowness the data does
-  not show. It is harmless, but it encodes a belief that is
-  false, and beliefs like that are why the sizing went unexamined.
+- **Retire the `test_timeout_minutes: 70` special case.** *Done,
+  phase 4.* The tier's extra ten minutes was granted for slowness
+  the data did not show. Phase 4's 4f dropped the tier's timeout to
+  60 once six merge runs on the reshaped topology supported it; see
+  [PLAN-ci-cloud-sizing-phase-04-topologies.md](PLAN-ci-cloud-sizing-phase-04-topologies.md),
+  *4f -- the tier timeout drops to 60*.
 - **The merge queue's throttle counts groups, not clouds.** #3696
   records two merge groups forming for the same PR sixty seconds
   apart, both running their full matrix, for roughly eleven nested
