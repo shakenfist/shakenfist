@@ -71,6 +71,7 @@ change.
 |----------|---------|------|
 | `functional-tests.yml` (`sanity_checks`) | pull_request, merge_group | smoke |
 | `functional-tests.yml` (`credential_scan`) | pull_request, merge_group, never path-filtered | smoke |
+| `functional-tests.yml` (`docs_checks`) | pull_request, merge_group, never path-filtered | smoke |
 | `functional-tests.yml` (`ovirt_matrix`, `openstack_matrix`) | merge_group, workflow_dispatch | merge |
 | `direct-qemu-functional.yml` | pull_request, merge_group, nightly | smoke |
 | `sf-e2e-functional.yml` | pull_request, merge_group, nightly | smoke |
@@ -171,6 +172,65 @@ asserts every required context in the exported ruleset
 (`.github/exported-config/ruleset-*.json`, archived daily by
 `export-repo-config.yml`) still matches a job name in
 `.github/workflows/`.
+
+### Documentation checks
+
+`docs_checks` runs `tools/check-backend-tls-claims.py`, which fails
+when a sentence in `docs/use-cases/` or the Use Cases table in
+`docs/index.md` claims the Kerbside-to-hypervisor leg is TLS'd or
+certificate-pinned without naming the condition that makes it so.
+Five consecutive phases of
+[PLAN-use-case-docs.md](/components/kerbside/plans/PLAN-use-case-docs/) overstated that
+leg and three were caught by review rather than by writing, so the
+check exists to trip on the sixth.
+
+**It is its own job, and that is the point.** `sanity_checks` is
+gated on `check_paths`, whose filter excludes `docs/**`, so a
+documentation-only pull request skips it entirely -- which is every
+pull request this check exists to police. It lived there for one
+review round before that was noticed. `docs_checks` is ungated for
+the same class of reason `credential_scan` is.
+
+It is a tripwire and not a proof, and its limit is worth stating
+concretely rather than as a caveat. It works on blocks -- a bullet, a
+paragraph or a table row -- and any conditional word anywhere in the
+block satisfies it. So it catches a bald claim in a block of its own,
+which is what the first of those five phases wrote, and it does not
+catch a claim mixed into a block that names some *other* condition.
+Measured against the real case: the version of
+`docs/use-cases/shakenfist.md` that said Kerbside "pins the
+certificate subject the node publishes" -- false when the node
+publishes none -- passes this check, because the same bullet
+correctly conditions the TLS escalation on `NEED_SECURED`.
+
+That makes the conditional vocabulary load-bearing, because a word
+in it that does not actually name a condition exempts every block it
+appears in. Review found `configured` doing exactly that, on pages
+that say "configured cloud" and "configured source" constantly, and
+it was dropped along with `should` and `none`. Anything added back
+needs a case in
+`kerbside/tests/unit/test_check_backend_tls_claims.py` that fails
+without it. That file is the reason a regex edit here cannot quietly
+neuter the check: it asserts the known-bad sentences still fail and
+the current tree still passes. `tools/mutate-backend-tls-claims.py`
+is what proves that file -- it breaks the guard once per rule and
+asserts the suite notices each one, so a vocabulary change is only
+covered once a mutation for it fails without the test. Four of its
+mutations exist because a run reported them uncaught.
+
+**It is a manual proof and no CI lane runs it**, which matters
+because the point of the section above is that a claim of
+enforcement should name where. Run it by hand whenever you change
+the guard's vocabulary or its matching, and add a mutation for the
+rule you changed. What CI enforces is the unit test; the mutation
+tool is how you find out whether that test would have failed.
+
+A green run means nobody wrote a careless sentence, not that the
+prose is right. The conditions themselves are in
+`rust/kerbside-proxy/src/backend.rs`: TLS happens when the hypervisor
+rejects plaintext and a secure port is configured, the subject is
+pinned when the source supplied one, and a private CA has to be
+supplied or the handshake fails against the public web trust store.
 
 ### Merge queue concurrency
 

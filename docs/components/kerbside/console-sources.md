@@ -341,6 +341,6 @@ An example configuration follows:
 
 - [Configuration](/components/kerbside/configuration/) - General configuration reference
 - [Proxy Architecture](/components/kerbside/proxy-architecture/) - Internal proxy design
-- [Kerbside for Shaken Fist](/components/kerbside/use-cases/shaken-fist/) - The Shaken Fist use-case guide: value proposition, setup, and the sf-e2e worked example
+- [Kerbside for Shaken Fist](/components/kerbside/use-cases/shakenfist/) - The Shaken Fist use-case guide: value proposition, setup, and the sf-e2e worked example
 - [Kerbside for OpenStack](/components/kerbside/use-cases/openstack/) - The OpenStack use-case guide: the spice-direct token exchange, setup, and the openstack_matrix worked example
 - [Kerbside standalone](/components/kerbside/use-cases/standalone/) - The standalone use-case guide: the static source's no-control-plane model, setup, and the direct-qemu worked example

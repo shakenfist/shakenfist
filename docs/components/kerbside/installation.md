@@ -327,7 +327,7 @@ the guide for yours:
 |---|---|
 | oVirt | [use-cases/ovirt.md](/components/kerbside/use-cases/ovirt/) |
 | OpenStack | A sample Kolla-Ansible deployment lives in [kerbside-patches](https://github.com/shakenfist/kerbside-patches) |
-| Shaken Fist | [console-sources.md](/components/kerbside/console-sources/#shaken-fist), until the use-case page is written |
+| Shaken Fist | [use-cases/shakenfist.md](/components/kerbside/use-cases/shakenfist/) |
 | Static targets | The demo above is the worked example |
 
 Whichever you pick, the pieces described in

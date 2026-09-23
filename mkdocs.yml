@@ -103,6 +103,7 @@ nav:
             - "Consistency audits": components/development/consistency-audits.md
             - "Release Automation": components/development/release-automation.md
             - Audits:
+                - "Audit: Agent instruction file naming": components/development/audits/llm-doc-naming.md
                 - "Audit: AGENTS.md / ARCHITECTURE.md structure": components/development/audits/llm-doc-structure.md
                 - "Audit: audit scope against the organisation": components/development/audits/scope-coverage.md
                 - "Audit: CI review automation and developer automation": components/development/audits/ci-review-automation.md
@@ -312,6 +313,7 @@ nav:
                 - "Phase 3: `docs/use-cases/standalone.md`": components/kerbside/plans/PLAN-use-case-docs-phase-03-standalone.md
                 - "Phase 3: Control socket on Ryll": components/kerbside/plans/PLAN-test-harness-phase-03-control-socket.md
                 - "Phase 3: the `docker compose` demo stack": components/kerbside/plans/PLAN-demo-install-phase-03-compose-demo.md
+                - "Phase 4: `multi-cloud.md` and `placement.md`": components/kerbside/plans/PLAN-use-case-docs-phase-04-multi-cloud.md
                 - "Phase 4: a CI lane for the compose demo": components/kerbside/plans/PLAN-demo-install-phase-04-ci-lane.md
                 - "Phase 4: Port latency loadtest to control socket": components/kerbside/plans/PLAN-test-harness-phase-04-port-latency.md
                 - "Phase 5: Direct-qemu CI workflow": components/kerbside/plans/PLAN-test-harness-phase-05-direct-qemu-ci.md
@@ -363,9 +365,11 @@ nav:
                 - "USB Redirection Protocol": components/kerbside/spice/usb-redirection.md
                 - "VD Agent Protocol": components/kerbside/spice/vd-agent-protocol.md
             - Use Cases:
+                - "Kerbside across several clouds": components/kerbside/use-cases/multi-cloud.md
                 - "Kerbside for OpenStack": components/kerbside/use-cases/openstack.md
                 - "Kerbside for oVirt": components/kerbside/use-cases/ovirt.md
-                - "Kerbside for Shaken Fist": components/kerbside/use-cases/shaken-fist.md
+                - "Kerbside for Shaken Fist": components/kerbside/use-cases/shakenfist.md
+                - "Kerbside placement topologies": components/kerbside/use-cases/placement.md
                 - "Kerbside standalone": components/kerbside/use-cases/standalone.md
         - Occystrap:
             - "Introduction": components/occystrap/index.md
