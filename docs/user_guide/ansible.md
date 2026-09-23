@@ -119,11 +119,11 @@ the identity alone in these modules says only "authenticate as this",
 which is precisely the instruction discovery would discard, so it is
 held to the same all-or-nothing rule as `api_url` and `key`.
 
-Each module declares this rule on its argument specification as well as
-checking it when it builds a client, so Ansible reports a partial set in
-its own wording before the module body runs. That also means the rule
-holds in a `--check` run, which would otherwise report success for a
-task that fails as soon as it is run for real.
+Each module checks this rule as soon as Ansible has parsed the task's
+arguments, before it does anything else -- including the `--check` paths
+that return without ever needing a client. A `--check` run therefore
+reports the same failure a real run would, rather than reporting success
+for a task that fails as soon as it is run in earnest.
 
 A parameter supplied as an empty string counts as not supplied. A
 playbook writing `api_url: "{{ sf_url | default('') }}"` against unset

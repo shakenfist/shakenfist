@@ -39,6 +39,28 @@ class ForgivingModule(FakeModule):
         self.failure = kwargs
 
 
+class _Exited(SystemExit):
+    ...
+
+
+class CheckModeModule(FakeModule):
+    """FakeModule with the attributes run_module() reaches for.
+
+    check_mode is set because the check mode paths are the ones a rule
+    living in _make_client() never reached.
+    """
+
+    check_mode = True
+
+    def __init__(self, **params):
+        super().__init__(**params)
+        self.exited = None
+
+    def exit_json(self, **kwargs):
+        self.exited = kwargs
+        raise _Exited()
+
+
 # The connection rule differs between modules, and the difference is
 # deliberate. Where the identity parameter is also the object to operate on
 # it is legitimate on its own -- sf_instance and sf_network pass namespace
@@ -66,34 +88,53 @@ ANSIBLE_DOC = os.path.abspath(os.path.join(
     os.path.dirname(__file__), '..', '..', 'docs', 'user_guide',
     'ansible.md'))
 
+# A check mode task per module that reports changed -- or at least exits
+# cleanly -- once the connection is whole. Each was confirmed to reach
+# exit_json() with the connection check stubbed out, which is what makes
+# test_check_mode_refuses_a_partial_connection an assertion about where the
+# rule is checked rather than about whether run_module() happens to raise.
+CHECK_MODE_TASK = {
+    'sf_claim': {'state': 'absent', 'namespace': 'a-namespace',
+                 'renew_within_seconds': None},
+    'sf_namespace': {'state': 'present', 'name': 'a-namespace'},
+    'sf_snapshot': {'state': 'present', 'instance_uuid': 'an-instance'},
+    'sf_instance': {'state': 'absent', 'uuid': 'an-instance'},
+    'sf_network': {'state': 'absent', 'uuid': 'a-network'},
+}
+
+# A task each module rejects on its own account, and the fragment of the
+# message it uses. The connection rule is checked before any of these, so a
+# task that is wrong in both ways is told which cluster it would have talked
+# to rather than shown the typo. sf_namespace has no row because it has no
+# such check: everything it needs is required in the argument spec, so its
+# run_module() reaches _make_client() with nothing in between. The call it
+# makes before that is there so the next branch added above it cannot
+# reopen the hole, which is not a difference any test can see today.
+OWN_ARGUMENT_CHECK = {
+    'sf_claim': ({'state': 'present', 'expires_in_seconds': 0,
+                  'renew_within_seconds': None, 'namespace': 'a-namespace'},
+                 'expires_in_seconds must be positive'),
+    'sf_snapshot': ({'state': 'present'},
+                    'You must specify an instance_uuid'),
+    'sf_instance': ({'state': 'absent'},
+                    'You must specify one of name or uuid'),
+    'sf_network': ({'state': 'absent'},
+                   'You must specify one of name or uuid'),
+}
+
+# The collection README is published to Ansible Galaxy and is the first
+# thing a collection user reads about authentication. It is held to
+# delegating the table rather than restating it, because a third copy is a
+# third thing to keep in step -- and it went stale once already.
+COLLECTION_README = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), '..', 'deploy', 'collection', 'README.md'))
+
 API_URL = 'https://api.example.com'
 KEY = 'a-key'
 IDENTITY = 'a-namespace'
 
 DISCOVERY_KWARGS = ('base_url', 'namespace', 'key',
                     'suppress_configuration_lookup')
-
-
-def _spec_rejects(declared, supplied):
-    """Would Ansible refuse this parameter set, given the declaration?
-
-    required_together refuses a group that is partly present;
-    required_by refuses a parameter present without everything it names.
-    Both are reimplemented here rather than called, because ansible is not
-    a test dependency of this repository -- ansible_module_loader stubs it
-    out to load the modules at all. The two behaviours were checked
-    against ansible 2.19.11's ArgumentSpecValidator before being written
-    down.
-    """
-    supplied = set(supplied)
-    for group in declared.get('required_together') or []:
-        present = supplied & set(group)
-        if present and present != set(group):
-            return True
-    for param, needs in (declared.get('required_by') or {}).items():
-        if param in supplied and not set(needs) <= supplied:
-            return True
-    return False
 
 
 class MakeClientConnectionRuleTestCase(base.ShakenFistTestCase):
@@ -122,40 +163,97 @@ class MakeClientConnectionRuleTestCase(base.ShakenFistTestCase):
                 pass
         return fake, client
 
-    def _declared(self, name):
-        """The connection rule as run_module() declares it to Ansible."""
+    def _run(self, name, task=None, **params):
+        """Run run_module() in check mode, returning (module, client_mock)."""
         mod = self.modules[name]
-        captured = {}
+        if task is None:
+            task = CHECK_MODE_TASK[name]
+        fake = CheckModeModule(**dict(task, **params))
+        with mock.patch.object(mod, 'AnsibleModule', return_value=fake), \
+                mock.patch.object(mod.apiclient, 'Client') as client:
+            try:
+                mod.run_module()
+            except (_Failed, _Exited):
+                pass
+        return fake, client
 
-        def _capture(**kwargs):
-            captured.update(kwargs)
-            raise _Failed()
-
-        with mock.patch.object(mod, 'AnsibleModule', side_effect=_capture):
-            self.assertRaises(_Failed, mod.run_module)
-
-        return captured
-
-    def test_the_spec_and_the_guard_refuse_the_same_sets(self):
-        # _make_client()'s guard only runs when a client is wanted, and
-        # sf_snapshot returns for check mode before wanting one -- so a
-        # partial set there used to pass --check and fail the real run.
-        # Declaring the rule on the argument spec closes that, because
-        # Ansible checks it while AnsibleModule is built. Asserting the two
-        # agree, rather than that a declaration merely exists, is what
-        # keeps them from drifting apart into two different rules.
+    def test_check_mode_refuses_a_partial_connection(self):
+        # The rule used to live only in _make_client(), which runs on a
+        # path that wants a client -- and sf_snapshot returns for check
+        # mode before wanting one. A play naming a cluster half way was
+        # therefore told --check would have succeeded, and then failed on
+        # the real run against whatever credentials the control node held.
+        #
+        # Every module is held to this, not just the one with the early
+        # return today, because the hole is in where the rule is checked
+        # rather than in any one module: the next early return added above
+        # a _make_client() call would open it again. CHECK_MODE_TASK is
+        # what makes the assertion bite -- each is a task that reports
+        # changed when the connection check is removed.
         for name, identity, _optional in MODULES:
-            declared = self._declared(name)
-            names = ('api_url', identity, 'key')
-            for count in range(len(names) + 1):
-                for subset in itertools.combinations(names, count):
-                    params = {n: {'api_url': API_URL, 'key': KEY}.get(
-                        n, IDENTITY) for n in subset}
-                    fake, _client = self._call(name, **params)
-                    case = (name, subset)
+            for supplied in (('api_url', ), ('key', ),
+                             ('api_url', 'key'), ('api_url', identity)):
+                params = {n: {'api_url': API_URL, 'key': KEY}.get(
+                    n, IDENTITY) for n in supplied}
+                case = (name, supplied)
 
-                    self.assertEqual(_spec_rejects(declared, subset),
-                                     fake.failure is not None, case)
+                fake, client = self._run(name, **params)
+                self.assertIsNotNone(fake.failure, case)
+                self.assertIsNone(fake.exited, case)
+                client.assert_not_called()
+
+    def test_check_mode_still_runs_when_the_connection_is_whole(self):
+        # Otherwise the test above would pass just as well if the modules
+        # refused every check mode task, which is not the fix.
+        for name, identity, _optional in MODULES:
+            for params in ({}, {'api_url': API_URL, 'key': KEY,
+                                identity: IDENTITY}):
+                case = (name, sorted(params))
+                fake, _client = self._run(name, **params)
+                self.assertIsNone(fake.failure, case)
+                self.assertIsNotNone(fake.exited, case)
+
+    def test_the_connection_is_checked_before_the_task_itself(self):
+        # Checking it first is the whole of the fix: a rule enforced only
+        # where a client is built is not enforced on the paths that return
+        # before wanting one. Asserting the order, rather than that a check
+        # exists, is what distinguishes the two.
+        for name, (task, message) in OWN_ARGUMENT_CHECK.items():
+            fake, _client = self._run(name, task=task)
+            self.assertIsNotNone(fake.failure, name)
+            self.assertIn(message, fake.failure['msg'], name)
+
+            fake, client = self._run(name, task=task, api_url=API_URL)
+            self.assertIsNotNone(fake.failure, name)
+            self.assertNotIn(message, fake.failure['msg'], name)
+            self.assertIn('discarded in favour of', fake.failure['msg'], name)
+            client.assert_not_called()
+
+    def test_an_empty_string_counts_as_not_supplied(self):
+        # docs/user_guide/ansible.md tells operators that a templated
+        # api_url: "{{ sf_url | default('') }}" against unset inventory
+        # auto-discovers. That is only true while "supplied" means a
+        # truthy value. Declaring the rule to Ansible as required_together
+        # or required_by instead would break exactly this, because those
+        # count key presence and never look at the value: the empty string
+        # is present, so the whole templated pattern would be refused,
+        # while a full set with one member empty would be accepted and
+        # caught only later, or -- in check mode -- not at all.
+        for name, identity, _optional in MODULES:
+            fake, client = self._call(
+                name, api_url='', key='', **{identity: ''})
+            self.assertIsNone(fake.failure, name)
+            for unwanted in DISCOVERY_KWARGS:
+                self.assertNotIn(unwanted, client.call_args[1], name)
+
+            for empty in ('api_url', identity, 'key'):
+                params = {'api_url': API_URL, 'key': KEY, identity: IDENTITY}
+                params[empty] = ''
+                case = (name, empty)
+
+                fake, client = self._call(name, **params)
+                self.assertIsNotNone(fake.failure, case)
+                client.assert_not_called()
 
     def test_a_refused_set_never_reaches_the_client(self):
         # The kwargs branch has to stand on its own rather than on
@@ -216,6 +314,39 @@ class MakeClientConnectionRuleTestCase(base.ShakenFistTestCase):
         self.assertEqual(expected, documented,
                          'the table in docs/user_guide/ansible.md and the '
                          'MODULES table above disagree')
+
+    def test_the_collection_readme_does_not_restate_the_table(self):
+        # It said 'sf_claim is the exception' until this rule reached the
+        # other four modules, at which point it was simply wrong. Rather
+        # than add a third copy of the table to keep in step, the README
+        # states the general rule and points at the user guide -- and this
+        # holds it to that.
+        with open(COLLECTION_README) as f:
+            readme = f.read()
+
+        self.assertIn('user_guide/ansible', readme,
+                      'the collection README should point at the user '
+                      'guide for the per-module table rather than '
+                      'restating it')
+
+        with open(ANSIBLE_DOC) as f:
+            header = [line for line in f
+                      if line.startswith('| Module | Identity parameter')]
+        self.assertEqual(1, len(header),
+                         'the identity table in docs/user_guide/ansible.md '
+                         'has moved or changed shape; this test and '
+                         'test_the_documented_table_says_the_same_thing '
+                         'both parse it')
+        for cell in header[0].strip('|\n').split('|'):
+            cell = cell.strip()
+            if not cell.startswith('Identity'):
+                # 'Module' is too common a word to look for.
+                continue
+            self.assertNotIn(
+                cell, readme,
+                'the collection README appears to be growing its own copy '
+                'of the identity table from docs/user_guide/ansible.md; '
+                'keep one copy and link to it')
 
     def test_nothing_supplied_auto_discovers(self):
         for name, _identity, _optional in MODULES:

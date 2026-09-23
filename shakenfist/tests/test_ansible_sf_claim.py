@@ -675,7 +675,8 @@ class SfClaimArgumentSpecTestCase(base.ShakenFistTestCase):
 
     AnsibleModule itself is not importable here, so the spec it is handed
     is asserted rather than exercised. That is the whole of what the module
-    controls: required_together and required_if are enforced by ansible.
+    controls for required_if, which ansible enforces. The connection rule
+    is checked by run_module() itself and so is exercised here.
     """
 
     def _run_module(self, **params):
@@ -700,11 +701,20 @@ class SfClaimArgumentSpecTestCase(base.ShakenFistTestCase):
         # module's namespace parameter names the claim target rather than
         # the identity, so a playbook written against the rest of the
         # collection lands exactly there.
-        call, failure, _present, _absent = self._run_module()
+        #
+        # run_module() checks this itself rather than declaring it to
+        # ansible as required_together. _make_client() is mocked out here,
+        # so a rule that only lived there would not be reached at all --
+        # which is the shape of the hole that check mode used to fall
+        # through. See test_ansible_make_client.py for the whole table.
+        _call, failure, present, _absent = self._run_module(
+            api_url='https://api.example.com')
+        self.assertIn('must be supplied together', failure['msg'])
+        present.assert_not_called()
+
+        _call, failure, present, _absent = self._run_module()
         self.assertIsNone(failure)
-        self.assertEqual(
-            [['api_url', 'auth_namespace', 'key']],
-            call.kwargs['required_together'])
+        self.assertEqual(1, present.call_count)
 
     def test_a_non_positive_expiry_is_rejected(self):
         _call, failure, present, _absent = self._run_module(

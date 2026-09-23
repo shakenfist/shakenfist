@@ -94,28 +94,34 @@ log:
 '''
 
 
-def _make_client(module):
-    # Build a quiet, patient, blocking client. When all three connection
-    # parameters are supplied we suppress configuration lookup and use them
-    # verbatim; otherwise we let the client auto-discover from the environment
-    # and sfrc config exactly like the sf-client CLI does.
-    # None of the three is a connection parameter that can stand alone, so any
-    # of them arriving without the other two is a mistake rather than a request
-    # to discover: the values passed would be discarded and the module pointed
-    # at whatever cloud discovery found, with nothing said about it. namespace
-    # is held to that rule here because in this module it is an identity and
-    # nothing else: the namespace acted on is named by name. So namespace on its
-    # own says only "authenticate as this", which is exactly the instruction
-    # that would be silently discarded. sf_instance and sf_network exempt
-    # namespace because there it also names the object to operate on, and their
-    # deployment playbooks pass it alone.
-    # The argument spec declares the same rule as required_together, and that
-    # is where a play meets it: Ansible checks it while AnsibleModule is being
-    # built, so it holds on every path through run_module() -- including check
-    # mode, which returns before a client is ever needed -- and the failure is
-    # reported in Ansible's own wording. This guard is the backstop for callers
-    # reaching _make_client() directly, the tests today and anything importing
-    # the module tomorrow.
+def _check_connection(module):
+    """Refuse a partially specified connection, and say what was supplied.
+
+    None of api_url, namespace and key is a connection parameter that can stand
+    alone, so any of them arriving without the other two is a mistake rather
+    than a request to discover: the values passed would be discarded and the
+    module pointed at whatever cloud discovery found, with nothing said about
+    it. namespace is held to that rule here because in this module it is an
+    identity and nothing else -- the namespace acted on is named by name -- so
+    namespace on its own says only "authenticate as this", which is exactly the
+    instruction that would be discarded. sf_instance and sf_network exempt
+    namespace because there it also names the object to operate on, and their
+    deployment playbooks pass it alone.
+
+    run_module() calls this immediately after AnsibleModule is built, which is
+    what makes the rule hold on every path -- including the check mode paths
+    that return before a client is ever needed. _make_client() calls it again
+    for callers reaching it directly, the tests today and anything importing
+    the module tomorrow.
+
+    The rule is deliberately not declared on the argument spec. Ansible's
+    required_together and required_by count key presence and never look at the
+    value, so an empty string -- which is what "{{ sf_url | default('') }}"
+    yields in a templated inventory, and which the rest of the collection
+    treats as not supplied -- would be refused outright, while a full set with
+    one member empty would be accepted and only caught later. Checking here
+    keeps one definition of the rule, with one meaning of "supplied".
+    """
     api_url = module.params.get('api_url')
     namespace = module.params.get('namespace')
     key = module.params.get('key')
@@ -125,10 +131,23 @@ def _make_client(module):
                                ('key', key)) if v]
     if supplied and len(supplied) != 3:
         module.fail_json(
-            msg=('api_url, namespace and key must be supplied together or not '
-                 'at all. Got only %s, which would be discarded in favour of '
-                 'discovered configuration.' % ', '.join(supplied)),
+            msg=('api_url, namespace and key must be supplied together '
+                 'or not at all. Got only %s, which would be '
+                 'discarded in favour of discovered '
+                 'configuration.' % ', '.join(supplied)),
             meta=None, log=[])
+    return supplied
+
+
+def _make_client(module):
+    # Build a quiet, patient, blocking client. When all three connection
+    # parameters are supplied we suppress configuration lookup and use them
+    # verbatim; otherwise we let the client auto-discover from the environment
+    # and sfrc config exactly like the sf-client CLI does.
+    supplied = _check_connection(module)
+    api_url = module.params.get('api_url')
+    namespace = module.params.get('namespace')
+    key = module.params.get('key')
 
     kwargs = {
         'verbose': False,
@@ -163,14 +182,12 @@ def run_module():
     }
 
     module = AnsibleModule(
-        argument_spec=argument_spec, supports_check_mode=True,
-        # All three connection parameters or none of them. A partial set is
-        # otherwise ignored in favour of whatever ambient credentials the
-        # control node holds, which may be a different cluster entirely.
-        # Declaring it here as well as in _make_client() is what makes the
-        # rule hold on every path: Ansible checks it while AnsibleModule is
-        # built, before run_module() branches on check mode.
-        required_together=[['api_url', 'namespace', 'key']])
+        argument_spec=argument_spec, supports_check_mode=True)
+
+    # Before anything branches. Every other exit from run_module() -- an
+    # argument check, a check mode return -- happens after this, so a play
+    # that names a cluster half way cannot be told it would have succeeded.
+    _check_connection(module)
 
     log = []
 

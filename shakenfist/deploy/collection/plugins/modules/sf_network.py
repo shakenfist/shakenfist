@@ -121,49 +121,68 @@ log:
 '''
 
 
-def _make_client(module):
-    # Build a quiet, patient, blocking client. When all three connection
-    # parameters are supplied we suppress configuration lookup and use them
-    # verbatim; otherwise we auto-discover from the environment / sfrc config
-    # exactly like the sf-client CLI.
-    # api_url and key are connection parameters and nothing else, so either of
-    # them arriving without the full set is a mistake rather than a request to
-    # discover: the values passed would be discarded and the module pointed at
-    # whatever cloud discovery found, with nothing said about it. namespace is
-    # deliberately not held to that rule in this module. It names the namespace
-    # to operate in -- it is passed to allocate_network() and get_network() --
-    # as well as the one to authenticate as, so it is legitimate on its own and
-    # keeps meaning "work here, and find the credentials the usual way", which
-    # is how the deployment playbooks have always called this. sf_claim,
-    # sf_namespace and sf_snapshot hold all three to the rule because their
-    # identity parameter is an identity and nothing else.
-    # The argument spec declares the same rule as required_by, and that is
-    # where a play meets it: Ansible checks it while AnsibleModule is being
-    # built, so it holds on every path through run_module() -- including check
-    # mode -- and the failure is reported in Ansible's own wording. This guard
-    # is the backstop for callers reaching _make_client() directly, which is
-    # also why it passes an empty log: nothing has accumulated one by then.
+def _check_connection(module):
+    """Refuse a partially specified connection, and say what was supplied.
+
+    api_url and key are connection parameters and nothing else, so either of
+    them arriving without the full set is a mistake rather than a request to
+    discover: the values passed would be discarded and the module pointed at
+    whatever cloud discovery found, with nothing said about it. namespace is
+    deliberately not held to that rule in this module. It names the namespace
+    to operate in -- it is passed to allocate_network() and get_network() -- as
+    well as the one to authenticate as, so it is legitimate on its own and
+    keeps meaning "work here, and find the credentials the usual way", which is
+    how the deployment playbooks have always called this. sf_claim,
+    sf_namespace and sf_snapshot hold all three to the rule because their
+    identity parameter is an identity and nothing else.
+
+    run_module() calls this immediately after AnsibleModule is built, which is
+    what makes the rule hold on every path -- including the check mode paths
+    that return before a client is ever needed. _make_client() calls it again
+    for callers reaching it directly, the tests today and anything importing
+    the module tomorrow.
+
+    The rule is deliberately not declared on the argument spec. Ansible's
+    required_together and required_by count key presence and never look at the
+    value, so an empty string -- which is what "{{ sf_url | default('') }}"
+    yields in a templated inventory, and which the rest of the collection
+    treats as not supplied -- would be refused outright, while a full set with
+    one member empty would be accepted and only caught later. Checking here
+    keeps one definition of the rule, with one meaning of "supplied".
+    """
     api_url = module.params.get('api_url')
     namespace = module.params.get('namespace')
     key = module.params.get('key')
 
-    if (api_url or key) and not (api_url and namespace and key):
-        supplied = [n for n, v in (('api_url', api_url),
-                                   ('namespace', namespace),
-                                   ('key', key)) if v]
+    supplied = [n for n, v in (('api_url', api_url),
+                               ('namespace', namespace),
+                               ('key', key)) if v]
+    if supplied and len(supplied) != 3 and supplied != ['namespace']:
         module.fail_json(
             msg=('api_url and key are only used when api_url, namespace and '
                  'key are all supplied. Got only %s, so the connection '
                  'details passed here would be silently discarded in favour '
                  'of discovered configuration.' % ', '.join(supplied)),
             meta=None, log=[])
+    return supplied
+
+
+def _make_client(module):
+    # Build a quiet, patient, blocking client. When all three connection
+    # parameters are supplied we suppress configuration lookup and use them
+    # verbatim; otherwise we auto-discover from the environment / sfrc config
+    # exactly like the sf-client CLI.
+    supplied = _check_connection(module)
+    api_url = module.params.get('api_url')
+    namespace = module.params.get('namespace')
+    key = module.params.get('key')
 
     kwargs = {
         'verbose': False,
         'sync_request_timeout': 1800,
         'async_strategy': apiclient.ASYNC_BLOCK,
     }
-    if api_url and namespace and key:
+    if len(supplied) == 3:
         kwargs.update({
             'base_url': api_url,
             'namespace': namespace,
@@ -234,15 +253,12 @@ def run_module():
     }
 
     module = AnsibleModule(
-        argument_spec=argument_spec, supports_check_mode=True,
-        # api_url and key are connection parameters and nothing else, so
-        # each drags in the other two. namespace also names the namespace to
-        # operate in, so it stands alone. Declaring the rule here as well as
-        # in _make_client() is what makes it hold on every path: Ansible
-        # checks it while AnsibleModule is built, before run_module()
-        # branches on check mode.
-        required_by={'api_url': ('namespace', 'key'),
-                     'key': ('namespace', 'api_url')})
+        argument_spec=argument_spec, supports_check_mode=True)
+
+    # Before anything branches. Every other exit from run_module() -- an
+    # argument check, a check mode return -- happens after this, so a play
+    # that names a cluster half way cannot be told it would have succeeded.
+    _check_connection(module)
 
     log = []
     state = module.params['state']

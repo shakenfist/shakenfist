@@ -76,13 +76,16 @@ Every module accepts optional `api_url`, `namespace` and `key` connection
 parameters. When all three are supplied they are used verbatim; when omitted,
 the module auto-discovers credentials from the environment and
 `sfrc`/`~/.shakenfist`/`/etc/sf/shakenfist.json` exactly like the `sf-client`
-CLI. `sf_claim` is the exception: claim management is administrator only, so
-there `namespace` names the namespace the claim covers and the namespace to
-authenticate as is `auth_namespace`, and supplying only some of `api_url`,
-`auth_namespace` and `key` is an error rather than a silent fall back to
-whatever credentials the control node happens to hold. Each module returns
-`changed`, `failed`, a `meta` object describing the resource, and a `log`
-list of progress messages for debugging.
+CLI. Supplying only some of them is an error rather than a silent fall back to
+whatever credentials the control node happens to hold. `sf_claim` authenticates
+as `auth_namespace` rather than `namespace`, because claim management is
+administrator only and there `namespace` names the namespace the claim covers.
+Which modules also accept their identity parameter on its own, because it
+names the object to operate on as well, is tabulated in
+[the Ansible user guide](https://shakenfist.com/user_guide/ansible/) rather
+than repeated here. Each module returns `changed`, `failed` and a `meta`
+object describing the resource; every module but `sf_snapshot` also returns a
+`log` list of progress messages for debugging.
 
 ## Requirements
 
