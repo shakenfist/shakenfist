@@ -986,6 +986,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#continuous-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuous Integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#adding-a-new-command" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14367,6 +14378,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#continuous-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuous Integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#adding-a-new-command" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14426,7 +14448,8 @@
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        common.proto     # Shared protobuf definitions
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        *_pb2.py         # Generated stubs (do not edit)
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    tests/
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        test_daemon.py   # Unit tests
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        test_daemon.py   # Unit tests for the daemon
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        test_main.py     # Unit tests for CLI logging setup
 </code></pre></div>
 <h2 id="building">Building<a class="headerlink" href="#building" title="Permanent link">&para;</a></h2>
 <p>The project uses <code>pyproject.toml</code> with <code>setuptools_scm</code> for
@@ -14443,6 +14466,47 @@ version management. Versions are derived from git tags:</p>
 <a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># Coverage report</span>
 <a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>tox<span class="w"> </span>-ecover
 </code></pre></div>
+<h2 id="continuous-integration">Continuous Integration<a class="headerlink" href="#continuous-integration" title="Permanent link">&para;</a></h2>
+<p>Pull requests to <code>develop</code> run <code>.github/workflows/functional-tests.yml</code>.
+Its <code>sanity_checks</code> job (flake8, a dependency install check, unit tests
+and coverage) runs on an ephemeral VM runner, so a <code>check_paths</code> job
+skips it when a pull request changes nothing outside <code>docs/</code>. The
+automated reviewer still runs on those pull requests. Commenting
+<code>@shakenfist-bot please retest</code> re-runs the workflow by dispatch, which
+always runs the full set.</p>
+<p>Two bot commands are honoured on pull requests, from collaborators
+with write access and on same-repository pull requests only:
+<code>@shakenfist-bot please re-review</code> asks the automated reviewer for
+another pass (<code>pr-re-review.yml</code>), and <code>@shakenfist-bot please retest</code>
+re-runs the functional tests (<code>pr-retest.yml</code>). The comment addressing
+bot that used to push fixes for review items has been retired fleet
+wide, and its workflow removed; address review items by hand.</p>
+<p><code>.github/workflows/supply-chain.yml</code> scans the git history for leaked
+credentials with gitleaks on every pull request, every push to
+<code>develop</code> and weekly. It is deliberately not path filtered: a
+credential in a documentation sample is still a credential. The scan
+lives in <code>tools/gitleaks-scan.sh</code>, which also plants two credentials in
+a scratch directory and fails unless gitleaks reports both, so a clean
+result means "scanned and found nothing" rather than "could not find
+anything". Run it locally with <code>tools/gitleaks-scan.sh</code>, or
+<code>tools/gitleaks-scan.sh --gitleaks PATH</code> to use a specific binary; it
+needs a full (not shallow) clone.</p>
+<p>If the positive control fails while nothing in the repository changed,
+the likely cause is a gitleaks upgrade (the job installs Debian's
+package, which is not pinned) renaming or splitting one of the two rules
+it expects, <code>github-pat</code> and <code>private-key</code>. The failure message lists
+the rules that did fire; update the expected list in the script to
+match, after checking that the new rule still catches the planted
+credential.</p>
+<p>None of these checks is configured as a required status check on
+<code>develop</code> today, so a failing gitleaks or agent context job is visible
+on the pull request but does not by itself block a merge; <code>can_merge</code>
+in <code>functional-tests.yml</code> only aggregates that workflow's own jobs.</p>
+<p>The same workflow runs <a href="https://skillsaw.org/">skillsaw</a> over the agent
+context (<code>AGENTS.md</code> and anything else an agent is handed) by running
+its pre-commit hook. <code>.pre-commit-config.yaml</code> carries that hook
+alongside actionlint and shellcheck, so run <code>pre-commit install</code> once
+per clone and <code>pre-commit run --all-files</code> before proposing a change.</p>
 <h2 id="adding-a-new-command">Adding a New Command<a class="headerlink" href="#adding-a-new-command" title="Permanent link">&para;</a></h2>
 <ol>
 <li>
