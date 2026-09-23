@@ -58,9 +58,11 @@ options:
     type: str
   api_url:
     description:
-      - Base URL of the Shaken Fist API. When omitted (with O(namespace)
-        and O(key)) credentials are auto-discovered from the environment and
-        C(sfrc) config exactly like the C(sf-client) CLI.
+      - Base URL of the Shaken Fist API. This, O(namespace) and O(key)
+        are all supplied together or not at all, and supplying only some of
+        them is an error. When all three are omitted credentials are
+        auto-discovered from the environment and C(sfrc) config exactly like
+        the C(sf-client) CLI.
     required: false
     type: str
   namespace:
@@ -118,9 +120,23 @@ def _make_client(module):
     # parameters are supplied we suppress configuration lookup and use them
     # verbatim; otherwise we auto-discover from the environment / sfrc config
     # exactly like the sf-client CLI.
+    # Supplying only some of the three is an error rather than a silent fall
+    # back to discovery: the client that would produce can be pointed at an
+    # entirely different cloud than the playbook named, with nothing said
+    # about it.
     api_url = module.params.get('api_url')
     namespace = module.params.get('namespace')
     key = module.params.get('key')
+
+    supplied = [n for n, v in (('api_url', api_url),
+                               ('namespace', namespace),
+                               ('key', key)) if v]
+    if supplied and len(supplied) != 3:
+        module.fail_json(
+            msg=('api_url, namespace and key must be supplied together or '
+                 'not at all. Got only %s, which would be discarded in '
+                 'favour of discovered configuration.' % ', '.join(supplied)),
+            meta=None, log=[])
 
     kwargs = {
         'verbose': False,
@@ -129,7 +145,7 @@ def _make_client(module):
     }
     if module.params.get('async'):
         kwargs['async_strategy'] = apiclient.ASYNC_CONTINUE
-    if api_url and namespace and key:
+    if supplied:
         kwargs.update({
             'base_url': api_url,
             'namespace': namespace,

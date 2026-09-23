@@ -51,6 +51,10 @@ def _load_sf_instance():
 
     apiclient.ResourceNotFoundException = _ResourceNotFoundException
     apiclient.APIException = _APIException
+    # _make_client() reads both of these, so the stub has to carry them
+    # even though nothing else in this file touches the constructor.
+    apiclient.UnconfiguredException = Exception
+    apiclient.ASYNC_BLOCK = 'block'
     apiclient.Client = mock.MagicMock()
     client.apiclient = apiclient
     stubs['shakenfist_client'] = client
@@ -882,3 +886,60 @@ class SfInstanceCreateTimeoutDetectionTestCase(base.ShakenFistTestCase):
         # A MagicMock does not raise from inspect.signature() -- it
         # reports (*args, **kwargs), which has no timeout parameter.
         self.assertFalse(sf_instance._create_accepts_timeout(mock.MagicMock()))
+
+
+class SfInstanceMakeClientTestCase(base.ShakenFistTestCase):
+    """A partial connection set fails the module rather than being dropped.
+
+    api_url, namespace and key are supplied together or not at all. Falling
+    back to discovery when only some of them arrive would build a client
+    pointed at whatever cloud the environment, ~/.shakenfist or
+    /etc/sf/shakenfist.json names, rather than the one the playbook asked
+    for, and say nothing about it.
+    """
+
+    def _module(self, **params):
+        module = mock.MagicMock()
+        module.params = {'api_url': None, 'namespace': None, 'key': None}
+        module.params.update(params)
+        module.fail_json.side_effect = _Failed()
+        return module
+
+    def _kwargs(self, **params):
+        with mock.patch.object(sf_instance.apiclient, 'Client') as client:
+            sf_instance._make_client(self._module(**params))
+        return client.call_args[1]
+
+    def test_all_three_are_used_verbatim(self):
+        kwargs = self._kwargs(api_url='https://api.example.com',
+                              namespace='ns', key='k')
+
+        self.assertEqual('https://api.example.com', kwargs['base_url'])
+        self.assertEqual('ns', kwargs['namespace'])
+        self.assertEqual('k', kwargs['key'])
+        self.assertTrue(kwargs['suppress_configuration_lookup'])
+
+    def test_nothing_supplied_auto_discovers(self):
+        kwargs = self._kwargs()
+
+        for name in ['base_url', 'namespace', 'key',
+                     'suppress_configuration_lookup']:
+            self.assertNotIn(name, kwargs)
+
+    def test_a_partial_set_fails_the_module(self):
+        # Each of the three omitted in turn.
+        for params in [{'namespace': 'ns', 'key': 'k'},
+                       {'api_url': 'https://api.example.com', 'key': 'k'},
+                       {'api_url': 'https://api.example.com',
+                        'namespace': 'ns'}]:
+            module = self._module(**params)
+            with mock.patch.object(sf_instance.apiclient, 'Client') as client:
+                self.assertRaises(
+                    _Failed, sf_instance._make_client, module)
+
+            # The message names what was passed, so the operator can see
+            # which of the three the playbook forgot.
+            msg = module.fail_json.call_args[1]['msg']
+            for name in params:
+                self.assertIn(name, msg, params)
+            client.assert_not_called()

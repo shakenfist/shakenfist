@@ -279,16 +279,30 @@ def _make_client(module):
     # parameters are supplied we suppress configuration lookup and use them
     # verbatim; otherwise we let the client auto-discover from the environment
     # and sfrc config exactly like the sf-client CLI does.
+    # Supplying only some of the three is an error rather than a silent fall
+    # back to discovery: the client that would produce can be pointed at an
+    # entirely different cloud than the playbook named, with nothing said
+    # about it.
     api_url = module.params.get('api_url')
     auth_namespace = module.params.get('auth_namespace')
     key = module.params.get('key')
+
+    supplied = [n for n, v in (('api_url', api_url),
+                               ('auth_namespace', auth_namespace),
+                               ('key', key)) if v]
+    if supplied and len(supplied) != 3:
+        module.fail_json(
+            msg=('api_url, auth_namespace and key must be supplied together or '
+                 'not at all. Got only %s, which would be discarded in '
+                 'favour of discovered configuration.' % ', '.join(supplied)),
+            meta=None, log=[])
 
     kwargs = {
         'verbose': False,
         'sync_request_timeout': 1800,
         'async_strategy': apiclient.ASYNC_BLOCK,
     }
-    if api_url and auth_namespace and key:
+    if supplied:
         kwargs.update({
             'base_url': api_url,
             'namespace': auth_namespace,
