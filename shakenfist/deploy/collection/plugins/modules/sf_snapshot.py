@@ -58,11 +58,12 @@ options:
     type: str
   api_url:
     description:
-      - Base URL of the Shaken Fist API. This, O(namespace) and O(key)
-        are all supplied together or not at all, and supplying only some of
-        them is an error. When all three are omitted credentials are
-        auto-discovered from the environment and C(sfrc) config exactly like
-        the C(sf-client) CLI.
+      - Base URL of the Shaken Fist API. This and O(key) are only used
+        when they and O(namespace) are all supplied; passing either of them
+        without the other two is an error rather than a silent fall back.
+        When they are omitted credentials are auto-discovered from the
+        environment and C(sfrc) config exactly like the C(sf-client) CLI,
+        which is the usual way to call this.
     required: false
     type: str
   namespace:
@@ -120,22 +121,28 @@ def _make_client(module):
     # parameters are supplied we suppress configuration lookup and use them
     # verbatim; otherwise we auto-discover from the environment / sfrc config
     # exactly like the sf-client CLI.
-    # Supplying only some of the three is an error rather than a silent fall
-    # back to discovery: the client that would produce can be pointed at an
-    # entirely different cloud than the playbook named, with nothing said
-    # about it.
+    # api_url and key are connection parameters and nothing else, so either
+    # of them arriving without the full set is a mistake rather than a
+    # request to discover: the values passed would be discarded and the
+    # module pointed at whatever cloud discovery found, with nothing said
+    # about it. namespace is deliberately not held to that rule. It names
+    # the namespace to operate in as well as the one to authenticate as, so
+    # it is legitimate on its own and keeps meaning "work here, and find
+    # the credentials the usual way" -- which is how the deployment
+    # playbooks have always called this.
     api_url = module.params.get('api_url')
     namespace = module.params.get('namespace')
     key = module.params.get('key')
 
-    supplied = [n for n, v in (('api_url', api_url),
-                               ('namespace', namespace),
-                               ('key', key)) if v]
-    if supplied and len(supplied) != 3:
+    if (api_url or key) and not (api_url and namespace and key):
+        supplied = [n for n, v in (('api_url', api_url),
+                                   ('namespace', namespace),
+                                   ('key', key)) if v]
         module.fail_json(
-            msg=('api_url, namespace and key must be supplied together or '
-                 'not at all. Got only %s, which would be discarded in '
-                 'favour of discovered configuration.' % ', '.join(supplied)),
+            msg=('api_url and key are only used when api_url, namespace and '
+                 'key are all supplied. Got only %s, so the connection '
+                 'details passed here would be silently discarded in favour '
+                 'of discovered configuration.' % ', '.join(supplied)),
             meta=None, log=[])
 
     kwargs = {
@@ -145,7 +152,7 @@ def _make_client(module):
     }
     if module.params.get('async'):
         kwargs['async_strategy'] = apiclient.ASYNC_CONTINUE
-    if supplied:
+    if api_url and namespace and key:
         kwargs.update({
             'base_url': api_url,
             'namespace': namespace,

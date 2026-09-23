@@ -889,13 +889,18 @@ class SfInstanceCreateTimeoutDetectionTestCase(base.ShakenFistTestCase):
 
 
 class SfInstanceMakeClientTestCase(base.ShakenFistTestCase):
-    """A partial connection set fails the module rather than being dropped.
+    """api_url and key are connection parameters; namespace is not only one.
 
-    api_url, namespace and key are supplied together or not at all. Falling
-    back to discovery when only some of them arrive would build a client
-    pointed at whatever cloud the environment, ~/.shakenfist or
-    /etc/sf/shakenfist.json names, rather than the one the playbook asked
-    for, and say nothing about it.
+    Passing api_url or key without the full set would have the value
+    discarded and the client built from discovered configuration instead,
+    pointing the module at a different cloud with nothing said about it.
+    That is an error.
+
+    namespace is deliberately outside that rule, because in this module it
+    names the namespace the instance belongs to as well as the one to
+    authenticate as. Passing it alone is how the deployment playbooks have
+    always called this, with credentials coming from SHAKENFIST_KEY and
+    friends, and it has to keep working.
     """
 
     def _module(self, **params):
@@ -926,12 +931,25 @@ class SfInstanceMakeClientTestCase(base.ShakenFistTestCase):
                      'suppress_configuration_lookup']:
             self.assertNotIn(name, kwargs)
 
-    def test_a_partial_set_fails_the_module(self):
-        # Each of the three omitted in turn.
+    def test_namespace_alone_auto_discovers(self):
+        # The case the collection smoke test caught: "Create a primary
+        # instance" passes namespace and nothing else, with credentials in
+        # the environment. Holding namespace to the all-or-nothing rule
+        # broke the cluster build outright.
+        kwargs = self._kwargs(namespace='ns')
+
+        for name in ['base_url', 'namespace', 'key',
+                     'suppress_configuration_lookup']:
+            self.assertNotIn(name, kwargs)
+
+    def test_a_partial_connection_set_fails_the_module(self):
+        # api_url or key without the other two, namespace present or not.
         for params in [{'namespace': 'ns', 'key': 'k'},
                        {'api_url': 'https://api.example.com', 'key': 'k'},
                        {'api_url': 'https://api.example.com',
-                        'namespace': 'ns'}]:
+                        'namespace': 'ns'},
+                       {'api_url': 'https://api.example.com'},
+                       {'key': 'k'}]:
             module = self._module(**params)
             with mock.patch.object(sf_instance.apiclient, 'Client') as client:
                 self.assertRaises(
