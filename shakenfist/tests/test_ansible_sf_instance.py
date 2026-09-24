@@ -51,6 +51,10 @@ def _load_sf_instance():
 
     apiclient.ResourceNotFoundException = _ResourceNotFoundException
     apiclient.APIException = _APIException
+    # _make_client() reads both of these, so the stub has to carry them
+    # even though nothing else in this file touches the constructor.
+    apiclient.UnconfiguredException = Exception
+    apiclient.ASYNC_BLOCK = 'block'
     apiclient.Client = mock.MagicMock()
     client.apiclient = apiclient
     stubs['shakenfist_client'] = client

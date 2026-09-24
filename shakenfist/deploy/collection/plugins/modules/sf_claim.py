@@ -274,11 +274,55 @@ CLAIM_VERBS = ('get_namespace_claims', 'create_namespace_claim',
                'update_namespace_claim', 'delete_namespace_claim')
 
 
+def _check_connection(module):
+    """Refuse a partially specified connection, and say what was supplied.
+
+    None of api_url, auth_namespace and key is a connection parameter that can
+    stand alone, so any of them arriving without the other two is a mistake
+    rather than a request to discover: the client that would produce can be
+    pointed at an entirely different cloud than the playbook named, with
+    nothing said about it. auth_namespace is the identity to authenticate as
+    and nothing else -- the claim's target namespace is named by namespace --
+    so on its own it says only "authenticate as this", which is exactly the
+    instruction that would be discarded.
+
+    run_module() calls this immediately after AnsibleModule is built, which is
+    what makes the rule hold on every path -- including the check mode paths
+    that return before a client is ever needed. _make_client() calls it again
+    for callers reaching it directly, the tests today and anything importing
+    the module tomorrow.
+
+    The rule is deliberately not declared on the argument spec. Ansible's
+    required_together and required_by count key presence and never look at the
+    value, so an empty string -- which is what "{{ sf_url | default('') }}"
+    yields in a templated inventory, and which the rest of the collection
+    treats as not supplied -- would be refused outright, while a full set with
+    one member empty would be accepted and only caught later. Checking here
+    keeps one definition of the rule, with one meaning of "supplied".
+    """
+    api_url = module.params.get('api_url')
+    auth_namespace = module.params.get('auth_namespace')
+    key = module.params.get('key')
+
+    supplied = [n for n, v in (('api_url', api_url),
+                               ('auth_namespace', auth_namespace),
+                               ('key', key)) if v]
+    if supplied and len(supplied) != 3:
+        module.fail_json(
+            msg=('api_url, auth_namespace and key must be supplied together '
+                 'or not at all. Got only %s, which would be '
+                 'discarded in favour of discovered '
+                 'configuration.' % ', '.join(supplied)),
+            meta=None, log=[])
+    return supplied
+
+
 def _make_client(module):
     # Build a quiet, patient, blocking client. When all three connection
     # parameters are supplied we suppress configuration lookup and use them
     # verbatim; otherwise we let the client auto-discover from the environment
     # and sfrc config exactly like the sf-client CLI does.
+    supplied = _check_connection(module)
     api_url = module.params.get('api_url')
     auth_namespace = module.params.get('auth_namespace')
     key = module.params.get('key')
@@ -288,7 +332,7 @@ def _make_client(module):
         'sync_request_timeout': 1800,
         'async_strategy': apiclient.ASYNC_BLOCK,
     }
-    if api_url and auth_namespace and key:
+    if len(supplied) == 3:
         kwargs.update({
             'base_url': api_url,
             'namespace': auth_namespace,
@@ -610,14 +654,12 @@ def run_module():
             ('state', 'present',
              ['limit_cpus', 'limit_memory_mb', 'limit_disk_gb',
               'expires_in_seconds'])
-        ],
-        # All three connection parameters or none of them. A partial triple
-        # is otherwise ignored in favour of whatever ambient credentials the
-        # control node holds, which may be a different cluster entirely --
-        # and this module's namespace parameter names the claim's target
-        # rather than the identity, so a playbook written against the rest
-        # of the collection lands exactly there.
-        required_together=[['api_url', 'auth_namespace', 'key']])
+        ])
+
+    # Before anything branches. Every other exit from run_module() -- an
+    # argument check, a check mode return -- happens after this, so a play
+    # that names a cluster half way cannot be told it would have succeeded.
+    _check_connection(module)
 
     log = []
 
