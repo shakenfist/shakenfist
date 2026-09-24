@@ -169,6 +169,35 @@ import traceback
 BAND_LOWER = 0.35
 BAND_UPPER = 0.70
 
+# The exit status this tool returns when, and only when, the cluster-wide
+# fraction sits above BAND_UPPER. Phase 5's 5f armed it against a window of
+# 30 cluster job-runs over 10 merge runs in which nothing came within 0.28 of
+# that bound (max 0.417), so gating on it would have failed nothing that was
+# fine -- which is the whole test D7 set for it.
+#
+# The *name* of this constant is load-bearing, not only its value.
+# shakenfist/actions's tools/ci_headroom_verdict.sh believes a status of 3
+# only when BAND_VIOLATION_EXIT appears in this file's source, exactly as
+# ci_headroom_collect.sh already greps this file before passing it a flag an
+# older build would not know. That is what makes the two repositories safe to
+# merge in either order, which matters because functional-tests.yml reaches
+# that workflow at @main with no pin to bump: the gate landed there first and
+# sat inert, because a report which cannot name the contract does not
+# implement it. Renaming this constant switches the gate off rather than
+# breaking it.
+#
+# Only this one direction gates. D7 rules out the per-node bound (D4) and the
+# refusal clause (D5) as candidates, and D8 rules out the lower bound -- which
+# matters more than it reads, because 20 of those same 30 job-runs are
+# OVERSIZED, so a status returned for a lower-bound violation would redden two
+# thirds of cluster CI on its first run. Everything else this tool can meet --
+# an unreadable series, an absent census, a bug in the report itself -- still
+# returns 0 and is still only printed. D15's rule that an instrument may not
+# fail the job it measures holds everywhere except here, and this is not an
+# exception to it: a band violation is a statement about the cloud the suite
+# ran on, not about the instrument.
+BAND_VIOLATION_EXIT = 3
+
 # Phase 5's D4: the per-node maximum's upper bound, also from the master
 # plan's "The headroom band, with numbers" section. It is the cleanest
 # separation phase 2 found in the dataset -- of job-runs recording no
@@ -2530,7 +2559,15 @@ def print_verdict(record):
             text = 'WITHIN BAND'
         print('  Verdict: %s' % text)
 
-    print('  Nothing gates on this verdict yet: phase 5 step 5f decides.')
+    if verdict['band'] == 'OVERSUBSCRIBED':
+        print('  This verdict gates (5f): the report returns %d, and'
+              % BAND_VIOLATION_EXIT)
+        print('  ci_headroom_verdict.sh in shakenfist/actions turns that into')
+        print('  a failed job unless CI_HEADROOM_GATE says otherwise.')
+    else:
+        print('  Only the cluster-wide upper bound gates (5f). Nothing else')
+        print('  here can fail a job: the lower bound is information rather')
+        print('  than an alarm (D8), and the per-node bound never gates (D4).')
 
     per_node_p90 = verdict['per_node_max_p90_fraction']
     per_node_upper = verdict['per_node_band_upper']
@@ -2870,6 +2907,12 @@ def report(args):
     emit_github_annotations(record)
     write_github_step_summary(record)
 
+    # Returned so that main() can read the band verdict without recomputing
+    # it. Nothing in here decides the exit status: a raise between here and
+    # the return means main() never sees a record, which is exactly the case
+    # that must not gate.
+    return record
+
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
@@ -2920,18 +2963,37 @@ def main(argv=None):
         args = parser.parse_args(argv)
     except SystemExit:
         # argparse exits 2 on a usage error and 0 on --help. Neither may
-        # fail the job: D15 says nothing this phase adds can, and a report
-        # tool which fails a build over its own arguments is precisely the
-        # instrument changing what it measures.
+        # fail the job. The one status which can is BAND_VIOLATION_EXIT,
+        # and it is a statement about the cloud; a report tool which failed
+        # a build over its own arguments would be the instrument changing
+        # what it measures, which is what D15 forbids.
         return 0
 
+    record = None
     try:
-        report(args)
+        record = report(args)
     except Exception:
         print('The headroom report failed to render:')
         traceback.print_exc(file=sys.stdout)
-        print('Reported rather than raised: this phase gates nothing and an')
-        print('instrument which can fail a job changes what it measures (D15).')
+        print('Reported rather than raised: an instrument which can fail a job')
+        print('over its own defects changes what it measures (D15). Only a')
+        print('band verdict gates, and there is no verdict to read here.')
+
+    # The only non-zero status this tool returns, and it is deliberately
+    # narrow: the record has to exist, and its cluster-wide band has to read
+    # OVERSUBSCRIBED. A record which failed to render, a series with too
+    # little in it to produce a fraction, and a band of OVERSIZED or WITHIN
+    # BAND all leave this at 0. See BAND_VIOLATION_EXIT.
+    if (record or {}).get('verdict', {}).get('band') == 'OVERSUBSCRIBED':
+        print()
+        print('Returning %d: the cluster-wide committed-vCPU fraction is above'
+              % BAND_VIOLATION_EXIT)
+        print('the upper bound of %.2f. Whether that fails this job is decided'
+              % BAND_UPPER)
+        print('by the caller -- see ci_headroom_verdict.sh in')
+        print('shakenfist/actions, and its CI_HEADROOM_GATE switch.')
+        return BAND_VIOLATION_EXIT
+
     return 0
 
 
