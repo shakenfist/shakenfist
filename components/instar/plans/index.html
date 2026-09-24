@@ -7947,6 +7947,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 1b: a Proxmox node in CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 2: HTTP CONNECT in shakenfist-spice-protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -14536,7 +14592,7 @@ at the repo root).</p>
 <td><a href="/components/instar/plans/PLAN-differencing/">VHD and VHDX differencing output</a></td>
 <td>Emit differencing VHD (<code>disk_type=4</code> + parent locator table) and differencing VHDX (<code>HasParent</code> + parent locator metadata item) from <code>create -b</code>, add parent-locator parsing to the vhd and vhdx crates, and close the silent parent-ignoring read of differencing children. An instar-only capability: qemu-img creates neither and reads both as though the parent did not exist, so the plan establishes an external oracle first</td>
 <td>In progress</td>
-<td><a href="/components/instar/plans/PLAN-differencing-phase-01-pin/">1: pin + oracle</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-02-fixtures/">2: fixtures</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-03-parse/">3: parse</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-04-read-policy/">4: read policy</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-05-vhd-emitter/">5: vhd emitter</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-06-vhdx-emitter/">6: vhdx emitter</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-07-guest-host/">7: guest + host</a> (planned; smaller than the master plan expected — the guest's backing probe already parses both parents and discards the identity, so this phase returns it rather than reading them again, and it fixes a measured bug where a VHD footer is mislocated for any sector size but 512), 8: tests, 9: fuzz, 10: docs, 11: chain host, 12: vhd compose, 13: vhdx compose, 14: op rollout, 15: compose tests, 16: compose docs, 17: push audit</td>
+<td><a href="/components/instar/plans/PLAN-differencing-phase-01-pin/">1: pin + oracle</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-02-fixtures/">2: fixtures</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-03-parse/">3: parse</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-04-read-policy/">4: read policy</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-05-vhd-emitter/">5: vhd emitter</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-06-vhdx-emitter/">6: vhdx emitter</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-07-guest-host/">7: guest + host</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-08-tests/">8: tests</a> (planned; most of what the master plan reserved for this phase shipped with phases 3–7 — the third-party-parent identity test, the structural locator assertions and phase 5's untested refusal are all in the tree — so it narrows to the two things nothing automates: no test anywhere drives the plan's libvhdi oracle against differencing output instar wrote, and the mutation evidence that the existing tests can fail was never committed), 9: fuzz, 10: docs, 11: chain host, 12: vhd compose, 13: vhdx compose, 14: op rollout, 15: compose tests, 16: compose docs, 17: push audit</td>
 </tr>
 </tbody>
 </table>

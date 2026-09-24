@@ -7958,6 +7958,62 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-proxmox-source-phase-01b-ci-substrate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 1b: a Proxmox node in CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-proxmox-source-phase-02-ryll-connect/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 2: HTTP CONNECT in shakenfist-spice-protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -14441,6 +14497,13 @@ repo root. For pre-push audits of our own work see
 <td>Complete</td>
 <td><a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/">phase 1</a> (done, PR #314), <a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier/">phase 2</a> (done, PR #314), <a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake/">phase 3</a> (done, PR #314 — committed proto-hash constant, --contract-hash flag, startup refusal with KERBSIDE_SKIP_CONTRACT_CHECK escape hatch), <a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream/">phase 4</a> (docs done in PR #314; bootstrap wheel 0.4.1.dev184 published 2026-08-17 once the operator registered the trusted publisher, and the committed floor was verified against the live index to resolve it with no pre-release opt-in. Tail: 4b (patch175 simplification) withdrawn 2026-08-18 after measurement showed the fallback it would delete is inert — kolla's install_pip always passes --upgrade, which does not downgrade the newer dev wheel the committed floor already installed; the Gerrit recheck (4c) completed 2026-08-29 with every Gerrit review passing Zuul CI), <a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune/">phase 5</a> (done, PR #328 — survey found publishing denser than the master plan assumed, ~365 dev releases/year with 76% of triggers being Renovate dependency bumps. PyPI has no delete/yank API for any credential (Warehouse #12810 open and blocked), so this automates the watching rather than the deleting: a weekly credential-free storage monitor that files a tracking issue, Cargo.lock dropped from the publish trigger, and a manual pruning runbook), <a href="/components/kerbside/plans/PLAN-proxy-dev-releases-phase-06-push-audit/">phase 6</a> (done, PR #375, 2026-08-29 — no critical, high or blocking findings. <code>PUSH-AUDIT.md</code> over the accumulated diff of phases 1-3, 4a and 5: <code>14b54f3^1..2e1fd43</code> scoped to the 40 paths those phases touched, 4,040 insertions. Survey found both audit scripts hard-code <code>DIFF_BASE=develop</code>, not just <code>wave1.sh</code> as the master plan said, so an unmodified run is a vacuous pass; that the Rust half of the range has no mechanical coverage at all; and one known wave-1 false positive, the two <code>print()</code> calls in <code>tools/check-pypi-storage.py</code>. The tooling step also caught wave 1's two fatal style checks never having inspected a line: a BRE <code>grep -v '^\+\+\+'</code> matched every added line rather than the diff headers, so <code>$ADDED</code> was empty for any diff at all. The audit produced five fixes — one correctness bug (<code>get_binary_contract_hash()</code> raised <code>UnicodeDecodeError</code> on a binary printing non-UTF-8, escaping its documented every-failure-returns-a-reason contract), two hardening fixes (an unanchored stamped-tree grep that could disagree with its two siblings, and an issue title interpolated into a jq program), and two documentation honesty fixes (the contract handshake is a compatibility check and not an integrity control; a git install resolves an unreviewed pre-release wheel and nothing on any install path verifies the build provenance attestations that are produced). Everything else is declined in writing in the master plan, and the finding that unattended OIDC publishes share a persistent runner pool with pull-request code is tracked as #374. The security review also refuted this phase plan's own claim that phases 3 and 4 describe the contract hash both ways)</td>
 </tr>
+<tr>
+<td>2026-09-20</td>
+<td><a href="/components/kerbside/plans/PLAN-proxmox-source/">Proxmox console source</a></td>
+<td>A Proxmox VE source driver and the transport work it needs: PVE reaches qemu's SPICE listener only through an HTTP CONNECT to its <code>spiceproxy</code>, which the backend dialer cannot do, and mints both credentials per request, which the authorize path has no way to ask for. Carries the feasibility research promoted out of PLAN-two-tier-ci.md's future-work section on 2026-09-20, now measured against an ephemeral PVE 9.2.20 deployment built by private prototype Ansible. Promoted to a master plan on 2026-09-24 when phase 2 was planned, which brings the mandatory push-audit phase (phase 7) with it</td>
+<td>In progress</td>
+<td>phase 1 (complete -- ticket semantics, measured against an ephemeral deployment on 2026-09-20 before the plan was scheduled; no code and no plan file, and its results are the master plan's <em>What the measurements settled</em>), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/">phase 1b</a> (in progress -- a Proxmox deployment action in shakenfist/actions and a ryll lane on it, replacing phase 2's operator-assisted step 2f. The survey found there was never a standing node, that the measurements never minted with the API token or resolved the node's FQDN off-node, and that ryll's VM lanes carry no fork guard. The decision most likely to be argued with is landing the lane's ryll commits inside phase 2's pull request), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect/">phase 2</a> (in progress -- 2a and 2b committed in ryll. HTTP CONNECT in ryll's <code>shakenfist-spice-protocol</code>, plus <code>.vv</code> <code>proxy=</code> support in the ryll binary, so ryll opens a Proxmox <code>.vv</code> without kerbside. The survey found open question 2 is a correctness requirement rather than hardening: <code>ServerName::try_from</code> rejects a pseudo-hostname outright, so every tunnelled handshake would fail. It also found the pseudo-hostname, which carries a signed ticket, written into ryll's logs, capture metadata and bug reports; an IPv6-literal dial bug the rewrite fixes in passing; and that kerbside's <code>build_config</code> escalates to TLS only on <code>NEED_SECURED</code>, which phase 3b must change for tunnels. Both settled open questions are recorded at source. The decision most likely to be argued with is redacting the whole tunnel target from ryll's output rather than parsing Proxmox's format to show the vmid and node), phase 3a (not started), phase 3b (not started), phase 4 (not started), phase 5 (not started), phase 6 (not started), phase 7 (not started -- push audit)</td>
+</tr>
 </tbody>
 </table>
 <h2 id="standalone-plans">Standalone plans<a class="headerlink" href="#standalone-plans" title="Permanent link">&para;</a></h2>
@@ -14455,10 +14518,10 @@ repo root. For pre-push audits of our own work see
 </thead>
 <tbody>
 <tr>
-<td>2026-09-20</td>
-<td><a href="/components/kerbside/plans/PLAN-proxmox-source/">Proxmox console source</a></td>
-<td>A Proxmox VE source driver and the transport work it needs: PVE reaches qemu's SPICE listener only through an HTTP CONNECT to its <code>spiceproxy</code>, which the backend dialer cannot do, and mints both credentials per request, which the authorize path has no way to ask for. Carries the feasibility research promoted out of PLAN-two-tier-ci.md's future-work section on 2026-09-20, now validated against a live PVE 9.2.20 node. Standalone because two open questions about ticket semantics can move the design before any of it is written; it becomes a master plan when its first phase is planned</td>
-<td>Proposed</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
 </tr>
 </tbody>
 </table>

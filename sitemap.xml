@@ -901,6 +901,10 @@
          <lastmod>2026-09-24</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-differencing-phase-08-tests/</loc>
+         <lastmod>2026-09-24</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-differencing/</loc>
          <lastmod>2026-09-24</lastmod>
     </url>
@@ -1542,6 +1546,14 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/kerbside/plans/PLAN-kerbside-vdi-tokens/</loc>
+         <lastmod>2026-09-24</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/</loc>
+         <lastmod>2026-09-24</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect/</loc>
          <lastmod>2026-09-24</lastmod>
     </url>
     <url>

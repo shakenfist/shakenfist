@@ -16,7 +16,7 @@
         <link rel="prev" href="../PLAN-test-harness-phase-08-openstack-disposition/">
       
       
-        <link rel="next" href="../PLAN-proxy-dev-releases-phase-01-publish-workflow/">
+        <link rel="next" href="../PLAN-proxmox-source-phase-01b-ci-substrate/">
       
       
         
@@ -8026,6 +8026,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#relationship-to-other-plans" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8051,6 +8062,62 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-proxmox-source-phase-01b-ci-substrate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 1b: a Proxmox node in CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-proxmox-source-phase-02-ryll-connect/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 2: HTTP CONNECT in shakenfist-spice-protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -14519,6 +14586,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#relationship-to-other-plans" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14571,31 +14649,36 @@ parked in PLAN-two-tier-ci.md's future-work section — a
 footnote it had outgrown. It moved here on 2026-09-20, and
 that section now points at this plan.</p>
 <p>That research was done from documentation, because there was
-nowhere to test it. There is now: a single-node PVE 9.2.20 on
-<code>debian:13</code>, built with Ansible and validated privately
-(deploys in under ten minutes, survives a reboot, re-runs
-idempotently). Everything below is measured against that node
-rather than read.</p>
-<p>This is a standalone plan because the shape of the work is
-understood but none of it is scheduled, and because two of
-the open questions below can invalidate the design before any
-of it is written. It becomes a master plan when its first
-phase is planned, which brings the mandatory push-audit phase
-with it — the same promotion PLAN-use-case-docs.md went
-through on 2026-09-18.</p>
+nowhere to test it. There is now a way to build one: a
+single-node PVE 9.2.20 on <code>debian:13</code>, deployed by prototype
+Ansible in a private repository (under ten minutes, survives
+a reboot, re-runs idempotently) and torn down after use.
+Everything below was measured against such a deployment on
+2026-09-20 rather than read. There is no standing node. Phase
+1b ports that Ansible to <code>shakenfist/actions</code> so CI can build
+one on demand.</p>
+<p>This was written as a standalone plan, and was promoted to a
+master plan on 2026-09-24 when phase 2 was planned. The two
+questions that could have invalidated the design had by then
+been answered by measurement. Promotion brings the mandatory
+push-audit phase with it, the same promotion
+PLAN-use-case-docs.md went through on 2026-09-18; see
+<em>Execution</em>.</p>
 <h2 id="mission">Mission<a class="headerlink" href="#mission" title="Permanent link">&para;</a></h2>
 <p>Broker Proxmox VE SPICE consoles with the guarantees kerbside
 gives every other source: a protocol-aware middle that
 inspects the session, host-subject pinning on the backend
 leg, and an audit trail.</p>
-<p>One part of this does reach past Proxmox. Phase 3 moves
+<p>One part of this does reach past Proxmox. Phase 3a moves
 console-ticket minting into the authorize path, and the
 measurements below show that is an improvement the oVirt
 source wants on its own terms — so that phase changes
 <code>ovirt.py</code> too, deliberately, rather than leaving it on a
 7200-second default it never chose.</p>
 <p>Out of scope: PVE's VNC consoles, PVE clustering (a
-single-node source is enough to prove the model), and the
+single-node source is enough to prove the model), direct
+(unbrokered) <code>.vv</code> files for Proxmox consoles, for the reason
+given under <em>What the measurements settled</em>, and the
 Proxmox use-case documentation page, which belongs to
 PLAN-use-case-docs.md's table and stays deferred until this
 plan produces something to document.</p>
@@ -14620,7 +14703,7 @@ token-issue time rather than at discovery. For oVirt,
 <code>ConsolesProxyVirtViewer</code> fetches a fresh ticket, writes it
 with <code>db.store_console_ticket()</code>, and only then mints the
 kerbside token the client will connect with
-(<code>api.py:480-527</code>). The authorize path never calls a driver,
+(<code>api.py:482-527</code>). The authorize path never calls a driver,
 and on this design it does not need to.</p>
 <p>Proxmox cannot reuse that shape, and this is the finding that
 shapes the plan. The pattern has an unstated precondition
@@ -14637,8 +14720,7 @@ naming the ticket, the vmid, the node and the port, so
 <code>Console.ticket</code> alone cannot carry a target — and with
 minting moved to connection time, the fresh half of it should
 not be stored on the row at all.</p>
-<p>Here is what the call actually returns, from the validated
-node:</p>
+<p>Here is what the call actually returns, from that deployment:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"spice"</span><span class="p">,</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">"proxy"</span><span class="p">:</span><span class="w"> </span><span class="s2">"http://pve1.example:3128"</span><span class="p">,</span>
@@ -14669,7 +14751,14 @@ source.</p>
 <p>These are ordered by how much they can move the design.</p>
 <p>The first two questions this plan was written with have
 since been answered by measurement; see <em>What the
-measurements settled</em> below. The rest are open.</p>
+measurements settled</em> below. Questions 1 and 2 below are
+settled by
+<a href="/components/kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect/">the phase 2 plan</a>
+(decisions 1 and 4), and are kept here with their answers
+because the reasoning is what later phases build on. Question
+5 is settled by
+<a href="/components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/">the phase 1b plan</a>.
+The rest are open.</p>
 <p><strong>1. Where does the CONNECT live — ryll or kerbside?</strong> Either
 <code>ConnectionConfig</code> grows an optional proxy, and
 <code>connect_channel</code> performs the CONNECT before the TLS wrap;
@@ -14679,7 +14768,20 @@ itself. The recommendation is ryll: it keeps every way of
 reaching a SPICE server in one place, and ryll is itself a
 client that someone will eventually want to point at a
 Proxmox console directly. The cost is that a deployment
-concern lands in a protocol crate.</p>
+concern lands in a protocol crate. <strong>Settled: ryll.</strong> The
+proxy is a typed <code>ConnectionConfig</code> field, parsed where the
+string arrives rather than at connect time.</p>
+<p>Putting the CONNECT in ryll does not weaken kerbside's
+inspection. The CONNECT is a transport step beneath TLS: once
+<code>spiceproxy</code> answers <code>200 OK</code> it relays opaque bytes, the TLS
+session runs end to end between kerbside and qemu (pinned by
+<code>host-subject</code>), and <code>connect_channel</code> still returns kerbside
+a plaintext <code>SpiceStream</code> for the relay and firewall, exactly
+as it does today. <code>spiceproxy</code> sees only ciphertext. What
+would bypass kerbside is a client doing the CONNECT itself,
+which is the direct <code>.vv</code> path this plan rules out for
+Proxmox; a standalone ryll pointed at Proxmox is that case by
+choice, not kerbside's brokered path.</p>
 <p><strong>2. What is the TLS <code>ServerName</code> inside the tunnel?</strong>
 <code>connect_channel</code> derives it from <code>config.host</code>, which under
 a tunnel is the CONNECT pseudo-hostname and not a DNS name at
@@ -14689,20 +14791,30 @@ is the identity check — but the crate must then <em>refuse</em> a
 tunnelled connection that has no <code>host_subject</code>, rather than
 quietly ending up with no identity check on the backend leg.
 Both directions want a test, as PLAN-host-subject did.</p>
+<p><strong>Settled</strong>, and more pressing than it read here: the phase
+2 survey found that <code>ServerName::try_from</code> rejects a
+pseudo-hostname outright, because of its colons, so without
+an answer every tunnelled handshake fails before it starts.
+<code>SpiceClient::new</code> refuses a tunnel with no <code>host_subject</code> or
+no <code>tls_port</code>. With a pin, the verifier forgives the name,
+so under a tunnel the <code>ServerName</code> is the proxy's host and
+serves only as SNI.</p>
 <p><strong>3. Does <code>Target</code> grow a field or a transport sub-message?</strong>
 Either way it is a proto change, and proto changes carry the
 contract-hash handshake from PLAN-proxy-dev-releases phase 3,
 so the daemon and the proxy binary have to ship together.</p>
 <p><strong>4. What is the least-privileged API account?</strong> The
-validated deployment uses <code>PVEVMUser</code> on <code>/vms</code> plus
+prototype deployment uses <code>PVEVMUser</code> on <code>/vms</code> plus
 <code>PVEAuditor</code> on <code>/</code>, with a <code>privsep=0</code> API token. That works;
 it is not proven minimal, and the same honesty the oVirt
 use-case page applies to <code>SuperUser</code> applies here.</p>
-<p><strong>5. Where does a CI lane get a node?</strong> PLAN-two-tier-ci's
-future work puts a Proxmox lane in the merge tier. The
-Ansible that builds the validated node lives in a private
-repository, so a public lane needs either a public
-equivalent or a different approach.</p>
+<p><strong>5. Where does a CI lane get a node?</strong> <strong>Settled by phase
+1b.</strong> A composite action in <code>shakenfist/actions</code>,
+<code>deploy-proxmox-on-shakenfist</code>, builds a node inside the
+calling job. It is ported from the private prototype with its
+private parts removed, and has its own weekly lane for
+upstream drift. Ryll's lane uses it first and kerbside's
+follows.</p>
 <p>One constraint is already settled and is not an open
 question: <strong>the node's FQDN is load-bearing on our side.</strong>
 PVE derives the node certificate from it, and every ticket
@@ -14711,10 +14823,13 @@ pin against. A node whose domain does not resolve for the
 broker hands out a proxy address that cannot be dialled and a
 subject that will not match. Any lane must give its node a
 resolvable domain rather than an invented one — which is a
-bug the private deployment hit, and fixed, before it worked.</p>
+bug the private deployment hit, and fixed, before it worked.
+Phase 1b asserts at deploy time that <code>hostname -f</code>, the node
+certificate and the ticket agree, and maps the FQDN on the
+runner from the ticket itself.</p>
 <h2 id="what-the-measurements-settled">What the measurements settled<a class="headerlink" href="#what-the-measurements-settled" title="Permanent link">&para;</a></h2>
-<p>Measured on 2026-09-20 against the validated node, by
-minting a ticket and driving the full CONNECT -&gt; TLS -&gt; SPICE
+<p>Measured on 2026-09-20 against that deployment, by minting a
+ticket and driving the full CONNECT -&gt; TLS -&gt; SPICE
 link -&gt; auth path against it. Both numbers are also readable
 in PVE's own source, which is quoted here because it explains
 them.</p>
@@ -14768,22 +14883,35 @@ between <code>ConsolesProxyVirtViewer</code> handing over a <code>.vv</code> and
 <code>remote-viewer</code> actually connecting is user-paced — a browser
 download prompt, an "open with" dialog, an application
 launch — and 30 seconds is not a safe budget for that. The
-same arithmetic makes the direct <code>.vv</code> path
-(<code>ConsolesDirectVirtViewer</code>) marginal for Proxmox.</p>
+same arithmetic rules out the direct <code>.vv</code> path
+(<code>ConsolesDirectVirtViewer</code>) for Proxmox: the ticket is
+embedded in the file, so the same user-paced gap applies, and
+there is no broker in the path to mint a fresh one. A
+Proxmox source therefore offers proxied consoles only, and
+the direct handler refuses it with an explicit error rather
+than handing out a file that works only if opened quickly.</p>
 <p>Minting therefore has to happen at connection time, which
 means <code>AuthorizeConnection</code> calling the source driver — the
-first time that path would do so. The shape that falls out
-is per-channel minting: each channel's authorize call mints
-its own ticket, which is a handful of PVE API calls per
-session and, usefully, means a channel opened late in a long
-session (a usbredir channel on a device plug, say) gets a
-ticket minted at that moment rather than failing against a
-30-second-old one. Caching one ticket per session for its
-30 seconds is the obvious optimisation and should be
-measured, not assumed, against the added failure mode: PVE
-being unreachable now breaks connection setup, not just
-discovery — and against the supersession behaviour described
-below, which per-channel minting runs straight into.</p>
+first time that path would do so.</p>
+<p>The obvious shape, a fresh ticket per channel, does not
+work, and the reason is in the supersession finding below:
+each mint sets a new qemu password, and a SPICE client opens
+its secondary channels in parallel once the main channel
+reports them. Channel B's mint lands between channel A's mint
+and channel A's auth, and A fails. Per-channel minting is a
+race the client wins only by luck.</p>
+<p>So the default is <strong>one ticket per session</strong>: the first
+channel's authorize call mints, and later channels in the
+same session reuse that ticket for as long as it is valid.
+A channel that arrives after the ticket has aged out (a
+usbredir channel on a device plug, say) mints a replacement.
+That is safe only if qemu does not re-check an established
+channel's password when it changes, which is what the
+supersession section says has not been proven. The ticket is
+held in the daemon's memory, keyed by session, and never
+written to the <code>Console</code> row. The failure mode this adds is
+unavoidable whichever shape is chosen: PVE being unreachable
+now breaks connection setup, not just discovery.</p>
 <h3 id="three-protocol-details-that-cost-an-afternoon">Three protocol details that cost an afternoon<a class="headerlink" href="#three-protocol-details-that-cost-an-afternoon" title="Permanent link">&para;</a></h3>
 <p>None of these are documented where a driver author would
 look, and each presents as something it is not:</p>
@@ -14807,7 +14935,7 @@ the oVirt driver would expect: the node certificate verifies
 against the returned <code>ca</code>, and its subject matches the
 returned <code>host-subject</code>.</p>
 <h3 id="what-ovirt-does-measured-the-same-way">What oVirt does, measured the same way<a class="headerlink" href="#what-ovirt-does-measured-the-same-way" title="Permanent link">&para;</a></h3>
-<p>Phase 3 moves minting into the authorize path because
+<p>Phase 3a moves minting into the authorize path because
 Proxmox leaves no alternative. The obvious reading of that
 is that it is a Proxmox workaround bolted onto a path the
 other sources are happy with. Measuring oVirt the same way,
@@ -14864,11 +14992,11 @@ password on the <code>Console</code> row, where <code>CONSOLE_PUBLIC_FIELDS</cod
 keeps it out of the API but nothing encrypts it at rest. A
 ten-second session leaves a live console password in the
 database for the remaining two hours.</p>
-<p><strong>That makes phase 3 a cross-source improvement that
+<p><strong>That makes phase 3a a cross-source improvement that
 Proxmox happens to make unavoidable.</strong> Once minting can
 happen at connect time, <code>ovirt.py</code> can pass a short explicit
 expiry and stop persisting a long-lived credential at all.
-Proxmox forces the pattern; oVirt would choose it. Phase 3
+Proxmox forces the pattern; oVirt would choose it. Phase 3a
 should therefore be scoped and reviewed as a change to the
 minting path in general, not as a Proxmox prerequisite, and
 whoever schedules it should expect to touch <code>ovirt.py</code>.</p>
@@ -14886,20 +15014,20 @@ credential, it revokes the first viewer's.</p>
 single qemu password, but its 30-second window makes it
 nearly unobservable there.</p>
 <p>This is a live property of the oVirt path today, not a
-design input for a new driver, and it interacts badly with
-the per-channel minting proposed above: a channel opened
-late in a session would revoke the credential every earlier
-channel authenticated with. Whether that matters depends on
-whether qemu re-checks an established channel's password
-(it does not appear to — the six concurrent channels stayed
-up) but "appears not to" is not a foundation to build
-per-channel minting on. <strong>Phase 3 cannot be designed without
-settling this</strong>, so it belongs in that phase's scope rather
-than as an open question here.</p>
+design input for a new driver. It is why per-channel minting
+was rejected above, and it still constrains the
+session-scoped design that replaced it: a replacement ticket
+minted for a late channel revokes the credential every
+earlier channel authenticated with. Whether that matters
+depends on whether qemu re-checks an established channel's
+password (it does not appear to — the six concurrent
+channels stayed up) but "appears not to" is not a foundation
+to build on. <strong>Phase 3a cannot be designed without settling
+this</strong>, so it belongs in that phase's scope rather than as an
+open question here.</p>
 <h2 id="proposed-phases">Proposed phases<a class="headerlink" href="#proposed-phases" title="Permanent link">&para;</a></h2>
-<p>A sketch of the decomposition, not a schedule. Nothing is
-scheduled until the plan is promoted, and phase 1 exists
-because it can change everything after it.</p>
+<p>The decomposition, with each phase's intent. Status and
+phase plan links are tracked under <em>Execution</em>.</p>
 <table>
 <thead>
 <tr>
@@ -14913,20 +15041,28 @@ because it can change everything after it.</p>
 <td>Done 2026-09-20, before the plan was scheduled, because it gated the design. See <em>What the measurements settled</em></td>
 </tr>
 <tr>
+<td>1b. CI substrate</td>
+<td>A Proxmox deployment action in shakenfist/actions with its own lane, and a ryll lane on it that replaces phase 2's operator-assisted step 2f. Kerbside's lane follows on the same action</td>
+</tr>
+<tr>
 <td>2. Tunnelled transport in ryll</td>
 <td>CONNECT support on the backend dial, with the <code>ServerName</code> and no-<code>host_subject</code> refusal decided and tested both ways</td>
 </tr>
 <tr>
-<td>3. Minting at connect time</td>
-<td><code>Target</code>/proto change, minting moved into the authorize path, and <code>backend.rs</code> passing the tunnel through. Not Proxmox-only: it is what lets <code>ovirt.py</code> stop taking a 7200s default, and it must settle the supersession behaviour above before per-channel minting is committed to</td>
+<td>3a. Minting at connect time</td>
+<td>Minting moved into the authorize path through a source-driver hook, with one ticket per session held in daemon memory, and <code>ovirt.py</code> converted to request a short explicit expiry and stop persisting the ticket on the <code>Console</code> row. Settles the supersession behaviour above first. Not Proxmox-only, and needs nothing from ryll</td>
+</tr>
+<tr>
+<td>3b. Tunnel transport</td>
+<td><code>Target</code>/proto change (open question 3), an Alembic migration giving the <code>Console</code> row somewhere to record the node and the <code>spiceproxy</code> URL (the columns it has today assume a direct address), and <code>backend.rs</code> passing the tunnel through. <code>build_config</code> (<code>backend.rs:183</code>) builds <code>ConnectionConfig</code> by struct literal with <code>tls_port: None</code> and escalates to TLS only on <code>NEED_SECURED</code>, but phase 2 refuses a tunnel without a TLS port, so a tunnelled target must set <code>tls_port</code> from the start. Needs phase 2 merged and the pin bumped</td>
 </tr>
 <tr>
 <td>4. The source driver</td>
-<td><code>kerbside/sources/proxmox.py</code>: discovery over <code>/nodes/{node}/qemu</code>, console details over <code>spiceproxy</code>, CA and subject handling</td>
+<td><code>kerbside/sources/proxmox.py</code>: discovery over <code>/nodes/{node}/qemu</code>, console details over <code>spiceproxy</code>, CA and subject handling, and the direct <code>.vv</code> handler refusing Proxmox sources</td>
 </tr>
 <tr>
 <td>5. CI lane</td>
-<td>A lane that proves an end-to-end proxied session, per open question 7</td>
+<td>A lane that proves an end-to-end proxied session, per open question 5</td>
 </tr>
 <tr>
 <td>6. Docs</td>
@@ -14934,10 +15070,101 @@ because it can change everything after it.</p>
 </tr>
 </tbody>
 </table>
-<p>Phases 1 and 2 land in other places than kerbside — phase 1
-against a deployment, phase 2 in <code>shakenfist/ryll</code> — and a
+<p>Phases 2 and 3a are independent and can run in parallel.
+Phase 3a is the natural first kerbside phase: it has value on
+its own, since it removes a two-hour console password from
+the oVirt path, and it tests the session-scoped ticket design
+against a source that already exists before Proxmox depends
+on it.</p>
+<p>Phase 1b lands in <code>shakenfist/actions</code> and ryll, and its ryll
+half lands inside phase 2's pull request. Whether kerbside's
+first Proxmox lane lands in phase 3b (a tunnel-dial lane) or
+phase 5 (the end-to-end lane) is settled when 3b is planned.</p>
+<p>Phase 1 was carried out against a deployment rather than in
+this repository. Phase 2 lands in <code>shakenfist/ryll</code>, and a
 phase that lands in another repository is audited there, as
 the push-audit block requires.</p>
+<h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
+<p>Promoted from a standalone plan on 2026-09-24, when phase 2
+was planned. Promotion brings the <code>plan-push-audit-phase</code>
+obligation from <code>PLAN-TEMPLATE.md</code> with it, which is phase 7
+and is not optional. Each row records what landed it as it
+lands. A phase that lands in ryll records
+<code>ryll &lt;sha&gt; (#pr)</code> and is audited in ryll, in the pull
+request that lands it.</p>
+<p>Phase 1 has no plan file and no <code>Merged</code> cell. It was a
+measurement against a deployment, it changed no code, and
+its results are the <em>What the measurements settled</em> section
+above. The push audit has nothing of it to read.</p>
+<p>Phase 1b's <code>Merged</code> cell holds <code>actions &lt;sha&gt; (#pr)</code>; its
+ryll half lands inside phase 2's merge and carries no
+separate <code>Merged</code> entry of its own.</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Plan</th>
+<th>Status</th>
+<th>Merged</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Ticket semantics</td>
+<td></td>
+<td>Complete</td>
+<td></td>
+</tr>
+<tr>
+<td>1b. CI substrate</td>
+<td><a href="/components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/">PLAN-proxmox-source-phase-01b-ci-substrate.md</a></td>
+<td>In progress</td>
+<td></td>
+</tr>
+<tr>
+<td>2. Tunnelled transport in ryll</td>
+<td><a href="/components/kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect/">PLAN-proxmox-source-phase-02-ryll-connect.md</a></td>
+<td>In progress</td>
+<td></td>
+</tr>
+<tr>
+<td>3a. Minting at connect time</td>
+<td></td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>3b. Tunnel transport</td>
+<td></td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>4. The source driver</td>
+<td></td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>5. CI lane</td>
+<td></td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>6. Docs</td>
+<td></td>
+<td>Not started</td>
+<td></td>
+</tr>
+<tr>
+<td>7. Push audit</td>
+<td></td>
+<td>Not started</td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <h2 id="relationship-to-other-plans">Relationship to other plans<a class="headerlink" href="#relationship-to-other-plans" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>PLAN-two-tier-ci.md</strong> — where the feasibility research
@@ -14953,7 +15180,10 @@ the push-audit block requires.</p>
   is why a <code>Target</code> change couples the daemon and the binary.</li>
 </ul>
 <h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
-<p>Proposed. No phase is scheduled and no work has begun.</p>
+<p>In progress. Phase 1 is complete, and phases 1b and 2 are
+planned. Phase 2 is in progress in ryll (steps 2a and 2b
+committed on <code>spice-http-connect</code>); its validation waits on
+phase 1b.</p>
 
 
 

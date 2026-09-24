@@ -4700,6 +4700,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#differencing-oracle-cross-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differencing oracle cross-check
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mutation-harness-for-the-differencing-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mutation harness for the differencing tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#related-documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8523,6 +8545,62 @@
     
   
     Proxmox console source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 1b: a Proxmox node in CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 2: HTTP CONNECT in shakenfist-spice-protocol
   
 
     
@@ -15437,6 +15515,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#differencing-oracle-cross-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differencing oracle cross-check
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mutation-harness-for-the-differencing-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mutation harness for the differencing tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#related-documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16566,7 +16666,10 @@ comparison layers:</p>
 <p>This closes the gap where VMDK/VHD/VHDX had no differential reference
 for <code>check</code> validation (qemu-img check only supports QCOW2), and
 provides a third independent opinion for QCOW2. libyal tools are
-optional — the fuzzer degrades gracefully when they are unavailable.</p>
+optional here — the fuzzer degrades gracefully when they are
+unavailable. That is not true of every use of libvhdi in this suite;
+see the differencing oracle cross-check below, which CI treats as
+mandatory.</p>
 <h3 id="running-locally">Running locally<a class="headerlink" href="#running-locally" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
@@ -17102,6 +17205,209 @@ by hand in interactive sessions. A workflow once attempted the fix
 itself; it was retired after an audit found its safety boundary
 unsound. See <code>docs/plans/PLAN-fuzz-autofix.md</code> for the history
 and the reasoning.</p>
+<h2 id="differencing-oracle-cross-check">Differencing oracle cross-check<a class="headerlink" href="#differencing-oracle-cross-check" title="Permanent link">&para;</a></h2>
+<p><code>tests/test_differencing.py</code>'s <code>TestDifferencingLibvhdiOracle</code>
+runs <code>vhdiinfo</code> against a differencing VHD or VHDX child that <code>instar
+create</code> wrote through the real CLI. It exists because <code>qemu-img</code>
+cannot serve as the oracle for this output — it reads a differencing
+image as though the parent were absent, surfacing no parent at all —
+so <code>vhdiinfo</code> is the only external cross-check of the parent linkage
+instar wrote, and this suite is the only place anything other than
+instar's own parser reads a differencing image instar wrote.</p>
+<p>The assertions are structural only, per
+<a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>: the disk type, the
+parent filename for VHD, and the parent identifier for both formats,
+each compared against what <code>vhdiinfo</code> reports for the parent itself
+rather than a hardcoded GUID. No composed content is read. One
+limitation is recorded rather than worked around: <code>vhdiinfo</code> prints no
+<code>Parent filename</code> line for a VHDX, with or without <code>-v</code>, so the VHDX
+parent locator's path key cannot be checked through this tool — the
+Rust round-trip test pins it instead
+(<code>src/crates/create/tests/round_trip.rs</code>).</p>
+<p>The suite runs inside the <code>instar-build</code> devcontainer, which installs
+<code>libvhdi-utils</code>, so locally these tests skip when <code>vhdiinfo</code> is absent
+(<code>_require_vhdiinfo</code> in <code>tests/base.py</code>), the same bargain
+<code>_require_qemu_img</code> strikes. In CI that same absence is a failure
+instead: <code>INSTAR_REQUIRE_LIBVHDI=1</code> is set on the integration job's
+test step and passed through by the <code>Makefile</code> to the container,
+because a skipped test and a passing test look identical in a green
+run and <code>stestr</code> does not name skipped tests in its output — parsing
+the log could not have caught it. Removing <code>libvhdi-utils</code> from the
+devcontainer turns that job red instead of leaving it quietly green.</p>
+<h2 id="mutation-harness-for-the-differencing-tests">Mutation harness for the differencing tests<a class="headerlink" href="#mutation-harness-for-the-differencing-tests" title="Permanent link">&para;</a></h2>
+<p><code>tools/mutate-differencing.sh</code> answers one question about the
+differencing output path (<code>instar create -f {vpc,vhdx} -b PARENT</code>):
+<strong>can the tests that guard it actually fail?</strong> It is not a coverage
+tool and it measures nothing. Each case breaks one specific behaviour
+in <code>src/</code> and requires one named test to notice; a test that still
+passes against a deliberately broken emitter is not guarding what its
+name says it guards. See
+<a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> for the path being
+guarded.</p>
+<p>There are <strong>26 cases</strong>: fourteen mutate a library crate (<code>create</code>,
+<code>vhd</code>, <code>vhdx</code>) and are caught by a Rust unit or round-trip test, and
+twelve are caught by a Python integration test through the real
+binary. Ten of those twelve mutate the <code>create</code> guest operation, which
+is excluded from <code>cargo test --workspace</code>, so a unit test written
+beside that code would never run; the other two mutate the <code>create</code>
+crate but break something only an external parser can see. Going
+through the real binary means <code>make instar</code> before the test and again
+after the source is restored.</p>
+<p>Four of the integration cases (<code>oracle-*</code>) name the libvhdi
+cross-check in <code>tests/test_differencing.py</code>, which skips without
+<code>vhdiinfo</code> on <code>PATH</code> (Debian: <code>libvhdi-utils</code>). A skipped test scores
+<code>BROKEN</code>, not <code>PASS</code>, so the harness needs that package installed to
+report a clean run; it warns once up front when it is missing.</p>
+<p>A full run took <strong>2m32s, 2m44s and 3m35s</strong> on three measured runs of
+this tree, with <code>vhdiinfo</code> present and all 26 cases passing — so
+budget three to four minutes and expect the spread, which is cargo and
+docker layer caching. Those are observations: an earlier "about two
+minutes" here was a guess, and an understated figure invites the
+reader to assume a run has hung. Most of the time is the 24 <code>make
+instar</code> rebuilds the integration cases need; the 21 baselines add test
+runs but no rebuilds.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>tools/mutate-differencing.sh<span class="w">          </span><span class="c1"># every case, three to four minutes</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>tools/mutate-differencing.sh<span class="w"> </span>--list<span class="w">   </span><span class="c1"># the case names, run nothing</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>tools/mutate-differencing.sh<span class="w"> </span>NAME...<span class="w">  </span><span class="c1"># only the named cases</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>tools/mutate-differencing.sh<span class="w"> </span>--self-test<span class="w">        </span><span class="c1"># check the verdict classifier</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>tools/mutate-differencing.sh<span class="w"> </span>--check-patterns<span class="w">  </span><span class="c1"># do the mutations still land?</span>
+</code></pre></div>
+<p>Three things run in the <code>ci-tooling</code> job, because a full run needs
+docker, testdata and <code>/dev/kvm</code> and so never runs on a pull request —
+which would leave the harness free to rot unnoticed, and a harness
+that has rotted quietly is worse than none, because its green is
+trusted.</p>
+<table>
+<thead>
+<tr>
+<th>Guard</th>
+<th>Answers</th>
+<th>Cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--self-test</code></td>
+<td>does the verdict classifier classify correctly?</td>
+<td>milliseconds</td>
+</tr>
+<tr>
+<td><code>--check-patterns</code></td>
+<td>does every mutation still have exactly one place to land, and do the case count here and in the script still agree?</td>
+<td>a few seconds</td>
+</tr>
+<tr>
+<td><code>tools/ci/test-replace-once.sh</code></td>
+<td>does the literal replace helper still refuse zero and multiple matches?</td>
+<td>milliseconds</td>
+</tr>
+</tbody>
+</table>
+<p>None of them needs docker, a venv, testdata or a build.</p>
+<p><code>--self-test</code> exists because the classifier is the one part of the
+harness nothing else checks — everything else is checked <em>by</em> it — and
+it shipped misreading <code>FAILED (errors=1)</code> as a caught mutation, which
+no run of the harness itself would have revealed.</p>
+<p><code>--check-patterns</code> exists because the 26 search strings are pinned to
+<code>src/</code> byte for byte, indentation included. A <code>rustfmt</code> change that
+moves a space turns a case <code>BROKEN</code>, and without this nothing would
+say so until someone spent the full run. It reports <code>LANDS</code> and
+<code>DRIFT</code> rather than <code>PASS</code> and <code>BROKEN</code>, because it applies no
+mutation and runs no test and those words are defined above as facts
+about a run that did both.</p>
+<p>It also reads the case count out of <em>this page</em> and compares it with
+the script's own constant, so the two cannot drift apart. That is a
+recent correction: the check previously compared the script against
+itself while the documentation claimed otherwise, which is the exact
+species of unverified claim the rest of this section is about.</p>
+<p>The verdicts are the point of the script:</p>
+<table>
+<thead>
+<tr>
+<th>Verdict</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PASS</code></td>
+<td>The mutation applied and the named test failed. The test guards the property.</td>
+</tr>
+<tr>
+<td><code>FAIL</code></td>
+<td>The mutation applied and the test still passed. The test does not guard the property.</td>
+</tr>
+<tr>
+<td><code>BROKEN</code></td>
+<td>The case proved nothing: the mutation could not be applied, the test never ran (a wrong package name, a build error, a filter that matched no test), the test skipped, or the test does not pass against unmutated source.</td>
+</tr>
+</tbody>
+</table>
+<p><code>BROKEN</code> exists because the interesting failure mode of a mutation
+harness is not a test that fails to fire, it is a case that scores a
+pass without having earned it. There are three ways that happens, and
+the harness closes each:</p>
+<ul>
+<li><strong>The mutation never lands.</strong> A substitution matching nothing leaves
+  the code unchanged, the test passes for the ordinary reason, and a
+  naive harness calls that a pass. Every edit therefore goes through
+  <code>tools/replace-once.py</code>, a <strong>literal</strong> find-and-replace — no regex,
+  no <code>sed</code>, no escaping rules — that exits non-zero unless the search
+  string occurs exactly once in the target file.</li>
+<li><strong>The test was already red.</strong> A test broken on <code>develop</code>, or red for
+  an environmental reason, fails again with the mutation applied and
+  the failure gets credited to the mutation. Each named test is
+  therefore run once against unmutated source first, and a case whose
+  baseline does not pass is <code>BROKEN</code> rather than <code>PASS</code>. Baselines are
+  cached per target: the 26 cases name 21 distinct targets (14 Rust,
+  7 integration), so that is 21 extra test runs and no extra rebuilds
+  — the integration baselines reuse the clean binary each case
+  restores anyway.</li>
+<li><strong>The test errored rather than failed.</strong> <code>unittest</code> reports an
+  exception raised outside an assertion as <code>FAILED (errors=1)</code> — the
+  same <code>FAILED</code> line a caught mutation produces. Matching on the word
+  alone meant a missing testdata checkout, which makes <code>setUpClass</code>
+  raise, scored <code>PASS</code> for every integration case without one
+  assertion being evaluated. A genuine catch always says <code>failures=</code>,
+  so <code>errors=</code> is now <code>BROKEN</code>, and the script refuses to start
+  without testdata at all.</li>
+</ul>
+<p>The script exits non-zero if any case is <code>FAIL</code> or <code>BROKEN</code>.</p>
+<p>The log of any case that does not pass is kept under
+<code>.mutation-backups/logs/</code> and named in the report, because the scratch
+directory dies with the process and the one moment the <code>cargo</code> or
+<code>unittest</code> output is wanted is when something went wrong. Those logs
+are cleared at the start of each run, so a stale one cannot be read as
+current.</p>
+<p>Naming a case that does not exist is an error rather than an empty
+pass: a mistyped name used to run nothing and report <code>0 cases: 0 PASS,
+0 FAIL, 0 BROKEN</code> with exit 0.</p>
+<p>Originals are copied into <code>.mutation-backups/</code> (gitignored) before each
+edit and copied back afterwards, including on interrupt. Restoring with
+<code>git checkout &lt;path&gt;</code> is deliberately avoided: it discards uncommitted
+work. After a run, <code>git status --short</code> should be unchanged and the
+<code>instar</code> binary rebuilt from clean source.</p>
+<p>The backup lives inside the repository rather than in a <code>mktemp -d</code>
+because a <code>mktemp -d</code> dies with the process: a run that is <strong>killed</strong>
+rather than interrupted leaves its mutation applied with nothing to
+restore from. Since a mutation is a small change that still compiles,
+<code>pre-commit</code> and <code>cargo build</code> both pass on it and nothing downstream
+would notice. So the script also <strong>refuses to start when <code>src/</code> has
+uncommitted modifications</strong>, listing what changed and printing the
+exact command to put it back — the surviving backup where there is one,
+<code>git checkout -- src/</code> otherwise. That turns a killed run into a
+refusal at the next invocation instead of a surprise at some later
+commit. Pass <code>--allow-dirty-src</code> when the modifications are your own
+work in progress and you want the harness to mutate on top of them.</p>
+<p>Two properties in this area are deliberately <strong>not</strong> mutation-tested.
+The <code>(_, true) =&gt; ERROR_PARENT_FORMAT_MISMATCH</code> arms of
+<code>vhd_opts_from</code> and <code>vhdx_opts_from</code> are unreachable by construction —
+the operation refuses a wrong-format parent, and then a format-right
+but identity-less parent, before either arm can be reached — so no
+single substitution in them changes observable behaviour. And a
+fixed-subformat <code>vpc</code> child with <code>-b</code> is refused on the host before the
+emitter sees it, so it is a host-argument case rather than an emitter
+one.</p>
 <h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="/components/instar/format-coverage/">Format Coverage</a> - Comparison with oslo.utils format_inspector</li>
@@ -17249,28 +17555,28 @@ baseline is suspect, diff <code>profiles/</code> against <code>raw/</code> and c
 recorded <code>*_stdout_bytes</code> in each <code>.meta.json</code>, which is what
 <code>detect-profiles.py</code>'s <code>validate_profiles()</code> now does before it will
 commit anything.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Set up test environment</span>
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>make<span class="w"> </span>test-venv
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1"># Run safe integration tests</span>
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>make<span class="w"> </span><span class="nb">test</span>
-<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
-<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="c1"># Run tests with verbose output (shows diffs on failure)</span>
-<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>make<span class="w"> </span>test-report
-<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>
-<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="c1"># Run all tests including malicious images (use with caution)</span>
-<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>make<span class="w"> </span>test-malicious
-<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>
-<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a><span class="c1"># Run tests inside container (as CI does)</span>
-<a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a>make<span class="w"> </span>test-container
-<a id="__codelineno-17-15" name="__codelineno-17-15" href="#__codelineno-17-15"></a>
-<a id="__codelineno-17-16" name="__codelineno-17-16" href="#__codelineno-17-16"></a><span class="c1"># CI splits tests into three parallel jobs by format family:</span>
-<a id="__codelineno-17-17" name="__codelineno-17-17" href="#__codelineno-17-17"></a>make<span class="w"> </span>test-container-core<span class="w">              </span><span class="c1"># info, check, security, oslo-crossval</span>
-<a id="__codelineno-17-18" name="__codelineno-17-18" href="#__codelineno-17-18"></a>make<span class="w"> </span>test-container-convert-qcow2<span class="w">    </span><span class="c1"># QCOW2/VMDK/RAW convert + compare</span>
-<a id="__codelineno-17-19" name="__codelineno-17-19" href="#__codelineno-17-19"></a>make<span class="w"> </span>test-container-convert-vhd<span class="w">      </span><span class="c1"># VHD/VHDX convert (slowest)</span>
-<a id="__codelineno-17-20" name="__codelineno-17-20" href="#__codelineno-17-20"></a>
-<a id="__codelineno-17-21" name="__codelineno-17-21" href="#__codelineno-17-21"></a><span class="c1"># Clean test artifacts</span>
-<a id="__codelineno-17-22" name="__codelineno-17-22" href="#__codelineno-17-22"></a>make<span class="w"> </span>clean-tests
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Set up test environment</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>make<span class="w"> </span>test-venv
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="c1"># Run safe integration tests</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>make<span class="w"> </span><span class="nb">test</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="c1"># Run tests with verbose output (shows diffs on failure)</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>make<span class="w"> </span>test-report
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="c1"># Run all tests including malicious images (use with caution)</span>
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>make<span class="w"> </span>test-malicious
+<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a>
+<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a><span class="c1"># Run tests inside container (as CI does)</span>
+<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>make<span class="w"> </span>test-container
+<a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a>
+<a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a><span class="c1"># CI splits tests into three parallel jobs by format family:</span>
+<a id="__codelineno-18-17" name="__codelineno-18-17" href="#__codelineno-18-17"></a>make<span class="w"> </span>test-container-core<span class="w">              </span><span class="c1"># info, check, security, oslo-crossval</span>
+<a id="__codelineno-18-18" name="__codelineno-18-18" href="#__codelineno-18-18"></a>make<span class="w"> </span>test-container-convert-qcow2<span class="w">    </span><span class="c1"># QCOW2/VMDK/RAW convert + compare</span>
+<a id="__codelineno-18-19" name="__codelineno-18-19" href="#__codelineno-18-19"></a>make<span class="w"> </span>test-container-convert-vhd<span class="w">      </span><span class="c1"># VHD/VHDX convert (slowest)</span>
+<a id="__codelineno-18-20" name="__codelineno-18-20" href="#__codelineno-18-20"></a>
+<a id="__codelineno-18-21" name="__codelineno-18-21" href="#__codelineno-18-21"></a><span class="c1"># Clean test artifacts</span>
+<a id="__codelineno-18-22" name="__codelineno-18-22" href="#__codelineno-18-22"></a>make<span class="w"> </span>clean-tests
 </code></pre></div>
 <p><strong>Test structure:</strong>
 - <code>tests/manifest.json</code> - Defines test images and their safety levels
@@ -17375,19 +17681,19 @@ since qemu-img cannot inspect inside LUKS without a secret object.</p>
 <h2 id="testing-prototypes">Testing Prototypes<a class="headerlink" href="#testing-prototypes" title="Permanent link">&para;</a></h2>
 <p>Each prototype has its own devcontainer with the required toolchain. Use the
 Makefile for building and testing:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Build a specific prototype</span>
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>make<span class="w"> </span>build-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="c1"># Build the devcontainer for a prototype</span>
-<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>make<span class="w"> </span>build-prototype-devcontainer<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
-<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>
-<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="c1"># View run instructions</span>
-<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>make<span class="w"> </span>run-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Build a specific prototype</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>make<span class="w"> </span>build-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># Build the devcontainer for a prototype</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>make<span class="w"> </span>build-prototype-devcontainer<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="c1"># View run instructions</span>
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>make<span class="w"> </span>run-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
 </code></pre></div>
 <p>For manual testing without the Makefile:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="nb">cd</span><span class="w"> </span>prototypes/&lt;prototype-name&gt;
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>./build.sh<span class="w">                           </span><span class="c1"># Build the prototype</span>
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>sudo<span class="w"> </span>./target/release/vmm<span class="w"> </span>guest.bin<span class="w">  </span><span class="c1"># Run (requires KVM)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="nb">cd</span><span class="w"> </span>prototypes/&lt;prototype-name&gt;
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>./build.sh<span class="w">                           </span><span class="c1"># Build the prototype</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>sudo<span class="w"> </span>./target/release/vmm<span class="w"> </span>guest.bin<span class="w">  </span><span class="c1"># Run (requires KVM)</span>
 </code></pre></div>
 <h2 id="testing-considerations">Testing Considerations<a class="headerlink" href="#testing-considerations" title="Permanent link">&para;</a></h2>
 <ul>

@@ -8113,6 +8113,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 1b: a Proxmox node in CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 2: HTTP CONNECT in shakenfist-spice-protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -15047,13 +15103,13 @@ records <code>instar-testdata &lt;sha&gt; (#pr)</code> and is audited there.</p>
 <tr>
 <td>7. Guest create op and host CLI wiring</td>
 <td><a href="/components/instar/plans/PLAN-differencing-phase-07-guest-host/">PLAN-differencing-phase-07-guest-host.md</a></td>
-<td>Planned</td>
-<td></td>
+<td>Complete</td>
+<td><code>99d7d24</code> (#581)</td>
 </tr>
 <tr>
 <td>8. Rust unit tests and Python integration tests</td>
-<td>PLAN-differencing-phase-08-tests.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-differencing-phase-08-tests/">PLAN-differencing-phase-08-tests.md</a></td>
+<td>Planned</td>
 <td></td>
 </tr>
 <tr>
@@ -15159,7 +15215,10 @@ claim is read from code, not measured on output) and consider
 giving created images a real DataWriteGuid; phase 8's
 negative identity test must be built against a <strong>third-party</strong>
 parent either way, because an instar-created parent cannot fail
-it.</p>
+it. <strong>Discharged by phase 7</strong>, which built exactly that test:
+<code>tests/test_create.py</code> round-trips both formats against
+third-party fixtures and asserts the fixture identity is non-zero
+before comparing, so the comparison is not zeros against zeros.</p>
 <p>Phase 8 carried one debt from phase 5, <strong>now discharged</strong> and
 recorded here because the phase 5 plan is not where phase 8's
 planner will look. <code>create -f vpc -b</code> is still refused at the guest
@@ -15404,8 +15463,10 @@ status becomes <code>Complete</code>.</p>
   parent-identity check is vacuous for chains instar wrote end to
   end. Deferred by decision 2 of the phase 5 plan: it needs a
   host-side entropy source passed through the call table, which is
-  the one ABI change this plan is built to avoid. Phase 8's
-  negative identity test must therefore use a third-party parent.</li>
+  the one ABI change this plan is built to avoid. The negative
+  identity test therefore uses a third-party parent; phase 7 built
+  it, so this is a note on the constraint rather than outstanding
+  work.</li>
 <li>Differencing-aware <code>check</code>, once a chain can be resolved:
   today <code>check</code> refuses VHDX differencing and validates a VHD
   differencing child as if it were dynamic.</li>
