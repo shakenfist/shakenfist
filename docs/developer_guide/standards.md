@@ -55,13 +55,14 @@ still see the write it expected.
 ## A guarded UPDATE must be the transaction's first statement
 
 `innodb_snapshot_isolation` defaults ON from MariaDB 11.6.2, which is
-what Debian 13, Ubuntu 24.04 and every recent container tag ship. Under
-it, a REPEATABLE READ transaction whose read view was established by a
-plain `SELECT` does not block and re-evaluate a later `UPDATE` whose
-target row has moved since — it aborts the whole transaction with
-ER_CHECKREAD (1020). When the guarded `UPDATE` is instead the
-transaction's *first* statement, the read view is established by the DML
-itself, there is no stale-snapshot window, and a contending writer
+what Debian 13 and every recent container tag ship (Ubuntu 24.04 is
+still on 10.11, where it defaults OFF). Under it, a REPEATABLE READ
+transaction whose read view was established by a plain `SELECT` does
+not block and re-evaluate a later `UPDATE` whose target row has moved
+since — it aborts the whole transaction with ER_CHECKREAD (1020). When
+the guarded `UPDATE` is instead the transaction's *first* statement, the
+read view is established by the DML itself, there is no stale-snapshot
+window, and a contending writer
 blocks on the row lock and then re-evaluates its `WHERE`, which is the
 behaviour every guarded-counter design in `shakenfist/mariadb.py`
 depends on.
@@ -81,8 +82,10 @@ The structural regression tests are `SnapshotIsolationInvariantTestCase`
 in `shakenfist/tests/test_mariadb_capacity_admission.py`; the
 behavioural one is `PlacementAdmissionConcurrencyLiveTestCase` in the
 matching `_live` module, which only bites against a server with the
-variable ON — CI's `debian-12` runner has MariaDB 10.11, where it does
-not exist, so this is a rule CI cannot enforce for you. See
+variable ON. The `schema_enum_widening` job runs the live modules on a
+`debian-13` runner against Debian 13's MariaDB 11.8, where it is ON, so
+CI does enforce this in the merge queue — but not on a pull request,
+where that job does not run. See
 `docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md` step 6a.
 
 ## Secret-carrying fields are `SecretStr`

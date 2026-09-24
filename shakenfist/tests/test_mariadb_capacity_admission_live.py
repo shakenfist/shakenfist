@@ -1127,6 +1127,9 @@ class PlacementAdmissionConcurrencyLiveTestCase(_LiveCapacityFixture):
       followed by a reconcile pass which must report zero drift. That
       last one is the "guard and reconciler agree by construction"
       claim of decision P2, tested rather than asserted in prose.
+
+    CI's schema_enum_widening job runs it against Debian 13's MariaDB
+    11.8, where innodb_snapshot_isolation is ON (issue #3759).
     """
 
     # One pooled connection per concurrent admission plus headroom for
@@ -1145,7 +1148,8 @@ class PlacementAdmissionConcurrencyLiveTestCase(_LiveCapacityFixture):
         """Record the server settings the run's result is only true for.
 
         ``innodb_snapshot_isolation`` is ON by default from MariaDB
-        11.6.2 and absent before it, and it changes what a guarded
+        11.6.2, OFF in the older series which have it (10.11.18 does),
+        and absent from older point releases. It changes what a guarded
         UPDATE does when it collides: block and re-evaluate, or abort
         with ER_CHECKREAD (1020) for the caller to retry. A concurrency
         result that does not say which regime produced it is not a
@@ -1161,7 +1165,7 @@ class PlacementAdmissionConcurrencyLiveTestCase(_LiveCapacityFixture):
                 snapshot = conn.execute(sa.text(
                     'SELECT @@innodb_snapshot_isolation')).scalar()
             except sa.exc.OperationalError:
-                snapshot = 'absent (pre 11.6.2)'
+                snapshot = 'absent (server predates it)'
         self._report('server-regime', (
             f'MariaDB {version}, collation {collation}, '
             f'innodb_snapshot_isolation {snapshot}'))

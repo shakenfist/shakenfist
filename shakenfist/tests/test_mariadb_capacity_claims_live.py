@@ -871,8 +871,8 @@ class NamespaceClaimConcurrencyLiveTestCase(_LiveClaimFixture):
 
     It is also the only place an ER_CHECKREAD regression in the new
     transactions is visible, so it reports the server regime it ran
-    under (see issue #3759 for the standing gap that CI's MariaDB does
-    not have innodb_snapshot_isolation).
+    under. CI's schema_enum_widening job runs it against Debian 13's
+    MariaDB 11.8, where innodb_snapshot_isolation is ON (issue #3759).
     """
 
     ENGINE_KWARGS = {'pool_size': RACE_THREADS + 8, 'max_overflow': 8,
@@ -893,7 +893,7 @@ class NamespaceClaimConcurrencyLiveTestCase(_LiveClaimFixture):
                 snapshot = conn.execute(sa.text(
                     'SELECT @@innodb_snapshot_isolation')).scalar()
             except sa.exc.OperationalError:
-                snapshot = 'absent (pre 11.6.2)'
+                snapshot = 'absent (server predates it)'
         self._report('server-regime', (
             f'MariaDB {version}, collation {collation}, '
             f'innodb_snapshot_isolation {snapshot}'))

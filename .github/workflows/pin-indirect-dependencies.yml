@@ -52,7 +52,7 @@ jobs:
     # xs (1 vCPU / 2048 MB, no swap) when the labels name none. The
     # resolve below builds an isolated venv and resolves the whole
     # dependency tree, which wants more headroom than that.
-    runs-on: [self-hosted, vm, debian-12, s]
+    runs-on: [self-hosted, vm, debian-13, s]
     timeout-minutes: 60
     env:
       http_proxy: http://192.168.1.15:3128

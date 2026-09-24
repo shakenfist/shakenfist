@@ -34,11 +34,13 @@
 # bumped only one of the duplicates (see shakenfist#3398, shakenfist#3399
 # and shakenfist#3462).
 #
-# The resolve runs once, in whatever environment invoked it -- in CI that
-# is the lowest supported Python on Linux. Dependencies guarded by
-# environment markers are therefore resolved for that environment only, so
-# the block is complete for it but may omit packages needed only on a newer
-# Python or another platform.
+# The resolve runs once, under the lowest Python the project supports: the
+# floor of requires-python in pyproject.toml, which uv fetches if the host
+# does not have it. That is deliberately not the host's python3, because a
+# runner image moves to a newer distro long before the project drops the
+# older Python. Dependencies guarded by environment markers are resolved
+# for that Python on Linux only, so the block is complete for it but may
+# omit packages needed only on a newer Python or another platform.
 #
 # Some packages must never be pinned even though they are installed. The
 # canonical example is pydantic-core: pydantic pins it exactly (==), so an
@@ -107,11 +109,24 @@ sed -n 's/^ *# never-pin: *//p' pyproject.toml \
 python3 -m venv "${workdir}/uv"
 "${workdir}/uv/bin/pip3" install uv
 
+# The resolve Python is the requires-python floor (see the header). A
+# missing or non-">=" floor is an error rather than a fallback to python3,
+# because that fallback is exactly the silent drift this exists to prevent.
+floor=$(sed -n 's/^requires-python *= *">= *\([0-9][0-9.]*\)".*/\1/p' pyproject.toml)
+if [ -z "${floor}" ]; then
+    echo 'pyproject.toml must declare requires-python = ">=X.Y", the' >&2
+    echo 'Python the pins are resolved under.' >&2
+    exit 1
+fi
+echo "Resolving under Python ${floor}, the requires-python floor."
+
 # The target venv is deliberately isolated (no --system-site-packages): if
 # system packages could satisfy requirements then pip freeze would not see
 # the complete dependency closure, and anything the system happened to
-# provide would be wrongly dropped from the pinned block as stale.
-python3 -m venv "${workdir}/venv"
+# provide would be wrongly dropped from the pinned block as stale. --seed
+# puts pip in it for the freeze below.
+"${workdir}/uv/bin/uv" venv --seed --python "${floor}" "${workdir}/venv"
+"${workdir}/venv/bin/python" --version
 if ! "${workdir}/uv/bin/uv" pip install --python "${workdir}/venv/bin/python" \
         -r "${workdir}/pyproject.toml" -c "${workdir}/constraints.txt"; then
     echo >&2

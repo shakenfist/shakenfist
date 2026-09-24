@@ -13,7 +13,7 @@
 # sync it rather than editing it.
 #
 # The runner label is not a typo. This needs a docker daemon, and
-# static runners do not have one: `debian-12-docker` is the fleet's
+# static runners do not have one: `debian-13-docker` is the fleet's
 # docker-capable image. Add it to .github/actionlint.yaml's runner
 # labels or actionlint fails.
 #
@@ -91,7 +91,7 @@ permissions:
 jobs:
   mermaid-lint:
     name: Mermaid lint
-    runs-on: [self-hosted, vm, debian-12-docker, s]
+    runs-on: [self-hosted, vm, debian-13-docker, s]
     timeout-minutes: 15
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
