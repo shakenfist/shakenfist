@@ -8,6 +8,36 @@ function log {
     echo -e "$(date) $1"
     }
 
+# Filter a `ps -ef` listing on stdin down to Shaken Fist daemon processes.
+#
+# Match the daemons precisely rather than grepping for the two letters "sf".
+# Daemons rename themselves with setproctitle to the "sf-<name>" values in
+# DAEMON_NAMES (shakenfist/daemons/daemon.py); nodelock, privexec and the two
+# sentinels set theirs literally; sf-queues adds a " startup" suffix; and
+# sf-api runs under gunicorn as "gunicorn: master [sf-api]". None of those
+# carry a path, so the first alternative anchors on "sf-" at a field, path or
+# bracket boundary. The second catches anything still executing out of the
+# venv, including the /bin/sh wrapper sf-api.service starts gunicorn from.
+#
+# A bare `grep sf` used to be the whole test. It matched any command line
+# containing those two letters anywhere, which needed an ever-growing
+# exclusion list and still failed the job whenever the under-cloud's
+# log-shipping hostname guard -- which mentions sfcbr-* -- was still alive.
+# That false positive ejected PRs from the merge queue about four times a
+# day for two weeks. See issue #4209.
+#
+# The one exclusion that remains is real: qemu declares the guest agent's
+# virtio-serial channel as name=sf-agent (see shakenfist/instance.py), and
+# instances legitimately keep running on a node whose Shaken Fist services
+# have stopped. Kernel threads such as [ata_sff] and the kvm helpers no
+# longer need excluding because they cannot match the pattern.
+#
+# shakenfist/tests/test_nodelifecycle_shell.py runs this function against a
+# recorded listing, including the line from the issue.
+function sf_processes {
+    grep -E '([/ ]|\[)sf-[a-z]|/srv/shakenfist/venv/bin/' | grep -v 'sf-agent' || true
+    }
+
 # Install dependencies
 sudo apt-get install -y jq
 
@@ -462,14 +492,17 @@ while [ ${finished} -lt 1 ]; do
     fi
 done
 
-# Ensure SF really stopped on ${other_victim}
-running_count=$(sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
-    "sudo ps -ef | grep sf | egrep -v '(ata_sff|kvm|agent|grep)'" | wc -l)
+# Ensure SF really stopped on ${other_victim}. The listing is fetched once and
+# filtered here rather than remotely, so that the filter's own command line
+# cannot appear in the listing it is filtering -- which is what the old
+# check's trailing `grep -v grep` was for.
+leftovers=$(sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
+    'sudo ps -ef' | sf_processes)
+running_count=$(echo -n "${leftovers}" | grep -c . || true)
 if [ ${running_count} -gt 0 ]; then
     log "SF failed to stop on ${other_victim}, there are ${running_count} processes still running."
     log ""
-    sudo ssh -o StrictHostKeyChecking=no debian@${other_victim} \
-        "sudo ps -ef | grep sf | egrep -v '(ata_sff|kvm|agent|grep)'"
+    echo "${leftovers}"
     exit 1
 fi
 
