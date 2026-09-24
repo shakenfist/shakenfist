@@ -363,8 +363,8 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 | 4. Read-side policy: close the silent parent-ignoring read | [PLAN-differencing-phase-04-read-policy.md](/components/instar/plans/PLAN-differencing-phase-04-read-policy/) | Complete | `f981374` (#563) |
 | 5. `plan_vhd` differencing emitter | [PLAN-differencing-phase-05-vhd-emitter.md](/components/instar/plans/PLAN-differencing-phase-05-vhd-emitter/) | Complete | `9a80776` (#568) |
 | 6. `plan_vhdx` differencing emitter | [PLAN-differencing-phase-06-vhdx-emitter.md](/components/instar/plans/PLAN-differencing-phase-06-vhdx-emitter/) | Complete | `882d098` (#577) |
-| 7. Guest create op and host CLI wiring | [PLAN-differencing-phase-07-guest-host.md](/components/instar/plans/PLAN-differencing-phase-07-guest-host/) | Planned | |
-| 8. Rust unit tests and Python integration tests | PLAN-differencing-phase-08-tests.md | Not started | |
+| 7. Guest create op and host CLI wiring | [PLAN-differencing-phase-07-guest-host.md](/components/instar/plans/PLAN-differencing-phase-07-guest-host/) | Complete | `99d7d24` (#581) |
+| 8. Rust unit tests and Python integration tests | [PLAN-differencing-phase-08-tests.md](/components/instar/plans/PLAN-differencing-phase-08-tests/) | Planned | |
 | 9. Coverage fuzzing of the locator parsers | PLAN-differencing-phase-09-fuzz.md | Not started | |
 | 10. Documentation | PLAN-differencing-phase-10-docs.md | Not started | |
 | 11. Composition: host chain discovery, device attachment, `info --chain` | PLAN-differencing-phase-11-chain-host.md | Not started | |
@@ -427,7 +427,10 @@ claim is read from code, not measured on output) and consider
 giving created images a real DataWriteGuid; phase 8's
 negative identity test must be built against a **third-party**
 parent either way, because an instar-created parent cannot fail
-it.
+it. **Discharged by phase 7**, which built exactly that test:
+`tests/test_create.py` round-trips both formats against
+third-party fixtures and asserts the fixture identity is non-zero
+before comparing, so the comparison is not zeros against zeros.
 
 Phase 8 carried one debt from phase 5, **now discharged** and
 recorded here because the phase 5 plan is not where phase 8's
@@ -684,8 +687,10 @@ status becomes `Complete`.
   parent-identity check is vacuous for chains instar wrote end to
   end. Deferred by decision 2 of the phase 5 plan: it needs a
   host-side entropy source passed through the call table, which is
-  the one ABI change this plan is built to avoid. Phase 8's
-  negative identity test must therefore use a third-party parent.
+  the one ABI change this plan is built to avoid. The negative
+  identity test therefore uses a third-party parent; phase 7 built
+  it, so this is a note on the constraint rather than outstanding
+  work.
 * Differencing-aware `check`, once a chain can be resolved:
   today `check` refuses VHDX differencing and validates a VHD
   differencing child as if it were dynamic.

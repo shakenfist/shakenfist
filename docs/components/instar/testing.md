@@ -1043,7 +1043,10 @@ comparison layers:
 This closes the gap where VMDK/VHD/VHDX had no differential reference
 for `check` validation (qemu-img check only supports QCOW2), and
 provides a third independent opinion for QCOW2. libyal tools are
-optional — the fuzzer degrades gracefully when they are unavailable.
+optional here — the fuzzer degrades gracefully when they are
+unavailable. That is not true of every use of libvhdi in this suite;
+see the differencing oracle cross-check below, which CI treats as
+mandatory.
 
 ### Running locally
 
@@ -1439,6 +1442,196 @@ by hand in interactive sessions. A workflow once attempted the fix
 itself; it was retired after an audit found its safety boundary
 unsound. See `docs/plans/PLAN-fuzz-autofix.md` for the history
 and the reasoning.
+
+## Differencing oracle cross-check
+
+`tests/test_differencing.py`'s `TestDifferencingLibvhdiOracle`
+runs `vhdiinfo` against a differencing VHD or VHDX child that `instar
+create` wrote through the real CLI. It exists because `qemu-img`
+cannot serve as the oracle for this output — it reads a differencing
+image as though the parent were absent, surfacing no parent at all —
+so `vhdiinfo` is the only external cross-check of the parent linkage
+instar wrote, and this suite is the only place anything other than
+instar's own parser reads a differencing image instar wrote.
+
+The assertions are structural only, per
+[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/): the disk type, the
+parent filename for VHD, and the parent identifier for both formats,
+each compared against what `vhdiinfo` reports for the parent itself
+rather than a hardcoded GUID. No composed content is read. One
+limitation is recorded rather than worked around: `vhdiinfo` prints no
+`Parent filename` line for a VHDX, with or without `-v`, so the VHDX
+parent locator's path key cannot be checked through this tool — the
+Rust round-trip test pins it instead
+(`src/crates/create/tests/round_trip.rs`).
+
+The suite runs inside the `instar-build` devcontainer, which installs
+`libvhdi-utils`, so locally these tests skip when `vhdiinfo` is absent
+(`_require_vhdiinfo` in `tests/base.py`), the same bargain
+`_require_qemu_img` strikes. In CI that same absence is a failure
+instead: `INSTAR_REQUIRE_LIBVHDI=1` is set on the integration job's
+test step and passed through by the `Makefile` to the container,
+because a skipped test and a passing test look identical in a green
+run and `stestr` does not name skipped tests in its output — parsing
+the log could not have caught it. Removing `libvhdi-utils` from the
+devcontainer turns that job red instead of leaving it quietly green.
+
+## Mutation harness for the differencing tests
+
+`tools/mutate-differencing.sh` answers one question about the
+differencing output path (`instar create -f {vpc,vhdx} -b PARENT`):
+**can the tests that guard it actually fail?** It is not a coverage
+tool and it measures nothing. Each case breaks one specific behaviour
+in `src/` and requires one named test to notice; a test that still
+passes against a deliberately broken emitter is not guarding what its
+name says it guards. See
+[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) for the path being
+guarded.
+
+There are **26 cases**: fourteen mutate a library crate (`create`,
+`vhd`, `vhdx`) and are caught by a Rust unit or round-trip test, and
+twelve are caught by a Python integration test through the real
+binary. Ten of those twelve mutate the `create` guest operation, which
+is excluded from `cargo test --workspace`, so a unit test written
+beside that code would never run; the other two mutate the `create`
+crate but break something only an external parser can see. Going
+through the real binary means `make instar` before the test and again
+after the source is restored.
+
+Four of the integration cases (`oracle-*`) name the libvhdi
+cross-check in `tests/test_differencing.py`, which skips without
+`vhdiinfo` on `PATH` (Debian: `libvhdi-utils`). A skipped test scores
+`BROKEN`, not `PASS`, so the harness needs that package installed to
+report a clean run; it warns once up front when it is missing.
+
+A full run took **2m32s, 2m44s and 3m35s** on three measured runs of
+this tree, with `vhdiinfo` present and all 26 cases passing — so
+budget three to four minutes and expect the spread, which is cargo and
+docker layer caching. Those are observations: an earlier "about two
+minutes" here was a guess, and an understated figure invites the
+reader to assume a run has hung. Most of the time is the 24 `make
+instar` rebuilds the integration cases need; the 21 baselines add test
+runs but no rebuilds.
+
+```bash
+tools/mutate-differencing.sh          # every case, three to four minutes
+tools/mutate-differencing.sh --list   # the case names, run nothing
+tools/mutate-differencing.sh NAME...  # only the named cases
+tools/mutate-differencing.sh --self-test        # check the verdict classifier
+tools/mutate-differencing.sh --check-patterns  # do the mutations still land?
+```
+
+Three things run in the `ci-tooling` job, because a full run needs
+docker, testdata and `/dev/kvm` and so never runs on a pull request —
+which would leave the harness free to rot unnoticed, and a harness
+that has rotted quietly is worse than none, because its green is
+trusted.
+
+| Guard | Answers | Cost |
+|---|---|---|
+| `--self-test` | does the verdict classifier classify correctly? | milliseconds |
+| `--check-patterns` | does every mutation still have exactly one place to land, and do the case count here and in the script still agree? | a few seconds |
+| `tools/ci/test-replace-once.sh` | does the literal replace helper still refuse zero and multiple matches? | milliseconds |
+
+None of them needs docker, a venv, testdata or a build.
+
+`--self-test` exists because the classifier is the one part of the
+harness nothing else checks — everything else is checked *by* it — and
+it shipped misreading `FAILED (errors=1)` as a caught mutation, which
+no run of the harness itself would have revealed.
+
+`--check-patterns` exists because the 26 search strings are pinned to
+`src/` byte for byte, indentation included. A `rustfmt` change that
+moves a space turns a case `BROKEN`, and without this nothing would
+say so until someone spent the full run. It reports `LANDS` and
+`DRIFT` rather than `PASS` and `BROKEN`, because it applies no
+mutation and runs no test and those words are defined above as facts
+about a run that did both.
+
+It also reads the case count out of *this page* and compares it with
+the script's own constant, so the two cannot drift apart. That is a
+recent correction: the check previously compared the script against
+itself while the documentation claimed otherwise, which is the exact
+species of unverified claim the rest of this section is about.
+
+The verdicts are the point of the script:
+
+| Verdict | Meaning |
+|---|---|
+| `PASS` | The mutation applied and the named test failed. The test guards the property. |
+| `FAIL` | The mutation applied and the test still passed. The test does not guard the property. |
+| `BROKEN` | The case proved nothing: the mutation could not be applied, the test never ran (a wrong package name, a build error, a filter that matched no test), the test skipped, or the test does not pass against unmutated source. |
+
+`BROKEN` exists because the interesting failure mode of a mutation
+harness is not a test that fails to fire, it is a case that scores a
+pass without having earned it. There are three ways that happens, and
+the harness closes each:
+
+* **The mutation never lands.** A substitution matching nothing leaves
+  the code unchanged, the test passes for the ordinary reason, and a
+  naive harness calls that a pass. Every edit therefore goes through
+  `tools/replace-once.py`, a **literal** find-and-replace — no regex,
+  no `sed`, no escaping rules — that exits non-zero unless the search
+  string occurs exactly once in the target file.
+* **The test was already red.** A test broken on `develop`, or red for
+  an environmental reason, fails again with the mutation applied and
+  the failure gets credited to the mutation. Each named test is
+  therefore run once against unmutated source first, and a case whose
+  baseline does not pass is `BROKEN` rather than `PASS`. Baselines are
+  cached per target: the 26 cases name 21 distinct targets (14 Rust,
+  7 integration), so that is 21 extra test runs and no extra rebuilds
+  — the integration baselines reuse the clean binary each case
+  restores anyway.
+* **The test errored rather than failed.** `unittest` reports an
+  exception raised outside an assertion as `FAILED (errors=1)` — the
+  same `FAILED` line a caught mutation produces. Matching on the word
+  alone meant a missing testdata checkout, which makes `setUpClass`
+  raise, scored `PASS` for every integration case without one
+  assertion being evaluated. A genuine catch always says `failures=`,
+  so `errors=` is now `BROKEN`, and the script refuses to start
+  without testdata at all.
+
+The script exits non-zero if any case is `FAIL` or `BROKEN`.
+
+The log of any case that does not pass is kept under
+`.mutation-backups/logs/` and named in the report, because the scratch
+directory dies with the process and the one moment the `cargo` or
+`unittest` output is wanted is when something went wrong. Those logs
+are cleared at the start of each run, so a stale one cannot be read as
+current.
+
+Naming a case that does not exist is an error rather than an empty
+pass: a mistyped name used to run nothing and report `0 cases: 0 PASS,
+0 FAIL, 0 BROKEN` with exit 0.
+
+Originals are copied into `.mutation-backups/` (gitignored) before each
+edit and copied back afterwards, including on interrupt. Restoring with
+`git checkout <path>` is deliberately avoided: it discards uncommitted
+work. After a run, `git status --short` should be unchanged and the
+`instar` binary rebuilt from clean source.
+
+The backup lives inside the repository rather than in a `mktemp -d`
+because a `mktemp -d` dies with the process: a run that is **killed**
+rather than interrupted leaves its mutation applied with nothing to
+restore from. Since a mutation is a small change that still compiles,
+`pre-commit` and `cargo build` both pass on it and nothing downstream
+would notice. So the script also **refuses to start when `src/` has
+uncommitted modifications**, listing what changed and printing the
+exact command to put it back — the surviving backup where there is one,
+`git checkout -- src/` otherwise. That turns a killed run into a
+refusal at the next invocation instead of a surprise at some later
+commit. Pass `--allow-dirty-src` when the modifications are your own
+work in progress and you want the harness to mutate on top of them.
+
+Two properties in this area are deliberately **not** mutation-tested.
+The `(_, true) => ERROR_PARENT_FORMAT_MISMATCH` arms of
+`vhd_opts_from` and `vhdx_opts_from` are unreachable by construction —
+the operation refuses a wrong-format parent, and then a format-right
+but identity-less parent, before either arm can be reached — so no
+single substitution in them changes observable behaviour. And a
+fixed-subformat `vpc` child with `-b` is refused on the host before the
+emitter sees it, so it is a host-argument case rather than an emitter
+one.
 
 ## Related Documentation
 
