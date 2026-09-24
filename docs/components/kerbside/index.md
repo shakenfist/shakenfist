@@ -49,9 +49,9 @@ the following steps need to occur:
 
 1. The user requests a desktop via an external user interface that we call "the
    Broker". In Shaken Fist's case the broker is embedded in Shaken Fist itself
-   and is initiated via a Shaken Fist REST API. In the OpenStack case this role
-   is likely performed by Horizon or Skyline, although this is not yet
-   implemented.
+   and is initiated via a Shaken Fist REST API. In the OpenStack case Nova
+   performs this role itself: it mints a console token and returns a URL
+   that points at Kerbside.
 
 2. The cloud boots the instance that runs the desktop. The Broker waits for the
    instance to be booted. In some cases the broker needs to perform additional
@@ -87,7 +87,7 @@ the following steps need to occur:
 
 ```mermaid
 flowchart TD
-    broker["External Broker<br/>(SF/Horizon)"]
+    broker["External Broker<br/>(SF/Nova)"]
     client["User's SPICE Client<br/>(remote-viewer, ryll)"]
     kerbside["Kerbside<br/>SPICE Proxy"]
     hypervisor["Hypervisor<br/>(QEMU/KVM)"]
@@ -102,46 +102,6 @@ Edge numbers match the steps above. Steps 1, 2, and 6 happen outside
 the components shown, and steps 7 and 8 happen inside Kerbside on the
 established client to hypervisor path, so they have no arrow of their
 own.
-
-### Implementation in OpenStack
-
-OpenStack Nova now supports native SPICE direct consoles as of the 2025.1 Epoxy
-release. The
-[Nova specification](https://specs.openstack.org/openstack/nova-specs/specs/2025.1/implemented/libvirt-spice-direct-consoles.html)
-adds a new "spice-direct" console type that enables users to access virtual
-desktops using native SPICE clients like remote-viewer instead of HTML5 proxies.
-
-When users request a SPICE direct console, Nova returns a URL pointing to
-Kerbside with an authentication token. Kerbside validates this token via the
-`/os-console-auth-tokens/` API and establishes the proxied connection to the
-hypervisor. This provides users with a much richer virtual desktop experience
-including support for USB passthrough, audio, and multi-monitor configurations.
-
-Kerbside needs to be deployed as a component of the OpenStack cluster to provide
-a safe mechanism for users to interact with their console. OpenStack is (wisely)
-unwilling to provide direct network connectivity from a client network to TCP
-ports on the hypervisor, and so Kerbside acts as an intermediary to protect
-those hypervisors. There is a sample implementation of Kerbside deployment using
-Kolla-Ansible in the
-[Kerbside Patches repository](https://github.com/shakenfist/kerbside-patches).
-At the time of last update to this document, the Kolla OpenStack project had
-merged the OCI build portion of the proposed Kerbside support into the Kolla
-project, but had not yet merged the deployment code into Kolla-Ansible. That
-deployment code is tracked on
-[the OpenStack gerrit review system](https://review.opendev.org/q/topic:%22spice-direct-consoles%22)
-if you are curious as to its current state.
-
-### What About Bumblebee?
-
-The folks over at the NECTAR research cloud developed
-[Bumblebee VDI](https://github.com/NeCTAR-RC/bumblebee), which is superficially
-similar to Kerbside in that it provides a mechanism to make it easier to obtain
-a virtual desktop as a user. The Kerbside description above would classify
-Bumblebee as a Broker to our model -- it orchestrates the creation and then
-access to virtual desktops for users. However, Bumblebee exclusively orchestrates
-HTML5 consoles using Apache Guacamole as its HTML5 proxy at the moment, so misses
-out on some of the richer features of SPICE and has the performance implications
-of a HTML5 desktop environment.
 
 ## Documentation Index
 
