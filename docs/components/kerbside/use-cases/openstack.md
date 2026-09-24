@@ -385,6 +385,17 @@ that something is already standard equipment:
   `spice-direct`. It bypasses Kerbside entirely and is not a
   session Kerbside can see, audit or terminate. Useful as a
   fallback; not the path the native client users are on.
+- **[Bumblebee VDI](https://github.com/NeCTAR-RC/bumblebee).**
+  Developed at the NeCTAR research cloud, and superficially
+  similar to Kerbside in that it also makes it easier for a
+  user to obtain a virtual desktop. It is not a competitor
+  to Kerbside, though: it fills the broker role this section
+  is enumerating, orchestrating the creation of virtual
+  desktops and then access to them, so it sits where Nova
+  sits here rather than where Kerbside does. It orchestrates
+  HTML5 consoles exclusively, using Apache Guacamole as its
+  own HTML5 proxy, so it misses SPICE's richer features and
+  carries an HTML5 desktop's performance implications.
 
 ## Status and limitations
 
@@ -433,5 +444,8 @@ Not covered, and worth knowing before you deploy:
   [Placement topologies](/components/kerbside/use-cases/placement/) — the two topology
   pages: several sources behind one Kerbside, and several
   Kerbsides in front of one cloud
+- [Nova specification](https://specs.openstack.org/openstack/nova-specs/specs/2025.1/implemented/libvirt-spice-direct-consoles.html)
+  — the specification that added the `spice-direct` console
+  type to Nova in 2025.1
 - [kerbside-patches](https://github.com/shakenfist/kerbside-patches)
   — the Kolla and Kolla-Ansible changes, until they are upstream

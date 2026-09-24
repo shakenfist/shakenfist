@@ -57,17 +57,31 @@ readme-discipline policy).
 
 ## Status
 
-The oVirt page landed 2026-08-10 as PLAN-two-tier-ci.md
-phase 4's deliverable, and settles the format. The Shaken
-Fist page followed on 2026-09-18 as phase 1, merge commit
-2f0e526, and the OpenStack page on 2026-09-20 as phase 2,
-merge commit a7df5e5: all three carry identical section
-headings, so the format is a convention rather than a
-coincidence. The remaining three writable pages are
-unblocked; Proxmox is not, and still has no source driver
-(`kerbside/sources/` holds `base.py`, `ovirt.py`,
-`shakenfist.py` and `static.py` and nothing else, rechecked
-2026-09-20).
+All six writable pages exist. The oVirt page landed
+2026-08-10 as PLAN-two-tier-ci.md phase 4's deliverable, and
+settles the format; `shakenfist.md` followed 2026-09-18 as
+phase 1 (`2f0e526`), `openstack.md` 2026-09-20 as phase 2
+(`a7df5e5`), `standalone.md` 2026-09-21 as phase 3
+(`28efa6c`), and `multi-cloud.md` with `placement.md`
+2026-09-22 as phase 4 (`8c5c042`). All six carry identical
+section headings, so the format is a convention rather than
+a coincidence. What remains is phase 5, the index slim-down
+and closeout, and phase 6, the push audit. Proxmox is still
+blocked and still has no source driver (`kerbside/sources/`
+holds `base.py`, `ovirt.py`, `shakenfist.py` and `static.py`
+and nothing else, rechecked 2026-09-23).
+
+One fact about the backend leg cost four phases to settle
+and is now guarded rather than remembered. Phases 1, 2 and 3
+each stated backend TLS or host-subject pinning more
+strongly than `rust/kerbside-proxy/src/backend.rs` supports,
+and each was corrected at review. Phase 4 stopped correcting
+instances and swept the class: six pages had it wrong, the
+sixth (`docs/proxy-architecture.md`) is filed as #472, and
+`tools/check-backend-tls-claims.py` now fails CI on an
+unconditional claim in `docs/use-cases/` or the Use Cases
+table. A page in this plan may not say the leg is encrypted
+or pinned without saying when.
 
 A third thing landed since this plan was written, and the
 plan did not know it: **the index scaffolding already
@@ -115,8 +129,8 @@ the range is not reliably reconstructable afterwards.
 | 1. Shaken Fist | [PLAN-use-case-docs-phase-01-shaken-fist.md](/components/kerbside/plans/PLAN-use-case-docs-phase-01-shaken-fist/) | Complete | 2f0e526 |
 | 2. OpenStack | [PLAN-use-case-docs-phase-02-openstack.md](/components/kerbside/plans/PLAN-use-case-docs-phase-02-openstack/) | Complete | a7df5e5 |
 | 3. Standalone / static source | [PLAN-use-case-docs-phase-03-standalone.md](/components/kerbside/plans/PLAN-use-case-docs-phase-03-standalone/) | Complete | 28efa6c |
-| 4. Multi-cloud aggregation and placement topologies | [PLAN-use-case-docs-phase-04-multi-cloud.md](/components/kerbside/plans/PLAN-use-case-docs-phase-04-multi-cloud/) | In progress | |
-| 5. Index slim-down and closeout | | Not started | |
+| 4. Multi-cloud aggregation and placement topologies | [PLAN-use-case-docs-phase-04-multi-cloud.md](/components/kerbside/plans/PLAN-use-case-docs-phase-04-multi-cloud/) | Complete | 8c5c042 |
+| 5. Index slim-down and closeout | [PLAN-use-case-docs-phase-05-index-slimdown.md](/components/kerbside/plans/PLAN-use-case-docs-phase-05-index-slimdown/) | In progress | |
 | 6. Push audit | | Not started | |
 
 The oVirt page is not a phase: it landed 2026-08-10 as
