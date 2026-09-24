@@ -754,6 +754,34 @@ class BaseTestCase(testtools.TestCase):
         return self._await_instance_event(
             instance_uuid, 'detected poweroff', after=after)
 
+    def _assert_power_state(self, instance_uuid, expected, after):
+        """Assert the API's reported power_state, reading it exactly once.
+
+        Every power transition this harness drives is written synchronously
+        by the call under test before it returns, so the correct value is
+        already there on the first read. See D1 in
+        docs/plans/PLAN-power-state-correctness-phase-00-assertions.md for
+        why this does not poll or sleep.
+        """
+        observed = self.system_client.get_instance(instance_uuid).get('power_state')
+        if observed == expected:
+            self._emit_tracing_event({
+                'msg': 'Power state asserted',
+                'instance_uuid': instance_uuid,
+                'power_state': observed,
+            })
+            return
+
+        self._log_instance_events(instance_uuid)
+        message = (
+            f'Instance {instance_uuid} reports power_state {observed!r} {after}, '
+            f'expected {expected!r}.')
+        if observed == 'on' and expected in ('off', 'paused'):
+            message += (
+                ' This matches the cleaner stale-write race recorded as F13 in '
+                'docs/plans/PLAN-power-state-correctness.md.')
+        self.fail(message)
+
     def _cloud_init_health_check_json(self, instance_uuid):
         exit_code, data = self.system_client.await_agent_command(
             instance_uuid, 'cloud-init status --wait --format json',
