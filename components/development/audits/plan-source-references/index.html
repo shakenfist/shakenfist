@@ -14434,18 +14434,20 @@
 <p>Every reference to a plan file (<code>PLAN-*.md</code>) written into source code
 or configuration must resolve in the repository it is written in, or
 else be an absolute URL.</p>
-<p>Comments and configuration cite plans to say where a decision is
-recorded: "pinned at 50 MB rather than scaled to system memory; the
-deferral is recorded in <code>docs/plans/PLAN-session-001-feedback.md</code>".
-That pointer is the only trail from the code to the reasoning behind
-it, and it is the trail a reader follows when they want to change the
-code.</p>
+<p>Since 2026-09-24 the <code>plan-references-in-code</code> shared block (see the
+<a href="/components/development/audits/push-audit/">push-audit</a> audit) says what code may cite at all:
+the reasoning behind a line belongs in its comment, not behind a
+pointer to the plan that produced it, and a plan link survives only
+for work that is not built yet -- "deferred; see
+<code>docs/plans/PLAN-session-001-feedback.md</code>". This audit is the
+mechanical half for the links that remain: whatever a comment still
+points at has to be there when a reader follows it.</p>
 <p>Nothing renders these pointers. A markdown link in <code>docs/</code> breaks
 visibly and <code>docs-external-links</code> audits it; a path inside a <code>//</code>
 comment or a YAML key is inert text no renderer resolves. So a renamed
 or archived plan rots the pointer silently, and the first person to
-notice is someone who went looking for the reasoning and did not find
-it -- at which point the comment is worse than none, because it asserts
+notice is someone who went looking for the plan and did not find it
+-- at which point the comment is worse than none, because it asserts
 a record exists.</p>
 <p>The check runs <code>git ls-files</code>, skips markdown files (they are
 <code>docs-external-links</code>' scope) and files over 2 MB, and resolves each
@@ -14503,9 +14505,11 @@ code still lands on a file.</p>
 <li>the whole file is fixtures rather than pointers -- mark it once with
   <code>audit-ok: plan-reference-file</code>, and say why.</li>
 </ul>
-<p>Rewording is not a fix on its own: the point of the pointer is that a
-reader can reach the reasoning, so a reference that cannot be made to
-resolve should be replaced by the reasoning itself, not deleted.</p>
+<p>Deleting a pointer is not a fix on its own where the comment leaned
+on it: write the reasoning the plan held into the comment, then drop
+the pointer. That is also the right fix for a pointer that does
+resolve but cites work already built -- <code>plan-references-in-code</code>
+asks for it, though this audit does not flag it.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <p>Per-project compliance for this criterion is regenerated
 every morning by the consistency audit: see
