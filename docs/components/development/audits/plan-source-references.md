@@ -6,19 +6,21 @@ Every reference to a plan file (`PLAN-*.md`) written into source code
 or configuration must resolve in the repository it is written in, or
 else be an absolute URL.
 
-Comments and configuration cite plans to say where a decision is
-recorded: "pinned at 50 MB rather than scaled to system memory; the
-deferral is recorded in `docs/plans/PLAN-session-001-feedback.md`".
-That pointer is the only trail from the code to the reasoning behind
-it, and it is the trail a reader follows when they want to change the
-code.
+Since 2026-09-24 the `plan-references-in-code` shared block (see the
+[push-audit](/components/development/audits/push-audit/) audit) says what code may cite at all:
+the reasoning behind a line belongs in its comment, not behind a
+pointer to the plan that produced it, and a plan link survives only
+for work that is not built yet -- "deferred; see
+`docs/plans/PLAN-session-001-feedback.md`". This audit is the
+mechanical half for the links that remain: whatever a comment still
+points at has to be there when a reader follows it.
 
 Nothing renders these pointers. A markdown link in `docs/` breaks
 visibly and `docs-external-links` audits it; a path inside a `//`
 comment or a YAML key is inert text no renderer resolves. So a renamed
 or archived plan rots the pointer silently, and the first person to
-notice is someone who went looking for the reasoning and did not find
-it -- at which point the comment is worse than none, because it asserts
+notice is someone who went looking for the plan and did not find it
+-- at which point the comment is worse than none, because it asserts
 a record exists.
 
 The check runs `git ls-files`, skips markdown files (they are
@@ -81,9 +83,11 @@ No template. Fix each reference at its source:
 * the whole file is fixtures rather than pointers -- mark it once with
   `audit-ok: plan-reference-file`, and say why.
 
-Rewording is not a fix on its own: the point of the pointer is that a
-reader can reach the reasoning, so a reference that cannot be made to
-resolve should be replaced by the reasoning itself, not deleted.
+Deleting a pointer is not a fix on its own where the comment leaned
+on it: write the reasoning the plan held into the comment, then drop
+the pointer. That is also the right fix for a pointer that does
+resolve but cites work already built -- `plan-references-in-code`
+asks for it, though this audit does not flag it.
 
 ## Projects
 

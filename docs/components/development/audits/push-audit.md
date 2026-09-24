@@ -20,6 +20,13 @@ Repositories that carry a pre-push audit runbook must:
   size is itself worth raising in review, framed as the cost of
   re-reading a whole file rather than as taste, because where review
   is tracked per file every change discards the review of all of it;
+* embed the current **`plan-references-in-code`** shared block
+  alongside those -- code, comments and configuration describe the
+  software as it is, so they cite no plan phase, step or decision
+  number, and carry the reasoning a plan pointer would otherwise
+  stand in for; a plan link survives only for work not yet built
+  (see the [plan-source-references](/components/development/audits/plan-source-references/) audit,
+  which checks that such links resolve);
 * embed the current **`path-traversal-review`**,
   **`python-version-discipline`** and **`functional-test-coverage`**
   shared blocks, which carry the three criteria delegated to the
@@ -84,6 +91,21 @@ documentation reviewer that "`README.md` reflects any new features",
 which is the exact feedback loop that bloats READMEs.
 
 ### Recently enforced
+
+**`plan-references-in-code` became a required block on 2026-09-24.**
+It extends to code the rule `plan-phase-references` already applies
+to documentation: a reader of the code has not read the plan, so
+"added in phase 5" or "per decision 3" tells them nothing, and a
+comment that points at a plan for its reasoning should carry the
+reasoning instead. It is a judgement check in the reviewer's brief
+rather than a grep, for now: a raw scan of the fleet's code on the
+day it was written found roughly 3,400 phase, step, decision and plan
+references across thirteen repositories, and "phase" has enough
+ordinary meanings that a mechanical check wants the first repository
+sweep to show what its false positives look like before it files
+issues. The fix for a non-compliant repository is a verbatim copy of
+`templates/shared-blocks/plan-references-in-code.md`; the backlog
+the block describes is swept separately.
 
 **`source-file-size` became a required block on 2026-09-20**, and the
 repositories that do not yet embed it are non-compliant on the
