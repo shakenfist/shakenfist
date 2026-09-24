@@ -578,6 +578,192 @@ Falsifiable, in order:
     the master plan's Future work.
 14. `pre-commit run --all-files` passes.
 
+## Outcome
+
+### 5e -- the warn window
+
+Harvested with `tools/ci_headroom_harvest.py --since 2026-09-21T11:10:53Z
+--until 2026-09-24T12:00:00Z`, which is every `merge_group` run of
+`functional-tests.yml` from phase 4's reshape (`6856aad74`, #4289) to the
+morning #4308 merged. Ten merge runs carried cluster bundles; three
+further runs in the window (`35909829697`, `35935845390`, `35975439402`)
+are documentation syncs whose `check_paths` reported `code_changed ==
+'false'`, so they ran no functional job at all and are not in the table.
+That is ten runs per cluster topology, against the six 5e asked for.
+
+| Job | Topology | Runs | min p90 | max p90 | WITHIN | OVERSIZED | OVERSUBSCRIBED | per-node ABOVE |
+|---|---|---|---|---|---|---|---|---|
+| Debian 12 cluster | `slim-primary` | 10 | 0.296 | 0.370 | 2 | 8 | 0 | 2 |
+| Ubuntu 24.04 cluster | `slim-primary` | 10 | 0.259 | 0.407 | 3 | 7 | 0 | 3 |
+| Debian 12 tier | `slim-tier` | 10 | 0.292 | 0.417 | 5 | 5 | 0 | 1 |
+
+The verdicts are recomputed from each bundle's raw series by the current
+report, which is what `summary_record()` is for: the band and per-node
+figures in the table are the ones this checkout's constants produce, not
+the ones printed by whatever build the run carried. A run harvested this
+way carries the whole verdict whether or not its own report knew how to
+judge the per-node bound.
+
+
+**The headline is the one that decides 5f: nothing came within 0.28 of
+the upper bound.** The maximum cluster-wide p90 over all 30 job-runs is
+0.417 against a bound of 0.70, and no job-run in the window exceeded it.
+Twenty of the thirty fell below the lower bound of 0.35.
+
+**D2's prediction, both halves.** D2 predicted `slim-tier` "should stop
+reading OVERSUBSCRIBED and may begin reading OVERSIZED". Both halves are
+right: not one OVERSUBSCRIBED reading survives on the reshaped topology,
+where phase 2 had measured 37 of 50 job-runs above the upper bound, and
+5 of 10 now read OVERSIZED. What D2 did not predict is the more
+interesting half of the result. `slim-primary`, which phase 4
+deliberately did **not** reshape, reads OVERSIZED more often (15 of 20)
+than the topology that was reshaped (5 of 10). The band did not follow
+the reshape so much as reveal that the untouched topology was already the
+emptier of the two -- which is a phase 6 question about `slim-primary`,
+not a phase 5 one.
+
+**The refusal count held, as D5 said it would.** `slim-tier` records 10
+to 19 capacity-stage drops per run against `slim-primary`'s 16 to 31,
+and guard denials sit at 161-193 against 147-239, on a topology with
+twice the ledger of the one phase 2 measured. `expected_demand` fills
+whatever bound it is given; this is that mechanism, measured a second
+time and in a second place.
+
+**The structural assertion and the annotation.** Both are only observable
+from #4308 onwards, so the evidence is narrower than the band's and is
+stated as such. Run
+[35954362019](https://github.com/shakenfist/shakenfist/actions/runs/35954362019)
+is #4308's own merge-queue run -- the first run that could possibly carry
+either -- and all three of its cluster jobs report
+`test_cluster_topology_meets_the_structural_minimum ... ok` in the stestr
+output, on `slim-primary` twice and `slim-tier` once (Definition of done
+item 9, read from the job logs rather than inferred from job colour). The
+band verdict reached GitHub as a real annotation on the two
+`slim-primary` jobs of that run, titled *CI headroom: cluster OVERSIZED*,
+confirmed through `repos/shakenfist/shakenfist/check-runs/<job>/annotations`
+rather than by reading the emitting code (item 10).
+
+### 5f -- the gate is armed, on one bound only
+
+**Decision: gate on the cluster-wide upper bound, and arm it here.**
+
+The shape of the change is not the one D7 anticipated, because the
+`shakenfist/actions` half landed first. What D7 expected to be a prepared
+diff became [shakenfist/actions#94](https://github.com/shakenfist/actions/pull/94),
+merged as `633c56b31`, which replaced `|| true` and the step's
+`continue-on-error` with `tools/ci_headroom_verdict.sh`. That half went
+live *inert*: the verdict script fails a job on status 3 and on nothing
+else, and this repository's report returned 0 on every path. The
+remaining and only irreversible act was here -- adding
+`BAND_VIOLATION_EXIT = 3` to `tools/ci_headroom_report.py` and returning
+it for an OVERSUBSCRIBED cluster-wide band. That merge order was chosen
+deliberately, because `functional-tests.yml:485` references that workflow
+at `@main` with no pin: whichever half landed second is the one that
+switches the gate on, so the second half is the one that belongs in the
+repository a revert can reach.
+
+**What the window says about the gate, run by run.** It would have failed
+none of the 30 job-runs above. That is the test D7 set ("a gate that
+would have failed runs which were fine is not ready") and it passes
+emphatically rather than narrowly: the closest run sat 0.28 below the
+bound. The honest statement of the other side is that a gate which fires
+on nothing in the observed window also catches nothing in it -- its value
+is entirely prospective, against a future topology shrink or a demand
+regression, which is precisely the direction phase 2 measured
+`slim-tier` sitting in before phase 4 reshaped it (37 of 50 job-runs).
+
+**What is not gated, and why the asymmetry is load-bearing.** D7 already
+ruled out the per-node bound (D4) and the refusal clause (D5); D8 already
+ruled out the lower bound. The window turns the last of those from a
+judgement into an arithmetic fact: 20 of 30 job-runs read OVERSIZED, so a
+status returned for a lower-bound violation would have reddened two
+thirds of cluster CI on the first run after this merged. The report
+therefore returns `BAND_VIOLATION_EXIT` for exactly one condition, and 0
+for an unreadable series, an absent census, a thin series with no
+verdict, a usage error and a bug in the report itself -- D15 holding
+everywhere except on a statement about the cloud rather than about the
+instrument.
+
+**Both guards were proven live, not read.** Against a synthetic
+oversubscribed series, `ci_headroom_verdict.sh` from `actions`'s `main`
+exits 3 and emits the *Cluster headroom outside the CI sizing band* error
+annotation; with `CI_HEADROOM_GATE=false` it exits 0; against a series
+below the lower bound it exits 0. Against a copy of the report with the
+constant renamed -- returning 3 while no longer naming the contract -- it
+exits 0 and says why, and against `develop`'s report it exits 0. The
+version-skew guard is therefore not a claim about what would happen.
+
+**D5's open check, settled.** D5 required 5f to name a reader for the
+refusal warning or delete it. It is named: `PLAN-transient-capacity-refusals`,
+whose phase 5 is the decision on server-side queued placement and is fed
+by exactly this series -- the guard's refusal behaviour under a ledger
+that changed size. The warning stays, labelled as an observation about
+the demand estimator's calibration.
+
+**D9's issue, filed.**
+[#4320](https://github.com/shakenfist/shakenfist/issues/4320) records the
+hardcoded `10.0.0.20`-`10.0.0.24` upload-target list at
+`.github/workflows/functional-tests.yml:569`, phase 0's D4 commitment and
+why phase 5 is not fixing it. It is in the master plan's Future work.
+
+### The per-run window
+
+| Run | Job | p90 fraction | Band | Per-node p90 | Per-node | Capacity-stage drops | Guard denials |
+|---|---|---|---|---|---|---|---|
+| [35666222479](https://github.com/shakenfist/shakenfist/actions/runs/35666222479) | Debian 12 cluster | 0.296 | OVERSIZED | 0.833 | WITHIN BAND | 18 | 225 |
+| [35677335839](https://github.com/shakenfist/shakenfist/actions/runs/35677335839) | Debian 12 cluster | 0.333 | OVERSIZED | 0.667 | WITHIN BAND | 20 | 204 |
+| [35713308961](https://github.com/shakenfist/shakenfist/actions/runs/35713308961) | Debian 12 cluster | 0.333 | OVERSIZED | 1.000 | ABOVE BAND | 20 | 204 |
+| [35781045381](https://github.com/shakenfist/shakenfist/actions/runs/35781045381) | Debian 12 cluster | 0.333 | OVERSIZED | 0.833 | WITHIN BAND | 25 | 197 |
+| [35792467388](https://github.com/shakenfist/shakenfist/actions/runs/35792467388) | Debian 12 cluster | 0.296 | OVERSIZED | 0.500 | WITHIN BAND | 16 | 239 |
+| [35804030364](https://github.com/shakenfist/shakenfist/actions/runs/35804030364) | Debian 12 cluster | 0.333 | OVERSIZED | 1.000 | ABOVE BAND | 28 | 202 |
+| [35851169069](https://github.com/shakenfist/shakenfist/actions/runs/35851169069) | Debian 12 cluster | 0.370 | WITHIN BAND | 0.667 | WITHIN BAND | 16 | 187 |
+| [35940203974](https://github.com/shakenfist/shakenfist/actions/runs/35940203974) | Debian 12 cluster | 0.370 | WITHIN BAND | 0.833 | WITHIN BAND | 16 | 224 |
+| [35946925675](https://github.com/shakenfist/shakenfist/actions/runs/35946925675) | Debian 12 cluster | 0.296 | OVERSIZED | 0.667 | WITHIN BAND | 27 | 183 |
+| [35954362019](https://github.com/shakenfist/shakenfist/actions/runs/35954362019) | Debian 12 cluster | 0.296 | OVERSIZED | 0.667 | WITHIN BAND | 28 | 186 |
+| [35666222479](https://github.com/shakenfist/shakenfist/actions/runs/35666222479) | Ubuntu 24.04 cluster | 0.407 | WITHIN BAND | 0.667 | WITHIN BAND | 18 | 186 |
+| [35677335839](https://github.com/shakenfist/shakenfist/actions/runs/35677335839) | Ubuntu 24.04 cluster | 0.296 | OVERSIZED | 0.667 | WITHIN BAND | 22 | 147 |
+| [35713308961](https://github.com/shakenfist/shakenfist/actions/runs/35713308961) | Ubuntu 24.04 cluster | 0.259 | OVERSIZED | 0.500 | WITHIN BAND | 19 | 198 |
+| [35781045381](https://github.com/shakenfist/shakenfist/actions/runs/35781045381) | Ubuntu 24.04 cluster | 0.370 | WITHIN BAND | 1.000 | ABOVE BAND | 30 | 185 |
+| [35792467388](https://github.com/shakenfist/shakenfist/actions/runs/35792467388) | Ubuntu 24.04 cluster | 0.333 | OVERSIZED | 0.833 | WITHIN BAND | 19 | 187 |
+| [35804030364](https://github.com/shakenfist/shakenfist/actions/runs/35804030364) | Ubuntu 24.04 cluster | 0.333 | OVERSIZED | 1.000 | ABOVE BAND | 31 | 173 |
+| [35851169069](https://github.com/shakenfist/shakenfist/actions/runs/35851169069) | Ubuntu 24.04 cluster | 0.407 | WITHIN BAND | 1.000 | ABOVE BAND | 27 | 179 |
+| [35940203974](https://github.com/shakenfist/shakenfist/actions/runs/35940203974) | Ubuntu 24.04 cluster | 0.333 | OVERSIZED | 0.833 | WITHIN BAND | 16 | 197 |
+| [35946925675](https://github.com/shakenfist/shakenfist/actions/runs/35946925675) | Ubuntu 24.04 cluster | 0.296 | OVERSIZED | 0.833 | WITHIN BAND | 16 | 163 |
+| [35954362019](https://github.com/shakenfist/shakenfist/actions/runs/35954362019) | Ubuntu 24.04 cluster | 0.296 | OVERSIZED | 0.833 | WITHIN BAND | 23 | 162 |
+| [35666222479](https://github.com/shakenfist/shakenfist/actions/runs/35666222479) | Debian 12 tier | 0.333 | OVERSIZED | 0.833 | WITHIN BAND | 11 | 170 |
+| [35677335839](https://github.com/shakenfist/shakenfist/actions/runs/35677335839) | Debian 12 tier | 0.375 | WITHIN BAND | 0.833 | WITHIN BAND | 14 | 193 |
+| [35713308961](https://github.com/shakenfist/shakenfist/actions/runs/35713308961) | Debian 12 tier | 0.333 | OVERSIZED | 0.500 | WITHIN BAND | 10 | 171 |
+| [35781045381](https://github.com/shakenfist/shakenfist/actions/runs/35781045381) | Debian 12 tier | 0.375 | WITHIN BAND | 0.667 | WITHIN BAND | 14 | 189 |
+| [35792467388](https://github.com/shakenfist/shakenfist/actions/runs/35792467388) | Debian 12 tier | 0.292 | OVERSIZED | 0.500 | WITHIN BAND | 10 | 173 |
+| [35804030364](https://github.com/shakenfist/shakenfist/actions/runs/35804030364) | Debian 12 tier | 0.417 | WITHIN BAND | 1.000 | ABOVE BAND | 19 | 174 |
+| [35851169069](https://github.com/shakenfist/shakenfist/actions/runs/35851169069) | Debian 12 tier | 0.333 | OVERSIZED | 0.500 | WITHIN BAND | 10 | 177 |
+| [35940203974](https://github.com/shakenfist/shakenfist/actions/runs/35940203974) | Debian 12 tier | 0.375 | WITHIN BAND | 0.667 | WITHIN BAND | 10 | 180 |
+| [35946925675](https://github.com/shakenfist/shakenfist/actions/runs/35946925675) | Debian 12 tier | 0.333 | OVERSIZED | 0.500 | WITHIN BAND | 11 | 161 |
+| [35954362019](https://github.com/shakenfist/shakenfist/actions/runs/35954362019) | Debian 12 tier | 0.417 | WITHIN BAND | 0.583 | WITHIN BAND | 10 | 179 |
+
+### What phase 6 inherits
+
+* **A gate that has never fired.** Nothing in 30 job-runs came near the
+  bound. The first real firing will be the first evidence about its
+  false-positive rate, and the response to a surprise is
+  `headroom_gate: false` on the caller rather than a revert, because
+  `@main` is unpinned.
+* **`slim-primary` reads OVERSIZED more often than the topology phase 4
+  reshaped.** 15 of 20 job-runs, against `slim-tier`'s 5 of 10. Phase 4
+  left `slim-primary` alone on the argument that more vCPU changes
+  *which* placements are refused rather than how many; the band now says
+  something separate about it, which is that it is the emptier cloud.
+  Whether that is worth acting on is a phase 6 question, and D8's harvest
+  command in `docs/developer_guide/ci.md` is how to ask it.
+* **A third merge commit to record.** 5e, 5f and 5g land as their own
+  pull request, after #4308. Its SHA belongs in the master plan's phase 5
+  `Merged` cell and no commit inside it can name it -- see the note under
+  the Execution table.
+* **The propagation half of the sizing model is still undone.** The
+  downstream repositories fork these topologies and none of them has the
+  band, the annotation, the gate or the structural assertion. That is
+  phase 6's own scope.
+
 ## Back brief
 
 Before executing any step of this plan, back brief the operator on
