@@ -416,18 +416,42 @@ caught the mistake, which is why it is worth calling out here: read a
 `sufficient_idle_disk` row in a census as a disk I/O problem, never as
 evidence the cloud needs more disk capacity.
 
-### Nothing here is a quality gate
+### The band warns, the topology assertion fails
 
 Every workflow step this instrumentation added is
 `continue-on-error`, and `ci_headroom_report.py` always exits 0
 whatever it finds -- even an internal error in the report is printed,
-not raised. The band verdict it prints (committed vCPU as a fraction
-of the admission ledger, against bounds of 0.35 and 0.70) is
-explicitly labelled PROVISIONAL: those bounds were set with no
-distribution to check them against, and replacing or defending them --
-and turning any of this into something that gates -- is work
-[PLAN-ci-cloud-sizing](../plans/PLAN-ci-cloud-sizing.md) still has
-ahead of it. No verdict this instrumentation prints can fail a job.
+not raised. So no verdict it prints can fail a job.
+
+The band verdict it prints is committed vCPU as a fraction of the
+admission ledger, against bounds of 0.35 and 0.70, plus a per-node
+bound of 0.85. Those bounds are no longer provisional: phase 2 of
+[PLAN-ci-cloud-sizing](../plans/PLAN-ci-cloud-sizing.md) defended them
+against a distribution of 204 job-runs. What has not happened is the
+gate. The report's exit code is discarded twice on the way to a human
+-- by a `|| true` in `shakenfist/actions`'s collect script and by the
+step's own `continue-on-error` -- so a violation reaches a reader as a
+GitHub annotation and a step summary rather than as a red job. Turning
+that into a gate is a change to `shakenfist/actions`, prepared in
+[shakenfist/actions#94](https://github.com/shakenfist/actions/pull/94),
+and phase 5 decides whether to make it. Read the per-node bound as
+what a topology should achieve rather than as an alarm about one run:
+the statistic saturates, and did so on passing runs.
+
+One thing here *is* a gate, and it is a test rather than a verdict.
+`cluster_ci_tests/test_nodes.py`'s
+`test_cluster_topology_meets_the_structural_minimum` fails the job when
+the deployed cluster reports fewer than three nodes, three hypervisors,
+two non-network hypervisors, or a summed hypervisor ledger below 24. It
+fails rather than skipping on purpose: it exists because four other
+tests in that directory skip on exactly these preconditions, and a skip
+reports as a pass, so a topology edit that removed capacity would stop
+proving scheduler affinity and network teardown while every job stayed
+green. The single exception is a single-machine deployment -- one node
+holding every role, which is what the `localhost` topology deploys and
+what `scheduled-tests.yml` runs `cluster-ci.conf` against on purpose --
+where it skips, because none of those minimums means anything on one
+node.
 
 That is not the same as the instrumentation being invisible to the
 checks that do gate, which is what this section used to say and what

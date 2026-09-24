@@ -49,6 +49,12 @@ CLUSTER_CI_IMAGE = 'sf://upload/system/debian-12'
 #
 # This does not make refusals rarer. It makes them survivable, and each
 # wait is recorded so that a run which spent its time waiting says so.
+#
+# cluster_ci_tests/test_nodes.py's STRUCTURAL_MINIMUM_WAIT is the same
+# number for a different reason -- how long a topology reading smaller
+# than it is gets to settle -- and is deliberately not derived from this
+# one. Neither constrains the other, but a change to either is worth a
+# look at the other.
 CLUSTER_HEADROOM_WAIT = 420
 
 # How often to re-read /admin/resources while waiting. The poll is

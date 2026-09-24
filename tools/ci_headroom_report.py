@@ -153,16 +153,32 @@ import argparse
 import collections
 import datetime
 import json
+import os
 import sys
 import traceback
 
 
-# Phase 0's D3 band, as ratios of committed vCPU to ledger. These have never
-# been checked against a distribution -- phase 2's job is to replace them or
-# defend them -- so every use of them in the output says PROVISIONAL out
-# loud. Nothing gates on them in this phase (D15).
+# Phase 0's D3 band, as ratios of committed vCPU to ledger. Phase 2 defended
+# both bounds against a 204 job-run distribution -- see the master plan's
+# "The headroom band, with numbers" section. The cluster-wide upper bound of
+# 0.70 is never reached by slim-primary (max 0.519 over 154 job-runs) and is
+# exceeded by 37 of 50 slim-tier job-runs, with no false positives in the
+# window; the lower bound of 0.35 is "numerically right and operationally
+# awkward" (104 of 154 slim-primary job-runs fall below it). Phase 5's D2
+# adopts both numbers unchanged rather than re-deriving them.
 BAND_LOWER = 0.35
 BAND_UPPER = 0.70
+
+# Phase 5's D4: the per-node maximum's upper bound, also from the master
+# plan's "The headroom band, with numbers" section. It is the cleanest
+# separation phase 2 found in the dataset -- of job-runs recording no
+# capacity refusal at all (n=44) only 1 exceeds it, while of those recording
+# at least one (n=160), 123 do -- but it is also saturated at its ceiling in
+# 48% of slim-primary and 100% of slim-tier job-runs, including plenty that
+# passed, so it cannot discriminate a bad run from a good one at the top of
+# its range. Per D4 it is judged and published, in verdict_record() below,
+# and never gates.
+PER_NODE_BAND_UPPER = 0.85
 
 # The shape of the dict summary_record() returns. Phase 2's harvest and phase
 # 5's guardrail both read it from files written by builds older than
@@ -176,7 +192,25 @@ BAND_UPPER = 0.70
 # had to read those four facts out of the raw series inside the bundles,
 # which expire; a dataset harvested from version 2 records carries them.
 # The committed baseline (records.jsonl) is version 1 and does not.
-RECORD_VERSION = 2
+#
+# Version 3 (phase 5) dropped the verdict flag that used to mark the
+# cluster-wide band as unchecked. Phase 2 defended it against a 204 job-run
+# distribution, so that flag would only ever read False from here on, and
+# nothing reads it -- a consumer wanting to know whether a record's band is
+# defended checks record_version >= 3 instead. It also added
+# verdict.per_node_band_upper and gave verdict.per_node_band an actual
+# verdict ('WITHIN BAND' / 'ABOVE BAND' / None) rather than the constant
+# None every version 2 record carried, judging the per-node maximum
+# against PER_NODE_BAND_UPPER (D4). A consumer reading a version 2 record
+# already tolerates per_node_band being None, so that half is additive;
+# the dropped flag is the one non-additive change and is why the version
+# bumped rather than the record growing a field in place. Additive is not
+# the same as unchanged, though: None no longer means one thing. Below
+# version 3 it means "not judged"; from version 3 it means "no sample
+# produced a per-node fraction". A harvest over a window which mixes
+# versions (5e's does) must read per_node_band together with
+# record_version, or it pools the two.
+RECORD_VERSION = 3
 
 # Loki's own max_entries_limit_per_query, and the value
 # tools/ci_headroom_collect.sh in shakenfist/actions issues its query with. A
@@ -1703,9 +1737,12 @@ def verdict_record(record):
     census which was never read cannot say there were none, so it is null
     rather than False.
 
-    The per-node maximum (D21) is carried unjudged. Its bounds do not exist
-    yet: phase 2's harvest sets them from the distribution, and the
-    provisional 0.35/0.70 below are bounds on the cluster-wide figure only.
+    The per-node maximum (D21) is judged against PER_NODE_BAND_UPPER (D4).
+    Phase 2 found 0.85 the cleanest separation in the dataset, but also
+    found the statistic saturated at its ceiling in a large fraction of
+    passing job-runs -- see PER_NODE_BAND_UPPER's own comment -- so
+    ``per_node_band`` is published information, read against the lower tail
+    rather than as a per-run alarm, and per D4 it never gates.
     """
     ratio = record['cluster']['committed_cpu']['p90_fraction']
     if ratio is None:
@@ -1719,16 +1756,23 @@ def verdict_record(record):
 
     shortage = record['census']['capacity_shortage_drops']
     per_node_max = record['per_node_max_cpu_fraction']
+    per_node_p90 = per_node_max['p90']
+    if per_node_p90 is None:
+        per_node_band = None
+    elif per_node_p90 > PER_NODE_BAND_UPPER:
+        per_node_band = 'ABOVE BAND'
+    else:
+        per_node_band = 'WITHIN BAND'
     return collections.OrderedDict([
         ('p90_cpu_fraction', ratio),
         ('band', band),
         ('band_lower', BAND_LOWER),
         ('band_upper', BAND_UPPER),
-        ('band_provisional', True),
         ('refusal_warning', None if shortage is None else bool(shortage)),
         ('per_node_max_p90_fraction', per_node_max['p90']),
         ('per_node_max_peak_fraction', per_node_max['peak']),
-        ('per_node_band', None),
+        ('per_node_band', per_node_band),
+        ('per_node_band_upper', PER_NODE_BAND_UPPER),
     ])
 
 
@@ -2465,7 +2509,7 @@ def print_verdict(record):
     census = record['census']
     guard = record['guard']
     verdict = record['verdict']
-    print_heading('D3 band verdict (PROVISIONAL bounds %.2f / %.2f)'
+    print_heading('D3 band verdict (bounds %.2f / %.2f)'
                   % (BAND_LOWER, BAND_UPPER))
     ratio = verdict['p90_cpu_fraction']
     if ratio is None:
@@ -2478,19 +2522,30 @@ def print_verdict(record):
         print('  p90 committed vCPU / ledger, cluster wide: %s'
               % fmt_fraction(ratio))
         if verdict['band'] == 'OVERSIZED':
-            text = ('OVERSIZED -- below the provisional lower bound of %.2f'
-                    % BAND_LOWER)
+            text = 'OVERSIZED -- below the lower bound of %.2f' % BAND_LOWER
         elif verdict['band'] == 'OVERSUBSCRIBED':
-            text = ('OVERSUBSCRIBED -- above the provisional upper bound of '
-                    '%.2f' % BAND_UPPER)
+            text = ('OVERSUBSCRIBED -- above the upper bound of %.2f'
+                    % BAND_UPPER)
         else:
             text = 'WITHIN BAND'
         print('  Verdict: %s' % text)
 
-    print('  These bounds are PROVISIONAL. Phase 0 set them without any')
-    print('  distribution to check them against, and phase 2 replaces them or')
-    print('  defends them. Nothing gates on this verdict: this phase computes')
-    print('  and prints the band, and phase 5 owns turning it into a guardrail.')
+    print('  Nothing gates on this verdict yet: phase 5 step 5f decides.')
+
+    per_node_p90 = verdict['per_node_max_p90_fraction']
+    per_node_upper = verdict['per_node_band_upper']
+    print()
+    print('  Per-node maximum p90, D4 bound %.2f: %s'
+          % (per_node_upper, fmt_fraction(per_node_p90)))
+    if verdict['per_node_band'] is None:
+        print('  NO VERDICT: no sample produced a per-node committed-vCPU-')
+        print('  over-ledger fraction.')
+    else:
+        print('  Verdict: %s' % verdict['per_node_band'])
+    print('  This statistic is saturated: phase 2 found it sitting at its')
+    print('  ceiling in a large fraction of passing job-runs, so it is read')
+    print('  as what a topology should achieve, not as a per-run alarm the')
+    print('  current clouds could pass -- and, per D4, it never gates.')
 
     print()
     if verdict['refusal_warning'] is None:
@@ -2505,6 +2560,13 @@ def print_verdict(record):
         print('  Per D3 that is a warning in its own right, whatever the ratio')
         print('  says: a poll every fifteen seconds cannot see a refusal, which')
         print('  begins and ends between samples.')
+        print('  Per D5, that count is close to invariant under node size, so it')
+        print('  is not evidence this cloud is too small: expected_demand')
+        print('  accumulates cpus x SCHEDULER_DEMAND_PER_VCPU per placement, and')
+        print('  the guard admits until whatever bound it is given fills up and')
+        print('  then refuses. Phase 4 doubled a cluster\'s ledger and refusals')
+        print('  held at essentially the same rate. Read the count as the')
+        print('  earliest sign the demand estimator has drifted, nothing more.')
         if census['disk_bandwidth_drops']:
             print('  %d of them are at sufficient_idle_disk, which is disk'
                   % census['disk_bandwidth_drops'])
@@ -2553,6 +2615,192 @@ def print_verdict(record):
     if census['truncated']:
         print('  The census may have been truncated, so every count above is a')
         print('  lower bound. Absence of a warning is not evidence of absence.')
+
+
+def _encode_workflow_command_value(text):
+    """Escape a string for use as a GitHub workflow command's value.
+
+    Per the documented encoding: '%' becomes '%25', carriage return
+    becomes '%0D' and newline becomes '%0A'. '%' must be encoded first,
+    or the '%25'/'%0D'/'%0A' this function writes would themselves be
+    re-escaped.
+    """
+    text = text.replace('%', '%25')
+    text = text.replace('\r', '%0D')
+    text = text.replace('\n', '%0A')
+    return text
+
+
+def _encode_workflow_command_property(text):
+    """Escape a string for use as a workflow command's *property* value.
+
+    A property value sits inside the command's parameter list, where ':'
+    ends the properties and ',' separates them, so the documented
+    encoding adds '%3A' and '%2C' on top of what an ordinary value needs.
+    Every title this tool emits contains a colon ("CI headroom: cluster
+    OVERSUBSCRIBED"), which is the case that made this worth having: a
+    single colon happens to parse today, but the escaping is the
+    contract rather than the observed behaviour.
+    """
+    text = _encode_workflow_command_value(text)
+    text = text.replace(':', '%3A')
+    text = text.replace(',', '%2C')
+    return text
+
+
+def band_annotations(record):
+    """Return a (title, message) pair for each D3 band violation in record.
+
+    There are four kinds: the cluster-wide p90 fraction above BAND_UPPER
+    (OVERSUBSCRIBED) or below BAND_LOWER (OVERSIZED); the per-node
+    maximum p90 above PER_NODE_BAND_UPPER (D4); and any capacity-stage
+    refusal (D3's refusal clause). Shared by emit_github_annotations() and
+    write_github_step_summary() so the annotation stream and the job
+    summary cannot say different things about the same run.
+
+    The refusal message is worded as an observation about the demand
+    estimator's calibration, never as evidence the cloud is undersized
+    (D5): phase 4 doubled a cluster's ledger and the guard refused at
+    essentially the same rate, because expected_demand accumulates per
+    admitted placement and the guard admits until whatever bound it is
+    given fills up, which makes the refusal count close to invariant
+    under node size. The per-node message says explicitly that the bound
+    never gates (D4): it is saturated at its ceiling on plenty of runs
+    that otherwise pass, so it cannot discriminate a bad run from a good
+    one at the top of its range.
+    """
+    verdict = record['verdict']
+    label = record['label']
+    where = ' (%s)' % label if label else ''
+    annotations = []
+
+    if verdict['band'] == 'OVERSUBSCRIBED':
+        annotations.append((
+            'CI headroom: cluster OVERSUBSCRIBED',
+            'Cluster-wide p90 committed-vCPU/ledger fraction is %s, above '
+            'the upper bound of %.2f%s.'
+            % (fmt_fraction(verdict['p90_cpu_fraction']), BAND_UPPER, where)))
+    elif verdict['band'] == 'OVERSIZED':
+        annotations.append((
+            'CI headroom: cluster OVERSIZED',
+            'Cluster-wide p90 committed-vCPU/ledger fraction is %s, below '
+            'the lower bound of %.2f%s. Informational for a single run '
+            '(D8): the oversized question is read from a window of runs '
+            'with tools/ci_headroom_harvest.py, not from one job.'
+            % (fmt_fraction(verdict['p90_cpu_fraction']), BAND_LOWER, where)))
+
+    if verdict['per_node_band'] == 'ABOVE BAND':
+        annotations.append((
+            'CI headroom: per-node maximum above band',
+            'Per-node maximum p90 committed-vCPU/ledger fraction is %s, '
+            'above the bound of %.2f%s. This bound never gates (D4): it is '
+            'saturated at its ceiling on plenty of runs that otherwise '
+            'pass, and is read as a statement about what the topology '
+            'should achieve, not as a per-run alarm.'
+            % (fmt_fraction(verdict['per_node_max_p90_fraction']),
+               verdict['per_node_band_upper'], where)))
+
+    if verdict['refusal_warning']:
+        shortage = record['census']['capacity_shortage_drops']
+        annotations.append((
+            'CI headroom: capacity-stage refusals observed',
+            '%d capacity-stage %s in this run%s. This is a signal about '
+            'the demand estimator\'s calibration, not evidence the cloud '
+            'is too small (D5): phase 4 doubled a cluster\'s ledger and '
+            'the guard refused at essentially the same rate afterwards, '
+            'because expected_demand accumulates and the guard admits '
+            'until whatever bound it is given fills up.'
+            % (shortage, plural(shortage, 'drop'), where)))
+
+    return annotations
+
+
+def emit_github_annotations(record):
+    """Print a '::warning::' workflow command for each band violation (D3).
+
+    GitHub Actions reads annotations from the step's stdout regardless of
+    the step's exit code or continue-on-error (F4), which is why this
+    exists: the report's own exit code is discarded twice between here
+    and a human reading the job. Unconditional and flagless by design
+    (F5, D3): shakenfist/actions's collect script feature-detects new
+    *flags* by grepping this file's source at a possibly-stale ref, and
+    an annotation this tool always tries to print needs no such
+    detection, so it works the same on every ref.
+    """
+    for title, message in band_annotations(record):
+        print('::warning title=%s::%s'
+              % (_encode_workflow_command_property(title),
+                 _encode_workflow_command_value(message)))
+
+
+def step_summary_lines(record):
+    """Render a short markdown verdict block for $GITHUB_STEP_SUMMARY (D3).
+
+    Built from the same verdict fields print_verdict() prints and the
+    same band_annotations() emit_github_annotations() uses, so the three
+    surfaces (job log, annotations, step summary) never disagree.
+    """
+    verdict = record['verdict']
+    label = record['label']
+    suffix = ' -- %s' % label if label else ''
+    heading = '### CI headroom band verdict%s' % suffix
+    lines = [heading, '']
+    if verdict['p90_cpu_fraction'] is None:
+        lines.append('* Cluster-wide p90: NO VERDICT (no usable samples)')
+    else:
+        lines.append(
+            '* Cluster-wide p90: %s -- %s (bounds %.2f-%.2f)'
+            % (fmt_fraction(verdict['p90_cpu_fraction']), verdict['band'],
+               BAND_LOWER, BAND_UPPER))
+    if verdict['per_node_band'] is None:
+        lines.append('* Per-node maximum p90: NO VERDICT (no usable samples)')
+    else:
+        lines.append(
+            '* Per-node maximum p90: %s -- %s (bound %.2f, never gates, D4)'
+            % (fmt_fraction(verdict['per_node_max_p90_fraction']),
+               verdict['per_node_band'], verdict['per_node_band_upper']))
+    if verdict['refusal_warning'] is None:
+        lines.append('* Refusal warning: UNKNOWN (no census read)')
+    elif verdict['refusal_warning']:
+        lines.append(
+            '* Refusal warning: YES -- a demand-estimator calibration '
+            'signal (D5), not evidence the cloud is undersized')
+    else:
+        lines.append('* Refusal warning: no capacity-stage drops in the '
+                     'census window')
+    annotations = band_annotations(record)
+    if annotations:
+        count = len(annotations)
+        lines.append('')
+        lines.append('%d GitHub %s raised on this run.'
+                     % (count, plural(count, 'annotation')))
+    lines.append('')
+    return lines
+
+
+def write_github_step_summary(record):
+    """Append a short markdown verdict block to $GITHUB_STEP_SUMMARY (D3).
+
+    Opened in append mode, because other steps in the same job write
+    their own sections to the same file. Does nothing at all if the
+    variable is unset -- which is the case every time this tool is run
+    by hand over a downloaded bundle, not just in CI -- and swallows any
+    error opening or writing the path it names. D15 holds here the same
+    as everywhere else in this tool: nothing it does may fail the job it
+    is measuring, and that has to include a summary path which is
+    unwritable or does not exist.
+    """
+    path = os.environ.get('GITHUB_STEP_SUMMARY')
+    if not path:
+        return
+    try:
+        with open(path, 'a') as f:
+            # Led by a blank line: an earlier writer may have left its
+            # last line unterminated, and a heading appended onto it
+            # does not render as one.
+            f.write('\n' + '\n'.join(step_summary_lines(record)) + '\n')
+    except OSError:
+        pass
 
 
 def print_report(record, waits=None):
@@ -2607,6 +2855,20 @@ def report(args):
         # summary is not written here (see print_report()'s docstring): it
         # is not part of the versioned record.
         write_record(record, args.json)
+
+    # Written before these two, and the order is the point. Neither call
+    # below is guarded locally, so a raise in either is caught by main()'s
+    # global handler -- which would have cost this run its record while the
+    # report still exited 0 and said nothing was wrong. The record is the
+    # dataset ci_headroom_harvest.py reads; the annotation is a convenience
+    # for whoever is looking at this one job.
+    #
+    # Additional output, not a replacement (D3): the stdout prose above is
+    # unchanged from before this phase, and the annotations below are read
+    # by GitHub from the same stdout stream regardless of this step's exit
+    # code (F4). No new flag gates either call (F5).
+    emit_github_annotations(record)
+    write_github_step_summary(record)
 
 
 def main(argv=None):

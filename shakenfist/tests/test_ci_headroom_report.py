@@ -48,6 +48,8 @@ import os
 import shutil
 import tempfile
 
+import fixtures
+
 from shakenfist.tests import base
 
 
@@ -184,6 +186,15 @@ class HeadroomReportTestCase(base.ShakenFistTestCase):
         super().setUp()
         self.tempdir = tempfile.mkdtemp()
         self.addCleanup(self._remove_tempdir)
+
+        # GitHub Actions sets $GITHUB_STEP_SUMMARY for every step, and
+        # main() appends a verdict block to whatever file it names. Left
+        # ambient, every test here which produces a record would write to
+        # the unit-test job's own summary page when run in CI, and would
+        # behave differently there than it does locally. Unset it for
+        # every test; the ones which exercise the summary point it at a
+        # file of their own with _set_step_summary().
+        self.useFixture(fixtures.EnvironmentVariable('GITHUB_STEP_SUMMARY'))
 
     def _remove_tempdir(self):
         shutil.rmtree(self.tempdir, ignore_errors=True)
@@ -926,6 +937,42 @@ class CensusTestCase(HeadroomReportTestCase):
             'makes a refusal in an otherwise-idle-looking run a warning '
             'independent of the ratio, and this run is both at once.')
 
+    def test_the_refusal_warning_is_framed_as_calibration_not_undersizing(self):
+        """D5: the job-log prose, not just the annotation, carries the frame.
+
+        Step 5c relabelled the GitHub annotation and step summary; this
+        closes the gap left in print_verdict()'s stdout, which is what
+        lands in the job log a human actually reads.
+        """
+        census = self._census([
+            census_event('schedule at stage sufficient_free_disk',
+                         {NODE_ONE: {'reason': 'insufficient disk'}}),
+        ])
+        path = self._series([
+            sample({NODE_ONE: node_payload(cpu_measured=1, cpu_committed=1)}),
+        ])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'not evidence this cloud is too small', output,
+            'D5: the refusal warning prose must say the count is not '
+            'evidence of undersizing.')
+        self.assertIn(
+            'close to invariant under node size', output,
+            'D5: the prose must say the refusal count is close to '
+            'invariant under node size -- phase 4 doubled a ledger and '
+            'the refusal rate held essentially steady.')
+        self.assertIn(
+            'SCHEDULER_DEMAND_PER_VCPU', output,
+            'D5: the prose must name the mechanism -- expected_demand '
+            'accumulating cpus x SCHEDULER_DEMAND_PER_VCPU per placement '
+            '-- that makes the guard admit until its bound fills and '
+            'then refuse.')
+        self.assertIn(
+            'earliest sign the demand estimator has drifted', output,
+            'D5: the prose must say what the count IS good for -- the '
+            'earliest signal that the demand estimator has drifted.')
+
     def test_the_four_capacity_stages_are_named_in_the_output(self):
         """Including the disk distinction, which the plan itself got wrong.
 
@@ -967,11 +1014,16 @@ class BandVerdictTestCase(HeadroomReportTestCase):
         self.assertEqual(0, code)
         self.assertIn('OVERSUBSCRIBED', output)
         self.assertIn(
+            'Nothing gates on this verdict yet', output,
+            'The band verdict was printed without saying nothing gates on '
+            'it yet. Phase 2 defended 0.35 and 0.70 against a 204 job-run '
+            'distribution (D2), but only step 5f decides whether the '
+            'cluster-wide upper bound becomes a gate.')
+        self.assertNotIn(
             'PROVISIONAL', output,
-            'The band bounds were printed without saying they are '
-            'provisional. Phase 0 set 0.35 and 0.70 with no distribution to '
-            'check them against and phase 2 replaces them; a verdict which '
-            'does not say so invites phase 2 to trust them.')
+            'The band is no longer provisional (D2): phase 2 defended both '
+            'bounds against a 204 job-run distribution, so the verdict must '
+            'not still call them provisional.')
 
     def test_committed_cpu_is_the_larger_of_measured_and_committed(self):
         """Admission charges max(measured, committed), so the report does too.
@@ -1001,6 +1053,301 @@ class BandVerdictTestCase(HeadroomReportTestCase):
             'A run with no samples produced a band verdict anyway. A ratio '
             'of zero would read as "oversized", which is a recommendation to '
             'shrink the cloud made on no data at all.')
+
+    def test_a_node_pinned_at_its_ledger_reads_above_the_per_node_band(self):
+        """D4: the per-node maximum is judged against PER_NODE_BAND_UPPER.
+
+        One node sits at its own ledger for the whole run, well above
+        0.85, while the cluster-wide figure alone would call the run
+        healthy.
+        """
+        records = []
+        for i in range(10):
+            records.append(sample({
+                NODE_ONE: node_payload(cpu_measured=6, cpu_committed=6,
+                                       cpu_limit=6, cpu_hard_max=6),
+                NODE_TWO: node_payload(cpu_measured=0, cpu_committed=0,
+                                       cpu_limit=18, cpu_hard_max=18),
+            }, sampled_at=1756000000.0 + 15 * i))
+        path = self._series(records)
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'Per-node maximum p90, D4 bound 0.85: 1.000', output,
+            'The per-node maximum and the D4 bound it is judged against '
+            'were not both printed.')
+        self.assertIn(
+            'ABOVE BAND', output,
+            'A per-node maximum of 1.000 is above the D4 bound of 0.85 and '
+            'must read as such.')
+        self.assertIn(
+            'saturated', output,
+            'The per-node verdict must say the statistic is saturated -- '
+            'phase 2 found it sitting at its ceiling in a large fraction of '
+            'passing job-runs, so it is read as what a topology should '
+            'achieve, not as a per-run alarm (D4).')
+        self.assertIn(
+            'never gates', output,
+            'D4 excludes the per-node bound from ever gating; the printed '
+            'verdict must say so.')
+
+    def test_a_node_well_under_its_ledger_reads_within_the_per_node_band(self):
+        """The lower tail is where the per-node bound has information (D4)."""
+        path = self._series([
+            sample({NODE_ONE: node_payload(cpu_measured=1, cpu_committed=1,
+                                           cpu_limit=10, cpu_hard_max=10)}),
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'Per-node maximum p90, D4 bound 0.85: 0.100', output)
+        self.assertIn('WITHIN BAND', output)
+        self.assertNotIn('ABOVE BAND', output)
+
+
+class GithubAnnotationsTestCase(HeadroomReportTestCase):
+    """D3: a ``::warning::`` for each band violation, plus a step summary.
+
+    F4 is why this exists at all: the report's exit code is discarded
+    twice between here and a human, by ``|| true`` in
+    ``ci_headroom_collect.sh`` and by ``continue-on-error: true`` in the
+    workflow, so a warning that only changed the exit code would be
+    invisible. GitHub reads annotations from stdout regardless of exit
+    code, which is why every test here drives ``main()`` through
+    ``_run()`` and reads its stdout, the same as every other test in this
+    file.
+    """
+
+    def _set_step_summary(self, path):
+        """Point $GITHUB_STEP_SUMMARY at path for one test, or unset it.
+
+        setUp() has already unset it for every test in this file; this
+        layers on top of that, and the fixture restores whatever the
+        process started with.
+        """
+        self.useFixture(fixtures.EnvironmentVariable(
+            'GITHUB_STEP_SUMMARY', path))
+
+    def test_the_ambient_step_summary_is_never_inherited(self):
+        """setUp() unsets it, so no test here writes to CI's own summary."""
+        self.assertNotIn(
+            'GITHUB_STEP_SUMMARY', os.environ,
+            'A test in this file can see the $GITHUB_STEP_SUMMARY GitHub '
+            'Actions sets for the unit-test step, so every test which '
+            'produces a record appends a verdict block to that job\'s '
+            'real summary page.')
+
+    def test_encode_workflow_command_value_escapes_percent_cr_and_newline(self):
+        """Percent must be escaped first, or the escapes re-escape themselves."""
+        self.assertEqual(
+            '100%25 chance%0D%0Aof rain',
+            report._encode_workflow_command_value('100% chance\r\nof rain'))
+        self.assertEqual(
+            'a%25b%0Ac',
+            report._encode_workflow_command_value('a%b\nc'),
+            'Escaping "%" after "\\n"/"\\r" would turn the "%0A" this '
+            'function itself writes into "%250A".')
+
+    def test_a_within_band_run_emits_no_warning_annotations(self):
+        """The common case: no violation, no annotation, no step summary noise."""
+        self._set_step_summary(None)
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertNotIn(
+            '::warning', output,
+            'A run within every band emitted a GitHub annotation anyway.')
+
+    def test_an_oversubscribed_run_emits_a_warning_annotation(self):
+        self._set_step_summary(None)
+        path = self._series([
+            sample({NODE_ONE: node_payload(
+                cpu_measured=9, cpu_committed=9, cpu_limit=10)}),
+        ])
+        code, output = self._run('--series', path, '--label', 'slim-tier')
+        self.assertEqual(0, code)
+        self.assertIn(
+            '::warning title=CI headroom%3A cluster OVERSUBSCRIBED::', output,
+            'An OVERSUBSCRIBED band verdict did not raise a GitHub '
+            'annotation (D3).')
+        self.assertIn('above the upper bound of 0.70', output)
+        self.assertIn(
+            '(slim-tier)', output,
+            'The run label was not carried into the annotation message.')
+
+    def test_an_oversized_run_emits_a_warning_annotation(self):
+        self._set_step_summary(None)
+        path = self._series([
+            sample({NODE_ONE: node_payload(cpu_measured=1, cpu_committed=1)}),
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            '::warning title=CI headroom%3A cluster OVERSIZED::', output,
+            'An OVERSIZED band verdict did not raise a GitHub annotation '
+            '(D3).')
+        self.assertIn('below the lower bound of 0.35', output)
+        self.assertIn(
+            'tools/ci_headroom_harvest.py', output,
+            'D8: a single-run OVERSIZED annotation must point at the '
+            'harvest tool as the way to ask the operational question, '
+            'rather than reading as actionable on its own.')
+
+    def test_a_saturated_node_emits_a_per_node_band_warning_annotation(self):
+        records = []
+        for i in range(10):
+            records.append(sample({
+                NODE_ONE: node_payload(cpu_measured=6, cpu_committed=6,
+                                       cpu_limit=6, cpu_hard_max=6),
+                NODE_TWO: node_payload(cpu_measured=0, cpu_committed=0,
+                                       cpu_limit=18, cpu_hard_max=18),
+            }, sampled_at=1756000000.0 + 15 * i))
+        self._set_step_summary(None)
+        path = self._series(records)
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            '::warning title=CI headroom%3A per-node maximum above band::',
+            output,
+            'A per-node maximum above PER_NODE_BAND_UPPER did not raise a '
+            'GitHub annotation (D4).')
+        self.assertIn('never gates', output)
+        self.assertIn(
+            'This bound never gates', output,
+            'D4: the per-node annotation must say the bound never gates, '
+            'the same as the printed verdict does.')
+
+    def test_a_capacity_refusal_emits_a_warning_annotation_about_calibration(self):
+        """D5: phrased as a calibration signal, never as undersizing evidence."""
+        census = self._census([
+            census_event('schedule at stage sufficient_free_disk',
+                         {NODE_ONE: {'reason': 'insufficient disk'}}),
+        ])
+        self._set_step_summary(None)
+        path = self._series([
+            sample({NODE_ONE: node_payload(cpu_measured=5, cpu_committed=5,
+                                           cpu_limit=10)}),
+        ])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn(
+            '::warning title=CI headroom%3A capacity-stage refusals observed::',
+            output,
+            'A capacity-stage refusal did not raise its own GitHub '
+            'annotation (D3).')
+        self.assertIn(
+            "demand estimator's calibration", output,
+            'D5: the refusal annotation must be worded as an observation '
+            'about the demand estimator\'s calibration.')
+        self.assertIn(
+            'not evidence the cloud is too small', output,
+            'D5: the refusal annotation must explicitly say a refusal is '
+            'not evidence the cloud is undersized -- phase 4 doubled a '
+            "cluster's ledger and the refusal rate stayed essentially the "
+            'same.')
+
+    def test_the_step_summary_variable_is_left_alone_when_unset(self):
+        """No file, no exception, when $GITHUB_STEP_SUMMARY is not set."""
+        self._set_step_summary(None)
+        path = self._series([
+            sample({NODE_ONE: node_payload(
+                cpu_measured=9, cpu_committed=9, cpu_limit=10)}),
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(
+            0, code,
+            'An unset $GITHUB_STEP_SUMMARY must not raise: this tool is '
+            'also run by hand over a downloaded bundle, where the '
+            'variable is never set.')
+        self.assertIn('::warning', output)
+
+    def test_the_step_summary_file_is_written_when_the_variable_is_set(self):
+        summary_path = os.path.join(self.tempdir, 'step-summary.md')
+        self._set_step_summary(summary_path)
+        path = self._series([
+            sample({NODE_ONE: node_payload(
+                cpu_measured=9, cpu_committed=9, cpu_limit=10)}),
+        ])
+        code, _ = self._run('--series', path, '--label', 'slim-tier')
+        self.assertEqual(0, code)
+        with open(summary_path) as f:
+            contents = f.read()
+        self.assertIn('### CI headroom band verdict -- slim-tier', contents)
+        self.assertIn('OVERSUBSCRIBED', contents)
+        # This fixture's single node is also above the D4 per-node band
+        # (0.900 > 0.85), so both annotations fire.
+        self.assertIn('2 GitHub annotations raised on this run.', contents)
+
+    def test_the_step_summary_file_is_appended_to_not_overwritten(self):
+        """Other steps in the same job write their own sections first."""
+        summary_path = os.path.join(self.tempdir, 'step-summary.md')
+        with open(summary_path, 'w') as f:
+            f.write('### An earlier step\n\nSome other content.\n')
+        self._set_step_summary(summary_path)
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, _ = self._run('--series', path)
+        self.assertEqual(0, code)
+        with open(summary_path) as f:
+            contents = f.read()
+        self.assertIn(
+            'An earlier step', contents,
+            'Opening $GITHUB_STEP_SUMMARY truncated a section an earlier '
+            'step in the same job had already written.')
+        self.assertIn('CI headroom band verdict', contents)
+
+    def test_the_heading_is_not_glued_to_an_unterminated_last_line(self):
+        """An earlier writer need not have ended its section with a newline."""
+        summary_path = os.path.join(self.tempdir, 'step-summary.md')
+        with open(summary_path, 'w') as f:
+            f.write('Some other content without a newline')
+        self._set_step_summary(summary_path)
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        code, _ = self._run('--series', path)
+        self.assertEqual(0, code)
+        with open(summary_path) as f:
+            lines = f.read().split('\n')
+        self.assertIn(
+            'Some other content without a newline', lines,
+            'The verdict heading was appended onto the last line an '
+            'earlier step left unterminated, so it will not render as a '
+            'heading.')
+        self.assertTrue(
+            any(line.startswith('### CI headroom band verdict')
+                for line in lines))
+
+    def test_an_unwritable_step_summary_path_does_not_raise(self):
+        """A path whose parent directory does not exist is tolerated (D15)."""
+        summary_path = os.path.join(
+            self.tempdir, 'no-such-directory', 'step-summary.md')
+        self._set_step_summary(summary_path)
+        path = self._series([
+            sample({NODE_ONE: node_payload(
+                cpu_measured=9, cpu_committed=9, cpu_limit=10)}),
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(
+            0, code,
+            'An unwritable $GITHUB_STEP_SUMMARY path made the report fail. '
+            'Nothing this tool does may fail the job it is measuring '
+            '(D15), and that has to include a summary path which cannot '
+            'be opened.')
+        self.assertFalse(os.path.exists(summary_path))
+        self.assertIn(
+            '::warning', output,
+            'A failure writing the step summary must not suppress the '
+            'stdout annotations, which are a separate surface.')
+
+    def test_the_step_summary_reports_no_verdict_for_an_empty_series(self):
+        summary_path = os.path.join(self.tempdir, 'step-summary.md')
+        self._set_step_summary(summary_path)
+        path = self._series([])
+        code, _ = self._run('--series', path)
+        self.assertEqual(0, code)
+        with open(summary_path) as f:
+            contents = f.read()
+        self.assertIn('Cluster-wide p90: NO VERDICT', contents)
+        self.assertIn('Per-node maximum p90: NO VERDICT', contents)
+        self.assertIn('Refusal warning: UNKNOWN', contents)
 
 
 class PercentileTestCase(base.ShakenFistTestCase):
@@ -1910,11 +2257,11 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
         """D21: the cluster-wide fraction averages a full node against an empty one.
 
         The shape here is the one merge run 33944911413 actually recorded:
-        a cluster-wide p90 comfortably inside the provisional band while one
-        node sat pinned at its own ledger for the whole run. A band written
-        only cluster-wide calls that run healthy, which is the precise
-        failure this plan exists to stop making, so the per-node maximum is
-        a first-class figure in the record.
+        a cluster-wide p90 comfortably inside the band while one node sat
+        pinned at its own ledger for the whole run. A band written only
+        cluster-wide calls that run healthy, which is the precise failure
+        this plan exists to stop making, so the per-node maximum is a
+        first-class figure in the record.
         """
         records = []
         for i in range(10):
@@ -1937,8 +2284,8 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
             'ledger.')
         self.assertEqual(
             'OVERSIZED', record['verdict']['band'],
-            'Read cluster-wide this run is under the provisional lower '
-            'bound, which is exactly the reading D21 says is misleading.')
+            'Read cluster-wide this run is under the lower bound, which is '
+            'exactly the reading D21 says is misleading.')
         self.assertEqual(
             {'n': 10, 'p90': 1.0, 'peak': 1.0},
             record['per_node_max_cpu_fraction'],
@@ -1950,11 +2297,17 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
             1.0, record['verdict']['per_node_max_p90_fraction'],
             'The verdict must carry the per-node maximum beside the '
             'cluster-wide ratio it judged.')
-        self.assertIsNone(
-            record['verdict']['per_node_band'],
-            'There is no per-node band verdict yet: D21 says the bounds come '
-            'from phase 2\'s harvest, and the provisional 0.35/0.70 are '
-            'bounds on the cluster-wide figure only.')
+        self.assertEqual(
+            'ABOVE BAND', record['verdict']['per_node_band'],
+            'D4 judges the per-node maximum against PER_NODE_BAND_UPPER '
+            '(0.85). A p90 of 1.0 is above it, and the cluster-wide band '
+            'being OVERSIZED must not suppress that -- they are separate '
+            'verdicts (D21).')
+        self.assertEqual(
+            report.PER_NODE_BAND_UPPER, record['verdict']['per_node_band_upper'],
+            'The record must carry the bound the per-node verdict was '
+            'judged against, not just the verdict, so a reader does not '
+            'have to know the constant to check the arithmetic.')
 
     def test_the_ledger_is_recorded_as_the_range_it_moved_over(self):
         """A ledger which changed mid-run is a finding, not something to average.
@@ -2003,6 +2356,24 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
             'and phase 5\'s guardrail would read different numbers.')
         self.assertEqual('slim-tier', written['label'])
         self.assertEqual(report.RECORD_VERSION, written['record_version'])
+
+    def test_record_version_is_3_and_band_provisional_is_gone(self):
+        """Phase 5's D2: the band is defended, not provisional, as of version 3.
+
+        The flag itself is dropped rather than merely flipped to False --
+        nothing read it, and a reader wanting to know whether a record's
+        band is defended checks record_version instead (see RECORD_VERSION's
+        own comment).
+        """
+        path = self._series([sample({NODE_ONE: node_payload()})])
+        record = report.summary_record(path)
+        self.assertEqual(3, report.RECORD_VERSION)
+        self.assertEqual(3, record['record_version'])
+        self.assertNotIn(
+            'band_provisional', record['verdict'],
+            'band_provisional should no longer be a key in the verdict '
+            'record (D2); phase 2 defended the band and nothing reads the '
+            'flag.')
 
     def test_a_json_path_which_cannot_be_written_is_a_warning_not_a_failure(self):
         """D15 holds for the output file as much as for the inputs.
@@ -2212,3 +2583,121 @@ class CapacityWaitsTestCase(HeadroomReportTestCase):
         self.assertEqual('not requested', not_requested['state'])
         self.assertFalse(not_requested['available'])
         self.assertIsNone(not_requested['count'])
+
+
+class OutputOrderingTestCase(HeadroomReportTestCase):
+    """The record is the dataset; the annotation is a convenience.
+
+    ``emit_github_annotations()`` and ``write_github_step_summary()``
+    are not guarded locally, so a raise in either is caught by
+    ``main()``'s global handler -- which, when they ran first, silently
+    cost the run its ``--json`` record while the tool still exited 0 and
+    said nothing was wrong. ``ci_headroom_harvest.py`` reads those
+    records, so that failure mode costs the dataset rather than one
+    annotation.
+    """
+
+    def _series_with_a_verdict(self):
+        return self._series([
+            sample({NODE_ONE: node_payload(cpu_measured=10, cpu_committed=10,
+                                           cpu_limit=10, cpu_hard_max=12)}),
+        ])
+
+    def test_the_record_survives_an_annotation_which_raises(self):
+        path = self._series_with_a_verdict()
+        record_path = os.path.join(self.tempdir, 'record.json')
+
+        original = report.emit_github_annotations
+
+        def _explode(record):
+            raise RuntimeError('annotation code is unguarded on purpose')
+
+        report.emit_github_annotations = _explode
+        try:
+            code, _ = self._run('--series', path, '--json', record_path)
+        finally:
+            report.emit_github_annotations = original
+
+        self.assertEqual(0, code)
+        self.assertTrue(
+            os.path.exists(record_path),
+            'The --json record was not written because the annotation code '
+            'raised first. The record is what the harvest reads; an '
+            'annotation failing must not cost a run its data.')
+        with open(record_path) as f:
+            self.assertEqual(3, json.load(f)['record_version'])
+
+    def test_the_record_survives_a_step_summary_which_raises(self):
+        path = self._series_with_a_verdict()
+        record_path = os.path.join(self.tempdir, 'record.json')
+
+        original = report.write_github_step_summary
+
+        def _explode(record):
+            # write_github_step_summary() catches only OSError, and it
+            # builds the lines inside the try, so a TypeError or KeyError
+            # from step_summary_lines() escapes it.
+            raise TypeError('step summary code is unguarded on purpose')
+
+        report.write_github_step_summary = _explode
+        try:
+            code, _ = self._run('--series', path, '--json', record_path)
+        finally:
+            report.write_github_step_summary = original
+
+        self.assertEqual(0, code)
+        self.assertTrue(os.path.exists(record_path))
+
+
+class WorkflowCommandPropertyTestCase(HeadroomReportTestCase):
+    """A property value needs two escapes an ordinary value does not.
+
+    ':' ends a workflow command's property list and ',' separates its
+    properties, so both have to be encoded inside one. Every title this
+    tool emits contains a colon.
+    """
+
+    def test_property_encoding_covers_colon_and_comma(self):
+        self.assertEqual(
+            '%3A%2C',
+            report._encode_workflow_command_property(':,'))
+
+    def test_property_encoding_still_covers_what_a_value_needs(self):
+        # It must not lose the percent-first ordering it builds on: a
+        # literal '%3A' in the input has to survive as '%253A'.
+        self.assertEqual(
+            '%253A%0A100%25',
+            report._encode_workflow_command_property('%3A\n100%'))
+
+    def test_emitted_titles_are_property_encoded(self):
+        path = self._series([
+            sample({NODE_ONE: node_payload(cpu_measured=10, cpu_committed=10,
+                                           cpu_limit=10, cpu_hard_max=12)}),
+        ])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+
+        titles = [line.split('::')[1][len('warning title='):]
+                  for line in output.splitlines()
+                  if line.startswith('::warning title=')]
+        self.assertNotEqual([], titles, 'no annotation was emitted at all')
+        for title in titles:
+            with self.subTest(title=title):
+                self.assertNotIn(':', title)
+                self.assertNotIn(',', title)
+                self.assertIn('%3A', title)
+
+
+class PerNodeNoVerdictTestCase(HeadroomReportTestCase):
+    def test_the_per_node_no_verdict_reaches_stdout_as_well(self):
+        # The step summary covered this; the job log did not. A reader
+        # looking at the log would have seen a per-node bound printed with
+        # nothing said about whether it was met.
+        path = self._series([])
+        code, output = self._run('--series', path)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'NO VERDICT: no sample produced a per-node committed-vCPU-',
+            output,
+            'print_verdict() printed the D4 per-node bound without saying '
+            'that no verdict could be reached against it.')
