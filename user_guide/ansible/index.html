@@ -15103,6 +15103,18 @@ others set -- is a partial set, and fails.</p>
 <td>state<br/><em>string</em></td>
 <td>The state of the resource. Valid states are <code>present</code> or <code>absent</code>, defaults to <code>present</code>.</td>
 </tr>
+<tr>
+<td>api_url<br/><em>string</em></td>
+<td>The base URL of the Shaken Fist API, for example <code>http://sf-1:13000</code>. Optional: when it is not supplied the module discovers the API from the environment and <code>sfrc</code> exactly like the <code>sf-client</code> CLI. <code>api_url</code>, <code>namespace</code> and <code>key</code> must be supplied together or not at all -- see <a href="#authentication">Authentication</a>.</td>
+</tr>
+<tr>
+<td>namespace<br/><em>string</em></td>
+<td>The namespace to authenticate as. In this module it names the identity and nothing else -- the resource acted on is named by <code>name</code> -- so it may not be supplied on its own: alone it would say only "authenticate as this", which is exactly the instruction credential discovery would discard. See <a href="#authentication">Authentication</a>.</td>
+</tr>
+<tr>
+<td>key<br/><em>string</em></td>
+<td>The key to authenticate with. Optional, and carries the same all-or-nothing rule as <code>api_url</code> -- see <a href="#authentication">Authentication</a>.</td>
+</tr>
 </tbody>
 </table>
 <h3 id="return-value">Return value<a class="headerlink" href="#return-value" title="Permanent link">&para;</a></h3>
@@ -15177,6 +15189,18 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 <tr>
 <td>uuid<br/><em>string</em></td>
 <td>The UUID for the network. Either <code>name</code> or <code>uuid</code> must be included in all requests with <code>state: absent</code>. If you specify a UUID and the network does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation.</td>
+</tr>
+<tr>
+<td>api_url<br/><em>string</em></td>
+<td>The base URL of the Shaken Fist API, for example <code>http://sf-1:13000</code>. Optional: when it is not supplied the module discovers the API from the environment and <code>sfrc</code> exactly like the <code>sf-client</code> CLI. <code>api_url</code>, <code>namespace</code> and <code>key</code> must be supplied together or not at all -- see <a href="#authentication">Authentication</a>.</td>
+</tr>
+<tr>
+<td>namespace<br/><em>string</em></td>
+<td>The namespace the network belongs to, which is also the namespace to authenticate as. May be supplied on its own, which means "work in this namespace and discover the credentials the usual way" -- but supplying <code>api_url</code> or <code>key</code> requires all three. See <a href="#authentication">Authentication</a>.</td>
+</tr>
+<tr>
+<td>key<br/><em>string</em></td>
+<td>The key to authenticate with. Optional, and carries the same all-or-nothing rule as <code>api_url</code> -- see <a href="#authentication">Authentication</a>.</td>
 </tr>
 </tbody>
 </table>
@@ -15312,6 +15336,18 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 <td>await_timeout<br/><em>integer</em></td>
 <td>How many seconds an <code>await</code> may take, counted from the start of the operation rather than from the start of the wait. Where an instance is being replaced, the time spent deleting the old one and creating the new one is deducted from this number before the wait begins. It is a budget rather than a hard deadline: a deletion or creation already underway is not interrupted, and a <code>shakenfist-client</code> of v0.8.3 or earlier cannot be told not to wait while creating. Defaults to 600.</td>
 </tr>
+<tr>
+<td>api_url<br/><em>string</em></td>
+<td>The base URL of the Shaken Fist API, for example <code>http://sf-1:13000</code>. Optional: when it is not supplied the module discovers the API from the environment and <code>sfrc</code> exactly like the <code>sf-client</code> CLI. <code>api_url</code>, <code>namespace</code> and <code>key</code> must be supplied together or not at all -- see <a href="#authentication">Authentication</a>.</td>
+</tr>
+<tr>
+<td>namespace<br/><em>string</em></td>
+<td>The namespace the instance belongs to, which is also the namespace to authenticate as. May be supplied on its own, which means "work in this namespace and discover the credentials the usual way" -- but supplying <code>api_url</code> or <code>key</code> requires all three. See <a href="#authentication">Authentication</a>.</td>
+</tr>
+<tr>
+<td>key<br/><em>string</em></td>
+<td>The key to authenticate with. Optional, and carries the same all-or-nothing rule as <code>api_url</code> -- see <a href="#authentication">Authentication</a>.</td>
+</tr>
 </tbody>
 </table>
 <h3 id="examples_2">Examples<a class="headerlink" href="#examples_2" title="Permanent link">&para;</a></h3>
@@ -15372,6 +15408,18 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 <td>state<br/><em>string</em></td>
 <td>The state of the resource. Valid states are <code>present</code> or <code>absent</code>, defaults to <code>present</code>.</td>
 </tr>
+<tr>
+<td>api_url<br/><em>string</em></td>
+<td>The base URL of the Shaken Fist API, for example <code>http://sf-1:13000</code>. Optional: when it is not supplied the module discovers the API from the environment and <code>sfrc</code> exactly like the <code>sf-client</code> CLI. <code>api_url</code>, <code>namespace</code> and <code>key</code> must be supplied together or not at all -- see <a href="#authentication">Authentication</a>.</td>
+</tr>
+<tr>
+<td>namespace<br/><em>string</em></td>
+<td>The namespace to authenticate as. In this module it names the identity and nothing else -- the resource acted on is named by <code>instance_uuid</code> -- so it may not be supplied on its own: alone it would say only "authenticate as this", which is exactly the instruction credential discovery would discard. See <a href="#authentication">Authentication</a>.</td>
+</tr>
+<tr>
+<td>key<br/><em>string</em></td>
+<td>The key to authenticate with. Optional, and carries the same all-or-nothing rule as <code>api_url</code> -- see <a href="#authentication">Authentication</a>.</td>
+</tr>
 </tbody>
 </table>
 <h3 id="examples_3">Examples<a class="headerlink" href="#examples_3" title="Permanent link">&para;</a></h3>
@@ -15431,7 +15479,15 @@ does.</p>
 </tr>
 <tr>
 <td>auth_namespace<br/><em>string</em></td>
-<td>The namespace to authenticate as, which is normally <code>system</code>.</td>
+<td>The namespace to authenticate as, which is normally <code>system</code>. This module is the only one that names the identity separately, because <code>namespace</code> is already the namespace the claim covers. See <a href="#authentication">Authentication</a>.</td>
+</tr>
+<tr>
+<td>api_url<br/><em>string</em></td>
+<td>The base URL of the Shaken Fist API, for example <code>http://sf-1:13000</code>. Optional: when it is not supplied the module discovers the API from the environment and <code>sfrc</code> exactly like the <code>sf-client</code> CLI. <code>api_url</code>, <code>auth_namespace</code> and <code>key</code> must be supplied together or not at all -- see <a href="#authentication">Authentication</a>.</td>
+</tr>
+<tr>
+<td>key<br/><em>string</em></td>
+<td>The key to authenticate with. Optional, and carries the same all-or-nothing rule as <code>api_url</code> -- see <a href="#authentication">Authentication</a>.</td>
 </tr>
 </tbody>
 </table>
