@@ -794,7 +794,8 @@ placed, non-deleted instances and corrects it.
 
 The admission and release transactions are compatible with
 `innodb_snapshot_isolation` ON, the default from MariaDB 11.6.2 (what
-Debian 13, Ubuntu 24.04 and every recent container tag ship). That took
+Debian 13 and every recent container tag ship; Ubuntu 24.04 is still on
+10.11, where it defaults OFF). That took
 moving every plain `SELECT` a transaction needs ahead of opening it, so
 the transaction's first statement is always a guarded `UPDATE` — see
 [the developer guide](../developer_guide/standards.md#a-guarded-update-must-be-the-transactions-first-statement)

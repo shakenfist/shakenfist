@@ -56,6 +56,25 @@ uv pip install -e '.[test]'
 
 export SF_MARIADB_TEST_DSN="mariadb+mysqldb://shakenfist:${DB_PASSWORD}@127.0.0.1:3306/shakenfist"
 
+# The live capacity suite only sees ER_CHECKREAD regressions (a plain
+# SELECT ahead of a guarded UPDATE, issue #3759) when the server runs
+# with innodb_snapshot_isolation ON, the default from MariaDB 11.6.2.
+# The suites report the regime but pass either way, because developers
+# run them against 10.11 too. Here that would let a runner image
+# rebuild or a distro move silently drop the coverage, so the job
+# refuses to run against any other regime. On a server too old to know
+# the variable the query errors, which fails the same way.
+echo "Checking the server runs with innodb_snapshot_isolation ON..."
+regime=$(mariadb -h 127.0.0.1 -u shakenfist -p"${DB_PASSWORD}" -N -B \
+    -e 'SELECT VERSION(), @@GLOBAL.innodb_snapshot_isolation' 2>&1) || true
+echo "Server regime: ${regime}"
+if ! echo "${regime}" | grep -qE $'\t1$'; then
+    echo "ERROR: innodb_snapshot_isolation is not ON on this server." >&2
+    echo "This job exists to run the live suites under it; see the" >&2
+    echo "schema_enum_widening comment in functional-tests.yml." >&2
+    exit 1
+fi
+
 echo "Running live MariaDB tests..."
 # --serial because these share one database and drop their tables on
 # cleanup. The regex is anchored on the module name so a live test

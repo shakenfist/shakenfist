@@ -55,13 +55,14 @@ still see the write it expected.
 ## A guarded UPDATE must be the transaction's first statement
 
 `innodb_snapshot_isolation` defaults ON from MariaDB 11.6.2, which is
-what Debian 13, Ubuntu 24.04 and every recent container tag ship. Under
-it, a REPEATABLE READ transaction whose read view was established by a
-plain `SELECT` does not block and re-evaluate a later `UPDATE` whose
-target row has moved since — it aborts the whole transaction with
-ER_CHECKREAD (1020). When the guarded `UPDATE` is instead the
-transaction's *first* statement, the read view is established by the DML
-itself, there is no stale-snapshot window, and a contending writer
+what Debian 13 and every recent container tag ship (Ubuntu 24.04 is
+still on 10.11, where it defaults OFF). Under it, a REPEATABLE READ
+transaction whose read view was established by a plain `SELECT` does
+not block and re-evaluate a later `UPDATE` whose target row has moved
+since — it aborts the whole transaction with ER_CHECKREAD (1020). When
+the guarded `UPDATE` is instead the transaction's *first* statement, the
+read view is established by the DML itself, there is no stale-snapshot
+window, and a contending writer
 blocks on the row lock and then re-evaluates its `WHERE`, which is the
 behaviour every guarded-counter design in `shakenfist/mariadb.py`
 depends on.

@@ -26331,7 +26331,8 @@ def _instance_location_nodes(
 # ER_CHECKREAD under innodb_snapshot_isolation.
 #
 # innodb_snapshot_isolation defaults ON from MariaDB 11.6.2, which is what
-# Debian 13, Ubuntu 24.04 and every recent container tag ship. Under it a
+# Debian 13 and every recent container tag ship (Ubuntu 24.04 is still on
+# 10.11, where it defaults OFF). Under it a
 # REPEATABLE READ transaction whose read view was established by a plain
 # SELECT does not block and re-evaluate a later UPDATE whose target row has
 # moved since -- it aborts the whole transaction with ER_CHECKREAD (1020),

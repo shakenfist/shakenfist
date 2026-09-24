@@ -893,7 +893,7 @@ class NamespaceClaimConcurrencyLiveTestCase(_LiveClaimFixture):
                 snapshot = conn.execute(sa.text(
                     'SELECT @@innodb_snapshot_isolation')).scalar()
             except sa.exc.OperationalError:
-                snapshot = 'absent (pre 11.6.2)'
+                snapshot = 'absent (server predates it)'
         self._report('server-regime', (
             f'MariaDB {version}, collation {collation}, '
             f'innodb_snapshot_isolation {snapshot}'))
