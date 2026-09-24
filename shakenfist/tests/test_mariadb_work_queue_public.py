@@ -173,6 +173,37 @@ class PublicWorkQueueDispatchTestCase(base.ShakenFistTestCase):
         direct.assert_called_once_with(30.0)
         grpc.assert_not_called()
 
+    @mock.patch(
+        'shakenfist.mariadb._grpc_list_orphaned_cluster_operations')
+    @mock.patch(
+        'shakenfist.mariadb._direct_list_orphaned_cluster_operations')
+    @mock.patch(
+        'shakenfist.mariadb._use_database_service',
+        return_value=True)
+    def test_list_orphaned_service_mode_goes_to_grpc(
+            self, _svc, direct, grpc):
+        grpc.return_value = [{'uuid': 'a'}]
+        self.assertEqual(
+            [{'uuid': 'a'}],
+            mariadb.list_orphaned_cluster_operations(1800.0))
+        grpc.assert_called_once_with(1800.0)
+        direct.assert_not_called()
+
+    @mock.patch(
+        'shakenfist.mariadb._grpc_list_orphaned_cluster_operations')
+    @mock.patch(
+        'shakenfist.mariadb._direct_list_orphaned_cluster_operations')
+    @mock.patch(
+        'shakenfist.mariadb._use_database_service',
+        return_value=False)
+    def test_list_orphaned_direct_mode_goes_to_direct(
+            self, _svc, direct, grpc):
+        direct.return_value = []
+        self.assertEqual(
+            [], mariadb.list_orphaned_cluster_operations(1800.0))
+        direct.assert_called_once_with(1800.0)
+        grpc.assert_not_called()
+
     @mock.patch('shakenfist.mariadb._grpc_work_queue_clear_claim')
     @mock.patch('shakenfist.mariadb._direct_work_queue_clear_claim')
     @mock.patch(

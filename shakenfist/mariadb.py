@@ -51,6 +51,7 @@ from shakenfist.constants import CLUSTER_LOCK_LEASE_SECONDS
 from shakenfist.constants import DISK_BUSY_PER_SECOND_METRIC
 from shakenfist.constants import GiB
 from shakenfist.constants import NODE_ACTIVE_STATES
+from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
 from shakenfist import exceptions
 from shakenfist.operations.error_report import ErrorReport
 from shakenfist.protos import database_pb2
@@ -22143,6 +22144,29 @@ def _grpc_work_queue_delete_row(row_id: int) -> bool:
         return False
 
 
+def _grpc_list_orphaned_cluster_operations(
+        threshold_seconds: float) -> list[dict[str, Any]]:
+    """List orphaned cluster operations via the database microservice."""
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.ListOrphanedClusterOperationsRequest(
+            threshold_seconds=threshold_seconds)
+        reply = _grpc_call(stub.ListOrphanedClusterOperations, request)
+        return [
+            {
+                'uuid': op.uuid,
+                'operation_type': op.operation_type,
+                'state_value': op.state_value,
+                'update_time': float(op.update_time),
+            }
+            for op in reply.operations
+        ]
+    except grpc.RpcError as e:
+        LOG.warning(
+            f'gRPC ListOrphanedClusterOperations failed: {e}')
+        return []
+
+
 def _coalescible_key_pairs(
         keys: 'list[tuple[str, Optional[str]]]'
 ) -> 'list[Any]':
@@ -23067,6 +23091,26 @@ def _coalescible_key_clause(
     return key_column == value
 
 
+def _work_queue_references_op_clause(cluster_ops_table: sa.Table) -> Any:
+    """An EXISTS predicate: some work_queue row references this op.
+
+    Every live cluster operation is referenced by exactly one
+    work_queue row -- the enqueue writes both in one transaction, and
+    a defer inserts the replacement row before flipping the state back
+    to queued. An operation in a non-terminal state with no row is
+    therefore permanently stranded: no dispatcher will ever dequeue
+    it (issue 4303). The payload comparison goes through
+    ``_dashed_uuid_expr`` because the payload stores the dashed uuid
+    string while ``cluster_operations.uuid`` is undashed CHAR(32).
+    """
+    work_queue_table = _get_work_queue_table()
+    return sa.exists(
+        sa.select(work_queue_table.c.id).where(
+            sa.func.json_unquote(sa.func.json_extract(
+                work_queue_table.c.payload, '$.operation_uuid'))
+            == _dashed_uuid_expr(cluster_ops_table.c.uuid)))
+
+
 def _direct_find_existing_coalescible_op(
         operation_type: str,
         keys: 'list[tuple[str, Optional[str]]]',
@@ -23083,6 +23127,8 @@ def _direct_find_existing_coalescible_op(
       is strictly narrower than a one-pair key.
     * has a single-task list whose entry equals ``task_name``
     * is currently in state ``queued`` (not yet picked up)
+    * is still referenced by a work_queue row, so a dispatcher can
+      actually run it -- see ``_work_queue_references_op_clause``
     * carries one of ``priorities``, when the caller supplies them
 
     ``priorities`` holds ``PRIORITY`` member names and exists because
@@ -23151,6 +23197,12 @@ def _direct_find_existing_coalescible_op(
                         sa.func.json_extract(
                             cluster_ops_table.c.metadata_json,
                             '$.tasks[0]')) == task_name)
+                # Never adopt an orphan: a queued op with no work_queue
+                # row will never run, so reusing it wedges the caller
+                # in raise_for_error() until its timeout (issue 4303).
+                # Enqueue fresh work instead; the reaper's orphan pass
+                # errors the dead op out separately.
+                .where(_work_queue_references_op_clause(cluster_ops_table))
                 .order_by(cluster_ops_table.c.created_at.asc())
                 .limit(1)
             )
@@ -23309,6 +23361,83 @@ def _direct_claim_coalescible_siblings(
         LOG.warning(
             f'MariaDB claim_coalescible_siblings failed for '
             f'{operation_type}/{_coalescible_key_description(keys)}: {e}')
+        return []
+
+
+def _direct_list_orphaned_cluster_operations(
+        threshold_seconds: float) -> list[dict[str, Any]]:
+    """Cluster operations stranded in a non-terminal state with no
+    work_queue row.
+
+    The enqueue writes the operation, its queued state and its
+    work_queue row in one transaction, and a defer inserts the
+    replacement row before flipping the state back to queued, so a
+    queued or executing operation with no row referencing it can only
+    be the debris of a failure (issue 4273's deadlock chain was one
+    producer). Nothing will ever dequeue such an operation; worse,
+    until issue 4303 the enqueue-side dedup kept adopting it, wedging
+    every caller in raise_for_error(). Rows must have sat rowless for
+    ``threshold_seconds`` (measured against the state's update_time)
+    to be reported, which keeps the sweep conservative without any
+    correctness cost. Each returned dict has uuid (dashed string),
+    operation_type, state_value and update_time; oldest first.
+
+    ``object_states.object_type`` stores the ObjectType enum *name*
+    while ``cluster_operations.operation_type`` holds the enum
+    *value*, so the join binds one ObjectType per operation type
+    rather than comparing the two columns (which silently never
+    matches -- see docs/developer_guide/coding_rules.md).
+    """
+    engine = _get_engine()
+    cluster_ops_table = _get_cluster_operations_table()
+    states_table = _get_object_states_table()
+
+    op_object_types = [
+        ObjectType(t)  # type: ignore[call-arg]
+        for t in OPERATION_NAMES_TO_CLASSES]
+
+    try:
+        with engine.connect() as conn:
+            cutoff = (sa.func.unix_timestamp(sa.func.now(6))
+                      - threshold_seconds)
+            stmt = (
+                sa.select(
+                    cluster_ops_table.c.uuid,
+                    cluster_ops_table.c.operation_type,
+                    states_table.c.state_value,
+                    states_table.c.update_time,
+                )
+                .select_from(
+                    cluster_ops_table.join(
+                        states_table,
+                        sa.and_(
+                            states_table.c.object_uuid
+                            == _dashed_uuid_expr(cluster_ops_table.c.uuid),
+                            sa.or_(*[
+                                sa.and_(
+                                    cluster_ops_table.c.operation_type
+                                    == ot.value,
+                                    states_table.c.object_type == ot)
+                                for ot in op_object_types]))))
+                .where(states_table.c.state_value.in_(
+                    ['queued', 'executing']))
+                .where(states_table.c.update_time <= cutoff)
+                .where(~_work_queue_references_op_clause(cluster_ops_table))
+                .order_by(states_table.c.update_time.asc())
+            )
+            rows = conn.execute(stmt).fetchall()
+            return [
+                {
+                    'uuid': str(r.uuid),
+                    'operation_type': r.operation_type,
+                    'state_value': r.state_value,
+                    'update_time': float(r.update_time),
+                }
+                for r in rows
+            ]
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB list_orphaned_cluster_operations failed: {e}')
         return []
 
 
@@ -24225,6 +24354,19 @@ def delete_work_queue_row(row_id: int) -> bool:
     if _use_database_service():
         return _grpc_work_queue_delete_row(row_id)
     return _direct_work_queue_delete_row(row_id)
+
+
+def list_orphaned_cluster_operations(
+        threshold_seconds: float) -> list[dict[str, Any]]:
+    """List cluster operations stranded with no work_queue row.
+
+    Used by the cluster daemon reaper's orphan pass, which flips
+    each one to the error state -- see
+    ``_direct_list_orphaned_cluster_operations`` for what qualifies.
+    """
+    if _use_database_service():
+        return _grpc_list_orphaned_cluster_operations(threshold_seconds)
+    return _direct_list_orphaned_cluster_operations(threshold_seconds)
 
 
 def find_existing_coalescible_op(

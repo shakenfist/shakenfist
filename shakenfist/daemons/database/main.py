@@ -245,6 +245,34 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             return database_pb2.StatusReply(
                 success=False, error=str(e))
 
+    def ListOrphanedClusterOperations(
+        self,
+        request: database_pb2.ListOrphanedClusterOperationsRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.ListOrphanedClusterOperationsReply:
+        """List cluster operations stranded with no work_queue row."""
+        try:
+            self.monitor.counters[
+                'list_orphaned_cluster_operations'].inc()
+            ops = mariadb._direct_list_orphaned_cluster_operations(
+                request.threshold_seconds)
+            return database_pb2.ListOrphanedClusterOperationsReply(
+                operations=[
+                    database_pb2.OrphanedClusterOperation(
+                        uuid=op['uuid'],
+                        operation_type=op['operation_type'],
+                        state_value=op['state_value'],
+                        update_time=op['update_time'],
+                    )
+                    for op in ops
+                ]
+            )
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database ListOrphanedClusterOperations failed', e)
+            return database_pb2.ListOrphanedClusterOperationsReply(
+                operations=[])
+
     def FindExistingCoalescibleOp(
         self,
         request: database_pb2.FindExistingCoalescibleOpRequest,
@@ -6385,6 +6413,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'enqueue', 'dequeue', 'resolve', 'get_queue_length',
             'restart_queue', 'list_stuck_work_queue_rows',
             'clear_work_queue_claim', 'delete_work_queue_row',
+            'list_orphaned_cluster_operations',
             'claim_coalescible_siblings',
             'find_existing_coalescible_op',
             'claim_coalescible_siblings_v2',

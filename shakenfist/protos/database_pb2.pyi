@@ -347,6 +347,78 @@ class DeleteWorkQueueRowRequest(_message.Message):
 Global___DeleteWorkQueueRowRequest: _TypeAlias = DeleteWorkQueueRowRequest  # noqa: Y015
 
 @_typing.final
+class ListOrphanedClusterOperationsRequest(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    THRESHOLD_SECONDS_FIELD_NUMBER: _builtins.int
+    threshold_seconds: _builtins.float
+    """A cluster operation is orphaned when it has sat in a non-terminal
+    state (queued or executing) for longer than threshold_seconds with
+    no work_queue row referencing it -- nothing will ever run it, so
+    the reaper moves it to the error state (issue 4303).
+    """
+    def __init__(
+        self,
+        *,
+        threshold_seconds: _builtins.float = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["threshold_seconds", b"threshold_seconds"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ListOrphanedClusterOperationsRequest: _TypeAlias = ListOrphanedClusterOperationsRequest  # noqa: Y015
+
+@_typing.final
+class OrphanedClusterOperation(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    UUID_FIELD_NUMBER: _builtins.int
+    OPERATION_TYPE_FIELD_NUMBER: _builtins.int
+    STATE_VALUE_FIELD_NUMBER: _builtins.int
+    UPDATE_TIME_FIELD_NUMBER: _builtins.int
+    uuid: _builtins.str
+    operation_type: _builtins.str
+    state_value: _builtins.str
+    update_time: _builtins.float
+    def __init__(
+        self,
+        *,
+        uuid: _builtins.str = ...,
+        operation_type: _builtins.str = ...,
+        state_value: _builtins.str = ...,
+        update_time: _builtins.float = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["operation_type", b"operation_type", "state_value", b"state_value", "update_time", b"update_time", "uuid", b"uuid"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___OrphanedClusterOperation: _TypeAlias = OrphanedClusterOperation  # noqa: Y015
+
+@_typing.final
+class ListOrphanedClusterOperationsReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    OPERATIONS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def operations(self) -> _containers.RepeatedCompositeFieldContainer[Global___OrphanedClusterOperation]: ...
+    def __init__(
+        self,
+        *,
+        operations: _abc.Iterable[Global___OrphanedClusterOperation] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["operations", b"operations"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___ListOrphanedClusterOperationsReply: _TypeAlias = ListOrphanedClusterOperationsReply  # noqa: Y015
+
+@_typing.final
 class ClaimCoalescibleSiblingsRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 

@@ -14,6 +14,7 @@ service DatabaseService {
   rpc ListStuckWorkQueueRows (ListStuckWorkQueueRowsRequest) returns (ListStuckWorkQueueRowsReply) {}
   rpc ClearWorkQueueClaim (ClearWorkQueueClaimRequest) returns (StatusReply) {}
   rpc DeleteWorkQueueRow (DeleteWorkQueueRowRequest) returns (StatusReply) {}
+  rpc ListOrphanedClusterOperations (ListOrphanedClusterOperationsRequest) returns (ListOrphanedClusterOperationsReply) {}
   rpc ClaimCoalescibleSiblings (ClaimCoalescibleSiblingsRequest) returns (ClaimCoalescibleSiblingsReply) {}
   rpc FindExistingCoalescibleOp (FindExistingCoalescibleOpRequest) returns (FindExistingCoalescibleOpReply) {}
   // V2 of the two coalescing RPCs, taking a multi-column key. The V1
@@ -508,6 +509,25 @@ message ClearWorkQueueClaimRequest {
 
 message DeleteWorkQueueRowRequest {
   int64 row_id = 1;
+}
+
+message ListOrphanedClusterOperationsRequest {
+  // A cluster operation is orphaned when it has sat in a non-terminal
+  // state (queued or executing) for longer than threshold_seconds with
+  // no work_queue row referencing it -- nothing will ever run it, so
+  // the reaper moves it to the error state (issue 4303).
+  double threshold_seconds = 1;
+}
+
+message OrphanedClusterOperation {
+  string uuid = 1;
+  string operation_type = 2;
+  string state_value = 3;
+  double update_time = 4;
+}
+
+message ListOrphanedClusterOperationsReply {
+  repeated OrphanedClusterOperation operations = 1;
 }
 
 message ClaimCoalescibleSiblingsRequest {

@@ -65,18 +65,23 @@ class CoalescingSQLTestCase(
     def _build_engine(self):
         return self.build_engine(
             [mariadb._get_object_states_table,
-             mariadb._get_cluster_operations_table],
+             mariadb._get_cluster_operations_table,
+             mariadb._get_work_queue_table],
             json_shims=True)
 
     def _insert_op(self, conn, op_uuid, tasks=(TASK,), state='queued',
                    created_at=100.0, node_uuid=None,
-                   priority='user_facing'):
+                   priority='user_facing', with_work_queue_row=True):
         """Insert one cluster operation and its state row.
 
         The two rows deliberately go in the way production writes them:
         the static row through the sa.Uuid bind processor, which stores
         the undashed form, and the state row as the dashed string every
         caller hands to set_state().
+
+        ``with_work_queue_row`` matches the production enqueue, which
+        writes the work_queue row in the same transaction; passing
+        False manufactures the issue-4303 orphan shape.
 
         ``node_uuid`` defaults to ``None`` -- a cluster-wide op -- so
         every caller written before the multi-column key still gets the
@@ -98,6 +103,23 @@ class CoalescingSQLTestCase(
             state_value=state,
             update_time=created_at,
             message=None))
+        if with_work_queue_row:
+            # sqlite only autoincrements INTEGER primary keys, not the
+            # BIGINT the real column is, so supply an id explicitly.
+            self._work_queue_id = getattr(self, '_work_queue_id', 0) + 1
+            work_queue = mariadb._get_work_queue_table()
+            conn.execute(sa.insert(work_queue).values(
+                id=self._work_queue_id,
+                queue_name='networknode-net-user_facing',
+                scheduled_at=created_at,
+                claimed_at=None,
+                claimed_by=None,
+                attempts=0,
+                payload={
+                    'operation_type': 'net_op',
+                    'operation_uuid': op_uuid,
+                },
+                created_at=created_at))
 
     def test_the_two_tables_really_do_store_uuids_differently(self):
         # The premise every other test here rests on. If this ever stops
@@ -145,6 +167,39 @@ class CoalescingSQLTestCase(
 
         self.assertEqual(
             SURVIVOR_UUID,
+            mariadb._direct_find_existing_coalescible_op(
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_ignores_an_orphaned_op(self, mock_get_engine):
+        # Issue #4303: an op still in 'queued' whose work_queue row is
+        # gone can never run. Adopting it wedged every ensure_mesh
+        # caller on sfcbr in raise_for_error() for 600s per daemon
+        # start; the dedup must enqueue fresh work instead.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SIBLING_UUID, with_work_queue_row=False)
+            conn.commit()
+
+        self.assertIsNone(
+            mariadb._direct_find_existing_coalescible_op(
+                'net_op', [('network_uuid', NETWORK_UUID)], TASK))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_find_existing_skips_an_orphan_for_a_live_sibling(
+            self, mock_get_engine):
+        # The orphan is older, but the live op is the one returned.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        with engine.connect() as conn:
+            self._insert_op(conn, SURVIVOR_UUID, created_at=50.0,
+                            with_work_queue_row=False)
+            self._insert_op(conn, SIBLING_UUID, created_at=150.0)
+            conn.commit()
+
+        self.assertEqual(
+            SIBLING_UUID,
             mariadb._direct_find_existing_coalescible_op(
                 'net_op', [('network_uuid', NETWORK_UUID)], TASK))
 

@@ -40,6 +40,7 @@ class DatabaseServiceStub:
     ListStuckWorkQueueRows: _grpc.UnaryUnaryMultiCallable[_database_pb2.ListStuckWorkQueueRowsRequest, _database_pb2.ListStuckWorkQueueRowsReply]
     ClearWorkQueueClaim: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClearWorkQueueClaimRequest, _database_pb2.StatusReply]
     DeleteWorkQueueRow: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteWorkQueueRowRequest, _database_pb2.StatusReply]
+    ListOrphanedClusterOperations: _grpc.UnaryUnaryMultiCallable[_database_pb2.ListOrphanedClusterOperationsRequest, _database_pb2.ListOrphanedClusterOperationsReply]
     ClaimCoalescibleSiblings: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsRequest, _database_pb2.ClaimCoalescibleSiblingsReply]
     FindExistingCoalescibleOp: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindExistingCoalescibleOpRequest, _database_pb2.FindExistingCoalescibleOpReply]
     ClaimCoalescibleSiblingsV2: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsV2Request, _database_pb2.ClaimCoalescibleSiblingsReply]
@@ -457,6 +458,7 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     ListStuckWorkQueueRows: _aio.UnaryUnaryMultiCallable[_database_pb2.ListStuckWorkQueueRowsRequest, _database_pb2.ListStuckWorkQueueRowsReply]  # type: ignore[assignment]
     ClearWorkQueueClaim: _aio.UnaryUnaryMultiCallable[_database_pb2.ClearWorkQueueClaimRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     DeleteWorkQueueRow: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteWorkQueueRowRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    ListOrphanedClusterOperations: _aio.UnaryUnaryMultiCallable[_database_pb2.ListOrphanedClusterOperationsRequest, _database_pb2.ListOrphanedClusterOperationsReply]  # type: ignore[assignment]
     ClaimCoalescibleSiblings: _aio.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsRequest, _database_pb2.ClaimCoalescibleSiblingsReply]  # type: ignore[assignment]
     FindExistingCoalescibleOp: _aio.UnaryUnaryMultiCallable[_database_pb2.FindExistingCoalescibleOpRequest, _database_pb2.FindExistingCoalescibleOpReply]  # type: ignore[assignment]
     ClaimCoalescibleSiblingsV2: _aio.UnaryUnaryMultiCallable[_database_pb2.ClaimCoalescibleSiblingsV2Request, _database_pb2.ClaimCoalescibleSiblingsReply]  # type: ignore[assignment]
@@ -919,6 +921,13 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _database_pb2.DeleteWorkQueueRowRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
+
+    @_abc_1.abstractmethod
+    def ListOrphanedClusterOperations(
+        self,
+        request: _database_pb2.ListOrphanedClusterOperationsRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.ListOrphanedClusterOperationsReply, _abc.Awaitable[_database_pb2.ListOrphanedClusterOperationsReply]]: ...
 
     @_abc_1.abstractmethod
     def ClaimCoalescibleSiblings(
