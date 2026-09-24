@@ -140,6 +140,9 @@ others set -- is a partial set, and fails.
 |---|---|
 | name<br/>*string* | The name of the namespace. This must always be specified. |
 | state<br/>*string* | The state of the resource. Valid states are `present` or `absent`, defaults to `present`. |
+| api_url<br/>*string* | The base URL of the Shaken Fist API, for example `http://sf-1:13000`. Optional: when it is not supplied the module discovers the API from the environment and `sfrc` exactly like the `sf-client` CLI. `api_url`, `namespace` and `key` must be supplied together or not at all -- see [Authentication](#authentication). |
+| namespace<br/>*string* | The namespace to authenticate as. In this module it names the identity and nothing else -- the resource acted on is named by `name` -- so it may not be supplied on its own: alone it would say only "authenticate as this", which is exactly the instruction credential discovery would discard. See [Authentication](#authentication). |
+| key<br/>*string* | The key to authenticate with. Optional, and carries the same all-or-nothing rule as `api_url` -- see [Authentication](#authentication). |
 
 ### Return value
 
@@ -200,6 +203,9 @@ Delete a namespace:
 | netblock<br/>*string* | The IP block for the network, for example `10.0.0.0/24`. Required when creating a network. Changing this value from what is present in the Shaken Fist cluster if the network already exists implies re-creation of the network. |
 | state<br/>*string* | The state of the resource. Valid states are `present` or `absent`, defaults to `present`. |
 | uuid<br/>*string* | The UUID for the network. Either `name` or `uuid` must be included in all requests with `state: absent`. If you specify a UUID and the network does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation. |
+| api_url<br/>*string* | The base URL of the Shaken Fist API, for example `http://sf-1:13000`. Optional: when it is not supplied the module discovers the API from the environment and `sfrc` exactly like the `sf-client` CLI. `api_url`, `namespace` and `key` must be supplied together or not at all -- see [Authentication](#authentication). |
+| namespace<br/>*string* | The namespace the network belongs to, which is also the namespace to authenticate as. May be supplied on its own, which means "work in this namespace and discover the credentials the usual way" -- but supplying `api_url` or `key` requires all three. See [Authentication](#authentication). |
+| key<br/>*string* | The key to authenticate with. Optional, and carries the same all-or-nothing rule as `api_url` -- see [Authentication](#authentication). |
 
 ### Return value
 
@@ -277,6 +283,9 @@ Delete a network:
 | uuid<br/>*string* | The UUID for the instance. Either `name` or `uuid` must be included in all requests with `state: absent`. If you specify a UUID and the instance does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation. |
 | await<br/>*boolean* | Whether to wait for the instance to be created. Only works for when state is `present`. Default is `false`. The wait is bounded by `await_timeout`, as is the creation which precedes it. |
 | await_timeout<br/>*integer* | How many seconds an `await` may take, counted from the start of the operation rather than from the start of the wait. Where an instance is being replaced, the time spent deleting the old one and creating the new one is deducted from this number before the wait begins. It is a budget rather than a hard deadline: a deletion or creation already underway is not interrupted, and a `shakenfist-client` of v0.8.3 or earlier cannot be told not to wait while creating. Defaults to 600. |
+| api_url<br/>*string* | The base URL of the Shaken Fist API, for example `http://sf-1:13000`. Optional: when it is not supplied the module discovers the API from the environment and `sfrc` exactly like the `sf-client` CLI. `api_url`, `namespace` and `key` must be supplied together or not at all -- see [Authentication](#authentication). |
+| namespace<br/>*string* | The namespace the instance belongs to, which is also the namespace to authenticate as. May be supplied on its own, which means "work in this namespace and discover the credentials the usual way" -- but supplying `api_url` or `key` requires all three. See [Authentication](#authentication). |
+| key<br/>*string* | The key to authenticate with. Optional, and carries the same all-or-nothing rule as `api_url` -- see [Authentication](#authentication). |
 
 ### Examples
 
@@ -318,6 +327,9 @@ Delete an instance:
 | delete_after_label<br/>*boolean* | Whether to delete the snapshot artifact after applying the label. Defaults to `false`. |
 | async<br/>*boolean* | When `true`, do not block waiting for the snapshot to be created (ignored when `label` is set, which always blocks). Defaults to `false`. |
 | state<br/>*string* | The state of the resource. Valid states are `present` or `absent`, defaults to `present`. |
+| api_url<br/>*string* | The base URL of the Shaken Fist API, for example `http://sf-1:13000`. Optional: when it is not supplied the module discovers the API from the environment and `sfrc` exactly like the `sf-client` CLI. `api_url`, `namespace` and `key` must be supplied together or not at all -- see [Authentication](#authentication). |
+| namespace<br/>*string* | The namespace to authenticate as. In this module it names the identity and nothing else -- the resource acted on is named by `instance_uuid` -- so it may not be supplied on its own: alone it would say only "authenticate as this", which is exactly the instruction credential discovery would discard. See [Authentication](#authentication). |
+| key<br/>*string* | The key to authenticate with. Optional, and carries the same all-or-nothing rule as `api_url` -- see [Authentication](#authentication). |
 
 ### Examples
 
@@ -355,7 +367,9 @@ does.
 | expires_in_seconds<br/>*integer* | How long the claim should cover placements for, in seconds from now. Required when `state` is `present`, and must be positive. A duration rather than a timestamp: the expiry is computed from the cluster's clock, which is the only clock the expiry sweep ever compares against. Every run re-dates the claim to exactly this far in the future, which can shorten a claim as well as extend one. |
 | renew_within_seconds<br/>*integer* | Re-date the claim only when it has less than this long left to run. Optional, must be positive when set, and ignored when `state` is `absent`. See [Idempotence](#idempotence). |
 | state<br/>*string* | The state of the resource. Valid states are `present` or `absent`, defaults to `present`. |
-| auth_namespace<br/>*string* | The namespace to authenticate as, which is normally `system`. |
+| auth_namespace<br/>*string* | The namespace to authenticate as, which is normally `system`. This module is the only one that names the identity separately, because `namespace` is already the namespace the claim covers. See [Authentication](#authentication). |
+| api_url<br/>*string* | The base URL of the Shaken Fist API, for example `http://sf-1:13000`. Optional: when it is not supplied the module discovers the API from the environment and `sfrc` exactly like the `sf-client` CLI. `api_url`, `auth_namespace` and `key` must be supplied together or not at all -- see [Authentication](#authentication). |
+| key<br/>*string* | The key to authenticate with. Optional, and carries the same all-or-nothing rule as `api_url` -- see [Authentication](#authentication). |
 
 ### Idempotence
 
