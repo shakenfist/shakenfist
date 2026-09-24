@@ -7749,6 +7749,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-use-case-docs-phase-05-index-slimdown/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: the index slim-down and closeout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-test-harness-phase-06-digest-decoding/" class="md-nav__link">
         
   
@@ -14446,17 +14474,30 @@ Operator Documentation section of the index. README.md is
 only touched if the curated doc links change (per the
 readme-discipline policy).</p>
 <h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
-<p>The oVirt page landed 2026-08-10 as PLAN-two-tier-ci.md
-phase 4's deliverable, and settles the format. The Shaken
-Fist page followed on 2026-09-18 as phase 1, merge commit
-2f0e526, and the OpenStack page on 2026-09-20 as phase 2,
-merge commit a7df5e5: all three carry identical section
-headings, so the format is a convention rather than a
-coincidence. The remaining three writable pages are
-unblocked; Proxmox is not, and still has no source driver
-(<code>kerbside/sources/</code> holds <code>base.py</code>, <code>ovirt.py</code>,
-<code>shakenfist.py</code> and <code>static.py</code> and nothing else, rechecked
-2026-09-20).</p>
+<p>All six writable pages exist. The oVirt page landed
+2026-08-10 as PLAN-two-tier-ci.md phase 4's deliverable, and
+settles the format; <code>shakenfist.md</code> followed 2026-09-18 as
+phase 1 (<code>2f0e526</code>), <code>openstack.md</code> 2026-09-20 as phase 2
+(<code>a7df5e5</code>), <code>standalone.md</code> 2026-09-21 as phase 3
+(<code>28efa6c</code>), and <code>multi-cloud.md</code> with <code>placement.md</code>
+2026-09-22 as phase 4 (<code>8c5c042</code>). All six carry identical
+section headings, so the format is a convention rather than
+a coincidence. What remains is phase 5, the index slim-down
+and closeout, and phase 6, the push audit. Proxmox is still
+blocked and still has no source driver (<code>kerbside/sources/</code>
+holds <code>base.py</code>, <code>ovirt.py</code>, <code>shakenfist.py</code> and <code>static.py</code>
+and nothing else, rechecked 2026-09-23).</p>
+<p>One fact about the backend leg cost four phases to settle
+and is now guarded rather than remembered. Phases 1, 2 and 3
+each stated backend TLS or host-subject pinning more
+strongly than <code>rust/kerbside-proxy/src/backend.rs</code> supports,
+and each was corrected at review. Phase 4 stopped correcting
+instances and swept the class: six pages had it wrong, the
+sixth (<code>docs/proxy-architecture.md</code>) is filed as #472, and
+<code>tools/check-backend-tls-claims.py</code> now fails CI on an
+unconditional claim in <code>docs/use-cases/</code> or the Use Cases
+table. A page in this plan may not say the leg is encrypted
+or pinned without saying when.</p>
 <p>A third thing landed since this plan was written, and the
 plan did not know it: <strong>the index scaffolding already
 exists.</strong> <code>docs/index.md</code> carries a <code>### Use Cases</code> heading
@@ -14525,13 +14566,13 @@ the range is not reliably reconstructable afterwards.</p>
 <tr>
 <td>4. Multi-cloud aggregation and placement topologies</td>
 <td><a href="/components/kerbside/plans/PLAN-use-case-docs-phase-04-multi-cloud/">PLAN-use-case-docs-phase-04-multi-cloud.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>8c5c042</td>
 </tr>
 <tr>
 <td>5. Index slim-down and closeout</td>
-<td></td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-use-case-docs-phase-05-index-slimdown/">PLAN-use-case-docs-phase-05-index-slimdown.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>

@@ -7747,6 +7747,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-use-case-docs-phase-05-index-slimdown/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: the index slim-down and closeout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-test-harness-phase-06-digest-decoding/" class="md-nav__link">
         
   
@@ -14884,6 +14912,17 @@ that something is already standard equipment:</p>
   <code>spice-direct</code>. It bypasses Kerbside entirely and is not a
   session Kerbside can see, audit or terminate. Useful as a
   fallback; not the path the native client users are on.</li>
+<li><strong><a href="https://github.com/NeCTAR-RC/bumblebee">Bumblebee VDI</a>.</strong>
+  Developed at the NeCTAR research cloud, and superficially
+  similar to Kerbside in that it also makes it easier for a
+  user to obtain a virtual desktop. It is not a competitor
+  to Kerbside, though: it fills the broker role this section
+  is enumerating, orchestrating the creation of virtual
+  desktops and then access to them, so it sits where Nova
+  sits here rather than where Kerbside does. It orchestrates
+  HTML5 consoles exclusively, using Apache Guacamole as its
+  own HTML5 proxy, so it misses SPICE's richer features and
+  carries an HTML5 desktop's performance implications.</li>
 </ul>
 <h2 id="status-and-limitations">Status and limitations<a class="headerlink" href="#status-and-limitations" title="Permanent link">&para;</a></h2>
 <p>Kerbside is experimental overall. The OpenStack path is
@@ -14972,6 +15011,9 @@ SPICE link handshake against the proxy over TLS.</p>
   <a href="/components/kerbside/use-cases/placement/">Placement topologies</a> — the two topology
   pages: several sources behind one Kerbside, and several
   Kerbsides in front of one cloud</li>
+<li><a href="https://specs.openstack.org/openstack/nova-specs/specs/2025.1/implemented/libvirt-spice-direct-consoles.html">Nova specification</a>
+  — the specification that added the <code>spice-direct</code> console
+  type to Nova in 2025.1</li>
 <li><a href="https://github.com/shakenfist/kerbside-patches">kerbside-patches</a>
   — the Kolla and Kolla-Ansible changes, until they are upstream</li>
 </ul>

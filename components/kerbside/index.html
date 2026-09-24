@@ -6667,28 +6667,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#implementation-in-openstack" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Implementation in OpenStack
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#what-about-bumblebee" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What About Bumblebee?
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -8067,6 +8045,34 @@
     
   
     Phase 5: rewrite `docs/installation.md`
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plans/PLAN-use-case-docs-phase-05-index-slimdown/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 5: the index slim-down and closeout
   
 
     
@@ -14605,28 +14611,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#implementation-in-openstack" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Implementation in OpenStack
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#what-about-bumblebee" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What About Bumblebee?
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -14904,9 +14888,9 @@ the following steps need to occur:</p>
 <li>
 <p>The user requests a desktop via an external user interface that we call "the
    Broker". In Shaken Fist's case the broker is embedded in Shaken Fist itself
-   and is initiated via a Shaken Fist REST API. In the OpenStack case this role
-   is likely performed by Horizon or Skyline, although this is not yet
-   implemented.</p>
+   and is initiated via a Shaken Fist REST API. In the OpenStack case Nova
+   performs this role itself: it mints a console token and returns a URL
+   that points at Kerbside.</p>
 </li>
 <li>
 <p>The cloud boots the instance that runs the desktop. The Broker waits for the
@@ -14948,7 +14932,7 @@ the following steps need to occur:</p>
 </ol>
 <h3 id="connection-flow-diagram">Connection Flow Diagram<a class="headerlink" href="#connection-flow-diagram" title="Permanent link">&para;</a></h3>
 <pre class="mermaid"><code>flowchart TD
-    broker["External Broker&lt;br/&gt;(SF/Horizon)"]
+    broker["External Broker&lt;br/&gt;(SF/Nova)"]
     client["User's SPICE Client&lt;br/&gt;(remote-viewer, ryll)"]
     kerbside["Kerbside&lt;br/&gt;SPICE Proxy"]
     hypervisor["Hypervisor&lt;br/&gt;(QEMU/KVM)"]
@@ -14961,40 +14945,6 @@ the following steps need to occur:</p>
 the components shown, and steps 7 and 8 happen inside Kerbside on the
 established client to hypervisor path, so they have no arrow of their
 own.</p>
-<h3 id="implementation-in-openstack">Implementation in OpenStack<a class="headerlink" href="#implementation-in-openstack" title="Permanent link">&para;</a></h3>
-<p>OpenStack Nova now supports native SPICE direct consoles as of the 2025.1 Epoxy
-release. The
-<a href="https://specs.openstack.org/openstack/nova-specs/specs/2025.1/implemented/libvirt-spice-direct-consoles.html">Nova specification</a>
-adds a new "spice-direct" console type that enables users to access virtual
-desktops using native SPICE clients like remote-viewer instead of HTML5 proxies.</p>
-<p>When users request a SPICE direct console, Nova returns a URL pointing to
-Kerbside with an authentication token. Kerbside validates this token via the
-<code>/os-console-auth-tokens/</code> API and establishes the proxied connection to the
-hypervisor. This provides users with a much richer virtual desktop experience
-including support for USB passthrough, audio, and multi-monitor configurations.</p>
-<p>Kerbside needs to be deployed as a component of the OpenStack cluster to provide
-a safe mechanism for users to interact with their console. OpenStack is (wisely)
-unwilling to provide direct network connectivity from a client network to TCP
-ports on the hypervisor, and so Kerbside acts as an intermediary to protect
-those hypervisors. There is a sample implementation of Kerbside deployment using
-Kolla-Ansible in the
-<a href="https://github.com/shakenfist/kerbside-patches">Kerbside Patches repository</a>.
-At the time of last update to this document, the Kolla OpenStack project had
-merged the OCI build portion of the proposed Kerbside support into the Kolla
-project, but had not yet merged the deployment code into Kolla-Ansible. That
-deployment code is tracked on
-<a href="https://review.opendev.org/q/topic:%22spice-direct-consoles%22">the OpenStack gerrit review system</a>
-if you are curious as to its current state.</p>
-<h3 id="what-about-bumblebee">What About Bumblebee?<a class="headerlink" href="#what-about-bumblebee" title="Permanent link">&para;</a></h3>
-<p>The folks over at the NECTAR research cloud developed
-<a href="https://github.com/NeCTAR-RC/bumblebee">Bumblebee VDI</a>, which is superficially
-similar to Kerbside in that it provides a mechanism to make it easier to obtain
-a virtual desktop as a user. The Kerbside description above would classify
-Bumblebee as a Broker to our model -- it orchestrates the creation and then
-access to virtual desktops for users. However, Bumblebee exclusively orchestrates
-HTML5 consoles using Apache Guacamole as its HTML5 proxy at the moment, so misses
-out on some of the richer features of SPICE and has the performance implications
-of a HTML5 desktop environment.</p>
 <h2 id="documentation-index">Documentation Index<a class="headerlink" href="#documentation-index" title="Permanent link">&para;</a></h2>
 <h3 id="use-cases">Use Cases<a class="headerlink" href="#use-cases" title="Permanent link">&para;</a></h3>
 <p>One page per deployment permutation: what Kerbside is worth in that
