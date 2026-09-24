@@ -59,9 +59,10 @@ surface in CI rather than seconds, and the reason was in the power state
 code: `Instance.is_powered_on()` returned the truthy string `'off'` when
 libvirt had no domain, so `create()` marked instances which had never
 started as `created`, and the functional suite waited out the agent
-timeout. Both are fixed on the `issue-4280-trixie-spice` branch
-(`a100fcd26`), which had not merged when this plan was written and is a
-prerequisite for it.
+timeout. Both were fixed by
+[#4309](https://github.com/shakenfist/shakenfist/pull/4309), which had
+not merged when this plan was written and was a prerequisite for it; it
+merged on 2026-09-23 as `de5e3833c`.
 
 Mikal's reaction was that the power state detection code as a whole is
 suspect, and that the functional tests covering it should be audited at
@@ -84,6 +85,7 @@ support that suspicion. Every finding below was checked against
 | F10 | `instance.py` `_power_on_inner()`, `power_off()` | `setAutostart(1)` is called on every power on and nothing ever clears it; `power_off()` only calls `destroy()`. | After a hypervisor reboot libvirtd starts every instance ever powered on, including those the user powered off, and the database says `off` until the cleaner rewrites it. It also means sf-queues restore (F2) has no job: a restart of sf-queues or libvirtd leaves domains running, and autostart covers a reboot. Nothing in the deployer configures `libvirt-guests`, so the distribution default applies. |
 | F11 | `daemons/cleaner/scheduled_tasks.py` ~lines 246-266 | The second loop's `delete-wait` branch rmtree's files, undefines the domain and sets `state = deleted` by hand, bypassing `_delete_globally()`. `_instance_delete` then returns early because the instance is already deleted (`node_inst_op.py:193`). | Dead today (F1). Once F1 is fixed, a powered off instance left in `delete-wait` for five minutes by a queue backlog leaks its ports, placement, references and agent operations. |
 | F12 | the power endpoints | `requires_instance_active` answers 406 for any state other than `created`, but none of the four power endpoints declares 406 in its `swag_from`. | The published API is incomplete. |
+| F13 | `daemons/cleaner/scheduled_tasks.py` first loop (~lines 153-154) | Found by the phase 0 survey. The cleaner reads `extract_power_state(domain)` and only then calls `update_power_state()`, without the instance lock the power endpoints hold, so a power off or pause which completes between the two has its value overwritten with the stale one. | A paused instance reads `on` until the next cleaner pass corrects it. A powered off instance reads `on` indefinitely, because the cleaner cannot see inactive domains (F1). The window is the attribute lock acquisition, so it is rare, but phase 0's assertions can observe it. |
 
 The test suites did not catch any of this, for specific reasons:
 
@@ -95,7 +97,7 @@ The test suites did not catch any of this, for specific reasons:
   meaning the domain started (`test_nodes.py:274-290` says so, and adds
   only that metrics lag behind it). Before the #4280 fix that was false,
   which is why #4280 was a timeout rather than a failure.
-- `base.py:747` defines `_await_power_off()`, which waits for the
+- `base.py:753` defines `_await_power_off()`, which waits for the
   "detected poweroff" event from dead loop F1. Nothing calls it: a guest
   shutdown test was evidently intended and never written, and would have
   found F1.
@@ -129,8 +131,8 @@ Concretely, when this plan is complete:
 - The unit-test fakes for libvirt behave like libvirt: `listDomainsID()`
   returns only active domains, and `power_state` is a dict.
 
-Out of scope: the SPICE packaging and `is_powered_on()` fixes (on the
-unmerged `issue-4280-trixie-spice` branch, a prerequisite), changes to
+Out of scope: the SPICE packaging and `is_powered_on()` fixes (#4309, a
+prerequisite, merged 2026-09-23), changes to
 the instance state machine itself, and the agent side of agent
 readiness.
 
@@ -215,12 +217,13 @@ spelling above is the one to write.
     the whole-plan status, so it only reaches `Complete` once
     every phase has been completed, abandoned or superseded.
 
-No phase starts until `issue-4280-trixie-spice` has merged: phases 0, 1b
-and 3 all rely on `create()` failing when power on fails.
+No phase started until #4280's fix had merged
+([#4309](https://github.com/shakenfist/shakenfist/pull/4309), 2026-09-23):
+phases 0, 1b and 3 all rely on `create()` failing when power on fails.
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 0. Assert power state in the existing lifecycle tests | PLAN-power-state-correctness-phase-00-assertions.md | Not started | — |
+| 0. Assert power state in the existing lifecycle tests | [PLAN-power-state-correctness-phase-00-assertions.md](PLAN-power-state-correctness-phase-00-assertions.md) | In progress | — |
 | 1a. Honest libvirt domain listing | PLAN-power-state-correctness-phase-01a-listing.md | Not started | — |
 | 1b. The cleaner sees powered off domains | PLAN-power-state-correctness-phase-01b-inactive-domains.md | Not started | — |
 | 2. Autostart and instance restore | PLAN-power-state-correctness-phase-02-autostart-restore.md | Not started | — |
@@ -233,13 +236,17 @@ rather than leaving them to a trailing test phase.
 ### Phase 0: assert power state in the existing lifecycle tests
 
 Add `power_state` assertions to every lifecycle test in
-`guest_ci_tests/test_state_changes.py` and to the power cycle in
-`test_interface_plug_and_exec_reboot`: `on` after create, `off` after
-power off, `paused` then `on` around pause, `on` after each reboot. These
-pass on `develop` today, because the power methods write those values.
+`guest_ci_tests/test_state_changes.py` (six tests across two classes)
+and to the power cycle in `test_interface_plug_and_exec_reboot`, which
+exists twice -- in `smoke_ci_tests`, run on every pull request, and in
+`guest_ci_tests`, run in the merge queue -- and gets the assertions in
+both: `on` after create, `off` after power off, `paused` then `on`
+around pause, `on` after each reboot. These pass on `develop` today,
+because the power methods write those values before the API returns.
 The point is to have the net in place before phase 1b adds a second
-writer that can race them. Plan at medium effort; the judgement is in
-choosing waits which do not flake.
+writer that can race them. The survey found that the first loop can
+already race them (F13); the phase plan decides how the assertions
+treat that. Plan at medium effort.
 
 ### Phase 1a: honest libvirt domain listing
 
@@ -267,7 +274,9 @@ mostly the guards that the dead code never needed:
   flake. Skip instances in `initial`, `preflight` or `creating`; take
   the instance lock (`get_lock(global_scope=False)`, which the power
   endpoints hold) with a short timeout and skip if busy; and re-check
-  `domain.isActive()` immediately before writing.
+  `domain.isActive()` immediately before writing. Apply the same lock
+  and re-read to the first loop's `update_power_state()`, which fixes
+  F13.
 - **Delete through the delete path (F11).** Replace the `delete-wait`
   branch's by-hand rmtree, undefine and `state = deleted` with
   `inst.delete()`, as the first loop does.
@@ -748,6 +757,10 @@ chosen to defer to here, so that we do not forget them.
 - Whether `instances_total` in the resources daemon should count
   defined-but-inactive domains (open question 4). This plan keeps
   today's semantics.
+- [#4318](https://github.com/shakenfist/shakenfist/issues/4318):
+  `test_interface_plug_and_exec_reboot` is duplicated between the smoke
+  and guest suites and the copies have drifted. Phase 0 edits both
+  rather than deduplicating them.
 
 ### Bugs fixed during this work
 
@@ -759,13 +772,14 @@ while planning it.
 
 - [#4280](https://github.com/shakenfist/shakenfist/issues/4280): the
   SPICE packaging defect and `is_powered_on()` returning a truthy
-  string, fixed on the `issue-4280-trixie-spice` branch before this plan
-  was written. It is what prompted the plan.
+  string, fixed by
+  [#4309](https://github.com/shakenfist/shakenfist/pull/4309) before this
+  plan's phases started. It is what prompted the plan.
 
 Related issues:
 
 - [#4307](https://github.com/shakenfist/shakenfist/issues/4307) tracks
-  this plan and findings F1 to F12.
+  this plan and findings F1 to F13.
 - [#2241](https://github.com/shakenfist/shakenfist/issues/2241) (unpause
   should recover from a crashed guest or a qemu monitor EOF, not just
   retry) overlaps F6 and F7; phase 3 resolves or excludes it.
