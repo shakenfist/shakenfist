@@ -323,6 +323,8 @@ nav:
                 - "Phase 7: First Sextant scenario tempest test": components/kerbside/plans/PLAN-test-harness-phase-07-scenario-test.md
                 - "Phase 8: OpenStack CI lane disposition + oVirt provisioning flake": components/kerbside/plans/PLAN-test-harness-phase-08-openstack-disposition.md
                 - "Proxmox console source": components/kerbside/plans/PLAN-proxmox-source.md
+                - "Proxmox source phase 1b: a Proxmox node in CI": components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate.md
+                - "Proxmox source phase 2: HTTP CONNECT in shakenfist-spice-protocol": components/kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect.md
                 - "Proxy dev releases phase 1: the publish workflow": components/kerbside/plans/PLAN-proxy-dev-releases-phase-01-publish-workflow.md
                 - "Proxy dev releases phase 2: the committed dev specifier": components/kerbside/plans/PLAN-proxy-dev-releases-phase-02-dev-specifier.md
                 - "Proxy dev releases phase 3: the contract handshake": components/kerbside/plans/PLAN-proxy-dev-releases-phase-03-contract-handshake.md

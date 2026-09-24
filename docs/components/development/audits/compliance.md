@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-23T11:05:48.072644+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-24T11:22:42.032909+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -49,7 +49,7 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 | sfui | non-compliant | shakenfist/sfui#26 |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#16 |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#16 |
+| visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
@@ -58,7 +58,6 @@ Details for non-compliant projects:
 - **kerbside-client** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
 - **sfui** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py); it is unused, and its workflow holds contents: write on the pull request branch
 - **uncalibrated-sextant** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
-- **visual-digest-rust** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
 
 ## console-logging
 
@@ -259,26 +258,23 @@ Criterion: [eol-distro.md](/components/development/audits/eol-distro/)
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
-| instar | non-compliant | shakenfist/instar#564 |
+| instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
 | occystrap | non-compliant | shakenfist/occystrap#138 |
 | private-ci | N/A | - |
-| ryll | non-compliant | shakenfist/ryll#378 |
+| ryll | compliant | - |
 | sfui | compliant | - |
 | shakenfist | non-compliant | shakenfist/shakenfist#4204 |
 | uncalibrated-sextant | compliant | - |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#22 |
+| visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
-- **instar** (Status): 1 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
 - **occystrap** (Status): 5 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
-- **ryll** (Status): 17 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
 - **shakenfist** (Status): 5 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
-- **visual-digest-rust** (Status): 1 reference(s) to end-of-life distribution releases. Debian 12 (bookworm) reached end of life on 2026-06-10; use the debian-13 runner labels, or a debian:13 (trixie) image. Moving a runner label also means declaring the new one in .github/actionlint.yaml in the same commit, or the workflow fails actionlint. A reference that must stay -- test input built on the old release, say -- is marked "audit-ok: eol-distro" with the reason, on the line or the line above
 
 ## expensive-lane-path-filter
 
@@ -306,13 +302,12 @@ Criterion: [expensive-lane-path-filter.md](/components/development/audits/expens
 | sfui | non-compliant | shakenfist/sfui#14 |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | compliant | - |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#17 |
+| visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
 - **clingwrap** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
 - **sfui** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: functional-tests.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
-- **visual-digest-rust** (Status): 1 expensive lane(s) triggered by pull_request or merge_group without adequate path filtering: ci.yml (no path filtering). Add a check_paths filter job (see kerbside functional-tests.yml) or, only for workflows backing no required status check, trigger-level paths-ignore, excluding docs/** and the review-tracking files; mark deliberate exceptions with an "audit-ok: no-path-filter" comment
 
 ## export-repo-config
 
@@ -340,14 +335,13 @@ Criterion: [export-repo-config.md](/components/development/audits/export-repo-co
 | sfui | compliant | - |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#19 |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#19 |
+| visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
 - **cloudgood** (Status): Missing .github/workflows/export-repo-config.yml
 - **kerbside-client** (Status): Missing .github/workflows/export-repo-config.yml
 - **uncalibrated-sextant** (Status): Missing .github/workflows/export-repo-config.yml
-- **visual-digest-rust** (Status): Missing .github/workflows/export-repo-config.yml
 
 ## fuzz-nightly-reporting
 
@@ -403,14 +397,13 @@ Criterion: [github-security.md](/components/development/audits/github-security/)
 | sfui | compliant | - |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#20 |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#20 |
+| visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
 - **cloudgood** (Status): Secret scanning not enabled; Secret scanning push protection not enabled
 - **kerbside-client** (Status): Missing .github/workflows/codeql-analysis.yml; Secret scanning not enabled; Secret scanning push protection not enabled
 - **uncalibrated-sextant** (Status): Missing .github/workflows/codeql-analysis.yml; Secret scanning not enabled; Secret scanning push protection not enabled
-- **visual-digest-rust** (Status): Missing .github/workflows/codeql-analysis.yml
 
 ## llm-context-lint-ci
 
@@ -438,7 +431,7 @@ Criterion: [llm-context-lint-ci.md](/components/development/audits/llm-context-l
 | sfui | non-compliant | shakenfist/sfui#25 |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#6 |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#9 |
+| visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
@@ -446,7 +439,6 @@ Details for non-compliant projects:
 - **cloudgood** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **sfui** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 - **uncalibrated-sextant** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
-- **visual-digest-rust** (Status): skillsaw does not run from .pre-commit-config.yaml or a CI workflow
 
 ## llm-context-lint
 
@@ -538,11 +530,7 @@ Criterion: [llm-doc-structure.md](/components/development/audits/llm-doc-structu
 | sfui | compliant | - |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | compliant | - |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#8 |
-
-Details for non-compliant projects:
-
-- **visual-digest-rust** (Status): AGENTS.md and ARCHITECTURE.md share the headings "feature flag matrix"; give each fact one home and link to it from the other file
+| visual-digest-rust | compliant | - |
 
 ## llm-tooling
 
@@ -803,7 +791,7 @@ Criterion: [plan-audit-phase.md](/components/development/audits/plan-audit-phase
 Details for non-compliant projects:
 
 - **instar** (Status): 1 of 1 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-differencing.md (ends with a push audit phase that never names PUSH-AUDIT.md)
-- **kerbside** (Status): 2 of 3 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-use-case-docs.md (ends with a push audit phase that never names PUSH-AUDIT.md), PLAN-proxmox-source.md (no push audit phase; phase 6 is "6. Docs")
+- **kerbside** (Status): 2 of 3 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-use-case-docs.md (ends with a push audit phase that never names PUSH-AUDIT.md), PLAN-proxmox-source.md (ends with a push audit phase that never names PUSH-AUDIT.md)
 - **uncalibrated-sextant** (Status): 5 of 5 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-locked-bootloader.md (no push audit phase; phase 3 is "3. Iteration, documentation, inventory closeout"), PLAN-display-mode-keystrokes.md (no push audit phase; phase 3 is "3. Iteration against ryll display-mode-ui, documentation,..."), PLAN-audit-cleanup.md (no push audit phase; phase 3 is "3. Test coverage and release verification"), PLAN-visual-digest.md (no push audit phase; phase 3 is "3. Repaint integration, format spec, closeout"), PLAN-continuous-digest.md (no push audit phase; phase 3 is "3. Docs, decoder coordination, closeout"); 2 plan(s) with no phases this check can read, not judged: PLAN-language-probes.md, PLAN-headless-readback-bug.md
 
 ## plan-index
@@ -865,7 +853,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 | sfui | compliant | - |
 | shakenfist | non-compliant | shakenfist/shakenfist#4257 |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#8 |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#11 |
+| visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
@@ -873,9 +861,8 @@ Details for non-compliant projects:
 - **client-python-k3s** (Status): 4 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/library-api.md:98, docs/library-api.md:109, docs/library-api.md:230, docs/library-api.md:232
 - **instar** (Status): 17 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/chain-discovery.md:207, docs/quirks.md:4199, docs/quirks.md:4208, docs/quirks.md:4216, docs/quirks.md:4217, docs/quirks.md:4218, docs/quirks.md:4449, docs/quirks.md:4493, docs/quirks.md:4505, docs/quirks.md:4508 (+7 more)
 - **private-ci** (Status): 10 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/dashboard-freshness.md:287, docs/gerrit-reviews.md:15, docs/gerrit-reviews.md:76, docs/gerrit-reviews.md:78, docs/gerrit-reviews.md:83, docs/gerrit-reviews.md:319, docs/gerrit-reviews.md:486, docs/gerrit-reviews.md:493, docs/gerrit-reviews.md:525
-- **shakenfist** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/operator_guide/capacity_refusals.md:116
+- **shakenfist** (Status): 3 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/developer_guide/ci.md:428, docs/developer_guide/ci.md:437, docs/operator_guide/capacity_refusals.md:116
 - **uncalibrated-sextant** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137, ARCHITECTURE.md:236 (+12 more)
-- **visual-digest-rust** (Status): 7 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): README.md:25, README.md:30, README.md:107, AGENTS.md:99, AGENTS.md:101, ARCHITECTURE.md:22, ARCHITECTURE.md:68
 
 ## plan-source-references
 
@@ -903,13 +890,12 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 | sfui | N/A | - |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | compliant | - |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#12 |
+| visual-digest-rust | N/A | - |
 
 Details for non-compliant projects:
 
 - **client-python** (Status): 2 of 4 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist_client/apiclient.py:185 -> docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md, shakenfist_client/tests/test_client_apiclient.py:2320 -> docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md
 - **instar** (Status): 2 of 267 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): scripts/create-vhd-testdata.sh:46 -> docs/plans/PLAN-extra-coverage.md, scripts/create-vhd-testdata.sh:463 -> instar-testdata/docs/plans/PLAN-extra-coverage.md
-- **visual-digest-rust** (Status): 1 of 1 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist-visual-digest/tests/qr.rs:7 -> PLAN-test-harness-phase-01-digest-crate.md
 
 ## plan-template
 
@@ -1109,11 +1095,7 @@ Criterion: [readme-structure.md](/components/development/audits/readme-structure
 | sfui | compliant | - |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | compliant | - |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#10 |
-
-Details for non-compliant projects:
-
-- **visual-digest-rust** (Status): README.md has no link into docs/ despite a docs/ directory existing; add curated links to the detailed documentation
+| visual-digest-rust | compliant | - |
 
 ## release-process
 
@@ -1197,7 +1179,7 @@ Criterion: [renovate.md](/components/development/audits/renovate/)
 | sfui | compliant | - |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#13 |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#13 |
+| visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
@@ -1205,7 +1187,6 @@ Details for non-compliant projects:
 - **cloudgood** (Status): Missing: .github/workflows/renovate.yml, renovate.json
 - **kerbside-client** (Status): Missing: .github/workflows/renovate.yml, renovate.json
 - **uncalibrated-sextant** (Status): Missing: .github/workflows/renovate.yml, renovate.json
-- **visual-digest-rust** (Status): Missing: .github/workflows/renovate.yml, renovate.json
 
 ## review-coverage
 
@@ -1219,7 +1200,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 | client-python-k3s | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
-| development | non-compliant | shakenfist/development#173 |
+| development | compliant | - |
 | divergulent | N/A | - |
 | hunkydory | compliant | - |
 | instar | N/A | - |
@@ -1229,7 +1210,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
 | private-ci | N/A | - |
-| ryll | compliant | - |
+| ryll | non-compliant | shakenfist/ryll#403 |
 | sfui | N/A | - |
 | shakenfist | N/A | - |
 | uncalibrated-sextant | N/A | - |
@@ -1237,9 +1218,9 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **actions** (Status): 95 of 109 in-scope files reviewed at HEAD; 14 need review (threshold 5)
-- **development** (Status): 175 of 194 in-scope files reviewed at HEAD; 19 need review (threshold 5)
+- **actions** (Status): 89 of 129 in-scope files reviewed at HEAD; 40 need review (threshold 5)
 - **kerbside** (Status): 98 of 238 in-scope files reviewed at HEAD; 140 need review (threshold 5)
+- **ryll** (Status): 206 of 214 in-scope files reviewed at HEAD; 8 need review (threshold 5)
 
 ## review-scope-completeness
 
@@ -1295,12 +1276,11 @@ Criterion: [rust-unwrap-lint.md](/components/development/audits/rust-unwrap-lint
 | sfui | N/A | - |
 | shakenfist | N/A | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#14 |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#14 |
+| visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
 - **uncalibrated-sextant** (Status): clippy unwrap_used lint not set to warn or deny in Cargo.toml; clippy.toml missing allow-unwrap-in-tests = true
-- **visual-digest-rust** (Status): clippy unwrap_used lint not set to warn or deny in Cargo.toml; clippy.toml missing allow-unwrap-in-tests = true; digest-decode/Cargo.toml neither inherits workspace lints ([lints] workspace = true) nor defines unwrap_used itself; shakenfist-visual-digest/Cargo.toml neither inherits workspace lints ([lints] workspace = true) nor defines unwrap_used itself
 
 ## scope-coverage
 
@@ -1356,13 +1336,12 @@ Criterion: [secret-handling.md](/components/development/audits/secret-handling/)
 | sfui | compliant | - |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#18 |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#18 |
+| visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
 - **clingwrap** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 - **uncalibrated-sextant** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
-- **visual-digest-rust** (Status): No secret scanner in CI; expected one of gitleaks, trufflehog, detect-secrets in a workflow
 
 ## security-sanitization
 
@@ -1545,7 +1524,7 @@ Criterion: [workflow-standards.md](/components/development/audits/workflow-stand
 | sfui | N/A | compliant | compliant | compliant | compliant | compliant | compliant | compliant | N/A | - |
 | shakenfist | compliant | compliant | compliant | compliant | compliant | compliant | compliant | compliant | N/A | - |
 | uncalibrated-sextant | N/A | non-compliant | compliant | compliant | non-compliant | compliant | N/A | compliant | N/A | shakenfist/uncalibrated-sextant#15, shakenfist/uncalibrated-sextant#17 |
-| visual-digest-rust | N/A | compliant | compliant | non-compliant | compliant | compliant | N/A | compliant | N/A | shakenfist/visual-digest-rust#15 |
+| visual-digest-rust | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 
 Details for non-compliant projects:
 
@@ -1555,7 +1534,6 @@ Details for non-compliant projects:
 - **kerbside-client** (Linting): Missing .pre-commit-config.yaml
 - **uncalibrated-sextant** (Runners): 1 unmarked GitHub-hosted runner reference(s): pre-commit.yml:10 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment
 - **uncalibrated-sextant** (Permissions): 1 workflow(s) missing top-level permissions: pre-commit.yml
-- **visual-digest-rust** (VM size): 1 "vm" runner job(s) naming no size: ci.yml:16 (self-hosted, vm, debian-12). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason
 
 ## Criteria with no automated check
 
