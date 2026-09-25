@@ -14570,10 +14570,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#sharing-pattern-arc" class="md-nav__link">
+  <a href="#sharing-pattern-arcmutex" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Sharing pattern: Arc>
+        Sharing pattern: Arc&lt;Mutex&gt;
       
     </span>
   </a>
@@ -15024,7 +15024,7 @@ tracked by the app, so they appear in <code>AppSnapshot</code>.</p>
 <a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span><span class="k">pub</span><span class="w"> </span><span class="n">height</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span>
 <a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="p">}</span>
 </code></pre></div>
-<h3 id="sharing-pattern-arc">Sharing pattern: Arc<Mutex\<T>><a class="headerlink" href="#sharing-pattern-arc" title="Permanent link">&para;</a></h3>
+<h3 id="sharing-pattern-arcmutex">Sharing pattern: Arc&lt;Mutex<T>&gt;<a class="headerlink" href="#sharing-pattern-arcmutex" title="Permanent link">&para;</a></h3>
 <p>The master plan specifies <code>Arc&lt;Mutex&lt;ChannelSnapshot&gt;&gt;</code> for
 cross-thread sharing. The concrete pattern:</p>
 <ol>

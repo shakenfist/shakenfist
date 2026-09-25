@@ -14718,10 +14718,11 @@ sends the author round again.</p>
 <p>The audit's regex and the script disagree about two of the four, and
 in the safe direction both times. <code>`mermaid` does not match
 `MERMAID_FENCE_RE`, so a repository whose only diagram is written that
-way is N/A here and red in the lane -- the tilde direction again.</code> <code>``mermaid title=x ```` does match, so such a repository is
+way is N/A here and red in the lane -- the tilde direction again.</code> <code>ermaid title=x</code> does match, so such a repository is
 counted as having diagrams, told it needs the lane, and then told by
 the lane to fix the fence. Neither outcome calls a repository covered
-for a diagram nothing renders, which is the property that matters.</code>MermaidLintScriptTest<code>in</code>scripts/tests/` pins that behaviour, and
+for a diagram nothing renders, which is the property that matters.
+<code>MermaidLintScriptTest</code> in <code>scripts/tests/</code> pins that behaviour, and
 pins the audit's narrower answer next to it.</p>
 <p>The two therefore give deliberately different answers to the same
 input, and a repository whose only diagrams are tilde-fenced sees
