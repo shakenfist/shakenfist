@@ -204,5 +204,6 @@ The `convert`, `dd`, `compare`, `bench`, `check` and `measure` operations
 refuse a differencing source outright regardless of whether its parent
 exists — see the "VHD/VHDX differencing" section of
 [quirks.md](/components/instar/quirks/) — so a refusal must not depend on the parent being
-present. Phase 14 of [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/)
-lifts this restriction per operation as real chain composition lands.
+present. The composition work in
+[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) lifts this restriction
+per operation as real chain composition lands.

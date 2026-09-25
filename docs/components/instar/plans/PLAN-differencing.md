@@ -350,8 +350,8 @@ Each phase gets its own detailed plan file before implementation
 begins; this table is the tracking source of truth. The `Merged`
 column records what put each phase on `develop` -- the merge
 commit of its pull request, or a `first..last` range for a phase
-that landed directly -- because phase 11 audits the union of
-those ranges, and `git diff develop...HEAD` is empty once the
+that landed directly -- because the push-audit phase runs
+`PUSH-AUDIT.md` over the union of those ranges, and `git diff develop...HEAD` is empty once the
 phases have landed. A phase that lands in `instar-testdata`
 records `instar-testdata <sha> (#pr)` and is audited there.
 
@@ -373,7 +373,7 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 | 14. Composition: per-op rollout, replacing phase 4's refusals | PLAN-differencing-phase-14-op-rollout.md | Not started | |
 | 15. Composition: integration tests and fuzz | PLAN-differencing-phase-15-compose-tests.md | Not started | |
 | 16. Composition: documentation | PLAN-differencing-phase-16-compose-docs.md | Not started | |
-| 17. Push audit | PLAN-differencing-phase-17-push-audit.md | Not started | |
+| 17. Push audit: `PUSH-AUDIT.md` over every phase above | PLAN-differencing-phase-17-push-audit.md | Not started | |
 
 ### Sequencing rationale
 
@@ -655,9 +655,9 @@ We will know this plan has been implemented because:
   and the false "differencing with backing chains" input claim
   at `CHANGELOG.md:1922` is reconciled by a current statement of
   what is actually supported.
-* The push audit in phase 17 has run over the union of the
-  merged ranges, and its findings are resolved or declined in
-  writing.
+* The push audit in phase 17 has run `PUSH-AUDIT.md` over the
+  union of the merged ranges, and its findings are resolved or
+  declined in writing.
 
 ### Documentation index maintenance
 

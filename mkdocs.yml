@@ -285,6 +285,9 @@ nav:
             - "Kerbside Proxy Architecture": components/kerbside/proxy-architecture.md
             - "Testing": components/kerbside/testing.md
             - "The direct-qemu mock harness": components/kerbside/direct-qemu-harness.md
+            - Performance:
+                - "Proxy backpressure on a shaped client link": components/kerbside/performance/proxy-backpressure.md
+                - "Streaming and the qemu damage series on a shaped link": components/kerbside/performance/streaming-rebaseline.md
             - Plans:
                 - "Plans index": components/kerbside/plans/index.md
                 - "A working installation path: the compose demo": components/kerbside/plans/PLAN-demo-install.md
@@ -306,6 +309,7 @@ nav:
                 - "Kerbside VDI tokens phase 9: full cross-repo end-to-end lane": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-09-e2e.md
                 - "Phase 1: `docs/use-cases/shaken-fist.md`": components/kerbside/plans/PLAN-use-case-docs-phase-01-shaken-fist.md
                 - "Phase 1: package the migrations and add `kerbside db upgrade`": components/kerbside/plans/PLAN-demo-install-phase-01-db-upgrade.md
+                - "Phase 1: proxy backpressure and a WAN baseline": components/kerbside/plans/PLAN-spice-performance-phase-01-proxy-backpressure.md
                 - "Phase 1: Shared visual-digest crate": components/kerbside/plans/PLAN-test-harness-phase-01-digest-crate.md
                 - "Phase 2: `docs/use-cases/openstack.md`": components/kerbside/plans/PLAN-use-case-docs-phase-02-openstack.md
                 - "Phase 2: Static source driver": components/kerbside/plans/PLAN-test-harness-phase-02-static-hypervisor.md
@@ -351,6 +355,7 @@ nav:
                 - "sfui conversion phase 8: terminate actions to POST": components/kerbside/plans/PLAN-sfui-conversion-phase-08-terminate-post.md
                 - "sfui conversion phase 9: teardown, docs and issue closure": components/kerbside/plans/PLAN-sfui-conversion-phase-09-teardown.md
                 - "Shaken Fist VDI console tokens (kerbside side)": components/kerbside/plans/PLAN-kerbside-vdi-tokens.md
+                - "SPICE session performance, in Kerbside and upstream": components/kerbside/plans/PLAN-spice-performance.md
                 - "Two-tier CI phase 1: the oVirt lane deploys and drives kerbside": components/kerbside/plans/PLAN-two-tier-ci-phase-01-ovirt-kerbside.md
                 - "Two-tier CI phase 2: promote sf-e2e to a PR smoke gate": components/kerbside/plans/PLAN-two-tier-ci-phase-02-sf-e2e-promotion.md
                 - "Two-tier CI phase 3: merge queue adoption and tier split": components/kerbside/plans/PLAN-two-tier-ci-phase-03-merge-queue.md
