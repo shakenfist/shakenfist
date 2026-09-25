@@ -388,6 +388,26 @@ hard-fails if the client does not advertise and accept a
 than silently falling back to a different metric under the same column
 name. The CSV is one float per line, seconds, no header.
 
+### Shaped-link latency rig
+
+`tools/shaped-link/` measures the same keypress-to-draw latency on a
+deliberately slow link, for performance work rather than CI. It runs
+qemu, the proxy (started with `tools/direct-qemu/`'s scripts) and Ryll
+in unprivileged network namespaces with `tc netem` shaping between
+client and proxy, across a matrix of link profiles, guest activity
+levels and proxy settings, and `summarise.py` renders the results as
+a table.
+
+Its metric differs from the loadtest's. With screen activity running,
+the first draw after a key press is almost always an activity frame,
+so `keydraw-latency.py` pairs each press with the first draw that
+touches the guest's key box instead. That needs a `rect` field on
+`surface_drawn` which the control socket protocol does not have yet;
+`build-ryll.sh` patches it in. What the rig has measured, and how to
+rerun it, is in
+[performance/proxy-backpressure.md](/components/kerbside/performance/proxy-backpressure/)
+and [performance/streaming-rebaseline.md](/components/kerbside/performance/streaming-rebaseline/).
+
 ## Testing the SPICE console of an oVirt VM
 
 `tools/test-ovirt-console.py` is Kerbside's oVirt SPICE console probe.

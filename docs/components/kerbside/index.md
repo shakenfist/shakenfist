@@ -168,6 +168,16 @@ Guides for working on Kerbside itself:
   proxy locally against qemu with a mock control plane: end-to-end
   relay, firewall capture, and session-termination checks
 
+- [Proxy backpressure on a shaped link](/components/kerbside/performance/proxy-backpressure/) -
+  The shaped-link keypress-to-draw rig (`tools/shaped-link/`) and its
+  first results: where the display backlog sits on a slow client link,
+  and why the proxy's socket options do not shorten it
+
+- [Streaming and the qemu damage series on a shaped link](/components/kerbside/performance/streaming-rebaseline/) -
+  The same rig with spice-server streaming on and the qemu and Linux
+  damage patches: most of the slow-link latency was qemu's default
+  `streaming-video=off`
+
 ### Architecture Documentation
 
 Internal design of the Kerbside proxy:
