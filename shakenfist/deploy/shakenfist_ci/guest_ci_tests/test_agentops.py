@@ -5,10 +5,15 @@ import time
 from testtools import content
 
 from shakenfist_ci import base
+from shakenfist_ci import instance_hotplug
 from shakenfist_client import apiclient
 
 
-class TestAgentOperations(base.BaseNamespacedTestCase):
+class TestAgentOperations(instance_hotplug.InstanceHotplugTestsMixin,
+                          base.BaseNamespacedTestCase):
+    # The interface hot plug tests live on InstanceHotplugTestsMixin so the
+    # smoke and guest suites run one implementation (issue 4318). Do not add
+    # a local copy here.
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'agentops'
         super().__init__(*args, **kwargs)
@@ -275,160 +280,3 @@ class TestAgentOperations(base.BaseNamespacedTestCase):
         self.assertRaises(
             apiclient.AgentOperationFailed, self.test_client.await_agent_fetch,
             inst['uuid'], '/tmp/nosuch')
-
-    def test_interface_plug_and_exec_dhcp(self):
-        # Create a network to hot plug to
-        hotnet = self.test_client.allocate_network(
-            '10.0.0.0/24', True, True, '%s-hotplug' % self.namespace)
-
-        # Create an instance to run our command on
-        inst = self.create_instance(
-            'test-hotplug', 1, 1024, None,
-            [
-                {
-                    'size': 8,
-                    'base': 'sf://upload/system/debian-12',
-                    'type': 'disk'
-                }
-            ], None, None)
-
-        # Wait for the instance agent to report in
-        self._await_instance_ready(inst['uuid'])
-
-        # Hot plug an interface in
-        netdesc = {
-            'network_uuid': hotnet['uuid'],
-            'address': '10.0.0.5',
-            'macaddress': '02:00:00:ea:3a:28'
-        }
-        self.test_client.add_instance_interface(inst['uuid'], netdesc)
-        self._await_instance_operations_complete(inst['uuid'])
-
-        # Wait a bit longer for the kernel to do its thing
-        time.sleep(10)
-
-        # Check lshw
-        _, data = self.test_client.await_agent_command(
-            inst['uuid'], 'sudo lshw -class network')
-        self.assertNotEqual(
-            -1, data.find('02:00:00:ea:3a:28'),
-            'Interface not found in `sudo lshw -class network` output:\n%s' % data)
-
-        # List interfaces
-        _, data = self.test_client.await_agent_command(
-            inst['uuid'], 'ip -json link')
-        self.assertNotEqual(
-            -1, data.find('02:00:00:ea:3a:28'),
-            'Interface not found in `ip -json link` output:\n%s' % data)
-
-        # Determine which interface the new one was added as
-        d = json.loads(data)
-        new_interface = None
-        for i in d:
-            if i['address'] == '02:00:00:ea:3a:28':
-                new_interface = i['ifname']
-        self.assertNotEqual(None, new_interface)
-
-        # DHCP on the new interface
-        _, data = self.test_client.await_agent_command(
-            inst['uuid'], f'dhclient {new_interface}')
-
-        # Ensure interface picked up the right address
-        _, data = self.test_client.await_agent_command(
-            inst['uuid'], f'ip -4 -json -o addr show dev {new_interface}')
-        d = json.loads(data)
-        self.assertEqual('10.0.0.5', d[0]['addr_info'][0]['local'],
-                         'Wrong address in {data}')
-
-    def test_interface_plug_and_exec_reboot(self):
-        # Create a network to hot plug to
-        hotnet = self.test_client.allocate_network(
-            '10.0.0.0/24', True, True, '%s-hotplug' % self.namespace)
-
-        # Create an instance to run our command on
-        inst = self.create_instance(
-            'test-hotplug', 1, 1024, None,
-            [
-                {
-                    'size': 8,
-                    'base': 'sf://upload/system/debian-12',
-                    'type': 'disk'
-                }
-            ], None, None)
-
-        # Wait for the instance agent to report in
-        self._await_instance_ready(inst['uuid'])
-
-        # Hot plug an interface in
-        netdesc = {
-            'network_uuid': hotnet['uuid'],
-            'address': '10.0.0.5',
-            'macaddress': '02:00:00:ea:3a:28'
-        }
-        self.test_client.add_instance_interface(inst['uuid'], netdesc)
-        self._await_instance_operations_complete(inst['uuid'])
-
-        # Wait a bit longer for the kernel to do its thing
-        time.sleep(10)
-
-        # Check lshw
-        _, data = self.test_client.await_agent_command(
-            inst['uuid'], 'sudo lshw -class network')
-        self.assertNotEqual(
-            -1, data.find('02:00:00:ea:3a:28'),
-            'Interface not found in `sudo lshw -class network` output:\n%s' % data)
-
-        # List interfaces
-        _, data = self.test_client.await_agent_command(
-            inst['uuid'], 'ip -json link')
-        self.assertNotEqual(
-            -1, data.find('02:00:00:ea:3a:28'),
-            'Interface not found in `ip -json link` output:\n%s' % data)
-
-        # Determine which interface the new one was added as
-        d = json.loads(data)
-        new_interface = None
-        for i in d:
-            if i['address'] == '02:00:00:ea:3a:28':
-                new_interface = i['ifname']
-        self.assertNotEqual(None, new_interface)
-
-        # Power instance off and then on again to force re-creation of the
-        # config drive.
-        self.test_client.power_off_instance(inst['uuid'])
-        self._await_instance_not_ready(inst['uuid'])
-        self.test_client.power_on_instance(inst['uuid'])
-        self._await_instance_ready(inst['uuid'])
-
-        # List interfaces to ensure the device persisted
-        _, data = self.test_client.await_agent_command(
-            inst['uuid'], 'ip -json link')
-        self.assertNotEqual(
-            -1, data.find('02:00:00:ea:3a:28'),
-            'Interface not found in `ip -json link` output:\n%s' % data)
-
-        # Collect the config drive network configuration to ensure that the new
-        # device is listed
-        self.test_client.await_agent_command(
-            inst['uuid'], 'mount /dev/vdb /mnt', ignore_stderr=True)
-        data = self.test_client.await_agent_fetch(
-            inst['uuid'], '/mnt/openstack/latest/network_data.json')
-        self.assertTrue('02:00:00:ea:3a:28' in data,
-                        f'Expected mac address not present in {data}')
-
-        # DHCP the new interface to ensure that works too
-        self.test_client.await_agent_command(
-            inst['uuid'], f'dhclient {new_interface}')
-
-        # Ensure interface picked up the right address
-        _, data = self.test_client.await_agent_command(
-            inst['uuid'], f'ip -4 -json -o addr show dev {new_interface}')
-        d = json.loads(data)
-        self.assertNotEqual(0, len(d),
-                            f'Wrong address information in {data}')
-        self.assertTrue('addr_info' in d[0],
-                        f'Wrong address information in {data}')
-        self.assertNotEqual(0, len(d[0]['addr_info']),
-                            f'Wrong address information in {data}')
-        self.assertEqual('10.0.0.5', d[0]['addr_info'][0]['local'],
-                         f'Wrong address information in {data}')

@@ -700,7 +700,7 @@ CASES = [
          {'network': {'network_uuid': NETWORK,
                       'macaddress': '02:00:00:55:66:78'}},
          ACCEPTED, ACCEPTED,
-         'width: smoke_ci_tests/test_agentops.py hotplugs with a real MAC'),
+         'width: shakenfist_ci/instance_hotplug.py hotplugs with a real MAC'),
     Case('hotplug.float.false', HOTPLUG, 'networkspec', 'float',
          {'network': {'network_uuid': NETWORK, 'float': False}},
          ACCEPTED, ACCEPTED,
