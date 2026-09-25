@@ -12,6 +12,8 @@ from shakenfist.exceptions import ImagesCannotShrinkException
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.exceptions import AffinityConstraintUnsatisfiable
 from shakenfist.exceptions import LowResourceException
+from shakenfist.exceptions import NVRAMTemplateMissing
+from shakenfist.exceptions import UEFIFirmwareUnavailable
 from shakenfist.instance import Instance
 from shakenfist.network.bridged_vxlan_network import BridgedVXLanNetwork
 from shakenfist.network.network import Network
@@ -494,3 +496,9 @@ class NodeInstNetdescOp(BaseClusterOperation):
             except ImagesCannotShrinkException as e:
                 if inst:
                     inst.enqueue_delete_due_error(f'Image resize failed: {e}')
+
+            except (NVRAMTemplateMissing, UEFIFirmwareUnavailable) as e:
+                # Raised while building the domain XML, before libvirt is
+                # asked for anything, so there is nothing to retry: record
+                # why rather than leaving the operation to fail opaquely.
+                inst.enqueue_delete_due_error(f'UEFI boot unavailable: {e}')

@@ -77,6 +77,10 @@ class NVRAMTemplateMissing(InstanceException):
     ...
 
 
+class UEFIFirmwareUnavailable(InstanceException):
+    ...
+
+
 class InvalidLifecycleState(InstanceException):
     ...
 
