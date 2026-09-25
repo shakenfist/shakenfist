@@ -684,6 +684,20 @@ verdict, a usage error and a bug in the report itself -- D15 holding
 everywhere except on a statement about the cloud rather than about the
 instrument.
 
+The first review of this change found that the one condition was not
+narrow enough: an OVERSUBSCRIBED band computed from a single readable
+sample, in a series whose capacity read reported failing for the other
+nine, still returned 3. That is the instrument talking about itself. The
+gate now also requires the series to be one the report could read --
+at least `BAND_GATE_MIN_SAMPLES` (20) usable samples, no sample
+reporting `capacity_degraded`, and no ledger-unreadable sample after the
+warm-up prefix -- and prints why when it withholds. Checked against the
+committed data rather than assumed: the 204 version 1 baseline records
+have at least 41 usable samples each, and the 32 version 2 addendum
+records -- the only ones carrying the flag and prefix counts -- have at
+least 57, no degraded sample and no unreadable sample after the prefix.
+So the guard would have withheld nothing in either dataset.
+
 **Both guards were proven live, not read.** Against a synthetic
 oversubscribed series, `ci_headroom_verdict.sh` from `actions`'s `main`
 exits 3 and emits the *Cluster headroom outside the CI sizing band* error
@@ -745,9 +759,10 @@ why phase 5 is not fixing it. It is in the master plan's Future work.
 
 * **A gate that has never fired.** Nothing in 30 job-runs came near the
   bound. The first real firing will be the first evidence about its
-  false-positive rate, and the response to a surprise is
-  `headroom_gate: false` on the caller rather than a revert, because
-  `@main` is unpinned.
+  false-positive rate, and the response to a surprise is setting the
+  `CI_HEADROOM_GATE` repository variable to `false` rather than a revert,
+  because `@main` is unpinned. All four `smoke-cluster.yml` call sites pass
+  it through as `headroom_gate`; see `docs/developer_guide/ci.md`.
 * **`slim-primary` reads OVERSIZED more often than the topology phase 4
   reshaped.** 15 of 20 job-runs, against `slim-tier`'s 5 of 10. Phase 4
   left `slim-primary` alone on the argument that more vCPU changes

@@ -45,6 +45,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import shutil
 import tempfile
 
@@ -226,6 +227,30 @@ class HeadroomReportTestCase(base.ShakenFistTestCase):
         with contextlib.redirect_stdout(out):
             code = report.main(list(argv))
         return code, out.getvalue()
+
+    def _readable(self, per_node, count=None, start=1756000000.0):
+        """The same cluster sampled often enough for a violation to gate.
+
+        A single sample never gates (BAND_GATE_MIN_SAMPLES), so a test
+        about the gate itself needs a series at least that long. Returned
+        as records rather than a path so a test can add to it first.
+        """
+        if count is None:
+            count = report.BAND_GATE_MIN_SAMPLES
+        return [sample(per_node, sampled_at=start + 15.0 * i)
+                for i in range(count)]
+
+    def _assert_rendered(self, code, output):
+        """The report ran to completion, and this fixture did not gate.
+
+        main() swallows a raise inside report() and returns 0, so the
+        status alone cannot tell a clean run from a broken one. The text
+        main() prints when it swallows one can.
+        """
+        self.assertNotIn(
+            'failed to render', output,
+            'The report raised, and main() swallowed it.')
+        self.assertEqual(0, code)
 
 
 class RobustnessTestCase(HeadroomReportTestCase):
@@ -424,7 +449,7 @@ class LedgerUnreadableTestCase(HeadroomReportTestCase):
             sampled_at=1756000015.0)
         path = self._series([good, blind])
         code, output = self._run('--series', path)
-        self.assertEqual(report.BAND_VIOLATION_EXIT, code)
+        self._assert_rendered(code, output)
         self.assertIn(
             'LEDGER UNREADABLE: 1 of 2 samples', output,
             'A sample whose every node reported no capacity row was not '
@@ -512,7 +537,7 @@ class CapacityDegradedTestCase(HeadroomReportTestCase):
             self._blind(1756000000.0, capacity_degraded=False),
             self._busy(1756000015.0, capacity_degraded=False)])
         code, output = self._run('--series', path)
-        self.assertEqual(report.BAND_VIOLATION_EXIT, code)
+        self._assert_rendered(code, output)
         self.assertIn(
             'empty table rather than a failed read', output,
             'The report flagged an unreadable ledger without saying which of '
@@ -533,7 +558,7 @@ class CapacityDegradedTestCase(HeadroomReportTestCase):
         self.assertEqual(0, series['ledger_unreadable_prefix_samples'])
         self.assertIsNone(series['ledger_unreadable_prefix_seconds'])
         code, output = self._run('--series', path)
-        self.assertEqual(report.BAND_VIOLATION_EXIT, code)
+        self._assert_rendered(code, output)
         self.assertIn(
             'THE CAPACITY READ WAS FAILING', output,
             'A sample which reported capacity_degraded was folded in with '
@@ -556,7 +581,7 @@ class CapacityDegradedTestCase(HeadroomReportTestCase):
         # lasted no time at all.
         self.assertIsNone(series['ledger_unreadable_prefix_seconds'])
         code, output = self._run('--series', path)
-        self.assertEqual(report.BAND_VIOLATION_EXIT, code)
+        self._assert_rendered(code, output)
         self.assertIn(
             'that is not all of them: 1 more is unreadable', output,
             'The report described a series with unreadable samples after '
@@ -573,7 +598,7 @@ class CapacityDegradedTestCase(HeadroomReportTestCase):
         self.assertEqual(
             2, record['series']['capacity_degraded_absent_samples'])
         code, output = self._run('--series', path)
-        self.assertEqual(report.BAND_VIOLATION_EXIT, code)
+        self._assert_rendered(code, output)
         self.assertIn(
             'predate the capacity_degraded flag', output,
             'A bundle with no capacity_degraded flag was reported as though '
@@ -1006,10 +1031,8 @@ class CensusTestCase(HeadroomReportTestCase):
 
 class BandVerdictTestCase(HeadroomReportTestCase):
     def test_a_busy_cluster_reads_as_oversubscribed(self):
-        path = self._series([
-            sample({NODE_ONE: node_payload(
-                cpu_measured=9, cpu_committed=9, cpu_limit=10)}),
-        ])
+        path = self._series(self._readable({NODE_ONE: node_payload(
+            cpu_measured=9, cpu_committed=9, cpu_limit=10)}))
         code, output = self._run('--series', path)
         self.assertEqual(
             report.BAND_VIOLATION_EXIT, code,
@@ -1041,7 +1064,7 @@ class BandVerdictTestCase(HeadroomReportTestCase):
                 cpu_measured=2, cpu_committed=8, cpu_limit=10)}),
         ])
         code, output = self._run('--series', path)
-        self.assertEqual(report.BAND_VIOLATION_EXIT, code)
+        self._assert_rendered(code, output)
         self.assertIn(
             '0.800', output,
             'Committed vCPU read as something other than max(cpu_measured, '
@@ -1169,7 +1192,7 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
                 cpu_measured=9, cpu_committed=9, cpu_limit=10)}),
         ])
         code, output = self._run('--series', path, '--label', 'slim-tier')
-        self.assertEqual(report.BAND_VIOLATION_EXIT, code)
+        self._assert_rendered(code, output)
         self.assertIn(
             '::warning title=CI headroom%3A cluster OVERSUBSCRIBED::', output,
             'An OVERSUBSCRIBED band verdict did not raise a GitHub '
@@ -1258,13 +1281,10 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
                 cpu_measured=9, cpu_committed=9, cpu_limit=10)}),
         ])
         code, output = self._run('--series', path)
-        self.assertEqual(
-            report.BAND_VIOLATION_EXIT, code,
-            'An unset $GITHUB_STEP_SUMMARY must not raise: this tool is '
-            'also run by hand over a downloaded bundle, where the '
-            'variable is never set. The status here is the band verdict\'s '
-            'and nothing else -- a raise would be swallowed by main() and '
-            'read as 0, so this assertion is what proves none happened.')
+        # An unset $GITHUB_STEP_SUMMARY must not raise: this tool is also
+        # run by hand over a downloaded bundle, where the variable is
+        # never set.
+        self._assert_rendered(code, output)
         self.assertIn('::warning', output)
 
     def test_the_step_summary_file_is_written_when_the_variable_is_set(self):
@@ -1274,8 +1294,8 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
             sample({NODE_ONE: node_payload(
                 cpu_measured=9, cpu_committed=9, cpu_limit=10)}),
         ])
-        code, _ = self._run('--series', path, '--label', 'slim-tier')
-        self.assertEqual(report.BAND_VIOLATION_EXIT, code)
+        code, output = self._run('--series', path, '--label', 'slim-tier')
+        self._assert_rendered(code, output)
         with open(summary_path) as f:
             contents = f.read()
         self.assertIn('### CI headroom band verdict -- slim-tier', contents)
@@ -1331,13 +1351,9 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
                 cpu_measured=9, cpu_committed=9, cpu_limit=10)}),
         ])
         code, output = self._run('--series', path)
-        self.assertEqual(
-            report.BAND_VIOLATION_EXIT, code,
-            'An unwritable $GITHUB_STEP_SUMMARY path changed the exit '
-            'status. Only a band verdict may do that (D15 otherwise '
-            'holds), and a raise inside the summary write would leave '
-            'main() with no record at all and return 0 -- so this reads '
-            'the band status precisely because the failure mode is 0.')
+        # An unwritable $GITHUB_STEP_SUMMARY path must not raise either:
+        # nothing this tool does may fail the job it is measuring (D15).
+        self._assert_rendered(code, output)
         self.assertFalse(os.path.exists(summary_path))
         self.assertIn(
             '::warning', output,
@@ -2046,12 +2062,10 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
         code, output = self._run('--series', path, '--census', census,
                                  '--label', 'slim-primary', '--json', target,
                                  *extra)
-        # The rich fixture sits above the upper bound, so the band status
-        # is the expected one. It is asserted rather than ignored because
-        # a report which raised would return 0 (main() swallows it), and
-        # every caller of this helper then reads a record which is not
-        # the one the run produced.
-        self.assertEqual(report.BAND_VIOLATION_EXIT, code)
+        # Asserted rather than ignored: a report which raised would still
+        # return 0 (main() swallows it), and every caller of this helper
+        # would then read a record which is not the one the run produced.
+        self._assert_rendered(code, output)
         with open(target) as f:
             return json.load(f), output
 
@@ -2356,9 +2370,9 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
         path = self._rich_series()
         census = self._rich_census()
         target = os.path.join(self.tempdir, 'summary.json')
-        code, _ = self._run('--series', path, '--census', census,
-                            '--label', 'slim-tier', '--json', target)
-        self.assertEqual(report.BAND_VIOLATION_EXIT, code)
+        code, output = self._run('--series', path, '--census', census,
+                                 '--label', 'slim-tier', '--json', target)
+        self._assert_rendered(code, output)
         with open(target) as f:
             written = json.load(f)
         returned = report.summary_record(path, census=census, label='slim-tier')
@@ -2687,7 +2701,7 @@ class WorkflowCommandPropertyTestCase(HeadroomReportTestCase):
                                            cpu_limit=10, cpu_hard_max=12)}),
         ])
         code, output = self._run('--series', path)
-        self.assertEqual(report.BAND_VIOLATION_EXIT, code)
+        self._assert_rendered(code, output)
 
         titles = [line.split('::')[1][len('warning title='):]
                   for line in output.splitlines()
@@ -2719,8 +2733,10 @@ class BandGateTestCase(HeadroomReportTestCase):
     """5f armed the cluster-wide upper bound, and nothing else.
 
     The contract has two halves in two repositories.  Here the report
-    returns ``BAND_VIOLATION_EXIT`` for an oversubscribed cluster and
-    zero for everything else it can meet.  In ``shakenfist/actions``,
+    returns ``BAND_VIOLATION_EXIT`` for an oversubscribed cluster it could
+    read, and zero for everything else it can meet -- including an
+    oversubscribed verdict resting on a series too thin or too unreadable
+    to trust.  In ``shakenfist/actions``,
     ``tools/ci_headroom_verdict.sh`` fails the job on that status -- but
     only after grepping this file's source for the constant's name, so a
     report too old to implement the contract cannot be read as
@@ -2729,10 +2745,40 @@ class BandGateTestCase(HeadroomReportTestCase):
     """
 
     def _oversubscribed(self):
-        return self._series([
-            sample({NODE_ONE: node_payload(
-                cpu_measured=9, cpu_committed=9, cpu_limit=10)}),
-        ])
+        return self._series(self._readable({NODE_ONE: node_payload(
+            cpu_measured=9, cpu_committed=9, cpu_limit=10)}))
+
+    @staticmethod
+    def _busy_pair():
+        return {
+            NODE_ONE: node_payload(cpu_measured=9, cpu_committed=9,
+                                   cpu_limit=10),
+            NODE_TWO: node_payload(cpu_measured=9, cpu_committed=9,
+                                   cpu_limit=10),
+        }
+
+    @staticmethod
+    def _blind_pair(sampled_at, capacity_degraded):
+        return sample({
+            NODE_ONE: node_payload(cpu_measured=0, cpu_committed=0,
+                                   cpu_limit=None, row_present=False),
+            NODE_TWO: node_payload(cpu_measured=0, cpu_committed=0,
+                                   cpu_limit=None, row_present=False),
+        }, sampled_at=sampled_at, capacity_degraded=capacity_degraded)
+
+    def _assert_withheld(self, records, reason):
+        code, output = self._run('--series', self._series(records))
+        self.assertEqual(
+            0, code,
+            'An OVERSUBSCRIBED verdict the instrument could not trust '
+            'failed the job. That is the instrument talking about itself, '
+            'which D15 says may never gate.')
+        self.assertIn('OVERSUBSCRIBED', output)
+        self.assertIn('This verdict would gate (5f), but', output)
+        self.assertIn(
+            reason, output,
+            'The report withheld the gate without saying why.')
+        self.assertNotIn('Returning %d' % report.BAND_VIOLATION_EXIT, output)
 
     def test_an_oversubscribed_cluster_returns_the_band_violation_status(self):
         code, output = self._run('--series', self._oversubscribed())
@@ -2763,14 +2809,17 @@ class BandGateTestCase(HeadroomReportTestCase):
         constant is therefore a way to switch the gate off, and doing it
         by accident is the failure this asserts against.
         """
-        with open(report.__file__ if hasattr(report, '__file__')
-                  else REPORT_PATH) as f:
+        with open(REPORT_PATH) as f:
             source = f.read()
-        self.assertIn(
-            'BAND_VIOLATION_EXIT', source,
-            'The sentinel ci_headroom_verdict.sh greps for is not in the '
-            'report source, so shakenfist/actions will decline to believe '
-            'a status of 3 and the gate is off.')
+        # A definition, not an occurrence: the comment above the constant
+        # names it several times, and a rename which left that comment in
+        # place would otherwise still pass here while the gate had become
+        # a status nothing names.
+        self.assertIsNotNone(
+            re.search(r'^BAND_VIOLATION_EXIT = ', source, re.M),
+            'The report source does not define the sentinel '
+            'ci_headroom_verdict.sh greps for, so shakenfist/actions will '
+            'decline to believe a status of 3 and the gate is off.')
 
     def test_an_oversized_cluster_does_not_gate(self):
         """D8: the lower bound is information, and gating on it would be bad.
@@ -2854,3 +2903,84 @@ class BandGateTestCase(HeadroomReportTestCase):
     def test_a_usage_error_does_not_gate(self):
         code, _ = self._run('--not-an-argument')
         self.assertEqual(0, code)
+
+    def test_the_gate_rests_on_at_least_the_minimum_sample_count(self):
+        """One sample short of the floor is withheld; the floor itself gates.
+
+        Both sides are asserted so the boundary cannot drift by one in
+        either direction without a test naming it.
+        """
+        per_node = {NODE_ONE: node_payload(
+            cpu_measured=9, cpu_committed=9, cpu_limit=10)}
+        short = report.BAND_GATE_MIN_SAMPLES - 1
+        self._assert_withheld(
+            self._readable(per_node, count=short),
+            'only %d usable samples, fewer than the %d'
+            % (short, report.BAND_GATE_MIN_SAMPLES))
+
+        code, output = self._run(
+            '--series', self._series(self._readable(per_node)))
+        self.assertEqual(report.BAND_VIOLATION_EXIT, code)
+        self.assertIn('This verdict gates (5f)', output)
+
+    def test_a_failing_capacity_read_does_not_gate(self):
+        """The review's own reproduction: nine blind samples, one busy.
+
+        The nine are a capacity read which reported failing, and the one
+        busy sample is the whole of the p90. Every sample which *could* be
+        read says the cluster was full, and it still must not gate.
+        """
+        records = [self._blind_pair(1756000000.0 + 15.0 * i, True)
+                   for i in range(9)]
+        records.append(sample(self._busy_pair(), sampled_at=1756000135.0,
+                              capacity_degraded=False))
+        self._assert_withheld(
+            records, 'the capacity read reported failing on 9 samples')
+
+    def test_a_degraded_read_in_an_otherwise_long_series_does_not_gate(self):
+        """capacity_degraded withholds on its own, above the sample floor.
+
+        The degraded sample is readable here (every node has its row), so
+        neither the floor nor the unreadable count fires: this isolates the
+        flag, which is the one fact that separates a failing read from an
+        empty table.
+        """
+        records = self._readable(self._busy_pair())
+        records[5]['resources']['total']['capacity_degraded'] = True
+        self._assert_withheld(
+            records, 'the capacity read reported failing on 1 sample')
+
+    def test_an_unreadable_sample_after_the_warm_up_does_not_gate(self):
+        """Issue 4087's other reading: blind *after* the table was readable.
+
+        The flag is False throughout, so this is the unreadable count alone
+        -- a bundle whose capacity read went blind mid-run without saying
+        so is still not a series to fail a job on.
+        """
+        records = self._readable(self._busy_pair())
+        for record in records:
+            record['resources']['total']['capacity_degraded'] = False
+        records.insert(10, self._blind_pair(1756000142.0, False))
+        self._assert_withheld(
+            records, '1 sample was unreadable after the warm-up prefix')
+
+    def test_a_warm_up_prefix_does_not_withhold_the_gate(self):
+        """An empty table at the start of a run is healthy, and every run has one.
+
+        Without this the guard would withhold every real cluster job, which
+        is the gate switched off by a different route.
+        """
+        records = [self._blind_pair(1756000000.0 + 15.0 * i, False)
+                   for i in range(3)]
+        records.extend(self._readable(self._busy_pair(), start=1756000045.0))
+        path = self._series(records)
+        code, output = self._run('--series', path)
+        self.assertIn('LEDGER UNREADABLE: 3 of', output)
+        self.assertEqual(
+            report.BAND_VIOLATION_EXIT, code,
+            'A warm-up prefix withheld the gate. Every cluster job opens '
+            'with one, so this would switch the gate off everywhere.')
+
+        record = report.summary_record(path)
+        self.assertTrue(record['verdict']['gates'])
+        self.assertEqual([], record['verdict']['gate_withheld'])

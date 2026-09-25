@@ -378,6 +378,12 @@ jobs:
     with:
       component: shakenfist
       component_ref: ${{ github.sha }}
+      # The headroom band gate's off switch (PLAN-ci-cloud-sizing phase 5).
+      # Set the CI_HEADROOM_GATE repository variable to 'false' to stop a
+      # band violation failing cluster jobs without a commit. Unset, or
+      # anything else, leaves the gate on. Repeated at every call site of
+      # smoke-cluster.yml in functional-tests.yml and scheduled-tests.yml.
+      headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}
       tier: smoke
 
   automated_reviewer:
@@ -489,6 +495,8 @@ jobs:
     with:
       component: shakenfist
       component_ref: ${{ github.sha }}
+      # The headroom band gate's off switch: see the smoke tier job above.
+      headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}
       tier: full
       topology: ${{ matrix.merge.topology }}
       base_image: ${{ matrix.merge.base_image }}
@@ -512,6 +520,8 @@ jobs:
     with:
       component: shakenfist
       component_ref: ${{ github.sha }}
+      # The headroom band gate's off switch: see the smoke tier job above.
+      headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}
       tier: full
       topology: slim-primary
       base_image: 'sf://label/ci-images/debian-12'

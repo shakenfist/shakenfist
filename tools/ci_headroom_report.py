@@ -196,7 +196,22 @@ BAND_UPPER = 0.70
 # fail the job it measures holds everywhere except here, and this is not an
 # exception to it: a band violation is a statement about the cloud the suite
 # ran on, not about the instrument.
+#
+# That argument only holds for a verdict the instrument could actually read,
+# so an OVERSUBSCRIBED band is not enough on its own: gate_withheld_reasons()
+# below also has to come back empty. A p90 which rests on a handful of
+# samples, or on a series whose capacity read was failing, is the instrument
+# talking about itself, and it is printed with the reason it did not gate.
 BAND_VIOLATION_EXIT = 3
+
+# The fewest usable CPU samples a band violation may rest on. At the probe's
+# 15 second interval this is five minutes of a cluster which was actually
+# readable; the smallest of the 204 job-runs in the committed phase 2
+# baseline had 41, and a complete cluster job runs for around 29 minutes,
+# so this withholds only a series which stopped early or could barely be
+# read. Below it the p90 is close to the maximum of a few samples, which
+# is a single busy moment rather than a statement about the cloud.
+BAND_GATE_MIN_SAMPLES = 20
 
 # Phase 5's D4: the per-node maximum's upper bound, also from the master
 # plan's "The headroom band, with numbers" section. It is the cleanest
@@ -239,6 +254,11 @@ PER_NODE_BAND_UPPER = 0.85
 # produced a per-node fraction". A harvest over a window which mixes
 # versions (5e's does) must read per_node_band together with
 # record_version, or it pools the two.
+#
+# 5f added verdict.gates and verdict.gate_withheld to version 3 in place,
+# because they are purely additive: nothing already in the record changed
+# meaning. Version 3 records written before 5f lack both, so a consumer
+# reads them with .get() and treats absence as "written before the gate".
 RECORD_VERSION = 3
 
 # Loki's own max_entries_limit_per_query, and the value
@@ -1774,6 +1794,7 @@ def verdict_record(record):
     rather than as a per-run alarm, and per D4 it never gates.
     """
     ratio = record['cluster']['committed_cpu']['p90_fraction']
+    withheld = gate_withheld_reasons(record)
     if ratio is None:
         band = None
     elif ratio < BAND_LOWER:
@@ -1802,7 +1823,42 @@ def verdict_record(record):
         ('per_node_max_peak_fraction', per_node_max['peak']),
         ('per_node_band', per_node_band),
         ('per_node_band_upper', PER_NODE_BAND_UPPER),
+        ('gates', band == 'OVERSUBSCRIBED' and not withheld),
+        ('gate_withheld', withheld),
     ])
+
+
+def gate_withheld_reasons(record):
+    """Why this series cannot support a band violation, or [] if it can.
+
+    Computed for every record rather than only an OVERSUBSCRIBED one, so a
+    harvest can see how often the gate would have been withheld without
+    waiting for a violation to find out. Each reason is a fact the report
+    already prints elsewhere; this only decides that it disqualifies the
+    series from gating. The warm-up prefix does not: a capacity table which
+    is merely not populated yet is issue 4087's healthy reading, and every
+    cluster job opens with one.
+    """
+    series = record['series']
+    reasons = []
+    usable = record['cluster']['committed_cpu']['n']
+    if usable < BAND_GATE_MIN_SAMPLES:
+        reasons.append(
+            'only %d usable %s, fewer than the %d a band violation may '
+            'rest on' % (usable, plural(usable, 'sample'),
+                         BAND_GATE_MIN_SAMPLES))
+    degraded = series['capacity_degraded_samples']
+    if degraded:
+        reasons.append(
+            'the capacity read reported failing on %d %s'
+            % (degraded, plural(degraded, 'sample')))
+    late = (series['ledger_unreadable_samples']
+            - series['ledger_unreadable_prefix_samples'])
+    if late:
+        reasons.append(
+            '%d %s unreadable after the warm-up prefix'
+            % (late, 'sample was' if late == 1 else 'samples were'))
+    return reasons
 
 
 def build_summary_record(series, census, label=None):
@@ -2559,11 +2615,17 @@ def print_verdict(record):
             text = 'WITHIN BAND'
         print('  Verdict: %s' % text)
 
-    if verdict['band'] == 'OVERSUBSCRIBED':
+    if verdict['gates']:
         print('  This verdict gates (5f): the report returns %d, and'
               % BAND_VIOLATION_EXIT)
         print('  ci_headroom_verdict.sh in shakenfist/actions turns that into')
         print('  a failed job unless CI_HEADROOM_GATE says otherwise.')
+    elif verdict['band'] == 'OVERSUBSCRIBED':
+        print('  This verdict would gate (5f), but the series cannot support')
+        print('  it, so the report returns 0:')
+        for reason in verdict['gate_withheld']:
+            print('    - %s' % reason)
+        print('  An unreadable instrument is not a statement about the cloud.')
     else:
         print('  Only the cluster-wide upper bound gates (5f). Nothing else')
         print('  here can fail a job: the lower bound is information rather')
@@ -2764,6 +2826,10 @@ def emit_github_annotations(record):
     an annotation this tool always tries to print needs no such
     detection, so it works the same on every ref.
     """
+    # Warnings even for the one verdict which can fail the job. Whether it
+    # does is decided downstream -- CI_HEADROOM_GATE can switch it off --
+    # and ci_headroom_verdict.sh emits the ::error when it really fails the
+    # job, so an ::error here would sit on green runs the gate let through.
     for title, message in band_annotations(record):
         print('::warning title=%s::%s'
               % (_encode_workflow_command_property(title),
@@ -2980,11 +3046,12 @@ def main(argv=None):
         print('band verdict gates, and there is no verdict to read here.')
 
     # The only non-zero status this tool returns, and it is deliberately
-    # narrow: the record has to exist, and its cluster-wide band has to read
-    # OVERSUBSCRIBED. A record which failed to render, a series with too
-    # little in it to produce a fraction, and a band of OVERSIZED or WITHIN
-    # BAND all leave this at 0. See BAND_VIOLATION_EXIT.
-    if (record or {}).get('verdict', {}).get('band') == 'OVERSUBSCRIBED':
+    # narrow: the record has to exist, its cluster-wide band has to read
+    # OVERSUBSCRIBED, and the series has to be one the instrument could read
+    # (verdict_record() folds both into 'gates'). A record which failed to
+    # render, a series too thin or too unreadable to trust, and a band of
+    # OVERSIZED or WITHIN BAND all leave this at 0. See BAND_VIOLATION_EXIT.
+    if (record or {}).get('verdict', {}).get('gates'):
         print()
         print('Returning %d: the cluster-wide committed-vCPU fraction is above'
               % BAND_VIOLATION_EXIT)
