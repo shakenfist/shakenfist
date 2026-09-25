@@ -86,6 +86,39 @@ the existing definition. Recreating the instance is the supported
 route; this is a workaround, and it is on you to confirm the instance
 comes back.
 
+### UEFI instances and the 4 MB OVMF firmware
+
+UEFI firmware comes in two flash sizes, and a firmware image only boots
+with an NVRAM file of its own size. Debian 12 and Ubuntu 22.04 ship both
+sizes; Debian 13 and Ubuntu 24.04 ship only the 4 MB images. Shaken Fist
+used to hard-code the 2 MB images, so UEFI instances did not start at
+all on the newer distributions.
+
+It now picks the firmware when it renders the domain XML:
+
+* a new UEFI instance gets the 4 MB firmware wherever it is installed,
+  which is every supported distribution;
+* an instance that already has an NVRAM file, or was created from an
+  `nvram_template` blob, gets the firmware whose size matches it, so
+  instances created with the 2 MB firmware keep booting on a hypervisor
+  that still has it.
+
+Moving a hypervisor from Debian 12 to Debian 13, or from Ubuntu 22.04
+to Ubuntu 24.04, removes the 2 MB images. That breaks any UEFI instance
+created before the upgrade, twice over:
+
+* its persistent libvirt definition names the 2 MB firmware path
+  directly, as described above;
+* its NVRAM is 2 MB, so even a re-rendered domain has no firmware to
+  pair it with, and power on fails with an error saying so.
+
+Recreate those instances after the upgrade. If that is not acceptable,
+keep the 2 MB images installed on the upgraded hypervisor, for example
+by copying `/usr/share/OVMF/OVMF_CODE.fd`, `OVMF_CODE.secboot.fd`,
+`OVMF_VARS.fd` and `OVMF_VARS.ms.fd` from the older release's `ovmf`
+package. Treat those copies as unmanaged files that will not receive
+security updates.
+
 ### Network nodes need the iptables conntrack match
 
 Since the release which made floating addresses answer from inside their own

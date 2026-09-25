@@ -1597,6 +1597,12 @@ class InstancePowerOnEndpoint(api_base.Resource):
                 return instance_from_db.power_on()
         except exceptions.InvalidLifecycleState as e:
             return sf_api.error(409, f'Invalid lifecycle state: {e}')
+        except (exceptions.NVRAMTemplateMissing,
+                exceptions.UEFIFirmwareUnavailable) as e:
+            instance_from_db.add_event(
+                EVENT_TYPE_AUDIT, 'power on failed: UEFI boot unavailable',
+                extra={'error': str(e)})
+            return sf_api.error(409, f'UEFI boot unavailable: {e}')
 
 
 class InstancePauseEndpoint(api_base.Resource):

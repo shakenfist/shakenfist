@@ -12,9 +12,9 @@
 
     {%- if uefi -%}
     {%- if secure_boot -%}
-    <loader readonly='yes' secure='yes' type='pflash'>/usr/share/OVMF/OVMF_CODE.secboot.fd</loader>
+    <loader readonly='yes' secure='yes' type='pflash'>{{ovmf_code}}</loader>
     {%- else -%}
-    <loader readonly='yes' type='pflash'>/usr/share/OVMF/OVMF_CODE.fd</loader>
+    <loader readonly='yes' type='pflash'>{{ovmf_code}}</loader>
     {%- endif -%}
     <nvram {{nvram_template_attribute}}>{{instance_path}}/nvram</nvram>
     {%- endif -%}

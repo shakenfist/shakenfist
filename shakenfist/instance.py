@@ -129,6 +129,56 @@ def _xml_attribute_escape(value):
     return saxutils.escape(str(value), {"'": '&apos;', '"': '&quot;'})
 
 
+# OVMF firmware as (code, vars) pairs, most preferred first. A code image
+# only works with VARS (and so an NVRAM file) of the same flash size, so
+# the two are never chosen independently. Debian 12 and Ubuntu 22.04 ship
+# both sizes; Debian 13 and Ubuntu 24.04 ship only the 4 MB pair, which is
+# why hard-coding the 2 MB paths broke every UEFI instance on them (issue
+# 4329).
+OVMF_DIR = '/usr/share/OVMF'
+OVMF_FIRMWARE = {
+    False: [('OVMF_CODE_4M.fd', 'OVMF_VARS_4M.fd'),
+            ('OVMF_CODE.fd', 'OVMF_VARS.fd')],
+    True: [('OVMF_CODE_4M.secboot.fd', 'OVMF_VARS_4M.ms.fd'),
+           ('OVMF_CODE.secboot.fd', 'OVMF_VARS.ms.fd')],
+}
+
+
+def select_ovmf_firmware(secure_boot, nvram_path, ovmf_dir=None):
+    """Choose the OVMF code and VARS images for a UEFI instance.
+
+    Returns a (code_path, vars_path) tuple. If the instance already has
+    an NVRAM file -- from an earlier boot, or copied from an
+    nvram_template blob -- its size fixes the flash size, and the pair
+    whose VARS image matches it is chosen. Otherwise the most preferred
+    installed pair is chosen. Raises UEFIFirmwareUnavailable, naming what
+    was looked for, when nothing usable is installed.
+    """
+    ovmf_dir = ovmf_dir or OVMF_DIR
+    pairs = [(os.path.join(ovmf_dir, code), os.path.join(ovmf_dir, nvvars))
+             for code, nvvars in OVMF_FIRMWARE[bool(secure_boot)]]
+    installed = [(code, nvvars) for code, nvvars in pairs
+                 if os.path.exists(code) and os.path.exists(nvvars)]
+    if not installed:
+        looked_for = ', '.join(f'{code} with {nvvars}' for code, nvvars in pairs)
+        raise exceptions.UEFIFirmwareUnavailable(
+            f'No OVMF firmware installed; looked for {looked_for}')
+
+    if not os.path.exists(nvram_path):
+        return installed[0]
+
+    nvram_size = os.path.getsize(nvram_path)
+    for code, nvvars in installed:
+        if os.path.getsize(nvvars) == nvram_size:
+            return code, nvvars
+
+    sizes = ', '.join(f'{nvvars} is {os.path.getsize(nvvars)} bytes'
+                      for _, nvvars in installed)
+    raise exceptions.UEFIFirmwareUnavailable(
+        f'NVRAM {nvram_path} is {nvram_size} bytes, which matches no '
+        f'installed OVMF firmware ({sizes})')
+
+
 def traverse_cluster_operations_tree(op, only_incomplete=True):
     # Walk the tree of ops from a starting point and yield all ops.
     if not op:
@@ -2106,15 +2156,17 @@ class Instance(dbowo):
                 }
             )
 
-        # The nvram_template variable is either None (use the default path), or
-        # a UUID of a blob to fetch. The nvram template is only used for UEFI boots.
+        # The nvram_template variable is either None (use the installed OVMF
+        # VARS image), or a UUID of a blob to fetch. The nvram template is only
+        # used for UEFI boots.
         nvram_template_attribute = ''
+        ovmf_code = ''
         if self.uefi:
             if not self.nvram_template:
-                if self.secure_boot:
-                    nvram_template_attribute = "template='/usr/share/OVMF/OVMF_VARS.ms.fd'"
-                else:
-                    nvram_template_attribute = "template='/usr/share/OVMF/OVMF_VARS.fd'"
+                ovmf_code, ovmf_vars = select_ovmf_firmware(
+                    self.secure_boot,
+                    os.path.join(self.instance_path, 'nvram'))
+                nvram_template_attribute = f"template='{ovmf_vars}'"
             else:
                 # Fetch the nvram template
                 b = blob.Blob.from_db(self.nvram_template)
@@ -2127,6 +2179,12 @@ class Instance(dbowo):
                 shutil.copyfile(
                     blob.Blob.filepath(b.uuid), os.path.join(self.instance_path, 'nvram'))
                 nvram_template_attribute = ''
+
+                # The copied template's size decides which code image
+                # can boot it.
+                ovmf_code, _ = select_ovmf_firmware(
+                    self.secure_boot,
+                    os.path.join(self.instance_path, 'nvram'))
 
         # Convert side channels into extra devices. There are now several types
         # of side channel:
@@ -2177,6 +2235,7 @@ class Instance(dbowo):
             uefi=self.uefi,
             secure_boot=self.secure_boot,
             nvram_template_attribute=nvram_template_attribute,
+            ovmf_code=ovmf_code,
             extracommands=block_devices.get('extracommands', []),
             machine_type=self.machine_type,
             vdi_type=vdi_type,

@@ -70,6 +70,7 @@ BASE_CONTEXT = {
     'uefi': False,
     'secure_boot': False,
     'nvram_template_attribute': '',
+    'ovmf_code': '',
     'extracommands': [],
     'machine_type': 'pc',
     'vdi_type': 'spice',
@@ -89,7 +90,15 @@ VARIANTS = [
         'vdi_type': 'vnc',
         'uefi': True,
         'secure_boot': True,
-        'nvram_template_attribute': "template='/usr/share/OVMF/OVMF_VARS.ms.fd'",
+        'nvram_template_attribute':
+            "template='/usr/share/OVMF/OVMF_VARS_4M.ms.fd'",
+        'ovmf_code': '/usr/share/OVMF/OVMF_CODE_4M.secboot.fd',
+    }),
+    ('i440fx spice uefi', {
+        'uefi': True,
+        'nvram_template_attribute':
+            "template='/usr/share/OVMF/OVMF_VARS_4M.fd'",
+        'ovmf_code': '/usr/share/OVMF/OVMF_CODE_4M.fd',
     }),
 ]
 
@@ -145,3 +154,23 @@ class LibvirtTemplateTestCase(base.ShakenFistTestCase):
             self.assertEqual(
                 '10', stats.get('period'),
                 f'{name} variant memballoon stats period is not 10 seconds')
+
+    def test_uefi_loader_is_the_selected_firmware(self):
+        # The loader path used to be hard-coded here, and the 2 MB image it
+        # named does not exist on Debian 13 or Ubuntu 24.04 (issue 4329).
+        # It must be whatever select_ovmf_firmware() chose, for both the
+        # plain and the secure boot branch of the template.
+        for name, overrides in VARIANTS:
+            root = ET.fromstring(render(**overrides))
+            loaders = root.findall('./os/loader')
+            if not overrides.get('uefi'):
+                self.assertEqual(
+                    [], loaders, f'{name} variant is BIOS but has a loader')
+                continue
+
+            self.assertEqual(
+                1, len(loaders), f'{name} variant should have one loader')
+            self.assertEqual(overrides['ovmf_code'], loaders[0].text)
+            self.assertEqual(
+                'yes' if overrides.get('secure_boot') else None,
+                loaders[0].get('secure'))

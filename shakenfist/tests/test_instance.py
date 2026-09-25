@@ -866,6 +866,54 @@ class InstanceDomainXMLEscapingTestCase(base.ShakenFistTestCase):
         self.assertEqual('None', instance._xml_attribute_escape(None))
         self.assertEqual('16384', instance._xml_attribute_escape(16384))
 
+    def test_create_domain_xml_uses_the_installed_ovmf(self):
+        # Issue 4329: the loader and NVRAM template were hard-coded to the
+        # 2 MB images, which Debian 13 and Ubuntu 24.04 do not ship. Render
+        # a UEFI domain against a 4 MB only firmware directory and check
+        # the XML names what is actually there.
+        ovmf_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, ovmf_dir, ignore_errors=True)
+        for name, size in (('OVMF_CODE_4M.fd', 3653632),
+                           ('OVMF_VARS_4M.fd', 540672)):
+            with open(os.path.join(ovmf_dir, name), 'wb') as f:
+                f.truncate(size)
+
+        self.ni.model = 'virtio'
+        pm = mock.PropertyMock
+        patches = [
+            mock.patch('shakenfist.instance.OVMF_DIR', ovmf_dir),
+            mock.patch.object(instance.Instance, 'uefi', new_callable=pm,
+                              return_value=True),
+            mock.patch.object(instance.Instance, 'secure_boot',
+                              new_callable=pm, return_value=False),
+            mock.patch.object(instance.Instance, 'nvram_template',
+                              new_callable=pm, return_value=None),
+            mock.patch.object(instance.Instance, 'interfaces',
+                              new_callable=pm, return_value=[self.ni]),
+            mock.patch.object(instance.Instance, 'block_devices',
+                              new_callable=pm,
+                              return_value={'devices': [],
+                                            'extracommands': []}),
+            mock.patch.object(instance.Instance, 'ports', new_callable=pm,
+                              return_value={'console_port': 30000,
+                                            'vdi_port': 30001}),
+            mock.patch.object(instance.Instance, 'video', new_callable=pm,
+                              return_value={'model': 'qxl',
+                                            'memory': 16384, 'vdi': 'vnc'}),
+            mock.patch('shakenfist.instance.network.Network.from_db',
+                       return_value=self.fake_net),
+            mock.patch.object(instance.Instance, 'add_event'),
+        ]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+
+        root = ET.fromstring(self.inst._create_domain_xml())
+        self.assertEqual(os.path.join(ovmf_dir, 'OVMF_CODE_4M.fd'),
+                         root.find('./os/loader').text)
+        self.assertEqual(os.path.join(ovmf_dir, 'OVMF_VARS_4M.fd'),
+                         root.find('./os/nvram').get('template'))
+
     def test_create_domain_xml_keeps_hostile_models_inert(self):
         self.ni.model = self.HOSTILE_NET_MODEL
         pm = mock.PropertyMock
