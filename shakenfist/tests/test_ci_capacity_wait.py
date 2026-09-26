@@ -1222,3 +1222,97 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
             1, client.node_listings,
             'The pin was resolved once per wait rather than once per '
             'create, which puts a node listing into the retry loop.')
+
+
+class EnsureCapacityWaitTraceTestCase(test_base.ShakenFistTestCase):
+    """The trace file exists from start-up, so an empty file means zero.
+
+    The append path opens the trace 'a', so a run in which no create was
+    ever refused used to leave no file at all -- indistinguishable from a
+    component ref predating the wrapper and from a run whose writes all
+    failed, which made 92% of phase 5's first measurement window unknown
+    (issue 4337). setUp() now touches the file into existence, so 'empty'
+    is a real observation and 'absent' keeps only the other two meanings.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tempdir, True)
+        self.trace = os.path.join(self.tempdir, 'instance-waits.jsonl')
+        patcher = mock.patch.object(
+            ci_base, 'CAPACITY_WAIT_TRACE_FILE', self.trace)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_an_absent_trace_is_created_empty(self):
+        ci_base.ensure_capacity_wait_trace()
+
+        self.assertTrue(
+            os.path.exists(self.trace),
+            'The trace was not created, so a run with no waits leaves no '
+            'file and reads as unknown rather than as zero.')
+        self.assertEqual(0, os.path.getsize(self.trace))
+
+    def test_an_existing_trace_is_never_truncated(self):
+        """Concurrent workers and later tests must not lose earlier lines.
+
+        Every worker's every setUp calls this, so anything other than an
+        append-mode open would race the sibling which just recorded a
+        wait.
+        """
+        with open(self.trace, 'w') as f:
+            f.write('{"seconds_waited": 30.0}\n')
+
+        ci_base.ensure_capacity_wait_trace()
+
+        with open(self.trace) as f:
+            self.assertEqual('{"seconds_waited": 30.0}\n', f.read())
+
+    def test_a_missing_directory_is_created_rather_than_failed_on(self):
+        deep = os.path.join(self.tempdir, 'no', 'such', 'waits.jsonl')
+        with mock.patch.object(ci_base, 'CAPACITY_WAIT_TRACE_FILE', deep):
+            ci_base.ensure_capacity_wait_trace()
+
+        self.assertTrue(os.path.exists(deep))
+
+    def test_an_uncreatable_trace_never_raises(self):
+        """The instrument-may-not-fail-the-job rule holds at start-up too.
+
+        The append path swallows every exception, and a start-up touch
+        which could raise into setUp() would fail every test in the run
+        at once -- a far worse failure than the one wait the append path
+        is allowed to lose.
+        """
+        blocker = os.path.join(self.tempdir, 'blocker')
+        with open(blocker, 'w') as f:
+            f.write('a regular file where a directory is needed')
+
+        impossible = os.path.join(blocker, 'traces', 'waits.jsonl')
+        with mock.patch.object(
+                ci_base, 'CAPACITY_WAIT_TRACE_FILE', impossible):
+            ci_base.ensure_capacity_wait_trace()
+
+        self.assertFalse(os.path.exists(impossible))
+
+    def test_setup_touches_the_trace(self):
+        """The wiring, not just the helper.
+
+        A helper nothing calls would leave the defect exactly as it was,
+        so this drives the real BaseTestCase.setUp() -- with the tracing
+        event patched out, because it writes under /srv/ci -- and asserts
+        the file the bundle collects exists afterwards.
+        """
+        class NoopFunctionalTest(ci_base.BaseTestCase):
+            def test_nothing(self):
+                pass
+
+        with mock.patch.object(ci_base.BaseTestCase, '_emit_tracing_event'):
+            NoopFunctionalTest('test_nothing').setUp()
+
+        self.assertTrue(
+            os.path.exists(self.trace),
+            'setUp() no longer creates the trace, so a run in which no '
+            'create is refused leaves no file and its zero reads as '
+            'unknown.')
+        self.assertEqual(0, os.path.getsize(self.trace))

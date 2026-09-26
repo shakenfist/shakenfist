@@ -31,6 +31,9 @@ TRACE_PATH = '/srv/ci/traces'
 # into the artifact bundle, so this file reaches the bundle with no change
 # needed there. A module-level constant so the path is greppable and
 # overridable (a test points it at a tempdir rather than the real path).
+# BaseTestCase.setUp() touches the file into existence, so an empty file
+# means "the suite ran and no create was refused" -- see
+# ensure_capacity_wait_trace() below.
 CAPACITY_WAIT_TRACE_FILE = os.path.join(TRACE_PATH, 'instance-waits.jsonl')
 
 
@@ -174,10 +177,41 @@ def load_userdata(suite, name):
         return base64.b64encode(f.read().encode('utf-8')).decode('utf-8')
 
 
+def ensure_capacity_wait_trace():
+    """Create CAPACITY_WAIT_TRACE_FILE, empty, if it does not exist yet.
+
+    _append_capacity_wait_trace() opens the file 'a', so before this
+    existed a run in which no create was ever refused left no file at
+    all -- the same on-disk signature as a component ref predating the
+    wrapper and as a run whose every write failed.
+    tools/ci_headroom_report.py --waits is right to read an absent file
+    as unknown rather than as zero, so 92% of the first measurement
+    window PLAN-transient-capacity-refusals phase 5 read was unknown
+    (issue 4337). Touching the file at start-up gives "no waits" its own
+    signature: an empty file is a real zero, and absence keeps only the
+    other two meanings. The report tool already keeps 'empty' apart from
+    'absent', so nothing downstream changes.
+
+    Called from BaseTestCase.setUp(), so any run which executes at least
+    one test writes it. Opened 'a', which creates without ever
+    truncating, so concurrent stestr workers and later tests can never
+    lose a line a sibling already wrote. Every failure is swallowed: an
+    instrument may never fail the thing it measures, exactly as the
+    append path swallows its own failures.
+    """
+    try:
+        os.makedirs(os.path.dirname(CAPACITY_WAIT_TRACE_FILE), exist_ok=True)
+        with open(CAPACITY_WAIT_TRACE_FILE, 'a'):
+            pass
+    except Exception as e:
+        LOG.info('Failed to create the capacity wait trace: %s' % e)
+
+
 class BaseTestCase(testtools.TestCase):
     def setUp(self):
         super().setUp()
 
+        ensure_capacity_wait_trace()
         self.system_client = apiclient.Client(async_strategy=apiclient.ASYNC_PAUSE)
         self._emit_tracing_event({
             'msg': 'Test starts'
