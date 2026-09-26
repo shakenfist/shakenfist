@@ -193,37 +193,23 @@ class DatabaseTierTestsMixin:
         return totals, sum(read_at) / len(read_at)
 
     def _standing_instances(self, nodes):
-        """How many libvirt domains the cluster is running, or None.
+        """How many libvirt domains the cluster is running, and who did not say.
 
-        Summed over every node, not only the database tier: an instance
-        loads the sf-database tier from wherever it is placed. All or
-        nothing, because a partial sum is a smaller cluster than the real
-        one and every per-instance ceiling is a multiple of it --
-        under-reporting the shape fails the build for load sitting
-        exactly where the model says it should, which is issue #4039.
+        See lb.standing_instances(), which is where the rules live so that
+        the unit suite can reach them. Summed over every hypervisor, not
+        only the database tier: an instance loads the sf-database tier
+        from wherever it is placed.
 
-        Retried the same way and for the same reason as _all_pairs(),
-        but unlike _all_pairs() a persistent failure does not fail the
-        build. The caller takes five of these samples across four
-        minutes on every node, so a hard failure would turn one refused
-        connection into a red pull request. It drops the sample instead,
-        and falls back to reporting rather than enforcing the ceilings
-        which need it if no sample survives.
+        Retried the same way and for the same reason as _all_pairs(), but
+        unlike _all_pairs() a persistent failure does not fail the build.
+        The caller takes five of these samples across four minutes on
+        every node, so a hard failure would turn one refused connection
+        into a red pull request. It drops the sample instead, and falls
+        back to reporting rather than enforcing the ceilings which need it
+        if no sample survives.
         """
-        total = 0.0
-        for node in nodes:
-            active = None
-            for attempt in range(SCRAPE_ATTEMPTS):
-                try:
-                    active = lb.scrape_instances_active(node['ip'])
-                    break
-                except Exception:
-                    if attempt < SCRAPE_ATTEMPTS - 1:
-                        time.sleep(SCRAPE_RETRY_SECONDS)
-            if active is None:
-                return None
-            total += active
-        return int(total)
+        return lb.standing_instances(nodes, SCRAPE_ATTEMPTS,
+                                     SCRAPE_RETRY_SECONDS)
 
     def _sum_requests(self, database_nodes, operation, caller_daemon):
         """Sum one counter across the tier, retrying a failed scrape.
@@ -501,13 +487,16 @@ class DatabaseTierTestsMixin:
         # cluster which was not there.
         shape_samples = []
         shape_attempts = 0
+        shape_unread = {}
 
         def sample_shape():
             nonlocal shape_attempts
             shape_attempts += 1
-            sample = self._standing_instances(nodes)
+            sample, unread = self._standing_instances(nodes)
             if sample is not None:
                 shape_samples.append(sample)
+            for name in unread:
+                shape_unread[name] = shape_unread.get(name, 0) + 1
 
         counters, read_at = self._all_pairs(database_nodes)
         sample_shape()
@@ -646,16 +635,7 @@ class DatabaseTierTestsMixin:
 
         # The busiest shape seen while the load was being measured, and
         # the reason the samples are taken at all five boundaries rather
-        # than once at the end.
-        #
-        # The most instances seen, not the mean and not the last, because
-        # of which way the comparisons below err. Each pair is judged at
-        # its lowest observed rate -- see fixed_rate(), which chooses the
-        # lowest for exactly this reason -- and the matching choice for
-        # the shape the model is evaluated against is the largest, so
-        # that a failure here means a pair ran high against every
-        # reasonable reading of the cluster it ran on rather than against
-        # the least generous one.
+        # than once at the end. Why the busiest is in lb.busiest_shape().
         #
         # What this still cannot see is an instance which was created and
         # deleted entirely inside one sixty second window. That costs
@@ -663,17 +643,17 @@ class DatabaseTierTestsMixin:
         # it belongs to the churn the base terms absorb (see the
         # (GetInstanceAttributes, sidechannel) note in the budget) rather
         # than to the per-instance term being evaluated here.
-        standing_instances = max(shape_samples) if shape_samples else 0
-        # Not a single node answered, across five attempts each with its
-        # own retries. The shape term of the model is then unknown rather
-        # than zero, and zero is the answer which fails a build for load
-        # the model accounts for, so every pair whose budget has a
-        # per-instance term is reported below instead of enforced. The
-        # unbudgeted half of this test needs no shape at all and still
-        # runs -- losing the detector for brand new polling loops because
-        # one metrics port refused a connection would be the worse
-        # trade.
-        shape_known = bool(shape_samples)
+        #
+        # None when not a single sample survived, across five attempts
+        # each with its own retries. Every pair whose budget has a
+        # per-instance term is then reported below instead of enforced --
+        # see lb.enforceable(). The unbudgeted half of this test needs no
+        # shape at all and still runs -- losing the detector for brand new
+        # polling loops because one metrics port refused a connection
+        # would be the worse trade.
+        busiest = lb.busiest_shape(shape_samples)
+        shape_known = busiest is not None
+        standing_instances = busiest if shape_known else 0
         # Steady is not yet metronomic. A blob heavy test running at a
         # level rate for the whole measurement is steady too, which is how
         # the first version of this check came to report twelve pairs of
@@ -729,8 +709,7 @@ class DatabaseTierTestsMixin:
                        + defaults['tolerance_floor_qps'])
             if measured <= ceiling:
                 continue
-            if lb.enforced(entry) and (
-                    shape_known or not entry.get('per_instance_qps')):
+            if lb.enforceable(entry, shape_known):
                 over.append((key, measured, modelled, ceiling))
             else:
                 reported.append((key, measured, modelled, ceiling))
@@ -741,6 +720,10 @@ class DatabaseTierTestsMixin:
             'standing_instances_per_sample': shape_samples,
             'shape_samples_attempted': shape_attempts,
             'shape_known': shape_known,
+            # Per node, how many of the samples it failed to answer. The
+            # detail is what says why the shape is unknown rather than
+            # only that it is.
+            'shape_unread_nodes': shape_unread,
             'window_seconds': lb.LOAD_WINDOW_SECONDS,
             'unbudgeted_ceiling_qps': round(unbudgeted_ceiling, 3),
             'measured_seconds': elapsed_seconds,

@@ -147,19 +147,25 @@ class DeriveBudgetTestCase(base.ShakenFistTestCase):
                          tool.DISPATCH_CHECK_INTERVAL)
         self.assertEqual(float(sidechannel_main.EXECUTOR_REAP_INTERVAL),
                          tool.EXECUTOR_REAP_INTERVAL)
+        self.assertEqual(float(sidechannel_main.MONITOR_START_INTERVAL),
+                         tool.MONITOR_START_INTERVAL)
 
     def test_the_sidechannel_per_instance_term_is_both_its_sweeps(self):
         # 0.233/s, not 0.2: the executor reaper landed after this file was
         # derived and is a second per-instance attributes read. Asserted as
-        # the arithmetic of the two intervals rather than as the number, so
-        # that changing either throttle moves the budget with it.
+        # the arithmetic of the three intervals rather than as the number,
+        # so that changing any throttle moves the budget with it. Today the
+        # sweeps dominate the monitor start retry; the max is there so that
+        # stops being an assumption.
         entry = tool.to_entry(('GetInstanceAttributes', 'sidechannel'),
                               stats(slope=0.134, intercept=0.45, r2=0.725,
                                     mean=2.905), nodes=6)
         self.assertEqual(
-            round(1.0 / tool.DISPATCH_CHECK_INTERVAL
-                  + 1.0 / tool.EXECUTOR_REAP_INTERVAL, 3),
+            round(max(1.0 / tool.DISPATCH_CHECK_INTERVAL
+                      + 1.0 / tool.EXECUTOR_REAP_INTERVAL,
+                      1.0 / tool.MONITOR_START_INTERVAL), 3),
             entry['per_instance_qps'])
+        self.assertEqual(0.233, entry['per_instance_qps'])
 
     def test_a_code_derived_term_leaves_the_others_measured(self):
         # The sidechannel entry overrides its per-instance term and not its

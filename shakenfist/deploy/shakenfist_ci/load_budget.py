@@ -16,6 +16,7 @@ harness puts it. What must not be duplicated is the data.
 
 import os
 import re
+import time
 
 import requests
 import yaml
@@ -552,8 +553,8 @@ def parse_gauge(text, name):
     summed.
     """
     for line in text.splitlines():
-        if line.startswith('#'):
-            continue
+        # A '# HELP' or '# TYPE' line splits to '#' first, so the name
+        # check below rejects it without a comment guard of its own.
         fields = line.split()
         if len(fields) != 2 or fields[0] != name:
             continue
@@ -574,6 +575,87 @@ def scrape_instances_active(ip):
     resp = requests.get(url, timeout=METRICS_TIMEOUT)
     resp.raise_for_status()
     return parse_gauge(resp.text, 'instances_active')
+
+
+def shape_nodes(nodes):
+    """The nodes whose instances_active the cluster's shape is summed over.
+
+    Hypervisors in the created state. A node which is not a hypervisor
+    runs no libvirt domains by definition, so leaving it out cannot change
+    the sum, and GET /nodes is a roster which does not shrink when a node
+    goes away (see shakenfist_ci/sizing.py) -- a deleted node's record
+    would otherwise be a node which never answers, and standing_instances()
+    is all or nothing.
+    """
+    return [n for n in nodes
+            if n.get('is_hypervisor') and n.get('state') == 'created']
+
+
+def standing_instances(nodes, attempts, retry_seconds,
+                       scrape=scrape_instances_active, sleep=time.sleep):
+    """How many libvirt domains the cluster is running, and who did not say.
+
+    Returns (count, unread), where count is None unless every node in
+    shape_nodes(nodes) answered. All or nothing, because a partial sum is
+    a smaller cluster than the real one and every per-instance ceiling is
+    a multiple of it -- under-reporting the shape fails the build for load
+    sitting exactly where the model says it should, which is issue #4039.
+    unread names the nodes which did not answer, so that a run which fell
+    back to reporting says why.
+
+    An absent gauge is retried like a failed request: sf-resources creates
+    its gauges on its first metrics update, up to a minute after it
+    starts, so "not published yet" is as transient as a refused
+    connection. Each node is still read at most attempts times.
+    """
+    total = 0.0
+    unread = []
+    for node in shape_nodes(nodes):
+        active = None
+        for attempt in range(attempts):
+            try:
+                active = scrape(node['ip'])
+            except Exception:
+                active = None
+            if active is not None:
+                break
+            if attempt < attempts - 1:
+                sleep(retry_seconds)
+        if active is None:
+            unread.append(node.get('name', node['ip']))
+        else:
+            total += active
+    if unread:
+        return None, unread
+    return int(total), unread
+
+
+def busiest_shape(samples):
+    """The largest standing instance count sampled, or None if none was.
+
+    The largest, not the mean and not the last, because of which way the
+    load check's comparisons err: each pair is judged at its lowest
+    observed rate (see fixed_rate()), and the matching choice for the
+    shape the model is evaluated against is the largest, so that a
+    failure means a pair ran high against every reasonable reading of the
+    cluster rather than against the least generous one. The last sample
+    is the least generous of all -- it is taken after the suite has
+    tidied up, which is issue #4039.
+    """
+    return max(samples) if samples else None
+
+
+def enforceable(entry, shape_known):
+    """Whether exceeding this budget entry fails the build on this run.
+
+    enforced(), and additionally not when the entry has a per-instance
+    term and no shape sample survived: the shape term of the model is then
+    unknown rather than zero, and zero is the answer which fails a build
+    for load the model accounts for. An entry with no per-instance term
+    needs no shape and is enforced regardless.
+    """
+    return enforced(entry) and (
+        shape_known or not entry.get('per_instance_qps'))
 
 
 def activity_levels(rates_per_window):

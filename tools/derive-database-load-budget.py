@@ -253,6 +253,7 @@ DAEMON_STATE_POLL_INTERVAL = 2.0      # shakenfist/daemons/daemon.py
 ELECTED_LOOP_POLL_SECONDS = 5.0       # shakenfist/daemons/cluster/main.py
 DISPATCH_CHECK_INTERVAL = 5.0         # shakenfist/daemons/sidechannel/main.py
 EXECUTOR_REAP_INTERVAL = 30.0         # shakenfist/daemons/sidechannel/main.py
+MONITOR_START_INTERVAL = 30.0         # shakenfist/daemons/sidechannel/main.py
 CODE_DERIVED_TERMS = {
     ('GetNodeDaemonState', 'cluster'): {
         'per_node_base_qps': round(1.0 / DAEMON_STATE_POLL_INTERVAL, 3),
@@ -261,9 +262,14 @@ CODE_DERIVED_TERMS = {
             - 1.0 / DAEMON_STATE_POLL_INTERVAL, 3),
         'per_instance_qps': None,
     },
+    # An instance costs both sweeps while it has a monitor, and the monitor
+    # start retry instead of both while it does not. The larger of the two
+    # is the budget, written as a max rather than assumed, so that a
+    # monitor retry made faster than the sweeps moves the term too.
     ('GetInstanceAttributes', 'sidechannel'): {
-        'per_instance_qps': round(1.0 / DISPATCH_CHECK_INTERVAL
-                                  + 1.0 / EXECUTOR_REAP_INTERVAL, 3),
+        'per_instance_qps': round(max(
+            1.0 / DISPATCH_CHECK_INTERVAL + 1.0 / EXECUTOR_REAP_INTERVAL,
+            1.0 / MONITOR_START_INTERVAL), 3),
     },
 }
 

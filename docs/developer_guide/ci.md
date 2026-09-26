@@ -560,8 +560,10 @@ compares against rather than evaluating it at the instant of the alert.
 Three things follow, and each is easy to get wrong:
 
 * **The count comes from `instances_active`**, scraped from
-  `sf-resources` on `RESOURCES_METRICS_PORT` on every node -- not from
-  the API's `power_state` field. `_doc.method` in the budget says a
+  `sf-resources` on `RESOURCES_METRICS_PORT` on every hypervisor in the
+  `created` state -- not from the API's `power_state` field, and not from
+  every record in `GET /nodes`, a roster which keeps a node's record after
+  the node has gone and would otherwise hold a node that never answers. `_doc.method` in the budget says a
   consumer which counts standing instances any other way evaluates the
   model against a quantity it was never fitted against, and `sf-ctl
   database-load` and the Prometheus rules both read that gauge.
@@ -574,9 +576,12 @@ Three things follow, and each is easy to get wrong:
 * **A failed scrape unenforces the per-instance ceilings rather than
   failing the build**, because five samples per run across every node
   would otherwise turn one refused connection into a red pull request.
-  The `unbudgeted` half of the check needs no shape and still runs. The
-  gauge going missing is the quiet version of this, so its name is
-  pinned by a unit test.
+  A gauge not yet published is retried like a refused connection, since
+  `sf-resources` creates its gauges on its first update. The `unbudgeted`
+  half of the check needs no shape and still runs, and the run's
+  `shape_unread_nodes` detail names each node that did not answer and
+  how often. The gauge going missing altogether is the quiet version of
+  this, so its name is pinned by a unit test.
 
 ## Coverage the functional suite does not have
 

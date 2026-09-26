@@ -520,9 +520,105 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         # the model against a cluster that was not there.
         self.assertIsNone(harness.parse_gauge(RESOURCE_METRICS, 'nonesuch'))
 
-    def test_a_gauge_help_line_is_not_a_sample(self):
+    def test_a_published_zero_is_a_value_not_an_absence(self):
+        # The other half of test_an_absent_gauge_is_not_zero.
         self.assertEqual(
             0.0, harness.parse_gauge(RESOURCE_METRICS, 'instances_errored'))
+
+    def test_the_shape_is_summed_over_created_hypervisors(self):
+        # GET /nodes keeps a record after its node has gone, and the sum is
+        # all or nothing, so a deleted node's record would otherwise be a
+        # node which never answers and unenforce every per-instance ceiling.
+        nodes = [
+            {'name': 'sf1', 'ip': '10.0.0.1', 'is_hypervisor': True,
+             'state': 'created'},
+            {'name': 'sf2', 'ip': '10.0.0.2', 'is_hypervisor': True,
+             'state': 'created'},
+            {'name': 'gone', 'ip': '10.0.0.3', 'is_hypervisor': True,
+             'state': 'deleted'},
+            {'name': 'db', 'ip': '10.0.0.4', 'is_hypervisor': False,
+             'state': 'created'},
+        ]
+        scraped = []
+
+        def scrape(ip):
+            scraped.append(ip)
+            return {'10.0.0.1': 2.0, '10.0.0.2': 3.0}[ip]
+
+        self.assertEqual(
+            (5, []), harness.standing_instances(nodes, 3, 0, scrape=scrape,
+                                                sleep=lambda s: None))
+        self.assertEqual(['10.0.0.1', '10.0.0.2'], scraped)
+
+    def test_one_unread_node_makes_the_shape_unknown_and_names_it(self):
+        # A partial sum is a smaller cluster than the real one, and every
+        # per-instance ceiling is a multiple of it: #4039 again.
+        nodes = [
+            {'name': 'sf1', 'ip': '10.0.0.1', 'is_hypervisor': True,
+             'state': 'created'},
+            {'name': 'sf2', 'ip': '10.0.0.2', 'is_hypervisor': True,
+             'state': 'created'},
+        ]
+
+        def scrape(ip):
+            if ip == '10.0.0.2':
+                raise harness.requests.ConnectionError('refused')
+            return 4.0
+
+        self.assertEqual(
+            (None, ['sf2']),
+            harness.standing_instances(nodes, 3, 0, scrape=scrape,
+                                       sleep=lambda s: None))
+
+    def test_an_unpublished_gauge_is_retried(self):
+        # sf-resources creates its gauges on its first metrics update, so
+        # an absent gauge soon after a restart is as transient as a refused
+        # connection, and is retried the same way and the same number of
+        # times.
+        nodes = [{'name': 'sf1', 'ip': '10.0.0.1', 'is_hypervisor': True,
+                  'state': 'created'}]
+        answers = [None, harness.requests.ConnectionError('refused'), 6.0]
+        sleeps = []
+
+        def scrape(ip):
+            answer = answers.pop(0)
+            if isinstance(answer, Exception):
+                raise answer
+            return answer
+
+        self.assertEqual(
+            (6, []), harness.standing_instances(nodes, 3, 2, scrape=scrape,
+                                                sleep=sleeps.append))
+        self.assertEqual([2, 2], sleeps)
+
+        answers[:] = [None, None, None, 6.0]
+        self.assertEqual(
+            (None, ['sf1']),
+            harness.standing_instances(nodes, 3, 2, scrape=scrape,
+                                       sleep=sleeps.append))
+        self.assertEqual([6.0], answers)
+
+    def test_the_busiest_shape_is_the_largest_sample(self):
+        # Not the last: the last sample is taken after the suite has tidied
+        # up, which is the count that produced #4039. Not the mean either,
+        # for the reason busiest_shape() gives.
+        self.assertEqual(7, harness.busiest_shape([2, 7, 4, 1, 0]))
+        self.assertIsNone(harness.busiest_shape([]))
+
+    def test_an_unknown_shape_unenforces_only_per_instance_entries(self):
+        per_instance = {'operation': 'GetInstanceAttributes',
+                        'caller_daemon': 'sidechannel',
+                        'per_node_base_qps': 0.075,
+                        'per_instance_qps': 0.233}
+        base_only = {'operation': 'GetNodeDaemonState',
+                     'caller_daemon': 'cluster',
+                     'per_node_base_qps': 0.5}
+        self.assertFalse(harness.enforceable(per_instance, False))
+        self.assertTrue(harness.enforceable(per_instance, True))
+        self.assertTrue(harness.enforceable(base_only, False))
+        # And a known shape does not override the entry's own exemption.
+        self.assertFalse(harness.enforceable(
+            dict(per_instance, provisional='a known defect'), True))
 
     def test_elected_loop_interval_matches_the_daemon(self):
         # The other half of the pair above, and the one which was a bare
