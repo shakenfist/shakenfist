@@ -374,7 +374,8 @@ three classes the phase 5 survey recorded, so the issue is scoped
 to the two proxy call sites and the local-socket case that fix
 does not cover, not to the survey's original table.
 
-**Filed by phase 7's survey, and deliberately not fixed by it:**
+**Filed by phase 7's survey, deliberately not fixed by it, and
+fixed since:**
 [#4223](https://github.com/shakenfist/shakenfist/issues/4223), a null
 object reference resolving to an arbitrary object. The pushed-down
 `from_db_by_ref` implementations build
@@ -393,13 +394,25 @@ guard now tests the value rather than its presence
 `off` as well, and `NETWORKSPEC_SCHEMA` marks `network_uuid` required
 (`base.py:516`), which at `enforce` refuses an explicit null because a
 required compiled field is built `allow_none=False`
-(`validation.py:534`). The lookup function itself is still wrong for
-any caller reaching it another way, so this is a mask rather than a
+(`validation.py:534`). That left the lookup function itself wrong for
+any caller which reached it another way, so it was a mask rather than a
 fix. The issue was filed carrying `automated-fix-attempted`, which is
 the first time this plan has applied that label at filing rather than
 watching the fixer apply it afterwards; `sfconductor` then closed it
 on the merge of #4232 without it having been fixed, and phase 8's
-audit reopened it (see *Known defects*).
+audit reopened it with the label removed so the issue-fix workflow
+could take it. It did: `bc2b759f1` (PR #4259) added
+`baseobject.valid_object_ref()` (`shakenfist/baseobject.py:140`) and
+guarded all four `from_db_by_ref` implementations with it
+(`baseobject.py:408`, `artifact.py:257`, `instance.py:528`,
+`network/network.py:206`), which is the lookup function rather than
+the routes phase 7 had already covered, and the non-string arm as
+well -- six warn-column rows in `test_nested_sweep.py` move from
+`FAULTED` to a 404. Because the guard sits below the validation
+layer, no `API_VALIDATION_MODE` rollback restores the 500. One
+instance of the same defect survives elsewhere and is now
+[#4339](https://github.com/shakenfist/shakenfist/issues/4339); see
+*Known defects*.
 
 **Filed by a sibling plan, and belonging to this one:**
 [#4240](https://github.com/shakenfist/shakenfist/issues/4240),
@@ -550,33 +563,59 @@ the fixer looks.
 
 ### Known defects
 
-Defects this plan is responsible for and did not fix, recorded in
-one place by phase 8's audit because until then some of them
-appeared in a phase plan and none of them appeared here. Each says
-what it is and why it is not fixed.
+Defects this plan is responsible for, recorded in one place by
+phase 8's audit because until then some of them appeared in a
+phase plan and none of them appeared here. Most have since been
+fixed, each by its own issue-fix pull request rather than by a
+phase of this plan; the fixed ones are kept here rather than
+deleted, because this is the plan's record of what it was
+responsible for and not only of what is still outstanding. Each
+entry says what the defect is, and either how it was fixed or
+why it is not.
 
 * **[#4242](https://github.com/shakenfist/shakenfist/issues/4242)
   — `network[].model` and `video.model` reach the libvirt domain
-  XML unescaped.** Filed 2026-09-17 from the phase 7 review, which
-  is the change that published both as free strings. They are the
-  only two values a request can turn into raw markup at the default
-  mode; phase 8's audit enumerated all 46 declared unconstrained
-  strings and walked each to its sink to confirm that. The fix is
-  two-part — a schema `pattern` on both `model` properties *and*
-  XML escaping at render time — and it touches
-  `shakenfist/instance.py` and the domain template, which is
-  outside what an audit of this plan's diff should be writing and
-  needs its own functional coverage, so phase 8's scope excluded
-  it explicitly. Two things were added to the issue rather than
-  fixed: `Instance._create_domain_xml()` is not the only sink, the
-  interface hotplug path builds `device_xml` as a plain f-string
-  at `shakenfist/instance.py:2837-2843`; and the
-  `ET.fromstring()` check at `:2177` is not a mitigation, because
-  an injected value can produce well-formed XML with an extra
-  element in it.
+  XML unescaped. Fixed.** Filed 2026-09-17 from the phase 7
+  review, which is the change that published both as free
+  strings. They were the only two values a request could turn
+  into raw markup at the default mode; phase 8's audit
+  enumerated all 46 declared unconstrained strings and walked
+  each to its sink to confirm that. The fix had to be two-part —
+  a schema `pattern` on both `model` properties *and* XML
+  escaping at render time — and `18d4c2957` (PR #4243) landed
+  both halves. The pattern is
+  `DEVICE_MODEL_PATTERN = '^[A-Za-z0-9._-]{1,32}$'`
+  (`shakenfist/external_api/base.py:644`), applied to the
+  networkspec at `:720` and the videospec at `:753`; the
+  escaping is `_xml_attribute_escape()`
+  (`shakenfist/instance.py:119`), which escapes both quote
+  styles because the domain template quotes attributes with
+  `'` and the hotplug f-string with `"`. The second sink the
+  audit added to the issue rather than fixing — the interface
+  hotplug path building `device_xml` as a plain f-string — was
+  fixed with it, so all three call sites escape (`:2154`,
+  `:2233`-`:2234` and `:2923`). Two things a later reader still
+  needs. First, `jinja2.Template` has autoescape off
+  (`instance.py:2145`, unchanged): the rendered values are safe
+  because each call site pre-escapes them, not because the
+  engine escapes anything. That is deliberate, since the one
+  helper also has to serve the hotplug f-string jinja never
+  sees, but it makes escaping a per-site obligation which a
+  future template variable could silently miss. Second, the
+  `ET.fromstring()` check at `:2258` is still not a mitigation
+  — the audit's point stands, and the fix's tests honour it by
+  choosing hostile payloads which are well-formed after
+  injection. Coverage is
+  `test_instance.py::InstanceDomainXMLEscapingTestCase`, three
+  tests which each parse the rendered XML and assert no injected
+  `<serial>` element, plus the functional
+  `cluster_ci_tests/test_api_validation.py::TestNestedSpecKeysRefused.test_attribute_closing_model_refused`.
+  Mutation-tested: removing the quote entity map, and reverting
+  the hotplug escape, are each caught.
 * **[#4236](https://github.com/shakenfist/shakenfist/issues/4236)
   — the ansible collection's `sf_instance` sends `video` as a
-  string.** A consequence of phase 7 typing the videospec: the
+  string. Still open, and the only live defect in this list.** A
+  consequence of phase 7 typing the videospec: the
   module builds a string where the API now requires an object, so
   the collection's own `video` parameter no longer works against
   an `enforce`-mode cluster. It is a collection defect rather than
@@ -584,43 +623,137 @@ what it is and why it is not fixed.
   [#4227](https://github.com/shakenfist/shakenfist/issues/4227) is
   the same defect filed separately and the two should be merged.
 * **[#4223](https://github.com/shakenfist/shakenfist/issues/4223)
-  — a null object reference resolves to an arbitrary object.** The
-  reachable path through the API is closed twice over (a handler
-  guard testing the value, which holds in every mode, plus
-  `network_uuid` being required in the networkspec schema, which
-  refuses an explicit null at `enforce`), but the lookup function
-  itself still reads a `None` name as *no name filter*, so any
-  other caller of it gets an arbitrary object. `sfconductor`
-  closed the issue on the merge of #4232 without it having been
-  fixed, and against this plan's own text; phase 8's audit
-  reopened it, restated the surviving scope in a comment and
-  removed `automated-fix-attempted` so the issue-fix workflow can
-  take it.
-* **Eight further issues filed by phase 8's audit**, all advisory
-  and all with the reasoning recorded on the issue:
+  — a null object reference resolves to an arbitrary object.
+  Fixed.** The reachable path through the API was closed twice
+  over by phase 7 (a handler guard testing the value, which
+  holds in every mode, plus `network_uuid` being required in the
+  networkspec schema, which refuses an explicit null at
+  `enforce`), but the lookup function itself still read a `None`
+  name as *no name filter*, so any other caller of it got an
+  arbitrary object. `sfconductor` closed the issue on the merge
+  of #4232 without it having been fixed, and against this plan's
+  own text; phase 8's audit reopened it, restated the surviving
+  scope in a comment and removed `automated-fix-attempted` so
+  the issue-fix workflow could take it. It then did:
+  `bc2b759f1` (PR #4259) added `baseobject.valid_object_ref()`
+  (`shakenfist/baseobject.py:140`) and guarded each of the four
+  `from_db_by_ref` implementations with it (`baseobject.py:408`,
+  `artifact.py:257`, `instance.py:528`,
+  `network/network.py:206`) — which is the lookup function
+  itself and not merely the API routes phase 7 had already
+  guarded, the thing this entry asked for — and the non-string
+  arm with it, so six warn-column rows in
+  `test_nested_sweep.py` move from `FAULTED` to a 404. The
+  guard sits below the validation layer, so no
+  `API_VALIDATION_MODE` rollback restores the 500. One instance
+  of the defect survives in a fifth entry point, next.
+* **[#4339](https://github.com/shakenfist/shakenfist/issues/4339)
+  — #4223's defect surviving in
+  `Artifact.from_db_by_ref_visible_to()`. Live.** Filed
+  2026-09-26, while verifying #4223's fix for this close-out.
+  The method (`shakenfist/artifact.py:285`) is a two-phase
+  resolver: phase one delegates to the now-guarded
+  `from_db_by_ref`, but phase two builds its own
+  `ObjectFilterCriteria(name=object_ref)` at `artifact.py:336`,
+  and that one is unguarded. `name=None` means *no name filter*
+  (`shakenfist/schema/object_filter.py:25`, implemented at
+  `mariadb.py:1555`), so a null ref from a requestor other than
+  `system` issues an unfiltered active-artifact query and
+  answers one of them. It is not reachable through the REST API
+  — the only caller is `shakenfist/external_api/artifact.py:78`
+  and `artifact_ref` is a Flask path segment, so always a
+  non-empty string — which leaves it in exactly the status
+  #4223 originally had: the reachable path closed, the lookup
+  function not. A one-line `valid_object_ref` guard closes it.
+* **Eight further issues filed by phase 8's audit**, all
+  advisory and all with the reasoning recorded on the issue.
+  Seven have since been fixed and closed, each by its own pull
+  request:
   [#4248](https://github.com/shakenfist/shakenfist/issues/4248)
   (two request values guarded only by the schema, so a rollback
-  exposes a dnsmasq hosts file and the capacity ledger),
+  exposes a dnsmasq hosts file and the capacity ledger — fixed
+  with two mode-independent handler guards: a non-IP DNS
+  `value` refused with 406 at
+  `shakenfist/external_api/network.py:984-990`, and a negative
+  diskspec size refused with 400 at
+  `shakenfist/external_api/instance.py:826-834`),
   [#4249](https://github.com/shakenfist/shakenfist/issues/4249)
   (the validation pass is bounded in output and unbounded in
-  input),
+  input — fixed slightly more broadly than the issue asked, by
+  a `limit_request_body_size` `before_request` hook
+  (`shakenfist/external_api/app.py:260`) which answers 413 to
+  an oversized body and 411 to a `Transfer-Encoding` body with
+  no `Content-Length`, before any reader runs; because it is a
+  `before_request` hook it also closes the pre-authentication
+  `log_request` parse the issue explicitly scoped out. The new
+  `API_MAX_REQUEST_BODY_BYTES` defaults to 1 MiB),
   [#4250](https://github.com/shakenfist/shakenfist/issues/4250)
-  (namespace names are unvalidated on create and reach a dnsmasq
-  configuration file),
+  (namespace names are unvalidated on create and reach a
+  dnsmasq configuration file — fixed as asked, which is at
+  create time only: `NAMESPACE_NAME_PATTERN` is published as an
+  OpenAPI pattern *and* re-checked with `re.fullmatch` in the
+  handler (`shakenfist/external_api/auth.py:288-301`) so it
+  holds in every mode, but there is no render-time escaping
+  (`dhcp.tmpl:29-30,44` still interpolate `{{namespace}}` raw)
+  and existing namespaces are neither migrated nor checked on
+  use, so a deployment which already has a namespace containing
+  a newline keeps the injection until that namespace is
+  deleted),
   [#4251](https://github.com/shakenfist/shakenfist/issues/4251)
-  (code tidy-ups: five copied format wrappers, a dead IDE guard,
-  an undocumented guard chain),
+  (code tidy-ups: five copied format wrappers, a dead IDE
+  guard, an undocumented guard chain — fixed, all three: the
+  skeletons collapse into `_string_format()`
+  (`validation.py:235`), the dead loop is deleted, and
+  `docs/developer_guide/writing_an_endpoint.md` gained a
+  *Handler guards, and where a new one goes* section alongside
+  a head-of-chain comment),
   [#4252](https://github.com/shakenfist/shakenfist/issues/4252)
-  (the nested sweep cannot see "accepted with the wrong meaning":
-  add the null-equals-absent differential),
+  (the nested sweep cannot see "accepted with the wrong
+  meaning": add the null-equals-absent differential — fixed,
+  and as a genuinely derived differential rather than
+  hand-written rows:
+  `tests/external_api/test_null_absent_sweep.py` enumerates
+  spec keys from `api_base.ARGTYPES`, sends `absent`, `null`
+  and `probe` for each, checks vacuity (`probe != absent`)
+  before asserting `null == absent`, and observes what reached
+  `Instance.new` and `NetworkInterface.new` rather than a
+  status code, so a new schema key fails until it has a probe.
+  Writing it found a live defect: `noneish(None)` is truthy, so
+  an explicit null `address` took the `'none'` no-address path
+  at `shakenfist/external_api/instance.py:459`),
   [#4253](https://github.com/shakenfist/shakenfist/issues/4253)
-  (no functional coverage for `warn` or `off`),
+  (no functional coverage for `warn` or `off` — fixed for
+  `warn` only. The coverage added is genuinely functional, a
+  deployed cluster with a real `sf-ctl set-config` and a real
+  `sf-api` restart, but it lives in the node-lifecycle job
+  (`deploy/apivalidationrollbacktests.py`, driven from
+  `nodelifecycletests.sh`) rather than the stestr
+  `cluster_ci_tests` suite — deliberately, because a
+  cluster-wide mode flip mid-suite would fail unrelated
+  concurrent tests. `off` is not exercised at all: the script
+  declares `choices=['enforce', 'warn']` at line 281 and the
+  string `'off'` appears nowhere in it. The issue's *body*
+  specified only `warn`, so the fix matches what was asked and
+  it is the title's "warn or off" that is left half covered.
+  Its `uefi` companion exposed a live defect, and is why
+  `uefi` and `secure_boot` now go through
+  `validation.declared_boolean()`), and
   [#4254](https://github.com/shakenfist/shakenfist/issues/4254)
-  (pin the error contract's fixed facts mechanically), and
+  (pin the error contract's fixed facts mechanically — fixed by
+  `tests/test_error_contract_docs.py`, which carries both
+  mechanisms: a byte-identical error-shape check over live
+  markdown, with `docs/plans` excluded, and stale-claim greps
+  including one over the pydantic `Field` description that no
+  docs grep reaches. One nuance: the issue said the drift
+  itself was already fixed and that only the regression guard
+  was wanted. That was true of phase 8's unmerged branch, but
+  the three stale sites were still stale on `develop`, so
+  PR #4302 carried both halves — the audit alone did not fix
+  the drift there).
   [client-python#401](https://github.com/shakenfist/client-python/issues/401)
   (`sf-client` reads only the literal `true`/`True` in
-  `-N ...,float=`, so four spellings the API accepts are silently
-  false).
+  `-N ...,float=`, so four spellings the API accepts are
+  silently false) is still open.
 
 ### Carried into phase 2 from phase 1
 

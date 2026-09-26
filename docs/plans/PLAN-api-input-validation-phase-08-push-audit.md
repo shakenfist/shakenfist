@@ -2957,6 +2957,29 @@ Every open issue on this surface was searched first --
 findings which already had a home were recorded there rather than
 filed again (#4242 and #4167, below).
 
+**As of 2026-09-26**, after this branch sat unmerged for a week,
+seven of the eight issues filed above have been fixed and closed
+by their own pull requests -- all but
+[client-python#401](https://github.com/shakenfist/client-python/issues/401)
+-- and so have the two the audit recorded rather than filed,
+[#4242](https://github.com/shakenfist/shakenfist/issues/4242)
+(`18d4c2957`, PR #4243) and
+[#4223](https://github.com/shakenfist/shakenfist/issues/4223)
+(`bc2b759f1`, PR #4259). Verifying those fixes for this close-out
+turned up three things worth naming here. #4223's defect survives
+in a fifth entry point,
+`Artifact.from_db_by_ref_visible_to()`, now filed as
+[#4339](https://github.com/shakenfist/shakenfist/issues/4339). And
+two fixes are narrower than their issue titles:
+[#4250](https://github.com/shakenfist/shakenfist/issues/4250)
+validates a namespace name at create time only, with no
+render-time escaping and no migration of existing names, and
+[#4253](https://github.com/shakenfist/shakenfist/issues/4253)
+covers `warn` but not `off`. Both match their issue bodies. The
+master plan's *Known defects* section carries the current state;
+the disposition rows below are left as the audit wrote them, and
+record what was true when it ran.
+
 ### The survey findings
 
 | # | Disposition |
@@ -3296,15 +3319,29 @@ checked against the tree rather than recalled.
 6. **Met.** All four blocking findings are fixed on this branch. None
    was declined and none was downgraded to advisory, which the phase's
    own risk section asked to be checked.
-7. **Met.** #4223 is open, carries the comment distinguishing the two
-   guarded API routes from the still-wrong lookup function and quoting
-   phase 7's own commit, and carries no labels at all -- so
-   `automated-fix-attempted` is gone and the issue-fix workflow can
-   take it.
-8. **Met.** `docs/plans/PLAN-api-input-validation.md` has a *Known
-   defects* subsection naming #4242, #4236 and #4223 with what each is
-   and why it is not fixed, plus the eight filed here and the note
-   that #4227 duplicates #4236.
+7. **Met, and the workflow then took it.** #4223 was left open,
+   carrying the comment distinguishing the two guarded API routes from
+   the still-wrong lookup function and quoting phase 7's own commit,
+   and carrying no labels at all -- so `automated-fix-attempted` was
+   gone and the issue-fix workflow could pick the issue up. It did:
+   `bc2b759f1` (PR #4259) added `baseobject.valid_object_ref()` and
+   guarded all four `from_db_by_ref` implementations, which is the
+   lookup function this item was protecting rather than the routes
+   phase 7 had already covered. Verifying that for this close-out
+   found the same defect surviving in a fifth entry point,
+   `Artifact.from_db_by_ref_visible_to()`, now
+   [#4339](https://github.com/shakenfist/shakenfist/issues/4339).
+8. **Met, and kept current since.**
+   `docs/plans/PLAN-api-input-validation.md` gained a *Known defects*
+   subsection naming #4242, #4236 and #4223 with what each is and why
+   it was not fixed, plus the eight issues filed here and the note
+   that #4227 duplicates #4236. That section has since been brought
+   up to date for the close-out: #4242 and #4223 are recorded as
+   fixed, #4236 is marked as the only live entry of the three, the
+   surviving instance of #4223's defect is a new entry for #4339, and
+   the eight-issues bullet records the seven fixes with the two
+   caveats that matter -- #4250 is create-time only and #4253 covers
+   `warn` but not `off`.
 9. **Met** by step 8d, verified here: `grep -n "float" docs/user_guide/usage.md`
    and `docs/developer_guide/api_reference/instances.md` show both now
    say a JSON boolean is the expected form and that the string
