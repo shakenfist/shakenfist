@@ -14874,9 +14874,10 @@ surface in CI rather than seconds, and the reason was in the power state
 code: <code>Instance.is_powered_on()</code> returned the truthy string <code>'off'</code> when
 libvirt had no domain, so <code>create()</code> marked instances which had never
 started as <code>created</code>, and the functional suite waited out the agent
-timeout. Both are fixed on the <code>issue-4280-trixie-spice</code> branch
-(<code>a100fcd26</code>), which had not merged when this plan was written and is a
-prerequisite for it.</p>
+timeout. Both were fixed by
+<a href="https://github.com/shakenfist/shakenfist/pull/4309">#4309</a>, which had
+not merged when this plan was written and was a prerequisite for it; it
+merged on 2026-09-23 as <code>de5e3833c</code>.</p>
 <p>Mikal's reaction was that the power state detection code as a whole is
 suspect, and that the functional tests covering it should be audited at
 the same time. A read-only audit of the code and tests, and then a
@@ -14965,6 +14966,12 @@ support that suspicion. Every finding below was checked against
 <td><code>requires_instance_active</code> answers 406 for any state other than <code>created</code>, but none of the four power endpoints declares 406 in its <code>swag_from</code>.</td>
 <td>The published API is incomplete.</td>
 </tr>
+<tr>
+<td>F13</td>
+<td><code>daemons/cleaner/scheduled_tasks.py</code> first loop (~lines 153-154)</td>
+<td>Found by the phase 0 survey. The cleaner reads <code>extract_power_state(domain)</code> and only then calls <code>update_power_state()</code>, without the instance lock the power endpoints hold, so a power off or pause which completes between the two has its value overwritten with the stale one.</td>
+<td>A paused instance reads <code>on</code> until the next cleaner pass corrects it. A powered off instance reads <code>on</code> indefinitely, because the cleaner cannot see inactive domains (F1). The window is the attribute lock acquisition, so it is rare, but phase 0's assertions can observe it.</td>
+</tr>
 </tbody>
 </table>
 <p>The test suites did not catch any of this, for specific reasons:</p>
@@ -14977,7 +14984,7 @@ support that suspicion. Every finding below was checked against
   meaning the domain started (<code>test_nodes.py:274-290</code> says so, and adds
   only that metrics lag behind it). Before the #4280 fix that was false,
   which is why #4280 was a timeout rather than a failure.</li>
-<li><code>base.py:747</code> defines <code>_await_power_off()</code>, which waits for the
+<li><code>base.py:753</code> defines <code>_await_power_off()</code>, which waits for the
   "detected poweroff" event from dead loop F1. Nothing calls it: a guest
   shutdown test was evidently intended and never written, and would have
   found F1.</li>
@@ -15009,8 +15016,8 @@ that a regression fails a named test instead of timing one out.</p>
 <li>The unit-test fakes for libvirt behave like libvirt: <code>listDomainsID()</code>
   returns only active domains, and <code>power_state</code> is a dict.</li>
 </ul>
-<p>Out of scope: the SPICE packaging and <code>is_powered_on()</code> fixes (on the
-unmerged <code>issue-4280-trixie-spice</code> branch, a prerequisite), changes to
+<p>Out of scope: the SPICE packaging and <code>is_powered_on()</code> fixes (#4309, a
+prerequisite, merged 2026-09-23), changes to
 the instance state machine itself, and the agent side of agent
 readiness.</p>
 <h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
@@ -15090,8 +15097,9 @@ below, and once in the row this plan carries in
 the whole-plan status, so it only reaches <code>Complete</code> once
 every phase has been completed, abandoned or superseded.</p>
 </div>
-<p>No phase starts until <code>issue-4280-trixie-spice</code> has merged: phases 0, 1b
-and 3 all rely on <code>create()</code> failing when power on fails.</p>
+<p>No phase started until #4280's fix had merged
+(<a href="https://github.com/shakenfist/shakenfist/pull/4309">#4309</a>, 2026-09-23):
+phases 0, 1b and 3 all rely on <code>create()</code> failing when power on fails.</p>
 <table>
 <thead>
 <tr>
@@ -15104,8 +15112,8 @@ and 3 all rely on <code>create()</code> failing when power on fails.</p>
 <tbody>
 <tr>
 <td>0. Assert power state in the existing lifecycle tests</td>
-<td>PLAN-power-state-correctness-phase-00-assertions.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-power-state-correctness-phase-00-assertions/">PLAN-power-state-correctness-phase-00-assertions.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -15144,13 +15152,17 @@ and 3 all rely on <code>create()</code> failing when power on fails.</p>
 rather than leaving them to a trailing test phase.</p>
 <h3 id="phase-0-assert-power-state-in-the-existing-lifecycle-tests">Phase 0: assert power state in the existing lifecycle tests<a class="headerlink" href="#phase-0-assert-power-state-in-the-existing-lifecycle-tests" title="Permanent link">&para;</a></h3>
 <p>Add <code>power_state</code> assertions to every lifecycle test in
-<code>guest_ci_tests/test_state_changes.py</code> and to the power cycle in
-<code>test_interface_plug_and_exec_reboot</code>: <code>on</code> after create, <code>off</code> after
-power off, <code>paused</code> then <code>on</code> around pause, <code>on</code> after each reboot. These
-pass on <code>develop</code> today, because the power methods write those values.
+<code>guest_ci_tests/test_state_changes.py</code> (six tests across two classes)
+and to the power cycle in <code>test_interface_plug_and_exec_reboot</code>, which
+exists twice -- in <code>smoke_ci_tests</code>, run on every pull request, and in
+<code>guest_ci_tests</code>, run in the merge queue -- and gets the assertions in
+both: <code>on</code> after create, <code>off</code> after power off, <code>paused</code> then <code>on</code>
+around pause, <code>on</code> after each reboot. These pass on <code>develop</code> today,
+because the power methods write those values before the API returns.
 The point is to have the net in place before phase 1b adds a second
-writer that can race them. Plan at medium effort; the judgement is in
-choosing waits which do not flake.</p>
+writer that can race them. The survey found that the first loop can
+already race them (F13); the phase plan decides how the assertions
+treat that. Plan at medium effort.</p>
 <h3 id="phase-1a-honest-libvirt-domain-listing">Phase 1a: honest libvirt domain listing<a class="headerlink" href="#phase-1a-honest-libvirt-domain-listing" title="Permanent link">&para;</a></h3>
 <p>No behaviour change. Replace <code>get_all_domains()</code> and <code>get_sf_domains()</code>
 with helpers whose names say whether they return active or inactive
@@ -15174,7 +15186,9 @@ mostly the guards that the dead code never needed:</p>
   flake. Skip instances in <code>initial</code>, <code>preflight</code> or <code>creating</code>; take
   the instance lock (<code>get_lock(global_scope=False)</code>, which the power
   endpoints hold) with a short timeout and skip if busy; and re-check
-  <code>domain.isActive()</code> immediately before writing.</li>
+  <code>domain.isActive()</code> immediately before writing. Apply the same lock
+  and re-read to the first loop's <code>update_power_state()</code>, which fixes
+  F13.</li>
 <li><strong>Delete through the delete path (F11).</strong> Replace the <code>delete-wait</code>
   branch's by-hand rmtree, undefine and <code>state = deleted</code> with
   <code>inst.delete()</code>, as the first loop does.</li>
@@ -15642,6 +15656,10 @@ chosen to defer to here, so that we do not forget them.</p>
 <li>Whether <code>instances_total</code> in the resources daemon should count
   defined-but-inactive domains (open question 4). This plan keeps
   today's semantics.</li>
+<li><a href="https://github.com/shakenfist/shakenfist/issues/4318">#4318</a>:
+  <code>test_interface_plug_and_exec_reboot</code> is duplicated between the smoke
+  and guest suites and the copies have drifted. Phase 0 edits both
+  rather than deduplicating them.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>This section should list any bugs we encounter during development
@@ -15652,13 +15670,14 @@ while planning it.</p>
 <ul>
 <li><a href="https://github.com/shakenfist/shakenfist/issues/4280">#4280</a>: the
   SPICE packaging defect and <code>is_powered_on()</code> returning a truthy
-  string, fixed on the <code>issue-4280-trixie-spice</code> branch before this plan
-  was written. It is what prompted the plan.</li>
+  string, fixed by
+  <a href="https://github.com/shakenfist/shakenfist/pull/4309">#4309</a> before this
+  plan's phases started. It is what prompted the plan.</li>
 </ul>
 <p>Related issues:</p>
 <ul>
 <li><a href="https://github.com/shakenfist/shakenfist/issues/4307">#4307</a> tracks
-  this plan and findings F1 to F12.</li>
+  this plan and findings F1 to F13.</li>
 <li><a href="https://github.com/shakenfist/shakenfist/issues/2241">#2241</a> (unpause
   should recover from a crashed guest or a qemu monitor EOF, not just
   retry) overlaps F6 and F7; phase 3 resolves or excludes it.</li>
