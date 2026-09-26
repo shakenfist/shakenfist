@@ -1,10 +1,17 @@
 #!/bin/bash
 # Copyright 2019 Michael Still and contributors
 #
-# mutate-nested-sweep.sh -- break each structured-parameter schema and
-# each handler guard on purpose, and check that the right row of
-# shakenfist/tests/external_api/test_nested_sweep.py fails with the
-# right message.
+# mutate-nested-sweep.sh -- break each structured-parameter schema,
+# each handler guard and each declaration-time check on purpose, and
+# check that the right row of the right sweep fails with the right
+# message.
+#
+# The name is historical: it started as the nested sweep's mutations and
+# now also covers test_boolean_sweep.py and the declaration checks in
+# test_parameter_declarations.py, which is why `check` takes the test
+# filter to run. It is not renamed because the phase plans in
+# docs/plans/ cite it by name, and those record what a phase said at the
+# time rather than being corrected afterwards.
 #
 # Reading a guard cannot distinguish "this holds" from "this cannot
 # fail". A sweep row which passes for the wrong reason is worse than a
@@ -30,13 +37,13 @@
 #   bash tools/mutate-nested-sweep.sh
 #
 # Run it from the root of a clean-ish worktree. Your own uncommitted
-# work is safe: the four files it touches -- the vocabulary, the
-# compiler, the handler and the sweep itself -- are restored from a copy
+# work is safe: the six files it touches -- the vocabulary, the
+# compiler, the handler and the three sweeps -- are restored from a copy
 # taken before the first mutation, never with `git checkout`, because a
 # directory-wide checkout discards uncommitted work in that directory
 # and is painful to notice afterwards.
 #
-# What is *not* safe is a concurrent edit to one of those four files by
+# What is *not* safe is a concurrent edit to one of those six files by
 # somebody else while this runs: restore() copies the whole file back
 # from the snapshot, so an edit made in between is silently reverted.
 # Do not run this in a worktree another agent is editing.
@@ -48,7 +55,10 @@ BASE="shakenfist/external_api/base.py"
 VALIDATION="shakenfist/external_api/validation.py"
 HANDLER="shakenfist/external_api/instance.py"
 SWEEP="shakenfist/tests/external_api/test_nested_sweep.py"
-FILES=("$BASE" "$VALIDATION" "$HANDLER" "$SWEEP")
+BOOLSWEEP="shakenfist/tests/external_api/test_boolean_sweep.py"
+DECLARATIONS="shakenfist/tests/external_api/test_parameter_declarations.py"
+FILES=("$BASE" "$VALIDATION" "$HANDLER" "$SWEEP" "$BOOLSWEEP" \
+       "$DECLARATIONS")
 
 if [ ! -x "$PYTHON" ]; then
     echo "No $PYTHON. Run tox once to build the test environment." >&2
@@ -98,8 +108,9 @@ PYEOF
 # fixture, a half-finished edit -- then every mutation below is
 # "caught" by a failure this script did not cause, and it exits 0
 # having proved nothing.
-echo "=== baseline: the sweep must pass before anything is mutated"
-if ! "${PYTHON}" -m stestr run --no-subunit-trace 'test_nested_sweep' \
+echo "=== baseline: every sweep must pass before anything is mutated"
+if ! "${PYTHON}" -m stestr run --no-subunit-trace \
+        '(test_nested_sweep|test_boolean_sweep|test_parameter_declarations)' \
         > "${BACKUP}/baseline.log" 2>&1; then
     echo >&2
     echo "The sweep fails with no mutation applied, so no verdict below" >&2
@@ -113,18 +124,21 @@ echo "  green"
 SURVIVORS=0
 CHECKED=0
 
-# check <name> <expected row substring>
-# Runs the sweep against the mutated tree and requires the named row to
-# be in the failure output.
+# check <name> <expected row substring> [test filter]
+# Runs the named tests against the mutated tree and requires the named
+# row to be in the failure output. The filter defaults to the nested
+# sweep, which is what most of the mutations below break; a mutation to
+# a declaration-time check or to a declared boolean names its own.
 check() {
     local name="$1"
     local expected="$2"
+    local filter="${3:-test_nested_sweep}"
     local output
     local status
 
     CHECKED=$((CHECKED + 1))
     output=$("${PYTHON}" -m stestr run --no-subunit-trace \
-        'test_nested_sweep' 2>&1)
+        "${filter}" 2>&1)
     status=$?
 
     # The run has to have failed, not merely to have mentioned the row.
@@ -383,6 +397,68 @@ mutate "${SWEEP}" \
     "    Case('net.model.int', CREATE, 'networkspec', 'model'," \
     "    Case('net.model.int', CREATE, 'networkspec', 'wombat'," || exit 1
 check "accepted-value coverage" "only ever refused in the table"
+
+# ---------------------------------------------------------------------
+# 15. The character class's first position, which is the defect the
+#     first round of review on phase 8 found: CPython reads a leading
+#     ']' as a literal class member, ECMA-262 reads '[]' as an empty
+#     class, and the scanner used to call the disagreement a top level
+#     alternation. Reverting the check makes '^[]|]$' fall through to
+#     the alternation message, which is what the pinned message refuses
+#     to accept.
+# ---------------------------------------------------------------------
+run "a leading ']' in a class is blamed on the alternation again"
+mutate "${BASE}" \
+    "                elif was_class_start and character == ']':" \
+    "                elif False:" || exit 1
+check "class-start bracket" "first position of a character class" \
+    test_parameter_declarations
+
+# ---------------------------------------------------------------------
+# 16. The group extension vocabulary. Widening it to anything CPython
+#     compiles is exactly the state the token list was in, where '(?>'
+#     and the conditional '(?(1)a|b)' reached a JSON Schema validator
+#     which has neither.
+# ---------------------------------------------------------------------
+run "the group extension check accepts whatever CPython compiles"
+mutate "${BASE}" \
+    "                    if pattern[index + 2:index + 3] not in (':', '=', '!'," \
+    "                    if pattern[index + 2:index + 3] not in (':', '=', '!', '>', '(', 'i'," || exit 1
+# Named by test rather than by message: with the vocabulary widened
+# nothing is raised at all, so the message the refusal *would* have
+# carried is not in the output to grep for.
+check "group extension vocabulary" \
+    "test_a_refused_pattern_names_the_right_construct" \
+    test_parameter_declarations
+
+# ---------------------------------------------------------------------
+# 17. declared_boolean stops consulting marshmallow's sets, which is the
+#     whole class test_boolean_sweep.py exists to close: every falsy
+#     string spelling is a non-empty string and Python calls it true.
+# ---------------------------------------------------------------------
+run "declared_boolean is a bare truthiness test again (finding B-4)"
+mutate "${VALIDATION}" \
+    "    if isinstance(value, str):
+        if value in fields.Boolean.falsy:
+            return False
+        if value in fields.Boolean.truthy:
+            return True
+    return bool(value)" \
+    "    return bool(value)" || exit 1
+check "declared_boolean" "rather than" test_boolean_sweep
+
+# ---------------------------------------------------------------------
+# 18. The boolean sweep's derived enumeration, which is the guard that
+#     stops a twentieth declared boolean joining the class quietly. It
+#     is computed from the source rather than from a request, so nothing
+#     else here would notice if it had stopped meaning anything.
+# ---------------------------------------------------------------------
+run "a declared boolean has no reading in the table (derived guard)"
+mutate "${BOOLSWEEP}" \
+    "    ('NetworksEndpoint', 'post', 'provide_dns'): {" \
+    "    ('NetworksEndpoint', 'post', 'wombat'): {" || exit 1
+check "derived boolean enumeration" "nothing here measures how" \
+    test_boolean_sweep
 
 echo
 echo "====================================================================="

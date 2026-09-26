@@ -368,7 +368,7 @@ would have been refused and leaves the response to the handler — and
 unexpected log volume.
 
 Neither rollback restores the handler-facing behaviour from before
-enforcement existed, and there are two places that shows.
+enforcement existed, and there are four places that shows.
 
 The first is an undeclared body key. Under `warn` or `off` the key
 still reaches the handler, which raises `TypeError` on the unexpected
@@ -379,20 +379,37 @@ answer.
 
 The second is the handler guards. A guard is a check written in the
 handler rather than in a declaration, and it therefore holds in every
-mode: a network specification whose `network_uuid` is an explicit
-null, a video specification with a null `model` or `memory`, and the
-six spellings of a disk specification which asks for neither a size
-nor a base are all refused at `warn` and `off` as well as at
-`enforce`. Each of them was accepted before v0.8.0 and did something
+mode. There are five: a network specification whose `network_uuid` is
+an explicit null, a video specification with a null `model` or
+`memory`, the six spellings of a disk specification which asks for
+neither a size nor a base, a disk specification whose size reads as a
+negative number, and a custom DNS entry whose `value` is not an IP
+address. Each of them was accepted before v0.8.0 and did something
 wrong — an interface on an arbitrary network, `type='None'` in the
-domain XML — so the rollback deliberately does not hand the defect
-back. Write a check as a guard rather than as a declaration when that
-is the property you want, and as a declaration when a caller should be
-able to roll it back.
+domain XML, a deflated used-capacity counter, an extra line in a hosts
+file — so the rollback deliberately does not hand the defect back.
+Write a check as a guard rather than as a declaration when that is the
+property you want, and as a declaration when a caller should be able
+to roll it back. The last two of the five arrived after the phase which
+wrote the other three, which is why a hand-maintained list of them is a
+poor thing to trust: what measures the real set is a `warn`-mode test
+class next to each guard — `NestedSweepWarnTestCase` for the three
+specification guards and the negative size, and
+`NetworkDNSAddressValueGuardTestCase` for the DNS entry. A new guard
+gets one, and this paragraph gets a sentence.
+
+The third is a declared boolean read with `validation.declared_boolean()`,
+which is a *reading* rather than a check and so does not roll back
+either — see the rule below. There is nothing to roll back to except a
+handler which contradicted its own published schema.
+
+The fourth is outside this layer altogether: an object reference which
+is null or not a string answers `404` from the lookup layer, where it
+used to fault. No validation mode reaches it.
 
 So an operator choosing the rollback gets most requests that were
 working kept working. What they do not get is a tidier answer for the
-requests that were already broken, or those three guards handing back
+requests that were already broken, or those five guards handing back
 what they refuse; see the [v0.7 to v0.8 release
 notes](../release_notes/v07-v08.md) for the caller-visible shape of
 it.
@@ -504,10 +521,23 @@ spelling the schema accepts and the meaning the handler reads cannot
 drift. `shakenfist/tests/external_api/test_boolean_sweep.py` enumerates
 every `boolean` declaration in the API from the source and sends each
 one both spellings of both values, so a new one fails CI until it has
-either been routed through `declared_boolean()` or recorded, with a
-reason, as deliberately reading something narrower — which `confirm` on
-the delete-all routes is, since an identity test on a destructive route
-refuses a string spelling rather than acting on it.
+an entry in `BOOLEAN_READS` whose measured verdict holds. Note what
+that requires and what it does not: the test measures the reading, not
+the mechanism, so there are three ways an entry passes. Most are routed
+through `declared_boolean()` in the handler. Three — `provide_dhcp`,
+`provide_nat` and `provide_dns` on network create — agree one layer
+down instead, because `NetworkData` types them as pydantic `bool` and
+the coercion happens before the value is stored; they are deliberately
+not routed through `declared_boolean()` because it would read an
+omitted parameter as False, and the reason is written at the handler.
+Three more — `all` on the outstanding-operations routes — arrive
+through a `@use_kwargs` schema, so marshmallow has already deserialised
+them. And `confirm` on the delete-all routes is recorded, with a
+reason, as deliberately reading something *narrower*: an identity test
+on a destructive route refuses a string spelling rather than acting on
+it. `declared_boolean()` is the right answer for a new declaration; the
+other three are existing shapes, each with its reason recorded where a
+change would break it.
 
 ## Handler guards, and where a new one goes
 

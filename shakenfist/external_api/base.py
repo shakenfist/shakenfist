@@ -986,7 +986,15 @@ def _validated_constraints(section: str, name: str,
         # in somebody else's toolchain. Note also that JSON Schema
         # pattern is an unanchored partial match, so a pattern which
         # means to match the whole value needs ^...$ as macaddr does.
-        dialect = [c for c in ('(?P', '(?#', '\\A', '\\Z') if c in pattern]
+        #
+        # Only the two Python-only *escapes* are matched as tokens
+        # here. The Python-only group extensions are refused by the
+        # scan below instead, which knows what it is looking at: a
+        # token list of them drifted twice, missing '(?>' and the
+        # conditional '(?(1)...)' entirely, and a substring test for
+        # '[]' cannot tell the empty class in '[]a]' from the escaped
+        # one in '[\\[]]'.
+        dialect = [c for c in ('\\A', '\\Z') if c in pattern]
         if dialect:
             raise exceptions.InvalidAPIDeclaration(
                 '%s parameter %s declares a pattern using the Python only '
@@ -1009,6 +1017,10 @@ def _validated_constraints(section: str, name: str,
                 'compiled validator matches, and full anchoring is the '
                 'only form they read identically'
                 % (section, name, pattern))
+        # One pass, three refusals, because each of them needs to know
+        # where in the pattern it is -- unescaped, and inside or
+        # outside a character class.
+        #
         # A top-level alternation defeats the anchors the check above
         # just required: '^a|b$' means (^a)|(b$) and is anchored on
         # neither branch, so the string test alone would bless a
@@ -1023,23 +1035,66 @@ def _validated_constraints(section: str, name: str,
         # exercised these branches after the coverage report said no
         # test ever had; nothing in tree declares such a pattern yet,
         # so the defect was latent.
-        depth, escaped, in_class = 0, False, False
-        for character in pattern:
+        #
+        # The remaining two are dialect divergences, refused for the
+        # reason the '\A'/'\Z' check above gives rather than blessed or
+        # mis-blamed on the alternation: a ']' in a class's first
+        # position, and a group extension ECMA-262 does not have.
+        depth, escaped, in_class, class_start = 0, False, False, False
+        for index, character in enumerate(pattern):
+            was_class_start, class_start = class_start, False
             if escaped:
                 escaped = False
             elif character == '\\':
                 escaped = True
             elif in_class:
-                # ']' closes the class. A ']' as the class's first
-                # character is a literal in both dialects, but the
-                # anchoring check above means a pattern cannot begin
-                # with '[', so the simple reading is enough here.
-                if character == ']':
+                if was_class_start and character == '^':
+                    # A negation does not move the class off its first
+                    # position: '[^]' diverges exactly as '[]' does.
+                    class_start = True
+                elif was_class_start and character == ']':
+                    # CPython reads this ']' as a literal member of the
+                    # class, so '^[]|]$' is one character from the set
+                    # {']', '|'}. ECMA-262 reads '[]' as an empty class
+                    # (and '[^]' as any character), which makes the same
+                    # pattern an alternation of '^[]' and ']$'. The two
+                    # consumers genuinely disagree, so this is refused
+                    # rather than accepted -- and refused here, naming
+                    # the divergence, rather than falling through to the
+                    # alternation message below, which used to blame the
+                    # wrong construct.
+                    raise exceptions.InvalidAPIDeclaration(
+                        '%s parameter %s declares a pattern with a "]" in '
+                        'the first position of a character class: %r. '
+                        'CPython reads it as a literal class member while '
+                        'ECMA-262 reads "[]" as an empty class and "[^]" as '
+                        'any character, so the consumers do not agree on '
+                        'what the pattern matches. Escape it as "\\]"'
+                        % (section, name, pattern))
+                elif character == ']':
                     in_class = False
             elif character == '[':
-                in_class = True
+                in_class, class_start = True, True
             elif character == '(':
                 depth += 1
+                if pattern[index + 1:index + 2] == '?':
+                    # ECMA-262's whole group vocabulary. Everything else
+                    # CPython accepts after '(?' -- '(?P<x>', '(?P=x',
+                    # '(?#comment', the atomic '(?>', the conditional
+                    # '(?(1)a|b)' and the scoped flags '(?i:a)' -- is
+                    # meaningless to a JSON Schema validator or a client
+                    # generator. Checked as a vocabulary rather than as a
+                    # list of Python spellings so a new CPython extension
+                    # is refused by default.
+                    if pattern[index + 2:index + 3] not in (':', '=', '!',
+                                                            '<'):
+                        raise exceptions.InvalidAPIDeclaration(
+                            '%s parameter %s declares a pattern using the '
+                            'group extension %r, which ECMA-262 does not '
+                            'have: %r. ECMA-262 has only (?:, (?=, (?!, '
+                            '(?<=, (?<! and (?<name>'
+                            % (section, name, pattern[index:index + 3],
+                               pattern))
             elif character == ')':
                 depth -= 1
             elif character == '|' and depth == 0:

@@ -259,6 +259,23 @@ class NetworksEndpoint(api_base.Resource):
         # the field" (None) from "the caller explicitly asked for False".
         # Using `if not provide_nat` collapses both cases and silently
         # re-enables NAT (and DHCP) when --no-nat / --no-dhcp was requested.
+        #
+        # These three are the one place in the API where a declared
+        # boolean is deliberately *not* read with
+        # validation.declared_boolean(), and the reason is the None test
+        # immediately below: `declared_boolean(None)` is False, which
+        # would turn "the caller omitted the field" into "the caller
+        # asked for False" and take DHCP and NAT away from every caller
+        # who did not mention them. A string spelling agrees with the
+        # published schema anyway, one layer down --
+        # `shakenfist/schema/network_data.py` types provide_dhcp,
+        # provide_nat and provide_dns as pydantic `bool`, whose lax
+        # coercion reads 'off' as False before the value is stored. That
+        # is a cross-layer dependency, so it is written here rather than
+        # left to be discovered: if those fields are ever retyped, or if
+        # a declared_boolean() call is ever added *before* the None
+        # tests, test_boolean_sweep.py's three NetworksEndpoint.post
+        # rows are what fails.
         if provide_dhcp is None:
             provide_dhcp = True
         if provide_nat is None:

@@ -2980,6 +2980,24 @@ master plan's *Known defects* section carries the current state;
 the disposition rows below are left as the audit wrote them, and
 record what was true when it ran.
 
+**As of 2026-09-27**, the automated review of PR #4341 raised one
+`fix` item and it was a real one, in code this branch added: the
+character-class tracking taught to the pattern scanner treats a `]`
+immediately after `[` as closing the class, where CPython reads it as a
+literal member, so `^[]|]$` was still refused at import time -- the
+same latent sf-api-will-not-start defect one level deeper. The fix is
+not to accept those patterns, because ECMA-262 reads `[]` as an *empty*
+class and genuinely disagrees with CPython about what they match; they
+are refused as a dialect divergence, with a message which names the
+divergence rather than blaming the alternation. The same round of work
+generalised the neighbouring check: the Python-only constructs were a
+four-token substring list which had already missed `(?>`, `(?(1)a|b)`
+and the scoped flags `(?i:a)`, so `(?` is now checked against
+ECMA-262's group vocabulary and a construct CPython grows next is
+refused by default. `tools/mutate-nested-sweep.sh` grew a test filter
+argument and four mutations for the new checks and for the boolean
+sweep's own two derived guards.
+
 ### The survey findings
 
 | # | Disposition |
@@ -3359,8 +3377,12 @@ checked against the tree rather than recalled.
     `pre-commit run --all-files` passes every hook. `tox` (`py3`,
     `flake8`, `cover`) passes with no failures, including the new
     `test_boolean_sweep.py` and the four new mode-crossing guard
-    classes. `bash tools/mutate-nested-sweep.sh` reports 19 mutations,
-    0 survivors.
+    classes. `bash tools/mutate-nested-sweep.sh` reported 19 mutations,
+    0 survivors when this was written; it now reports 25, which is two
+    the rebase onto develop brought in with the #4248 fix and four added
+    by the first round of review (see the 2026-09-27 note under
+    *Dispositions*). The count is recorded rather than fixed because the
+    number is only useful alongside the date it was measured.
 12. **Not applicable, and deliberately so.** The item is conditional on
     the audit finding nothing blocking. It found four. *The audit's
     result* above says what they were and what they mean about the plan

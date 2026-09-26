@@ -2103,13 +2103,39 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
                   {'pattern': '^a|b$'})],
                 # The Python-only dialect: these constructs compile in
                 # CPython and are meaningless to a JSON Schema
-                # validator or a client generator.
+                # validator or a client generator. The group
+                # extensions are refused as an ECMA-262 vocabulary
+                # rather than by a list of Python spellings, which is
+                # why the atomic group, the conditional and the scoped
+                # flags are here -- all three were missing from the
+                # token list that check replaced, and all three
+                # compile in CPython.
                 [('thing', 'body', 'string', 'A thing.', False,
                   {'pattern': '^(?P<x>a)$'})],
                 [('thing', 'body', 'string', 'A thing.', False,
                   {'pattern': '^(?#comment)a$'})],
                 [('thing', 'body', 'string', 'A thing.', False,
                   {'pattern': '^\\Aa\\Z$'})],
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '^(?>a)$'})],
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '^(a)(?(1)b|c)$'})],
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '^(?i:a)$'})],
+                # A ']' in a character class's first position, which
+                # CPython reads as a literal member of the class and
+                # ECMA-262 reads as an empty class -- or, after a '^',
+                # as any character at all. The consumers disagree about
+                # what the pattern matches, so it is refused; the
+                # message is pinned separately below, because until the
+                # first round of review on this phase it blamed the
+                # alternation instead.
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '^[]|]$'})],
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '^[^]|]$'})],
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '^[]]$'})],
                 # A sixth element which is not a dictionary, in the
                 # shape that used to be a wrong-arity case.
                 [('thing', 'body', 'string', 'A thing.', False, 1)],
@@ -2143,7 +2169,23 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
                         '^a\\|b$',
                         '^[a|b]$',
                         '^[|]$',
-                        '^([a|b]|c)$'):
+                        '^([a|b]|c)$',
+                        '^[^a|b]$',
+                        # An escaped ']' is a literal class member in
+                        # both dialects, so the class-start check must
+                        # not fire on one: '[\\]]' and '[a\\]]' are
+                        # ordinary, and '[\\[]]' is a class holding '['
+                        # followed by a literal ']'.
+                        '^[\\]]$',
+                        '^[a\\]]$',
+                        '^[\\[]]$',
+                        # The group extensions ECMA-262 does have. The
+                        # vocabulary check refuses everything else after
+                        # '(?', so these four are what must still pass.
+                        '^(?:a|b)$',
+                        '^(?=a)a$',
+                        '^(?!x)a$',
+                        '^(?<=a)b$'):
             with self.subTest(pattern=pattern):
                 out = self._helper([
                     ('thing', 'body', 'string', 'A thing.', False,
@@ -2153,6 +2195,37 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
                 self.assertEqual(
                     pattern,
                     body['schema']['properties']['thing']['pattern'])
+
+    def test_a_refused_pattern_names_the_right_construct(self):
+        """A refusal which blames the wrong construct sends the author
+        looking in the wrong place, and an assertRaises on the type
+        alone cannot tell the two apart. '^[]|]$' was refused before
+        this round too -- as a top-level alternation, which it is not
+        in CPython's reading of it -- so the message is what changed
+        and the message is what is pinned.
+        """
+        for pattern in ('^[]|]$', '^[^]|]$', '^[]]$'):
+            with self.subTest(pattern=pattern):
+                with self.assertRaises(
+                        exceptions.InvalidAPIDeclaration) as caught:
+                    self._helper([('thing', 'body', 'string', 'A thing.',
+                                   False, {'pattern': pattern})])
+                self.assertIn('first position of a character class',
+                              str(caught.exception))
+                self.assertNotIn('alternation', str(caught.exception))
+
+        for pattern, prefix in (('^(?P<x>a)$', '(?P'),
+                                ('^(?#comment)a$', '(?#'),
+                                ('^(?>a)$', '(?>'),
+                                ('^(a)(?(1)b|c)$', '(?('),
+                                ('^(?i:a)$', '(?i')):
+            with self.subTest(pattern=pattern):
+                with self.assertRaises(
+                        exceptions.InvalidAPIDeclaration) as caught:
+                    self._helper([('thing', 'body', 'string', 'A thing.',
+                                   False, {'pattern': pattern})])
+                self.assertIn('group extension', str(caught.exception))
+                self.assertIn("'%s'" % prefix, str(caught.exception))
 
     def test_new_tokens_render_their_bounds(self):
         # The D9 vocabulary: bounds and formats phase 3 will compile,

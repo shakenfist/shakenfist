@@ -40,14 +40,20 @@ So this file is derived and differential:
   class silently: it fails CI until somebody has measured it.
 * **Differential.** Each entry names a request and one *observable*: an
   argument the handler passes on, a key of the response, or the status
-  code. Every parameter is sent four times -- JSON ``true``, JSON
-  ``false``, the string ``'true'``, the string ``'false'`` -- and the
-  assertion is that the string spelling produces the same observable as
-  the JSON boolean marshmallow says it means. There is no hand-written
-  expected value anywhere in the table, which is the point: a pinned
-  expectation is how ``net.float.yes`` passed for years while being
-  wrong (see ``tools/mutate-nested-sweep.sh``'s header on a row which
-  passes for the wrong reason).
+  code. Every parameter is sent four times -- the JSON boolean and a
+  string spelling, for each of true and false -- and the assertion is
+  that the string spelling produces the same observable as the JSON
+  boolean marshmallow says it means. There is no hand-written expected
+  value anywhere in the table, which is the point: a pinned expectation
+  is how ``net.float.yes`` passed for years while being wrong (see
+  ``tools/mutate-nested-sweep.sh``'s header on a row which passes for
+  the wrong reason).
+
+  The spellings differ by location, because a query string carries no
+  JSON: a query parameter's ``true`` *is* the JSON boolean's rendering,
+  so sending both would compare a request with itself. ``QUERY_SPELLINGS``
+  uses ``'1'`` for the truthy string there, which is in the same
+  marshmallow set and is four distinct requests rather than three.
 
 Each entry also carries the anti-vacuity check for free. Before any
 spelling is compared, the two JSON booleans are required to produce
@@ -74,6 +80,7 @@ import importlib
 import json
 from unittest import mock
 
+from shakenfist.config import config
 from shakenfist.external_api import declarations
 from shakenfist.tests.external_api.test_required_sweep import (
     SweepFixtureTestCase)
@@ -190,7 +197,12 @@ BOOLEAN_READS = {
     },
 
     # Snapshots. `thin` is read with `if not thin:` and falls back to
-    # SNAPSHOTS_DEFAULT_TO_THIN, which a falsy string defeats.
+    # SNAPSHOTS_DEFAULT_TO_THIN, which a falsy string defeats. That
+    # fallback is also why this is the one row whose observable depends
+    # on cluster configuration: with SNAPSHOTS_DEFAULT_TO_THIN true,
+    # `thin=False` reads as True as well and the anti-vacuity gate fires
+    # instead of the row measuring anything. setUp pins the setting for
+    # that reason -- the row is about the reading, not about the default.
     ('InstanceSnapshotEndpoint', 'post', 'all'): {
         'method': 'post',
         'url': '/instances/{instance}/snapshot',
@@ -321,6 +333,18 @@ SPELLINGS = (
     (False, 'off'),
 )
 
+# The same, for a parameter which arrives in the query string. There is
+# no JSON on the wire there, so `_observe` renders the JSON boolean as
+# its lower-case literal -- which makes the JSON `true` and the string
+# `'true'` the same four bytes, and `observed['true'] != observed[True]`
+# a comparison of a request with itself. '1' is in the same marshmallow
+# truthy set and is a distinct request, so the truthy half measures
+# something here too. The falsy half already did: 'off' is not 'false'.
+QUERY_SPELLINGS = (
+    (True, '1'),
+    (False, 'off'),
+)
+
 
 def boolean_declarations():
     """Every parameter the API declares ``boolean``.
@@ -359,6 +383,17 @@ class BooleanSweepTestCase(SweepFixtureTestCase):
 
     def setUp(self):
         super().setUp()
+
+        # `thin` is read with `if not thin: thin = SNAPSHOTS_DEFAULT_TO_THIN`,
+        # so the row's observable collapses to True for both JSON
+        # booleans if that setting is ever true -- the anti-vacuity gate
+        # would fire and the failure would name the observable rather
+        # than anything about the reading. Pinned, with the restore, so
+        # the sweep measures the handler and not the configuration.
+        saved_thin = config.SNAPSHOTS_DEFAULT_TO_THIN
+        self.addCleanup(
+            setattr, config, 'SNAPSHOTS_DEFAULT_TO_THIN', saved_thin)
+        config.SNAPSHOTS_DEFAULT_TO_THIN = False
 
         # The agent operations listing reads a dict off the instance and
         # picks a key from it, so without two different keys the
@@ -454,12 +489,37 @@ class BooleanSweepTestCase(SweepFixtureTestCase):
 
     def test_every_reading_agrees_with_the_declaration(self):
         """A string spelling means what the published schema says it means."""
+        self._sweep(sorted(BOOLEAN_READS))
+
+    def test_the_readings_do_not_depend_on_row_order(self):
+        """The same sweep, rows reversed.
+
+        Every row shares one fixture and several of them create real
+        objects -- eight instances, twelve networks in the ``system``
+        namespace -- so a row's observable could in principle depend on
+        what an earlier row left behind. The first round of review on
+        phase 8 read the ``clean_wait`` row as depending on it: its
+        observable is a 202-versus-403 over every network in ``system``,
+        and it runs before the network-creating rows only because
+        ``'clean_wait'`` sorts before ``'post'``.
+
+        It does not, in fact: the falsy arm answers 403 because the
+        *fixture* network has an interface, and the rows which run in
+        between add networks which have none. But that is an argument,
+        and an argument is the thing this file exists not to rely on. So
+        the order is measured instead, which also covers the rows
+        nobody has reasoned about.
+        """
+        self._sweep(sorted(BOOLEAN_READS, reverse=True))
+
+    def _sweep(self, keys):
         failures = []
-        for key in sorted(BOOLEAN_READS):
+        for key in keys:
             cls, method, name = key
             entry = BOOLEAN_READS[key]
+            spellings = QUERY_SPELLINGS if 'query' in entry else SPELLINGS
             observed = {}
-            for literal, spelling in SPELLINGS:
+            for literal, spelling in spellings:
                 observed[literal] = self._observe(entry, name, literal)
                 observed[spelling] = self._observe(entry, name, spelling)
 
@@ -475,7 +535,7 @@ class BooleanSweepTestCase(SweepFixtureTestCase):
                 continue
 
             if entry['verdict'] == 'refuses_strings':
-                for _, spelling in SPELLINGS:
+                for _, spelling in spellings:
                     if not (400 <= observed[spelling] < 500):
                         failures.append(
                             '%s.%s %s: declared a deliberate string '
@@ -484,7 +544,7 @@ class BooleanSweepTestCase(SweepFixtureTestCase):
                                observed[spelling]))
                 continue
 
-            for literal, spelling in SPELLINGS:
+            for literal, spelling in spellings:
                 if observed[spelling] != observed[literal]:
                     failures.append(
                         '%s.%s %s: the schema publishes %r as a boolean '
