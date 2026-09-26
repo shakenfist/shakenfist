@@ -248,13 +248,22 @@ not its value, which may be user data.
 
 ### D6 — Query-string fallback (open question 6)
 
-**Accept `location=('json', 'query')` for parameters declared
+**Accept a query-string fallback for parameters declared
 `query`, keeping the JSON body authoritative.** Purely additive:
 the official client sends everything in the body regardless of
 method, so nothing that exists today can break. It removes the
 GET-with-a-body fragility for anyone using curl or a browser,
 and it makes the OpenAPI honest, where today a `query`
 declaration is a documented lie.
+
+*Amended by phase 3.* This decision originally named its mechanism
+as `location=('json', 'query')`. That was tried and rejected before
+phase 3 began: a tuple location key is not JSON-serialisable, so the
+422 webargs raises is rendered as a 500. The shipped mechanism is the
+`json_or_query` custom loader — see
+[phase 3](PLAN-api-input-validation-phase-03-compile-and-warn.md)'s
+inherited-constraints section, which says in as many words that phase
+3 must not re-derive this. The decision's substance is unchanged.
 
 ### D7 — Response validation (open question 7)
 
@@ -273,6 +282,12 @@ a 400 naming it. Nothing relies on the override, and
 `passed_uuid` (`base.py:593-594`) specifically to dodge one
 instance of this collision — evidence that it is a known hazard
 rather than a feature.
+
+*Amended by phase 3.* That supporting evidence no longer exists:
+D11 removed the `passed_uuid` remap, so `base.py:593-594` does not
+contain it (the surviving note is at `base.py:1740-1741`). The
+decision stands on its own reasoning; the master plan's copy of D8
+carries the same amendment.
 
 One documented exception must keep working: `arg_is_artifact_ref`
 accepts an `artifact_uuid` supplied in the body by internal
@@ -331,3 +346,8 @@ The audit backlog, ready to execute:
    or deliberately hide.
 4. Four hand-authored `get_args` schemas to fold into the
    compiled path so they stop being a second source of truth.
+   *Superseded by D19 (phase 4):* read literally this is a bug
+   rather than a refactor, because deleting the `@use_kwargs`
+   decorators would silently revert `offset`/`limit` on
+   `GET /blobs/<uuid>/data` to their signature defaults. Deferred
+   as [#4098](https://github.com/shakenfist/shakenfist/issues/4098).

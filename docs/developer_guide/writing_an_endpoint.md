@@ -357,23 +357,43 @@ request. `API_VALIDATION_MODE` defaults to `enforce`: a finding
 answers `400` in the usual
 `{"error": "<parameter>: <reason>", "status": ...}` shape, naming the
 offending parameter, before the handler or any of its per-method
-decorators ever run. A refusal names the **first** finding only, so a
+decorators ever run. That includes `missing-required` — see
+*`required` is enforced* below, which was not true of every earlier
+release in this cycle. A refusal names the **first** finding only, so a
 request with several problems is fixed one round trip at a time; every
 finding is logged either way, so an operator sees the rest. `warn` is
-the operator's rollback for a caller that breaks — it logs what would
-have been refused and changes no response — and `off` disables the
-layer entirely, as a further safety valve against unexpected log
-volume.
+the operator's rollback for a caller that breaks — it records what
+would have been refused and leaves the response to the handler — and
+`off` disables the layer entirely, as a further safety valve against
+unexpected log volume.
 
 Neither rollback restores the handler-facing behaviour from before
-enforcement existed, and an undeclared body key is where that shows.
-Under `warn` or `off` the key still reaches the handler, which raises
-`TypeError` on the unexpected keyword argument, and that now answers
-`500` — recorded like any other server exception, with nothing about
-it in the response body — rather than the `400` carrying the
-interpreter's own message it used to answer. An operator choosing the
-rollback gets requests that were working kept working, not a tidier
-answer for the ones that were not; see the [v0.7 to v0.8 release
+enforcement existed, and there are two places that shows.
+
+The first is an undeclared body key. Under `warn` or `off` the key
+still reaches the handler, which raises `TypeError` on the unexpected
+keyword argument, and that now answers `500` — recorded like any other
+server exception, with nothing about it in the response body — rather
+than the `400` carrying the interpreter's own message it used to
+answer.
+
+The second is the handler guards. A guard is a check written in the
+handler rather than in a declaration, and it therefore holds in every
+mode: a network specification whose `network_uuid` is an explicit
+null, a video specification with a null `model` or `memory`, and the
+six spellings of a disk specification which asks for neither a size
+nor a base are all refused at `warn` and `off` as well as at
+`enforce`. Each of them was accepted before v0.8.0 and did something
+wrong — an interface on an arbitrary network, `type='None'` in the
+domain XML — so the rollback deliberately does not hand the defect
+back. Write a check as a guard rather than as a declaration when that
+is the property you want, and as a declaration when a caller should be
+able to roll it back.
+
+So an operator choosing the rollback gets most requests that were
+working kept working. What they do not get is a tidier answer for the
+requests that were already broken, or those three guards handing back
+what they refuse; see the [v0.7 to v0.8 release
 notes](../release_notes/v07-v08.md) for the caller-visible shape of
 it.
 
@@ -469,6 +489,25 @@ narrower than the handler behind it; `url`, which has to accept the
 scheme-less `cirros` image shortcut and `label:` NVRAM templates as
 well as `https://`, is the instructive case. So `type`, `format`,
 `pattern`, `minimum` and `maximum` are what constrain anything.
+
+**Read a declared `boolean` with `validation.declared_boolean()`, not
+with `if flag:`.** Validation is check-only: the compiled schema is run
+for its findings and the deserialised result is thrown away, so your
+handler is handed the raw request body. marshmallow's `Boolean` accepts
+string spellings — `'false'`, `'no'`, `'off'`, `'0'` and some of their
+cases are all False — and every one of them is a non-empty string,
+which Python calls true. So `if flag:` on a declared boolean publishes
+a specification which says the opposite of what your handler does,
+which is worse than not declaring the parameter at all.
+`declared_boolean()` is keyed on marshmallow's own sets, so the
+spelling the schema accepts and the meaning the handler reads cannot
+drift. `shakenfist/tests/external_api/test_boolean_sweep.py` enumerates
+every `boolean` declaration in the API from the source and sends each
+one both spellings of both values, so a new one fails CI until it has
+either been routed through `declared_boolean()` or recorded, with a
+reason, as deliberately reading something narrower — which `confirm` on
+the delete-all routes is, since an identity test on a destructive route
+refuses a string spelling rather than acting on it.
 
 ## Handler guards, and where a new one goes
 

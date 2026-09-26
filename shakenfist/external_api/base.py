@@ -1014,12 +1014,30 @@ def _validated_constraints(section: str, name: str,
         # neither branch, so the string test alone would bless a
         # pattern the two consumers still read differently. Wrap the
         # alternation in a group instead.
-        depth, escaped = 0, False
+        #
+        # Character classes are tracked as well as groups, because a
+        # '|' inside one is a literal pipe and not an alternation at
+        # all. Without that, '^[a|b]$' -- a perfectly ordinary pattern
+        # -- is refused at import time and sf-api does not start. Found
+        # by the phase 8 audit of PLAN-api-input-validation, which
+        # exercised these branches after the coverage report said no
+        # test ever had; nothing in tree declares such a pattern yet,
+        # so the defect was latent.
+        depth, escaped, in_class = 0, False, False
         for character in pattern:
             if escaped:
                 escaped = False
             elif character == '\\':
                 escaped = True
+            elif in_class:
+                # ']' closes the class. A ']' as the class's first
+                # character is a literal in both dialects, but the
+                # anchoring check above means a pattern cannot begin
+                # with '[', so the simple reading is enough here.
+                if character == ']':
+                    in_class = False
+            elif character == '[':
+                in_class = True
             elif character == '(':
                 depth += 1
             elif character == ')':

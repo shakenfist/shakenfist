@@ -89,3 +89,45 @@ class SnapshotMaxVersionsTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code, resp.get_json())
         snapshot.assert_called_once()
         self.assertEqual(3, snapshot.call_args.kwargs['max_versions'])
+
+
+class SnapshotMaxVersionsWarnTestCase(SnapshotMaxVersionsTestCase):
+    """The same assertions with the schema layer not refusing.
+
+    Added by the phase 8 audit of PLAN-api-input-validation. The class
+    above runs at the shipped default, where `max_versions` carries
+    `unsignedinteger`'s `minimum: 0` and the compiled schema answers
+    every assertion in it before the handler is reached -- so the
+    handler guard the file was written for had no executed coverage at
+    all, and nothing would have noticed if it stopped working. It is
+    the *only* defence at `warn` and `off`, which is exactly where an
+    operator who has rolled enforcement back is standing.
+
+    Asserting the guard's own message is the other half: it says which
+    layer answered, rather than leaving that to be inferred from a
+    status code both layers produce.
+    """
+
+    mode = 'warn'
+
+    def setUp(self):
+        super().setUp()
+        self.saved_mode = config.API_VALIDATION_MODE
+        config.API_VALIDATION_MODE = self.mode
+        self.addCleanup(self._restore_mode)
+
+    def _restore_mode(self):
+        config.API_VALIDATION_MODE = self.saved_mode
+
+    def test_a_negative_max_versions_is_refused(self):
+        resp, snapshot = self._post(-1)
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertEqual('max version cannot be negative',
+                         resp.get_json()['error'])
+        snapshot.assert_not_called()
+
+
+class SnapshotMaxVersionsOffTestCase(SnapshotMaxVersionsWarnTestCase):
+    """And with the layer not running at all."""
+
+    mode = 'off'
