@@ -308,9 +308,19 @@ For every row whose `claimed_at` is older than
 claim so a fresh worker picks the job up or -- if `attempts`
 has reached `CLUSTER_OP_MAX_ATTEMPTS` -- deletes the row and
 transitions the underlying cluster operation to `STATE_ERROR`.
-Reaper activity is exported on
-`cluster_op_reaper_requeued_total` and
-`cluster_op_reaper_rejected_total`, scraped from
+A second pass in the same tick sweeps the inverse shape: cluster
+operations sitting in `queued` or `executing` for longer than the
+same threshold with no `work_queue` row referencing them at all
+(failure debris -- the enqueue writes both in one transaction, so
+the shape cannot occur in normal operation). Nothing can ever
+dequeue such an operation, so the pass transitions it to
+`STATE_ERROR` with an audit event; the enqueue-side coalescing
+dedup independently refuses to return a rowless op, so a caller's
+"ensure" enqueues fresh work rather than adopting a dead op
+(issue 4303). Reaper activity is exported on
+`cluster_op_reaper_requeued_total`,
+`cluster_op_reaper_rejected_total` and
+`cluster_op_reaper_orphaned_total`, scraped from
 `CLUSTER_METRICS_PORT` on the cluster daemon.
 
 The cluster daemon also runs two other reaping sweeps from

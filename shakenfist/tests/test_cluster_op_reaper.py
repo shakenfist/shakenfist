@@ -45,6 +45,8 @@ class StuckJobReaperTestCase(base.ShakenFistTestCase):
             'cluster_op_reaper_requeued_total')
         self.rejected_start = _counter_value(
             'cluster_op_reaper_rejected_total')
+        self.orphaned_start = _counter_value(
+            'cluster_op_reaper_orphaned_total')
 
     def _add_row(self, row_id, queue_name, claimed_at,
                  claimed_by='worker-a', attempts=1, payload=None):
@@ -68,6 +70,24 @@ class StuckJobReaperTestCase(base.ShakenFistTestCase):
     def _rejected_delta(self):
         return (_counter_value('cluster_op_reaper_rejected_total')
                 - self.rejected_start)
+
+    def _orphaned_delta(self):
+        return (_counter_value('cluster_op_reaper_orphaned_total')
+                - self.orphaned_start)
+
+    def _add_op_state(self, op_uuid, operation_type='net_op',
+                      state_value='queued', update_time=None):
+        """Seed an operation's object_states row in the mock store."""
+        if update_time is None:
+            update_time = time.time() - 3600.0
+        self.mock_mariadb.mariadb_states[
+            f'{operation_type}/{op_uuid}'] = {
+            'object_type': operation_type,
+            'object_uuid': op_uuid,
+            'state_value': state_value,
+            'update_time': update_time,
+            'message': None,
+        }
 
     def test_empty_store_is_a_noop(self):
         scheduled_tasks.reap_stuck_cluster_operation_jobs()
@@ -230,3 +250,104 @@ class StuckJobReaperTestCase(base.ShakenFistTestCase):
                 0, len(self.mock_mariadb.work_queue_store))
             self.assertEqual(
                 BaseClusterOperation.STATE_ERROR, mock_op.state)
+
+    # The orphan pass (issue 4303): operations sitting in a
+    # non-terminal state with no work_queue row referencing them at
+    # all. The stuck-row walk cannot see these, and until the
+    # enqueue-side dedup learned to skip them, ensure_mesh adopted
+    # them forever.
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    def test_orphaned_op_is_errored(self, mock_get_class):
+        mock_op = mock.MagicMock()
+        mock_class = mock.MagicMock()
+        mock_class.from_db.return_value = mock_op
+        mock_get_class.return_value = mock_class
+
+        self._add_op_state('orphan-uuid')
+
+        scheduled_tasks.reap_stuck_cluster_operation_jobs()
+
+        self.assertEqual(1, self._orphaned_delta())
+        mock_class.from_db.assert_called_once_with('orphan-uuid')
+        self.assertEqual(
+            BaseClusterOperation.STATE_ERROR, mock_op.state)
+        mock_op.add_event.assert_called_once()
+        event_args = mock_op.add_event.call_args
+        self.assertIn('no work queue row', event_args[0][1])
+        self.assertEqual(
+            'queued', event_args.kwargs['extra']['orphaned_state'])
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    def test_orphaned_executing_op_is_errored(self, mock_get_class):
+        mock_op = mock.MagicMock()
+        mock_class = mock.MagicMock()
+        mock_class.from_db.return_value = mock_op
+        mock_get_class.return_value = mock_class
+
+        self._add_op_state('orphan-uuid', state_value='executing')
+
+        scheduled_tasks.reap_stuck_cluster_operation_jobs()
+
+        self.assertEqual(1, self._orphaned_delta())
+        self.assertEqual(
+            BaseClusterOperation.STATE_ERROR, mock_op.state)
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    def test_op_with_a_work_queue_row_is_not_orphaned(
+            self, mock_get_class):
+        self._add_op_state('live-uuid')
+        row = self._add_row(
+            row_id=1, queue_name='q', claimed_at=time.time(),
+            claimed_by=None, attempts=0,
+            payload={
+                'operation_type': 'net_op',
+                'operation_uuid': 'live-uuid',
+            })
+        # An unclaimed row is never stuck either.
+        row['claimed_at'] = None
+
+        scheduled_tasks.reap_stuck_cluster_operation_jobs()
+
+        self.assertEqual(0, self._orphaned_delta())
+        mock_get_class.assert_not_called()
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    def test_fresh_rowless_op_is_left_alone(self, mock_get_class):
+        self._add_op_state('orphan-uuid', update_time=time.time() - 1.0)
+
+        scheduled_tasks.reap_stuck_cluster_operation_jobs()
+
+        self.assertEqual(0, self._orphaned_delta())
+        mock_get_class.assert_not_called()
+
+    @mock.patch(
+        'shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    def test_orphan_transition_failure_is_tolerated(
+            self, mock_get_class):
+        # An orphan whose state write races a dispatcher's fold (or is
+        # otherwise refused) must not abort the tick for the others.
+        mock_racing_op = mock.MagicMock()
+        type(mock_racing_op).state = mock.PropertyMock(
+            side_effect=InvalidStateException('already terminal'))
+        mock_op = mock.MagicMock()
+
+        mock_class = mock.MagicMock()
+        mock_class.from_db.side_effect = lambda u: {
+            'racing-uuid': mock_racing_op,
+            'orphan-uuid': mock_op}[u]
+        mock_get_class.return_value = mock_class
+
+        self._add_op_state('racing-uuid', update_time=time.time() - 7200.0)
+        self._add_op_state('orphan-uuid', update_time=time.time() - 3600.0)
+
+        scheduled_tasks.reap_stuck_cluster_operation_jobs()
+
+        # Only the op that actually transitioned is counted.
+        self.assertEqual(1, self._orphaned_delta())
+        self.assertEqual(
+            BaseClusterOperation.STATE_ERROR, mock_op.state)

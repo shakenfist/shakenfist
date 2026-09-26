@@ -11,6 +11,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import FINAL_OBJECT_STATES
 from shakenfist.constants import get_object_class
+from shakenfist.constants import NoSuchObject
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import InvalidStateException
@@ -47,6 +48,10 @@ REAPER_REJECTED = Counter(
     'cluster_op_reaper_rejected_total',
     'Stuck cluster operation work items that exceeded '
     'max_attempts and were rejected.')
+REAPER_ORPHANED = Counter(
+    'cluster_op_reaper_orphaned_total',
+    'Cluster operations errored because no work_queue row '
+    'referenced them.')
 
 # Every sweep in this module shares a failure mode: silence. A pass
 # that cannot read its work list does nothing, and nothing else ever
@@ -516,6 +521,12 @@ def reap_stuck_cluster_operation_jobs():
       STATE_ERROR, and log an audit event. This is the 'job of
       death' guard.
 
+    A second pass errors out cluster operations sitting in a
+    non-terminal state for longer than the same threshold with no
+    work_queue row referencing them at all (issue 4303). Nothing
+    can ever run such an operation, and before the enqueue-side
+    dedup learned to skip them it adopted them forever.
+
     Races with another freshly-elected cluster daemon are
     harmless: the row-level delete / update wins exactly once,
     and the loser's helper returns False so the loser skips the
@@ -525,12 +536,10 @@ def reap_stuck_cluster_operation_jobs():
     max_attempts = config.CLUSTER_OP_MAX_ATTEMPTS
 
     stuck = mariadb.list_stuck_work_queue_rows(threshold)
-    if not stuck:
-        return
-
-    LOG.info(
-        f'Reaper found {len(stuck)} stuck work queue rows '
-        f'(threshold={threshold}s, max_attempts={max_attempts})')
+    if stuck:
+        LOG.info(
+            f'Reaper found {len(stuck)} stuck work queue rows '
+            f'(threshold={threshold}s, max_attempts={max_attempts})')
 
     for row in stuck:
         row_id = row['id']
@@ -594,6 +603,50 @@ def reap_stuck_cluster_operation_jobs():
                 'claimed_by': row.get('claimed_by'),
                 'claimed_at': row.get('claimed_at'),
             }).info('Reaper re-queued stuck work item')
+
+    # Orphan pass: operations in queued or executing with no work_queue
+    # row at all. The stuck-row walk above cannot see these -- there is
+    # no row to walk. They cannot make progress, so error them out.
+    orphans = mariadb.list_orphaned_cluster_operations(threshold)
+    if orphans:
+        LOG.info(
+            f'Reaper found {len(orphans)} cluster operations with no '
+            f'work queue row (threshold={threshold}s)')
+
+    for orphan in orphans:
+        op_type = orphan['operation_type']
+        op_uuid = orphan['uuid']
+        try:
+            cls = get_object_class(op_type)
+        except NoSuchObject:
+            continue
+        op = cls.from_db(op_uuid)
+        if op is None:
+            continue
+        try:
+            op.state = BaseClusterOperation.STATE_ERROR
+            op.add_event(
+                EVENT_TYPE_AUDIT,
+                'rejected by reaper: no work queue row references '
+                'this operation',
+                extra={
+                    'orphaned_state': orphan['state_value'],
+                    'state_update_time': orphan['update_time'],
+                })
+            REAPER_ORPHANED.inc()
+            LOG.with_fields({
+                'operation_type': op_type,
+                'operation_uuid': op_uuid,
+                'orphaned_state': orphan['state_value'],
+            }).warning('Reaper errored orphaned cluster operation')
+        except InvalidStateException as e:
+            # Already terminal -- for example a dispatcher's fold
+            # marked it complete between our read and this write.
+            LOG.with_fields({
+                'operation_type': op_type,
+                'operation_uuid': op_uuid,
+            }).warning(
+                f'Reaper cannot transition orphaned op to error: {e}')
 
 
 def reap_expired_namespace_keys() -> None:

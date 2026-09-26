@@ -18,6 +18,7 @@ from uuid import uuid4
 from shakenfist import mariadb
 from shakenfist.config import config
 from shakenfist.constants import get_object_class
+from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
 from shakenfist.instance import Instance
 from shakenfist.namespace import Namespace
 from shakenfist.network.network import Network
@@ -1150,6 +1151,13 @@ class MockMariaDB():
         self.mariadb_delete_work_queue_row.start()
         self.test_obj.addCleanup(
             self.mariadb_delete_work_queue_row.stop)
+
+        self.mariadb_list_orphaned_cluster_operations = mock.patch(
+            'shakenfist.mariadb.list_orphaned_cluster_operations',
+            side_effect=self._mariadb_list_orphaned_cluster_operations)
+        self.mariadb_list_orphaned_cluster_operations.start()
+        self.test_obj.addCleanup(
+            self.mariadb_list_orphaned_cluster_operations.stop)
 
         self.mariadb_claim_coalescible_siblings = mock.patch(
             'shakenfist.mariadb.claim_coalescible_siblings',
@@ -3910,6 +3918,45 @@ class MockMariaDB():
                 return False
         return True
 
+    def _work_queue_row_references_op(self, op_uuid):
+        """Mirror of mariadb._work_queue_references_op_clause."""
+        for row in self.work_queue_store:
+            if (row.get('payload') or {}).get('operation_uuid') == op_uuid:
+                return True
+        return False
+
+    def _mariadb_list_orphaned_cluster_operations(self, threshold_seconds):
+        """Mock implementation of mariadb.list_orphaned_cluster_operations().
+
+        Mirrors the SQL guards in
+        ``mariadb._direct_list_orphaned_cluster_operations``: cluster
+        operations in queued or executing whose state is older than
+        ``threshold_seconds`` and which no work_queue row references,
+        oldest first.
+        """
+        now = time.time()
+        orphans = []
+        for data in self.mariadb_states.values():
+            if data['object_type'] not in OPERATION_NAMES_TO_CLASSES:
+                continue
+            if data['state_value'] not in ('queued', 'executing'):
+                continue
+            if now - data['update_time'] < threshold_seconds:
+                continue
+            if self._work_queue_row_references_op(data['object_uuid']):
+                continue
+            orphans.append({
+                'uuid': data['object_uuid'],
+                'operation_type': data['object_type'],
+                'state_value': data['state_value'],
+                'update_time': float(data['update_time']),
+            })
+        orphans.sort(key=lambda o: o['update_time'])
+        self._trace(
+            f'MockMariaDB.list_orphaned_cluster_operations'
+            f'({threshold_seconds}): {len(orphans)}')
+        return orphans
+
     def _mariadb_find_existing_coalescible_op(
             self, operation_type, keys, task_name, priorities=None):
         """Mock implementation of mariadb.find_existing_coalescible_op().
@@ -3951,6 +3998,11 @@ class MockMariaDB():
             state_key = f'{operation_type}/{op_uuid}'
             state_row = self.mariadb_states.get(state_key)
             if not state_row or state_row.get('state_value') != 'queued':
+                continue
+            # Mirrors the real query's work_queue EXISTS guard: an op
+            # with no work_queue row can never run, so it is never
+            # reused (issue 4303).
+            if not self._work_queue_row_references_op(op_uuid):
                 continue
             candidates.append(
                 (op_row.get('created_at', 0.0), op_uuid))

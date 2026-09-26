@@ -154,11 +154,29 @@ class EnableNATReply(_message.Message):
         OK: EnableNATReply._Errors.ValueType  # 0
         IPTABLES_FAILED: EnableNATReply._Errors.ValueType  # 1
         RULES_ALREADY_PRESENT: EnableNATReply._Errors.ValueType  # 2
+        """Retired, and a trap: do not return this. The client
+        (util.concurrency.enable_nat) raises EnableNATFailed for any
+        reply which is not OK, so "the rules were already there" --
+        the normal outcome every time the maintain loop recreates a
+        healthy network -- became a hard failure and the network
+        never came up (issue 3662). Each rule now carries its own
+        iptables -C instead, and success is success either way. The
+        number stays claimed so no later member reuses it.
+        """
 
     class Errors(_Errors, metaclass=_ErrorsEnumTypeWrapper): ...
     OK: EnableNATReply.Errors.ValueType  # 0
     IPTABLES_FAILED: EnableNATReply.Errors.ValueType  # 1
     RULES_ALREADY_PRESENT: EnableNATReply.Errors.ValueType  # 2
+    """Retired, and a trap: do not return this. The client
+    (util.concurrency.enable_nat) raises EnableNATFailed for any
+    reply which is not OK, so "the rules were already there" --
+    the normal outcome every time the maintain loop recreates a
+    healthy network -- became a hard failure and the network
+    never came up (issue 3662). Each rule now carries its own
+    iptables -C instead, and success is success either way. The
+    number stays claimed so no later member reuses it.
+    """
 
     NETWORK_UUID_FIELD_NUMBER: _builtins.int
     NETWORK_ADDRESS_FIELD_NUMBER: _builtins.int

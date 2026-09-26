@@ -5,7 +5,7 @@ import warnings
 
 from shakenfist.protos import database_pb2 as database__pb2
 
-GRPC_GENERATED_VERSION = '1.83.1'
+GRPC_GENERATED_VERSION = '1.84.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -73,6 +73,11 @@ class DatabaseServiceStub:
                 '/shakenfist.protos.DatabaseService/DeleteWorkQueueRow',
                 request_serializer=database__pb2.DeleteWorkQueueRowRequest.SerializeToString,
                 response_deserializer=database__pb2.StatusReply.FromString,
+                _registered_method=True)
+        self.ListOrphanedClusterOperations = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/ListOrphanedClusterOperations',
+                request_serializer=database__pb2.ListOrphanedClusterOperationsRequest.SerializeToString,
+                response_deserializer=database__pb2.ListOrphanedClusterOperationsReply.FromString,
                 _registered_method=True)
         self.ClaimCoalescibleSiblings = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/ClaimCoalescibleSiblings',
@@ -1253,6 +1258,12 @@ class DatabaseServiceServicer:
         raise NotImplementedError('Method not implemented!')
 
     def DeleteWorkQueueRow(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListOrphanedClusterOperations(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2799,6 +2810,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     request_deserializer=database__pb2.DeleteWorkQueueRowRequest.FromString,
                     response_serializer=database__pb2.StatusReply.SerializeToString,
             ),
+            'ListOrphanedClusterOperations': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListOrphanedClusterOperations,
+                    request_deserializer=database__pb2.ListOrphanedClusterOperationsRequest.FromString,
+                    response_serializer=database__pb2.ListOrphanedClusterOperationsReply.SerializeToString,
+            ),
             'ClaimCoalescibleSiblings': grpc.unary_unary_rpc_method_handler(
                     servicer.ClaimCoalescibleSiblings,
                     request_deserializer=database__pb2.ClaimCoalescibleSiblingsRequest.FromString,
@@ -4146,6 +4162,33 @@ class DatabaseService:
             '/shakenfist.protos.DatabaseService/DeleteWorkQueueRow',
             database__pb2.DeleteWorkQueueRowRequest.SerializeToString,
             database__pb2.StatusReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListOrphanedClusterOperations(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/ListOrphanedClusterOperations',
+            database__pb2.ListOrphanedClusterOperationsRequest.SerializeToString,
+            database__pb2.ListOrphanedClusterOperationsReply.FromString,
             options,
             channel_credentials,
             insecure,
