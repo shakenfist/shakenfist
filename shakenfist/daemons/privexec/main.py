@@ -6,6 +6,7 @@
 import ipaddress
 import os
 import re
+import shlex
 import shutil
 import signal
 import socket
@@ -162,9 +163,17 @@ class PrivExecJob:
         self.task_details = None
 
     def _execute(self, request):
-        command = request.command
+        # Wrappers such as ionice and ip netns exec run an executable, not a
+        # shell command line. If we have any, the command is quoted and run by
+        # an inner shell so that full shell syntax (environment variable
+        # prefixes, builtins, pipes and so on) still works, and the wrapper
+        # applies to the whole command line rather than its first word. This
+        # mirrors the in-guest agent's executor (shakenfist/agent-python#144).
+        wrappers = []
         if request.network_namespace != '':
-            command = f'ip netns exec {request.network_namespace} {command}'
+            wrappers.extend([
+                privexec_util.locate_command('ip'), 'netns', 'exec',
+                request.network_namespace])
 
         env_variables = {}
         for env_var in request.environment_variables:
@@ -178,13 +187,18 @@ class PrivExecJob:
             request.io_priority, IO_PRIORITIES[common_pb2.ExecuteRequest.NORMAL])
 
         if current_iopriority != requested_iopriority:
-            command = (f'{privexec_util.locate_command("ionice")} -c '
-                       f'{requested_iopriority[0]} '
-                       f'-n {requested_iopriority[1]} {command}')
+            wrappers.extend([
+                privexec_util.locate_command('ionice'),
+                '-c', str(requested_iopriority[0]),
+                '-n', str(requested_iopriority[1])])
 
         working_directory = None
         if request.working_directory != '':
             working_directory = request.working_directory
+
+        command = request.command
+        if wrappers:
+            command = shlex.join(wrappers + ['/bin/sh', '-c', command])
 
         start_time = time.time()
         obj = subprocess.Popen(
