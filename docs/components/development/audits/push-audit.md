@@ -95,7 +95,7 @@ which is the exact feedback loop that bloats READMEs.
 **`plan-references-in-code` became a required block on 2026-09-24.**
 It extends to code the rule `plan-phase-references` already applies
 to documentation: a reader of the code has not read the plan, so
-"added in phase 5" or "per decision 3" tells them nothing, and a
+`added in phase 5` or `per decision 3` tells them nothing, and a
 comment that points at a plan for its reasoning should carry the
 reasoning instead. It is a judgement check in the reviewer's brief
 rather than a grep, for now: a raw scan of the fleet's code on the

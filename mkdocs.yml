@@ -168,6 +168,7 @@ nav:
                 - "Plan: the image supply chain, from end-of-life migration to production that reports its own failures": components/development/plans/PLAN-image-supply-chain.md
                 - "Plan: the size of a review unit": components/development/plans/PLAN-review-unit-size.md
                 - "Review coverage steady state": components/development/plans/PLAN-review-coverage.md
+                - "Review import": components/development/plans/PLAN-review-import.md
                 - "Shaken Fist Project Consistency Plan": components/development/plans/PLAN-consistency.md
                 - "Systematic whole-codebase review tracking": components/development/plans/PLAN-code-review-tracking.md
         - Instar:
@@ -362,6 +363,7 @@ nav:
                 - "Two-tier CI phase 4: documentation": components/kerbside/plans/PLAN-two-tier-ci-phase-04-docs.md
                 - "Two-tier CI: smoke gates on PRs, full clouds in the merge queue": components/kerbside/plans/PLAN-two-tier-ci.md
                 - "Use case documentation": components/kerbside/plans/PLAN-use-case-docs.md
+                - "Use case documentation phase 6: push audit": components/kerbside/plans/PLAN-use-case-docs-phase-06-push-audit.md
             - Spice:
                 - "console.vv Extensions and Interpretations": components/kerbside/spice/console-vv-extensions.md
                 - "Keyboard Scancodes": components/kerbside/spice/scancodes.md

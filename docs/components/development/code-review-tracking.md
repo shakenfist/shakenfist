@@ -11,7 +11,7 @@ The full design rationale is in
 
 The automation lives in this repository:
 `scripts/review-tracking.py` (subcommands `stamp`, `prune`, `regen`,
-`next`, `status`, and `scope-orphans`), with tests in
+`next`, `status`, `scope-orphans`, and `import`), with tests in
 `scripts/tests/test_review_tracking.py`. In a developer's clone it is
 run by hand -- deliberately not from git hooks. An earlier iteration
 wired `stamp` and `prune` into the pre-commit, post-merge,
@@ -23,9 +23,14 @@ subcommands also run automatically: `prune` from an adopting repo's
 `prune-reviews` workflow on every push to the default branch, and
 `status` and `scope-orphans` from the consistency audit's
 `review-coverage` and `review-scope-completeness` checks (see
-"Steady state" below). Target repositories carry a thin wrapper
-(for example ryll's `tools/review-tracking.sh`) that locates a
-local clone of this repository and passes through to the script.
+"Steady state" below). `import` is run by hand today; once the
+review tracking CI template planned in
+`docs/plans/PLAN-review-import.md` is rolled out, that workflow
+will run `prune` and then `import`, in that order, on every push
+and daily.
+Target repositories carry a thin wrapper (for example ryll's
+`tools/review-tracking.sh`) that locates a local clone of this
+repository and passes through to the script.
 
 ## The pieces
 
@@ -44,6 +49,11 @@ local clone of this repository and passes through to the script.
   blob SHA and date of each review so staleness is a mechanical
   check, and a generated **`REVIEWS.md`** surfaces the review state
   to people who do not know to look in `.vscode/`.
+* **An imports file** (`.vscode/imports.weaudit-shas.json`, written
+  by the `import` subcommand, never by weAudit or a human) records
+  full-file reviews carried in from this repository's own review
+  history rather than made in this clone -- see "Importing reviews
+  from this repository" under "Steady state".
 * **A scope config** (`.vscode/review-scope.toml`) defines which
   files count as reviewable: `include` and `exclude` lists of
   fnmatch patterns matched against repo-relative paths (`*` matches
@@ -67,7 +77,10 @@ local clone of this repository and passes through to the script.
   excluded, as should ephemeral working documents like a
   `docs/plans/` archive -- point-in-time records of intended work,
   not living artifacts, and numerous enough to swamp the queue.
-  Whether unit tests are in scope is a per-repo decision.
+  Whether unit tests are in scope is a per-repo decision. An
+  optional `import-exclude` list names files that must never be
+  marked reviewed by import (see "Importing reviews from this
+  repository" under "Steady state").
 
 ## Adopting a repository
 
@@ -327,6 +340,14 @@ gitsign verify \
 git log --show-signature -- .vscode/   # with the config above
 ```
 
+`import` performs the same check, and needs to know which identity
+each reviewer signs as: `REVIEWER_IDENTITIES` in
+`scripts/review-tracking.py` maps a reviewer name (the `<username>`
+of `.vscode/<username>.weaudit`) to their certificate identity.
+When a new reviewer starts signing review-state commits here, add
+an entry for them; until then `import` cannot verify their reviews
+and skips each one with a warning naming them.
+
 Note that GitHub's web UI shows gitsign commits as "Unverified"
 (reason `bad_cert`): GitHub cannot validate Fulcio's short-lived
 certificates. This is expected -- the trust path is gitsign
@@ -382,7 +403,11 @@ A session therefore looks like:
    ```
 
    picks a random unreviewed in-scope file and opens it in VSCode
-   (`--no-open` to just print it).
+   (`--no-open` to just print it). A file imported from this
+   repository's own review history (see "Importing reviews from
+   this repository" under "Steady state") shows no tick in weAudit
+   and is not offered here; reviewing it by hand supersedes the
+   import.
 3. Read it. weAudit's explorer ticks show what is already done;
    Claude Code in the integrated terminal for questions.
 4. Mark it reviewed (`weAudit: Mark File as Reviewed`), attach
@@ -548,15 +573,167 @@ Actions app as a bypass actor, so shakenfist-bot pushes with
 finds nothing left to prune (observed 2026-09-11 04:57:20 UTC,
 `Prune stale review marks.`, which committed nothing).
 
-The bot's prune commits are not signed, and do not need to be:
-prune can only *remove* marks, never add or refresh them ('a
-stamped entry is never re-stamped while it exists', above, is
-enforced by `stamp`, which the automation never runs). The
-attestations live in the signed review-state commits already in
-history, and verifying a mark means verifying the signed commit
-that *introduced* its stamp -- an unsigned later commit that
-deletes marks weakens nothing. Removing a mark is always safe; it
-merely queues the file for re-review.
+The bot's prune commits are not signed, and do not need to be, and
+that argument is scoped to what prune does: prune can only *remove*
+marks, never add or refresh them ('a stamped entry is never
+re-stamped while it exists', above, is enforced by `stamp`, which
+the automation never runs). The attestations live in the signed
+review-state commits already in history, and verifying a native mark
+means verifying the signed commit that *introduced* its stamp -- an
+unsigned later commit that deletes marks weakens nothing. Removing a
+mark is always safe; it merely queues the file for re-review.
+
+`import` will also run unsigned from the bot -- it is run by hand
+until the review tracking CI template planned in
+`docs/plans/PLAN-review-import.md` adds it to the `prune-reviews`
+workflow -- and it adds marks, so it needs its own argument rather
+than inheriting prune's. An imported
+entry is not itself an attestation: it is a pointer to one --
+the repository, path, and introducing commit of a signed
+review-state commit already made in this repository (see
+"Importing reviews from this repository" below). Trusting the entry
+means verifying that commit, which `import` does at the moment it
+writes the entry, not later and not by anyone downstream. This is a
+genuinely new trust surface -- for the first time, an unsigned bot
+commit can cause a file to read as reviewed -- and verification is
+what bounds it: the bot can only relay an attestation a human has
+already signed, and an entry it cannot verify is skipped and
+reported rather than written.
+
+**Importing reviews from this repository.** Much of what an adopted
+repository has to review is not its own code: workflow templates,
+helper scripts, and exported GitHub configuration are written and
+reviewed here, then copied out byte-for-byte by
+`standards-alignment` rollouts and reviewed again, file by file, in
+every repository that received them. A review mark attests to a
+blob SHA, not a path, and two files with the same blob SHA have the
+same bytes -- so a review of a blob here is equally a review of an
+identical blob anywhere else. `review-tracking.py import`, run in an
+adopted repository, marks as reviewed every in-scope file whose
+`HEAD` blob matches one this repository has fully reviewed.
+
+Only full-file marks count, and only from this repository's own
+sidecar history. `stamp` also stamps files carrying partial (region)
+marks, so `import` walks every `.vscode/*.weaudit-shas.json` in this
+repository's history, oldest commit first, and credits a
+`(reviewer, blob)` pair only where the same commit's
+`.vscode/<reviewer>.weaudit` has a full-file `auditedFiles` entry for
+that path. Where a blob was reviewed more than once, the earliest
+qualifying commit wins, since that is the attestation to point at.
+Any path is eligible, not only `templates/`: identical bytes need no
+context the file does not carry, and a whole-file review never
+attested to context either -- a native mark does not go stale when a
+script the file calls changes. History matters because a target's
+copy often lags a template this repository has since changed and
+re-reviewed: the copy's blob then matches an older stamp, which only
+the sidecar's history still records, not `HEAD`.
+
+The imported marks live only in `.vscode/imports.weaudit-shas.json`,
+a sidecar-shaped file with no `.weaudit` file beside it, and
+`import` never writes a `.weaudit` file or a human reviewer's own
+sidecar. This is deliberately narrower than it could be: weAudit
+loads every `.vscode/*.weaudit` file and decorates a file as audited
+from its path alone, whatever file or author the entry came from
+(`src/codeMarker.ts:626-628` in trailofbits/vscode-weaudit), so a
+`.weaudit` imports file would show ticks in VSCode for files nobody
+read in this clone. Worse, weAudit writes an `auditedFiles` change
+back to `<author>.weaudit` (`codeMarker.ts:559-586`, `:931`), so an
+imported entry authored by the original reviewer would, once
+un-ticked, be written into that reviewer's own state file in this
+repository, mixing imported reviews into a human's record. weAudit only globs `*.weaudit`, so it never reads the
+sidecar-shaped imports file, and the name is already covered by the
+`.gitignore` exception and the `paths-ignore` entry
+(`.vscode/*.weaudit-shas.json`) that step 8 of "Adopting a
+repository" puts in every adopted repository, so an import commit
+needs no new exception and triggers none of the expensive CI lanes.
+
+Each entry records where the attestation lives, not the attestation
+itself:
+
+```json
+{
+  "version": 1,
+  "files": {
+    "<target path>": {
+      "sha": "<blob sha>",
+      "date": "<source stamp date>",
+      "imported": {
+        "repo": "shakenfist/development",
+        "reviewer": "<reviewer>",
+        "path": "<source path>",
+        "commit": "<introducing commit>",
+        "verified": true
+      }
+    }
+  }
+}
+```
+
+`date` is the source stamp's date, not the day of the import,
+because it records when the content was actually read. `verified`
+records whether the introducing commit's signature was checked --
+see the attestation argument above for why `import` checks it before
+trusting the entry, rather than leaving verification to a later
+reader. A commit that fails verification is skipped with a warning
+naming it, as is a review by a reviewer with no entry in
+`REVIEWER_IDENTITIES` (see "Commit signing"). `status` does not
+verify an imported entry's provenance, any more than it verifies a
+native mark's signature: it only checks that the blob SHA still
+matches `HEAD`, the same as it does for a native mark.
+
+`--no-verify` is the only way to import without verification. It
+disables the check outright, every run under it says so on stderr,
+and what it imports is recorded with `verified: false` and shown in
+`REVIEWS.md` with an `(unverified)` suffix on its Source cell,
+rather than passed off as checked. A run without gitsign on `PATH`
+does not fall back to that: it imports nothing, leaves the entries
+already recorded alone, ends with a warning banner on stderr saying
+so and pointing at `--no-verify`, and still exits zero, so that a
+CI job on a runner without gitsign neither fails nor marks anything
+reviewed. It still removes entries, which needs no verification.
+
+A file whose native mark has gone stale is not imported until
+`prune` has removed the mark, which is why the workflow will run
+`prune` first; until then the file's own review history says it
+needs a human. An imported entry that has itself gone stale -- its
+blob is no longer the file's content at `HEAD` -- is replaced if the
+new content was reviewed here too and can be imported, and
+otherwise removed by `import` itself, with the same message `prune`
+gives, so that `REVIEWS.md` never shows it as reviewed in the
+meantime. `import` regenerates `REVIEWS.md` when it changes
+anything, as `stamp` and `prune` do.
+
+A native review always supersedes an import: if a reviewer marks a
+file that already carries an imported entry, `import` removes its
+own entry on the next run, so `REVIEWS.md` shows one row per file and
+the human's review is the one kept.
+
+An import can be rejected the same way scope itself is narrowed.
+`.vscode/review-scope.toml` gains an `import-exclude` list of
+fnmatch patterns with the same semantics as `exclude` (`!`
+re-includes), and, like the other exclusions in that file, an entry
+should say why:
+
+```toml
+# Byte-identical to the template today, but this file is genuinely
+# per-repository and a shared review would hide that it needs its
+# own read.
+import-exclude = ['config/local-overrides.yml']
+```
+
+`import` never adds an entry matching `import-exclude`, and removes
+any existing imported entry that starts matching one.
+
+`REVIEWS.md`'s reviewed-files table gains a `Source` column: `-` for
+a native review, `development@<12-char commit>` for an imported one
+(with ` (unverified)` appended if it was imported under `--no-verify`),
+with the `Reviewer` cell taken from the entry's own provenance rather
+than from a `.weaudit` file in this clone.
+
+This repository does not import from itself. A template and this
+repository's own instance of it could in principle cross-import, but
+the case is rare enough that `import` simply refuses to run when the
+target is this repository, whether this clone or a worktree of it.
 
 **Backlog alerting.** The daily consistency audit runs a
 `review-coverage` check (`docs/audits/review-coverage.md`) against
