@@ -1,15 +1,26 @@
 # Copyright 2026 Michael Still and contributors
 
-"""Every call of smoke-cluster.yml passes the headroom gate's off switch.
+"""Every call of smoke-cluster.yml states its headroom gate policy.
 
 PLAN-ci-cloud-sizing phase 5 made a cluster-wide band violation fail the
 cluster job, in `shakenfist/actions`'s smoke-cluster.yml, which this
-repository reaches at `@main` with no pin. The recovery for a spurious gate
-is therefore not a revert but the CI_HEADROOM_GATE repository variable, and
-that only works for a call site which passes it through as `headroom_gate`.
-A call site which does not is gated with no way to switch it off, and
-nothing about the job would say so until the day the switch was needed.
-docs/developer_guide/ci.md states the rule; this is what enforces it.
+repository reaches at `@main` with no pin. Two rules follow, and this is
+what enforces them; docs/developer_guide/ci.md states them.
+
+A call site which is gated must pass the CI_HEADROOM_GATE repository
+variable through as `headroom_gate`, because the recovery for a spurious
+gate is that variable rather than a revert. The reusable workflow defaults
+to gating, so a call site which passes nothing is gated with no way to
+switch it off, and nothing about the job would say so until the day the
+switch was needed. Every call site therefore passes `headroom_gate`
+explicitly, either as the off switch or as a literal false.
+
+And a call site may only be gated on a job shape a warn window measured.
+D7's test for arming the gate was that it would not have failed runs which
+were fine, and that test says nothing about a shape it never saw. The
+shape is derived from what each call site (and each matrix entry) actually
+passes, so a new matrix entry on an unmeasured topology fails here rather
+than arming itself.
 """
 
 import glob
@@ -23,6 +34,28 @@ from shakenfist.tests import base
 
 REUSABLE_WORKFLOW = 'smoke-cluster.yml'
 OFF_SWITCH = "${{ vars.CI_HEADROOM_GATE != 'false' }}"
+
+# The inputs which decide a job's shape, and the defaults smoke-cluster.yml
+# in shakenfist/actions gives them when a caller passes nothing. They live
+# in another repository, so they are restated here rather than read.
+SHAPE_DEFAULTS = {
+    'topology': 'localhost',
+    'tier': 'smoke',
+    'test_kind': 'functional',
+    'stestr_config': 'smoke-ci.conf',
+}
+
+# The shapes phase 5's warn window measured -- every job of the merge
+# matrix, ten merge_group runs each, recorded in the 5e Outcome of
+# docs/plans/PLAN-ci-cloud-sizing-phase-05-guardrails.md. Adding a shape
+# here is the act of arming the gate on it, and needs a window of its own.
+MEASURED_SHAPES = {
+    ('slim-primary', 'full', 'functional', 'cluster-ci.conf'),
+    ('slim-primary', 'full', 'functional', 'guest-ci.conf'),
+    ('slim-tier', 'full', 'functional', 'cluster-ci.conf'),
+}
+
+MATRIX_REFERENCE = re.compile(r'^\$\{\{\s*matrix\.(\w+)\.(\w+)\s*\}\}$')
 
 
 def _repo_root():
@@ -49,7 +82,50 @@ class HeadroomGateWorkflowSeamsTestCase(base.ShakenFistTestCase):
                     sites.append(('%s:%s' % (name, job_name), job))
         return sites
 
-    def test_every_call_site_passes_the_off_switch(self):
+    def _shapes(self, site, job):
+        """The job shape of every run a call site can make.
+
+        One per matrix entry the shape inputs reference, or one for a call
+        site with no matrix. An input which is an expression this cannot
+        resolve fails the test rather than being skipped: a shape it cannot
+        derive is a shape it cannot say was measured.
+        """
+        inputs = job.get('with') or {}
+        matrix = (job.get('strategy') or {}).get('matrix') or {}
+        axes = set()
+        for key in SHAPE_DEFAULTS:
+            match = MATRIX_REFERENCE.match(str(inputs.get(key, '')))
+            if match:
+                axes.add(match.group(1))
+        self.assertLessEqual(
+            len(axes), 1,
+            '%s takes its shape from more than one matrix axis (%s), which '
+            'this test does not expand.' % (site, sorted(axes)))
+        entries = matrix.get(axes.pop()) if axes else [{}]
+        self.assertTrue(entries, '%s references a matrix axis with no entries.'
+                        % site)
+
+        shapes = []
+        for entry in entries:
+            shape = []
+            for key, default in SHAPE_DEFAULTS.items():
+                value = inputs.get(key, default)
+                match = MATRIX_REFERENCE.match(str(value))
+                if match:
+                    self.assertIn(
+                        match.group(2), entry,
+                        '%s: matrix entry %r has no %s.'
+                        % (site, entry, match.group(2)))
+                    value = entry[match.group(2)]
+                self.assertNotIn(
+                    '${{', str(value),
+                    '%s passes %s as %r, which this test cannot resolve to '
+                    'a job shape.' % (site, key, value))
+                shape.append(value)
+            shapes.append(tuple(shape))
+        return shapes
+
+    def test_every_call_site_states_its_gate(self):
         sites = self._call_sites()
         self.assertTrue(
             sites,
@@ -57,12 +133,33 @@ class HeadroomGateWorkflowSeamsTestCase(base.ShakenFistTestCase):
             'workflow was renamed, update REUSABLE_WORKFLOW.'
             % REUSABLE_WORKFLOW)
         for site, job in sites:
-            self.assertEqual(
-                OFF_SWITCH, (job.get('with') or {}).get('headroom_gate'),
-                '%s calls %s without passing headroom_gate: %s, so the '
-                'CI_HEADROOM_GATE repository variable cannot switch the '
-                'headroom band gate off for it.'
-                % (site, REUSABLE_WORKFLOW, OFF_SWITCH))
+            gate = (job.get('with') or {}).get('headroom_gate')
+            self.assertIn(
+                gate, (OFF_SWITCH, False),
+                '%s calls %s with headroom_gate: %r. It must pass either %s, '
+                'so the CI_HEADROOM_GATE repository variable can switch the '
+                'headroom band gate off for it, or false. Passing nothing '
+                'leaves it gated by the reusable workflow\'s default with no '
+                'way to switch it off.'
+                % (site, REUSABLE_WORKFLOW, gate, OFF_SWITCH))
+
+    def test_only_measured_shapes_are_gated(self):
+        armed = 0
+        for site, job in self._call_sites():
+            if (job.get('with') or {}).get('headroom_gate') is False:
+                continue
+            armed += 1
+            for shape in self._shapes(site, job):
+                self.assertIn(
+                    shape, MEASURED_SHAPES,
+                    '%s arms the headroom band gate on %s (topology, tier, '
+                    'test_kind, stestr_config), which no warn window has '
+                    'measured. Pass headroom_gate: false until one has.'
+                    % (site, shape))
+        self.assertGreater(
+            armed, 0,
+            'No call site arms the headroom band gate, so this test checks '
+            'nothing about which shapes are gated.')
 
     def test_every_textual_reference_is_a_parsed_call_site(self):
         """A reference the job walk above missed would escape the check.

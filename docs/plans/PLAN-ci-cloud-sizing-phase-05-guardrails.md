@@ -201,7 +201,8 @@ any topology changes, which is exactly what phase 4 does".
 Phase 4 never touched it and never mentions it: `grep -n '10\.0\.0\.2'
 docs/plans/PLAN-ci-cloud-sizing-phase-04-topologies.md` is empty. The
 list is still the `nodes=(10.0.0.20 ... 10.0.0.24)` line in
-`.github/workflows/functional-tests.yml`'s `node_lifecycle_collection` job, which deploys `slim-primary`.
+`.github/workflows/functional-tests.yml`'s `node_lifecycle_collection`
+job, which deploys `slim-primary`.
 
 It did not break, because phase 4 changed `slim-tier`'s vCPU and not
 `slim-primary`'s node count or addressing. It is still a live latent
@@ -589,12 +590,22 @@ morning #4308 merged. Ten merge runs carried cluster bundles; three
 further runs in the window (`35909829697`, `35935845390`, `35975439402`)
 are documentation syncs whose `check_paths` reported `code_changed ==
 'false'`, so they ran no functional job at all and are not in the table.
-That is ten runs per cluster topology, against the six 5e asked for.
+That is ten runs per cluster job, against the six per topology 5e asked
+for.
+
+The first version of this section tabulated only the three jobs 5e named
+and left `Guests` out, though the harvest had read it and it is the
+fourth entry of the same merge matrix. It is restored below. It changes
+none of the conclusions about the upper bound, but it is the evidence
+that every job the merge matrix runs was measured -- which is what
+arming the gate on that matrix, and on nothing else, rests on (see
+*Where the gate is armed* under 5f).
 
 | Job | Topology | Runs | min p90 | max p90 | WITHIN | OVERSIZED | OVERSUBSCRIBED | per-node ABOVE |
 |---|---|---|---|---|---|---|---|---|
 | Debian 12 cluster | `slim-primary` | 10 | 0.296 | 0.370 | 2 | 8 | 0 | 2 |
 | Ubuntu 24.04 cluster | `slim-primary` | 10 | 0.259 | 0.407 | 3 | 7 | 0 | 3 |
+| Guests | `slim-primary` | 10 | 0.222 | 0.296 | 0 | 10 | 0 | 4 |
 | Debian 12 tier | `slim-tier` | 10 | 0.292 | 0.417 | 5 | 5 | 0 | 1 |
 
 The verdicts are recomputed from each bundle's raw series by the current
@@ -606,9 +617,9 @@ judge the per-node bound.
 
 
 **The headline is the one that decides 5f: nothing came within 0.28 of
-the upper bound.** The maximum cluster-wide p90 over all 30 job-runs is
+the upper bound.** The maximum cluster-wide p90 over all 40 job-runs is
 0.417 against a bound of 0.70, and no job-run in the window exceeded it.
-Twenty of the thirty fell below the lower bound of 0.35.
+Thirty of the forty fell below the lower bound of 0.35.
 
 **D2's prediction, both halves.** D2 predicted `slim-tier` "should stop
 reading OVERSUBSCRIBED and may begin reading OVERSIZED". Both halves are
@@ -616,15 +627,17 @@ right: not one OVERSUBSCRIBED reading survives on the reshaped topology,
 where phase 2 had measured 37 of 50 job-runs above the upper bound, and
 5 of 10 now read OVERSIZED. What D2 did not predict is the more
 interesting half of the result. `slim-primary`, which phase 4
-deliberately did **not** reshape, reads OVERSIZED more often (15 of 20)
-than the topology that was reshaped (5 of 10). The band did not follow
+deliberately did **not** reshape, reads OVERSIZED more often (15 of 20
+on the cluster suite, 25 of 30 with `Guests`) than the topology that was
+reshaped (5 of 10). The band did not follow
 the reshape so much as reveal that the untouched topology was already the
 emptier of the two -- which is a phase 6 question about `slim-primary`,
 not a phase 5 one.
 
 **The refusal count held, as D5 said it would.** `slim-tier` records 10
-to 19 capacity-stage drops per run against `slim-primary`'s 16 to 31,
-and guard denials sit at 161-193 against 147-239, on a topology with
+to 19 capacity-stage drops per run against `slim-primary`'s 16 to 31 on
+the same cluster suite, and guard denials sit at 161-193 against 147-239
+(`Guests`, a lighter suite, records 0 to 3 and 18 to 55), on a topology with
 twice the ledger of the one phase 2 measured. `expected_demand` fills
 whatever bound it is given; this is that mechanism, measured a second
 time and in a second place.
@@ -658,12 +671,12 @@ remaining and only irreversible act was here -- adding
 `BAND_VIOLATION_EXIT = 3` to `tools/ci_headroom_report.py` and returning
 it for an OVERSUBSCRIBED cluster-wide band. That merge order was chosen
 deliberately, because every `functional-tests.yml` call site references
-that workflow at `@main` with no pin: whichever half landed second is the one that
-switches the gate on, so the second half is the one that belongs in the
-repository a revert can reach.
+that workflow at `@main` with no pin: whichever half landed second is the
+one that switches the gate on, so the second half is the one that belongs
+in the repository a revert can reach.
 
 **What the window says about the gate, run by run.** It would have failed
-none of the 30 job-runs above. That is the test D7 set ("a gate that
+none of the 40 job-runs above. That is the test D7 set ("a gate that
 would have failed runs which were fine is not ready") and it passes
 emphatically rather than narrowly: the closest run sat 0.28 below the
 bound. The honest statement of the other side is that a gate which fires
@@ -675,9 +688,9 @@ regression, which is precisely the direction phase 2 measured
 **What is not gated, and why the asymmetry is load-bearing.** D7 already
 ruled out the per-node bound (D4) and the refusal clause (D5); D8 already
 ruled out the lower bound. The window turns the last of those from a
-judgement into an arithmetic fact: 20 of 30 job-runs read OVERSIZED, so a
-status returned for a lower-bound violation would have reddened two
-thirds of cluster CI on the first run after this merged. The report
+judgement into an arithmetic fact: 30 of 40 job-runs read OVERSIZED, so a
+status returned for a lower-bound violation would have reddened three
+quarters of cluster CI on the first run after this merged. The report
 therefore returns `BAND_VIOLATION_EXIT` for exactly one condition, and 0
 for an unreadable series, an absent census, a thin series with no
 verdict, a usage error and a bug in the report itself -- D15 holding
@@ -696,7 +709,30 @@ committed data rather than assumed: the 204 version 1 baseline records
 have at least 41 usable samples each, and the 32 version 2 addendum
 records -- the only ones carrying the flag and prefix counts -- have at
 least 57, no degraded sample and no unreadable sample after the prefix.
-So the guard would have withheld nothing in either dataset.
+The floor counts samples which produced a fraction (`n_fraction`), which
+those records do not carry, but no record in either file lists a node
+without a CPU ledger, so every usable sample produced one and the
+usable-sample counts bound the floor directly. The 40 job-runs of the 5e
+window, re-harvested with the current report, carry `n_fraction`
+directly: it equals `n` in every one, the smallest is 67, and none has
+the gate withheld. So the guard would have withheld nothing in any of
+the three datasets.
+
+**Where the gate is armed.** Only on job shapes this window measured.
+The harvest reads `merge_group` runs, so the window covers exactly the
+four entries of the merge matrix, and the gate is armed there alone.
+Three other call sites of `smoke-cluster.yml` pass `headroom_gate:
+false` instead: the smoke tier job, which runs on pull requests only on
+a single node and has never been harvested; the Ansible modules job,
+whose collect step does not run at all for its `test_kind`; and the
+scheduled matrix, which is dispatch-only and whose single machine entry
+has never been harvested either. They pass `false` rather than nothing
+because the reusable workflow defaults to gating.
+`shakenfist/tests/test_headroom_gate_workflow_seams.py` derives each
+call site's shape (topology, tier, `test_kind`, `stestr_config`, per
+matrix entry) and fails if an armed one is not a measured shape, so
+arming another shape is a deliberate edit to its `MEASURED_SHAPES`
+that should come with a window of its own.
 
 **Both guards were proven live, not read.** Against a synthetic
 oversubscribed series, `ci_headroom_verdict.sh` from `actions`'s `main`
@@ -717,7 +753,8 @@ the demand estimator's calibration.
 **D9's issue, filed.**
 [#4320](https://github.com/shakenfist/shakenfist/issues/4320) records the
 hardcoded `10.0.0.20`-`10.0.0.24` upload-target list in the
-`node_lifecycle_collection` job of `.github/workflows/functional-tests.yml`, phase 0's D4 commitment and
+`node_lifecycle_collection` job of
+`.github/workflows/functional-tests.yml`, phase 0's D4 commitment and
 why phase 5 is not fixing it. It is in the master plan's Future work.
 
 ### The per-run window
@@ -744,6 +781,17 @@ why phase 5 is not fixing it. It is in the master plan's Future work.
 | [35940203974](https://github.com/shakenfist/shakenfist/actions/runs/35940203974) | Ubuntu 24.04 cluster | 0.333 | OVERSIZED | 0.833 | WITHIN BAND | 16 | 197 |
 | [35946925675](https://github.com/shakenfist/shakenfist/actions/runs/35946925675) | Ubuntu 24.04 cluster | 0.296 | OVERSIZED | 0.833 | WITHIN BAND | 16 | 163 |
 | [35954362019](https://github.com/shakenfist/shakenfist/actions/runs/35954362019) | Ubuntu 24.04 cluster | 0.296 | OVERSIZED | 0.833 | WITHIN BAND | 23 | 162 |
+True 67
+| [35666222479](https://github.com/shakenfist/shakenfist/actions/runs/35666222479) | Guests | 0.259 | OVERSIZED | 1.000 | ABOVE BAND | 3 | 50 |
+| [35677335839](https://github.com/shakenfist/shakenfist/actions/runs/35677335839) | Guests | 0.296 | OVERSIZED | 1.000 | ABOVE BAND | 3 | 46 |
+| [35713308961](https://github.com/shakenfist/shakenfist/actions/runs/35713308961) | Guests | 0.259 | OVERSIZED | 0.667 | WITHIN BAND | 1 | 18 |
+| [35781045381](https://github.com/shakenfist/shakenfist/actions/runs/35781045381) | Guests | 0.259 | OVERSIZED | 1.000 | ABOVE BAND | 3 | 38 |
+| [35792467388](https://github.com/shakenfist/shakenfist/actions/runs/35792467388) | Guests | 0.222 | OVERSIZED | 0.667 | WITHIN BAND | 0 | 24 |
+| [35804030364](https://github.com/shakenfist/shakenfist/actions/runs/35804030364) | Guests | 0.259 | OVERSIZED | 0.667 | WITHIN BAND | 0 | 38 |
+| [35851169069](https://github.com/shakenfist/shakenfist/actions/runs/35851169069) | Guests | 0.296 | OVERSIZED | 0.667 | WITHIN BAND | 0 | 46 |
+| [35940203974](https://github.com/shakenfist/shakenfist/actions/runs/35940203974) | Guests | 0.259 | OVERSIZED | 0.667 | WITHIN BAND | 0 | 55 |
+| [35946925675](https://github.com/shakenfist/shakenfist/actions/runs/35946925675) | Guests | 0.222 | OVERSIZED | 0.667 | WITHIN BAND | 1 | 24 |
+| [35954362019](https://github.com/shakenfist/shakenfist/actions/runs/35954362019) | Guests | 0.259 | OVERSIZED | 1.000 | ABOVE BAND | 1 | 31 |
 | [35666222479](https://github.com/shakenfist/shakenfist/actions/runs/35666222479) | Debian 12 tier | 0.333 | OVERSIZED | 0.833 | WITHIN BAND | 11 | 170 |
 | [35677335839](https://github.com/shakenfist/shakenfist/actions/runs/35677335839) | Debian 12 tier | 0.375 | WITHIN BAND | 0.833 | WITHIN BAND | 14 | 193 |
 | [35713308961](https://github.com/shakenfist/shakenfist/actions/runs/35713308961) | Debian 12 tier | 0.333 | OVERSIZED | 0.500 | WITHIN BAND | 10 | 171 |
@@ -757,14 +805,22 @@ why phase 5 is not fixing it. It is in the master plan's Future work.
 
 ### What phase 6 inherits
 
-* **A gate that has never fired.** Nothing in 30 job-runs came near the
+* **A gate that has never fired.** Nothing in 40 job-runs came near the
   bound. The first real firing will be the first evidence about its
   false-positive rate, and the response to a surprise is setting the
   `CI_HEADROOM_GATE` repository variable to `false` rather than a revert,
-  because `@main` is unpinned. All four `smoke-cluster.yml` call sites pass
-  it through as `headroom_gate`; see `docs/developer_guide/ci.md`.
+  because `@main` is unpinned. The merge matrix passes it through as
+  `headroom_gate`; the three unmeasured call sites are not gated at all.
+  See `docs/developer_guide/ci.md`.
+* **Three call sites are not gated at all.** The smoke tier job, the
+  Ansible modules job and the scheduled matrix pass `headroom_gate:
+  false`, because the window never measured them (see *Where the gate is
+  armed*). Arming the smoke tier -- the one that runs on every pull
+  request -- needs a window of pull request runs, and
+  `tools/ci_headroom_harvest.py` reads only `merge_group` runs today.
 * **`slim-primary` reads OVERSIZED more often than the topology phase 4
-  reshaped.** 15 of 20 job-runs, against `slim-tier`'s 5 of 10. Phase 4
+  reshaped.** 25 of 30 job-runs (15 of 20 on the cluster suite), against
+  `slim-tier`'s 5 of 10. Phase 4
   left `slim-primary` alone on the argument that more vCPU changes
   *which* placements are refused rather than how many; the band now says
   something separate about it, which is that it is the emptier cloud.

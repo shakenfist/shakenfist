@@ -19,11 +19,14 @@ shakenfist import, no third-party import. The percentile() helper below is
 copied verbatim from tools/queue-wait-report.py for that reason rather than
 imported.
 
-It also exits zero whatever it finds (D15). This phase builds an instrument
-and gates nothing; an instrument which can fail the job changes the thing it
-is measuring, and would do so during the very window whose distribution
-phase 2 means to read. Even an internal error here is printed and shrugged
-off, never raised.
+It exits zero whatever it finds about itself (D15): an instrument which can
+fail the job changes the thing it is measuring. An unreadable series, an
+absent census, a usage error and even an internal error here are printed
+and shrugged off, never raised. Exactly one thing returns non-zero, and it
+is a statement about the cloud rather than the instrument: from phase 5's
+5f, a cluster-wide OVERSUBSCRIBED band on a series the report could read
+returns BAND_VIOLATION_EXIT. That constant's comment below is where the
+contract, and why it is the only exception, is stated.
 
 Two instruments, reported separately (D9). A fifteen second poll cannot see
 a refusal, which begins and ends between samples; a census cannot see a
@@ -171,9 +174,11 @@ BAND_UPPER = 0.70
 
 # The exit status this tool returns when, and only when, the cluster-wide
 # fraction sits above BAND_UPPER. Phase 5's 5f armed it against a window of
-# 30 cluster job-runs over 10 merge runs in which nothing came within 0.28 of
+# 40 cluster job-runs over 10 merge runs in which nothing came within 0.28 of
 # that bound (max 0.417), so gating on it would have failed nothing that was
-# fine -- which is the whole test D7 set for it.
+# fine -- which is the whole test D7 set for it. That window is the merge
+# matrix's four jobs, and the gate is armed on those shapes alone; see
+# shakenfist/tests/test_headroom_gate_workflow_seams.py.
 #
 # The *name* of this constant is load-bearing, not only its value.
 # shakenfist/actions's tools/ci_headroom_verdict.sh believes a status of 3
@@ -188,9 +193,9 @@ BAND_UPPER = 0.70
 #
 # Only this one direction gates. D7 rules out the per-node bound (D4) and the
 # refusal clause (D5) as candidates, and D8 rules out the lower bound -- which
-# matters more than it reads, because 20 of those same 30 job-runs are
-# OVERSIZED, so a status returned for a lower-bound violation would redden two
-# thirds of cluster CI on its first run. Everything else this tool can meet --
+# matters more than it reads, because 30 of those same 40 job-runs are
+# OVERSIZED, so a status returned for a lower-bound violation would redden
+# three quarters of cluster CI on its first run. Everything else this tool can meet --
 # an unreadable series, an absent census, a bug in the report itself -- still
 # returns 0 and is still only printed. D15's rule that an instrument may not
 # fail the job it measures holds everywhere except here, and this is not an
@@ -209,10 +214,10 @@ BAND_VIOLATION_EXIT = 3
 # (the committed_cpu block's n_fraction), not from the usable samples, since
 # a usable sample whose ledgered nodes sum to no ledger at all produces no
 # fraction. At the probe's 15 second interval this is five minutes of a
-# cluster which was actually readable; the smallest of the 204 job-runs in the committed phase 2
-# baseline had 41, and a complete cluster job runs for around 29 minutes,
-# so this withholds only a series which stopped early or could barely be
-# read. Below it the p90 is close to the maximum of a few samples, which
+# cluster which was actually readable; the smallest of the 204 job-runs in
+# the committed phase 2 baseline had 41, and a complete cluster job runs for
+# around 29 minutes, so this withholds only a series which stopped early or
+# could barely be read. Below it the p90 is close to the maximum of a few samples, which
 # is a single busy moment rather than a statement about the cloud.
 BAND_GATE_MIN_SAMPLES = 20
 
@@ -1244,10 +1249,11 @@ def metric_block(values, fractions, ledgers):
     measured against as a range; and the count, p90 and peak of the
     fraction of that ledger. The two counts differ whenever a sample had
     the quantity but no ledger to divide it by, and anything judging the
-    fraction must use n_fraction, which is what the p90 rests on. The fractions are computed per sample and percentiled
-    afterwards, never derived by dividing one percentile by another -- a
-    ratio of two percentiles is a number nothing ever stood at, and the
-    printed table says as much.
+    fraction must use n_fraction, which is what the p90 rests on. The
+    fractions are computed per sample and percentiled afterwards, never
+    derived by dividing one percentile by another -- a ratio of two
+    percentiles is a number nothing ever stood at, and the printed table
+    says as much.
     """
     low, high = ledger_bounds(ledgers)
     return collections.OrderedDict([
@@ -2891,6 +2897,18 @@ def step_summary_lines(record):
     else:
         lines.append('* Refusal warning: no capacity-stage drops in the '
                      'census window')
+    # The one line which says whether the band decided the job's exit
+    # status, so a red job's summary names its cause and a withheld
+    # verdict -- the gate going quiet -- is visible without the log.
+    if verdict['gates']:
+        lines.append(
+            '* Gate: this verdict returns exit status %d, which fails the '
+            'job unless the CI_HEADROOM_GATE switch is off (5f)'
+            % BAND_VIOLATION_EXIT)
+    elif verdict['band'] == 'OVERSUBSCRIBED':
+        lines.append(
+            '* Gate: WITHHELD, exit status 0 -- the series cannot support '
+            'the verdict: %s' % '; '.join(verdict['gate_withheld']))
     annotations = band_annotations(record)
     if annotations:
         count = len(annotations)

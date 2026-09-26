@@ -378,12 +378,13 @@ jobs:
     with:
       component: shakenfist
       component_ref: ${{ github.sha }}
-      # The headroom band gate's off switch (PLAN-ci-cloud-sizing phase 5).
-      # Set the CI_HEADROOM_GATE repository variable to 'false' to stop a
-      # band violation failing cluster jobs without a commit. Unset, or
-      # anything else, leaves the gate on. Repeated at every call site of
-      # smoke-cluster.yml in functional-tests.yml and scheduled-tests.yml.
-      headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}
+      # Not gated on the headroom band (PLAN-ci-cloud-sizing phase 5). The
+      # gate is armed only on job shapes a warn window measured, and this
+      # one -- single-node, smoke tier, pull requests only -- has never been
+      # harvested, because the harvest reads merge_group runs. Passed
+      # explicitly because the reusable workflow defaults to gating; see
+      # docs/developer_guide/ci.md and test_headroom_gate_workflow_seams.py.
+      headroom_gate: false
       tier: smoke
 
   automated_reviewer:
@@ -495,7 +496,11 @@ jobs:
     with:
       component: shakenfist
       component_ref: ${{ github.sha }}
-      # The headroom band gate's off switch: see the smoke tier job above.
+      # The headroom band gate's off switch (PLAN-ci-cloud-sizing phase 5).
+      # Set the CI_HEADROOM_GATE repository variable to 'false' to stop a
+      # band violation failing these jobs without a commit; unset, or
+      # anything else, leaves the gate on. Every entry of this matrix was
+      # in phase 5's measured window, which is what arming it requires.
       headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}
       tier: full
       topology: ${{ matrix.merge.topology }}
@@ -520,8 +525,9 @@ jobs:
     with:
       component: shakenfist
       component_ref: ${{ github.sha }}
-      # The headroom band gate's off switch: see the smoke tier job above.
-      headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}
+      # Not gated: the collect step only runs for test_kind functional, so
+      # this job has never been measured. See the smoke tier job above.
+      headroom_gate: false
       tier: full
       topology: slim-primary
       base_image: 'sf://label/ci-images/debian-12'

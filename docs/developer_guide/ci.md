@@ -437,9 +437,9 @@ incidental:
 
 * **The lower bound (0.35) never gates.** Being oversized is not urgent,
   no build is at risk, and the response is a topology change nobody makes
-  from one run. It is also the *common* reading -- 20 of the 30 cluster
+  from one run. It is also the *common* reading -- 30 of the 40 cluster
   job-runs phase 5 measured were below it -- so returning a status for it
-  would redden two thirds of cluster CI immediately. Ask the question over
+  would redden three quarters of cluster CI immediately. Ask the question over
   a window instead; the command is below.
 * **The per-node bound (0.85) never gates.** The statistic saturates at
   its ceiling on plenty of passing runs, so it cannot tell a bad run from
@@ -476,15 +476,27 @@ feature detection `ci_headroom_collect.sh` already does before passing a
 flag. And the gate has an off switch that needs no commit: setting the
 `CI_HEADROOM_GATE` **repository variable** to `false` (Settings, Secrets
 and variables, Actions, Variables) turns it off for every run which starts
-afterwards. All four `smoke-cluster.yml` call sites in this repository --
-three in `functional-tests.yml` and one in `scheduled-tests.yml` -- pass
+afterwards. Both switches matter because `functional-tests.yml` reaches
+that workflow at `@main` with no pin to bump: a change there is live for
+every run in flight and cannot be rolled back from here.
+
+The gate is armed only on job shapes a warn window has measured, which
+today means the merge matrix in `functional-tests.yml` -- the four jobs
+phase 5's window read. That call site passes
 `headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}`, so the variable
-being unset leaves the gate on. A new call site has to pass the same line
-or it is gated with no way to switch it off, which
-`shakenfist/tests/test_headroom_gate_workflow_seams.py` enforces. Both switches matter because
-`functional-tests.yml` reaches that workflow at `@main` with no pin to
-bump: a change there is live for every run in flight and cannot be rolled
-back from here.
+being unset leaves the gate on. The other three call sites of
+`smoke-cluster.yml` pass `headroom_gate: false`: the smoke tier job (pull
+requests only, a single node, never harvested because the harvest reads
+`merge_group` runs), the Ansible modules job (its collect step does not
+run at all), and the dispatch-only matrix in `scheduled-tests.yml` (whose
+single machine entry has never been harvested). Every call site has to
+pass one of those two values explicitly, because the reusable workflow
+defaults to gating, and passing nothing gates a job with no way to switch
+it off. `shakenfist/tests/test_headroom_gate_workflow_seams.py` enforces
+both rules: it derives each call site's shape per matrix entry (topology,
+tier, `test_kind`, `stestr_config`) and fails if an armed one is not in
+its `MEASURED_SHAPES`. Arming a new shape means adding it there, with a
+window of its own behind it.
 
 #### Asking whether a cloud is oversized
 
@@ -501,6 +513,7 @@ import collections, json, re
 rows = [json.loads(l) for l in open('/tmp/window.jsonl')]
 by = collections.defaultdict(list)
 skipped = 0
+pregate = 0
 withheld = collections.Counter()
 for r in rows:
     v = (r.get('summary') or {}).get('verdict') or {}
@@ -510,7 +523,10 @@ for r in rows:
         skipped += 1
     # Absent on records written before the gate existed, which is not
     # the same as a series the gate was allowed to judge.
-    for reason in v.get('gate_withheld') or []:
+    if 'gate_withheld' not in v:
+        pregate += 1
+        continue
+    for reason in v['gate_withheld']:
         withheld[re.sub(r'\d+', 'N', reason)] += 1
 for key, verdicts in sorted(by.items()):
     bands = collections.Counter(v['band'] for v in verdicts)
@@ -520,6 +536,7 @@ print(skipped, 'job-runs had no fraction to judge and are not counted')
 print(sum(1 for r in rows if ((r.get('summary') or {}).get('verdict')
                               or {}).get('gate_withheld')),
       'job-runs had the gate withheld:', dict(withheld))
+print(pregate, 'job-runs predate the gate and say nothing about it')
 EOF
 ```
 

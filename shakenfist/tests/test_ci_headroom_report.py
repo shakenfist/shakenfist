@@ -2806,6 +2806,51 @@ class BandGateTestCase(HeadroomReportTestCase):
             'fire and the whole of 5f is inert.')
         self.assertIn('OVERSUBSCRIBED', output)
 
+    def _summary(self, series):
+        """Exit code, stdout and step summary lines for one series."""
+        record_path = os.path.join(self.tempdir, 'record.json')
+        code, output = self._run('--series', series, '--json', record_path)
+        with open(record_path) as f:
+            return code, output, report.step_summary_lines(json.load(f))
+
+    def test_a_gating_verdict_names_itself_on_every_surface(self):
+        """A red job's annotation and summary must say the band caused it.
+
+        The job log alone is not enough: the annotation and the step
+        summary are what a reader of a failed job sees first.
+        """
+        code, output, summary = self._summary(self._oversubscribed())
+        self.assertEqual(report.BAND_VIOLATION_EXIT, code)
+        self.assertIn(
+            '::warning title=CI headroom%3A cluster OVERSUBSCRIBED::', output,
+            'A verdict which fails the job raised no annotation.')
+        self.assertTrue(
+            any(line.startswith('* Gate: this verdict returns exit status %d'
+                                % report.BAND_VIOLATION_EXIT)
+                for line in summary),
+            'The step summary of a gating run does not say the band verdict '
+            'decided the exit status: %r' % summary)
+
+    def test_a_withheld_verdict_says_so_in_the_step_summary(self):
+        """The gate going quiet has to be visible without reading the log."""
+        code, _, summary = self._summary(self._series(self._readable(
+            {NODE_ONE: node_payload(cpu_measured=9, cpu_committed=9,
+                                    cpu_limit=10)}, count=1)))
+        self.assertEqual(0, code)
+        gate = [line for line in summary if line.startswith('* Gate:')]
+        self.assertEqual(1, len(gate), summary)
+        self.assertIn('WITHHELD', gate[0])
+        self.assertIn(str(report.BAND_GATE_MIN_SAMPLES), gate[0],
+                      'The withheld line does not say why.')
+
+    def test_a_verdict_which_cannot_gate_has_no_gate_line(self):
+        code, _, summary = self._summary(self._series(self._readable(
+            {NODE_ONE: node_payload(cpu_measured=5, cpu_committed=5,
+                                    cpu_limit=10)})))
+        self.assertEqual(0, code)
+        self.assertEqual(
+            [], [line for line in summary if line.startswith('* Gate:')])
+
     def test_the_status_is_three_because_the_other_repository_says_so(self):
         """The number is a cross-repository constant, not a local choice.
 
@@ -2841,9 +2886,9 @@ class BandGateTestCase(HeadroomReportTestCase):
     def test_an_oversized_cluster_does_not_gate(self):
         """D8: the lower bound is information, and gating on it would be bad.
 
-        Not merely undesirable -- 20 of the 30 cluster job-runs 5e measured
-        read OVERSIZED, so a status returned here would redden two thirds
-        of cluster CI on the first run after this merged.
+        Not merely undesirable -- 30 of the 40 cluster job-runs 5e measured
+        read OVERSIZED, so a status returned here would redden three
+        quarters of cluster CI on the first run after this merged.
         """
         path = self._series([
             sample({NODE_ONE: node_payload(
