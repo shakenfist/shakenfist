@@ -12,7 +12,7 @@ class _Failed(SystemExit):
 
 
 class FakeModule(object):
-    """The part of AnsibleModule that _make_client() touches.
+    """The part of AnsibleModule that make_client() touches.
 
     fail_json() raises rather than returning, because the real one calls
     sys.exit() and the code after each fail_json() call in the modules is
@@ -47,7 +47,7 @@ class CheckModeModule(FakeModule):
     """FakeModule with the attributes run_module() reaches for.
 
     check_mode is set because the check mode paths are the ones a rule
-    living in _make_client() never reached.
+    living in make_client() never reached.
     """
 
     check_mode = True
@@ -107,7 +107,7 @@ CHECK_MODE_TASK = {
 # task that is wrong in both ways is told which cluster it would have talked
 # to rather than shown the typo. sf_namespace has no row because it has no
 # such check: everything it needs is required in the argument spec, so its
-# run_module() reaches _make_client() with nothing in between. The call it
+# run_module() reaches make_client() with nothing in between. The call it
 # makes before that is there so the next branch added above it cannot
 # reopen the hole, which is not a difference any test can see today.
 OWN_ARGUMENT_CHECK = {
@@ -138,27 +138,34 @@ DISCOVERY_KWARGS = ('base_url', 'namespace', 'key',
 
 
 class MakeClientConnectionRuleTestCase(base.ShakenFistTestCase):
-    """Every collection module's _make_client(), against one rule table.
+    """The shared make_client(), against one rule table.
 
-    These modules are copy-pasted from each other and have already started
-    to diverge -- issue 4314 tracks folding _make_client() into the
-    collection's module_utils -- so the rule is asserted here once per
-    module, against one table, rather than in the per-module test files.
+    The five modules used to each carry a copy of this code and the copies
+    diverged, which is what issue 4314 fixed: the one implementation now
+    lives in the collection's module_utils/sf_connection.py. The rule tests
+    here run against that implementation directly, once per table row so
+    every (identity_param, identity_optional) variant a module declares is
+    exercised; the run_module() tests then hold each module to actually
+    wiring the variant its row declares.
     """
 
     def setUp(self):
         super().setUp()
+        self.sf_connection = ansible_module_loader.load_sf_connection()
+        self.table = {name: (identity, optional)
+                      for name, identity, optional in MODULES}
         self.modules = {
             name: ansible_module_loader.load_collection_module(name)
             for name, _identity, _optional in MODULES}
 
     def _call(self, name, **params):
-        """Run _make_client(), returning (module, client_mock)."""
-        mod = self.modules[name]
+        """Run make_client() with name's variant, returning (module, client_mock)."""
+        identity, optional = self.table[name]
         fake = FakeModule(**params)
-        with mock.patch.object(mod.apiclient, 'Client') as client:
+        with mock.patch.object(self.sf_connection.apiclient, 'Client') as client:
             try:
-                mod._make_client(fake)
+                self.sf_connection.make_client(
+                    fake, identity_param=identity, identity_optional=optional)
             except _Failed:
                 pass
         return fake, client
@@ -178,7 +185,7 @@ class MakeClientConnectionRuleTestCase(base.ShakenFistTestCase):
         return fake, client
 
     def test_check_mode_refuses_a_partial_connection(self):
-        # The rule used to live only in _make_client(), which runs on a
+        # The rule used to live only in make_client(), which runs on a
         # path that wants a client -- and sf_snapshot returns for check
         # mode before wanting one. A play naming a cluster half way was
         # therefore told --check would have succeeded, and then failed on
@@ -187,7 +194,7 @@ class MakeClientConnectionRuleTestCase(base.ShakenFistTestCase):
         # Every module is held to this, not just the one with the early
         # return today, because the hole is in where the rule is checked
         # rather than in any one module: the next early return added above
-        # a _make_client() call would open it again. CHECK_MODE_TASK is
+        # a make_client() call would open it again. CHECK_MODE_TASK is
         # what makes the assertion bite -- each is a task that reports
         # changed when the connection check is removed.
         for name, identity, _optional in MODULES:
@@ -264,8 +271,7 @@ class MakeClientConnectionRuleTestCase(base.ShakenFistTestCase):
         # otherwise fall through and build a client from half a connection,
         # which is worse than the discovery it replaced: it fails deep
         # inside the API client instead of doing something.
-        for name, identity, _optional in MODULES:
-            mod = self.modules[name]
+        for name, identity, optional in MODULES:
             for supplied in (('api_url', ), ('key', ),
                              ('api_url', 'key'), ('api_url', identity)):
                 params = {n: {'api_url': API_URL, 'key': KEY}.get(
@@ -273,8 +279,11 @@ class MakeClientConnectionRuleTestCase(base.ShakenFistTestCase):
                 fake = ForgivingModule(**params)
                 case = (name, supplied)
 
-                with mock.patch.object(mod.apiclient, 'Client') as client:
-                    mod._make_client(fake)
+                with mock.patch.object(
+                        self.sf_connection.apiclient, 'Client') as client:
+                    self.sf_connection.make_client(
+                        fake, identity_param=identity,
+                        identity_optional=optional)
 
                 self.assertIsNotNone(fake.failure, case)
                 for unwanted in DISCOVERY_KWARGS:
@@ -382,6 +391,24 @@ class MakeClientConnectionRuleTestCase(base.ShakenFistTestCase):
             else:
                 self.assertIsNotNone(fake.failure, name)
                 client.assert_not_called()
+
+    def test_each_module_wires_its_own_row_of_the_table(self):
+        # The identity parameter's name and whether it stands alone are now
+        # arguments each module passes to the shared helper, so the direct
+        # tests above cannot see a module passing the wrong ones. Running
+        # run_module() with the identity alone can: the optional modules
+        # must proceed, the strict ones must refuse and name the identity
+        # they actually checked.
+        for name, identity, optional in MODULES:
+            fake, _client = self._run(name, **{identity: IDENTITY})
+            if optional:
+                self.assertIsNone(fake.failure, name)
+                self.assertIsNotNone(fake.exited, name)
+            else:
+                self.assertIsNotNone(fake.failure, name)
+                self.assertIsNone(fake.exited, name)
+                self.assertIn('Got only %s,' % identity,
+                              fake.failure['msg'], name)
 
     def test_every_other_partial_set_fails(self):
         for name, identity, _optional in MODULES:
