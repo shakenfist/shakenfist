@@ -6961,6 +6961,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/network-ports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network Ports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/testing/" class="md-nav__link">
         
   
@@ -7025,10 +7053,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_11" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_10" id="__nav_3_7_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_11" id="__nav_3_7_11_label" tabindex="0">
             
   
   
@@ -7046,8 +7074,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_10">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -7136,10 +7164,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_12" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_11" id="__nav_3_7_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_12" id="__nav_3_7_12_label" tabindex="0">
             
   
   
@@ -7157,8 +7185,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_11">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9263,10 +9291,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_12" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_13" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_12" id="__nav_3_7_12_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_13" id="__nav_3_7_13_label" tabindex="0">
             
   
   
@@ -9284,8 +9312,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_12_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_12">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_13">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9570,10 +9598,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_13" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_14" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_13" id="__nav_3_7_13_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_14" id="__nav_3_7_14_label" tabindex="0">
             
   
   
@@ -9591,8 +9619,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_13_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_13">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_14">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -14910,7 +14938,12 @@ The reply includes a boolean <code>result</code> (true if the output is
 <h3 id="execute">Execute<a class="headerlink" href="#execute" title="Permanent link">&para;</a></h3>
 <p>Runs a shell command inside the guest. The request supports:</p>
 <ul>
-<li><code>command</code>: The command string to execute.</li>
+<li><code>command</code>: The command string to execute. It is run by
+  <code>/bin/sh</code>, so full shell syntax is available, including
+  environment variable prefixes (<code>FOO=bar cmd</code>), builtins,
+  pipes and compound statements. <code>network_namespace</code> and
+  <code>io_priority</code> apply to the whole command line, not just its
+  first word.</li>
 <li><code>environment_variables</code>: Key-value pairs to set in the
   environment.</li>
 <li><code>network_namespace</code>: If set, the command is run inside the
@@ -14921,6 +14954,17 @@ The reply includes a boolean <code>result</code> (true if the output is
 </ul>
 <p>The reply contains <code>stdout</code>, <code>stderr</code>, <code>exit_code</code>, and
 <code>execution_seconds</code>.</p>
+<p>The agent does not check that the command exists before running
+it. A missing executable produces a normal reply with exit code
+127 and the shell's error on <code>stderr</code>. A <code>CommandError</code> is
+returned when the command cannot be started, for example
+because the working directory does not exist.</p>
+<p>Agents up to and including v1.0.1 checked that the first word of
+the command was an executable on <code>PATH</code> and returned a
+<code>CommandError</code> if it was not, which also rejected valid shell such
+as <code>FOO=bar cmd</code>. Hypervisor-side callers that need to detect a
+missing command should check <code>exit_code</code> rather than relying on
+the operation failing.</p>
 <h3 id="put-file">Put File<a class="headerlink" href="#put-file" title="Permanent link">&para;</a></h3>
 <p>Uploads a file to the guest. The <code>PutFileRequest</code> includes the
 destination <code>path</code>, file <code>mode</code> (numeric permissions), total

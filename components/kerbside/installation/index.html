@@ -6934,6 +6934,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../network-ports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network Ports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../testing/" class="md-nav__link">
         
   
@@ -6998,10 +7026,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_11" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_10" id="__nav_3_7_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_11" id="__nav_3_7_11_label" tabindex="0">
             
   
   
@@ -7019,8 +7047,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_10">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -7109,10 +7137,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_12" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_11" id="__nav_3_7_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_12" id="__nav_3_7_12_label" tabindex="0">
             
   
   
@@ -7130,8 +7158,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_11">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9236,10 +9264,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_12" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_13" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_12" id="__nav_3_7_12_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_13" id="__nav_3_7_13_label" tabindex="0">
             
   
   
@@ -9257,8 +9285,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_12_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_12">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_13">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9543,10 +9571,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_13" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_14" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_13" id="__nav_3_7_13_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_14" id="__nav_3_7_14_label" tabindex="0">
             
   
   
@@ -9564,8 +9592,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_13_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_13">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_14">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -14883,7 +14911,8 @@ socket (<code>API_SOCKET_PATH</code>, default <code>/run/kerbside/api.sock</code
 must be co-located</strong> — the same host, the same container, or two
 containers sharing that path. Note that the API's port is a gunicorn
 argument rather than a Kerbside setting; <code>PUBLIC_FQDN</code> is how Kerbside
-tells clients where to find it.</p>
+tells clients where to find it. Every port the two processes listen on
+or dial is listed in <a href="/components/kerbside/network-ports/">network-ports.md</a>.</p>
 <p>That gunicorn line is the demo's shape, not a recommendation: it
 serves plain HTTP on every interface, and the API carries bearer
 tokens and Keystone credentials. A real deployment binds it to an

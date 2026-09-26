@@ -7045,6 +7045,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../network-ports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network Ports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../testing/" class="md-nav__link">
         
   
@@ -7109,10 +7137,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_11" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_10" id="__nav_3_7_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_11" id="__nav_3_7_11_label" tabindex="0">
             
   
   
@@ -7130,8 +7158,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_10">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -7220,10 +7248,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_12" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_11" id="__nav_3_7_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_12" id="__nav_3_7_12_label" tabindex="0">
             
   
   
@@ -7241,8 +7269,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_11">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9347,10 +9375,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_12" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_13" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_12" id="__nav_3_7_12_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_13" id="__nav_3_7_13_label" tabindex="0">
             
   
   
@@ -9368,8 +9396,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_12_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_12">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_13">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9654,10 +9682,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_13" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_14" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_13" id="__nav_3_7_13_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_14" id="__nav_3_7_14_label" tabindex="0">
             
   
   
@@ -9675,8 +9703,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_13_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_13">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_14">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -15097,10 +15125,6 @@ byte-layout boxes in
 <code>packet</code> diagram is the only construct that fits the latter, and
 GitHub's mermaid version does not reliably support it yet, so the
 ASCII survives until that changes.</p>
-<p>The database entity relationship diagram exists twice: in
-<a href="/components/kerbside/schema/">schema.md</a> and, for standalone viewing, in
-<code>docs/schema.html</code>. Keep the two in sync -- the <code>add-database-migration</code>
-skill says to update both.</p>
 <p>No CI lane validates the diagrams -- a syntax error renders as an
 inline error box on GitHub rather than failing a check. To check a
 diagram before pushing, run mermaid-cli over the markdown file that
@@ -15119,11 +15143,11 @@ Dockerfiles, packaging and tool config), the Jinja templates that
 render the web UI, and the Markdown documentation. Excluded, each
 with a reason recorded in that file, are the plan archive in
 <code>docs/plans/</code>, the generated protobuf stubs, the vendored sfui tree,
-the exported GitHub configuration, <code>Cargo.lock</code>, the generated
-<code>docs/schema.html</code>, the qcow2 test fixtures, and <code>AUTHORS</code> and
-<code>LICENSE</code>. Anything matching neither list is reported by the
-consistency audit's <code>review-scope-completeness</code> check, so a new file
-type is a decision somebody makes rather than a silent omission.</p>
+the exported GitHub configuration, <code>Cargo.lock</code>, the qcow2 test
+fixtures, and <code>AUTHORS</code> and <code>LICENSE</code>. Anything matching neither
+list is reported by the consistency audit's
+<code>review-scope-completeness</code> check, so a new file type is a decision
+somebody makes rather than a silent omission.</p>
 <p>The state (<code>REVIEWS.md</code>, <code>.vscode/*.weaudit*</code>) is maintained with
 <code>tools/review-tracking.sh</code>, a wrapper around the shared helper in the
 <a href="https://github.com/shakenfist/development/blob/main/docs/code-review-tracking.md">shakenfist/development</a>

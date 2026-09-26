@@ -16,7 +16,7 @@
         <link rel="prev" href="../installation/">
       
       
-        <link rel="next" href="../testing/">
+        <link rel="next" href="../network-ports/">
       
       
         
@@ -7151,6 +7151,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../network-ports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network Ports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../testing/" class="md-nav__link">
         
   
@@ -7215,10 +7243,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_11" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_10" id="__nav_3_7_10_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_11" id="__nav_3_7_11_label" tabindex="0">
             
   
   
@@ -7236,8 +7264,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_10">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -7326,10 +7354,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_12" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_11" id="__nav_3_7_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_12" id="__nav_3_7_12_label" tabindex="0">
             
   
   
@@ -7347,8 +7375,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_11">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9453,10 +9481,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_12" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_13" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_12" id="__nav_3_7_12_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_13" id="__nav_3_7_13_label" tabindex="0">
             
   
   
@@ -9474,8 +9502,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_12_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_12">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_13">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -9760,10 +9788,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_13" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_7_14" >
         
           
-          <label class="md-nav__link" for="__nav_3_7_13" id="__nav_3_7_13_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_7_14" id="__nav_3_7_14_label" tabindex="0">
             
   
   
@@ -9781,8 +9809,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_13_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_7_13">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_7_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_7_14">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -15275,7 +15303,8 @@ gRPC service — the proxy never touches MariaDB directly.</p>
   certificate, then drives the SPICE link handshake.</li>
 <li><strong>Insecure (5901):</strong> a minimal responder that issues the SPICE
   <code>need_secured</code> redirect, steering clients to the TLS port. No plaintext
-  SPICE traffic is proxied.</li>
+  SPICE traffic is proxied, but clients that dial <code>port=</code> first still need
+  to reach it; see <a href="/components/kerbside/network-ports/">network-ports.md</a>.</li>
 </ul>
 <p>Accepted client sockets get TCP keepalive (mirroring the backend leg), so a
 silently dead peer is detected rather than pinning a task forever.</p>
