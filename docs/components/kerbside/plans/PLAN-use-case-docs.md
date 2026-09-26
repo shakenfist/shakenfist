@@ -65,11 +65,12 @@ phase 1 (`2f0e526`), `openstack.md` 2026-09-20 as phase 2
 (`28efa6c`), and `multi-cloud.md` with `placement.md`
 2026-09-22 as phase 4 (`8c5c042`). All six carry identical
 section headings, so the format is a convention rather than
-a coincidence. What remains is phase 5, the index slim-down
-and closeout, and phase 6, the push audit. Proxmox is still
-blocked and still has no source driver (`kerbside/sources/`
-holds `base.py`, `ovirt.py`, `shakenfist.py` and `static.py`
-and nothing else, rechecked 2026-09-23).
+a coincidence. Phase 5, the index slim-down and closeout,
+landed 2026-09-24 (`073603b`), so what remains is phase 6,
+the push audit. Proxmox is still blocked and still has no
+source driver (`kerbside/sources/` holds `base.py`,
+`ovirt.py`, `shakenfist.py` and `static.py` and nothing
+else, rechecked 2026-09-25).
 
 One fact about the backend leg cost four phases to settle
 and is now guarded rather than remembered. Phases 1, 2 and 3
@@ -130,12 +131,18 @@ the range is not reliably reconstructable afterwards.
 | 2. OpenStack | [PLAN-use-case-docs-phase-02-openstack.md](/components/kerbside/plans/PLAN-use-case-docs-phase-02-openstack/) | Complete | a7df5e5 |
 | 3. Standalone / static source | [PLAN-use-case-docs-phase-03-standalone.md](/components/kerbside/plans/PLAN-use-case-docs-phase-03-standalone/) | Complete | 28efa6c |
 | 4. Multi-cloud aggregation and placement topologies | [PLAN-use-case-docs-phase-04-multi-cloud.md](/components/kerbside/plans/PLAN-use-case-docs-phase-04-multi-cloud/) | Complete | 8c5c042 |
-| 5. Index slim-down and closeout | [PLAN-use-case-docs-phase-05-index-slimdown.md](/components/kerbside/plans/PLAN-use-case-docs-phase-05-index-slimdown/) | In progress | |
-| 6. Push audit | | Not started | |
+| 5. Index slim-down and closeout | [PLAN-use-case-docs-phase-05-index-slimdown.md](/components/kerbside/plans/PLAN-use-case-docs-phase-05-index-slimdown/) | Complete | 073603b |
+| 6. Push audit | [PLAN-use-case-docs-phase-06-push-audit.md](/components/kerbside/plans/PLAN-use-case-docs-phase-06-push-audit/) | In progress | |
 
 The oVirt page is not a phase: it landed 2026-08-10 as
-`PLAN-two-tier-ci-phase-04-docs.md`'s deliverable, and is
-audited by that plan rather than this one.
+`PLAN-two-tier-ci-phase-04-docs.md`'s deliverable. That plan
+predates the `plan-push-audit-phase` shared block, carries
+neither the phase nor a `Merged` column, and is already
+`Complete`; by the block's own rule such a plan is not
+reopened to acquire one. The page's creation is therefore
+push-audited nowhere, which the block permits rather than
+forbids. What phases 1 to 5 changed in the page is in this
+plan's audit range, and is audited here.
 
 Proxmox is not a phase either. It stays deferred until a
 source driver exists, and acquires a phase then.
@@ -153,3 +160,16 @@ introduction once the OpenStack page exists to receive
 Bumblebee?` — plus the README collapse that phase 1's risk
 table flags: one link to the Use Cases section rather than
 a bullet per page.
+
+**Phase 6 — push audit.** Work through `PUSH-AUDIT.md` over
+the accumulated diff of phases 1 to 5, deriving the range
+from the merge commits above with
+`tools/audit/plan-range.sh`, which gives
+`2f0e526^1..073603b` over 31 paths. The diff is not
+documentation-only, and the audit is not vacuous: it carries
+roughly 970 lines of Python that did not exist before this
+plan, the `docs_checks` CI job, and a change to
+`kerbside/sources/static.py`, so every judgment agent in the
+runbook has material. Findings land in this phase's own
+pull request, and the plan is not complete until each is
+fixed or declined in writing.

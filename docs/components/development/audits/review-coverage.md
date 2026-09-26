@@ -19,6 +19,18 @@ committed `REVIEWS.md`: that file is only accurate immediately
 after a prune, so a missed prune run cannot inflate the coverage
 this audit sees.
 
+Reviews imported from shakenfist/development (see "Importing
+reviews from this repository" in
+[docs/code-review-tracking.md](/components/development/code-review-tracking/)) count
+toward coverage on the same terms as a native review: their blob
+SHA must still match HEAD. They count because they attest to
+identical bytes -- a review of a blob is a review of every copy of
+it -- and `import` verified the signed commit that introduced each
+one before recording it (unless explicitly told not to with
+`--no-verify`, which `REVIEWS.md` then shows). The details line names how many of the
+reviewed files were imported, when any were, so that coverage
+arriving by import is not mistaken for a review session.
+
 A run that cannot be started at all -- an unusable checkout, an
 interpreter that will not execute -- is reported as a failure of
 this criterion against that repository, naming the error. It is
