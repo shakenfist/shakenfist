@@ -3271,17 +3271,21 @@ checked against the tree rather than recalled.
    ```
    docs/plans/PLAN-api-input-validation-phase-06-required.md 03ea26514
    docs/plans/PLAN-api-input-validation-phase-06-required.md d6b84b365
-   docs/plans/PLAN-api-input-validation-phase-08-push-audit.md 03ea26514  (x4)
-   docs/plans/PLAN-api-input-validation-phase-08-push-audit.md d6b84b365  (x4)
+   docs/plans/PLAN-api-input-validation-phase-08-push-audit.md 03ea26514  (x5)
+   docs/plans/PLAN-api-input-validation-phase-08-push-audit.md d6b84b365  (x5)
    docs/plans/PLAN-api-input-validation.md 03ea26514
    docs/plans/PLAN-api-input-validation.md d6b84b365
    ```
 
    Every line names one of the two permitted SHAs and no other, which
-   is the item's test. The second half of the item -- that every
-   mention sits inside a passage which says they are dead and names
-   `ec406a78a` and `c7a432886` as the replacements -- was **not** true
-   when this step started: this file's own three prose mentions said
+   is the item's test. One of this file's five mentions of each is the
+   definition-of-done item itself, so the count moves with the prose;
+   the test is the absence of a third SHA, not the multiplicity.
+
+   The second half of the item -- that every mention sits inside a
+   passage which says they are dead and names `ec406a78a` and
+   `c7a432886` as the replacements -- was **not** true when this step
+   started: this file's own three prose mentions said
    the objects resolve to nothing without naming what replaced them.
    Fixed here. The item is the reason that was noticed, which is a
    point in favour of writing a definition-of-done item as a runnable
@@ -3331,18 +3335,50 @@ checked against the tree rather than recalled.
 * **A `Merged` cell that can only be filled after merge will be blank at
   merge.** It has now been filled in retrospectively twice, by #4222 for
   phase 6 and by this phase for phase 7, and in both cases the phase's
-  own definition of done recorded that it could not do it. The task
-  belongs to whoever merges the pull request, not to the phase. Worth a
-  line in `PLAN-TEMPLATE.md`.
+  own definition of done recorded that it could not do it.
 
-  **This phase's own cell is the third instance and is deliberately
-  left as `—`.** Phase 8 is `Complete` and its `Merged` cell is empty,
+  **This has since been settled, and not the way this section first
+  proposed it.** The original text here said the task belongs to
+  whoever merges the pull request. It does not, and that would not
+  have worked: the merger has no reason to be holding the plan open.
+  The `plan-phase-landing` shared block -- canonical in
+  `shakenfist/development` at
+  `templates/shared-blocks/plan-phase-landing.md`, landed by
+  [development#145](https://github.com/shakenfist/development/pull/145)
+  -- puts the close-out in **the first commit of the next phase**.
+  That is the only ordering which both knows the merge commit and
+  records it without spending a pull request and a CI run on prose:
+  by the time the next phase branches, the previous one has merged.
+  The `next-phase` skill carries it as its step 5.
+  `PLAN-transient-capacity-refusals` phase 4 was closed out the old
+  way, in its own pull request (#4265), some six hours before
+  development#145 merged.
+
+  **This phase's own cell is deliberately left as `—`, and stays
+  that way.** Phase 8 is `Complete` and its `Merged` cell is empty,
   because the rule under the Execution table is that every SHA there is
   a merge commit read off the first-parent history, which does not
-  exist until this pull request merges. The master plan says so
-  explicitly beneath the table now, so the next reader finds a
-  complete phase with an empty cell and an explanation rather than
-  what looks like an oversight. Whoever merges this fills it in.
+  exist until this pull request merges. The shared block's second
+  rule now ratifies exactly this: the push-audit phase is the last
+  row of every plan, no next phase will carry its close-out, and it
+  is *the only row permitted to omit a `Merged` cell* -- the column
+  exists so the push-audit phase can reconstruct what to audit, and
+  nothing ever reads its own row. A follow-up pull request is opened
+  only where the audit's findings need a carrier; this audit's were
+  fixed inside this pull request, so there is none, and nobody fills
+  this cell in later.
+
+* **The block that settles the point has not reached this repository
+  yet.** `plan-phase-landing` is now in `PLAN_TEMPLATE_BLOCKS` in
+  `shakenfist/development`'s `scripts/audit/checks/plans.py`, so the
+  consistency audit requires it, but this repository's
+  `PLAN-TEMPLATE.md` carries nine shared blocks and not that one.
+  Tracked as
+  [#4299](https://github.com/shakenfist/shakenfist/issues/4299)
+  (`Consistency: Plan template`). Until it lands, a phase plan
+  written here is working from a template which still does not say
+  how a phase is closed out -- which is how the three retrospective
+  fills above happened.
 * **The phase 8 row's range was wrong here and in the agent operation
   deadlines plan.** Two independent discoveries of the same defect in two
   plans suggests the row is copied from a template written before
