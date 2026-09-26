@@ -7845,6 +7845,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-spice-performance-phase-03-transcoding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: display transcoding in Kerbside, a feasibility spike
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-demo-install-phase-03-compose-demo/" class="md-nav__link">
         
   
@@ -14760,7 +14788,7 @@ repo root. For pre-push audits of our own work see
 <td><a href="/components/kerbside/plans/PLAN-spice-performance/">SPICE session performance</a></td>
 <td>Make SPICE sessions through Kerbside measurably faster in three horizons: proxy socket backpressure now (the relay hides congestion from spice-server), a qemu <code>ui/spice-display.c</code> damage-path patch series soon (unioned damage cut into 32px columns defeats stream detection on virtio-gpu), and a feasibility spike for a Rust SPICE server on qemu's D-Bus display. Carries the ranked upstream wishlist from the 2026-09-23 research. Same-day measurement overturned the proxy finding (spice-server's ACK window, not proxy buffering, bounds the backlog) and found a sticky <code>ignore_damage_clips</code> bug making virtio-gpu guests report full-plane damage</td>
 <td>In progress</td>
-<td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-01-proxy-backpressure/">phase 1</a> (in progress), phase 2 (in progress -- out-of-tree prototype), phase 3 (not started), phase 4 (not started), phase 5 (not started -- spice-server patches), phase 6 (not started -- push audit)</td>
+<td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-01-proxy-backpressure/">phase 1</a> (complete), phase 2 (in progress -- import merged, kernel fix to submit), <a href="/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/">phase 3</a> (in progress -- transcoding spike planned), phase 4 (not started), phase 5 (not started -- spice-server patches), phase 6 (not started -- push audit)</td>
 </tr>
 </tbody>
 </table>

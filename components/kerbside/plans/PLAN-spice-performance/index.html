@@ -7776,6 +7776,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-spice-performance-phase-03-transcoding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 3: display transcoding in Kerbside, a feasibility spike
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-demo-install-phase-03-compose-demo/" class="md-nav__link">
         
   
@@ -15220,19 +15248,19 @@ first phase.</p>
 <tr>
 <td>1. Proxy backpressure and a WAN baseline</td>
 <td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-01-proxy-backpressure/">PLAN-spice-performance-phase-01-proxy-backpressure.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>52046167f8 (#478)</td>
 </tr>
 <tr>
 <td>2. qemu damage path: prototype and measure; carry qemu, submit the kernel fix</td>
 <td></td>
 <td>In progress</td>
-<td></td>
+<td>kerbside-patches b53aa39c7e (#1748)</td>
 </tr>
 <tr>
 <td>3. Display transcoding in Kerbside: feasibility spike</td>
-<td></td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/">PLAN-spice-performance-phase-03-transcoding.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -15271,13 +15299,10 @@ It is a patch series against qemu <code>ui/spice-display.c</code>,
 measured with Ryll in headless mode against a virtio-gpu guest.
 The prototype, its v2 and a companion kernel patch for the
 virtio-gpu damage-clip bug have all reported (below). Both
-series and their rigs were imported into kerbside-patches on
-2026-09-24 (<code>upstream/</code>, commit 0b5163bf on its
-<code>upstream-series</code> branch). The phase plan still to be written
-covers:
-- landing that import;
-- the dri-devel submission of the kernel fix. qemu is carried
-  downstream, not submitted (below).</p>
+series and their rigs were imported into kerbside-patches
+(<code>upstream/</code>), which merged on 2026-09-24 as b53aa39c7e (#1748).
+What remains is the dri-devel submission of the kernel fix;
+qemu is carried downstream, not submitted (below).</p>
 <p>Its <code>Merged</code> cell records <code>kerbside-patches &lt;sha&gt; (#pr)</code> for the
 import, and <code>linux &lt;sha&gt;</code> once the kernel fix lands. The push
 audit cites kerbside-patches' own audit for the import and the
@@ -15557,6 +15582,24 @@ productising plan:
 for productising the SPICE-out mode, and WebRTC out, if the
 answer is go. The phase 2 qemu series still pays off under
 transcoding, because fewer, larger draws are cheaper to decode.</p>
+<p>The phase plan
+(<a href="/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/">PLAN-spice-performance-phase-03-transcoding.md</a>,
+2026-09-26) grounds this sketch in the code and changes it in
+four places:
+- the first output is JPEG and lossless draws rather than an
+  MJPEG stream. spice-gtk schedules stream frames against a
+  multimedia clock that spice-server 0.16 no longer offsets, and
+  a queued frame can paint over a later draw;
+- MULTI_CODEC with no CODEC_* bits suppresses streams but not
+  lossy draws. The backend also needs PREFERRED_COMPRESSION set
+  to LZ4 to be lossless;
+- the client-leg link reply is sent before authorisation and
+  before the backend is dialled, so #477's fix can forward the
+  client's caps to the backend but not the backend's to the
+  client;
+- the renderer builds openh264 from source, so the transcoder
+  sits behind a build feature that the release wheels do not
+  enable.</p>
 <p><strong>Phase 4</strong> is a time-boxed spike, with three steps:
 1. confirm that D-Bus <code>Update</code> rectangles for virtio-gpu
    arrive promptly and precisely, which is not yet traced
