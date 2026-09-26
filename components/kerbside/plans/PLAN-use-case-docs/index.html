@@ -16,7 +16,7 @@
         <link rel="prev" href="../PLAN-two-tier-ci/">
       
       
-        <link rel="next" href="../../spice/console-vv-extensions/">
+        <link rel="next" href="../PLAN-use-case-docs-phase-06-push-audit/">
       
       
         
@@ -3228,6 +3228,34 @@
     
   
     Review coverage steady state
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/plans/PLAN-review-import/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Review import
   
 
     
@@ -9092,6 +9120,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-use-case-docs-phase-06-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use case documentation phase 6: push audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -14705,11 +14761,12 @@ phase 1 (<code>2f0e526</code>), <code>openstack.md</code> 2026-09-20 as phase 2
 (<code>28efa6c</code>), and <code>multi-cloud.md</code> with <code>placement.md</code>
 2026-09-22 as phase 4 (<code>8c5c042</code>). All six carry identical
 section headings, so the format is a convention rather than
-a coincidence. What remains is phase 5, the index slim-down
-and closeout, and phase 6, the push audit. Proxmox is still
-blocked and still has no source driver (<code>kerbside/sources/</code>
-holds <code>base.py</code>, <code>ovirt.py</code>, <code>shakenfist.py</code> and <code>static.py</code>
-and nothing else, rechecked 2026-09-23).</p>
+a coincidence. Phase 5, the index slim-down and closeout,
+landed 2026-09-24 (<code>073603b</code>), so what remains is phase 6,
+the push audit. Proxmox is still blocked and still has no
+source driver (<code>kerbside/sources/</code> holds <code>base.py</code>,
+<code>ovirt.py</code>, <code>shakenfist.py</code> and <code>static.py</code> and nothing
+else, rechecked 2026-09-25).</p>
 <p>One fact about the backend leg cost four phases to settle
 and is now guarded rather than remembered. Phases 1, 2 and 3
 each stated backend TLS or host-subject pinning more
@@ -14795,20 +14852,26 @@ the range is not reliably reconstructable afterwards.</p>
 <tr>
 <td>5. Index slim-down and closeout</td>
 <td><a href="/components/kerbside/plans/PLAN-use-case-docs-phase-05-index-slimdown/">PLAN-use-case-docs-phase-05-index-slimdown.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>073603b</td>
 </tr>
 <tr>
 <td>6. Push audit</td>
-<td></td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-use-case-docs-phase-06-push-audit/">PLAN-use-case-docs-phase-06-push-audit.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 </tbody>
 </table>
 <p>The oVirt page is not a phase: it landed 2026-08-10 as
-<code>PLAN-two-tier-ci-phase-04-docs.md</code>'s deliverable, and is
-audited by that plan rather than this one.</p>
+<code>PLAN-two-tier-ci-phase-04-docs.md</code>'s deliverable. That plan
+predates the <code>plan-push-audit-phase</code> shared block, carries
+neither the phase nor a <code>Merged</code> column, and is already
+<code>Complete</code>; by the block's own rule such a plan is not
+reopened to acquire one. The page's creation is therefore
+push-audited nowhere, which the block permits rather than
+forbids. What phases 1 to 5 changed in the page is in this
+plan's audit range, and is audited here.</p>
 <p>Proxmox is not a phase either. It stays deferred until a
 source driver exists, and acquires a phase then.</p>
 <p>Phases 2 to 4 group the remaining five pages. OpenStack
@@ -14824,6 +14887,18 @@ introduction once the OpenStack page exists to receive
 Bumblebee?</code> — plus the README collapse that phase 1's risk
 table flags: one link to the Use Cases section rather than
 a bullet per page.</p>
+<p><strong>Phase 6 — push audit.</strong> Work through <code>PUSH-AUDIT.md</code> over
+the accumulated diff of phases 1 to 5, deriving the range
+from the merge commits above with
+<code>tools/audit/plan-range.sh</code>, which gives
+<code>2f0e526^1..073603b</code> over 31 paths. The diff is not
+documentation-only, and the audit is not vacuous: it carries
+roughly 970 lines of Python that did not exist before this
+plan, the <code>docs_checks</code> CI job, and a change to
+<code>kerbside/sources/static.py</code>, so every judgment agent in the
+runbook has material. Findings land in this phase's own
+pull request, and the plan is not complete until each is
+fixed or declined in writing.</p>
 
 
 

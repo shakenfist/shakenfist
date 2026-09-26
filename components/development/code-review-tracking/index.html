@@ -3391,6 +3391,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-review-import/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Review import
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-consistency/" class="md-nav__link">
         
   
@@ -9140,6 +9168,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-use-case-docs-phase-06-push-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use case documentation phase 6: push audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -14727,7 +14783,7 @@ The full design rationale is in
 <code>docs/plans/PLAN-code-review-tracking.md</code>.</p>
 <p>The automation lives in this repository:
 <code>scripts/review-tracking.py</code> (subcommands <code>stamp</code>, <code>prune</code>, <code>regen</code>,
-<code>next</code>, <code>status</code>, and <code>scope-orphans</code>), with tests in
+<code>next</code>, <code>status</code>, <code>scope-orphans</code>, and <code>import</code>), with tests in
 <code>scripts/tests/test_review_tracking.py</code>. In a developer's clone it is
 run by hand -- deliberately not from git hooks. An earlier iteration
 wired <code>stamp</code> and <code>prune</code> into the pre-commit, post-merge,
@@ -14739,9 +14795,14 @@ subcommands also run automatically: <code>prune</code> from an adopting repo's
 <code>prune-reviews</code> workflow on every push to the default branch, and
 <code>status</code> and <code>scope-orphans</code> from the consistency audit's
 <code>review-coverage</code> and <code>review-scope-completeness</code> checks (see
-"Steady state" below). Target repositories carry a thin wrapper
-(for example ryll's <code>tools/review-tracking.sh</code>) that locates a
-local clone of this repository and passes through to the script.</p>
+"Steady state" below). <code>import</code> is run by hand today; once the
+review tracking CI template planned in
+<code>docs/plans/PLAN-review-import.md</code> is rolled out, that workflow
+will run <code>prune</code> and then <code>import</code>, in that order, on every push
+and daily.
+Target repositories carry a thin wrapper (for example ryll's
+<code>tools/review-tracking.sh</code>) that locates a local clone of this
+repository and passes through to the script.</p>
 <h2 id="the-pieces">The pieces<a class="headerlink" href="#the-pieces" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>weAudit</strong> (<code>trailofbits.weaudit</code> on the VSCode marketplace)
@@ -14759,6 +14820,11 @@ local clone of this repository and passes through to the script.</p>
   blob SHA and date of each review so staleness is a mechanical
   check, and a generated <strong><code>REVIEWS.md</code></strong> surfaces the review state
   to people who do not know to look in <code>.vscode/</code>.</li>
+<li><strong>An imports file</strong> (<code>.vscode/imports.weaudit-shas.json</code>, written
+  by the <code>import</code> subcommand, never by weAudit or a human) records
+  full-file reviews carried in from this repository's own review
+  history rather than made in this clone -- see "Importing reviews
+  from this repository" under "Steady state".</li>
 <li><strong>A scope config</strong> (<code>.vscode/review-scope.toml</code>) defines which
   files count as reviewable: <code>include</code> and <code>exclude</code> lists of
   fnmatch patterns matched against repo-relative paths (<code>*</code> matches
@@ -14782,7 +14848,10 @@ local clone of this repository and passes through to the script.</p>
   excluded, as should ephemeral working documents like a
   <code>docs/plans/</code> archive -- point-in-time records of intended work,
   not living artifacts, and numerous enough to swamp the queue.
-  Whether unit tests are in scope is a per-repo decision.</li>
+  Whether unit tests are in scope is a per-repo decision. An
+  optional <code>import-exclude</code> list names files that must never be
+  marked reviewed by import (see "Importing reviews from this
+  repository" under "Steady state").</li>
 </ul>
 <h2 id="adopting-a-repository">Adopting a repository<a class="headerlink" href="#adopting-a-repository" title="Permanent link">&para;</a></h2>
 <ol>
@@ -15018,6 +15087,13 @@ timestamp as a side effect.</p>
 <a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    &lt;sha&gt;
 <a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>git log --show-signature -- .vscode/   # with the config above
 </code></pre></div>
+<p><code>import</code> performs the same check, and needs to know which identity
+each reviewer signs as: <code>REVIEWER_IDENTITIES</code> in
+<code>scripts/review-tracking.py</code> maps a reviewer name (the <code>&lt;username&gt;</code>
+of <code>.vscode/&lt;username&gt;.weaudit</code>) to their certificate identity.
+When a new reviewer starts signing review-state commits here, add
+an entry for them; until then <code>import</code> cannot verify their reviews
+and skips each one with a warning naming them.</p>
 <p>Note that GitHub's web UI shows gitsign commits as "Unverified"
 (reason <code>bad_cert</code>): GitHub cannot validate Fulcio's short-lived
 certificates. This is expected -- the trust path is gitsign
@@ -15065,7 +15141,11 @@ covers, which imposes three rules:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>./tools/review-tracking.sh next
 </code></pre></div>
 <p>picks a random unreviewed in-scope file and opens it in VSCode
-   (<code>--no-open</code> to just print it).
+   (<code>--no-open</code> to just print it). A file imported from this
+   repository's own review history (see "Importing reviews from
+   this repository" under "Steady state") shows no tick in weAudit
+   and is not offered here; reviewing it by hand supersedes the
+   import.
 3. Read it. weAudit's explorer ticks show what is already done;
    Claude Code in the integrated terminal for questions.
 4. Mark it reviewed (<code>weAudit: Mark File as Reviewed</code>), attach
@@ -15215,15 +15295,150 @@ Actions app as a bypass actor, so shakenfist-bot pushes with
 <code>DEPENDENCIES_TOKEN</code> -- retriggers exactly once, into a run that
 finds nothing left to prune (observed 2026-09-11 04:57:20 UTC,
 <code>Prune stale review marks.</code>, which committed nothing).</p>
-<p>The bot's prune commits are not signed, and do not need to be:
-prune can only <em>remove</em> marks, never add or refresh them ('a
-stamped entry is never re-stamped while it exists', above, is
-enforced by <code>stamp</code>, which the automation never runs). The
-attestations live in the signed review-state commits already in
-history, and verifying a mark means verifying the signed commit
-that <em>introduced</em> its stamp -- an unsigned later commit that
-deletes marks weakens nothing. Removing a mark is always safe; it
-merely queues the file for re-review.</p>
+<p>The bot's prune commits are not signed, and do not need to be, and
+that argument is scoped to what prune does: prune can only <em>remove</em>
+marks, never add or refresh them ('a stamped entry is never
+re-stamped while it exists', above, is enforced by <code>stamp</code>, which
+the automation never runs). The attestations live in the signed
+review-state commits already in history, and verifying a native mark
+means verifying the signed commit that <em>introduced</em> its stamp -- an
+unsigned later commit that deletes marks weakens nothing. Removing a
+mark is always safe; it merely queues the file for re-review.</p>
+<p><code>import</code> will also run unsigned from the bot -- it is run by hand
+until the review tracking CI template planned in
+<code>docs/plans/PLAN-review-import.md</code> adds it to the <code>prune-reviews</code>
+workflow -- and it adds marks, so it needs its own argument rather
+than inheriting prune's. An imported
+entry is not itself an attestation: it is a pointer to one --
+the repository, path, and introducing commit of a signed
+review-state commit already made in this repository (see
+"Importing reviews from this repository" below). Trusting the entry
+means verifying that commit, which <code>import</code> does at the moment it
+writes the entry, not later and not by anyone downstream. This is a
+genuinely new trust surface -- for the first time, an unsigned bot
+commit can cause a file to read as reviewed -- and verification is
+what bounds it: the bot can only relay an attestation a human has
+already signed, and an entry it cannot verify is skipped and
+reported rather than written.</p>
+<p><strong>Importing reviews from this repository.</strong> Much of what an adopted
+repository has to review is not its own code: workflow templates,
+helper scripts, and exported GitHub configuration are written and
+reviewed here, then copied out byte-for-byte by
+<code>standards-alignment</code> rollouts and reviewed again, file by file, in
+every repository that received them. A review mark attests to a
+blob SHA, not a path, and two files with the same blob SHA have the
+same bytes -- so a review of a blob here is equally a review of an
+identical blob anywhere else. <code>review-tracking.py import</code>, run in an
+adopted repository, marks as reviewed every in-scope file whose
+<code>HEAD</code> blob matches one this repository has fully reviewed.</p>
+<p>Only full-file marks count, and only from this repository's own
+sidecar history. <code>stamp</code> also stamps files carrying partial (region)
+marks, so <code>import</code> walks every <code>.vscode/*.weaudit-shas.json</code> in this
+repository's history, oldest commit first, and credits a
+<code>(reviewer, blob)</code> pair only where the same commit's
+<code>.vscode/&lt;reviewer&gt;.weaudit</code> has a full-file <code>auditedFiles</code> entry for
+that path. Where a blob was reviewed more than once, the earliest
+qualifying commit wins, since that is the attestation to point at.
+Any path is eligible, not only <code>templates/</code>: identical bytes need no
+context the file does not carry, and a whole-file review never
+attested to context either -- a native mark does not go stale when a
+script the file calls changes. History matters because a target's
+copy often lags a template this repository has since changed and
+re-reviewed: the copy's blob then matches an older stamp, which only
+the sidecar's history still records, not <code>HEAD</code>.</p>
+<p>The imported marks live only in <code>.vscode/imports.weaudit-shas.json</code>,
+a sidecar-shaped file with no <code>.weaudit</code> file beside it, and
+<code>import</code> never writes a <code>.weaudit</code> file or a human reviewer's own
+sidecar. This is deliberately narrower than it could be: weAudit
+loads every <code>.vscode/*.weaudit</code> file and decorates a file as audited
+from its path alone, whatever file or author the entry came from
+(<code>src/codeMarker.ts:626-628</code> in trailofbits/vscode-weaudit), so a
+<code>.weaudit</code> imports file would show ticks in VSCode for files nobody
+read in this clone. Worse, weAudit writes an <code>auditedFiles</code> change
+back to <code>&lt;author&gt;.weaudit</code> (<code>codeMarker.ts:559-586</code>, <code>:931</code>), so an
+imported entry authored by the original reviewer would, once
+un-ticked, be written into that reviewer's own state file in this
+repository, mixing imported reviews into a human's record. weAudit only globs <code>*.weaudit</code>, so it never reads the
+sidecar-shaped imports file, and the name is already covered by the
+<code>.gitignore</code> exception and the <code>paths-ignore</code> entry
+(<code>.vscode/*.weaudit-shas.json</code>) that step 8 of "Adopting a
+repository" puts in every adopted repository, so an import commit
+needs no new exception and triggers none of the expensive CI lanes.</p>
+<p>Each entry records where the attestation lives, not the attestation
+itself:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="p">{</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span><span class="nt">"files"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">    </span><span class="nt">"&lt;target path&gt;"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">      </span><span class="nt">"sha"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;blob sha&gt;"</span><span class="p">,</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">      </span><span class="nt">"date"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;source stamp date&gt;"</span><span class="p">,</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">      </span><span class="nt">"imported"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">        </span><span class="nt">"repo"</span><span class="p">:</span><span class="w"> </span><span class="s2">"shakenfist/development"</span><span class="p">,</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="w">        </span><span class="nt">"reviewer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;reviewer&gt;"</span><span class="p">,</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="w">        </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;source path&gt;"</span><span class="p">,</span>
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="w">        </span><span class="nt">"commit"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;introducing commit&gt;"</span><span class="p">,</span>
+<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="w">        </span><span class="nt">"verified"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="w">      </span><span class="p">}</span>
+<a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-14-16" name="__codelineno-14-16" href="#__codelineno-14-16"></a><span class="p">}</span>
+</code></pre></div>
+<p><code>date</code> is the source stamp's date, not the day of the import,
+because it records when the content was actually read. <code>verified</code>
+records whether the introducing commit's signature was checked --
+see the attestation argument above for why <code>import</code> checks it before
+trusting the entry, rather than leaving verification to a later
+reader. A commit that fails verification is skipped with a warning
+naming it, as is a review by a reviewer with no entry in
+<code>REVIEWER_IDENTITIES</code> (see "Commit signing"). <code>status</code> does not
+verify an imported entry's provenance, any more than it verifies a
+native mark's signature: it only checks that the blob SHA still
+matches <code>HEAD</code>, the same as it does for a native mark.</p>
+<p><code>--no-verify</code> is the only way to import without verification. It
+disables the check outright, every run under it says so on stderr,
+and what it imports is recorded with <code>verified: false</code> and shown in
+<code>REVIEWS.md</code> with an <code>(unverified)</code> suffix on its Source cell,
+rather than passed off as checked. A run without gitsign on <code>PATH</code>
+does not fall back to that: it imports nothing, leaves the entries
+already recorded alone, ends with a warning banner on stderr saying
+so and pointing at <code>--no-verify</code>, and still exits zero, so that a
+CI job on a runner without gitsign neither fails nor marks anything
+reviewed. It still removes entries, which needs no verification.</p>
+<p>A file whose native mark has gone stale is not imported until
+<code>prune</code> has removed the mark, which is why the workflow will run
+<code>prune</code> first; until then the file's own review history says it
+needs a human. An imported entry that has itself gone stale -- its
+blob is no longer the file's content at <code>HEAD</code> -- is replaced if the
+new content was reviewed here too and can be imported, and
+otherwise removed by <code>import</code> itself, with the same message <code>prune</code>
+gives, so that <code>REVIEWS.md</code> never shows it as reviewed in the
+meantime. <code>import</code> regenerates <code>REVIEWS.md</code> when it changes
+anything, as <code>stamp</code> and <code>prune</code> do.</p>
+<p>A native review always supersedes an import: if a reviewer marks a
+file that already carries an imported entry, <code>import</code> removes its
+own entry on the next run, so <code>REVIEWS.md</code> shows one row per file and
+the human's review is the one kept.</p>
+<p>An import can be rejected the same way scope itself is narrowed.
+<code>.vscode/review-scope.toml</code> gains an <code>import-exclude</code> list of
+fnmatch patterns with the same semantics as <code>exclude</code> (<code>!</code>
+re-includes), and, like the other exclusions in that file, an entry
+should say why:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Byte-identical to the template today, but this file is genuinely</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="c1"># per-repository and a shared review would hide that it needs its</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="c1"># own read.</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="n">import-exclude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s1">'config/local-overrides.yml'</span><span class="p">]</span>
+</code></pre></div>
+<p><code>import</code> never adds an entry matching <code>import-exclude</code>, and removes
+any existing imported entry that starts matching one.</p>
+<p><code>REVIEWS.md</code>'s reviewed-files table gains a <code>Source</code> column: <code>-</code> for
+a native review, <code>development@&lt;12-char commit&gt;</code> for an imported one
+(with <code>(unverified)</code> appended if it was imported under <code>--no-verify</code>),
+with the <code>Reviewer</code> cell taken from the entry's own provenance rather
+than from a <code>.weaudit</code> file in this clone.</p>
+<p>This repository does not import from itself. A template and this
+repository's own instance of it could in principle cross-import, but
+the case is rare enough that <code>import</code> simply refuses to run when the
+target is this repository, whether this clone or a worktree of it.</p>
 <p><strong>Backlog alerting.</strong> The daily consistency audit runs a
 <code>review-coverage</code> check (<code>docs/audits/review-coverage.md</code>) against
 every repository in its matrix. Repositories without a
