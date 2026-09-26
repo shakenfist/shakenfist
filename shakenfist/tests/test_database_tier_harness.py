@@ -155,6 +155,26 @@ METRICS = textwrap.dedent("""\
     """)
 
 
+# One node's sf-resources exposition, trimmed. The gauges carry no
+# labels, instances_total sits next to instances_active and shares its
+# prefix, and instances_errored is present but zero -- which is a value,
+# not an absence.
+RESOURCE_METRICS = textwrap.dedent("""\
+    # HELP instances_total
+    # TYPE instances_total gauge
+    instances_total 9.0
+    # HELP instances_active
+    # TYPE instances_active gauge
+    instances_active 3.0
+    # HELP instances_errored
+    # TYPE instances_errored gauge
+    instances_errored 0.0
+    # HELP updated_at The last time metrics were updated
+    # TYPE updated_at gauge
+    updated_at 1.77e+09
+    """)
+
+
 class FakeResponse:
     def __init__(self, text):
         self.text = text
@@ -449,6 +469,60 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(float(daemon.DAEMON_STATE_POLL_INTERVAL),
                          harness.DAEMON_STATE_POLL_INTERVAL)
+
+    def test_the_resources_metrics_port_matches_the_config(self):
+        # Where the cluster's shape is read from. The suite duplicates this
+        # for the same reason it duplicates the intervals above, and a
+        # drift would not raise -- it would refuse a connection on every
+        # node, which the load check tolerates by reporting rather than
+        # enforcing its per-instance ceilings. A silently unenforced
+        # detector is the failure this test exists to prevent.
+        from shakenfist import config
+
+        self.assertEqual(
+            config.SFConfig.model_fields['RESOURCES_METRICS_PORT'].default,
+            harness.RESOURCES_METRICS_PORT)
+
+    def test_the_resources_daemon_still_publishes_that_gauge(self):
+        # The load check reads the cluster's shape from this gauge, and
+        # nothing about a renamed or removed metric raises: the scrape
+        # succeeds, the gauge is absent, and every per-instance ceiling
+        # quietly stops being enforced. Pinned by name because that is the
+        # only thing the scrape knows about it.
+        source = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'daemons', 'resources', 'main.py')
+        with open(source) as f:
+            tree = ast.parse(f.read())
+        published = {node.value for node in ast.walk(tree)
+                     if isinstance(node, ast.Constant)
+                     and isinstance(node.value, str)}
+        self.assertIn('instances_active', published)
+
+    def test_instances_active_is_read_from_the_node(self):
+        with mock.patch.object(harness.requests, 'get',
+                               return_value=FakeResponse(RESOURCE_METRICS)):
+            self.assertEqual(
+                3.0, harness.scrape_instances_active('10.0.0.1'))
+
+    def test_a_gauge_with_a_similar_name_is_not_the_one_asked_for(self):
+        # instances_total counts every instance placed here including the
+        # powered off ones, and the budget was not fitted against it.
+        # Prefix matching would read it as instances_active on any node
+        # whose exposition happened to order them the other way.
+        self.assertEqual(
+            9.0, harness.parse_gauge(RESOURCE_METRICS, 'instances_total'))
+
+    def test_an_absent_gauge_is_not_zero(self):
+        # A node which does not publish the gauge and a node running
+        # nothing are different answers, and summing the second over a
+        # cluster whose nodes gave the first is how #4039 came to evaluate
+        # the model against a cluster that was not there.
+        self.assertIsNone(harness.parse_gauge(RESOURCE_METRICS, 'nonesuch'))
+
+    def test_a_gauge_help_line_is_not_a_sample(self):
+        self.assertEqual(
+            0.0, harness.parse_gauge(RESOURCE_METRICS, 'instances_errored'))
 
     def test_elected_loop_interval_matches_the_daemon(self):
         # The other half of the pair above, and the one which was a bare

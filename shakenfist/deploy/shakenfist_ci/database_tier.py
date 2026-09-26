@@ -192,6 +192,39 @@ class DatabaseTierTestsMixin:
                     % (node['name'], node['ip'], SCRAPE_ATTEMPTS, last))
         return totals, sum(read_at) / len(read_at)
 
+    def _standing_instances(self, nodes):
+        """How many libvirt domains the cluster is running, or None.
+
+        Summed over every node, not only the database tier: an instance
+        loads the sf-database tier from wherever it is placed. All or
+        nothing, because a partial sum is a smaller cluster than the real
+        one and every per-instance ceiling is a multiple of it --
+        under-reporting the shape fails the build for load sitting
+        exactly where the model says it should, which is issue #4039.
+
+        Retried the same way and for the same reason as _all_pairs(),
+        but unlike _all_pairs() a persistent failure does not fail the
+        build. The caller takes five of these samples across four
+        minutes on every node, so a hard failure would turn one refused
+        connection into a red pull request. It drops the sample instead,
+        and falls back to reporting rather than enforcing the ceilings
+        which need it if no sample survives.
+        """
+        total = 0.0
+        for node in nodes:
+            active = None
+            for attempt in range(SCRAPE_ATTEMPTS):
+                try:
+                    active = lb.scrape_instances_active(node['ip'])
+                    break
+                except Exception:
+                    if attempt < SCRAPE_ATTEMPTS - 1:
+                        time.sleep(SCRAPE_RETRY_SECONDS)
+            if active is None:
+                return None
+            total += active
+        return int(total)
+
     def _sum_requests(self, database_nodes, operation, caller_daemon):
         """Sum one counter across the tier, retrying a failed scrape.
 
@@ -456,10 +489,32 @@ class DatabaseTierTestsMixin:
         windows = []
         elapsed_seconds = []
         restarted = []
+        # The cluster's shape is sampled at every boundary rather than
+        # once when the measurement is over. The suite creates and
+        # destroys instances throughout these four minutes and tidies up
+        # after itself, so a count taken at the end is the count of what
+        # nobody got round to deleting -- which on the run in #4039 was
+        # zero, on a cluster whose sidechannel daemon had plainly been
+        # monitoring instances for the whole measurement. Every
+        # per_instance_qps ceiling below is a multiple of this number, so
+        # reading it after the load has gone makes the model predict a
+        # cluster which was not there.
+        shape_samples = []
+        shape_attempts = 0
+
+        def sample_shape():
+            nonlocal shape_attempts
+            shape_attempts += 1
+            sample = self._standing_instances(nodes)
+            if sample is not None:
+                shape_samples.append(sample)
+
         counters, read_at = self._all_pairs(database_nodes)
+        sample_shape()
         for _ in range(lb.LOAD_WINDOW_COUNT):
             time.sleep(lb.LOAD_WINDOW_SECONDS)
             later, later_read_at = self._all_pairs(database_nodes)
+            sample_shape()
 
             # Divide by what was actually measured, not by what was
             # slept. See _all_pairs().
@@ -589,17 +644,36 @@ class DatabaseTierTestsMixin:
                    for e in budget['entries']}
         node_count = len(nodes)
 
-        # Powered on instances, not every instance. The per-instance
-        # coefficients were fitted against instances_active, which counts
-        # running libvirt domains, so a powered off instance contributes
-        # nothing to the model and must not contribute here either --
-        # counting it would raise every ceiling below by its coefficient
-        # for load it does not produce. power_state is the closest thing
-        # the API offers to that series; it is what the hypervisor last
-        # reported for the domain.
-        standing_instances = len(
-            [i for i in self.system_client.get_instances()
-             if i.get('power_state') == 'on'])
+        # The busiest shape seen while the load was being measured, and
+        # the reason the samples are taken at all five boundaries rather
+        # than once at the end.
+        #
+        # The most instances seen, not the mean and not the last, because
+        # of which way the comparisons below err. Each pair is judged at
+        # its lowest observed rate -- see fixed_rate(), which chooses the
+        # lowest for exactly this reason -- and the matching choice for
+        # the shape the model is evaluated against is the largest, so
+        # that a failure here means a pair ran high against every
+        # reasonable reading of the cluster it ran on rather than against
+        # the least generous one.
+        #
+        # What this still cannot see is an instance which was created and
+        # deleted entirely inside one sixty second window. That costs
+        # this daemon a monitor start rather than a window of sweeps, so
+        # it belongs to the churn the base terms absorb (see the
+        # (GetInstanceAttributes, sidechannel) note in the budget) rather
+        # than to the per-instance term being evaluated here.
+        standing_instances = max(shape_samples) if shape_samples else 0
+        # Not a single node answered, across five attempts each with its
+        # own retries. The shape term of the model is then unknown rather
+        # than zero, and zero is the answer which fails a build for load
+        # the model accounts for, so every pair whose budget has a
+        # per-instance term is reported below instead of enforced. The
+        # unbudgeted half of this test needs no shape at all and still
+        # runs -- losing the detector for brand new polling loops because
+        # one metrics port refused a connection would be the worse
+        # trade.
+        shape_known = bool(shape_samples)
         # Steady is not yet metronomic. A blob heavy test running at a
         # level rate for the whole measurement is steady too, which is how
         # the first version of this check came to report twelve pairs of
@@ -655,7 +729,8 @@ class DatabaseTierTestsMixin:
                        + defaults['tolerance_floor_qps'])
             if measured <= ceiling:
                 continue
-            if lb.enforced(entry):
+            if lb.enforced(entry) and (
+                    shape_known or not entry.get('per_instance_qps')):
                 over.append((key, measured, modelled, ceiling))
             else:
                 reported.append((key, measured, modelled, ceiling))
@@ -663,6 +738,9 @@ class DatabaseTierTestsMixin:
         summary = {
             'nodes': node_count,
             'standing_instances': standing_instances,
+            'standing_instances_per_sample': shape_samples,
+            'shape_samples_attempted': shape_attempts,
+            'shape_known': shape_known,
             'window_seconds': lb.LOAD_WINDOW_SECONDS,
             'unbudgeted_ceiling_qps': round(unbudgeted_ceiling, 3),
             'measured_seconds': elapsed_seconds,
@@ -737,5 +815,10 @@ class DatabaseTierTestsMixin:
             'model predicts for a cluster of this shape. Do not raise the '
             'budget to make this pass: either the load is a regression '
             'worth fixing, or the model has changed and that change '
-            'belongs in a commit which says so. summary=%s'
+            'belongs in a commit which says so. "A cluster of this shape" '
+            'is the busiest one seen while these rates were measured, not '
+            'whatever was left standing at the end -- '
+            'standing_instances_per_sample is every sample taken, one per '
+            'window boundary, and standing_instances is the largest of '
+            'them. summary=%s'
             % json.dumps(summary, sort_keys=True))
