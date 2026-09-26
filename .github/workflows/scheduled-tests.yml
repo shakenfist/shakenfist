@@ -75,8 +75,9 @@ jobs:
       # Not gated on the headroom band (PLAN-ci-cloud-sizing phase 5): the
       # gate is armed only on job shapes a warn window measured, and the
       # single machine entry of this matrix has never been harvested. Passed
-      # explicitly because the reusable workflow defaults to gating; see
-      # docs/developer_guide/ci.md and test_headroom_gate_workflow_seams.py.
+      # explicitly rather than left to the reusable workflow's default, which
+      # lives in another repository at @main; see docs/developer_guide/ci.md
+      # and test_headroom_gate_workflow_seams.py.
       headroom_gate: false
       tier: ${{ matrix.os.tier }}
       topology: ${{ matrix.os.topology }}

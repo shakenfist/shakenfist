@@ -496,9 +496,11 @@ requests only, a single node, never harvested because the harvest reads
 `merge_group` runs), the Ansible modules job (its collect step does not
 run at all), and the dispatch-only matrix in `scheduled-tests.yml` (whose
 single machine entry has never been harvested). Every call site has to
-pass one of those two values explicitly, because the reusable workflow
-defaults to gating, and passing nothing gates a job with no way to switch
-it off. `shakenfist/tests/test_headroom_gate_workflow_seams.py` enforces
+pass one of those two values explicitly. The reusable workflow leaves
+the gate off when nothing is passed (shakenfist/actions#102; before it,
+the default gated), but that default lives in another repository at
+`@main`, so a call site's policy is stated here where a change to it
+shows up in review. `shakenfist/tests/test_headroom_gate_workflow_seams.py` enforces
 both rules: it derives each call site's shape per matrix entry (topology,
 tier, `test_kind`, `stestr_config`) and fails if an armed one is not in
 its `MEASURED_SHAPES`. An armed call site must pass all four inputs

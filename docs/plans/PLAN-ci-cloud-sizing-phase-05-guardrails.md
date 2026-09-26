@@ -727,7 +727,13 @@ a single node and has never been harvested; the Ansible modules job,
 whose collect step does not run at all for its `test_kind`; and the
 scheduled matrix, which is dispatch-only and whose single machine entry
 has never been harvested either. They pass `false` rather than nothing
-because the reusable workflow defaults to gating.
+because the reusable workflow defaulted to gating. Round four of the
+review found two callers outside this repository relying on that
+default -- client-python's functional workflow and the actions canary,
+both single-node smoke clouds no window measured -- so
+shakenfist/actions#102 turns the default off and makes arming opt-in.
+The explicit `false` stays: the seam test still requires every call site
+here to state its gate.
 `shakenfist/tests/test_headroom_gate_workflow_seams.py` derives each
 call site's shape (topology, tier, `test_kind`, `stestr_config`, per
 matrix entry) and fails if an armed one is not a measured shape, so
@@ -831,8 +837,10 @@ why phase 5 is not fixing it. It is in the master plan's Future work.
   the Execution table.
 * **The propagation half of the sizing model is still undone.** The
   downstream repositories fork these topologies and none of them has the
-  band, the annotation, the gate or the structural assertion. That is
-  phase 6's own scope.
+  structural assertion or an armed gate. Those that call
+  `smoke-cluster.yml` (client-python, and the actions canary) get the
+  band and its annotation as information, and are gated only if they opt
+  in, which needs a window of their own. That is phase 6's own scope.
 
 ## Back brief
 

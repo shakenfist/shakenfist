@@ -144,8 +144,9 @@ class HeadroomGateWorkflowSeamsTestCase(base.ShakenFistTestCase):
                 '%s calls %s with headroom_gate: %r. It must pass either %s, '
                 'so the CI_HEADROOM_GATE repository variable can switch the '
                 'headroom band gate off for it, or false. Passing nothing '
-                'leaves it gated by the reusable workflow\'s default with no '
-                'way to switch it off.'
+                'leaves the policy to the reusable workflow\'s default, which '
+                'lives in another repository at @main and can change without '
+                'anything here changing.'
                 % (site, REUSABLE_WORKFLOW, gate, OFF_SWITCH))
 
     def test_only_measured_shapes_are_gated(self):

@@ -382,8 +382,9 @@ jobs:
       # gate is armed only on job shapes a warn window measured, and this
       # one -- single-node, smoke tier, pull requests only -- has never been
       # harvested, because the harvest reads merge_group runs. Passed
-      # explicitly because the reusable workflow defaults to gating; see
-      # docs/developer_guide/ci.md and test_headroom_gate_workflow_seams.py.
+      # explicitly rather than left to the reusable workflow's default, which
+      # lives in another repository at @main; see docs/developer_guide/ci.md
+      # and test_headroom_gate_workflow_seams.py.
       headroom_gate: false
       tier: smoke
 
