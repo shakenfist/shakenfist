@@ -14951,9 +14951,19 @@ For every row whose <code>claimed_at</code> is older than
 claim so a fresh worker picks the job up or -- if <code>attempts</code>
 has reached <code>CLUSTER_OP_MAX_ATTEMPTS</code> -- deletes the row and
 transitions the underlying cluster operation to <code>STATE_ERROR</code>.
-Reaper activity is exported on
-<code>cluster_op_reaper_requeued_total</code> and
-<code>cluster_op_reaper_rejected_total</code>, scraped from
+A second pass in the same tick sweeps the inverse shape: cluster
+operations sitting in <code>queued</code> or <code>executing</code> for longer than the
+same threshold with no <code>work_queue</code> row referencing them at all
+(failure debris -- the enqueue writes both in one transaction, so
+the shape cannot occur in normal operation). Nothing can ever
+dequeue such an operation, so the pass transitions it to
+<code>STATE_ERROR</code> with an audit event; the enqueue-side coalescing
+dedup independently refuses to return a rowless op, so a caller's
+"ensure" enqueues fresh work rather than adopting a dead op
+(issue 4303). Reaper activity is exported on
+<code>cluster_op_reaper_requeued_total</code>,
+<code>cluster_op_reaper_rejected_total</code> and
+<code>cluster_op_reaper_orphaned_total</code>, scraped from
 <code>CLUSTER_METRICS_PORT</code> on the cluster daemon.</p>
 <p>The cluster daemon also runs two other reaping sweeps from
 <code>daemons/cluster/scheduled_tasks.py</code>. <code>per_deleted_object_checks()</code>
