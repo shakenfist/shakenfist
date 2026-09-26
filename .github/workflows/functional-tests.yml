@@ -502,6 +502,10 @@ jobs:
       # anything else, leaves the gate on. Every entry of this matrix was
       # in phase 5's measured window, which is what arming it requires.
       headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}
+      # An armed call site states every shape input rather than leaning on
+      # smoke-cluster.yml's defaults; test_headroom_gate_workflow_seams.py
+      # checks the shape against the ones the window measured.
+      test_kind: functional
       tier: full
       topology: ${{ matrix.merge.topology }}
       base_image: ${{ matrix.merge.base_image }}

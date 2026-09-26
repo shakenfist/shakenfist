@@ -478,7 +478,13 @@ flag. And the gate has an off switch that needs no commit: setting the
 and variables, Actions, Variables) turns it off for every run which starts
 afterwards. Both switches matter because `functional-tests.yml` reaches
 that workflow at `@main` with no pin to bump: a change there is live for
-every run in flight and cannot be rolled back from here.
+every run in flight and cannot be rolled back from here. The reverse
+also holds: every call site here now passes `headroom_gate`, and GitHub
+rejects a call passing an input the callee does not declare, so
+reverting shakenfist/actions#94 would fail every functional job on an
+undeclared input rather than ungate it. The rollbacks are the variable,
+or removing the input from these call sites before the actions-side
+revert.
 
 The gate is armed only on job shapes a warn window has measured, which
 today means the merge matrix in `functional-tests.yml` -- the four jobs
@@ -495,7 +501,12 @@ defaults to gating, and passing nothing gates a job with no way to switch
 it off. `shakenfist/tests/test_headroom_gate_workflow_seams.py` enforces
 both rules: it derives each call site's shape per matrix entry (topology,
 tier, `test_kind`, `stestr_config`) and fails if an armed one is not in
-its `MEASURED_SHAPES`. Arming a new shape means adding it there, with a
+its `MEASURED_SHAPES`. An armed call site must pass all four inputs
+itself, since the defaults live in shakenfist/actions at `@main` and a
+shape derived from one could drift without anything here changing. The
+base image is deliberately outside the shape: the band measures the
+cloud, and the window covered Debian 12 and Ubuntu 24.04 on the same
+topology. Arming a new shape means adding it there, with a
 window of its own behind it.
 
 #### Asking whether a cloud is oversized
@@ -533,9 +544,13 @@ for key, verdicts in sorted(by.items()):
     fractions = sorted(v['p90_cpu_fraction'] for v in verdicts)
     print(key, len(verdicts), 'max %.3f' % fractions[-1], dict(bands))
 print(skipped, 'job-runs had no fraction to judge and are not counted')
-print(sum(1 for r in rows if ((r.get('summary') or {}).get('verdict')
-                              or {}).get('gate_withheld')),
-      'job-runs had the gate withheld:', dict(withheld))
+verdicts = [(r.get('summary') or {}).get('verdict') or {} for r in rows]
+print(sum(1 for v in verdicts if v.get('gate_withheld')),
+      'job-runs had a series which could not have supported a violation:',
+      dict(withheld))
+print(sum(1 for v in verdicts if v.get('gate_withheld')
+          and v.get('band') == 'OVERSUBSCRIBED'),
+      'of those read OVERSUBSCRIBED, so withholding changed the outcome')
 print(pregate, 'job-runs predate the gate and say nothing about it')
 EOF
 ```

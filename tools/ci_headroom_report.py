@@ -2642,10 +2642,10 @@ def print_verdict(record):
         print('  Verdict: %s' % text)
 
     if verdict['gates']:
-        print('  This verdict gates (5f): the report returns %d, and'
+        print('  This verdict gates (5f): the report returns exit status %d.'
               % BAND_VIOLATION_EXIT)
-        print('  ci_headroom_verdict.sh in shakenfist/actions turns that into')
-        print('  a failed job unless CI_HEADROOM_GATE says otherwise.')
+        print('  Whether that fails this job is decided by the caller\'s')
+        print('  headroom_gate input and the CI_HEADROOM_GATE switch.')
     elif verdict['band'] == 'OVERSUBSCRIBED':
         print('  This verdict would gate (5f), but the series cannot support')
         print('  it, so the report returns 0:')
@@ -2853,7 +2853,8 @@ def emit_github_annotations(record):
     detection, so it works the same on every ref.
     """
     # Warnings even for the one verdict which can fail the job. Whether it
-    # does is decided downstream -- CI_HEADROOM_GATE can switch it off --
+    # does is decided downstream -- the caller's headroom_gate input and
+    # the CI_HEADROOM_GATE switch can each leave it green --
     # and ci_headroom_verdict.sh emits the ::error when it really fails the
     # job, so an ::error here would sit on green runs the gate let through.
     for title, message in band_annotations(record):
@@ -2902,8 +2903,9 @@ def step_summary_lines(record):
     # verdict -- the gate going quiet -- is visible without the log.
     if verdict['gates']:
         lines.append(
-            '* Gate: this verdict returns exit status %d, which fails the '
-            'job unless the CI_HEADROOM_GATE switch is off (5f)'
+            '* Gate: this verdict returns exit status %d; whether that '
+            'fails this job is decided by the caller\'s headroom_gate input '
+            'and the CI_HEADROOM_GATE switch (5f)'
             % BAND_VIOLATION_EXIT)
     elif verdict['band'] == 'OVERSUBSCRIBED':
         lines.append(
@@ -3095,8 +3097,8 @@ def main(argv=None):
               % BAND_VIOLATION_EXIT)
         print('the upper bound of %.2f. Whether that fails this job is decided'
               % BAND_UPPER)
-        print('by the caller -- see ci_headroom_verdict.sh in')
-        print('shakenfist/actions, and its CI_HEADROOM_GATE switch.')
+        print('by the caller\'s headroom_gate input and the CI_HEADROOM_GATE')
+        print('switch -- see ci_headroom_verdict.sh in shakenfist/actions.')
         return BAND_VIOLATION_EXIT
 
     return 0

@@ -35,20 +35,20 @@ from shakenfist.tests import base
 REUSABLE_WORKFLOW = 'smoke-cluster.yml'
 OFF_SWITCH = "${{ vars.CI_HEADROOM_GATE != 'false' }}"
 
-# The inputs which decide a job's shape, and the defaults smoke-cluster.yml
-# in shakenfist/actions gives them when a caller passes nothing. They live
-# in another repository, so they are restated here rather than read.
-SHAPE_DEFAULTS = {
-    'topology': 'localhost',
-    'tier': 'smoke',
-    'test_kind': 'functional',
-    'stestr_config': 'smoke-ci.conf',
-}
+# The inputs which decide a job's shape. An armed call site must pass every
+# one of them: their defaults live in smoke-cluster.yml in shakenfist/actions,
+# reached @main with no pin, so a shape derived from a default could drift
+# from what the job runs without anything here changing.
+SHAPE_INPUTS = ('topology', 'tier', 'test_kind', 'stestr_config')
 
 # The shapes phase 5's warn window measured -- every job of the merge
 # matrix, ten merge_group runs each, recorded in the 5e Outcome of
 # docs/plans/PLAN-ci-cloud-sizing-phase-05-guardrails.md. Adding a shape
 # here is the act of arming the gate on it, and needs a window of its own.
+# base_image is deliberately not part of the shape: the band measures the
+# cloud's committed vCPU against its ledger, not the guest, and the window
+# covered two base images (Debian 12 and Ubuntu 24.04) on the same topology
+# without the fraction separating them.
 MEASURED_SHAPES = {
     ('slim-primary', 'full', 'functional', 'cluster-ci.conf'),
     ('slim-primary', 'full', 'functional', 'guest-ci.conf'),
@@ -93,7 +93,7 @@ class HeadroomGateWorkflowSeamsTestCase(base.ShakenFistTestCase):
         inputs = job.get('with') or {}
         matrix = (job.get('strategy') or {}).get('matrix') or {}
         axes = set()
-        for key in SHAPE_DEFAULTS:
+        for key in SHAPE_INPUTS:
             match = MATRIX_REFERENCE.match(str(inputs.get(key, '')))
             if match:
                 axes.add(match.group(1))
@@ -108,8 +108,13 @@ class HeadroomGateWorkflowSeamsTestCase(base.ShakenFistTestCase):
         shapes = []
         for entry in entries:
             shape = []
-            for key, default in SHAPE_DEFAULTS.items():
-                value = inputs.get(key, default)
+            for key in SHAPE_INPUTS:
+                self.assertIn(
+                    key, inputs,
+                    '%s arms the headroom band gate without passing %s, so '
+                    'its shape would rest on a default which lives in '
+                    'another repository. Pass it explicitly.' % (site, key))
+                value = inputs[key]
                 match = MATRIX_REFERENCE.match(str(value))
                 if match:
                     self.assertIn(

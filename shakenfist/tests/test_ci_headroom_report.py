@@ -3091,3 +3091,27 @@ class BandGateTestCase(HeadroomReportTestCase):
         record = report.summary_record(path)
         self.assertTrue(record['verdict']['gates'])
         self.assertEqual([], record['verdict']['gate_withheld'])
+
+    def test_the_gate_is_withheld_on_bands_which_could_not_gate(self):
+        """Withholding is computed for every band, not only a violation.
+
+        The ci.md window command counts how often the gate was withheld,
+        and that count is only an instrument-health figure if a thin series
+        reads as withheld whatever its band. Short-circuiting the reasons
+        when the band is not OVERSUBSCRIBED would leave the command
+        counting violations alone, without anything else changing.
+        """
+        for cpu_committed, band in ((1, 'OVERSIZED'), (5, 'WITHIN BAND')):
+            path = self._series(self._readable(
+                {NODE_ONE: node_payload(cpu_measured=cpu_committed,
+                                        cpu_committed=cpu_committed,
+                                        cpu_limit=10)},
+                count=report.BAND_GATE_MIN_SAMPLES - 1))
+            verdict = report.summary_record(path)['verdict']
+            self.assertEqual(band, verdict['band'])
+            self.assertFalse(verdict['gates'])
+            self.assertNotEqual(
+                [], verdict['gate_withheld'],
+                'A %s series too short to gate reported no withhold reason, '
+                'so the harvest would count it as a series the gate was '
+                'allowed to judge.' % band)

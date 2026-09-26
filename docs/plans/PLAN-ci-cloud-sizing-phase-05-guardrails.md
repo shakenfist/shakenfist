@@ -781,7 +781,6 @@ why phase 5 is not fixing it. It is in the master plan's Future work.
 | [35940203974](https://github.com/shakenfist/shakenfist/actions/runs/35940203974) | Ubuntu 24.04 cluster | 0.333 | OVERSIZED | 0.833 | WITHIN BAND | 16 | 197 |
 | [35946925675](https://github.com/shakenfist/shakenfist/actions/runs/35946925675) | Ubuntu 24.04 cluster | 0.296 | OVERSIZED | 0.833 | WITHIN BAND | 16 | 163 |
 | [35954362019](https://github.com/shakenfist/shakenfist/actions/runs/35954362019) | Ubuntu 24.04 cluster | 0.296 | OVERSIZED | 0.833 | WITHIN BAND | 23 | 162 |
-True 67
 | [35666222479](https://github.com/shakenfist/shakenfist/actions/runs/35666222479) | Guests | 0.259 | OVERSIZED | 1.000 | ABOVE BAND | 3 | 50 |
 | [35677335839](https://github.com/shakenfist/shakenfist/actions/runs/35677335839) | Guests | 0.296 | OVERSIZED | 1.000 | ABOVE BAND | 3 | 46 |
 | [35713308961](https://github.com/shakenfist/shakenfist/actions/runs/35713308961) | Guests | 0.259 | OVERSIZED | 0.667 | WITHIN BAND | 1 | 18 |
