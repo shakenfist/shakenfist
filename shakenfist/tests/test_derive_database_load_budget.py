@@ -132,16 +132,54 @@ class DeriveBudgetTestCase(base.ShakenFistTestCase):
 
     def test_code_derived_terms_match_the_daemons(self):
         # The tool is standalone and cannot import the server, so it
-        # restates the two intervals the GetNodeDaemonState/cluster entry
-        # is arithmetic about. Restated is fine; drifted is not, and the
-        # drift would show up as a budget term rather than as an error.
+        # restates every interval a code-derived entry is arithmetic
+        # about. Restated is fine; drifted is not, and the drift would
+        # show up as a budget term rather than as an error.
         from shakenfist.daemons.cluster import main as cluster_main
         from shakenfist.daemons import daemon
+        from shakenfist.daemons.sidechannel import main as sidechannel_main
 
         self.assertEqual(float(daemon.DAEMON_STATE_POLL_INTERVAL),
                          tool.DAEMON_STATE_POLL_INTERVAL)
         self.assertEqual(float(cluster_main.ELECTED_LOOP_POLL_SECONDS),
                          tool.ELECTED_LOOP_POLL_SECONDS)
+        self.assertEqual(float(sidechannel_main.DISPATCH_CHECK_INTERVAL),
+                         tool.DISPATCH_CHECK_INTERVAL)
+        self.assertEqual(float(sidechannel_main.EXECUTOR_REAP_INTERVAL),
+                         tool.EXECUTOR_REAP_INTERVAL)
+
+    def test_the_sidechannel_per_instance_term_is_both_its_sweeps(self):
+        # 0.233/s, not 0.2: the executor reaper landed after this file was
+        # derived and is a second per-instance attributes read. Asserted as
+        # the arithmetic of the two intervals rather than as the number, so
+        # that changing either throttle moves the budget with it.
+        entry = tool.to_entry(('GetInstanceAttributes', 'sidechannel'),
+                              stats(slope=0.134, intercept=0.45, r2=0.725,
+                                    mean=2.905), nodes=6)
+        self.assertEqual(
+            round(1.0 / tool.DISPATCH_CHECK_INTERVAL
+                  + 1.0 / tool.EXECUTOR_REAP_INTERVAL, 3),
+            entry['per_instance_qps'])
+
+    def test_a_code_derived_term_leaves_the_others_measured(self):
+        # The sidechannel entry overrides its per-instance term and not its
+        # base, because the base absorbs the cost of instances arriving and
+        # leaving and nothing in the code predicts how often that happens.
+        # An override which cleared every term would zero it, tightening the
+        # ceiling on exactly the clusters which churn most.
+        entry = tool.to_entry(('GetInstanceAttributes', 'sidechannel'),
+                              stats(slope=0.134, intercept=0.45, r2=0.725,
+                                    mean=2.905), nodes=6)
+        self.assertEqual(0.075, entry['per_node_base_qps'])
+
+    def test_a_code_derived_term_of_none_removes_it(self):
+        # GetNodeDaemonState/cluster is arithmetic about two constants and
+        # has no per-instance term at all, so a fit which found one must
+        # not survive into the budget.
+        entry = tool.to_entry(('GetNodeDaemonState', 'cluster'),
+                              stats(slope=0.4, intercept=2.49, r2=0.9,
+                                    mean=2.49), nodes=6)
+        self.assertNotIn('per_instance_qps', entry)
 
     def test_a_significant_slope_becomes_a_per_instance_term(self):
         entry = tool.to_entry(('GetInstanceAttributes', 'net'),

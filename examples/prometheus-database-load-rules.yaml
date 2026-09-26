@@ -617,7 +617,7 @@ groups:
           or
           label_replace(label_replace(vector(0.014), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "resources", "", "")
           or
-          label_replace(label_replace(vector(0.134), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "sidechannel", "", "")
+          label_replace(label_replace(vector(0.233), "operation", "GetInstanceAttributes", "", ""), "caller_daemon", "sidechannel", "", "")
           or
           label_replace(label_replace(vector(0.025), "operation", "GetLatestClusterOperationTarget", "", ""), "caller_daemon", "api", "", "")
           or

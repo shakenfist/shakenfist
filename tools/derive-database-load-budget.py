@@ -213,30 +213,57 @@ FALLBACK_DEFAULTS = collections.OrderedDict([
 ])
 
 # A few entries are arithmetic about the code rather than a measurement, and
-# the measurement would be wrong to commit. GetNodeDaemonState/cluster is the
-# only one today: every daemon polls its own state row at
-# 1/DAEMON_STATE_POLL_INTERVAL from idle(), but the single elected cluster
-# daemon polls from a loop which sleeps for ELECTED_LOOP_POLL_SECONDS, so
-# the
-# cluster-wide rate is 0.5 per node less 0.3. Measuring it instead gives
-# whatever the cluster is running: before #3874 the elected daemon did not
-# poll at all and the pair read 5/6 of its siblings, and a cluster which has
-# not yet deployed that fix still does. Overriding here rather than editing
-# the generated file by hand means a re-derivation does not silently revert
-# to the measurement.
+# the measurement would be wrong to commit.
 #
-# Written as the arithmetic rather than as the two numbers it comes to,
-# because the numbers are a claim about two constants in the server and
-# nothing here can import them. test_code_derived_terms_match_the_daemons
-# pins both against the real ones.
+# GetNodeDaemonState/cluster was the first: every daemon polls its own state
+# row at 1/DAEMON_STATE_POLL_INTERVAL from idle(), but the single elected
+# cluster daemon polls from a loop which sleeps for
+# ELECTED_LOOP_POLL_SECONDS, so the cluster-wide rate is 0.5 per node less
+# 0.3. Measuring it instead gives whatever the cluster is running: before
+# #3874 the elected daemon did not poll at all and the pair read 5/6 of its
+# siblings, and a cluster which has not yet deployed that fix still does.
+#
+# GetInstanceAttributes/sidechannel is the second, for the other reason a
+# measurement can be wrong: the loop changed after the measurement was
+# taken. The sidechannel daemon reads one instance's attributes from two
+# throttled per-instance sweeps -- the dispatch check every
+# DISPATCH_CHECK_INTERVAL and the executor reaper every
+# EXECUTOR_REAP_INTERVAL -- and the reaper did not exist when this file was
+# derived on 2026-08-25. It landed days later with the agent operation
+# deadlines work, so the fitted slope of 0.134/s describes a daemon with one
+# sweep and the code has had two ever since. Issue #4039 is what that cost:
+# the pair has been failing the functional load check at rates its own idle
+# floor accounts for.
+#
+# Overriding here rather than editing the generated file by hand means a
+# re-derivation does not silently revert to the measurement.
+#
+# Only the terms named are replaced, and a term set to None is removed. A
+# code-derived term is a claim about one part of the model, not necessarily
+# about all of it: the sidechannel entry's base term is still a
+# measurement, because what it absorbs is the cost of instances being
+# created and destroyed -- see that entry's note -- and nothing in the code
+# predicts how often a cluster does that.
+#
+# Written as the arithmetic rather than as the numbers it comes to, because
+# the numbers are a claim about constants in the server and nothing here can
+# import them. test_code_derived_terms_match_the_daemons pins every one of
+# them against the real thing.
 DAEMON_STATE_POLL_INTERVAL = 2.0      # shakenfist/daemons/daemon.py
 ELECTED_LOOP_POLL_SECONDS = 5.0       # shakenfist/daemons/cluster/main.py
+DISPATCH_CHECK_INTERVAL = 5.0         # shakenfist/daemons/sidechannel/main.py
+EXECUTOR_REAP_INTERVAL = 30.0         # shakenfist/daemons/sidechannel/main.py
 CODE_DERIVED_TERMS = {
     ('GetNodeDaemonState', 'cluster'): {
         'per_node_base_qps': round(1.0 / DAEMON_STATE_POLL_INTERVAL, 3),
         'cluster_base_qps': round(
             1.0 / ELECTED_LOOP_POLL_SECONDS
             - 1.0 / DAEMON_STATE_POLL_INTERVAL, 3),
+        'per_instance_qps': None,
+    },
+    ('GetInstanceAttributes', 'sidechannel'): {
+        'per_instance_qps': round(1.0 / DISPATCH_CHECK_INTERVAL
+                                  + 1.0 / EXECUTOR_REAP_INTERVAL, 3),
     },
 }
 
@@ -359,10 +386,10 @@ def to_entry(key, stats, nodes):
 
     override = CODE_DERIVED_TERMS.get(key)
     if override:
-        for term in ('per_node_base_qps', 'cluster_base_qps',
-                     'per_instance_qps'):
+        for term, value in override.items():
             entry.pop(term, None)
-        entry.update(override)
+            if value is not None:
+                entry[term] = value
 
     if caller in NOT_OUR_LOOPS:
         entry['activity_coupled'] = True
