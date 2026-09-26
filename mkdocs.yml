@@ -318,6 +318,7 @@ nav:
                 - "Phase 2: write the missing `etc/kerbside.conf.example`": components/kerbside/plans/PLAN-demo-install-phase-02-conf-example.md
                 - "Phase 3: `docs/use-cases/standalone.md`": components/kerbside/plans/PLAN-use-case-docs-phase-03-standalone.md
                 - "Phase 3: Control socket on Ryll": components/kerbside/plans/PLAN-test-harness-phase-03-control-socket.md
+                - "Phase 3: display transcoding in Kerbside, a feasibility spike": components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding.md
                 - "Phase 3: the `docker compose` demo stack": components/kerbside/plans/PLAN-demo-install-phase-03-compose-demo.md
                 - "Phase 4: `multi-cloud.md` and `placement.md`": components/kerbside/plans/PLAN-use-case-docs-phase-04-multi-cloud.md
                 - "Phase 4: a CI lane for the compose demo": components/kerbside/plans/PLAN-demo-install-phase-04-ci-lane.md
