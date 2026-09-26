@@ -1624,8 +1624,8 @@ which is what `tools/check-plan-status.py` enforces.
   *4f -- the tier timeout drops to 60*.
 - **The lifecycle upload target is a hardcoded IP list.**
   [#4320](https://github.com/shakenfist/shakenfist/issues/4320).
-  `functional-tests.yml:569` picks the node the cached-image upload goes
-  to from `nodes=(10.0.0.20 ... 10.0.0.24)` with `RANDOM % 5`. Those
+  The Node lifecycle job in `functional-tests.yml` picks the node the
+  cached-image upload goes to from `nodes=(10.0.0.20 ... 10.0.0.24)` with `RANDOM % 5`. Those
   five addresses are `slim-primary`'s `sf1`-`sf5`, and that topology
   lives in `shakenfist/actions`, reached at `@main` with no pin -- so a
   node removed there breaks this step for a reason that says nothing

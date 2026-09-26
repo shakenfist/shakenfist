@@ -232,12 +232,15 @@ class HeadroomReportTestCase(base.ShakenFistTestCase):
         """The same cluster sampled often enough for a violation to gate.
 
         A single sample never gates (BAND_GATE_MIN_SAMPLES), so a test
-        about the gate itself needs a series at least that long. Returned
-        as records rather than a path so a test can add to it first.
+        about the gate itself needs a series at least that long, and a
+        sample without the capacity_degraded flag never gates either, so
+        every sample here carries it. Returned as records rather than a
+        path so a test can add to it first.
         """
         if count is None:
             count = report.BAND_GATE_MIN_SAMPLES
-        return [sample(per_node, sampled_at=start + 15.0 * i)
+        return [sample(per_node, sampled_at=start + 15.0 * i,
+                       capacity_degraded=False)
                 for i in range(count)]
 
     def _assert_rendered(self, code, output):
@@ -246,10 +249,24 @@ class HeadroomReportTestCase(base.ShakenFistTestCase):
         main() swallows a raise inside report() and returns 0, so the
         status alone cannot tell a clean run from a broken one. The text
         main() prints when it swallows one can.
+
+        Several callers build a short fixture above the upper bound, and
+        return 0 only because gate_withheld_reasons() withholds it -- a
+        one-sample series, or one without the capacity_degraded flag.
+        Those tests are not about the gate, so if one starts returning
+        BAND_VIOLATION_EXIT the message says the fixture is the thing to
+        change, rather than leaving it to read as a regression.
         """
         self.assertNotIn(
             'failed to render', output,
             'The report raised, and main() swallowed it.')
+        self.assertNotEqual(
+            report.BAND_VIOLATION_EXIT, code,
+            'This fixture gated. Tests using _assert_rendered() are not '
+            'about the gate; a short above-band fixture relied on '
+            'gate_withheld_reasons() withholding it (BAND_GATE_MIN_SAMPLES, '
+            'or an absent capacity_degraded flag), and a change to those '
+            'rules means the fixture needs to be made to not gate.')
         self.assertEqual(0, code)
 
 
@@ -2915,13 +2932,58 @@ class BandGateTestCase(HeadroomReportTestCase):
         short = report.BAND_GATE_MIN_SAMPLES - 1
         self._assert_withheld(
             self._readable(per_node, count=short),
-            'only %d usable samples, fewer than the %d'
-            % (short, report.BAND_GATE_MIN_SAMPLES))
+            'only %d samples produced a cluster CPU fraction, fewer than '
+            'the %d' % (short, report.BAND_GATE_MIN_SAMPLES))
 
         code, output = self._run(
             '--series', self._series(self._readable(per_node)))
         self.assertEqual(report.BAND_VIOLATION_EXIT, code)
         self.assertIn('This verdict gates (5f)', output)
+
+    def test_the_floor_counts_samples_which_produced_a_fraction(self):
+        """The second review's reproduction: usable, but with no ledger.
+
+        Nineteen samples whose one node has a capacity row but publishes
+        neither cpu_limit nor cpu_hard_max are usable CPU samples -- they
+        count towards the committed_cpu block's n -- but produce no
+        fraction, so the p90 rests on the one busy sample alone. Counting
+        the floor from n would gate on that one sample.
+        """
+        ledgerless = node_payload(cpu_measured=9, cpu_committed=9,
+                                  cpu_limit=None)
+        ledgerless['cpu_hard_max'] = None
+        records = [sample({NODE_ONE: ledgerless},
+                          sampled_at=1756000000.0 + 15.0 * i,
+                          capacity_degraded=False)
+                   for i in range(report.BAND_GATE_MIN_SAMPLES - 1)]
+        records.extend(self._readable(
+            {NODE_ONE: node_payload(cpu_measured=9, cpu_committed=9,
+                                    cpu_limit=10)},
+            count=1, start=1756000300.0))
+
+        record = report.summary_record(self._series(records))
+        block = record['cluster']['committed_cpu']
+        self.assertEqual(
+            report.BAND_GATE_MIN_SAMPLES, block['n'],
+            'The fixture no longer has enough usable samples to reach the '
+            'floor, so it cannot tell the two counts apart.')
+        self.assertEqual(1, block['n_fraction'])
+        self._assert_withheld(
+            records, 'only 1 sample produced a cluster CPU fraction')
+
+    def test_a_series_without_the_capacity_degraded_flag_does_not_gate(self):
+        """An absent flag is not a healthy read (Sample.capacity_degraded).
+
+        A probe built before step 2a publishes no flag, and cannot say
+        whether its capacity read was failing. The realistic route to one
+        is a partial rollback of shakenfist/actions, which is reached at
+        @main -- and the report elsewhere already says such samples
+        predate the flag rather than counting them as clean.
+        """
+        records = self._readable(self._busy_pair())
+        del records[7]['resources']['total']['capacity_degraded']
+        self._assert_withheld(
+            records, '1 sample carried no capacity_degraded flag')
 
     def test_a_failing_capacity_read_does_not_gate(self):
         """The review's own reproduction: nine blind samples, one busy.

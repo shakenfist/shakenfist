@@ -200,8 +200,8 @@ any topology changes, which is exactly what phase 4 does".
 
 Phase 4 never touched it and never mentions it: `grep -n '10\.0\.0\.2'
 docs/plans/PLAN-ci-cloud-sizing-phase-04-topologies.md` is empty. The
-list is still at `.github/workflows/functional-tests.yml:569`, in the
-`node_lifecycle_collection` job, which deploys `slim-primary`.
+list is still the `nodes=(10.0.0.20 ... 10.0.0.24)` line in
+`.github/workflows/functional-tests.yml`'s `node_lifecycle_collection` job, which deploys `slim-primary`.
 
 It did not break, because phase 4 changed `slim-tier`'s vCPU and not
 `slim-primary`'s node count or addressing. It is still a live latent
@@ -657,8 +657,8 @@ else, and this repository's report returned 0 on every path. The
 remaining and only irreversible act was here -- adding
 `BAND_VIOLATION_EXIT = 3` to `tools/ci_headroom_report.py` and returning
 it for an OVERSUBSCRIBED cluster-wide band. That merge order was chosen
-deliberately, because `functional-tests.yml:485` references that workflow
-at `@main` with no pin: whichever half landed second is the one that
+deliberately, because every `functional-tests.yml` call site references
+that workflow at `@main` with no pin: whichever half landed second is the one that
 switches the gate on, so the second half is the one that belongs in the
 repository a revert can reach.
 
@@ -716,8 +716,8 @@ the demand estimator's calibration.
 
 **D9's issue, filed.**
 [#4320](https://github.com/shakenfist/shakenfist/issues/4320) records the
-hardcoded `10.0.0.20`-`10.0.0.24` upload-target list at
-`.github/workflows/functional-tests.yml:569`, phase 0's D4 commitment and
+hardcoded `10.0.0.20`-`10.0.0.24` upload-target list in the
+`node_lifecycle_collection` job of `.github/workflows/functional-tests.yml`, phase 0's D4 commitment and
 why phase 5 is not fixing it. It is in the master plan's Future work.
 
 ### The per-run window
@@ -790,7 +790,7 @@ with it.
 * **Before 5f prepares anything for `shakenfist/actions`,** agree
   whether the gate is wanted at all. Phase 4 showed that a change to
   that repository goes live immediately for every run in flight,
-  because `functional-tests.yml:485` references
+  because every `functional-tests.yml` call site references
   `shakenfist/actions/.github/workflows/smoke-cluster.yml@main` with
   no pin to bump. A gate that turns out to be wrong cannot be rolled
   back by reverting here.

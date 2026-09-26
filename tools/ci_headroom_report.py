@@ -204,9 +204,12 @@ BAND_UPPER = 0.70
 # talking about itself, and it is printed with the reason it did not gate.
 BAND_VIOLATION_EXIT = 3
 
-# The fewest usable CPU samples a band violation may rest on. At the probe's
-# 15 second interval this is five minutes of a cluster which was actually
-# readable; the smallest of the 204 job-runs in the committed phase 2
+# The fewest samples which produced a cluster CPU fraction that a band
+# violation may rest on -- counted from the fractions the p90 is taken over
+# (the committed_cpu block's n_fraction), not from the usable samples, since
+# a usable sample whose ledgered nodes sum to no ledger at all produces no
+# fraction. At the probe's 15 second interval this is five minutes of a
+# cluster which was actually readable; the smallest of the 204 job-runs in the committed phase 2
 # baseline had 41, and a complete cluster job runs for around 29 minutes,
 # so this withholds only a series which stopped early or could barely be
 # read. Below it the p90 is close to the maximum of a few samples, which
@@ -259,6 +262,8 @@ PER_NODE_BAND_UPPER = 0.85
 # because they are purely additive: nothing already in the record changed
 # meaning. Version 3 records written before 5f lack both, so a consumer
 # reads them with .get() and treats absence as "written before the gate".
+# n_fraction joined every metric block in place for the same reason: the
+# gate's sample floor is counted from it.
 RECORD_VERSION = 3
 
 # Loki's own max_entries_limit_per_query, and the value
@@ -1236,8 +1241,10 @@ def metric_block(values, fractions, ledgers):
     """One measured quantity's block of the record.
 
     The count, p90 and peak of the quantity itself; the ledger it was
-    measured against as a range; and the p90 and peak of the fraction of
-    that ledger. The fractions are computed per sample and percentiled
+    measured against as a range; and the count, p90 and peak of the
+    fraction of that ledger. The two counts differ whenever a sample had
+    the quantity but no ledger to divide it by, and anything judging the
+    fraction must use n_fraction, which is what the p90 rests on. The fractions are computed per sample and percentiled
     afterwards, never derived by dividing one percentile by another -- a
     ratio of two percentiles is a number nothing ever stood at, and the
     printed table says as much.
@@ -1245,6 +1252,7 @@ def metric_block(values, fractions, ledgers):
     low, high = ledger_bounds(ledgers)
     return collections.OrderedDict([
         ('n', len(values)),
+        ('n_fraction', len(fractions)),
         ('p90', percentile(values, 0.9)),
         ('peak', max(values) if values else None),
         ('ledger_min', low),
@@ -1841,17 +1849,29 @@ def gate_withheld_reasons(record):
     """
     series = record['series']
     reasons = []
-    usable = record['cluster']['committed_cpu']['n']
-    if usable < BAND_GATE_MIN_SAMPLES:
+    counted = record['cluster']['committed_cpu']['n_fraction']
+    if counted < BAND_GATE_MIN_SAMPLES:
         reasons.append(
-            'only %d usable %s, fewer than the %d a band violation may '
-            'rest on' % (usable, plural(usable, 'sample'),
-                         BAND_GATE_MIN_SAMPLES))
+            'only %d %s produced a cluster CPU fraction, fewer than the %d '
+            'a band violation may rest on'
+            % (counted, plural(counted, 'sample'), BAND_GATE_MIN_SAMPLES))
     degraded = series['capacity_degraded_samples']
     if degraded:
         reasons.append(
             'the capacity read reported failing on %d %s'
             % (degraded, plural(degraded, 'sample')))
+    # Sample.capacity_degraded is tri-state, and None -- a probe built
+    # before step 2a -- cannot say whether its read was failing. The only
+    # route to one here is a partial rollback of shakenfist/actions, which
+    # is reached at @main, and a series which cannot say is not one to
+    # fail a job on.
+    absent = series['capacity_degraded_absent_samples']
+    if absent:
+        reasons.append(
+            '%d %s no capacity_degraded flag, so could not say whether '
+            'the capacity read was failing'
+            % (absent, 'sample carried' if absent == 1
+               else 'samples carried'))
     late = (series['ledger_unreadable_samples']
             - series['ledger_unreadable_prefix_samples'])
     if late:

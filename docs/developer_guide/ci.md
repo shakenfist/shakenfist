@@ -455,13 +455,18 @@ incidental:
   measures changes the failure surface it exists to measure.
 * **Nor does a verdict the report could not read.** An OVERSUBSCRIBED
   band is withheld, printed with the reason and exit 0, when the p90 rests
-  on fewer than 20 usable samples (five minutes at the probe's 15 second
-  interval; the smallest real job-run in the phase 2 baseline had 41),
-  when any sample reported `capacity_degraded`, or when any sample was
+  on fewer than 20 samples which produced a cluster CPU fraction (five
+  minutes at the probe's 15 second interval; the smallest real job-run in
+  the phase 2 baseline had 41), when any sample reported
+  `capacity_degraded`, when any sample predates that flag (a bundle whose
+  probe cannot say whether its read failed), or when any sample was
   ledger-unreadable *after* the warm-up prefix every run opens with. Each
   of those is the capacity read failing, not the cloud being full. The
   summary record carries the decision as `verdict.gates` and the reasons
-  as `verdict.gate_withheld`.
+  as `verdict.gate_withheld`. Because a single such sample withholds a
+  whole run, the gate can go quiet without anything failing; the window
+  command below counts withheld job-runs so that "the gate never fired"
+  and "the gate was never allowed to fire" can be told apart.
 
 Two switches sit in front of the gate, both of which fail towards *not*
 gating. `ci_headroom_verdict.sh` believes a status of 3 only when the
@@ -475,7 +480,8 @@ afterwards. All four `smoke-cluster.yml` call sites in this repository --
 three in `functional-tests.yml` and one in `scheduled-tests.yml` -- pass
 `headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}`, so the variable
 being unset leaves the gate on. A new call site has to pass the same line
-or it is gated with no way to switch it off. Both switches matter because
+or it is gated with no way to switch it off, which
+`shakenfist/tests/test_headroom_gate_workflow_seams.py` enforces. Both switches matter because
 `functional-tests.yml` reaches that workflow at `@main` with no pin to
 bump: a change there is live for every run in flight and cannot be rolled
 back from here.
@@ -491,21 +497,29 @@ python3 tools/ci_headroom_harvest.py \
     --since 2026-09-21 --until 2026-09-24 \
     -o /tmp/window.jsonl
 python3 - <<'EOF'
-import collections, json
+import collections, json, re
 rows = [json.loads(l) for l in open('/tmp/window.jsonl')]
 by = collections.defaultdict(list)
 skipped = 0
+withheld = collections.Counter()
 for r in rows:
     v = (r.get('summary') or {}).get('verdict') or {}
     if v.get('p90_cpu_fraction') is not None:
         by[(r['topology'], r['job'])].append(v)
     else:
         skipped += 1
+    # Absent on records written before the gate existed, which is not
+    # the same as a series the gate was allowed to judge.
+    for reason in v.get('gate_withheld') or []:
+        withheld[re.sub(r'\d+', 'N', reason)] += 1
 for key, verdicts in sorted(by.items()):
     bands = collections.Counter(v['band'] for v in verdicts)
     fractions = sorted(v['p90_cpu_fraction'] for v in verdicts)
     print(key, len(verdicts), 'max %.3f' % fractions[-1], dict(bands))
 print(skipped, 'job-runs had no fraction to judge and are not counted')
+print(sum(1 for r in rows if ((r.get('summary') or {}).get('verdict')
+                              or {}).get('gate_withheld')),
+      'job-runs had the gate withheld:', dict(withheld))
 EOF
 ```
 
