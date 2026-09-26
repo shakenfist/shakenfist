@@ -24,6 +24,22 @@ import yaml
 METRICS_PORT = 13006
 METRICS_TIMEOUT = 5
 
+# Where sf-resources publishes its own metrics, on every node rather than
+# only on the database tier. The budget's per-instance coefficient is a
+# regression against sum(instances_active), and that gauge is here: the
+# number of libvirt domains this node is running. Duplicated from
+# config.RESOURCES_METRICS_PORT rather than imported, like every other
+# constant in this file, and asserted against the real default by
+# test_database_tier_harness.py.
+#
+# Reading the cluster's shape from this rather than from the API's
+# power_state field is not a preference. _doc.method in the budget says
+# every consumer must count standing instances the way the coefficients
+# were fitted, or it evaluates the model against a quantity it was never
+# fitted against; sf-ctl database-load and the generated Prometheus rules
+# both read instances_active, and this is the third consumer.
+RESOURCES_METRICS_PORT = 13001
+
 # The load check watches several consecutive windows rather than one long
 # one, because the cluster it runs on is not idle: stestr runs the suite in
 # parallel, so other tests are creating and deleting things throughout. A
@@ -521,6 +537,43 @@ def scrape_request_pairs(mesh_ip):
             continue
         pairs[(operation, caller)] = pairs.get((operation, caller), 0.0) + value
     return pairs
+
+
+def parse_gauge(text, name):
+    """The value of one unlabelled Prometheus gauge, or None.
+
+    Deliberately narrow. The gauges sf-resources publishes carry no
+    labels, so a sample line is the metric name, whitespace and a value,
+    and anything else with this name as a prefix -- instances_total when
+    asked for instances_active, say -- is a different metric and must not
+    match. Returns None rather than zero when the gauge is absent,
+    because "this node is running nothing" and "this node does not
+    publish that" are different answers and only one of them can be
+    summed.
+    """
+    for line in text.splitlines():
+        if line.startswith('#'):
+            continue
+        fields = line.split()
+        if len(fields) != 2 or fields[0] != name:
+            continue
+        try:
+            return float(fields[1])
+        except ValueError:
+            return None
+    return None
+
+
+def scrape_instances_active(ip):
+    """How many libvirt domains one node is running, or None.
+
+    The regressor the budget's per_instance_qps terms were fitted
+    against, read from the node itself. See RESOURCES_METRICS_PORT.
+    """
+    url = 'http://%s:%d/metrics' % (ip, RESOURCES_METRICS_PORT)
+    resp = requests.get(url, timeout=METRICS_TIMEOUT)
+    resp.raise_for_status()
+    return parse_gauge(resp.text, 'instances_active')
 
 
 def activity_levels(rates_per_window):

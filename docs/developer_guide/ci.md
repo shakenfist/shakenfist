@@ -536,6 +536,48 @@ all. Such a filter matches nothing, and the empty census that results
 is reported honestly as "no schedule stage events at all", which reads
 like an idle cluster rather than a broken query.
 
+### The idle-load check measures the shape while it measures the load
+
+`test_no_unbudgeted_fixed_rate_database_polling` evaluates the budget's
+model, and two of that model's three terms are facts about the cluster
+rather than about the code: node count and standing instances. Both are
+sampled at every one of the five window boundaries, not once when the
+measurement is over.
+
+The instance count is the one that matters, because the suite is what
+creates and destroys instances and it tidies up after itself. A count
+taken when the four minutes are up is a count of what nobody got round
+to deleting, and on the run in
+[#4039](https://github.com/shakenfist/shakenfist/issues/4039) that was
+zero -- on a cluster whose `sidechannel` daemon had visibly been
+monitoring instances the whole time. Every `per_instance_qps` ceiling is
+a multiple of that number, so the model predicted a cluster that was not
+there and the build failed for load sitting exactly where the model says
+it should. The shipped Prometheus rules had already met the same problem
+and solved it the same way, by averaging the model over the window it
+compares against rather than evaluating it at the instant of the alert.
+
+Three things follow, and each is easy to get wrong:
+
+* **The count comes from `instances_active`**, scraped from
+  `sf-resources` on `RESOURCES_METRICS_PORT` on every node -- not from
+  the API's `power_state` field. `_doc.method` in the budget says a
+  consumer which counts standing instances any other way evaluates the
+  model against a quantity it was never fitted against, and `sf-ctl
+  database-load` and the Prometheus rules both read that gauge.
+* **The largest sample wins, not the mean or the last.** Each pair is
+  judged at its lowest observed rate, so the matching choice for the
+  shape is the largest: a failure then means a pair ran high against
+  every reasonable reading of the cluster it ran on, rather than against
+  the least generous one. Every sample is in the run's
+  `standing_instances_per_sample` detail.
+* **A failed scrape unenforces the per-instance ceilings rather than
+  failing the build**, because five samples per run across every node
+  would otherwise turn one refused connection into a red pull request.
+  The `unbudgeted` half of the check needs no shape and still runs. The
+  gauge going missing is the quiet version of this, so its name is
+  pinned by a unit test.
+
 ## Coverage the functional suite does not have
 
 ### Affinity test skips are topology dependent

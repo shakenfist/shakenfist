@@ -305,12 +305,40 @@ entries:
   - operation: GetInstanceAttributes
     caller_daemon: sidechannel
     per_node_base_qps: 0.075
-    per_instance_qps: 0.134
+    per_instance_qps: 0.233
     measured:
       mean_qps: 2.905
       r2: 0.725
     note: >-
-      The side channel daemon tracking agent state per instance.
+      The side channel daemon tracking agent state per instance. The
+      per-instance term is arithmetic about the code rather than a
+      measurement -- see CODE_DERIVED_TERMS in
+      tools/derive-database-load-budget.py -- because the daemon reads
+      an instance's attributes from two throttled sweeps and only one of
+      them existed when this file was derived. The dispatch check calls
+      agent_operation_next() once per DISPATCH_CHECK_INTERVAL (5s) per
+      agent-ready instance, and that method opens with an uncached
+      attributes read; the executor reaper peeks at the same attribute
+      once per EXECUTOR_REAP_INTERVAL (30s) per monitored instance. An
+      instance which has no monitor yet costs one read per
+      MONITOR_START_INTERVAL (30s) instead of both. So the idle floor is
+      0.233/s per standing instance against the 0.134/s originally
+      fitted here, which is issue #4039: the pair kept failing the
+      functional load check at rates its own idle floor accounts for.
+      The base term is still a measurement, and it is not an idle floor
+      -- with nothing standing this daemon reads no instance attributes
+      at all. What it absorbs is churn. Bringing one instance's agent up
+      costs roughly ten reads as the monitor walks it from never-talked
+      to ready through agent_state, agent_system_boot_time and
+      agent_facts, each of which re-reads the row inside its own write;
+      and every agent operation costs about five more as its queue entry
+      is peeked, locked, read and popped. Nothing in the code sets how
+      often a cluster does either, so the model has no term for it and a
+      single regressor has to leave it in the intercept. A cluster
+      pushing agent operations continuously will therefore read above
+      this entry however well the sweeps are modelled, and zeroing the
+      base term because no loop predicts it would tighten the ceiling on
+      exactly the clusters which churn most.
   - operation: GetNodeDaemonState
     caller_daemon: cleaner
     per_node_base_qps: 0.488

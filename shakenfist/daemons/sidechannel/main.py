@@ -76,6 +76,35 @@ BUDGET_CHECK_INTERVAL = 1
 # cost the dispatch check's own rate limit exists to avoid.
 EXECUTOR_REAP_INTERVAL = 30
 
+# How often the dispatcher asks one instance whether it has an agent
+# operation to run. A failed dispatch (the executor couldn't connect, or
+# the agent never welcomed us) leaves the operation at the head of the
+# queue, so without this we would retry every loop iteration. The idle
+# case matters just as much: agent_operation_next() opens with an
+# uncached instance attributes read, so an unthrottled check polls the
+# database at 1Hz per ready instance.
+DISPATCH_CHECK_INTERVAL = 5
+
+# How often we retry starting a monitor for an instance which libvirt
+# says is running but which has no monitor thread. Each attempt costs an
+# instance attributes read for vsock_cid(), so an instance which will
+# never have an agent channel -- a guest with no sf-agent2 side channel,
+# or one whose CID has not been published yet -- must not be retried on
+# every pass of the monitor management loop.
+MONITOR_START_INTERVAL = 30
+
+# Together, the three intervals above set what one instance costs this
+# daemon in GetInstanceAttributes reads while nothing is happening to it:
+# 1/DISPATCH_CHECK_INTERVAL for the dispatch check plus
+# 1/EXECUTOR_REAP_INTERVAL for the reaper, and 1/MONITOR_START_INTERVAL
+# instead of both while it has no monitor. That arithmetic is the
+# per_instance_qps term of the (GetInstanceAttributes, sidechannel) entry
+# in shakenfist/data/database_load_budget.yaml, which is why these are
+# named constants rather than literals at their use sites: the budget is
+# derived from them, and tools/derive-database-load-budget.py restates
+# them so a drift here shows up as a failing unit test rather than as a
+# budget term nobody can source. See issue #4039.
+
 
 class ConnectionFailed(Exception):
     ...
@@ -1464,9 +1493,9 @@ class Monitor(daemon.Daemon):
         self.dispatcher_thread = None
 
     def start_instance_monitor(self, instance_uuid):
-        # Rate limit how often we try to connect
+        # Rate limited for the reason MONITOR_START_INTERVAL records.
         last_attempt = self.monitor_attempts.get(instance_uuid, 0)
-        if time.time() - last_attempt < 30:
+        if time.time() - last_attempt < MONITOR_START_INTERVAL:
             return
         self.monitor_attempts[instance_uuid] = time.time()
 
@@ -1878,17 +1907,11 @@ class Monitor(daemon.Daemon):
                     if instance_uuid in self.executors:
                         continue
 
-                    # Rate limit dispatch checks per instance. A failed
-                    # dispatch (the executor couldn't connect, or the
-                    # agent never welcomed us) leaves the operation at
-                    # the head of the queue, so we would otherwise retry
-                    # every loop iteration. The idle case matters just as
-                    # much: agent_operation_next() costs an uncached
-                    # instance attributes read per call, so an unthrottled
-                    # check polls the database at 1Hz per ready instance.
+                    # Rate limited for the reason
+                    # DISPATCH_CHECK_INTERVAL records.
                     last_attempt = self.executor_attempts.get(
                         instance_uuid, 0)
-                    if time.time() - last_attempt < 5:
+                    if time.time() - last_attempt < DISPATCH_CHECK_INTERVAL:
                         continue
 
                     # The monitor management loop can remove entries while
