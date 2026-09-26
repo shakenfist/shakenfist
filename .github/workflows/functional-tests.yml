@@ -378,6 +378,14 @@ jobs:
     with:
       component: shakenfist
       component_ref: ${{ github.sha }}
+      # Not gated on the headroom band (PLAN-ci-cloud-sizing phase 5). The
+      # gate is armed only on job shapes a warn window measured, and this
+      # one -- single-node, smoke tier, pull requests only -- has never been
+      # harvested, because the harvest reads merge_group runs. Passed
+      # explicitly rather than left to the reusable workflow's default, which
+      # lives in another repository at @main; see docs/developer_guide/ci.md
+      # and test_headroom_gate_workflow_seams.py.
+      headroom_gate: false
       tier: smoke
 
   automated_reviewer:
@@ -489,6 +497,16 @@ jobs:
     with:
       component: shakenfist
       component_ref: ${{ github.sha }}
+      # The headroom band gate's off switch (PLAN-ci-cloud-sizing phase 5).
+      # Set the CI_HEADROOM_GATE repository variable to 'false' to stop a
+      # band violation failing these jobs without a commit; unset, or
+      # anything else, leaves the gate on. Every entry of this matrix was
+      # in phase 5's measured window, which is what arming it requires.
+      headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}
+      # An armed call site states every shape input rather than leaning on
+      # smoke-cluster.yml's defaults; test_headroom_gate_workflow_seams.py
+      # checks the shape against the ones the window measured.
+      test_kind: functional
       tier: full
       topology: ${{ matrix.merge.topology }}
       base_image: ${{ matrix.merge.base_image }}
@@ -512,6 +530,9 @@ jobs:
     with:
       component: shakenfist
       component_ref: ${{ github.sha }}
+      # Not gated: the collect step only runs for test_kind functional, so
+      # this job has never been measured. See the smoke tier job above.
+      headroom_gate: false
       tier: full
       topology: slim-primary
       base_image: 'sf://label/ci-images/debian-12'
