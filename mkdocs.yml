@@ -284,6 +284,7 @@ nav:
             - "Development": components/kerbside/development.md
             - "Installation": components/kerbside/installation.md
             - "Kerbside Proxy Architecture": components/kerbside/proxy-architecture.md
+            - "Network Ports": components/kerbside/network-ports.md
             - "Testing": components/kerbside/testing.md
             - "The direct-qemu mock harness": components/kerbside/direct-qemu-harness.md
             - Performance:

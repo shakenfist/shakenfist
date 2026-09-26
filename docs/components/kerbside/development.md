@@ -96,11 +96,6 @@ byte-layout boxes in
 GitHub's mermaid version does not reliably support it yet, so the
 ASCII survives until that changes.
 
-The database entity relationship diagram exists twice: in
-[schema.md](/components/kerbside/schema/) and, for standalone viewing, in
-`docs/schema.html`. Keep the two in sync -- the `add-database-migration`
-skill says to update both.
-
 No CI lane validates the diagrams -- a syntax error renders as an
 inline error box on GitHub rather than failing a check. To check a
 diagram before pushing, run mermaid-cli over the markdown file that
@@ -123,11 +118,11 @@ Dockerfiles, packaging and tool config), the Jinja templates that
 render the web UI, and the Markdown documentation. Excluded, each
 with a reason recorded in that file, are the plan archive in
 `docs/plans/`, the generated protobuf stubs, the vendored sfui tree,
-the exported GitHub configuration, `Cargo.lock`, the generated
-`docs/schema.html`, the qcow2 test fixtures, and `AUTHORS` and
-`LICENSE`. Anything matching neither list is reported by the
-consistency audit's `review-scope-completeness` check, so a new file
-type is a decision somebody makes rather than a silent omission.
+the exported GitHub configuration, `Cargo.lock`, the qcow2 test
+fixtures, and `AUTHORS` and `LICENSE`. Anything matching neither
+list is reported by the consistency audit's
+`review-scope-completeness` check, so a new file type is a decision
+somebody makes rather than a silent omission.
 
 The state (`REVIEWS.md`, `.vscode/*.weaudit*`) is maintained with
 `tools/review-tracking.sh`, a wrapper around the shared helper in the

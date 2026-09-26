@@ -139,7 +139,7 @@ zip contains:
 ```
 ryll-bugreport-YYYY-MM-DDTHH-MM-SSZ.zip
 ├── metadata.json         # report type, description, ryll version,
-│                         #   platform, target host/port, timestamp
+│                         #   platform, target, timestamp
 │                         #   (submit), triggered_at (dialog-open),
 │                         #   session_uptime_secs (submit),
 │                         #   triggered_uptime_secs (dialog-open)
@@ -280,9 +280,15 @@ When `--capture <DIR>` is specified, ryll records:
 ### Session metadata
 
 `metadata.json` is written at session start with platform details
-(OS, architecture), ryll version, and connection target (host, port).
-This makes capture directories self-describing when shared for bug
-reports or debugging.
+(OS, architecture), ryll version, and a single `target` field (from
+`ConnectionConfig::display_target()`, so a tunnelled connection's
+proxy address is shown with the target redacted rather than the raw
+`host:port`). For a direct connection `target` is `host:port` with
+the port actually dialled, which is the TLS port when the `.vv` has
+one; `target_tls_port` records that TLS port on its own, and is null
+for a plain connection. Bug-report zips carry the same `target`
+field in their `metadata.json`. This makes capture directories self-describing when
+shared for bug reports or debugging.
 
 ### Protocol capture (pcap)
 
@@ -435,7 +441,7 @@ Key design points:
   all channels via `TrafficBuffers::drain_all_pcap_bytes()`.
 - `AutoSnapshotState` in `ryll/src/auto_snapshot.rs` bundles the
   Arc handles the task needs (traffic, channel snapshots, app
-  snapshot, notifications, target host/port, output dir, cap,
+  snapshot, notifications, target, output dir, cap,
   byte cap, interval). All are already Arc-backed on `RyllApp`.
 - The task runs in its own std::thread with a dedicated
   `tokio::runtime::Builder::new_current_thread` runtime, spawned

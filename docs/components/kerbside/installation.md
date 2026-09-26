@@ -99,7 +99,8 @@ socket (`API_SOCKET_PATH`, default `/run/kerbside/api.sock`), so **they
 must be co-located** — the same host, the same container, or two
 containers sharing that path. Note that the API's port is a gunicorn
 argument rather than a Kerbside setting; `PUBLIC_FQDN` is how Kerbside
-tells clients where to find it.
+tells clients where to find it. Every port the two processes listen on
+or dial is listed in [network-ports.md](/components/kerbside/network-ports/).
 
 That gunicorn line is the demo's shape, not a recommendation: it
 serves plain HTTP on every interface, and the API carries bearer

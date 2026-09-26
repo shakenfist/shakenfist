@@ -45,6 +45,9 @@ These settings configure Keystone integration for OpenStack deployments.
 
 ## Network Settings
 
+What each port is for, and who needs to reach it, is in
+[network-ports.md](/components/kerbside/network-ports/).
+
 | Configuration Option | Type | Description |
 |---------------------|------|-------------|
 | PUBLIC_FQDN | String | The DNS name for the load balancers serving all Kerbside traffic. This needs to be configured to ensure DNS and the SSL certificates for the VDI proxy match or the certificates will be invalid. |
@@ -53,7 +56,7 @@ These settings configure Keystone integration for OpenStack deployments.
 | NODE_NAME | String (default "kerbside") | A unique name for each machine or container running the VDI proxy. This is used for logging and tracking purposes. |
 | VDI_ADDRESS | String (default 0.0.0.0) | The IPv4 address to bind the SPICE proxy to. |
 | VDI_SECURE_PORT | Integer (default 5900) | The port the VDI proxy will serve TLS SPICE sessions over. |
-| VDI_INSECURE_PORT | Integer (default 5901) | The port the VDI proxy will serve insecure SPICE sessions over. These insecure sessions are only used to redirect the user to the secure port. |
+| VDI_INSECURE_PORT | Integer (default 5901) | The port the VDI proxy will serve insecure SPICE sessions over. These insecure sessions are only used to redirect the user to the secure port, but clients must still be able to reach it: see [network-ports.md](/components/kerbside/network-ports/#why-the-insecure-port-cannot-be-skipped). |
 | PROXY_CLIENT_NOTSENT_LOWAT_BYTES | Integer (default unset) | `TCP_NOTSENT_LOWAT` on each accepted TLS client-leg SPICE socket (the insecure port only redirects, so it is left alone), in bytes: the most unsent data the kernel queues before the proxy stops relaying from the hypervisor. On a slow client link this moves the display backlog out of the proxy's send buffer and into spice-server's socket, which cuts the kernel memory the proxy holds per session, but it does not reduce keypress-to-draw latency: spice-server's per-channel ACK window bounds the backlog either way. See [the shaped-link measurement](/components/kerbside/performance/proxy-backpressure/). Unset uses the proxy's default (0, off); 0 disables the option. At most 4294967295. Setting it needs a `kerbside-proxy` that accepts `--client-notsent-lowat-bytes` (check `kerbside-proxy --help`): an older binary rejects the flag at startup, and the daemon exits with it. |
 | PROXY_BACKEND_RCVBUF_BYTES | Integer (default unset) | `SO_RCVBUF` on each hypervisor-leg SPICE socket, in bytes, capping the backlog the proxy accepts from spice-server while a client is slow. Linux clamps the value to `net.core.rmem_max` (commonly 212992) and doubles it, and setting it turns off receive autotuning for that socket. The same trade-off as PROXY_CLIENT_NOTSENT_LOWAT_BYTES applies. Unset uses the proxy's default (0, off); 0 disables the option. At most 4294967295. Setting it needs a `kerbside-proxy` that accepts `--backend-rcvbuf-bytes` (check `kerbside-proxy --help`): an older binary rejects the flag at startup, and the daemon exits with it. |
 

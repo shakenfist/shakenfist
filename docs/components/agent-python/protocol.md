@@ -67,7 +67,12 @@ Collects information about the guest:
 
 Runs a shell command inside the guest. The request supports:
 
-- `command`: The command string to execute.
+- `command`: The command string to execute. It is run by
+  `/bin/sh`, so full shell syntax is available, including
+  environment variable prefixes (`FOO=bar cmd`), builtins,
+  pipes and compound statements. `network_namespace` and
+  `io_priority` apply to the whole command line, not just its
+  first word.
 - `environment_variables`: Key-value pairs to set in the
   environment.
 - `network_namespace`: If set, the command is run inside the
@@ -78,6 +83,19 @@ Runs a shell command inside the guest. The request supports:
 
 The reply contains `stdout`, `stderr`, `exit_code`, and
 `execution_seconds`.
+
+The agent does not check that the command exists before running
+it. A missing executable produces a normal reply with exit code
+127 and the shell's error on `stderr`. A `CommandError` is
+returned when the command cannot be started, for example
+because the working directory does not exist.
+
+Agents up to and including v1.0.1 checked that the first word of
+the command was an executable on `PATH` and returned a
+`CommandError` if it was not, which also rejected valid shell such
+as `FOO=bar cmd`. Hypervisor-side callers that need to detect a
+missing command should check `exit_code` rather than relying on
+the operation failing.
 
 ### Put File
 

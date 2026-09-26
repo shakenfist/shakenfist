@@ -73,6 +73,7 @@ poller), media socket binding added 2026-08-21.
 | Connect via URL (`--url`) | available | available | available |
 | Connect via direct host:port (`--direct`) | available | available | available |
 | TLS / secure channel (inline CA from .vv) | available | available | available |
+| HTTP CONNECT proxy (`proxy=` in .vv) | available | available | available (all three build the same `ConnectionConfig`) |
 | Password authentication | available | available | available |
 | **Control socket** | | | |
 | Control socket (`--control-socket`) | n/a — intrinsic (the window owns input and the surface; combining with the GUI is a CLI error) | available | available |

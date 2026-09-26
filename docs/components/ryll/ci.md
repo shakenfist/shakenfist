@@ -484,6 +484,39 @@ So it is advisory. A red **Mermaid lint** on a pull request is
 visible and is expected to be fixed, but nothing enforces that
 automatically.
 
+## The Proxmox lane
+
+`proxmox-functional.yml` proves that ryll's SPICE HTTP CONNECT
+tunnelling actually works against a real Proxmox VE spiceproxy,
+not just against the direct-qemu and Shaken Fist targets the
+other functional lanes cover. It deploys a single-node PVE 9
+through `shakenfist/actions`'
+[`deploy-proxmox-on-shakenfist`](https://github.com/shakenfist/actions/blob/main/docs/actions.md),
+builds this branch's `ryll` first so a compile error never books
+the ~20-minute node deploy, and then runs
+`tools/proxmox-smoke.py`'s four checks (positive, expired ticket,
+wrong pin, missing pin) against the node's spiceproxy, each
+minting its own fresh ticket. See the script's own docstring for
+the checks' oracles and timing.
+
+It is advisory, for the same path-filter reason as [the mermaid
+lint lane](#it-is-deliberately-not-a-gate): it is filtered to
+`shakenfist-spice-protocol/src/**`,
+`shakenfist-spice-renderer/src/**`, `ryll/src/config.rs`,
+`ryll/src/main.rs`, the workflow itself and
+`tools/proxmox-smoke.py`, so a required check on it would never
+report on a pull request outside those paths and would block
+that pull request forever. It runs on `pull_request` against
+`develop` and on `workflow_dispatch`; there is no schedule,
+because drift in the Proxmox substrate itself is the job of the
+action repository's own weekly lane, not this one.
+
+Unlike ryll's other self-hosted VM lanes, it carries a fork
+guard: the runners hold `/srv/github/id_ci`, the key to every
+node in the CI mesh, and this lane uses it to create a Shaken
+Fist instance, so it does not run against a pull request from a
+fork.
+
 ## The three gates
 
 The `develop` ruleset requires exactly three status checks, and
@@ -685,6 +718,7 @@ consistency audit.
 | `supply-chain.yml` | Weekly advisory drift against develop (cargo-audit, cargo-deny); the PR-time scanners live in `ci.yml` |
 | `fuzz.yml` | Nightly `cargo-fuzz` build and smoke run against develop; failures filed as issues |
 | `mermaid-lint.yml` | Renders every mermaid diagram in the repository's markdown; advisory, not a gate |
+| `proxmox-functional.yml` | Deploys a real Proxmox VE node and runs the SPICE HTTP CONNECT smoke checks against it; advisory, not a gate |
 | `renovate.yml` | Automated dependency updates (hourly) |
 | `export-repo-config.yml` | Daily repository configuration export |
 | `pr-re-review.yml` | Bot-triggered PR re-review (`@shakenfist-bot please re-review`) |
