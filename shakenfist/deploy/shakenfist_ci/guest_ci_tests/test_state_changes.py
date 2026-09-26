@@ -77,6 +77,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         # Wait for our test instance to boot
         self.assertIsNotNone(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'on', 'after create')
 
         # We need to refetch the instance to get a complete view of its state.
         # It is also now safe to fetch the instance IP.
@@ -99,6 +100,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self.test_client.reboot_instance(inst['uuid'])
         self._await_instance_not_ready(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'on', 'after soft reboot')
         inst = self.test_client.get_instance(inst['uuid'])
         this_boot = inst['agent_system_boot_time']
         self.assertNotIn(
@@ -117,6 +119,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self.test_client.reboot_instance(inst['uuid'], hard=True)
         self._await_instance_not_ready(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'on', 'after hard reboot')
         inst = self.test_client.get_instance(inst['uuid'])
         this_boot = inst['agent_system_boot_time']
         self.assertNotIn(this_boot, [None, 0, last_boot],
@@ -133,6 +136,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self.test_client.power_off_instance(inst['uuid'])
         # Once the API returns the libvirt has powered off the instance or an
         # error has occurred (which CI will catch).
+        self._assert_power_state(inst['uuid'], 'off', 'after power off')
 
         self.assertRaises(
             apiclient.ResourceStateConflictException,
@@ -140,6 +144,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self.assertRaises(
             apiclient.ResourceStateConflictException,
             self.test_client.reboot_instance, inst['uuid'], hard=True)
+        self._assert_power_state(inst['uuid'], 'off', 'after rejected reboots')
 
     def test_lifecycle_power_cycle(self):
         inst = self._start_target('powercycle')
@@ -149,6 +154,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
 
         # Power off
         self.test_client.power_off_instance(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'off', 'after power off')
         # Once the API returns the libvirt has powered off the instance or an
         # error has occurred (which CI will catch).
         time.sleep(5)
@@ -164,6 +170,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self.test_client.power_on_instance(inst['uuid'])
         self._await_instance_not_ready(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'on', 'after power on')
         inst = self.test_client.get_instance(inst['uuid'])
         this_boot = inst['agent_system_boot_time']
         self.assertNotIn(this_boot, [None, 0, last_boot],
@@ -184,6 +191,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             'instance_uuid': inst['uuid']
         })
         self._await_instance_not_ready(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'paused', 'after pause')
         self._emit_tracing_event({
             'msg': 'Instance not ready',
             'instance_uuid': inst['uuid']
@@ -197,6 +205,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             'instance_uuid': inst['uuid']
         })
         self._await_instance_ready(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'on', 'after unpause')
         self._emit_tracing_event({
             'msg': 'Instance ready',
             'instance_uuid': inst['uuid']
@@ -236,6 +245,7 @@ class TestDetectReboot(base.BaseNamespacedTestCase):
         # Wait for our test instance to boot
         self.assertIsNotNone(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'on', 'after create')
 
         inst = self.test_client.get_instance(inst['uuid'])
         first_boot = inst['agent_system_boot_time']
@@ -246,6 +256,7 @@ class TestDetectReboot(base.BaseNamespacedTestCase):
         self.test_client.reboot_instance(inst['uuid'], hard=True)
         self._await_instance_not_ready(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'on', 'after hard reboot')
 
         inst = self.test_client.get_instance(inst['uuid'])
         if first_boot == inst['agent_system_boot_time']:
