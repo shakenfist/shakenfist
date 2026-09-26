@@ -113,6 +113,7 @@ class InstanceHotplugTestsMixin:
 
         # Wait for the instance agent to report in
         self._await_instance_ready(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'on', 'after create')
 
         # Debug: check that predictable interface naming is
         # disabled inside the instance
@@ -196,8 +197,10 @@ class InstanceHotplugTestsMixin:
         # config drive.
         self.test_client.power_off_instance(inst['uuid'])
         self._await_instance_not_ready(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'off', 'after power off')
         self.test_client.power_on_instance(inst['uuid'])
         self._await_instance_ready(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'on', 'after power on')
 
         # List interfaces to ensure the device persisted
         _, data = self.test_client.await_agent_command(
