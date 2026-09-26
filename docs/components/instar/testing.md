@@ -262,7 +262,7 @@ Wall clock: ~32 s serial / ~10 s with `make test-container`'s
 
 ### Snapshot Tests (`test_snapshot.py`)
 
-Tests for the `instar snapshot` subcommand (the PLAN-s worknapshot), 94 tests across five families:
+Tests for the `instar snapshot` subcommand (the snapshot work), 94 tests across five families:
 
 - **List matrix (human)**: per baselined image, `TZ=UTC instar
   snapshot -l` byte-equals the host-resolved profile baseline
@@ -981,7 +981,7 @@ For each iteration the fuzzer:
 5. Compares outputs at each stage: exit codes, normalized JSON info
    output, and converted file content (SHA-256 of raw-flattened output).
 
-The `op_snapshot` arm (the PLAN-s worknapshot) generates a
+The `op_snapshot` arm (the snapshot work) generates a
 fresh qcow2, then applies an identical random chain of
 `snapshot -c` / `-d` / `-a` and `qemu-io` write elements to the
 instar and qemu-img copies, asserting **byte-identity of the
@@ -991,7 +991,7 @@ normalized per docs/quirks.md). Its first runs surfaced a real
 multibyte list-padding bug and delete's missing surviving-L2
 COPIED refresh, both since fixed.
 
-The `op_repair` arm (the PLAN-c workheck-repair) builds a fresh
+The `op_repair` arm (the check-repair work) builds a fresh
 qcow2 with known data, injects one random qcow2 corruption
 (refcount-zero / too-high / leaked / stale-copied / overlapping),
 forks the corrupt file to two byte-identical copies, and repairs
@@ -1010,7 +1010,7 @@ is intentionally narrower than `qemu-img -r leaks` (see
 [quirks.md](/components/instar/quirks/#check---repairleaks-scope-vs-qemu-img-check--r-leaks)).
 
 The `op_commit`, `op_rebase` and `op_bench` arms draw a snapshot flag
-(40% probability, the PLAN-q workcow2-write-infrastructure) and, when
+(40% probability, the qcow2-write infrastructure work) and, when
 `qemu-io` is present, build a **snapshot-bearing** fixture that
 exercises the copy-on-write paths opened — commit over a
 backing- or overlay-snapshot span, safe rebase of a snapshot-bearing
@@ -1097,7 +1097,7 @@ differential fuzzing cannot reach.
 
 ### Fuzz targets
 
-40 targets across the parser and planner crates, organized in
+42 targets across the parser and planner crates, organized in
 `src/fuzz/`:
 
 | Target | Crate | Type |
@@ -1111,8 +1111,10 @@ differential fuzzing cannot reach.
 | `fuzz_vmdk_grain` | vmdk | CallTable |
 | `fuzz_vhd_footer` | vhd | Buffer-based |
 | `fuzz_vhd_bat` | vhd | CallTable |
+| `fuzz_vhd_parent` | vhd | Buffer-based |
 | `fuzz_vhdx_header` | vhdx | Buffer-based |
 | `fuzz_vhdx_metadata` | vhdx | CallTable |
+| `fuzz_vhdx_parent` | vhdx | Buffer-based |
 | `fuzz_raw_partition` | raw | Buffer-based |
 | `fuzz_luks_header` | luks | Buffer-based |
 | `fuzz_vdi_header` | vdi | Buffer-based |
@@ -1151,7 +1153,42 @@ sector-based I/O from the fuzzer input. **Sim harness** targets
 harness — here `crates/qcow2-write`'s `sim` module, feature-gated
 `#[cfg(any(test, feature = "sim"))]` and OFF in the production build.
 
-The two snapshot targets (the PLAN-s worknapshot) cover the
+The two parent-locator targets cover the differencing-image read path
+that an ordinary non-differencing VHD/VHDX never reaches, and that no
+other target reached either. `fuzz_vhd_parent` drives
+`VhdParentInfo::parse` over the eight-entry `VhdParentLocatorTable`,
+`locator_defect`'s placement rules (rejecting defective, unused or
+non-Windows entries), `preferred_locator`'s precedence and ambiguity
+logic (a disagreeing duplicate must resolve to ambiguous, never to a
+winner), and `decode_name`'s UTF-16BE decode. `fuzz_vhdx_parent`
+drives `parse_parent_locator` directly against raw item bytes —
+libFuzzer cannot synthesise a valid region table, a metadata table,
+and an in-item offset past the 64 KB floor by chance, so the item
+parser has to be fuzzed on its own rather than reached through
+`parse_metadata` — and asserts that every offset and length reachable
+from a returned locator lies inside the item it came from (checked
+by index, not by trusting the parser's own arithmetic), that the
+locator type comes from the item's GUID rather than a field the
+parser set, that a declined key stays distinguishable from an absent
+one, and that linkage comparison is case-insensitive.
+
+Both targets exist because a measurement, not a guess, showed the
+gap: before this phase `VhdParentInfo::parse`,
+`VhdParentLocatorTable::parse`, `VhdParentLocator::parse`,
+`locator_defect`, `preferred_locator`, `decode_name`,
+`parse_parent_locator` and its nine helpers were all at 0.00% region
+coverage, while the targets that were already running covered
+unrelated code in the same crates well — `VhdState::init` at 89.26%
+and `VhdFooter::parse` at 97.96% for VHD, `parse_metadata` at 33.91%
+and `read_header` at 94.44% for VHDX. After adding the targets, the
+VHD functions measured 86.67%-100% and the VHDX functions
+75%-100% (`value_of` and `linkage_matches` are the two below 90%).
+These targets assert invariants — a defective locator never winning
+selection, a disagreeing duplicate never resolving to a winner, no
+offset escaping its bounds — rather than only the absence of a
+panic.
+
+The two snapshot targets (the snapshot work) cover the
 streaming snapshot-table parser (`fuzz_snapshot_parse` drives
 `for_each_snapshot_entry` and the planner converter against
 adversarial qcow2 fragments) and the mutator primitives
@@ -1162,7 +1199,7 @@ table-serialisation round-trip — asserting semantic invariants
 such as precheck-never-mutates, inc/dec byte-identity, and
 allocator containment).
 
-`fuzz_check_repair` (the PLAN-c workheck-repair) dispatches one
+`fuzz_check_repair` (the check-repair work) dispatches one
 of four `crates/check` repair planners per exec — leak
 reclamation, count accumulation, refcount correction, and COPIED
 reconciliation — asserting sub-byte-masked containment (co-resident
@@ -1172,7 +1209,7 @@ and bounds→`MisalignedAccess` error classifications, idempotence,
 and the "correct generalises reclaim" cross-check. The COPIED
 walker's deep invariants are delegated to `fuzz_snapshot_refcount`.
 
-The two `crates/qcow2-write` targets (the PLAN-q workcow2-write-infrastructure) fuzz the write planner rather than a
+The two `crates/qcow2-write` targets (the qcow2-write infrastructure work) fuzz the write planner rather than a
 parser. `fuzz_qcow2_write` decodes a fixture archetype (clean /
 backing-present / shared-data / shared-L2 nested / owned-L2 /
 zero-flag-target) at a cluster size {512, 4 KiB, 64 KiB, 2 MiB} and
@@ -1211,6 +1248,23 @@ cargo fuzz tmin fuzz_qcow2_header artifacts/fuzz_qcow2_header/<crash>
 # Generate coverage report
 cargo fuzz coverage fuzz_qcow2_header
 ```
+
+Per-function coverage — which functions a target actually reached, not
+just a total — comes from `make fuzz-coverage`, which runs the same
+coverage build inside the devcontainer and renders the report with
+`llvm-cov`:
+
+```bash
+make fuzz-coverage FUZZ_TARGET=fuzz_vhd_parent
+make fuzz-coverage FUZZ_TARGET=fuzz_vhd_parent FUZZ_COVERAGE_FILTER=locator
+```
+
+A filter narrows the report to matching function names across every
+crate; `FUZZ_COVERAGE_SOURCES` narrows the files. This exists because a
+target that runs clean while reaching none of the code it claims to fuzz
+looks, from the outside, exactly like a target that found no bug. It
+does not use `cargo cov` to render: cargo-fuzz 0.12 passes
+`--no-default-features` to a clap parser that rejects it and panics.
 
 ### Corpus seeding
 
@@ -1254,8 +1308,8 @@ computed by `tools/ci/fuzz-tier.sh`: the fast-saturating targets (pure
 window math, CHS rounding, and the planner/emitter crates) take a short
 fixed slice (300s — they reach steady coverage in well under a minute),
 and the deep parser/format targets split the remainder. With the
-current 27 targets that gives the 17 deep targets ~24 min each versus
-~17 min under an even split.
+current 42 targets (17 fast, 25 deep) that gives the 25 deep targets
+~15 min each versus ~11 min under an even split (27000 / 42).
 
 This is one of two levers for keeping per-target time useful as the
 target count grows; the other is corpus persistence (see *Corpus
@@ -1265,6 +1319,20 @@ across multiple CI jobs instead.** Sharding only adds real throughput
 if the self-hosted runner pool has spare physical cores during the
 nightly window, since each libFuzzer target pins a core — confirm core
 availability before adding jobs.
+
+#### Keeping the registration lists honest
+
+Adding a target means editing several places by hand, and the
+`TARGETS=(...)` array in `coverage-fuzz.yml` is the one that fails
+silently: a target missing from it is never fuzzed in CI at all, while
+its row in the table above keeps claiming it is.
+`tools/ci/check-fuzz-targets.sh` fails the `ci-tooling` job unless the
+`.rs` basenames, the `[[bin]]` names in `src/fuzz/Cargo.toml` and that
+array name exactly the same set. `FAST_TIER` in `fuzz-tier.sh` is
+checked as a subset rather than for equality, since an unlisted target
+legitimately defaults to the deep tier. The guard needs no docker, no
+cargo and no testdata, and `tools/ci/test-check-fuzz-targets.sh` proves
+it still fails when one list loses an entry.
 
 #### Crash reporting
 

@@ -364,8 +364,8 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 | 5. `plan_vhd` differencing emitter | [PLAN-differencing-phase-05-vhd-emitter.md](/components/instar/plans/PLAN-differencing-phase-05-vhd-emitter/) | Complete | `9a80776` (#568) |
 | 6. `plan_vhdx` differencing emitter | [PLAN-differencing-phase-06-vhdx-emitter.md](/components/instar/plans/PLAN-differencing-phase-06-vhdx-emitter/) | Complete | `882d098` (#577) |
 | 7. Guest create op and host CLI wiring | [PLAN-differencing-phase-07-guest-host.md](/components/instar/plans/PLAN-differencing-phase-07-guest-host/) | Complete | `99d7d24` (#581) |
-| 8. Rust unit tests and Python integration tests | [PLAN-differencing-phase-08-tests.md](/components/instar/plans/PLAN-differencing-phase-08-tests/) | Planned | |
-| 9. Coverage fuzzing of the locator parsers | PLAN-differencing-phase-09-fuzz.md | Not started | |
+| 8. Rust unit tests and Python integration tests | [PLAN-differencing-phase-08-tests.md](/components/instar/plans/PLAN-differencing-phase-08-tests/) | Complete | `c416abd` (#588) |
+| 9. Coverage fuzzing of the locator parsers | [PLAN-differencing-phase-09-fuzz.md](/components/instar/plans/PLAN-differencing-phase-09-fuzz/) | Planned | |
 | 10. Documentation | PLAN-differencing-phase-10-docs.md | Not started | |
 | 11. Composition: host chain discovery, device attachment, `info --chain` | PLAN-differencing-phase-11-chain-host.md | Not started | |
 | 12. Composition: guest VHD sector-bitmap read path | PLAN-differencing-phase-12-vhd-compose.md | Not started | |

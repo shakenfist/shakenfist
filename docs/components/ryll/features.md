@@ -72,7 +72,7 @@ ryll --file connection.vv --capture /tmp/capture
 
 This writes:
 
-- `metadata.json` — session context (ryll version, platform, target host)
+- `metadata.json` — session context (ryll version, platform, target)
   for self-describing capture directories in bug reports
 - `main.pcap`, `display.pcap`, `cursor.pcap`, `inputs.pcap`, `usbredir.pcap`,
   `webdav.pcap` — per-channel pcap files with fake TCP/IP headers, openable
@@ -96,6 +96,14 @@ This will:
 - Process display updates (decompress images)
 - Send automatic keystrokes every 2 seconds
 - Print statistics periodically
+
+Headless mode's exit status says whether the connection worked. A
+failed connect -- a refused dial, a proxy refusing the `CONNECT`, a
+TLS or `host_subject` rejection, a failed SPICE link -- is logged at
+ERROR as `Connection task failed: <reason>` and ryll exits non-zero.
+A session that ends because of Ctrl+C or because the server closed
+the main channel exits 0. A `--paste-text` failure also exits
+non-zero.
 
 Headless mode supports a Unix-socket control interface via
 `--control-socket <path>` for driving the session from external

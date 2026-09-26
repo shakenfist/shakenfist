@@ -356,6 +356,10 @@ make fuzz-build
 # Run a single target for a bounded wall-clock budget (seconds; default 60)
 make fuzz-run FUZZ_TARGET=fuzz_resize_planners FUZZ_DURATION=300
 
+# Per-function coverage for one target, to show what it actually reached
+make fuzz-coverage FUZZ_TARGET=fuzz_vhd_parent
+make fuzz-coverage FUZZ_TARGET=fuzz_vhd_parent FUZZ_COVERAGE_FILTER=locator
+
 # Run the seven snapshot shell harnesses (live differential
 # verification against qemu-img; needs a built instar + /dev/kvm)
 make snapshot-harnesses
@@ -1007,6 +1011,11 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 - `tools/ci/report-fuzz-crash.sh` - Files the `security-audit` issue for a coverage-fuzz crash (bounds the log excerpt, dedups against open issues; see "Crash reporting" in `docs/testing.md`)
 - `tools/ci/pick-fuzz-artifact.sh` - Chooses which libFuzzer artifact to report as the reproducer
 - `tools/ci/test-report-fuzz-crash.sh`, `tools/ci/test-pick-fuzz-artifact.sh` - Tests for those two; run them after any change (the `ci-tooling` CI job does)
+- `tools/ci/check-fuzz-targets.sh` - Fails if the three places a fuzz target has to be registered by hand disagree: the `.rs` file under `src/fuzz/fuzz_targets/`, the `[[bin]]` stanza in `src/fuzz/Cargo.toml`, and the `TARGETS=(...)` array in `coverage-fuzz.yml`. A target absent from that array is never fuzzed in CI at all, silently, while its row in `docs/testing.md` keeps claiming it is. `FAST_TIER` in `fuzz-tier.sh` is checked as a subset, since an unlisted target legitimately defaults to the deep tier
+- `tools/ci/count-fuzz-targets.sh` - The number of `[[bin]]` targets in `src/fuzz/Cargo.toml`, so `coverage-fuzz.yml` derives the count instead of restating it
+- `tools/ci/test-check-fuzz-targets.sh` - Tests for the registration guard, against a synthetic four-target tree; the `ci-tooling` CI job runs it
+- `tools/fuzz-coverage.sh` - Per-function coverage for one fuzz target, via `make fuzz-coverage` (see "Coverage-Guided Fuzzing" in `docs/testing.md`). Calls `llvm-cov` directly because `cargo cov` panics on cargo-fuzz 0.12
+- `tools/ci/test_extract_fuzz_corpus.py` - Tests the corpus seed builders in `scripts/extract-fuzz-corpus.py`: that a fixture carrying a hostile locator offset cannot abort the nightly seeding run, and that the defect it carries survives the reshape. Run with `python3 -m unittest`; the `ci-tooling` CI job does
 - `tools/ci/check-glibc-floor.sh` - Fails if the built `instar` binary needs a glibc above the published floor (`GLIBC_2.31`, Debian 11; see `docs/installation.md`). Runs immediately after `make instar` in both `build-and-test` and the release workflow. Do not raise the ceiling to make it pass: it means the release image's base moved, and `src/.devcontainer/build/Dockerfile` must stay on `debian:bullseye`
 - `tools/ci/test-check-glibc-floor.sh` - Tests for that check; the `ci-tooling` CI job runs it
 - `tools/ci/claude-result.sh` - Reads the JSONL stream a `claude -p --output-format stream-json --verbose` run leaves behind; `--text` reconstructs the assistant text (plus a diagnostic block when the run reported an error or the stream was truncated), `--trailer` emits the `Assisted-By:`/`Co-Authored-By:` pair naming the model the run actually resolved to. Called from `test-drift-fix.yml`

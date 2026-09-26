@@ -18,7 +18,10 @@ a clean shutdown instead of killing the process immediately.
   set, which lets eframe run its normal teardown path and finalize the capture
   session.
 - **Headless mode**: The tokio `select!` loop polls the flag alongside channel
-  events and breaks out cleanly when shutdown is requested.
+  events and breaks out cleanly when shutdown is requested. However the loop
+  ends, `run_headless` then winds the connection task down and joins it
+  (aborting it if it has not stopped within two seconds), so a connection
+  error is always logged and returned, and a Ctrl+C shutdown still exits 0.
 
 ### Unbuffered capture I/O
 

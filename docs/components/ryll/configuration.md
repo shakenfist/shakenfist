@@ -160,6 +160,7 @@ port=5900
 | `password` | No | SPICE password for authentication |
 | `ca` | No | Inline PEM CA certificate for TLS verification. When present it is the only trust anchor for the connection -- the public CA roots are not trusted as well |
 | `host-subject` | No | Server certificate subject; enforced -- the connection fails if the server's certificate subject does not match, and a malformed value is rejected at startup |
+| `proxy` | No | HTTP CONNECT proxy to tunnel the connection through (e.g. Proxmox VE's `spiceproxy`); see [HTTP CONNECT proxy](#http-connect-proxy) below |
 
 ### Ticket lifecycle keys
 
@@ -185,6 +186,43 @@ in the kerbside-wt-docs repository, which is the canonical
 reference for SPICE deployment authors (Kerbside, oVirt,
 custom gateways) who want their .vv output to drive ryll's
 reconnect UX correctly.
+
+### HTTP CONNECT proxy
+
+- **`proxy=<uri>`** — tunnels the SPICE connection through an HTTP
+  CONNECT proxy, the way Proxmox VE's `spiceproxy` is reached. Accepts
+  an optional `http://` scheme (the default when omitted), a bare
+  `host`, `host:port`, `http://host:port`, or a bracketed IPv6 host
+  (`[::1]:3128`); the port defaults to 3128 when none is given.
+  Trailing slashes are stripped.
+
+  Two forms are parsed and refused, each with its own error naming the
+  unsupported feature rather than a generic parse failure: an
+  `https://` scheme (TLS to the proxy itself is not supported; use
+  `http://`), and `user:pass@` credentials in the URI (proxy
+  authentication is not supported). A malformed or refused `proxy=`
+  value fails the `.vv` load, naming the `proxy` key, before any
+  connection is attempted.
+
+  A tunnelled connection is TLS-only and must be pinned: a `.vv` that
+  sets `proxy` must also set both `tls-port` and `host-subject`. ryll
+  refuses to dial -- before opening a socket -- a `.vv` that sets
+  `proxy` without one of the two. This is not optional hardening: under
+  a tunnel, `host` is not a name TLS can verify at all (see the Proxmox
+  example below), so the certificate-subject pin is the only identity
+  check the connection has.
+
+  The CONNECT exchange with the proxy must finish within 10 seconds.
+  A proxy that accepts the TCP connection and then never answers fails
+  the dial with "HTTP proxy did not complete the CONNECT exchange"
+  rather than holding it open.
+
+  When a connection is tunnelled, ryll's info log, capture
+  `metadata.json`, and any bug report show the proxy's address with
+  the target redacted (`<proxy host>:<proxy port> (tunnelled, target
+  redacted)`) rather than the raw `host`, because under Proxmox `host`
+  carries a signed ticket that should not end up in a log line or in
+  an artefact attached to a public issue.
 
 ### Example .vv Files
 
@@ -235,6 +273,34 @@ host-subject=CN=spice.example.com
 Note: `host-subject` must match the server certificate's subject
 exactly, including attribute count, order, and type -- not just the
 `CN` value.
+
+**Proxmox VE (tunnelled through `spiceproxy`):**
+```ini
+[virt-viewer]
+type=spice
+host=pvespiceproxy:1a2b3c4d:100:pve1.example.com:61000::REDACTED-TICKET
+proxy=http://pve1.example.com:3128
+tls-port=61000
+host-subject=OU=PVE Cluster Node,O=Proxmox Virtual Environment,CN=pve1.example.com
+ca=-----BEGIN CERTIFICATE-----\nMIIE...\n-----END CERTIFICATE-----\n
+password=REDACTED-TICKET
+delete-this-file=1
+```
+
+Note: `host` here is not a hostname ryll resolves; it is an opaque,
+signed pseudo-hostname that Proxmox's `spiceproxy` interprets once the
+CONNECT tunnel reaches it, and the `password` above carries the same
+kind of ticket. Both are placeholders: a real Proxmox ticket is valid
+for only about 30 seconds, so a Proxmox `.vv` must be downloaded and
+opened promptly, before it expires. `delete-this-file=1` is why a
+dropped session does not retry against a now-dead ticket -- it
+suppresses ryll's auto-reconnect for this single-use ticket, per the
+[Ticket lifecycle keys](#ticket-lifecycle-keys) above.
+
+This example is exercised, not just documented: [the Proxmox
+lane](/components/ryll/ci/#the-proxmox-lane) mints a `.vv` in this shape against a
+real Proxmox VE node on every pull request that touches the CONNECT
+tunnelling code, and asserts that ryll connects through it.
 
 ## Keyboard Shortcuts
 

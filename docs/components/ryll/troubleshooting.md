@@ -736,7 +736,7 @@ Each zip is a complete bug-report artefact containing:
   counters, stream state, latencies, decoding metrics, etc.)
 - **`traffic.pcap`** — raw SPICE traffic covering all channels for the ~N-second
   window preceding the snapshot
-- **`metadata.json`** — session context (ryll version, platform, target host)
+- **`metadata.json`** — session context (ryll version, platform, target)
 - **`runtime-metrics.json`** — CPU, memory, and FD usage at snapshot time
 - **`notifications.json`** — all in-app notifications (channel events, gaps, etc.)
 - **Screenshot** — the display surface at snapshot time (if available)

@@ -145,6 +145,10 @@ Guides for deploying and configuring Kerbside:
 - [Configuration](/components/kerbside/configuration/) - Configuration reference for all Kerbside
   settings including TLS, Keystone, API, and monitoring options
 
+- [Network Ports](/components/kerbside/network-ports/) - Every port Kerbside listens on or
+  dials, who needs to reach it, and why the plaintext redirect port
+  cannot be skipped
+
 - [Console Sources](/components/kerbside/console-sources/) - Configuring console sources
   (sources.yaml) for Shaken Fist, oVirt, OpenStack, and the static driver,
   including the Shaken Fist offline token exchange

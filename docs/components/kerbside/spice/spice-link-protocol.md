@@ -311,7 +311,9 @@ Kerbside enforces TLS for all client connections:
 
 - **Secure Port (5900)**: TLS-wrapped connections are accepted and processed.
 - **Insecure Port (5901)**: Connections receive a `need_secured` error response
-  redirecting them to the TLS port.
+  redirecting them to the TLS port. See
+  [network-ports.md](/components/kerbside/network-ports/) for why this port must stay
+  reachable.
 
 ## Connection State Machine
 

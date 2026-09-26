@@ -42,7 +42,8 @@ flowchart TD
   certificate, then drives the SPICE link handshake.
 - **Insecure (5901):** a minimal responder that issues the SPICE
   `need_secured` redirect, steering clients to the TLS port. No plaintext
-  SPICE traffic is proxied.
+  SPICE traffic is proxied, but clients that dial `port=` first still need
+  to reach it; see [network-ports.md](/components/kerbside/network-ports/).
 
 Accepted client sockets get TCP keepalive (mirroring the backend leg), so a
 silently dead peer is detected rather than pinning a task forever.
