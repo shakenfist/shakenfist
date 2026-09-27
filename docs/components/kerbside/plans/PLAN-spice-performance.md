@@ -274,7 +274,7 @@ first phase.
 |-------|------|--------|--------|
 | 1. Proxy backpressure and a WAN baseline | [PLAN-spice-performance-phase-01-proxy-backpressure.md](/components/kerbside/plans/PLAN-spice-performance-phase-01-proxy-backpressure/) | Complete | 52046167f8 (#478) |
 | 2. qemu damage path: prototype and measure; carry qemu, submit the kernel fix | | In progress | kerbside-patches b53aa39c7e (#1748) |
-| 3. Display transcoding in Kerbside: feasibility spike | [PLAN-spice-performance-phase-03-transcoding.md](/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/) | In progress | |
+| 3. Display transcoding in Kerbside: feasibility spike | [PLAN-spice-performance-phase-03-transcoding.md](/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/) | In progress | 2e19d737aa (#489), ryll fdb5ead5b4 (#406) |
 | 4. Son of SPICE: D-Bus display feasibility spike | | Not started | |
 | 5. Small spice-server patches (item 9, and item 4 if still wanted) | | Not started | |
 | 6. Push audit (kerbside and kerbside-patches) | | Not started | |

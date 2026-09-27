@@ -60,6 +60,18 @@ hostname verification, so a mis-issued or substituted backend certificate is
 rejected. When the console has no `host_subject`, the CA chain is the only
 identity check. The rustls `ring` crypto provider is installed at startup.
 
+The console's `ca_cert` is the *only* trust anchor for the backend leg when
+it is set: the public web roots are not consulted, so a hypervisor
+certificate must chain to that CA and nothing else will do. Without a
+`ca_cert` the public web trust store applies instead, and then the
+certificate's name must match the host dialled unless a `host_subject` is
+pinned. This is narrower than earlier releases, where a configured
+`ca_cert` was added to the public roots rather than replacing them, so a
+certificate from any public CA also passed the chain check (ryll commit
+3050082, picked up with the fix for issue #477). A deployment whose
+hypervisors present publicly issued certificates must therefore leave
+`ca_cert` empty for that source rather than set it to an unrelated CA.
+
 For Shaken Fist consoles the enforced `host_subject` is not configured on the
 proxy: it is pinned at scrape time from the hosting node's published SPICE
 server certificate subject (`spice_server_cert_subject`), and carried through
@@ -73,7 +85,13 @@ Each accepted connection runs this sequence (`session.rs`, `backend.rs`,
 
 1. **TLS terminate** the client connection (secure port).
 2. **SPICE link handshake** using the ryll server-role handshake drivers:
-   parse the client `SpiceLinkMess`, reply, and negotiate.
+   parse the client `SpiceLinkMess` and reply. A client whose common
+   capabilities lack `MINI_HEADER` or `AUTH_SELECTION` is refused here with
+   a `version_mismatch` link error, since the relay frames on the mini
+   header and the ticket read expects an auth selector. Otherwise the reply
+   offers a fixed set of capabilities per channel type (see "Link
+   capabilities" below), and the client's own capabilities are kept for the
+   backend leg.
 3. **Ticket decryption / authorization.** The client's RSA-encrypted ticket is
    decrypted and sent to the control plane via the `AuthorizeConnection` RPC,
    which resolves it to a hypervisor `Target` (host, port, backend ticket,
@@ -81,7 +99,8 @@ Each accepted connection runs this sequence (`session.rs`, `backend.rs`,
    A denial closes the connection.
 4. **Backend connect.** The proxy opens the backend leg to the hypervisor's
    SPICE port (honouring a `need_secured` retry to the TLS port) and completes
-   the server-side handshake with the backend ticket.
+   the server-side handshake with the backend ticket, advertising the
+   client's capabilities rather than the proxy's own.
 5. **Relay.** Traffic is relayed in both directions until either side closes,
    the idle-read timeout fires, the firewall issues a terminating verdict, or
    the control plane terminates the session.
@@ -89,6 +108,43 @@ Each accepted connection runs this sequence (`session.rs`, `backend.rs`,
 The connection registers in the session registry (`session.rs`) under its
 `session_id` after authorization and deregisters on teardown, so the control
 plane can drop it (see "Session termination" below).
+
+### Link capabilities
+
+The client leg's link reply has to be sent before the backend is known: it
+carries the RSA key the client encrypts its ticket to, and the ticket is what
+selects the backend. So the capabilities Kerbside offers a client cannot
+depend on the backend. Instead, for each channel type it offers what
+spice-server itself advertises for that type (`rust/kerbside-proxy/src/caps.rs`
+cites the spice-server source for each):
+
+| Channel | Offered channel capabilities |
+|---------|------------------------------|
+| common (every channel) | AUTH_SELECTION, AUTH_SPICE, MINI_HEADER (never AUTH_SASL) |
+| main | SEMI_SEAMLESS_MIGRATE, NAME_AND_UUID, AGENT_CONNECTED_TOKENS, SEAMLESS_MIGRATE |
+| display | MONITORS_CONFIG, STREAM_REPORT, PREF_COMPRESSION, PREF_VIDEO_CODEC_TYPE |
+| inputs | KEY_SCANCODE |
+| playback | VOLUME, OPUS |
+| record | VOLUME, OPUS |
+| usbredir, port, webdav | DATA_COMPRESS_LZ4 |
+| cursor, smartcard | none |
+
+Every message those capabilities let a client send is in the L1 allowlist.
+
+The backend leg then advertises the *client's* capabilities, verbatim and
+including any extra capability words, so spice-server chooses image
+compression, stream codecs and drawing operations for the client actually
+connected. The one exception is the authentication mechanism bits, which
+describe Kerbside's own ticket exchange with the backend: AUTH_SPICE is set
+and AUTH_SASL cleared. Before issue #477 was fixed the backend leg always
+advertised ryll's capabilities, so spice-server could, for example, send
+H.264 streams to a client that had not offered H.264.
+
+If a backend grants fewer channel capabilities than Kerbside offered the
+client (a spice-server built without Opus or LZ4, say), the proxy logs a
+warning naming the missing capability bits; the backend's reply is logged at
+debug level. The client may then send something that backend refuses, which
+cannot be undone once the client leg's reply has been sent.
 
 ### Packet Framing and the Relay
 

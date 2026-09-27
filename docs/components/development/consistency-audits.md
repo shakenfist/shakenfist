@@ -68,7 +68,7 @@ rule set moves between releases, so an unpinned upgrade would change the
 compliance page for reasons nobody chose.
 
 **2. `manage-issues`** -- downloads every artifact and runs
-`scripts/audit-manage-issues.py`, which files and closes issues. See
+`scripts/audit-manage-issues.py`, which files, updates and closes issues. See
 [Issues are the work tracking](#issues-are-the-work-tracking) below.
 
 **3. `update-docs`** -- runs `scripts/audit-update-docs.py`, which
@@ -136,6 +136,15 @@ stale matrix entry would otherwise file a duplicate every single
 morning. A rename still fails the job, so the matrix actually gets
 updated. If duplicates exist anyway, the oldest is kept and the rest are
 closed.
+
+**An open issue's body is regenerated on every run.** While a check
+keeps failing, its issue's body is re-rendered from the latest result
+and rewritten with `gh issue edit` whenever it differs, so the counts,
+the per-item lists and the spec links stay current rather than
+remaining the snapshot taken at filing. Differences in line endings and
+trailing whitespace are ignored, so an unchanged result edits nothing.
+Hand edits to a body are not preserved -- anything worth saying to the
+next reader belongs in a comment.
 
 A check that starts passing closes its issue. A check that becomes
 `not_applicable` closes it too: "we decided this does not apply" and
@@ -348,7 +357,7 @@ python3 scripts/audit-update-docs.py --results-dir /tmp/results/ \
 ```
 
 Always pass `--dry-run` to `audit-manage-issues.py`. Without it the
-script creates and closes real issues on real repositories.
+script creates, edits and closes real issues on real repositories.
 
 Pass `--page` as well, as above. A locally generated page only covers
 the repositories you fed it, so it is never what you want to keep, and
