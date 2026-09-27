@@ -318,8 +318,18 @@ class Artifact(dbowo):
         fix is to push the filter into SQL -- both halves of it, the
         shared flag and the set of namespaces which trust the
         requestor, are known before the scan starts.
+
+        A null or otherwise non-string ref answers "not found" before
+        either phase runs: phase two hands the ref to
+        ObjectFilterCriteria as a name, where None reads as *no name
+        filter* and would resolve to an arbitrary artifact visible to
+        the requestor (issue 4339, the fifth entry point of the issue
+        4223 shape).
         """
-        if object_ref and util_general.valid_uuid4(object_ref):
+        if not baseobject.valid_object_ref(object_ref):
+            return None
+
+        if util_general.valid_uuid4(object_ref):
             return cls.from_db(object_ref)
 
         own = cls.from_db_by_ref(object_ref, requestor)

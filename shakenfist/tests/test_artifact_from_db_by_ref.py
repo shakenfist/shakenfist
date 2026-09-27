@@ -1,4 +1,5 @@
-# Tests for Artifact.from_db_by_ref (phase 2 SQL pushdown filtering).
+# Tests for Artifact.from_db_by_ref (phase 2 SQL pushdown filtering)
+# and Artifact.from_db_by_ref_visible_to.
 #
 # This module tests:
 # - UUID input short-circuits to cls.from_db (find_artifacts NOT called)
@@ -8,6 +9,8 @@
 # - Zero matches returns None
 # - One match returns an Artifact instance built from the ArtifactData
 # - Two matches raises exceptions.MultipleObjects with expected message
+# - from_db_by_ref_visible_to answers None for a null or non-string ref
+#   without querying (issue 4339), and still widens a real name
 
 import uuid
 from unittest import mock
@@ -178,3 +181,83 @@ class ArtifactFromDbByRefTestCase(base.ShakenFistTestCase):
 
         mock_from_db.assert_not_called()
         mock_find_artifacts.assert_not_called()
+
+
+class ArtifactFromDbByRefVisibleToTestCase(base.ShakenFistTestCase):
+    """Unit tests for Artifact.from_db_by_ref_visible_to."""
+
+    # ------------------------------------------------------------------
+    # Test 1: A null or non-string ref answers "not found" (issue 4339)
+    # ------------------------------------------------------------------
+
+    @mock.patch('shakenfist.artifact.namespace_or_shared_filter')
+    @mock.patch('shakenfist.artifact.mariadb.find_artifacts')
+    @mock.patch.object(Artifact, 'from_db')
+    def test_null_or_non_string_ref_returns_none(
+            self, mock_from_db, mock_find_artifacts, mock_visibility):
+        """A null ref must never widen into "no name filter" (issue 4339).
+
+        find_artifacts is primed with plausible rows, of which exactly
+        one is visible to the requestor, so an unguarded lookup returns
+        a real Artifact rather than raising downstream: the assertion
+        below states the property directly instead of relying on an
+        incidental exception.
+        """
+        visible = _make_artifact_data(
+            art_uuid=_ARTIFACT_UUID, name='foo', namespace='tenant-b')
+        hidden = _make_artifact_data(
+            art_uuid=_ARTIFACT_UUID_2, name='bar', namespace='tenant-c')
+        mock_find_artifacts.return_value = [visible, hidden]
+        mock_visibility.side_effect = lambda ns, a: a.uuid == _ARTIFACT_UUID
+
+        for object_ref in (None, '', False, 0, uuid.uuid4()):
+            result = Artifact.from_db_by_ref_visible_to(
+                object_ref, 'tenant-a')
+            self.assertIsNone(result)
+
+        mock_from_db.assert_not_called()
+        mock_find_artifacts.assert_not_called()
+
+    # ------------------------------------------------------------------
+    # Test 2: UUID input short-circuits to cls.from_db
+    # ------------------------------------------------------------------
+
+    @mock.patch('shakenfist.artifact.mariadb.find_artifacts')
+    @mock.patch.object(Artifact, 'from_db')
+    def test_uuid_input_calls_from_db_not_find_artifacts(
+            self, mock_from_db, mock_find_artifacts):
+        """UUID ref short-circuits to from_db; find_artifacts is never called."""
+        sentinel = mock.sentinel.artifact_instance
+        mock_from_db.return_value = sentinel
+
+        result = Artifact.from_db_by_ref_visible_to(
+            _ARTIFACT_UUID, 'tenant-a')
+
+        mock_from_db.assert_called_once_with(_ARTIFACT_UUID)
+        mock_find_artifacts.assert_not_called()
+        self.assertIs(result, sentinel)
+
+    # ------------------------------------------------------------------
+    # Test 3: A real name still widens when the own namespace is empty
+    # ------------------------------------------------------------------
+
+    @mock.patch('shakenfist.artifact.namespace_or_shared_filter',
+                return_value=True)
+    @mock.patch('shakenfist.artifact.mariadb.find_artifacts')
+    def test_name_not_in_own_namespace_widens(
+            self, mock_find_artifacts, mock_visibility):
+        """The guard must not break widening: phase two still runs and
+        keeps the name filter."""
+        shared = _make_artifact_data(name='foo', namespace='tenant-b')
+        # Phase one (namespace-scoped) finds nothing; phase two
+        # (unscoped) finds the shared artifact.
+        mock_find_artifacts.side_effect = [[], [shared]]
+
+        result = Artifact.from_db_by_ref_visible_to('foo', 'tenant-a')
+
+        self.assertIsInstance(result, Artifact)
+        self.assertEqual(result.name, 'foo')
+        self.assertEqual(2, mock_find_artifacts.call_count)
+        phase_two_criteria = mock_find_artifacts.call_args_list[1][0][0]
+        self.assertEqual(phase_two_criteria.name, 'foo')
+        self.assertIsNone(phase_two_criteria.namespace)
