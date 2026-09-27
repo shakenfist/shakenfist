@@ -133,7 +133,8 @@ Offset  Size  Type    Field
 
 **num_common_caps / num_channel_caps** (4 bytes each)
 : Number of 32-bit words of common and channel capabilities the server
-  advertises. On success Kerbside sends one word of each (see
+  advertises. On success Kerbside sends one common word and zero or one
+  channel words, depending on the channel type (see
   [Capability Handling](#capability-handling)).
 
 **caps_offset** (4 bytes)
@@ -376,12 +377,20 @@ public_key_der = private_key.public_key().public_bytes(
 
 ### Capability Handling
 
-Kerbside uses hardcoded default capabilities based on observed behavior:
-- Common caps: 11 (AuthSelection, AuthSpice, MiniHeader)
-- Channel caps: 9 (SemiSeamlessMigrate, SeamlessMigrate)
+Kerbside answers the client's link before the hypervisor is known, so the
+capabilities in its reply are fixed per channel type: common caps 11
+(AuthSelection, AuthSpice, MiniHeader), and for each channel type the channel
+caps spice-server itself advertises for it. The table, and why the reply
+cannot depend on the backend, are in
+[Proxy Architecture](/components/kerbside/proxy-architecture/#link-capabilities).
 
-These values are sent in the server hello before the actual hypervisor
-capabilities are known.
+A client whose common caps lack MiniHeader or AuthSelection is refused with
+a `version_mismatch` (4) error reply before any key exchange. The relay
+frames every message on the mini header, and the ticket read expects the
+auth mechanism selector that only an AuthSelection client sends.
+
+The client's own capabilities are not discarded: the proxy advertises them to
+the hypervisor on the backend leg, so the server encodes for the real client.
 
 The wire format permits more than one 32-bit word in each capability vector
 (`num_common_caps` / `num_channel_caps` may exceed 1). The Rust

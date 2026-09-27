@@ -138,18 +138,22 @@ Capabilities are stored as 32-bit words, with each bit representing a feature.
 
 | Bit | Capability             | Description |
 |----:|------------------------|-------------|
-|   0 | InvalidateList         | Supports invalidate list messages |
-|   1 | StreamReportSupport    | Supports stream reporting |
-|   2 | MultiCodec             | Supports multiple video codecs |
-|   3 | CodecMJPEG             | Supports MJPEG video codec |
-|   4 | CodecVP8               | Supports VP8 video codec |
-|   5 | CodecH264              | Supports H.264 video codec |
-|   6 | A8Surface              | Supports A8 surface format |
-|   7 | StreamReport           | Stream report enabled |
-|   8 | LZ4Compression         | Supports LZ4 image compression |
-|   9 | CodecVP9               | Supports VP9 video codec |
-|  10 | GLScanout              | Supports GL scanout |
-|  11 | CodecH265              | Supports H.265/HEVC video codec |
+|   0 | SizedStream            | Stream data messages include dimensions |
+|   1 | MonitorsConfig         | Supports multi-monitor configuration |
+|   2 | Composite              | Supports composite drawing operations |
+|   3 | A8Surface              | Supports A8 surface format |
+|   4 | StreamReport           | Supports stream reporting |
+|   5 | LZ4Compression         | Supports LZ4 image compression |
+|   6 | PrefCompression        | Accepts a preferred image compression |
+|   7 | GLScanout              | Supports GL scanout |
+|   8 | MultiCodec             | Supports multiple video codecs |
+|   9 | CodecMJPEG             | Supports MJPEG video codec |
+|  10 | CodecVP8               | Supports VP8 video codec |
+|  11 | CodecH264              | Supports H.264 video codec |
+|  12 | PrefVideoCodecType     | Accepts a preferred video codec list |
+|  13 | CodecVP9               | Supports VP9 video codec |
+|  14 | CodecH265              | Supports H.265/HEVC video codec |
+|  15 | GLScanout2             | Supports GL scanout with multiple planes |
 
 ### Playback Channel Capabilities
 
