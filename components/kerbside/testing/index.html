@@ -15737,7 +15737,9 @@ instance — followed by an adversarial matrix covering replay,
 expiry, wrong audience, unknown kid, and cross-namespace mint.</p>
 <p>Driver scripts live in <code>tools/sf-e2e/</code> (see
 <code>tools/sf-e2e/README.md</code>). It is a smoke-tier PR gate, and also runs
-nightly and on dispatch.</p>
+nightly and on dispatch. Every run uploads an artifact bundle with the
+kerbside, ryll, SF daemon and libvirt logs, redacted before upload;
+the README's Security section lists what is collected.</p>
 <h2 id="the-ovirt-end-to-end-kerbside-lane">The oVirt end-to-end kerbside lane<a class="headerlink" href="#the-ovirt-end-to-end-kerbside-lane" title="Permanent link">&para;</a></h2>
 <p>The <code>ovirt_matrix</code> job in <code>.github/workflows/functional-tests.yml</code>
 does more than build and

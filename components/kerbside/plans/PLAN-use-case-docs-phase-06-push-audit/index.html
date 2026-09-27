@@ -9261,6 +9261,67 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#outcome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Outcome">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-was-fixed-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What was fixed here
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-was-filed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What was filed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-was-declined-and-why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What was declined, and why
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-audit-found-out-about-itself" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the audit found out about itself
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14841,6 +14902,67 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#outcome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Outcome">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-was-fixed-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What was fixed here
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-was-filed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What was filed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-was-declined-and-why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What was declined, and why
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-audit-found-out-about-itself" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the audit found out about itself
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14955,10 +15077,13 @@ most likely to be assumed away. <code>plan-range.sh</code> over the
 five merge commits derives:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>AUDIT_RANGE=2f0e526^1..073603b
 </code></pre></div>
-<p>and a 31-path <code>AUDIT_PATHS</code>, whose diff is <strong>5230
-insertions and 130 deletions across 30 files</strong>. Roughly 970
-lines of that are Python that did not exist before this
-plan:</p>
+<p>and a 31-path <code>AUDIT_PATHS</code>, whose diff is 5230 insertions
+and 130 deletions across 30 files, of which 991 lines are
+Python. <strong>Those are the range's figures, and the range
+over-reports</strong> — see the Outcome below and issue #491. What
+the five merges themselves landed is 5014 insertions and
+220 deletions across 31 files, of which <strong>758 lines are
+Python that did not exist before this plan</strong>:</p>
 <table>
 <thead>
 <tr>
@@ -14981,11 +15106,11 @@ plan:</p>
 </tr>
 <tr>
 <td><code>kerbside/tests/unit/test_db.py</code></td>
-<td>259</td>
+<td>71 (259 in range)</td>
 </tr>
 <tr>
 <td><code>kerbside/tests/unit/test_sources_static.py</code></td>
-<td>64</td>
+<td>28 (64 in range)</td>
 </tr>
 <tr>
 <td><code>kerbside/sources/static.py</code></td>
@@ -15050,9 +15175,13 @@ confirm, not a fix to smuggle in.</strong> Nothing in CI guards
 the <code>docs/index.md#use-cases</code> anchor that <code>README.md:43</code>
 and <code>ARCHITECTURE.md</code> now both depend on:
 <code>kerbside/tests/unit/test_docs_links.py:82</code> skips every
-target containing <code>://</code>, and both links are absolute. Phase
-5 mitigated this with a one-time manual check and recorded
-it in its risk table. It is in range and it is a real gap
+target containing <code>://</code>, which drops <code>README.md</code>'s absolute
+link, and <code>:89</code> strips the anchor off what survives, which
+drops <code>ARCHITECTURE.md</code>'s relative one. Removing the first
+exemption would therefore not be enough; anchor checking has
+to be added rather than un-skipped. Phase 5 mitigated this
+with a one-time manual check and recorded it in its risk
+table. It is in range and it is a real gap
 that this plan opened, so 2c should find it independently.
 Step 6e decides what to do with it; if 2c does not find it,
 that is itself a finding about 2c's brief.</p>
@@ -15094,7 +15223,7 @@ is only worth spending on if wave 1 passes. Steps 6b through
 <td>low</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Wave 1 gates. From the repository root of this worktree, run <code>eval "$(tools/audit/plan-range.sh 2f0e526 a7df5e5 28efa6c 8c5c042 073603b)"</code> and confirm it prints <code>AUDIT_RANGE=2f0e526^1..073603b</code> and a 31-path <code>AUDIT_PATHS</code>; then run <code>tools/audit/wave1.sh</code> with both exported. Report its exit code and its output verbatim, including every advisory check, not only the fatal ones. The exit-code table is at <code>PUSH-AUDIT.md:55-64</code>: 0 pass, 1 flake8, 2 tests, 3 raw <code>print()</code> added, 4 bare <code>except:</code>, 5 cannot reach repo root, 6 <code>AUDIT_RANGE</code> does not resolve. Do not fix anything; do not re-run with a different range to make it pass. If exit is 6, stop and report — an explicitly-set range that does not resolve is fatal by design, precisely so that a mistyped range cannot audit nothing and pass. Expect the diff to contain roughly 970 lines of added Python, so a report of "no Python in the diff" means the range or paths are wrong, not that the plan was documentation-only.</td>
+<td>Wave 1 gates. From the repository root of this worktree, run <code>eval "$(tools/audit/plan-range.sh 2f0e526 a7df5e5 28efa6c 8c5c042 073603b)"</code> and confirm it prints <code>AUDIT_RANGE=2f0e526^1..073603b</code> and a 31-path <code>AUDIT_PATHS</code>; then run <code>tools/audit/wave1.sh</code> with both exported. Report its exit code and its output verbatim, including every advisory check, not only the fatal ones. The exit-code table is at <code>PUSH-AUDIT.md:55-64</code>: 0 pass, 1 flake8, 2 tests, 3 raw <code>print()</code> added, 4 bare <code>except:</code>, 5 cannot reach repo root, 6 <code>AUDIT_RANGE</code> does not resolve. Do not fix anything; do not re-run with a different range to make it pass. If exit is 6, stop and report — an explicitly-set range that does not resolve is fatal by design, precisely so that a mistyped range cannot audit nothing and pass. Expect the diff to contain roughly 990 lines of added Python, so a report of "no Python in the diff" means the range or paths are wrong, not that the plan was documentation-only.</td>
 </tr>
 <tr>
 <td>6b</td>
@@ -15122,14 +15251,14 @@ is only worth spending on if wave 1 passes. Steps 6b through
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>2c documentation review. Execute the brief at <code>PUSH-AUDIT.md:330-467</code> with the same diff substitution as 6b. Its four shared blocks are all binding and all have material here: <code>readme-discipline</code> (phase 5 collapsed six README bullets to one — confirm the result is a curated link and not a feature list), <code>llm-doc-discipline</code> (<code>.claude/CLAUDE.md</code> and <code>ARCHITECTURE.md</code> both changed), <code>diagram-discipline</code> (<code>docs/index.md</code>'s mermaid broker node changed) and <code>plan-phase-references</code> (grep <code>README.md</code> and <code>docs/</code> excluding <code>docs/plans/</code> for "phase <number>"). Check independently, and report as a finding if true, that nothing in CI guards the <code>docs/index.md#use-cases</code> anchor that <code>README.md:43</code> and <code>ARCHITECTURE.md</code> now depend on — <code>kerbside/tests/unit/test_docs_links.py:82</code> skips every target containing <code>://</code> and both links are absolute. Also verify the six use-case pages still carry identical <code>##</code> heading sets, and that no page states a backend TLS or host-subject-pinning claim more strongly than <code>rust/kerbside-proxy/src/backend.rs:85-108</code> and <code>:198-211</code> support. "No documentation gaps found" is a valid answer; a gap you were told to look for is not evidence on its own, so say whether you would have found it unprompted.</td>
+<td>2c documentation review. Execute the brief at <code>PUSH-AUDIT.md:330-467</code> with the same diff substitution as 6b. Its four shared blocks are all binding and all have material here: <code>readme-discipline</code> (phase 5 collapsed six README bullets to one — confirm the result is a curated link and not a feature list), <code>llm-doc-discipline</code> (<code>.claude/CLAUDE.md</code> and <code>ARCHITECTURE.md</code> both changed), <code>diagram-discipline</code> (<code>docs/index.md</code>'s mermaid broker node changed) and <code>plan-phase-references</code> (grep <code>README.md</code> and <code>docs/</code> excluding <code>docs/plans/</code> for "phase <number>"). Check independently, and report as a finding if true, that nothing in CI guards the <code>docs/index.md#use-cases</code> anchor that <code>README.md:43</code> and <code>ARCHITECTURE.md</code> now depend on — <code>kerbside/tests/unit/test_docs_links.py:82</code> skips every target containing <code>://</code> (which drops README's absolute link) and <code>:89</code> strips the anchor off what survives (which drops ARCHITECTURE's relative one). Also verify the six use-case pages still carry identical <code>##</code> heading sets, and that no page states a backend TLS or host-subject-pinning claim more strongly than <code>rust/kerbside-proxy/src/backend.rs:85-108</code> and <code>:198-211</code> support. "No documentation gaps found" is a valid answer; a gap you were told to look for is not evidence on its own, so say whether you would have found it unprompted.</td>
 </tr>
 <tr>
 <td>6f</td>
 <td>high</td>
 <td>opus</td>
 <td>none</td>
-<td>2d security review. Execute the brief at <code>PUSH-AUDIT.md:468-559</code> with the same diff substitution as 6b. The <code>path-traversal-review</code> shared block inside it is binding and is the one with real material: <code>tools/mutate-backend-tls-claims.py</code> rewrites tracked files in place, and <code>tools/check-backend-tls-claims.py</code> walks <code>DOC_PATHS</code> globs and opens what it finds. Both run in CI. Ask what each opens, what decides the path, and whether a path from a glob over a repository is process-chosen in the sense the block means. Also review the 91 changed lines of <code>.github/workflows/functional-tests.yml</code>: the <code>docs_checks</code> job and the <code>check_paths</code> filter, for anything that could cause a required check to pass without running, and for workflow-level injection of untrusted values into a shell. Most of the brief's classes (SPICE input validation, ticket lifecycle, SQL, TLS on the proxy legs) have no material in this diff — say so per class rather than omitting them. Report with severity, file and line.</td>
+<td>2d security review. Execute the brief at <code>PUSH-AUDIT.md:468-559</code> with the same diff substitution as 6b. The <code>path-traversal-review</code> shared block inside it is binding and is the one with real material: <code>tools/mutate-backend-tls-claims.py</code> rewrites tracked files in place, and <code>tools/check-backend-tls-claims.py</code> walks <code>DOC_PATHS</code> globs and opens what it finds. Only the guard runs in CI, at <code>functional-tests.yml:183</code>; the mutation tool is hand-run, which lowers the stakes without removing them. Ask what each opens, what decides the path, and whether a path from a glob over a repository is process-chosen in the sense the block means. Also review the 91 changed lines of <code>.github/workflows/functional-tests.yml</code>: the <code>docs_checks</code> job and the <code>check_paths</code> filter, for anything that could cause a required check to pass without running, and for workflow-level injection of untrusted values into a shell. Most of the brief's classes (SPICE input validation, ticket lifecycle, SQL, TLS on the proxy legs) have no material in this diff — say so per class rather than omitting them. Report with severity, file and line.</td>
 </tr>
 <tr>
 <td>6g</td>
@@ -15159,7 +15288,7 @@ is only worth spending on if wave 1 passes. Steps 6b through
 </tr>
 <tr>
 <td>An agent skips a class because "this was a documentation plan", and the skip reads as a pass.</td>
-<td>Findings 3 and decision 2 say the diff carries ~970 lines of Python, a workflow change and a source-module change. Each brief requires an explicit per-class statement where there is no material, rather than silence. 6g treats an omitted class as an unrun check.</td>
+<td>Findings 3 and decision 2 say the diff carries ~990 lines of Python, a workflow change and a source-module change. Each brief requires an explicit per-class statement where there is no material, rather than silence. 6g treats an omitted class as an unrun check.</td>
 </tr>
 <tr>
 <td>The audit re-finds <code>#468</code> or <code>#472</code> and the phase grows a code fix it should not carry.</td>
@@ -15234,6 +15363,116 @@ registers master plans only.</p>
    Proxmox is the expected answer; a second item is a
    reason to stop and ask.</li>
 </ol>
+<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
+<p>Run 2026-09-26. <strong>No blocking findings, and no security
+finding above LOW.</strong> Wave 1 failed once, on a real defect,
+and passed after it was fixed. All five judgment agents ran
+and each reported a result for every class in its brief,
+including the classes with no material.</p>
+<h3 id="what-was-fixed-here">What was fixed here<a class="headerlink" href="#what-was-fixed-here" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Finding</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>tools/check-backend-tls-claims.py</code> and <code>tools/mutate-backend-tls-claims.py</code> print to stdout with no <code>audit-allow-print</code> marker, tripping wave 1 fatally (exit 3). They are reporting CLIs and the marker is the documented exemption; <code>tools/check-pypi-storage.py:51</code> already carries it in the same form. Phase 4 added two such tools without following a convention the repository already had.</td>
+<td>wave 1</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>tools/mutate-backend-tls-claims.py</code> mutates the <em>tracked</em> guard in the working tree for the whole run, and its <code>finally</code> restore covers <code>sys.exit</code> and <code>KeyboardInterrupt</code> but not <code>SIGTERM</code> or <code>SIGHUP</code>. A kill or a closed terminal left a weakened CI guard behind for the next commit to pick up. A handler now routes both through the same restore. Verified by running the tool, waiting until a mutation was genuinely present in the tree, sending <code>SIGTERM</code>, and confirming the guard returned to its pre-run hash — reading the handler would not have distinguished "this works" from "this cannot fire".</td>
+<td>2d, LOW</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>tools/check-backend-tls-claims.py:143</code> joins two process-chosen components, which is correct and needs no containment check. The <code>path-traversal-review</code> block asks that this be said rather than left for the reader to re-derive. One comment.</td>
+<td>2d, informational</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Nine double-quoted string literals in <code>tools/mutate-backend-tls-claims.py</code> with no apostrophe in their contents, against the single-quote convention.</td>
+<td>style</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Three lines over 80 columns in <code>kerbside/tests/unit/test_sources_static.py</code>.</td>
+<td>style, 2a</td>
+</tr>
+</tbody>
+</table>
+<p>All eleven mutations are still caught after these changes,
+and the guard still exits 0 over its seven files.</p>
+<h3 id="what-was-filed">What was filed<a class="headerlink" href="#what-was-filed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>#488</strong> — the wave 1 flake8 gate ignores <code>AUDIT_RANGE</code>.
+  <code>wave1.sh:122</code> runs <code>tox -eflake8</code>, whose env runs
+  <code>flake8wrap.sh -HEAD</code>, which selects files from
+  <code>git diff HEAD~1</code>. In a worktree auditing an already-merged
+  plan it reported "No python files in change" as a pass
+  while the range held six Python files. This is the vacuous
+  pass <code>plan-range.sh</code> exists to prevent, surviving in the
+  one gate nobody re-plumbed. Flake8 was run by hand over the
+  six files in range instead: clean.</li>
+<li><strong>#490</strong> — nothing validates markdown anchors, so
+  <code>docs/index.md#use-cases</code> can break silently. Both links
+  that depend on it escape, for two different reasons.</li>
+<li><strong>#491</strong> — <code>plan-range.sh</code> sweeps unrelated commits into an
+  audit. See below.</li>
+</ul>
+<h3 id="what-was-declined-and-why">What was declined, and why<a class="headerlink" href="#what-was-declined-and-why" title="Permanent link">&para;</a></h3>
+<p>The guard's mutation coverage is partial: <code>BACKEND</code>, fourteen
+of the fifteen <code>ASSERTS</code> words, the <code>PIN</code> and <code>CRYPTO</code>
+regexes, bullet detection, table-row grouping and
+fenced-block skipping have no mutation, so a quiet edit to
+any of them would not be caught by the mutation tool today.
+Declined rather than filed. The coupling between guard and
+mutator is deliberate — <code>apply_mutation()</code> exits when its
+search string is not found exactly once, so drift is loud
+rather than silent — and "add a mutation whenever you add a
+rule" is a disclosed, unenforced convention that is
+proportionate for two scripts. Filing it would put a
+standing task against a tool that is working as designed.
+Several of the uncovered rules are exercised incidentally by
+the ordinary unit tests' fixture text.</p>
+<p>The phase 4 claim that four guard rules had no test coverage
+is separately resolved: those gaps were found while writing
+<code>test_check_backend_tls_claims.py</code>, were fixed in the same
+round, and are now mutations 2, 3, 5, 8 and 11.</p>
+<h3 id="what-the-audit-found-out-about-itself">What the audit found out about itself<a class="headerlink" href="#what-the-audit-found-out-about-itself" title="Permanent link">&para;</a></h3>
+<p>Two of the three methodology findings are the durable result
+of this phase, and both were invisible from inside a single
+phase.</p>
+<p><code>plan-range.sh</code> unions the <em>files</em> each merge touched and
+then diffs a single contiguous <em>range</em> restricted to them,
+so any unrelated commit touching a shared file is swept in.
+Here that was the issue #132 secret-redaction work —
+<code>3c5a309</code>, <code>8294f22</code>, <code>738c718</code>, none of them in any phase
+pull request — which added 188 lines to
+<code>kerbside/tests/unit/test_db.py</code>. The audit therefore read
+991 added lines of Python where the plan landed 758, and
+three judgment agents reviewed the #132 tests as this plan's
+work; one noticed they were not and said so. The correlated
+half is worse than the over-count: <code>kerbside/db.py</code>, the
+production code those commits changed, is not in
+<code>AUDIT_PATHS</code> and was not audited, so the diff contains
+tests for code the audit never read.</p>
+<p>This is the same hazard <code>PUSH-AUDIT.md</code> already warns about
+for reconstructed ranges — a path filter lists what touched
+a path without saying what arrived inside a pull request —
+applied to a <code>git diff</code> rather than a <code>git log</code>, where the
+runbook does not warn about it.</p>
+<p>The ancestry test that catches it is membership in
+<code>&lt;merge&gt;^1..&lt;merge&gt;^2</code>. Testing whether a commit is an
+ancestor of <code>&lt;merge&gt;^2</code> proves nothing, because that second
+parent's history includes everything on the default branch
+before the branch point. This phase got that wrong on the
+first attempt and reached the opposite conclusion.</p>
 
 
 

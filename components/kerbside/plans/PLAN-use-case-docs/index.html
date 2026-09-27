@@ -9165,6 +9165,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Execution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-6-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 6 findings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -14707,6 +14724,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Execution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-6-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 6 findings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -14818,11 +14852,13 @@ phase 1 (<code>2f0e526</code>), <code>openstack.md</code> 2026-09-20 as phase 2
 2026-09-22 as phase 4 (<code>8c5c042</code>). All six carry identical
 section headings, so the format is a convention rather than
 a coincidence. Phase 5, the index slim-down and closeout,
-landed 2026-09-24 (<code>073603b</code>), so what remains is phase 6,
-the push audit. Proxmox is still blocked and still has no
-source driver (<code>kerbside/sources/</code> holds <code>base.py</code>,
-<code>ovirt.py</code>, <code>shakenfist.py</code> and <code>static.py</code> and nothing
-else, rechecked 2026-09-25).</p>
+landed 2026-09-24 (<code>073603b</code>), and phase 6, the push audit,
+completed on 2026-09-26. <strong>The plan is complete.</strong> Proxmox
+is still blocked and still has no source driver
+(<code>kerbside/sources/</code> holds <code>base.py</code>, <code>ovirt.py</code>,
+<code>shakenfist.py</code> and <code>static.py</code> and nothing else, rechecked
+2026-09-26); it was never a phase of this plan and does not
+hold it open.</p>
 <p>One fact about the backend leg cost four phases to settle
 and is now guarded rather than remembered. Phases 1, 2 and 3
 each stated backend TLS or host-subject pinning more
@@ -14914,7 +14950,7 @@ the range is not reliably reconstructable afterwards.</p>
 <tr>
 <td>6. Push audit</td>
 <td><a href="/components/kerbside/plans/PLAN-use-case-docs-phase-06-push-audit/">PLAN-use-case-docs-phase-06-push-audit.md</a></td>
-<td>In progress</td>
+<td>Complete</td>
 <td></td>
 </tr>
 </tbody>
@@ -14949,12 +14985,48 @@ from the merge commits above with
 <code>tools/audit/plan-range.sh</code>, which gives
 <code>2f0e526^1..073603b</code> over 31 paths. The diff is not
 documentation-only, and the audit is not vacuous: it carries
-roughly 970 lines of Python that did not exist before this
-plan, the <code>docs_checks</code> CI job, and a change to
+758 lines of Python that did not exist before this plan, the
+<code>docs_checks</code> CI job, and a change to
 <code>kerbside/sources/static.py</code>, so every judgment agent in the
-runbook has material. Findings land in this phase's own
-pull request, and the plan is not complete until each is
-fixed or declined in writing.</p>
+runbook has material.</p>
+<h3 id="phase-6-findings">Phase 6 findings<a class="headerlink" href="#phase-6-findings" title="Permanent link">&para;</a></h3>
+<p>Run 2026-09-26. No blocking findings, and no security
+finding above LOW. Wave 1 failed once on a real defect and
+passed after it was fixed; all five judgment agents ran and
+each reported a result for every class in its brief.</p>
+<p>Five items were fixed in the audit's own pull request. Two
+were substantive. Phase 4 shipped two reporting CLIs
+(<code>tools/check-backend-tls-claims.py</code>,
+<code>tools/mutate-backend-tls-claims.py</code>) without the
+<code>audit-allow-print</code> marker that <code>tools/check-pypi-storage.py</code>
+already establishes for exactly that shape, which is what
+made wave 1 fail. And the mutation tester rewrites the
+tracked guard in the working tree for the whole of its run,
+where its restore covered <code>KeyboardInterrupt</code> but not
+<code>SIGTERM</code> — a kill or a closed terminal left a weakened CI
+guard behind. Both are fixed. The other three were a missing
+containment comment the <code>path-traversal-review</code> block asks
+for by name, nine double-quoted literals, and three lines
+over 80 columns.</p>
+<p>Three findings were out of this plan's range and were filed
+rather than fixed: <strong>#488</strong>, the wave 1 flake8 gate ignoring
+<code>AUDIT_RANGE</code> and passing vacuously; <strong>#490</strong>, nothing in CI
+validating the <code>docs/index.md#use-cases</code> anchor that
+<code>README.md</code> and <code>ARCHITECTURE.md</code> both now depend on; and
+<strong>#491</strong>, <code>plan-range.sh</code> sweeping unrelated commits into an
+audit. One finding was declined in writing — the guard's
+mutation coverage is partial, and the reason it is
+proportionate rather than a gap is recorded in the phase
+plan's Outcome.</p>
+<p>The durable result is #491, and it is the kind of thing only
+an accumulated audit finds. Because <code>plan-range.sh</code> unions
+the files each merge touched and then diffs one contiguous
+range across them, the issue #132 secret-redaction commits —
+in none of this plan's pull requests — added 188 lines to
+<code>kerbside/tests/unit/test_db.py</code> that the audit read as this
+plan's work. Three judgment agents reviewed them as such;
+one noticed and said so. The full account is in the phase
+plan.</p>
 
 
 
