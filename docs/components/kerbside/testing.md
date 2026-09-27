@@ -511,7 +511,9 @@ expiry, wrong audience, unknown kid, and cross-namespace mint.
 
 Driver scripts live in `tools/sf-e2e/` (see
 `tools/sf-e2e/README.md`). It is a smoke-tier PR gate, and also runs
-nightly and on dispatch.
+nightly and on dispatch. Every run uploads an artifact bundle with the
+kerbside, ryll, SF daemon and libvirt logs, redacted before upload;
+the README's Security section lists what is collected.
 
 ## The oVirt end-to-end kerbside lane
 
