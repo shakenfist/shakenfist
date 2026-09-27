@@ -16309,8 +16309,8 @@ superseded.</p>
 <tr>
 <td>5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger</td>
 <td><a href="../PLAN-ci-cloud-sizing-phase-05-guardrails/">PLAN-ci-cloud-sizing-phase-05-guardrails.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>de87bcde2</code> (#4308), <code>633c56b31</code> (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/94" title="GitHub Issue: shakenfist/actions #94">actions#94</a>)</td>
 </tr>
 <tr>
 <td>6. Documentation and downstream propagation</td>
@@ -16345,6 +16345,16 @@ code that sits in no range is a diff nothing audits. It is recorded
 <em>here</em> rather than against
 <code>PLAN-transient-capacity-refusals.md</code>, whose phase 2 added the guard,
 because the defect was in this phase's test file.</p>
+<p>Phase 5's cell is deliberately incomplete, and this says so rather
+than letting it read as finished. It records the two merges that are
+knowable -- <code>de87bcde2</code> (#4308) here and <code>633c56b31</code>
+(<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/94" title="GitHub Issue: shakenfist/actions #94">actions#94</a>) there -- but its steps 5e, 5f and 5g ran
+<em>after</em> #4308 merged, because 5e needs merge runs carrying 5b-5d and
+5f needs 5e. They land as a third pull request, whose merge commit no
+commit inside it can name. <strong>Phase 6's planning must append that SHA
+to the cell</strong>, the same after-the-fact repair the phase 3 note above
+describes, and for the same reason: a diff that sits in no range is a
+diff the push audit does not read.</p>
 <p>The master plan itself landed as <code>ab2158cb2</code> (#3938), ahead of
 phase 0. Phase 1's other half -- the invocation in the reusable
 <code>smoke-cluster</code> workflow -- lives in <code>shakenfist/actions</code>, and is
@@ -16885,6 +16895,21 @@ which is what <code>tools/check-plan-status.py</code> enforces.</p>
   60 once six merge runs on the reshaped topology supported it; see
   <a href="../PLAN-ci-cloud-sizing-phase-04-topologies/">PLAN-ci-cloud-sizing-phase-04-topologies.md</a>,
   <em>4f -- the tier timeout drops to 60</em>.</li>
+<li><strong>The lifecycle upload target is a hardcoded IP list.</strong>
+  <a href="https://github.com/shakenfist/shakenfist/issues/4320">#4320</a>.
+  The Node lifecycle job in <code>functional-tests.yml</code> picks the node the
+  cached-image upload goes to from <code>nodes=(10.0.0.20 ... 10.0.0.24)</code>
+  with <code>RANDOM % 5</code>. Those five addresses are <code>slim-primary</code>'s <code>sf1</code>-<code>sf5</code>, and that topology
+  lives in <code>shakenfist/actions</code>, reached at <code>@main</code> with no pin -- so a
+  node removed there breaks this step for a reason that says nothing
+  about topology, and a node added there is silently never chosen,
+  narrowing the non-primary upload coverage the step exists to give.
+  Phase 0 committed to this as D4 and assigned it to phase 4, which did
+  not do it and did not say so; phase 5's survey found the gap as F8 and
+  its D9 decided it gets an issue rather than a fix, because it is
+  unrelated to guardrails and touches a job this plan has otherwise left
+  alone. Note the overlap with the entry below: <code>Node lifecycle</code> is also
+  the one cluster job the headroom probe cannot see.</li>
 <li><strong>The merge queue's throttle counts groups, not clouds.</strong> #3696
   records two merge groups forming for the same PR sixty seconds
   apart, both running their full matrix, for roughly eleven nested

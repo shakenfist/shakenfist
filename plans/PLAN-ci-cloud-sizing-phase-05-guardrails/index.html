@@ -14841,6 +14841,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#outcome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Outcome">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#5e-the-warn-window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5e -- the warn window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5f-the-gate-is-armed-on-one-bound-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5f -- the gate is armed, on one bound only
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-per-run-window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The per-run window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-phase-6-inherits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What phase 6 inherits
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#back-brief" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15095,8 +15156,9 @@ workflow file and a topology file that will break silently the moment
 any topology changes, which is exactly what phase 4 does".</p>
 <p>Phase 4 never touched it and never mentions it: <code>grep -n '10\.0\.0\.2'
 docs/plans/PLAN-ci-cloud-sizing-phase-04-topologies.md</code> is empty. The
-list is still at <code>.github/workflows/functional-tests.yml:569</code>, in the
-<code>node_lifecycle_collection</code> job, which deploys <code>slim-primary</code>.</p>
+list is still the <code>nodes=(10.0.0.20 ... 10.0.0.24)</code> line in
+<code>.github/workflows/functional-tests.yml</code>'s <code>node_lifecycle_collection</code>
+job, which deploys <code>slim-primary</code>.</p>
 <p>It did not break, because phase 4 changed <code>slim-tier</code>'s vCPU and not
 <code>slim-primary</code>'s node count or addressing. It is still a live latent
 coupling and it is in no Future work list. D8 files it.</p>
@@ -15470,6 +15532,675 @@ brief requires naming a reader for the refusal warning or deleting it.</p>
     the master plan's Future work.</li>
 <li><code>pre-commit run --all-files</code> passes.</li>
 </ol>
+<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
+<h3 id="5e-the-warn-window">5e -- the warn window<a class="headerlink" href="#5e-the-warn-window" title="Permanent link">&para;</a></h3>
+<p>Harvested with <code>tools/ci_headroom_harvest.py --since 2026-09-21T11:10:53Z
+--until 2026-09-24T12:00:00Z</code>, which is every <code>merge_group</code> run of
+<code>functional-tests.yml</code> from phase 4's reshape (<code>6856aad74</code>, #4289) to the
+morning #4308 merged. Ten merge runs carried cluster bundles; three
+further runs in the window (<code>35909829697</code>, <code>35935845390</code>, <code>35975439402</code>)
+are documentation syncs whose <code>check_paths</code> reported <code>code_changed ==
+'false'</code>, so they ran no functional job at all and are not in the table.
+That is ten runs per cluster job, against the six per topology 5e asked
+for.</p>
+<p>The first version of this section tabulated only the three jobs 5e named
+and left <code>Guests</code> out, though the harvest had read it and it is the
+fourth entry of the same merge matrix. It is restored below. It changes
+none of the conclusions about the upper bound, but it is the evidence
+that every job the merge matrix runs was measured -- which is what
+arming the gate on that matrix, and on nothing else, rests on (see
+<em>Where the gate is armed</em> under 5f).</p>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>Topology</th>
+<th>Runs</th>
+<th>min p90</th>
+<th>max p90</th>
+<th>WITHIN</th>
+<th>OVERSIZED</th>
+<th>OVERSUBSCRIBED</th>
+<th>per-node ABOVE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Debian 12 cluster</td>
+<td><code>slim-primary</code></td>
+<td>10</td>
+<td>0.296</td>
+<td>0.370</td>
+<td>2</td>
+<td>8</td>
+<td>0</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Ubuntu 24.04 cluster</td>
+<td><code>slim-primary</code></td>
+<td>10</td>
+<td>0.259</td>
+<td>0.407</td>
+<td>3</td>
+<td>7</td>
+<td>0</td>
+<td>3</td>
+</tr>
+<tr>
+<td>Guests</td>
+<td><code>slim-primary</code></td>
+<td>10</td>
+<td>0.222</td>
+<td>0.296</td>
+<td>0</td>
+<td>10</td>
+<td>0</td>
+<td>4</td>
+</tr>
+<tr>
+<td>Debian 12 tier</td>
+<td><code>slim-tier</code></td>
+<td>10</td>
+<td>0.292</td>
+<td>0.417</td>
+<td>5</td>
+<td>5</td>
+<td>0</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p>The verdicts are recomputed from each bundle's raw series by the current
+report, which is what <code>summary_record()</code> is for: the band and per-node
+figures in the table are the ones this checkout's constants produce, not
+the ones printed by whatever build the run carried. A run harvested this
+way carries the whole verdict whether or not its own report knew how to
+judge the per-node bound.</p>
+<p><strong>The headline is the one that decides 5f: nothing came within 0.28 of
+the upper bound.</strong> The maximum cluster-wide p90 over all 40 job-runs is
+0.417 against a bound of 0.70, and no job-run in the window exceeded it.
+Thirty of the forty fell below the lower bound of 0.35.</p>
+<p><strong>D2's prediction, both halves.</strong> D2 predicted <code>slim-tier</code> "should stop
+reading OVERSUBSCRIBED and may begin reading OVERSIZED". Both halves are
+right: not one OVERSUBSCRIBED reading survives on the reshaped topology,
+where phase 2 had measured 37 of 50 job-runs above the upper bound, and
+5 of 10 now read OVERSIZED. What D2 did not predict is the more
+interesting half of the result. <code>slim-primary</code>, which phase 4
+deliberately did <strong>not</strong> reshape, reads OVERSIZED more often (15 of 20
+on the cluster suite, 25 of 30 with <code>Guests</code>) than the topology that was
+reshaped (5 of 10). The band did not follow
+the reshape so much as reveal that the untouched topology was already the
+emptier of the two -- which is a phase 6 question about <code>slim-primary</code>,
+not a phase 5 one.</p>
+<p><strong>The refusal count held, as D5 said it would.</strong> <code>slim-tier</code> records 10
+to 19 capacity-stage drops per run against <code>slim-primary</code>'s 16 to 31 on
+the same cluster suite, and guard denials sit at 161-193 against 147-239
+(<code>Guests</code>, a lighter suite, records 0 to 3 and 18 to 55), on a topology with
+twice the ledger of the one phase 2 measured. <code>expected_demand</code> fills
+whatever bound it is given; this is that mechanism, measured a second
+time and in a second place.</p>
+<p><strong>The structural assertion and the annotation.</strong> Both are only observable
+from #4308 onwards, so the evidence is narrower than the band's and is
+stated as such. Run
+<a href="https://github.com/shakenfist/shakenfist/actions/runs/35954362019">35954362019</a>
+is #4308's own merge-queue run -- the first run that could possibly carry
+either -- and all three of its cluster jobs report
+<code>test_cluster_topology_meets_the_structural_minimum ... ok</code> in the stestr
+output, on <code>slim-primary</code> twice and <code>slim-tier</code> once (Definition of done
+item 9, read from the job logs rather than inferred from job colour). The
+band verdict reached GitHub as a real annotation on the two
+<code>slim-primary</code> jobs of that run, titled <em>CI headroom: cluster OVERSIZED</em>,
+confirmed through <code>repos/shakenfist/shakenfist/check-runs/&lt;job&gt;/annotations</code>
+rather than by reading the emitting code (item 10).</p>
+<h3 id="5f-the-gate-is-armed-on-one-bound-only">5f -- the gate is armed, on one bound only<a class="headerlink" href="#5f-the-gate-is-armed-on-one-bound-only" title="Permanent link">&para;</a></h3>
+<p><strong>Decision: gate on the cluster-wide upper bound, and arm it here.</strong></p>
+<p>The shape of the change is not the one D7 anticipated, because the
+<code>shakenfist/actions</code> half landed first. What D7 expected to be a prepared
+diff became <a href="https://github.com/shakenfist/actions/pull/94">shakenfist/actions#94</a>,
+merged as <code>633c56b31</code>, which replaced <code>|| true</code> and the step's
+<code>continue-on-error</code> with <code>tools/ci_headroom_verdict.sh</code>. That half went
+live <em>inert</em>: the verdict script fails a job on status 3 and on nothing
+else, and this repository's report returned 0 on every path. The
+remaining and only irreversible act was here -- adding
+<code>BAND_VIOLATION_EXIT = 3</code> to <code>tools/ci_headroom_report.py</code> and returning
+it for an OVERSUBSCRIBED cluster-wide band. That merge order was chosen
+deliberately, because every <code>functional-tests.yml</code> call site references
+that workflow at <code>@main</code> with no pin: whichever half landed second is the
+one that switches the gate on, so the second half is the one that belongs
+in the repository a revert can reach.</p>
+<p><strong>What the window says about the gate, run by run.</strong> It would have failed
+none of the 40 job-runs above. That is the test D7 set ("a gate that
+would have failed runs which were fine is not ready") and it passes
+emphatically rather than narrowly: the closest run sat 0.28 below the
+bound. The honest statement of the other side is that a gate which fires
+on nothing in the observed window also catches nothing in it -- its value
+is entirely prospective, against a future topology shrink or a demand
+regression, which is precisely the direction phase 2 measured
+<code>slim-tier</code> sitting in before phase 4 reshaped it (37 of 50 job-runs).</p>
+<p><strong>What is not gated, and why the asymmetry is load-bearing.</strong> D7 already
+ruled out the per-node bound (D4) and the refusal clause (D5); D8 already
+ruled out the lower bound. The window turns the last of those from a
+judgement into an arithmetic fact: 30 of 40 job-runs read OVERSIZED, so a
+status returned for a lower-bound violation would have reddened three
+quarters of cluster CI on the first run after this merged. The report
+therefore returns <code>BAND_VIOLATION_EXIT</code> for exactly one condition, and 0
+for an unreadable series, an absent census, a thin series with no
+verdict, a usage error and a bug in the report itself -- D15 holding
+everywhere except on a statement about the cloud rather than about the
+instrument.</p>
+<p>The first review of this change found that the one condition was not
+narrow enough: an OVERSUBSCRIBED band computed from a single readable
+sample, in a series whose capacity read reported failing for the other
+nine, still returned 3. That is the instrument talking about itself. The
+gate now also requires the series to be one the report could read --
+at least <code>BAND_GATE_MIN_SAMPLES</code> (20) usable samples, no sample
+reporting <code>capacity_degraded</code>, and no ledger-unreadable sample after the
+warm-up prefix -- and prints why when it withholds. Checked against the
+committed data rather than assumed: the 204 version 1 baseline records
+have at least 41 usable samples each, and the 32 version 2 addendum
+records -- the only ones carrying the flag and prefix counts -- have at
+least 57, no degraded sample and no unreadable sample after the prefix.
+The floor counts samples which produced a fraction (<code>n_fraction</code>), which
+those records do not carry, but no record in either file lists a node
+without a CPU ledger, so every usable sample produced one and the
+usable-sample counts bound the floor directly. The 40 job-runs of the 5e
+window, re-harvested with the current report, carry <code>n_fraction</code>
+directly: it equals <code>n</code> in every one, the smallest is 67, and none has
+the gate withheld. So the guard would have withheld nothing in any of
+the three datasets.</p>
+<p><strong>Where the gate is armed.</strong> Only on job shapes this window measured.
+The harvest reads <code>merge_group</code> runs, so the window covers exactly the
+four entries of the merge matrix, and the gate is armed there alone.
+Three other call sites of <code>smoke-cluster.yml</code> pass <code>headroom_gate:
+false</code> instead: the smoke tier job, which runs on pull requests only on
+a single node and has never been harvested; the Ansible modules job,
+whose collect step does not run at all for its <code>test_kind</code>; and the
+scheduled matrix, which is dispatch-only and whose single machine entry
+has never been harvested either. They pass <code>false</code> rather than nothing
+because the reusable workflow defaulted to gating. Round four of the
+review found two callers outside this repository relying on that
+default -- client-python's functional workflow and the actions canary,
+both single-node smoke clouds no window measured -- so
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/102" title="GitHub Issue: shakenfist/actions #102">actions#102</a> turns the default off and makes arming opt-in.
+The explicit <code>false</code> stays: the seam test still requires every call site
+here to state its gate.
+<code>shakenfist/tests/test_headroom_gate_workflow_seams.py</code> derives each
+call site's shape (topology, tier, <code>test_kind</code>, <code>stestr_config</code>, per
+matrix entry) and fails if an armed one is not a measured shape, so
+arming another shape is a deliberate edit to its <code>MEASURED_SHAPES</code>
+that should come with a window of its own.</p>
+<p><strong>Both guards were proven live, not read.</strong> Against a synthetic
+oversubscribed series, <code>ci_headroom_verdict.sh</code> from <code>actions</code>'s <code>main</code>
+exits 3 and emits the <em>Cluster headroom outside the CI sizing band</em> error
+annotation; with <code>CI_HEADROOM_GATE=false</code> it exits 0; against a series
+below the lower bound it exits 0. Against a copy of the report with the
+constant renamed -- returning 3 while no longer naming the contract -- it
+exits 0 and says why, and against <code>develop</code>'s report it exits 0. The
+version-skew guard is therefore not a claim about what would happen.</p>
+<p><strong>D5's open check, settled.</strong> D5 required 5f to name a reader for the
+refusal warning or delete it. It is named: <code>PLAN-transient-capacity-refusals</code>,
+whose phase 5 is the decision on server-side queued placement and is fed
+by exactly this series -- the guard's refusal behaviour under a ledger
+that changed size. The warning stays, labelled as an observation about
+the demand estimator's calibration.</p>
+<p><strong>D9's issue, filed.</strong>
+<a href="https://github.com/shakenfist/shakenfist/issues/4320">#4320</a> records the
+hardcoded <code>10.0.0.20</code>-<code>10.0.0.24</code> upload-target list in the
+<code>node_lifecycle_collection</code> job of
+<code>.github/workflows/functional-tests.yml</code>, phase 0's D4 commitment and
+why phase 5 is not fixing it. It is in the master plan's Future work.</p>
+<h3 id="the-per-run-window">The per-run window<a class="headerlink" href="#the-per-run-window" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Run</th>
+<th>Job</th>
+<th>p90 fraction</th>
+<th>Band</th>
+<th>Per-node p90</th>
+<th>Per-node</th>
+<th>Capacity-stage drops</th>
+<th>Guard denials</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35666222479">35666222479</a></td>
+<td>Debian 12 cluster</td>
+<td>0.296</td>
+<td>OVERSIZED</td>
+<td>0.833</td>
+<td>WITHIN BAND</td>
+<td>18</td>
+<td>225</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35677335839">35677335839</a></td>
+<td>Debian 12 cluster</td>
+<td>0.333</td>
+<td>OVERSIZED</td>
+<td>0.667</td>
+<td>WITHIN BAND</td>
+<td>20</td>
+<td>204</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35713308961">35713308961</a></td>
+<td>Debian 12 cluster</td>
+<td>0.333</td>
+<td>OVERSIZED</td>
+<td>1.000</td>
+<td>ABOVE BAND</td>
+<td>20</td>
+<td>204</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35781045381">35781045381</a></td>
+<td>Debian 12 cluster</td>
+<td>0.333</td>
+<td>OVERSIZED</td>
+<td>0.833</td>
+<td>WITHIN BAND</td>
+<td>25</td>
+<td>197</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35792467388">35792467388</a></td>
+<td>Debian 12 cluster</td>
+<td>0.296</td>
+<td>OVERSIZED</td>
+<td>0.500</td>
+<td>WITHIN BAND</td>
+<td>16</td>
+<td>239</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35804030364">35804030364</a></td>
+<td>Debian 12 cluster</td>
+<td>0.333</td>
+<td>OVERSIZED</td>
+<td>1.000</td>
+<td>ABOVE BAND</td>
+<td>28</td>
+<td>202</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35851169069">35851169069</a></td>
+<td>Debian 12 cluster</td>
+<td>0.370</td>
+<td>WITHIN BAND</td>
+<td>0.667</td>
+<td>WITHIN BAND</td>
+<td>16</td>
+<td>187</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35940203974">35940203974</a></td>
+<td>Debian 12 cluster</td>
+<td>0.370</td>
+<td>WITHIN BAND</td>
+<td>0.833</td>
+<td>WITHIN BAND</td>
+<td>16</td>
+<td>224</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35946925675">35946925675</a></td>
+<td>Debian 12 cluster</td>
+<td>0.296</td>
+<td>OVERSIZED</td>
+<td>0.667</td>
+<td>WITHIN BAND</td>
+<td>27</td>
+<td>183</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35954362019">35954362019</a></td>
+<td>Debian 12 cluster</td>
+<td>0.296</td>
+<td>OVERSIZED</td>
+<td>0.667</td>
+<td>WITHIN BAND</td>
+<td>28</td>
+<td>186</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35666222479">35666222479</a></td>
+<td>Ubuntu 24.04 cluster</td>
+<td>0.407</td>
+<td>WITHIN BAND</td>
+<td>0.667</td>
+<td>WITHIN BAND</td>
+<td>18</td>
+<td>186</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35677335839">35677335839</a></td>
+<td>Ubuntu 24.04 cluster</td>
+<td>0.296</td>
+<td>OVERSIZED</td>
+<td>0.667</td>
+<td>WITHIN BAND</td>
+<td>22</td>
+<td>147</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35713308961">35713308961</a></td>
+<td>Ubuntu 24.04 cluster</td>
+<td>0.259</td>
+<td>OVERSIZED</td>
+<td>0.500</td>
+<td>WITHIN BAND</td>
+<td>19</td>
+<td>198</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35781045381">35781045381</a></td>
+<td>Ubuntu 24.04 cluster</td>
+<td>0.370</td>
+<td>WITHIN BAND</td>
+<td>1.000</td>
+<td>ABOVE BAND</td>
+<td>30</td>
+<td>185</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35792467388">35792467388</a></td>
+<td>Ubuntu 24.04 cluster</td>
+<td>0.333</td>
+<td>OVERSIZED</td>
+<td>0.833</td>
+<td>WITHIN BAND</td>
+<td>19</td>
+<td>187</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35804030364">35804030364</a></td>
+<td>Ubuntu 24.04 cluster</td>
+<td>0.333</td>
+<td>OVERSIZED</td>
+<td>1.000</td>
+<td>ABOVE BAND</td>
+<td>31</td>
+<td>173</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35851169069">35851169069</a></td>
+<td>Ubuntu 24.04 cluster</td>
+<td>0.407</td>
+<td>WITHIN BAND</td>
+<td>1.000</td>
+<td>ABOVE BAND</td>
+<td>27</td>
+<td>179</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35940203974">35940203974</a></td>
+<td>Ubuntu 24.04 cluster</td>
+<td>0.333</td>
+<td>OVERSIZED</td>
+<td>0.833</td>
+<td>WITHIN BAND</td>
+<td>16</td>
+<td>197</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35946925675">35946925675</a></td>
+<td>Ubuntu 24.04 cluster</td>
+<td>0.296</td>
+<td>OVERSIZED</td>
+<td>0.833</td>
+<td>WITHIN BAND</td>
+<td>16</td>
+<td>163</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35954362019">35954362019</a></td>
+<td>Ubuntu 24.04 cluster</td>
+<td>0.296</td>
+<td>OVERSIZED</td>
+<td>0.833</td>
+<td>WITHIN BAND</td>
+<td>23</td>
+<td>162</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35666222479">35666222479</a></td>
+<td>Guests</td>
+<td>0.259</td>
+<td>OVERSIZED</td>
+<td>1.000</td>
+<td>ABOVE BAND</td>
+<td>3</td>
+<td>50</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35677335839">35677335839</a></td>
+<td>Guests</td>
+<td>0.296</td>
+<td>OVERSIZED</td>
+<td>1.000</td>
+<td>ABOVE BAND</td>
+<td>3</td>
+<td>46</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35713308961">35713308961</a></td>
+<td>Guests</td>
+<td>0.259</td>
+<td>OVERSIZED</td>
+<td>0.667</td>
+<td>WITHIN BAND</td>
+<td>1</td>
+<td>18</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35781045381">35781045381</a></td>
+<td>Guests</td>
+<td>0.259</td>
+<td>OVERSIZED</td>
+<td>1.000</td>
+<td>ABOVE BAND</td>
+<td>3</td>
+<td>38</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35792467388">35792467388</a></td>
+<td>Guests</td>
+<td>0.222</td>
+<td>OVERSIZED</td>
+<td>0.667</td>
+<td>WITHIN BAND</td>
+<td>0</td>
+<td>24</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35804030364">35804030364</a></td>
+<td>Guests</td>
+<td>0.259</td>
+<td>OVERSIZED</td>
+<td>0.667</td>
+<td>WITHIN BAND</td>
+<td>0</td>
+<td>38</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35851169069">35851169069</a></td>
+<td>Guests</td>
+<td>0.296</td>
+<td>OVERSIZED</td>
+<td>0.667</td>
+<td>WITHIN BAND</td>
+<td>0</td>
+<td>46</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35940203974">35940203974</a></td>
+<td>Guests</td>
+<td>0.259</td>
+<td>OVERSIZED</td>
+<td>0.667</td>
+<td>WITHIN BAND</td>
+<td>0</td>
+<td>55</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35946925675">35946925675</a></td>
+<td>Guests</td>
+<td>0.222</td>
+<td>OVERSIZED</td>
+<td>0.667</td>
+<td>WITHIN BAND</td>
+<td>1</td>
+<td>24</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35954362019">35954362019</a></td>
+<td>Guests</td>
+<td>0.259</td>
+<td>OVERSIZED</td>
+<td>1.000</td>
+<td>ABOVE BAND</td>
+<td>1</td>
+<td>31</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35666222479">35666222479</a></td>
+<td>Debian 12 tier</td>
+<td>0.333</td>
+<td>OVERSIZED</td>
+<td>0.833</td>
+<td>WITHIN BAND</td>
+<td>11</td>
+<td>170</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35677335839">35677335839</a></td>
+<td>Debian 12 tier</td>
+<td>0.375</td>
+<td>WITHIN BAND</td>
+<td>0.833</td>
+<td>WITHIN BAND</td>
+<td>14</td>
+<td>193</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35713308961">35713308961</a></td>
+<td>Debian 12 tier</td>
+<td>0.333</td>
+<td>OVERSIZED</td>
+<td>0.500</td>
+<td>WITHIN BAND</td>
+<td>10</td>
+<td>171</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35781045381">35781045381</a></td>
+<td>Debian 12 tier</td>
+<td>0.375</td>
+<td>WITHIN BAND</td>
+<td>0.667</td>
+<td>WITHIN BAND</td>
+<td>14</td>
+<td>189</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35792467388">35792467388</a></td>
+<td>Debian 12 tier</td>
+<td>0.292</td>
+<td>OVERSIZED</td>
+<td>0.500</td>
+<td>WITHIN BAND</td>
+<td>10</td>
+<td>173</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35804030364">35804030364</a></td>
+<td>Debian 12 tier</td>
+<td>0.417</td>
+<td>WITHIN BAND</td>
+<td>1.000</td>
+<td>ABOVE BAND</td>
+<td>19</td>
+<td>174</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35851169069">35851169069</a></td>
+<td>Debian 12 tier</td>
+<td>0.333</td>
+<td>OVERSIZED</td>
+<td>0.500</td>
+<td>WITHIN BAND</td>
+<td>10</td>
+<td>177</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35940203974">35940203974</a></td>
+<td>Debian 12 tier</td>
+<td>0.375</td>
+<td>WITHIN BAND</td>
+<td>0.667</td>
+<td>WITHIN BAND</td>
+<td>10</td>
+<td>180</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35946925675">35946925675</a></td>
+<td>Debian 12 tier</td>
+<td>0.333</td>
+<td>OVERSIZED</td>
+<td>0.500</td>
+<td>WITHIN BAND</td>
+<td>11</td>
+<td>161</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35954362019">35954362019</a></td>
+<td>Debian 12 tier</td>
+<td>0.417</td>
+<td>WITHIN BAND</td>
+<td>0.583</td>
+<td>WITHIN BAND</td>
+<td>10</td>
+<td>179</td>
+</tr>
+</tbody>
+</table>
+<h3 id="what-phase-6-inherits">What phase 6 inherits<a class="headerlink" href="#what-phase-6-inherits" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>A gate that has never fired.</strong> Nothing in 40 job-runs came near the
+  bound. The first real firing will be the first evidence about its
+  false-positive rate, and the response to a surprise is setting the
+  <code>CI_HEADROOM_GATE</code> repository variable to <code>false</code> rather than a revert,
+  because <code>@main</code> is unpinned. The merge matrix passes it through as
+  <code>headroom_gate</code>; the three unmeasured call sites are not gated at all.
+  See <code>docs/developer_guide/ci.md</code>.</li>
+<li><strong>Three call sites are not gated at all.</strong> The smoke tier job, the
+  Ansible modules job and the scheduled matrix pass <code>headroom_gate:
+  false</code>, because the window never measured them (see <em>Where the gate is
+  armed</em>). Arming the smoke tier -- the one that runs on every pull
+  request -- needs a window of pull request runs, and
+  <code>tools/ci_headroom_harvest.py</code> reads only <code>merge_group</code> runs today.</li>
+<li><strong><code>slim-primary</code> reads OVERSIZED more often than the topology phase 4
+  reshaped.</strong> 25 of 30 job-runs (15 of 20 on the cluster suite), against
+  <code>slim-tier</code>'s 5 of 10. Phase 4
+  left <code>slim-primary</code> alone on the argument that more vCPU changes
+  <em>which</em> placements are refused rather than how many; the band now says
+  something separate about it, which is that it is the emptier cloud.
+  Whether that is worth acting on is a phase 6 question, and D8's harvest
+  command in <code>docs/developer_guide/ci.md</code> is how to ask it.</li>
+<li><strong>A third merge commit to record.</strong> 5e, 5f and 5g land as their own
+  pull request, after #4308. Its SHA belongs in the master plan's phase 5
+  <code>Merged</code> cell and no commit inside it can name it -- see the note under
+  the Execution table.</li>
+<li><strong>The propagation half of the sizing model is still undone.</strong> The
+  downstream repositories fork these topologies and none of them has the
+  structural assertion or an armed gate. Those that call
+  <code>smoke-cluster.yml</code> (client-python, and the actions canary) get the
+  band and its annotation as information, and are gated only if they opt
+  in, which needs a window of their own. That is phase 6's own scope.</li>
+</ul>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step of this plan, back brief the operator on
 your understanding of it and how the work you intend to do aligns
@@ -15479,7 +16210,7 @@ with it.</p>
 <li><strong>Before 5f prepares anything for <code>shakenfist/actions</code>,</strong> agree
   whether the gate is wanted at all. Phase 4 showed that a change to
   that repository goes live immediately for every run in flight,
-  because <code>functional-tests.yml:485</code> references
+  because every <code>functional-tests.yml</code> call site references
   <code>shakenfist/actions/.github/workflows/smoke-cluster.yml@main</code> with
   no pin to bump. A gate that turns out to be wrong cannot be rolled
   back by reverting here.</li>

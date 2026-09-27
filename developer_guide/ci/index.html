@@ -14704,10 +14704,38 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#the-band-warns-the-topology-assertion-fails" class="md-nav__link">
+  <a href="#one-bound-gates-and-everything-else-is-information" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The band warns, the topology assertion fails
+        One bound gates, and everything else is information
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="One bound gates, and everything else is information">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#asking-whether-a-cloud-is-oversized" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asking whether a cloud is oversized
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-topology-assertion-fails-rather-than-skipping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The topology assertion fails rather than skipping
       
     </span>
   </a>
@@ -15469,27 +15497,149 @@ plan itself named the wrong one as "disk" before this phase's survey
 caught the mistake, which is why it is worth calling out here: read a
 <code>sufficient_idle_disk</code> row in a census as a disk I/O problem, never as
 evidence the cloud needs more disk capacity.</p>
-<h3 id="the-band-warns-the-topology-assertion-fails">The band warns, the topology assertion fails<a class="headerlink" href="#the-band-warns-the-topology-assertion-fails" title="Permanent link">&para;</a></h3>
-<p>Every workflow step this instrumentation added is
-<code>continue-on-error</code>, and <code>ci_headroom_report.py</code> always exits 0
-whatever it finds -- even an internal error in the report is printed,
-not raised. So no verdict it prints can fail a job.</p>
-<p>The band verdict it prints is committed vCPU as a fraction of the
-admission ledger, against bounds of 0.35 and 0.70, plus a per-node
-bound of 0.85. Those bounds are no longer provisional: phase 2 of
+<h3 id="one-bound-gates-and-everything-else-is-information">One bound gates, and everything else is information<a class="headerlink" href="#one-bound-gates-and-everything-else-is-information" title="Permanent link">&para;</a></h3>
+<p>The band verdict <code>ci_headroom_report.py</code> prints is committed vCPU as a
+fraction of the admission ledger, against bounds of 0.35 and 0.70, plus a
+per-node bound of 0.85. Those bounds are not provisional: phase 2 of
 <a href="../../plans/PLAN-ci-cloud-sizing/">PLAN-ci-cloud-sizing</a> defended them
-against a distribution of 204 job-runs. What has not happened is the
-gate. The report's exit code is discarded twice on the way to a human
--- by a <code>|| true</code> in <code>shakenfist/actions</code>'s collect script and by the
-step's own <code>continue-on-error</code> -- so a violation reaches a reader as a
-GitHub annotation and a step summary rather than as a red job. Turning
-that into a gate is a change to <code>shakenfist/actions</code>, prepared in
-<a href="https://github.com/shakenfist/actions/pull/94">shakenfist/actions#94</a>,
-and phase 5 decides whether to make it. Read the per-node bound as
-what a topology should achieve rather than as an alarm about one run:
-the statistic saturates, and did so on passing runs.</p>
-<p>One thing here <em>is</em> a gate, and it is a test rather than a verdict.
-<code>cluster_ci_tests/test_nodes.py</code>'s
+against a distribution of 204 job-runs.</p>
+<p><strong>Exactly one of them can fail a job: the cluster-wide upper bound of
+0.70.</strong> Above it, the report returns status 3 and
+<code>shakenfist/actions</code>'s <code>tools/ci_headroom_verdict.sh</code> fails the step with
+an annotation titled <em>Cluster headroom outside the CI sizing band</em>. That
+is not a test failure and the annotation says so: the tests are whatever
+the log says they are, and the verdict is a statement about the cluster
+they ran on.</p>
+<p>Nothing else gates, and the asymmetry is deliberate rather than
+incidental:</p>
+<ul>
+<li><strong>The lower bound (0.35) never gates.</strong> Being oversized is not urgent,
+  no build is at risk, and the response is a topology change nobody makes
+  from one run. It is also the <em>common</em> reading -- 30 of the 40 cluster
+  job-runs phase 5 measured were below it -- so returning a status for it
+  would redden three quarters of cluster CI immediately. Ask the question over
+  a window instead; the command is below.</li>
+<li><strong>The per-node bound (0.85) never gates.</strong> The statistic saturates at
+  its ceiling on plenty of passing runs, so it cannot tell a bad run from
+  a good one at the top of its range. Read it as what a topology should
+  achieve, not as an alarm about one run.</li>
+<li><strong>The refusal count never gates.</strong> Phase 4 doubled a cluster's ledger
+  and the guard refused at essentially the same rate, because
+  <code>expected_demand</code> accumulates until whatever bound it is given fills up.
+  The count is the earliest sign the demand estimator has drifted, and
+  nothing more; <code>PLAN-transient-capacity-refusals</code> is what reads it.</li>
+<li><strong>A broken report never gates.</strong> An absent census or a bug in the tool
+  itself is printed and exits 0. An instrument that can fail the job it
+  measures changes the failure surface it exists to measure.</li>
+<li><strong>Nor does a verdict the report could not read.</strong> An OVERSUBSCRIBED
+  band is withheld, printed with the reason and exit 0, when the p90 rests
+  on fewer than 20 samples which produced a cluster CPU fraction (five
+  minutes at the probe's 15 second interval; the smallest real job-run in
+  the phase 2 baseline had 41), when any sample reported
+  <code>capacity_degraded</code>, when any sample predates that flag (a bundle whose
+  probe cannot say whether its read failed), or when any sample was
+  ledger-unreadable <em>after</em> the warm-up prefix every run opens with. Each
+  of those is the capacity read failing, not the cloud being full. The
+  summary record carries the decision as <code>verdict.gates</code> and the reasons
+  as <code>verdict.gate_withheld</code>. Because a single such sample withholds a
+  whole run, the gate can go quiet without anything failing; the window
+  command below counts withheld job-runs so that "the gate never fired"
+  and "the gate was never allowed to fire" can be told apart.</li>
+</ul>
+<p>Two switches sit in front of the gate, both of which fail towards <em>not</em>
+gating. <code>ci_headroom_verdict.sh</code> believes a status of 3 only when the
+string <code>BAND_VIOLATION_EXIT</code> appears in the report's source, so a cluster
+running an older checkout cannot have its exit code misread -- the same
+feature detection <code>ci_headroom_collect.sh</code> already does before passing a
+flag. And the gate has an off switch that needs no commit: setting the
+<code>CI_HEADROOM_GATE</code> <strong>repository variable</strong> to <code>false</code> (Settings, Secrets
+and variables, Actions, Variables) turns it off for every run which starts
+afterwards. Both switches matter because <code>functional-tests.yml</code> reaches
+that workflow at <code>@main</code> with no pin to bump: a change there is live for
+every run in flight and cannot be rolled back from here. The reverse
+also holds: every call site here now passes <code>headroom_gate</code>, and GitHub
+rejects a call passing an input the callee does not declare, so
+reverting <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/94" title="GitHub Issue: shakenfist/actions #94">actions#94</a> would fail every functional job on an
+undeclared input rather than ungate it. The rollbacks are the variable,
+or removing the input from these call sites before the actions-side
+revert.</p>
+<p>The gate is armed only on job shapes a warn window has measured, which
+today means the merge matrix in <code>functional-tests.yml</code> -- the four jobs
+phase 5's window read. That call site passes
+<code>headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}</code>, so the variable
+being unset leaves the gate on. The other three call sites of
+<code>smoke-cluster.yml</code> pass <code>headroom_gate: false</code>: the smoke tier job (pull
+requests only, a single node, never harvested because the harvest reads
+<code>merge_group</code> runs), the Ansible modules job (its collect step does not
+run at all), and the dispatch-only matrix in <code>scheduled-tests.yml</code> (whose
+single machine entry has never been harvested). Every call site has to
+pass one of those two values explicitly. The reusable workflow leaves
+the gate off when nothing is passed (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/102" title="GitHub Issue: shakenfist/actions #102">actions#102</a>; before it,
+the default gated), but that default lives in another repository at
+<code>@main</code>, so a call site's policy is stated here where a change to it
+shows up in review. <code>shakenfist/tests/test_headroom_gate_workflow_seams.py</code> enforces
+both rules: it derives each call site's shape per matrix entry (topology,
+tier, <code>test_kind</code>, <code>stestr_config</code>) and fails if an armed one is not in
+its <code>MEASURED_SHAPES</code>. An armed call site must pass all four inputs
+itself, since the defaults live in shakenfist/actions at <code>@main</code> and a
+shape derived from one could drift without anything here changing. The
+base image is deliberately outside the shape: the band measures the
+cloud, and the window covered Debian 12 and Ubuntu 24.04 on the same
+topology. Arming a new shape means adding it there, with a
+window of its own behind it.</p>
+<h4 id="asking-whether-a-cloud-is-oversized">Asking whether a cloud is oversized<a class="headerlink" href="#asking-whether-a-cloud-is-oversized" title="Permanent link">&para;</a></h4>
+<p>A single OVERSIZED verdict is noise. The question is a window, and
+<code>tools/ci_headroom_harvest.py</code> already computes the fraction, so it needs
+a command rather than new infrastructure:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python3<span class="w"> </span>tools/ci_headroom_harvest.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span>--since<span class="w"> </span><span class="m">2026</span>-09-21<span class="w"> </span>--until<span class="w"> </span><span class="m">2026</span>-09-24<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span>-o<span class="w"> </span>/tmp/window.jsonl
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>python3<span class="w"> </span>-<span class="w"> </span><span class="s">&lt;&lt;'EOF'</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="s">import collections, json, re</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="s">rows = [json.loads(l) for l in open('/tmp/window.jsonl')]</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="s">by = collections.defaultdict(list)</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="s">skipped = 0</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="s">pregate = 0</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="s">withheld = collections.Counter()</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="s">for r in rows:</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="s">    v = (r.get('summary') or {}).get('verdict') or {}</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="s">    if v.get('p90_cpu_fraction') is not None:</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="s">        by[(r['topology'], r['job'])].append(v)</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="s">    else:</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="s">        skipped += 1</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="s">    # Absent on records written before the gate existed, which is not</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="s">    # the same as a series the gate was allowed to judge.</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="s">    if 'gate_withheld' not in v:</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="s">        pregate += 1</span>
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="s">        continue</span>
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="s">    for reason in v['gate_withheld']:</span>
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="s">        withheld[re.sub(r'\d+', 'N', reason)] += 1</span>
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="s">for key, verdicts in sorted(by.items()):</span>
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="s">    bands = collections.Counter(v['band'] for v in verdicts)</span>
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="s">    fractions = sorted(v['p90_cpu_fraction'] for v in verdicts)</span>
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="s">    print(key, len(verdicts), 'max %.3f' % fractions[-1], dict(bands))</span>
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="s">print(skipped, 'job-runs had no fraction to judge and are not counted')</span>
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="s">verdicts = [(r.get('summary') or {}).get('verdict') or {} for r in rows]</span>
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="s">print(sum(1 for v in verdicts if v.get('gate_withheld')),</span>
+<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="s">      'job-runs had a series which could not have supported a violation:',</span>
+<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="s">      dict(withheld))</span>
+<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a><span class="s">print(sum(1 for v in verdicts if v.get('gate_withheld')</span>
+<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a><span class="s">          and v.get('band') == 'OVERSUBSCRIBED'),</span>
+<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a><span class="s">      'of those read OVERSUBSCRIBED, so withholding changed the outcome')</span>
+<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a><span class="s">print(pregate, 'job-runs predate the gate and say nothing about it')</span>
+<a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a><span class="s">EOF</span>
+</code></pre></div>
+<p>Filter on the fraction rather than on <code>series_present</code>: a series which
+exists but produced no usable CPU sample (an aborted job, a probe that
+died early) has a <code>p90_cpu_fraction</code> of null, and sorting that among
+floats raises.</p>
+<p>Name both ends of the window. <code>--since</code> alone grows with every merge, and
+<code>--limit</code> moves with the day the harvest is run on, so neither reproduces
+the dataset it produced.</p>
+<h3 id="the-topology-assertion-fails-rather-than-skipping">The topology assertion fails rather than skipping<a class="headerlink" href="#the-topology-assertion-fails-rather-than-skipping" title="Permanent link">&para;</a></h3>
+<p>The other gate here is a test rather than a verdict, and it asks a
+different question: not how full the cluster got, but whether it was ever
+the right shape. <code>cluster_ci_tests/test_nodes.py</code>'s
 <code>test_cluster_topology_meets_the_structural_minimum</code> fails the job when
 the deployed cluster reports fewer than three nodes, three hypervisors,
 two non-network hypervisors, or a summed hypervisor ledger below 24. It
@@ -15502,9 +15652,9 @@ holding every role, which is what the <code>localhost</code> topology deploys an
 what <code>scheduled-tests.yml</code> runs <code>cluster-ci.conf</code> against on purpose --
 where it skips, because none of those minimums means anything on one
 node.</p>
-<p>That is not the same as the instrumentation being invisible to the
-checks that do gate, which is what this section used to say and what
-issue 3975 disproved -- see below.</p>
+<p>Neither gate is the same thing as the instrumentation being invisible to
+the checks that were already gating, which is what this part of the page
+used to claim and what issue 3975 disproved -- see below.</p>
 <h3 id="the-probes-traffic-is-exempted-from-the-idle-load-check">The probe's traffic is exempted from the idle-load check<a class="headerlink" href="#the-probes-traffic-is-exempted-from-the-idle-load-check" title="Permanent link">&para;</a></h3>
 <p>The probe polls, and <code>test_no_unbudgeted_fixed_rate_database_polling</code>
 in the functional suite exists to notice polling. Each sample's <code>GET
