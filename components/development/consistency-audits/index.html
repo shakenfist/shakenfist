@@ -14901,7 +14901,7 @@ Visibility is queried live rather than hardcoded because it changes.</p>
 rule set moves between releases, so an unpinned upgrade would change the
 compliance page for reasons nobody chose.</p>
 <p><strong>2. <code>manage-issues</code></strong> -- downloads every artifact and runs
-<code>scripts/audit-manage-issues.py</code>, which files and closes issues. See
+<code>scripts/audit-manage-issues.py</code>, which files, updates and closes issues. See
 <a href="#issues-are-the-work-tracking">Issues are the work tracking</a> below.</p>
 <p><strong>3. <code>update-docs</code></strong> -- runs <code>scripts/audit-update-docs.py</code>, which
 rewrites everything between the <code>&lt;!-- consistency-audit:begin --&gt;</code> and
@@ -14955,6 +14955,14 @@ stale matrix entry would otherwise file a duplicate every single
 morning. A rename still fails the job, so the matrix actually gets
 updated. If duplicates exist anyway, the oldest is kept and the rest are
 closed.</p>
+<p><strong>An open issue's body is regenerated on every run.</strong> While a check
+keeps failing, its issue's body is re-rendered from the latest result
+and rewritten with <code>gh issue edit</code> whenever it differs, so the counts,
+the per-item lists and the spec links stay current rather than
+remaining the snapshot taken at filing. Differences in line endings and
+trailing whitespace are ignored, so an unchanged result edits nothing.
+Hand edits to a body are not preserved -- anything worth saying to the
+next reader belongs in a comment.</p>
 <p>A check that starts passing closes its issue. A check that becomes
 <code>not_applicable</code> closes it too: "we decided this does not apply" and
 "this now complies" are both reasons not to keep a work item open.</p>
@@ -15135,7 +15143,7 @@ repository. Test that half against local clones:</p>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    --no-issues --page /tmp/compliance.md
 </code></pre></div>
 <p>Always pass <code>--dry-run</code> to <code>audit-manage-issues.py</code>. Without it the
-script creates and closes real issues on real repositories.</p>
+script creates, edits and closes real issues on real repositories.</p>
 <p>Pass <code>--page</code> as well, as above. A locally generated page only covers
 the repositories you fed it, so it is never what you want to keep, and
 without <code>--page</code> the script rewrites the real

@@ -15448,7 +15448,8 @@ that is called out explicitly.</p>
   replies (see below) the field is present but zero-filled.</dd>
 <dt><strong>num_common_caps / num_channel_caps</strong> (4 bytes each)</dt>
 <dd>Number of 32-bit words of common and channel capabilities the server
-  advertises. On success Kerbside sends one word of each (see
+  advertises. On success Kerbside sends one common word and zero or one
+  channel words, depending on the channel type (see
   <a href="#capability-handling">Capability Handling</a>).</dd>
 <dt><strong>caps_offset</strong> (4 bytes)</dt>
 <dd>Byte offset to the start of the capability words, measured from the <code>error</code>
@@ -15691,11 +15692,18 @@ secrecy:</p>
 <a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="p">)</span>
 </code></pre></div>
 <h3 id="capability-handling">Capability Handling<a class="headerlink" href="#capability-handling" title="Permanent link">&para;</a></h3>
-<p>Kerbside uses hardcoded default capabilities based on observed behavior:
-- Common caps: 11 (AuthSelection, AuthSpice, MiniHeader)
-- Channel caps: 9 (SemiSeamlessMigrate, SeamlessMigrate)</p>
-<p>These values are sent in the server hello before the actual hypervisor
-capabilities are known.</p>
+<p>Kerbside answers the client's link before the hypervisor is known, so the
+capabilities in its reply are fixed per channel type: common caps 11
+(AuthSelection, AuthSpice, MiniHeader), and for each channel type the channel
+caps spice-server itself advertises for it. The table, and why the reply
+cannot depend on the backend, are in
+<a href="/components/kerbside/proxy-architecture/#link-capabilities">Proxy Architecture</a>.</p>
+<p>A client whose common caps lack MiniHeader or AuthSelection is refused with
+a <code>version_mismatch</code> (4) error reply before any key exchange. The relay
+frames every message on the mini header, and the ticket read expects the
+auth mechanism selector that only an AuthSelection client sends.</p>
+<p>The client's own capabilities are not discarded: the proxy advertises them to
+the hypervisor on the backend leg, so the server encodes for the real client.</p>
 <p>The wire format permits more than one 32-bit word in each capability vector
 (<code>num_common_caps</code> / <code>num_channel_caps</code> may exceed 1). The Rust
 implementation parses and retains every advertised word; new code should not
