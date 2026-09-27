@@ -107,18 +107,21 @@ five merge commits derives:
 AUDIT_RANGE=2f0e526^1..073603b
 ```
 
-and a 31-path `AUDIT_PATHS`, whose diff is **5230
-insertions and 130 deletions across 30 files**. Roughly 970
-lines of that are Python that did not exist before this
-plan:
+and a 31-path `AUDIT_PATHS`, whose diff is 5230 insertions
+and 130 deletions across 30 files, of which 991 lines are
+Python. **Those are the range's figures, and the range
+over-reports** — see the Outcome below and issue #491. What
+the five merges themselves landed is 5014 insertions and
+220 deletions across 31 files, of which **758 lines are
+Python that did not exist before this plan**:
 
 | Path | Lines |
 |------|-------|
 | `tools/check-backend-tls-claims.py` | 266 |
 | `tools/mutate-backend-tls-claims.py` | 138 |
 | `kerbside/tests/unit/test_check_backend_tls_claims.py` | 243 |
-| `kerbside/tests/unit/test_db.py` | 259 |
-| `kerbside/tests/unit/test_sources_static.py` | 64 |
+| `kerbside/tests/unit/test_db.py` | 71 (259 in range) |
+| `kerbside/tests/unit/test_sources_static.py` | 28 (64 in range) |
 | `kerbside/sources/static.py` | 26 changed |
 
 plus 91 changed lines of
@@ -184,9 +187,13 @@ confirm, not a fix to smuggle in.** Nothing in CI guards
 the `docs/index.md#use-cases` anchor that `README.md:43`
 and `ARCHITECTURE.md` now both depend on:
 `kerbside/tests/unit/test_docs_links.py:82` skips every
-target containing `://`, and both links are absolute. Phase
-5 mitigated this with a one-time manual check and recorded
-it in its risk table. It is in range and it is a real gap
+target containing `://`, which drops `README.md`'s absolute
+link, and `:89` strips the anchor off what survives, which
+drops `ARCHITECTURE.md`'s relative one. Removing the first
+exemption would therefore not be enough; anchor checking has
+to be added rather than un-skipped. Phase 5 mitigated this
+with a one-time manual check and recorded it in its risk
+table. It is in range and it is a real gap
 that this plan opened, so 2c should find it independently.
 Step 6e decides what to do with it; if 2c does not find it,
 that is itself a finding about 2c's brief.
@@ -220,12 +227,12 @@ is only worth spending on if wave 1 passes. Steps 6b through
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
-| 6a | low | sonnet | none | Wave 1 gates. From the repository root of this worktree, run `eval "$(tools/audit/plan-range.sh 2f0e526 a7df5e5 28efa6c 8c5c042 073603b)"` and confirm it prints `AUDIT_RANGE=2f0e526^1..073603b` and a 31-path `AUDIT_PATHS`; then run `tools/audit/wave1.sh` with both exported. Report its exit code and its output verbatim, including every advisory check, not only the fatal ones. The exit-code table is at `PUSH-AUDIT.md:55-64`: 0 pass, 1 flake8, 2 tests, 3 raw `print()` added, 4 bare `except:`, 5 cannot reach repo root, 6 `AUDIT_RANGE` does not resolve. Do not fix anything; do not re-run with a different range to make it pass. If exit is 6, stop and report — an explicitly-set range that does not resolve is fatal by design, precisely so that a mistyped range cannot audit nothing and pass. Expect the diff to contain roughly 970 lines of added Python, so a report of "no Python in the diff" means the range or paths are wrong, not that the plan was documentation-only. |
+| 6a | low | sonnet | none | Wave 1 gates. From the repository root of this worktree, run `eval "$(tools/audit/plan-range.sh 2f0e526 a7df5e5 28efa6c 8c5c042 073603b)"` and confirm it prints `AUDIT_RANGE=2f0e526^1..073603b` and a 31-path `AUDIT_PATHS`; then run `tools/audit/wave1.sh` with both exported. Report its exit code and its output verbatim, including every advisory check, not only the fatal ones. The exit-code table is at `PUSH-AUDIT.md:55-64`: 0 pass, 1 flake8, 2 tests, 3 raw `print()` added, 4 bare `except:`, 5 cannot reach repo root, 6 `AUDIT_RANGE` does not resolve. Do not fix anything; do not re-run with a different range to make it pass. If exit is 6, stop and report — an explicitly-set range that does not resolve is fatal by design, precisely so that a mistyped range cannot audit nothing and pass. Expect the diff to contain roughly 990 lines of added Python, so a report of "no Python in the diff" means the range or paths are wrong, not that the plan was documentation-only. |
 | 6b | low | sonnet | none | Wave 1 style-conformance judgment. Execute the brief under "Style conformance — judgment portion" at `PUSH-AUDIT.md:101-148`, but substitute the diff: the brief says `git diff develop...HEAD`, which is **empty** here because every phase has merged. Use `eval "$(tools/audit/plan-range.sh 2f0e526 a7df5e5 28efa6c 8c5c042 073603b)"` then `git diff "$AUDIT_RANGE" -- $AUDIT_PATHS`. The convention source the brief names as `AGENTS.md` is `.claude/CLAUDE.md` in this repository; read both. Most of the brief's checklist (SPICE parsing, source backends, API endpoints, DB access, migrations) will have no material — say so explicitly per bullet rather than silently omitting it. The bullets that do have material are logging, config and the Python style rules: 80-column wrap inside `kerbside/`, 120 elsewhere, single quotes except docstrings, never triple single quotes, no trailing whitespace, mypy type hints. `tools/check-backend-tls-claims.py` and `tools/mutate-backend-tls-claims.py` are the two new executables to read closely. Report violations with file and line, or "Style checks passed." |
 | 6c | medium | sonnet | none | Wave 2 mechanical plus 2a code quality. First run `tools/audit/wave2-mechanical.sh` with the range exported as in 6a, and report its output verbatim; it never exits non-zero on findings. Then execute the 2a brief at `PUSH-AUDIT.md:183-266` with the same diff substitution as 6b, taking the mechanical output as its input. The shared blocks inside that brief are binding: `python-version-discipline` (check `requires-python` in `pyproject.toml` and hold the new Python to that floor — this is the finding to look for first, because it breaks on a real user's machine and CI runs only the newest version) and `comment-proportion`. Pay particular attention to `tools/check-backend-tls-claims.py` and `tools/mutate-backend-tls-claims.py`: they were written in phase 4 as a guard and its mutation tester, they duplicate a regex vocabulary between them by design, and the question is whether that duplication is the intended coupling or a missed abstraction. Classify each finding blocking or advisory with file and line. |
 | 6d | medium | sonnet | none | 2b test review. Execute the brief at `PUSH-AUDIT.md:267-329` with the same diff substitution as 6b. The `functional-test-coverage` shared block inside it is binding. The material is `kerbside/tests/unit/test_check_backend_tls_claims.py` (243 lines), `test_db.py` (259) and `test_sources_static.py` (64), against `tools/check-backend-tls-claims.py` and the `kerbside/sources/static.py` change. Two specific questions worth answering directly. First: phase 4 committed `tools/mutate-backend-tls-claims.py`, which mutates the tracked documentation to prove the guard's rules can fail — does every rule in the guard have a mutation, and does every mutation have a test that catches it? Phase 4 reported it found four rules with no coverage at all, so the answer is checkable. Second: `test_db.py` grew 259 lines in a documentation plan — say what it covers and whether that belongs to this plan's work or arrived alongside it. Report grouped by file. |
-| 6e | medium | sonnet | none | 2c documentation review. Execute the brief at `PUSH-AUDIT.md:330-467` with the same diff substitution as 6b. Its four shared blocks are all binding and all have material here: `readme-discipline` (phase 5 collapsed six README bullets to one — confirm the result is a curated link and not a feature list), `llm-doc-discipline` (`.claude/CLAUDE.md` and `ARCHITECTURE.md` both changed), `diagram-discipline` (`docs/index.md`'s mermaid broker node changed) and `plan-phase-references` (grep `README.md` and `docs/` excluding `docs/plans/` for "phase <number>"). Check independently, and report as a finding if true, that nothing in CI guards the `docs/index.md#use-cases` anchor that `README.md:43` and `ARCHITECTURE.md` now depend on — `kerbside/tests/unit/test_docs_links.py:82` skips every target containing `://` and both links are absolute. Also verify the six use-case pages still carry identical `## ` heading sets, and that no page states a backend TLS or host-subject-pinning claim more strongly than `rust/kerbside-proxy/src/backend.rs:85-108` and `:198-211` support. "No documentation gaps found" is a valid answer; a gap you were told to look for is not evidence on its own, so say whether you would have found it unprompted. |
-| 6f | high | opus | none | 2d security review. Execute the brief at `PUSH-AUDIT.md:468-559` with the same diff substitution as 6b. The `path-traversal-review` shared block inside it is binding and is the one with real material: `tools/mutate-backend-tls-claims.py` rewrites tracked files in place, and `tools/check-backend-tls-claims.py` walks `DOC_PATHS` globs and opens what it finds. Both run in CI. Ask what each opens, what decides the path, and whether a path from a glob over a repository is process-chosen in the sense the block means. Also review the 91 changed lines of `.github/workflows/functional-tests.yml`: the `docs_checks` job and the `check_paths` filter, for anything that could cause a required check to pass without running, and for workflow-level injection of untrusted values into a shell. Most of the brief's classes (SPICE input validation, ticket lifecycle, SQL, TLS on the proxy legs) have no material in this diff — say so per class rather than omitting them. Report with severity, file and line. |
+| 6e | medium | sonnet | none | 2c documentation review. Execute the brief at `PUSH-AUDIT.md:330-467` with the same diff substitution as 6b. Its four shared blocks are all binding and all have material here: `readme-discipline` (phase 5 collapsed six README bullets to one — confirm the result is a curated link and not a feature list), `llm-doc-discipline` (`.claude/CLAUDE.md` and `ARCHITECTURE.md` both changed), `diagram-discipline` (`docs/index.md`'s mermaid broker node changed) and `plan-phase-references` (grep `README.md` and `docs/` excluding `docs/plans/` for "phase <number>"). Check independently, and report as a finding if true, that nothing in CI guards the `docs/index.md#use-cases` anchor that `README.md:43` and `ARCHITECTURE.md` now depend on — `kerbside/tests/unit/test_docs_links.py:82` skips every target containing `://` (which drops README's absolute link) and `:89` strips the anchor off what survives (which drops ARCHITECTURE's relative one). Also verify the six use-case pages still carry identical `## ` heading sets, and that no page states a backend TLS or host-subject-pinning claim more strongly than `rust/kerbside-proxy/src/backend.rs:85-108` and `:198-211` support. "No documentation gaps found" is a valid answer; a gap you were told to look for is not evidence on its own, so say whether you would have found it unprompted. |
+| 6f | high | opus | none | 2d security review. Execute the brief at `PUSH-AUDIT.md:468-559` with the same diff substitution as 6b. The `path-traversal-review` shared block inside it is binding and is the one with real material: `tools/mutate-backend-tls-claims.py` rewrites tracked files in place, and `tools/check-backend-tls-claims.py` walks `DOC_PATHS` globs and opens what it finds. Only the guard runs in CI, at `functional-tests.yml:183`; the mutation tool is hand-run, which lowers the stakes without removing them. Ask what each opens, what decides the path, and whether a path from a glob over a repository is process-chosen in the sense the block means. Also review the 91 changed lines of `.github/workflows/functional-tests.yml`: the `docs_checks` job and the `check_paths` filter, for anything that could cause a required check to pass without running, and for workflow-level injection of untrusted values into a shell. Most of the brief's classes (SPICE input validation, ticket lifecycle, SQL, TLS on the proxy legs) have no material in this diff — say so per class rather than omitting them. Report with severity, file and line. |
 | 6g | high | opus | none | Triage and close out. Management session work; do not delegate the judgement. Take the reports from 6a through 6f. For each finding classify blocking or advisory, and fix the blocking ones in this worktree in their own commits with their own subjects. Then write the result into `docs/plans/PLAN-use-case-docs.md`: every finding fixed or declined **in writing with the reason**, in a short subsection under the phase 6 sketch added by 6a. If the audit found nothing, say so in one sentence — the shared block calls that a real result and a run of them is the evidence for making the phase conditional. Set phase 6 to `Complete` in the master plan's Execution table with an empty `Merged` cell, and update the `docs/plans/index.md` row. Set the master plan's own status to `Complete` if and only if nothing else in it is outstanding; Proxmox is deferred by design and does not block it, but say so rather than leaving it implied. `pre-commit run --all-files` passes. Commit subject: `docs: record the phase 6 push audit findings.` |
 
 ## Risks and mitigations
@@ -234,7 +241,7 @@ is only worth spending on if wave 1 passes. Steps 6b through
 |------|------------|
 | A step runs `git diff develop...HEAD` as the runbook literally says, gets an empty diff, and reports a clean audit. This is the failure mode the whole `plan-range.sh` mechanism exists to prevent, and it fails silently. | Every brief from 6b onward states the substitution explicitly and names the expected shape of the result. 6a independently asserts the derived range and the 31-path set before any judgment agent runs, and 6g rejects any report whose findings are consistent with an empty diff. |
 | The SHAs are given to `plan-range.sh` in the wrong order, and the range diffs backwards — style checks then pass on reverted content. | The script rejects SHAs not given oldest-first, and 6a confirms the printed range is `2f0e526^1..073603b` before running anything. |
-| An agent skips a class because "this was a documentation plan", and the skip reads as a pass. | Findings 3 and decision 2 say the diff carries ~970 lines of Python, a workflow change and a source-module change. Each brief requires an explicit per-class statement where there is no material, rather than silence. 6g treats an omitted class as an unrun check. |
+| An agent skips a class because "this was a documentation plan", and the skip reads as a pass. | Findings 3 and decision 2 say the diff carries ~990 lines of Python, a workflow change and a source-module change. Each brief requires an explicit per-class statement where there is no material, rather than silence. 6g treats an omitted class as an unrun check. |
 | The audit re-finds `#468` or `#472` and the phase grows a code fix it should not carry. | Both are named out of scope above with their issue numbers. The response is to cite the issue. 6g is the only step permitted to fix anything, and only blocking findings inside this plan's range. |
 | Triage widens into a review-comment loop, fixing advisory findings until the diff is unrecognisable. | The shared block's standard is that a declined finding says why, in the plan. 6g declines in writing rather than fixing, and the master plan is where the reason lands. |
 | The master plan is marked `Complete` while `docs/plans/index.md` still says otherwise, leaving the half-finished closeout that step 1 of the next-phase skill exists to catch. | 6g changes both, and the definition of done checks both with a grep rather than a recollection. |
@@ -301,3 +308,97 @@ Read this plan back before starting, and gate on these:
    is left in it and why that does not block completion.
    Proxmox is the expected answer; a second item is a
    reason to stop and ask.
+
+## Outcome
+
+Run 2026-09-26. **No blocking findings, and no security
+finding above LOW.** Wave 1 failed once, on a real defect,
+and passed after it was fixed. All five judgment agents ran
+and each reported a result for every class in its brief,
+including the classes with no material.
+
+### What was fixed here
+
+| # | Finding | Source |
+|---|---------|--------|
+| 1 | `tools/check-backend-tls-claims.py` and `tools/mutate-backend-tls-claims.py` print to stdout with no `audit-allow-print` marker, tripping wave 1 fatally (exit 3). They are reporting CLIs and the marker is the documented exemption; `tools/check-pypi-storage.py:51` already carries it in the same form. Phase 4 added two such tools without following a convention the repository already had. | wave 1 |
+| 2 | `tools/mutate-backend-tls-claims.py` mutates the *tracked* guard in the working tree for the whole run, and its `finally` restore covers `sys.exit` and `KeyboardInterrupt` but not `SIGTERM` or `SIGHUP`. A kill or a closed terminal left a weakened CI guard behind for the next commit to pick up. A handler now routes both through the same restore. Verified by running the tool, waiting until a mutation was genuinely present in the tree, sending `SIGTERM`, and confirming the guard returned to its pre-run hash — reading the handler would not have distinguished "this works" from "this cannot fire". | 2d, LOW |
+| 3 | `tools/check-backend-tls-claims.py:143` joins two process-chosen components, which is correct and needs no containment check. The `path-traversal-review` block asks that this be said rather than left for the reader to re-derive. One comment. | 2d, informational |
+| 4 | Nine double-quoted string literals in `tools/mutate-backend-tls-claims.py` with no apostrophe in their contents, against the single-quote convention. | style |
+| 5 | Three lines over 80 columns in `kerbside/tests/unit/test_sources_static.py`. | style, 2a |
+
+All eleven mutations are still caught after these changes,
+and the guard still exits 0 over its seven files.
+
+### What was filed
+
+- **#488** — the wave 1 flake8 gate ignores `AUDIT_RANGE`.
+  `wave1.sh:122` runs `tox -eflake8`, whose env runs
+  `flake8wrap.sh -HEAD`, which selects files from
+  `git diff HEAD~1`. In a worktree auditing an already-merged
+  plan it reported "No python files in change" as a pass
+  while the range held six Python files. This is the vacuous
+  pass `plan-range.sh` exists to prevent, surviving in the
+  one gate nobody re-plumbed. Flake8 was run by hand over the
+  six files in range instead: clean.
+- **#490** — nothing validates markdown anchors, so
+  `docs/index.md#use-cases` can break silently. Both links
+  that depend on it escape, for two different reasons.
+- **#491** — `plan-range.sh` sweeps unrelated commits into an
+  audit. See below.
+
+### What was declined, and why
+
+The guard's mutation coverage is partial: `BACKEND`, fourteen
+of the fifteen `ASSERTS` words, the `PIN` and `CRYPTO`
+regexes, bullet detection, table-row grouping and
+fenced-block skipping have no mutation, so a quiet edit to
+any of them would not be caught by the mutation tool today.
+Declined rather than filed. The coupling between guard and
+mutator is deliberate — `apply_mutation()` exits when its
+search string is not found exactly once, so drift is loud
+rather than silent — and "add a mutation whenever you add a
+rule" is a disclosed, unenforced convention that is
+proportionate for two scripts. Filing it would put a
+standing task against a tool that is working as designed.
+Several of the uncovered rules are exercised incidentally by
+the ordinary unit tests' fixture text.
+
+The phase 4 claim that four guard rules had no test coverage
+is separately resolved: those gaps were found while writing
+`test_check_backend_tls_claims.py`, were fixed in the same
+round, and are now mutations 2, 3, 5, 8 and 11.
+
+### What the audit found out about itself
+
+Two of the three methodology findings are the durable result
+of this phase, and both were invisible from inside a single
+phase.
+
+`plan-range.sh` unions the *files* each merge touched and
+then diffs a single contiguous *range* restricted to them,
+so any unrelated commit touching a shared file is swept in.
+Here that was the issue #132 secret-redaction work —
+`3c5a309`, `8294f22`, `738c718`, none of them in any phase
+pull request — which added 188 lines to
+`kerbside/tests/unit/test_db.py`. The audit therefore read
+991 added lines of Python where the plan landed 758, and
+three judgment agents reviewed the #132 tests as this plan's
+work; one noticed they were not and said so. The correlated
+half is worse than the over-count: `kerbside/db.py`, the
+production code those commits changed, is not in
+`AUDIT_PATHS` and was not audited, so the diff contains
+tests for code the audit never read.
+
+This is the same hazard `PUSH-AUDIT.md` already warns about
+for reconstructed ranges — a path filter lists what touched
+a path without saying what arrived inside a pull request —
+applied to a `git diff` rather than a `git log`, where the
+runbook does not warn about it.
+
+The ancestry test that catches it is membership in
+`<merge>^1..<merge>^2`. Testing whether a commit is an
+ancestor of `<merge>^2` proves nothing, because that second
+parent's history includes everything on the default branch
+before the branch point. This phase got that wrong on the
+first attempt and reached the opposite conclusion.
