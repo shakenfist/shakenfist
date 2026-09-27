@@ -540,13 +540,13 @@ like an idle cluster rather than a broken query.
 
 `test_no_unbudgeted_fixed_rate_database_polling` evaluates the budget's
 model, and two of that model's three terms are facts about the cluster
-rather than about the code: node count and standing instances. Both are
-sampled at every one of the five window boundaries, not once when the
+rather than about the code: node count and standing instances. The
+instance count is sampled at every window boundary, not once when the
 measurement is over.
 
 The instance count is the one that matters, because the suite is what
 creates and destroys instances and it tidies up after itself. A count
-taken when the four minutes are up is a count of what nobody got round
+taken when the measurement is over is a count of what nobody got round
 to deleting, and on the run in
 [#4039](https://github.com/shakenfist/shakenfist/issues/4039) that was
 zero -- on a cluster whose `sidechannel` daemon had visibly been
@@ -562,11 +562,14 @@ Three things follow, and each is easy to get wrong:
 * **The count comes from `instances_active`**, scraped from
   `sf-resources` on `RESOURCES_METRICS_PORT` on every hypervisor in the
   `created` state -- not from the API's `power_state` field, and not from
-  every record in `GET /nodes`, a roster which keeps a node's record after
-  the node has gone and would otherwise hold a node that never answers. `_doc.method` in the budget says a
-  consumer which counts standing instances any other way evaluates the
-  model against a quantity it was never fitted against, and `sf-ctl
-  database-load` and the Prometheus rules both read that gauge.
+  every record in `GET /nodes`, a roster which keeps a node's record
+  after the node has gone and would otherwise hold a node that never
+  answers. The roster is re-read for every sample, so a node deleted
+  part way through drops out rather than going silent. `_doc.method` in
+  the budget says a consumer which counts standing instances any other
+  way evaluates the model against a quantity it was never fitted
+  against, and `sf-ctl database-load` and the Prometheus rules both read
+  that gauge.
 * **The largest sample wins, not the mean or the last.** Each pair is
   judged at its lowest observed rate, so the matching choice for the
   shape is the largest: a failure then means a pair ran high against
@@ -574,14 +577,18 @@ Three things follow, and each is easy to get wrong:
   the least generous one. Every sample is in the run's
   `standing_instances_per_sample` detail.
 * **A failed scrape unenforces the per-instance ceilings rather than
-  failing the build**, because five samples per run across every node
+  failing the build**, because a sample at every boundary on every node
   would otherwise turn one refused connection into a red pull request.
   A gauge not yet published is retried like a refused connection, since
   `sf-resources` creates its gauges on its first update. The `unbudgeted`
   half of the check needs no shape and still runs, and the run's
-  `shape_unread_nodes` detail names each node that did not answer and
-  how often. The gauge going missing altogether is the quiet version of
-  this, so its name is pinned by a unit test.
+  `shape_unread_nodes` detail names each node that did not answer, how
+  often, and why its last attempt failed. A node which answered *none*
+  of the samples does fail the build: that is a port which is never
+  open, not a transient, and left alone it would turn the per-instance
+  half of the check off on every run. The gauge going missing
+  altogether is the quiet version of the same thing, so its name is
+  pinned by a unit test.
 
 ## Coverage the functional suite does not have
 

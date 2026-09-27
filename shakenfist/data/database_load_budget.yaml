@@ -321,10 +321,18 @@ entries:
       attributes read; the executor reaper peeks at the same attribute
       once per EXECUTOR_REAP_INTERVAL (30s) per monitored instance. An
       instance which has no monitor yet costs one read per
-      MONITOR_START_INTERVAL (30s) instead of both. So the idle floor is
-      0.233/s per standing instance against the 0.134/s originally
-      fitted here, which is issue #4039: the pair kept failing the
-      functional load check at rates its own idle floor accounts for.
+      MONITOR_START_INTERVAL (30s) instead of both. So an agent-ready
+      instance costs 0.233/s, and one without a ready agent costs 0.033/s
+      whether or not it has a monitor. The term is the largest of those
+      cases -- a per-instance ceiling, not a typical rate -- because the
+      regressor counts every running domain, agent or not, and the check
+      must not fail a cluster whose guests all run one. The price is
+      slack: on a cluster of guests without agents this term predicts
+      about seven times what the daemon reads, and a regression in its
+      reads can hide in the difference. The 0.134/s originally fitted
+      here was below even the agent-ready case, which is issue #4039:
+      the pair kept failing the functional load check at rates the code
+      accounts for.
       The base term is still a measurement, and it is not an idle floor
       -- with nothing standing this daemon reads no instance attributes
       at all. What it absorbs is churn. Bringing one instance's agent up

@@ -62,6 +62,14 @@ INSTANCE_WALK_CEILING_PER_GET = 2
 SCRAPE_ATTEMPTS = 3
 SCRAPE_RETRY_SECONDS = 2
 
+# The cluster's shape is scraped from every hypervisor at every window
+# boundary, so it gets a shorter budget than the scrapes above: five
+# independent samples of which the largest wins already absorb one that
+# failed, and a full budget against an unreachable node costs 21s per
+# sample -- minutes of merge queue per run for a node which is not coming
+# back.
+SHAPE_SCRAPE_ATTEMPTS = 2
+
 
 def scrape_database_counters(mesh_ip):
     url = 'http://%s:%d/metrics' % (mesh_ip, METRICS_PORT)
@@ -191,25 +199,6 @@ class DatabaseTierTestsMixin:
                     '%d attempts: %s'
                     % (node['name'], node['ip'], SCRAPE_ATTEMPTS, last))
         return totals, sum(read_at) / len(read_at)
-
-    def _standing_instances(self, nodes):
-        """How many libvirt domains the cluster is running, and who did not say.
-
-        See lb.standing_instances(), which is where the rules live so that
-        the unit suite can reach them. Summed over every hypervisor, not
-        only the database tier: an instance loads the sf-database tier
-        from wherever it is placed.
-
-        Retried the same way and for the same reason as _all_pairs(), but
-        unlike _all_pairs() a persistent failure does not fail the build.
-        The caller takes five of these samples across four minutes on
-        every node, so a hard failure would turn one refused connection
-        into a red pull request. It drops the sample instead, and falls
-        back to reporting rather than enforcing the ceilings which need it
-        if no sample survives.
-        """
-        return lb.standing_instances(nodes, SCRAPE_ATTEMPTS,
-                                     SCRAPE_RETRY_SECONDS)
 
     def _sum_requests(self, database_nodes, operation, caller_daemon):
         """Sum one counter across the tier, retrying a failed scrape.
@@ -485,25 +474,23 @@ class DatabaseTierTestsMixin:
         # per_instance_qps ceiling below is a multiple of this number, so
         # reading it after the load has gone makes the model predict a
         # cluster which was not there.
-        shape_samples = []
-        shape_attempts = 0
-        shape_unread = {}
-
-        def sample_shape():
-            nonlocal shape_attempts
-            shape_attempts += 1
-            sample, unread = self._standing_instances(nodes)
-            if sample is not None:
-                shape_samples.append(sample)
-            for name in unread:
-                shape_unread[name] = shape_unread.get(name, 0) + 1
+        #
+        # Summed over every hypervisor, not only the database tier: an
+        # instance loads the sf-database tier from wherever it is placed.
+        # A sample that fails is dropped rather than failing the build,
+        # because five samples per run on every node would otherwise turn
+        # one refused connection into a red pull request; a node which
+        # never answers at all is a different matter, and is asserted on
+        # below. The roster is re-read for each sample for the reason
+        # lb.ShapeSampler gives.
+        shape = lb.ShapeSampler(SHAPE_SCRAPE_ATTEMPTS, SCRAPE_RETRY_SECONDS)
 
         counters, read_at = self._all_pairs(database_nodes)
-        sample_shape()
+        shape.sample(nodes)
         for _ in range(lb.LOAD_WINDOW_COUNT):
             time.sleep(lb.LOAD_WINDOW_SECONDS)
             later, later_read_at = self._all_pairs(database_nodes)
-            sample_shape()
+            shape.sample(self.system_client.get_nodes())
 
             # Divide by what was actually measured, not by what was
             # slept. See _all_pairs().
@@ -647,11 +634,12 @@ class DatabaseTierTestsMixin:
         # None when not a single sample survived, across five attempts
         # each with its own retries. Every pair whose budget has a
         # per-instance term is then reported below instead of enforced --
-        # see lb.enforceable(). The unbudgeted half of this test needs no
-        # shape at all and still runs -- losing the detector for brand new
-        # polling loops because one metrics port refused a connection
-        # would be the worse trade.
-        busiest = lb.busiest_shape(shape_samples)
+        # see lb.enforceable() -- unless some node answered none of them,
+        # which fails the run below. The unbudgeted half of this test
+        # needs no shape at all and still runs -- losing the detector for
+        # brand new polling loops because one metrics port refused a
+        # connection would be the worse trade.
+        busiest = shape.busiest()
         shape_known = busiest is not None
         standing_instances = busiest if shape_known else 0
         # Steady is not yet metronomic. A blob heavy test running at a
@@ -717,13 +705,13 @@ class DatabaseTierTestsMixin:
         summary = {
             'nodes': node_count,
             'standing_instances': standing_instances,
-            'standing_instances_per_sample': shape_samples,
-            'shape_samples_attempted': shape_attempts,
+            'standing_instances_per_sample': shape.samples,
+            'shape_samples_attempted': shape.attempted,
             'shape_known': shape_known,
-            # Per node, how many of the samples it failed to answer. The
-            # detail is what says why the shape is unknown rather than
-            # only that it is.
-            'shape_unread_nodes': shape_unread,
+            # Per node, how many of the samples it failed to answer and
+            # why the last one failed. The detail is what says why the
+            # shape is unknown rather than only that it is.
+            'shape_unread_nodes': shape.unread,
             'window_seconds': lb.LOAD_WINDOW_SECONDS,
             'unbudgeted_ceiling_qps': round(unbudgeted_ceiling, 3),
             'measured_seconds': elapsed_seconds,
@@ -751,6 +739,25 @@ class DatabaseTierTestsMixin:
         }
         self.addDetail('database_load', content.text_content(
             json.dumps(summary, indent=2, sort_keys=True)))
+
+        # Before either skip below, because it is true whatever they
+        # conclude. A node which failed a sample or two is tolerated above;
+        # one which answered none of five, each with its own retries, has a
+        # metrics port which is never open, and that turns off every
+        # per-instance ceiling on every run rather than on this one. Left
+        # to the fallback, the only evidence would be shape_known: false
+        # in the detail of a passing test.
+        never_read = shape.never_read()
+        self.assertEqual(
+            [], never_read,
+            'These hypervisors did not publish instances_active on port %d '
+            'in any of the %d samples taken during the measurement, so the '
+            'shape of this cluster is unknown and every per-instance budget '
+            'ceiling went unenforced. That is not a transient failure: '
+            'check that sf-resources is running there and that the port is '
+            'reachable from this node. unread=%s'
+            % (lb.RESOURCES_METRICS_PORT, shape.attempted,
+               json.dumps(shape.unread, sort_keys=True)))
 
         # Both assertions below read the metronomic set, so both are
         # vacuous unless this run could tell metronomic from busy. Where it

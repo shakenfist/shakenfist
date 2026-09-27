@@ -540,6 +540,12 @@ def scrape_request_pairs(mesh_ip):
     return pairs
 
 
+# What standing_instances() records for a node which answered but did not
+# publish the gauge. There is no exception to describe that case, and it
+# is the one which says sf-resources is up but not what the check expects.
+UNPUBLISHED_GAUGE = 'instances_active not published'
+
+
 def parse_gauge(text, name):
     """The value of one unlabelled Prometheus gauge, or None.
 
@@ -561,7 +567,7 @@ def parse_gauge(text, name):
         try:
             return float(fields[1])
         except ValueError:
-            return None
+            continue
     return None
 
 
@@ -600,8 +606,10 @@ def standing_instances(nodes, attempts, retry_seconds,
     a smaller cluster than the real one and every per-instance ceiling is
     a multiple of it -- under-reporting the shape fails the build for load
     sitting exactly where the model says it should, which is issue #4039.
-    unread names the nodes which did not answer, so that a run which fell
-    back to reporting says why.
+    unread maps each node which did not answer to why its last attempt
+    failed, so that a run which fell back to reporting says why: a
+    refused connection, a timeout and a gauge nobody published call for
+    three different responses.
 
     An absent gauge is retried like a failed request: sf-resources creates
     its gauges on its first metrics update, up to a minute after it
@@ -609,25 +617,82 @@ def standing_instances(nodes, attempts, retry_seconds,
     connection. Each node is still read at most attempts times.
     """
     total = 0.0
-    unread = []
+    unread = {}
     for node in shape_nodes(nodes):
         active = None
+        reason = None
         for attempt in range(attempts):
             try:
                 active = scrape(node['ip'])
-            except Exception:
+                reason = UNPUBLISHED_GAUGE
+            except Exception as e:
                 active = None
+                reason = repr(e)
             if active is not None:
                 break
             if attempt < attempts - 1:
                 sleep(retry_seconds)
         if active is None:
-            unread.append(node.get('name', node['ip']))
+            unread[node.get('name', node['ip'])] = reason
         else:
             total += active
     if unread:
         return None, unread
     return int(total), unread
+
+
+class ShapeSampler:
+    """The cluster's shape, sampled at each window boundary of a load check.
+
+    Keeps what the load check needs from its samples: every count which
+    survived, and for each node which did not answer, how many samples it
+    missed and why the last one failed. The roster is passed to every
+    sample rather than fixed when the sampler is made, because a node
+    deleted part way through the measurement stops being a hypervisor in
+    the created state from then on, and a snapshot would carry it as a
+    node which never answers.
+    """
+
+    def __init__(self, attempts, retry_seconds,
+                 scrape=scrape_instances_active, sleep=time.sleep):
+        self._attempts = attempts
+        self._retry_seconds = retry_seconds
+        self._scrape = scrape
+        self._sleep = sleep
+        self.samples = []
+        self.attempted = 0
+        self.unread = {}
+
+    def sample(self, nodes):
+        self.attempted += 1
+        count, unread = standing_instances(
+            nodes, self._attempts, self._retry_seconds,
+            scrape=self._scrape, sleep=self._sleep)
+        if count is not None:
+            self.samples.append(count)
+        for name, reason in unread.items():
+            seen = self.unread.setdefault(name, {'samples': 0})
+            seen['samples'] += 1
+            seen['last_error'] = reason
+
+    def busiest(self):
+        return busiest_shape(self.samples)
+
+    def never_read(self):
+        """The nodes which answered none of the samples, sorted.
+
+        The line between a transient failure and a configuration one. A
+        node which missed some samples and answered others has a metrics
+        port which works; one which missed every sample across the whole
+        measurement, each with its own retries, has a port which is never
+        open -- a firewall, a daemon which is not running, a port constant
+        which has drifted -- and that disables the per-instance half of
+        the check on every run rather than on this one.
+        """
+        if not self.attempted:
+            return []
+        return sorted(name for name, seen in self.unread.items()
+                      if seen['samples'] == self.attempted)
 
 
 def busiest_shape(samples):

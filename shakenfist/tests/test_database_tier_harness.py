@@ -546,7 +546,7 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
             return {'10.0.0.1': 2.0, '10.0.0.2': 3.0}[ip]
 
         self.assertEqual(
-            (5, []), harness.standing_instances(nodes, 3, 0, scrape=scrape,
+            (5, {}), harness.standing_instances(nodes, 3, 0, scrape=scrape,
                                                 sleep=lambda s: None))
         self.assertEqual(['10.0.0.1', '10.0.0.2'], scraped)
 
@@ -566,7 +566,7 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
             return 4.0
 
         self.assertEqual(
-            (None, ['sf2']),
+            (None, {'sf2': repr(harness.requests.ConnectionError('refused'))}),
             harness.standing_instances(nodes, 3, 0, scrape=scrape,
                                        sleep=lambda s: None))
 
@@ -587,16 +587,100 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
             return answer
 
         self.assertEqual(
-            (6, []), harness.standing_instances(nodes, 3, 2, scrape=scrape,
+            (6, {}), harness.standing_instances(nodes, 3, 2, scrape=scrape,
                                                 sleep=sleeps.append))
         self.assertEqual([2, 2], sleeps)
 
+        # And when it never appears, the node is named with that as the
+        # reason: there is no exception to describe it, and it is the case
+        # which says sf-resources is up but not publishing what we read.
         answers[:] = [None, None, None, 6.0]
         self.assertEqual(
-            (None, ['sf1']),
+            (None, {'sf1': harness.UNPUBLISHED_GAUGE}),
             harness.standing_instances(nodes, 3, 2, scrape=scrape,
                                        sleep=sleeps.append))
         self.assertEqual([6.0], answers)
+
+    def test_the_sampler_keeps_what_survived_and_counts_what_did_not(self):
+        # A failed sample is dropped rather than summed, and each unread
+        # node is counted per sample it missed with the reason its last
+        # attempt failed, which is what makes a degraded run diagnosable
+        # from its detail alone.
+        nodes = [
+            {'name': 'sf1', 'ip': '10.0.0.1', 'is_hypervisor': True,
+             'state': 'created'},
+            {'name': 'sf2', 'ip': '10.0.0.2', 'is_hypervisor': True,
+             'state': 'created'},
+        ]
+        answers = {'10.0.0.1': [1.0, 2.0, 3.0],
+                   '10.0.0.2': [harness.requests.ConnectionError('refused'),
+                                4.0, None]}
+
+        def scrape(ip):
+            answer = answers[ip].pop(0)
+            if isinstance(answer, Exception):
+                raise answer
+            return answer
+
+        sampler = harness.ShapeSampler(1, 0, scrape=scrape,
+                                       sleep=lambda s: None)
+        for _ in range(3):
+            sampler.sample(nodes)
+
+        self.assertEqual(3, sampler.attempted)
+        self.assertEqual([6], sampler.samples)
+        self.assertEqual(6, sampler.busiest())
+        self.assertEqual(
+            {'sf2': {'samples': 2, 'last_error': harness.UNPUBLISHED_GAUGE}},
+            sampler.unread)
+        # sf2 answered one sample, so its port works: transient, tolerated.
+        self.assertEqual([], sampler.never_read())
+
+    def test_a_node_which_never_answers_is_not_transient(self):
+        # The difference between one refused connection and a port which
+        # is never open. The second turns off every per-instance ceiling on
+        # every run, so the load check fails on it rather than reporting.
+        nodes = [
+            {'name': 'sf1', 'ip': '10.0.0.1', 'is_hypervisor': True,
+             'state': 'created'},
+            {'name': 'sf2', 'ip': '10.0.0.2', 'is_hypervisor': True,
+             'state': 'created'},
+        ]
+
+        def scrape(ip):
+            if ip == '10.0.0.2':
+                raise harness.requests.ConnectionError('refused')
+            return 1.0
+
+        sampler = harness.ShapeSampler(2, 0, scrape=scrape,
+                                       sleep=lambda s: None)
+        self.assertEqual([], sampler.never_read())
+        for _ in range(5):
+            sampler.sample(nodes)
+        self.assertEqual(['sf2'], sampler.never_read())
+        self.assertIsNone(sampler.busiest())
+
+    def test_the_sampler_reads_the_roster_it_is_given_each_time(self):
+        # A node deleted part way through leaves the created state, and a
+        # roster fixed at the start would carry it as a node which never
+        # answers -- failing the check for a node that is simply gone.
+        alive = {'name': 'sf1', 'ip': '10.0.0.1', 'is_hypervisor': True,
+                 'state': 'created'}
+        going = {'name': 'sf2', 'ip': '10.0.0.2', 'is_hypervisor': True,
+                 'state': 'created'}
+
+        def scrape(ip):
+            if ip == '10.0.0.2':
+                raise harness.requests.ConnectionError('refused')
+            return 2.0
+
+        sampler = harness.ShapeSampler(1, 0, scrape=scrape,
+                                       sleep=lambda s: None)
+        sampler.sample([alive, going])
+        for _ in range(4):
+            sampler.sample([alive, dict(going, state='deleted')])
+        self.assertEqual([], sampler.never_read())
+        self.assertEqual([2, 2, 2, 2], sampler.samples)
 
     def test_the_busiest_shape_is_the_largest_sample(self):
         # Not the last: the last sample is taken after the suite has tidied

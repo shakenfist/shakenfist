@@ -232,8 +232,9 @@ FALLBACK_DEFAULTS = collections.OrderedDict([
 # derived on 2026-08-25. It landed days later with the agent operation
 # deadlines work, so the fitted slope of 0.134/s describes a daemon with one
 # sweep and the code has had two ever since. Issue #4039 is what that cost:
-# the pair has been failing the functional load check at rates its own idle
-# floor accounts for.
+# the pair has been failing the functional load check at rates the code
+# accounts for. The term is the agent-ready case, the most expensive of the
+# three an instance can be in; that entry's note says what the choice costs.
 #
 # Overriding here rather than editing the generated file by hand means a
 # re-derivation does not silently revert to the measurement.

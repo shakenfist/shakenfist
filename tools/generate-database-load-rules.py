@@ -68,7 +68,7 @@ HEADER = """# Prometheus rules for Shaken Fist database load.
 #      mesh IP. All of the rules below sum across the tier, so scrape
 #      every instance rather than picking one.
 #
-#   2. Scrape sf-resources too, on RESOURCES_METRICS_PORT (13007). The
+#   2. Scrape sf-resources too, on RESOURCES_METRICS_PORT (13001). The
 #      model needs to know the shape of your cluster and that is where
 #      instances_active comes from. Without it every modelled value is
 #      empty and the alerts below can never fire -- which looks exactly
@@ -337,7 +337,7 @@ def main():
             empty and neither of the other alerts in this file can fire.
             That looks exactly like a healthy cluster, which is why this
             alert exists. Scrape sf-resources on RESOURCES_METRICS_PORT
-            (13007 by default) on every node.
+            (13001 by default) on every node.
 """.format(multiplier=defaults.tolerance_multiplier,
            floor=defaults.tolerance_floor_qps,
            unbudgeted=defaults.unbudgeted_fixed_rate_qps,

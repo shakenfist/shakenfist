@@ -17,6 +17,7 @@ import copy
 import importlib.util
 import io
 import os
+import re
 import types
 
 import yaml
@@ -166,6 +167,32 @@ class DeriveBudgetTestCase(base.ShakenFistTestCase):
                       1.0 / tool.MONITOR_START_INTERVAL), 3),
             entry['per_instance_qps'])
         self.assertEqual(0.233, entry['per_instance_qps'])
+
+    def test_the_sidechannel_note_quotes_the_code_it_is_about(self):
+        # The shipped note restates the three intervals and the rates they
+        # come to, because a reader of the budget should not need the tool
+        # open to follow it. Restated prose drifts as quietly as a restated
+        # constant, and a note quoting a stale interval is the budget term
+        # nobody can source which #4039 was.
+        with open(tool.DEFAULT_PREVIOUS) as f:
+            budget = yaml.safe_load(f)
+        entry = [e for e in budget['entries']
+                 if (e['operation'], e['caller_daemon'])
+                 == ('GetInstanceAttributes', 'sidechannel')][0]
+        note = ' '.join(entry['note'].split())
+
+        quoted = dict(re.findall(r'([A-Z_]+_INTERVAL) \((\d+)s\)', note))
+        self.assertEqual(
+            {'DISPATCH_CHECK_INTERVAL', 'EXECUTOR_REAP_INTERVAL',
+             'MONITOR_START_INTERVAL'}, set(quoted))
+        for name, seconds in quoted.items():
+            self.assertEqual(getattr(tool, name), float(seconds), name)
+
+        derived = tool.CODE_DERIVED_TERMS[
+            ('GetInstanceAttributes', 'sidechannel')]['per_instance_qps']
+        self.assertEqual(derived, entry['per_instance_qps'])
+        self.assertIn('%.3f/s' % derived, note)
+        self.assertIn('%.3f/s' % (1.0 / tool.EXECUTOR_REAP_INTERVAL), note)
 
     def test_a_code_derived_term_leaves_the_others_measured(self):
         # The sidechannel entry overrides its per-instance term and not its
