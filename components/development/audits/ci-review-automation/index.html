@@ -14827,6 +14827,13 @@ workflow files alone, so a reviewer confirms it instead.</p>
   rather than open-coding the phrase match, permission lookup, reaction
   and refusal reply.</li>
 <li>No caller passes <code>secrets: inherit</code>.</li>
+<li>In both developer workflows, the trigger job exports
+  <code>pr-bot-trigger</code>'s <code>same-repo</code> output, and the job that needs it
+  requires that export to be <code>'true'</code> in its <code>if:</code>.</li>
+<li><code>pr-re-review.yml</code> confirms that the tree it checked out is the commit
+  its resolve step validated, on the head fallback path as well as the
+  merge path: the step comparing <code>HEAD^2</code> has no <code>if:</code> and also
+  compares <code>HEAD</code>.</li>
 <li>The retired comment addresser is gone from the tree, as below.</li>
 </ul>
 <h3 id="required-but-confirmed-by-a-reviewer">Required, but confirmed by a reviewer<a class="headerlink" href="#required-but-confirmed-by-a-reviewer" title="Permanent link">&para;</a></h3>
@@ -14859,8 +14866,29 @@ reads no secrets -- it and <code>review-pr-with-claude</code> authenticate with
 <code>github.token</code> from the caller's <code>permissions:</code> block -- so inheriting
 buys nothing while putting every secret the repository holds, including
 publishing tokens, within reach of a workflow in another repository.
-Callers of <code>smoke-cluster.yml</code> and <code>export-repo-config.yml</code> do read
-secrets and inherit correctly.</p>
+Callers of <code>smoke-cluster.yml</code> do read secrets and inherit correctly.
+<code>export-repo-config.yml</code> reads none either, and the
+<a href="/components/development/audits/export-repo-config/">export-repo-config</a> criterion makes the same
+finding for its callers.</p>
+<p><strong>The fork gate is stated twice.</strong> <code>pr-bot-trigger</code> already folds its
+fork check into <code>authorized</code>, so requiring <code>same_repo</code> on the work job
+again is redundant, and required anyway: both workflows put a pull
+request's code, or a dispatch against its ref, next to a write-scoped
+token, and the action is taken at <code>@main</code>, so a regression there must
+not be able to quietly widen what runs. Both halves are measured
+because either alone is no gate -- without the export the <code>if:</code> reads
+an empty string and the job silently never runs. The rule covers
+every job which <code>needs:</code> the trigger job, not only the one doing the
+work: an adopter who adds a third job downstream of it -- a cleanup or
+a notification -- gates that job too, or hangs it off the work job
+instead.</p>
+<p><strong>Confirm the checkout on both paths.</strong> The resolve step validates a
+sha and the checkout then names a ref, and a push between the two moves
+what the ref reaches. That is as true of <code>refs/pull/N/head</code> as of the
+merge ref, so an earlier template confirming only the merge path let a
+fallback review be of a commit nobody validated. Measured rather than
+left to the template because every adopter copied the earlier one
+(<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/172" title="GitHub Issue: shakenfist/development #172">development#172</a>).</p>
 <p><strong>Same-repository pull requests only.</strong> The reviewer runs Claude Code
 with <code>--dangerously-skip-permissions</code> while holding a write-capable
 token, and the diff is untrusted input. Fork PRs are reviewed on

@@ -15470,28 +15470,34 @@ answers.</p>
 <tr>
 <th>Phase</th>
 <th>Status</th>
+<th>Merged</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>1. <code>import</code> subcommand</td>
-<td>In progress</td>
+<td>Complete</td>
+<td>54c7ecc (#177)</td>
 </tr>
 <tr>
 <td>2. Review tracking CI template and rollout</td>
-<td>Not started</td>
+<td>In progress</td>
+<td></td>
 </tr>
 <tr>
 <td>3. Template convergence</td>
 <td>Not started</td>
+<td></td>
 </tr>
 <tr>
 <td>4. Verification</td>
 <td>Not started</td>
+<td></td>
 </tr>
 <tr>
 <td>5. Push audit</td>
 <td>Not started</td>
+<td></td>
 </tr>
 </tbody>
 </table>
@@ -16416,6 +16422,19 @@ intend to do aligns with that plan.</p>
   every change to it costs a re-read of all of it. Raised by the
   automated review of #177 and deliberately not done there, where
   it would have buried the logic change in the diff.</li>
+<li><strong>Automate the gitsign bump.</strong> <code>GITSIGN_VERSION</code> and
+  <code>GITSIGN_SHA256</code> in <code>templates/review-tracking/ci-prune-reviews.sh</code>
+  are bumped by hand. A Renovate regex manager can bump the version
+  but not the binary's digest, so a half-automated bump would fail
+  the checksum check; this wants either a Renovate post-upgrade
+  task or a small scheduled job. Raised by the automated review of
+  #186.</li>
+<li><strong>Stagger the daily run.</strong> Every adopted repository runs the
+  template's <code>23 4 * * *</code> schedule at the same minute on the shared
+  static runners. They queue rather than fail, so this is left
+  alone unless phase 4 shows the queue matters; a per-repository
+  cron would break byte-identity for that file. Raised by the
+  automated review of #186.</li>
 </ul>
 <p>Related issues: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/173" title="GitHub Issue: shakenfist/development #173">development#173</a> is this repository's
 own review-coverage issue; import does not affect it, because this

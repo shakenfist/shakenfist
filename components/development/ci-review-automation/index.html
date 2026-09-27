@@ -15012,18 +15012,37 @@ falls back to reviewing the head on its own. <strong>When it falls back it
 says so in a comment on the pull request</strong>, naming which of the two
 cases it hit. A review of the head is worth having; a reader who
 believes it saw the merge result is not.</p>
+<p>On both paths the workflow then confirms that the tree it checked out
+is the commit it validated -- the merge's second parent on the merge
+path, <code>HEAD</code> itself on the fallback path -- because a push between
+resolving the ref and checking it out moves what the ref reaches. If
+the head moved in that window the run fails rather than reviewing
+code nobody validated, and the requester comments again to review the
+new head.</p>
 <h2 id="security-model">Security Model<a class="headerlink" href="#security-model" title="Permanent link">&para;</a></h2>
 <p>These workflows use <code>issue_comment</code> triggers, which run with
 elevated permissions. Security is enforced through multiple layers:</p>
 <ol>
 <li><strong>Authorization</strong> -- only repository collaborators with write
-   access can trigger commands (enforced by
-   <code>shakenfist/actions/pr-bot-trigger</code>)</li>
-<li><strong>Trusted tools</strong> -- scripts are checked out from the base branch,
-   not the PR, preventing execution of malicious PR code</li>
-<li><strong>No credential persistence</strong> -- <code>persist-credentials: false</code>
-   prevents tokens from being stored in the checkout</li>
-<li><strong>Git hooks disabled</strong> -- the workflows that put a pull request's
+   access can trigger commands, and only on pull requests whose head
+   is in this repository rather than a fork (enforced by
+   <code>shakenfist/actions/pr-bot-trigger</code>, which folds both into its
+   <code>authorized</code> output)</li>
+</ol>
+<p>The work job in <code>pr-re-review.yml</code> and <code>pr-retest.yml</code> then
+   requires the trigger job's <code>same_repo</code> export to be <code>'true'</code> as
+   well as <code>authorized</code>. That is deliberately redundant: callers take
+   the action at <code>@main</code>, so a regression there would otherwise widen
+   what runs next to a write-scoped token without any change in the
+   calling repository. The trigger job also fails if the action stops
+   reporting the outputs it reads, rather than letting the work job
+   skip silently. The <code>ci-review-automation</code> criterion measures both
+   halves of the gate on every adopter.
+2. <strong>Trusted tools</strong> -- scripts are checked out from the base branch,
+   not the PR, preventing execution of malicious PR code
+3. <strong>No credential persistence</strong> -- <code>persist-credentials: false</code>
+   prevents tokens from being stored in the checkout
+4. <strong>Git hooks disabled</strong> -- the workflows that put a pull request's
    code on the runner (<code>pr-re-review.yml</code>, and <code>test-drift-fix.yml</code>
    behind <code>pr-fix-tests.yml</code>) set <code>core.hooksPath=/dev/null</code> on the
    checkout before running anything over it. <code>pr-retest.yml</code> never
@@ -15035,8 +15054,8 @@ elevated permissions. Security is enforced through multiple layers:</p>
    in this repository, but the repositories that copied
    <code>pr-re-review.yml</code> before it existed do not have it, and
    <code>check_ci_review_automation</code> does not yet look for it, so the
-   daily audit will not tell you which ones</li>
-<li><strong>No pre-commit</strong> -- pre-commit hooks execute repository code and
+   daily audit will not tell you which ones
+5. <strong>No pre-commit</strong> -- pre-commit hooks execute repository code and
    are skipped in privileged workflows. <code>test-drift-fix.yml</code> is the
    deliberate exception: fixing test drift means running the pull
    request's own tests, and its prompt asks Claude to run <code>pre-commit
@@ -15044,10 +15063,9 @@ elevated permissions. Security is enforced through multiple layers:</p>
    privileged job. <code>core.hooksPath</code> does not cover that -- it stops
    git-invoked hooks, not an explicit <code>pre-commit run</code>. That workflow
    rests instead on maintainer-only triggering and runner isolation,
-   as its own file header states</li>
-<li><strong>Just-in-time auth</strong> -- <code>gh auth setup-git</code> is used only when
-   pushing, not during the entire workflow</li>
-</ol>
+   as its own file header states
+6. <strong>Just-in-time auth</strong> -- <code>gh auth setup-git</code> is used only when
+   pushing, not during the entire workflow</p>
 <p>See the <a href="https://securitylab.github.com/research/github-actions-preventing-pwn-requests/">GitHub Security Lab article</a>
 for background on <code>issue_comment</code> trigger security.</p>
 <h2 id="workflow-templates">Workflow Templates<a class="headerlink" href="#workflow-templates" title="Permanent link">&para;</a></h2>

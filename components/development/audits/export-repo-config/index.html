@@ -1837,6 +1837,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="What we check">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#measured" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measured
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#required-but-confirmed-by-a-reviewer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required, but confirmed by a reviewer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why
+      
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
@@ -14663,6 +14702,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="What we check">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#measured" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measured
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#required-but-confirmed-by-a-reviewer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required, but confirmed by a reviewer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why
+      
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
@@ -14710,13 +14788,32 @@
 
 <h1 id="audit-exporting-repo-configuration-changes">Audit: Exporting repo configuration changes<a class="headerlink" href="#audit-exporting-repo-configuration-changes" title="Permanent link">&para;</a></h1>
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
+<h3 id="measured">Measured<a class="headerlink" href="#measured" title="Permanent link">&para;</a></h3>
+<p>These are the requirements the check decides a pass or a failure on,
+and the only ones that produce an issue.</p>
 <ul>
 <li><code>.github/workflows/export-repo-config.yml</code> exists.</li>
+<li>No job passes <code>secrets: inherit</code> to <code>export-repo-config.yml</code>.</li>
+</ul>
+<h3 id="required-but-confirmed-by-a-reviewer">Required, but confirmed by a reviewer<a class="headerlink" href="#required-but-confirmed-by-a-reviewer" title="Permanent link">&para;</a></h3>
+<ul>
 <li>The workflow delegates to the shared reusable workflow in
   <code>shakenfist/actions</code> and runs daily at 00:30 UTC.</li>
 <li>The workflow is project-agnostic and can be copied directly with
   no modifications.</li>
 </ul>
+<h2 id="why">Why<a class="headerlink" href="#why" title="Permanent link">&para;</a></h2>
+<p><strong>No <code>secrets: inherit</code>.</strong> The shared workflow declares and reads no
+secrets: it authenticates with <code>github.token</code>, which comes from the
+calling workflow's <code>permissions:</code> block. Inheriting therefore buys
+nothing while putting every secret the repository holds, publishing
+tokens included, within reach of a workflow in another repository
+called at a moving <code>@main</code>. The template passed it until September
+2026, which is how every caller came to, so it is checked rather than
+left to the template. The matcher is the one the <code>ci-review-automation</code>
+criterion uses for <code>pr-auto-review.yml</code>: a quoted or trailing-commented
+<code>inherit</code> is still a finding, a commented-out line is not, and the
+explicit mapping form (naming each secret) is not matched.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>Template: <code>templates/export-repo-config/</code>
 See: <code>templates/export-repo-config/README.md</code></p>
