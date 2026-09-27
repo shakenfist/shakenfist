@@ -2114,8 +2114,30 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
                   {'pattern': '^(?P<x>a)$'})],
                 [('thing', 'body', 'string', 'A thing.', False,
                   {'pattern': '^(?#comment)a$'})],
+                # The Python-only escapes. ECMA-262 has no error for
+                # an unrecognised escape: outside unicode mode it is
+                # the letter itself, so '\\A' there means 'A' and
+                # '\\a' means 'a' where CPython means the start of the
+                # string and a bell. '\\N{NAME}' and '\\U0001F600'
+                # diverge on their first letter the same way. These
+                # were a substring test until the second round of
+                # review on this phase, which is why
+                # '^\\\\Administrator$' is in the accepted list below.
                 [('thing', 'body', 'string', 'A thing.', False,
                   {'pattern': '^\\Aa\\Z$'})],
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '^\\a$'})],
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '^\\N{BULLET}$'})],
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '^\\U0001F600$'})],
+                # A named group, which no spelling satisfies: ECMA-262
+                # writes '(?<name>' and CPython writes '(?P<name>'.
+                # This one is refused by re.compile() rather than by
+                # the group vocabulary, which is pinned below because
+                # the group message used to advertise it as available.
+                [('thing', 'body', 'string', 'A thing.', False,
+                  {'pattern': '^(?<name>a)$'})],
                 [('thing', 'body', 'string', 'A thing.', False,
                   {'pattern': '^(?>a)$'})],
                 [('thing', 'body', 'string', 'A thing.', False,
@@ -2185,7 +2207,26 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
                         '^(?:a|b)$',
                         '^(?=a)a$',
                         '^(?!x)a$',
-                        '^(?<=a)b$'):
+                        '^(?<=a)b$',
+                        # An escaped backslash followed by a letter.
+                        # Both dialects read a literal backslash and
+                        # then the letter; the substring test this
+                        # replaced saw the two characters '\\A' and
+                        # refused the declaration at import time, so
+                        # sf-api would not have started.
+                        '^\\\\Administrator$',
+                        '^\\\\\\\\$',
+                        '^[^\\]]$',
+                        # The escapes both dialects do share: the
+                        # classes, a backreference, and the numeric
+                        # forms. The vocabulary check must not catch
+                        # any of these.
+                        '^\\d{1,3}$',
+                        '^\\w+\\s\\w+$',
+                        '^(a)\\1$',
+                        '^\\x41$',
+                        '^\\u0041$',
+                        '^a\\.b$'):
             with self.subTest(pattern=pattern):
                 out = self._helper([
                     ('thing', 'body', 'string', 'A thing.', False,
@@ -2226,6 +2267,37 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
                                    False, {'pattern': pattern})])
                 self.assertIn('group extension', str(caught.exception))
                 self.assertIn("'%s'" % prefix, str(caught.exception))
+                # The message used to end its list of available forms
+                # with '(?<name>', which is advice nobody can follow:
+                # that spelling does not compile in CPython at all. It
+                # now says so instead of offering it.
+                self.assertNotIn('and (?<name>', str(caught.exception))
+                self.assertIn('available in neither', str(caught.exception))
+
+        for pattern, escape in (('^\\Aa$', '\\A'),
+                                ('^a\\Z$', '\\Z'),
+                                ('^\\a$', '\\a'),
+                                ('^\\N{BULLET}$', '\\N'),
+                                ('^\\U0001F600$', '\\U')):
+            with self.subTest(pattern=pattern):
+                with self.assertRaises(
+                        exceptions.InvalidAPIDeclaration) as caught:
+                    self._helper([('thing', 'body', 'string', 'A thing.',
+                                   False, {'pattern': pattern})])
+                self.assertIn('ECMA-262 does not recognise',
+                              str(caught.exception))
+                # repr() rather than the escape itself: the message
+                # carries %r of it, so the backslash is doubled there.
+                self.assertIn(repr(escape), str(caught.exception))
+
+        # A named group is refused by re.compile() before the scan sees
+        # it, so the interaction between the two checks is pinned here:
+        # a developer who followed the old message's advice got this
+        # refusal and no hint that named groups are simply unavailable.
+        with self.assertRaises(exceptions.InvalidAPIDeclaration) as caught:
+            self._helper([('thing', 'body', 'string', 'A thing.', False,
+                           {'pattern': '^(?<name>a)$'})])
+        self.assertIn('does not compile', str(caught.exception))
 
     def test_new_tokens_render_their_bounds(self):
         # The D9 vocabulary: bounds and formats phase 3 will compile,

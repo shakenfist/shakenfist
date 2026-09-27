@@ -37,13 +37,13 @@
 #   bash tools/mutate-nested-sweep.sh
 #
 # Run it from the root of a clean-ish worktree. Your own uncommitted
-# work is safe: the six files it touches -- the vocabulary, the
-# compiler, the handler and the three sweeps -- are restored from a copy
+# work is safe: the seven files it touches -- the vocabulary, the
+# compiler, two handlers and the three sweeps -- are restored from a copy
 # taken before the first mutation, never with `git checkout`, because a
 # directory-wide checkout discards uncommitted work in that directory
 # and is painful to notice afterwards.
 #
-# What is *not* safe is a concurrent edit to one of those six files by
+# What is *not* safe is a concurrent edit to one of those seven files by
 # somebody else while this runs: restore() copies the whole file back
 # from the snapshot, so an edit made in between is silently reverted.
 # Do not run this in a worktree another agent is editing.
@@ -57,8 +57,9 @@ HANDLER="shakenfist/external_api/instance.py"
 SWEEP="shakenfist/tests/external_api/test_nested_sweep.py"
 BOOLSWEEP="shakenfist/tests/external_api/test_boolean_sweep.py"
 DECLARATIONS="shakenfist/tests/external_api/test_parameter_declarations.py"
+ARTIFACT="shakenfist/external_api/artifact.py"
 FILES=("$BASE" "$VALIDATION" "$HANDLER" "$SWEEP" "$BOOLSWEEP" \
-       "$DECLARATIONS")
+       "$DECLARATIONS" "$ARTIFACT")
 
 if [ ! -x "$PYTHON" ]; then
     echo "No $PYTHON. Run tox once to build the test environment." >&2
@@ -370,7 +371,7 @@ run "float is read truthily again (review item 2)"
 mutate "${HANDLER}" \
     "        if validation.declared_boolean(netdesc.get('float')):" \
     "        if netdesc.get('float'):" || exit 1
-check "declared_boolean" "test_a_falsy_float_spelling_does_not_float"
+check "float call site" "test_a_falsy_float_spelling_does_not_float"
 
 # ---------------------------------------------------------------------
 # 13. _diskspec_value_absent stops reading util_general.noneish, so a
@@ -445,7 +446,13 @@ mutate "${VALIDATION}" \
             return True
     return bool(value)" \
     "    return bool(value)" || exit 1
-check "declared_boolean" "rather than" test_boolean_sweep
+# Named by test rather than by a fragment of the assertion message:
+# "rather than" is ordinary English and appears in docstrings, comments
+# and unrelated assertions throughout the suite, which is exactly the
+# "signs off a failure it did not cause" hazard check's own comment
+# warns about.
+check "declared_boolean reading" \
+    "test_every_reading_agrees_with_the_declaration" test_boolean_sweep
 
 # ---------------------------------------------------------------------
 # 18. The boolean sweep's derived enumeration, which is the guard that
@@ -458,6 +465,45 @@ mutate "${BOOLSWEEP}" \
     "    ('NetworksEndpoint', 'post', 'provide_dns'): {" \
     "    ('NetworksEndpoint', 'post', 'wombat'): {" || exit 1
 check "derived boolean enumeration" "nothing here measures how" \
+    test_boolean_sweep
+
+# ---------------------------------------------------------------------
+# 19. The escape vocabulary, which replaced a substring test for '\A'
+#     and '\Z' in the second round of review. The substring test both
+#     missed nothing it claimed and refused '^\\\\Administrator$',
+#     where the two characters appear without being the anchor.
+# ---------------------------------------------------------------------
+run "the Python-only escapes are no longer refused"
+mutate "${BASE}" \
+    "                if (character.isalpha()" \
+    "                if (False and character.isalpha()" || exit 1
+check "escape vocabulary" \
+    "test_a_refused_pattern_names_the_right_construct" \
+    test_parameter_declarations
+
+# ---------------------------------------------------------------------
+# 20. The boolean sweep's descent into the structured schemas, which is
+#     what makes network[].float -- the one member of the class already
+#     known to have failed -- visible to the enumeration at all.
+# ---------------------------------------------------------------------
+run "the boolean enumeration stops descending into netdescs"
+mutate "${BOOLSWEEP}" \
+    "                for prop in _nested_booleans(dec.argtype):" \
+    "                for prop in []:" || exit 1
+check "nested boolean descent" "no longer exists" test_boolean_sweep
+
+# ---------------------------------------------------------------------
+# 21. The positive control on the three deliberate-refusal rows. Without
+#     it a row asserting that string spellings are refused passes just
+#     as well against a route which refuses every spelling, which is the
+#     shape the anti-vacuity gate was covering for the other rows and
+#     never covered for these.
+# ---------------------------------------------------------------------
+run "a delete-all route refuses a JSON true as well"
+mutate "${ARTIFACT}" \
+    "        if confirm is not True:" \
+    "        if confirm is not None:" || exit 1
+check "refusal positive control" "from a route which refuses everything" \
     test_boolean_sweep
 
 echo

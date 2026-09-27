@@ -306,9 +306,13 @@ of the following keys:
   [the networkspec reference](/developer_guide/api_reference/instances/#networkspec)
   for more detail.
 * _float_ if true indicates to immediately float the interface once the instance
-  is created. Only the literal `true` or `True` are read as true by this
-  command's own parsing; every other spelling, including `yes`, `on`, `1`
-  and `TRUE`, is silently read as false before it ever reaches the API. The
+  is created. `sf-client`'s own parsing of this flag currently recognises
+  fewer spellings than the API does
+  ([client-python#401](https://github.com/shakenfist/client-python/issues/401)),
+  so a spelling the API would accept can be read as false before the request
+  is sent — at the time of writing only the literal `true` or `True` survive
+  it. That is a claim about a different repository, which nothing here can
+  keep true; the advice below is what does not change. The
   API itself accepts a wider range of string spellings (see
   [the networkspec reference](/developer_guide/api_reference/instances/#networkspec)),
   so sending a real JSON boolean is the only form free of this kind of

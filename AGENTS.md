@@ -123,7 +123,11 @@ metrics. The headlines:
 - **Request validation is check-only, so a handler reads the raw body.**
   A declared `boolean` must be read with
   `validation.declared_boolean()`: `if flag:` calls the string `"false"`
-  true, which is the opposite of what the published schema promises. See
+  true, which is the opposite of what the published schema promises. Not
+  where the handler has to tell an omitted parameter from an explicit
+  false — three network-create parameters do, and it would take DHCP and
+  NAT away from every caller who did not mention them. The exceptions are
+  enumerated in
   [docs/developer_guide/writing_an_endpoint.md](docs/developer_guide/writing_an_endpoint.md).
 
 - **Events and logs are different channels.** An event is a durable,

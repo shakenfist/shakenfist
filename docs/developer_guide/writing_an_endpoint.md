@@ -519,9 +519,11 @@ which is worse than not declaring the parameter at all.
 `declared_boolean()` is keyed on marshmallow's own sets, so the
 spelling the schema accepts and the meaning the handler reads cannot
 drift. `shakenfist/tests/external_api/test_boolean_sweep.py` enumerates
-every `boolean` declaration in the API from the source and sends each
-one both spellings of both values, so a new one fails CI until it has
-an entry in `BOOLEAN_READS` whose measured verdict holds. Note what
+every `boolean` in the API from the source — the parameter declarations
+and the boolean *properties* of the structured ones, which is where
+`float` lives — and sends each one both spellings of both values, so a
+new one fails CI until it has an entry in `BOOLEAN_READS` whose measured
+verdict holds. Note what
 that requires and what it does not: the test measures the reading, not
 the mechanism, so there are three ways an entry passes. Most are routed
 through `declared_boolean()` in the handler. Three — `provide_dhcp`,

@@ -23,11 +23,11 @@ The phase 7 review found one member of the class (``float`` on a
 netdesc) and fixed that one member. The audit then found three more in
 twenty minutes by hand, which is the evidence that a reviewer's eye is
 the wrong instrument: the class is *not* uniform, so there is nothing to
-pattern-match on. Of the nineteen declared booleans, three arrive
-through a ``@use_kwargs`` schema and are deserialised before the handler
-sees them, three are coerced somewhere downstream, and three are read
-with ``is not True`` and fail closed. Only a differential measurement
-can tell those apart from the ones that are simply wrong.
+pattern-match on. Of the nineteen top-level declared booleans, three
+arrive through a ``@use_kwargs`` schema and are deserialised before the
+handler sees them, three are coerced somewhere downstream, and three are
+read with ``is not True`` and fail closed. Only a differential
+measurement can tell those apart from the ones that are simply wrong.
 
 So this file is derived and differential:
 
@@ -35,9 +35,15 @@ So this file is derived and differential:
   ``declarations.handlers()`` -- the same enumeration
   ``test_required_sweep.required_declarations()`` and the published
   specification are built from -- and reports every parameter declared
-  ``boolean``. ``test_every_declared_boolean_has_a_reading`` fails if one
-  has no entry in ``BOOLEAN_READS``. A twentieth boolean cannot join the
-  class silently: it fails CI until somebody has measured it.
+  ``boolean``, *and* every boolean property of a structured one, read out
+  of ``api_base.ARGTYPES``. That second half arrived in the second round
+  of review, which pointed out that filtering on the top-level argtype
+  made ``network[].float`` invisible here -- so the one member of the
+  class already known to have failed was the one member this enumeration
+  could not see. ``test_every_declared_boolean_has_a_reading`` fails if a
+  boolean has no entry in ``BOOLEAN_READS``, and if an entry names a
+  declaration which no longer exists. A twenty-second boolean cannot join
+  the class silently: it fails CI until somebody has measured it.
 * **Differential.** Each entry names a request and one *observable*: an
   argument the handler passes on, a key of the response, or the status
   code. Every parameter is sent four times -- the JSON boolean and a
@@ -76,11 +82,13 @@ validation layer answers 200 for all four requests and the handler's
 reading is what is left to measure.
 """
 
+import copy
 import importlib
 import json
 from unittest import mock
 
 from shakenfist.config import config
+from shakenfist.external_api import base as api_base
 from shakenfist.external_api import declarations
 from shakenfist.tests.external_api.test_required_sweep import (
     SweepFixtureTestCase)
@@ -99,10 +107,16 @@ from shakenfist.tests.external_api.test_required_sweep import (
 # ``returns`` gives it a canned answer, ``wraps`` makes it delegate to
 # the real implementation so the rest of the handler still works.
 #
+# A key's third element is the parameter name, and ``parent.property``
+# names a boolean *property* of a structured parameter -- the sweep
+# writes it into the parent the entry's body already carries, at element
+# zero if that parent is an array.
+#
 # ``read`` says what to observe. ``kwarg:<name>`` reads one keyword
-# argument of the spy's recorded call, ``body:<key>`` reads a key of the
-# JSON response, ``body`` reads the whole response document, and
-# ``status`` the status code.
+# argument of the spy's recorded call, ``called`` reads whether the spy
+# was called at all, ``body:<key>`` reads a key of the JSON response,
+# ``body`` reads the whole response document, and ``status`` the status
+# code.
 #
 # ``verdict`` is ``agrees`` -- the string spelling must mean what the
 # schema says it means -- or ``refuses_strings``, which requires a 4xx
@@ -193,6 +207,37 @@ BOOLEAN_READS = {
                  'disk': [{'size': 8}], 'uefi': True},
         'spy': {'target': 'shakenfist.instance.Instance.new', 'wraps': True},
         'read': 'kwarg:secure_boot',
+        'verdict': 'agrees',
+    },
+
+    # `float`, inside a netdesc, on both routes which take one. This is
+    # the member of the class phase 7's review found by eye, and it is
+    # here because the enumeration above now descends into the
+    # structured schemas -- before that it was the one shape already
+    # known to have failed and the one shape this file could not see.
+    # `assign_floating_ip` is spied rather than run: whether it was
+    # called *is* the reading, and the real one needs a floating network
+    # the fixture does not have. The create route answers 507 at
+    # placement, after the netdesc is allocated, which is why the
+    # observable is the call and not the response.
+    ('InstancesEndpoint', 'post', 'network.float'): {
+        'method': 'post',
+        'url': '/instances',
+        'body': {'name': 'boolsweep{unique}', 'cpus': 1, 'memory': 1024,
+                 'disk': [{'size': 8}],
+                 'network': [{'network_uuid': '{network}'}]},
+        'spy': {'target': 'shakenfist.external_api.util.assign_floating_ip',
+                'returns': None},
+        'read': 'called',
+        'verdict': 'agrees',
+    },
+    ('InstanceInterfacesEndpoint', 'post', 'network.float'): {
+        'method': 'post',
+        'url': '/instances/{instance}/interfaces',
+        'body': {'network': {'network_uuid': '{network}'}},
+        'spy': {'target': 'shakenfist.external_api.util.assign_floating_ip',
+                'returns': None},
+        'read': 'called',
         'verdict': 'agrees',
     },
 
@@ -346,8 +391,33 @@ QUERY_SPELLINGS = (
 )
 
 
+def _nested_booleans(argtype):
+    """The boolean properties inside a structured declaration's schema.
+
+    A parameter declared ``networkspec`` or ``arrayofnetworkspec`` does
+    not publish a boolean, but the object it publishes has one --
+    ``float`` -- and that is where the defect this whole file exists to
+    close actually lived. Read out of ``api_base.ARGTYPES``, which is
+    the same rendering the published specification and the compiled
+    validator are built from, so a boolean property cannot be in one and
+    not the other.
+    """
+    spec = api_base.ARGTYPES.get(argtype)
+    if not isinstance(spec, dict):
+        return []
+    properties = spec.get('properties')
+    if properties is None:
+        items = spec.get('items')
+        properties = items.get('properties') if isinstance(items, dict) else None
+    if not isinstance(properties, dict):
+        return []
+    return sorted(
+        key for key, value in properties.items()
+        if isinstance(value, dict) and value.get('type') == 'boolean')
+
+
 def boolean_declarations():
-    """Every parameter the API declares ``boolean``.
+    """Every boolean the API declares, nested ones included.
 
     Returns sorted ``(class, method, name)`` tuples, read through
     ``declarations.declarations()`` so this enumeration, the published
@@ -355,6 +425,13 @@ def boolean_declarations():
     declarations the same way. A declaration which cannot be read
     statically is a loud failure rather than a silent omission, for the
     reason ``test_required_sweep.required_declarations()`` gives.
+
+    A boolean *property* of a structured parameter is reported as
+    ``parameter.property``. Filtering on ``argtype == 'boolean'`` alone
+    would have missed ``network[].float``, which is the member of the
+    class phase 7's review found by eye -- so the one shape already
+    known to fail would have been the one shape this enumeration could
+    not see. Added by the second round of review on phase 8.
     """
     rows = []
     unreadable = []
@@ -364,6 +441,9 @@ def boolean_declarations():
                 unreadable.append('%s.%s' % (cls.name, fn.name))
                 continue
             if dec.argtype != 'boolean':
+                for prop in _nested_booleans(dec.argtype):
+                    rows.append(
+                        (cls.name, fn.name, '%s.%s' % (dec.name, prop)))
                 continue
             rows.append((cls.name, fn.name, dec.name))
     if unreadable:
@@ -419,15 +499,65 @@ class BooleanSweepTestCase(SweepFixtureTestCase):
         agentop_from_db.start()
         self.addCleanup(agentop_from_db.stop)
 
+    def _refusal(self, key, entry, spellings, failures):
+        """Check a row whose verdict is a deliberate string refusal.
+
+        These three rows do not get the anti-vacuity gate the rest do.
+        That gate compares the two JSON booleans, and this verdict never
+        looks at the falsy one -- so it was asserting nothing here while
+        still sending the JSON ``true`` which runs the real delete-all.
+        The positive control is what the verdict actually needs: the
+        spelling the schema says means true has to be *accepted*, or a
+        row claiming that strings are refused would pass just as well
+        against a route which refused everything. One request each, and
+        every one of them asserted. Added by the second round of review
+        on phase 8.
+        """
+        cls, method, name = key
+        accepted = self._observe(entry, name, True)
+        if 400 <= accepted < 500:
+            failures.append(
+                '%s.%s %s: a JSON true answered %r, so this row cannot '
+                'tell a deliberate string refusal (%s) from a route which '
+                'refuses everything'
+                % (cls, method, name, accepted, entry['why']))
+            return
+        for _, spelling in spellings:
+            observed = self._observe(entry, name, spelling)
+            if not (400 <= observed < 500):
+                failures.append(
+                    '%s.%s %s: declared a deliberate string refusal (%s) '
+                    'but %r answered %r'
+                    % (cls, method, name, entry['why'], spelling, observed))
+
     def _observe(self, entry, name, value):
-        """Send one request with ``name`` set to ``value``, and read it."""
+        """Send one request with ``name`` set to ``value``, and read it.
+
+        ``deepcopy`` rather than ``dict()``: a nested name writes into a
+        structure inside the body, and a shallow copy would leave that
+        write in the table for every later request.
+        """
         recipe = {
             'url': entry['url'],
-            'body': dict(entry.get('body', {})) if 'body' in entry else None,
-            'query': dict(entry.get('query', {})) if 'query' in entry else {},
+            'body': (copy.deepcopy(entry.get('body', {}))
+                     if 'body' in entry else None),
+            'query': (copy.deepcopy(entry.get('query', {}))
+                      if 'query' in entry else {}),
         }
         if recipe['body'] is not None:
-            recipe['body'][name] = value
+            if '.' in name:
+                parent, prop = name.split('.', 1)
+                target = recipe['body'].get(parent)
+                if isinstance(target, list):
+                    target = target[0] if target else None
+                if not isinstance(target, dict):
+                    raise AssertionError(
+                        '%r names a property of %r, but this entry\'s body '
+                        'carries no %r object to write it into'
+                        % (name, parent, parent))
+                target[prop] = value
+            else:
+                recipe['body'][name] = value
         else:
             recipe.pop('body')
         if 'query' in entry:
@@ -442,8 +572,9 @@ class BooleanSweepTestCase(SweepFixtureTestCase):
         spec = entry.get('spy')
         if spec:
             if spec.get('wraps'):
-                patcher = mock.patch(spec['target'],
-                                     wraps=_resolve(spec['target']))
+                patcher = mock.patch(
+                    spec['target'],
+                    wraps=_import_attribute(spec['target']))
             else:
                 patcher = mock.patch(spec['target'],
                                      return_value=spec['returns'])
@@ -458,7 +589,17 @@ class BooleanSweepTestCase(SweepFixtureTestCase):
         read = entry['read']
         if read == 'status':
             return status
-        if read.startswith('kwarg:'):
+        if read in ('called',) or read.startswith('kwarg:'):
+            # A reading which needs a spy and has not got one is a
+            # named failure rather than an AttributeError from inside
+            # this helper -- the same argument the rest of this suite
+            # makes about a confident wrong answer versus an absence.
+            if spy is None:
+                raise AssertionError(
+                    'the entry for %r reads %r, which needs a spy, but '
+                    'declares none' % (name, read))
+            if read == 'called':
+                return bool(spy.call_args_list)
             if not spy.call_args_list:
                 return ('not called', status)
             return spy.call_args_list[-1].kwargs.get(
@@ -518,6 +659,11 @@ class BooleanSweepTestCase(SweepFixtureTestCase):
             cls, method, name = key
             entry = BOOLEAN_READS[key]
             spellings = QUERY_SPELLINGS if 'query' in entry else SPELLINGS
+
+            if entry['verdict'] == 'refuses_strings':
+                self._refusal(key, entry, spellings, failures)
+                continue
+
             observed = {}
             for literal, spelling in spellings:
                 observed[literal] = self._observe(entry, name, literal)
@@ -534,16 +680,6 @@ class BooleanSweepTestCase(SweepFixtureTestCase):
                                  observed[True]))
                 continue
 
-            if entry['verdict'] == 'refuses_strings':
-                for _, spelling in spellings:
-                    if not (400 <= observed[spelling] < 500):
-                        failures.append(
-                            '%s.%s %s: declared a deliberate string '
-                            'refusal (%s) but %r answered %r'
-                            % (cls, method, name, entry['why'], spelling,
-                               observed[spelling]))
-                continue
-
             for literal, spelling in spellings:
                 if observed[spelling] != observed[literal]:
                     failures.append(
@@ -557,11 +693,15 @@ class BooleanSweepTestCase(SweepFixtureTestCase):
         self.assertEqual([], failures, '\n'.join([''] + failures))
 
 
-def _resolve(dotted):
+def _import_attribute(dotted):
     """Return the object a dotted path names, importing as needed.
 
     ``mock.patch`` does this itself but does not hand the original
     back, and a ``wraps`` spy needs the original to delegate to.
+
+    Not ``_resolve``: ``SweepFixtureTestCase`` already has a
+    ``self._resolve`` which substitutes fixture uuids into a recipe, and
+    ``_observe`` uses both within a dozen lines.
     """
     parts = dotted.split('.')
     for split in range(len(parts) - 1, 0, -1):

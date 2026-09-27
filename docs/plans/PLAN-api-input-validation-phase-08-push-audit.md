@@ -2998,6 +2998,34 @@ refused by default. `tools/mutate-nested-sweep.sh` grew a test filter
 argument and four mutations for the new checks and for the boolean
 sweep's own two derived guards.
 
+**Also as of 2026-09-27**, the second round of review raised three `fix`
+items and all three were real. Two were in the round-1 work: the
+Python-only *escape* check was left as the substring test the new group
+check had just been written to replace, so `^\\Administrator$` -- a
+literal backslash followed by `Administrator`, read identically by both
+dialects -- was refused at import time because the two characters `\A`
+appear in it; and the group message advertised `(?<name>` as an available
+form, which is advice nobody can follow, because CPython spells a named
+group `(?P<name>` and so refuses that pattern three checks earlier. The
+escapes are now folded into the single scan and checked against
+ECMA-262's escape vocabulary, which also catches `\a`, `\N{NAME}` and
+`\U0001F600`: an unrecognised escape is not an error in ECMA-262, it is
+the letter itself, so each of these means something different to the two
+consumers rather than being refused by one of them.
+
+The third item was the more interesting one, and it was about the audit's
+own fix rather than about the round-1 work. `boolean_declarations()`
+filtered on the top-level argtype, so the boolean *properties* of the
+structured schemas were invisible to it -- and the only one in tree is
+`network[].float`, which is the member of this class phase 7's review
+found by eye and the reason the audit went looking for the rest. The
+enumeration which exists to stop a boolean joining the class quietly
+could not see the one shape already known to have failed. It now descends
+into `api_base.ARGTYPES`, and the two `network[].float` declarations
+carry rows of their own; mutating the `float` call site is caught by the
+sweep on both routes and in both row orders, where before it was caught
+only by `test_nested_sweep.py`.
+
 ### The survey findings
 
 | # | Disposition |
@@ -3378,11 +3406,12 @@ checked against the tree rather than recalled.
     `flake8`, `cover`) passes with no failures, including the new
     `test_boolean_sweep.py` and the four new mode-crossing guard
     classes. `bash tools/mutate-nested-sweep.sh` reported 19 mutations,
-    0 survivors when this was written; it now reports 25, which is two
-    the rebase onto develop brought in with the #4248 fix and four added
-    by the first round of review (see the 2026-09-27 note under
-    *Dispositions*). The count is recorded rather than fixed because the
-    number is only useful alongside the date it was measured.
+    0 survivors when this was written; it now reports 28, which is two
+    the rebase onto develop brought in with the #4248 fix, four added by
+    the first round of review and three by the second (see the
+    2026-09-27 notes under *Dispositions*). The count is recorded rather
+    than fixed because the number is only useful alongside the date it
+    was measured.
 12. **Not applicable, and deliberately so.** The item is conditional on
     the audit finding nothing blocking. It found four. *The audit's
     result* above says what they were and what they mean about the plan

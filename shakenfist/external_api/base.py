@@ -485,6 +485,16 @@ def _timing_seconds(name, value, maximum=None):
 # invisible to callers for years.
 CONSTRAINT_KEYS = frozenset(['minimum', 'maximum', 'pattern'])
 
+# The letters ECMA-262 recognises after a backslash in a pattern: the
+# assertions and classes (b, B, d, D, s, S, w, W), the control escapes
+# (f, n, r, t, v), the numeric and unicode forms (x, u, c) and the
+# named-group and unicode-property forms (k, p, P). A digit is a
+# backreference and any punctuation character is an identity escape,
+# both of which mean the same thing in CPython, so neither is checked.
+# Used by _validated_constraints() -- see the comment there for why
+# this is a vocabulary rather than a list of Python-only spellings.
+ECMA_262_ESCAPE_LETTERS = frozenset('bBdDsSwWfnrtvxuckpP')
+
 
 # The three structured specs the instance API publishes: a diskspec, a
 # networkspec and a videospec (decision D39 of
@@ -986,20 +996,14 @@ def _validated_constraints(section: str, name: str,
         # in somebody else's toolchain. Note also that JSON Schema
         # pattern is an unanchored partial match, so a pattern which
         # means to match the whole value needs ^...$ as macaddr does.
-        #
-        # Only the two Python-only *escapes* are matched as tokens
-        # here. The Python-only group extensions are refused by the
-        # scan below instead, which knows what it is looking at: a
-        # token list of them drifted twice, missing '(?>' and the
-        # conditional '(?(1)...)' entirely, and a substring test for
-        # '[]' cannot tell the empty class in '[]a]' from the escaped
-        # one in '[\\[]]'.
-        dialect = [c for c in ('\\A', '\\Z') if c in pattern]
-        if dialect:
-            raise exceptions.InvalidAPIDeclaration(
-                '%s parameter %s declares a pattern using the Python only '
-                'construct(s) %s; OpenAPI patterns are ECMA-262'
-                % (section, name, ', '.join(dialect)))
+        # Which constructs those are is decided by the scan below,
+        # which knows where in the pattern it is: every attempt to
+        # answer it with a list of substrings has been wrong, in both
+        # directions. The list missed '(?>', the conditional
+        # '(?(1)...)' and the scoped flags '(?i:a)', and it refused
+        # '^\\\\Administrator$' -- a literal backslash followed by
+        # 'Administrator' -- because the two characters '\\A' appear in
+        # it without being the Python-only anchor.
         # Anchoring is where the consumers genuinely disagree: JSON
         # Schema pattern is an unanchored search, while the compiled
         # validator requires the pattern to consume the whole value
@@ -1036,14 +1040,37 @@ def _validated_constraints(section: str, name: str,
         # test ever had; nothing in tree declares such a pattern yet,
         # so the defect was latent.
         #
-        # The remaining two are dialect divergences, refused for the
-        # reason the '\A'/'\Z' check above gives rather than blessed or
-        # mis-blamed on the alternation: a ']' in a class's first
-        # position, and a group extension ECMA-262 does not have.
+        # The remaining three are dialect divergences -- an escape, a
+        # ']' in a class's first position, and a group extension --
+        # each refused by naming the divergence rather than blessed or
+        # mis-blamed on the alternation.
         depth, escaped, in_class, class_start = 0, False, False, False
         for index, character in enumerate(pattern):
             was_class_start, class_start = class_start, False
             if escaped:
+                # An escaped letter ECMA-262 does not recognise. It has
+                # no error for one: outside unicode mode an unknown
+                # escape is an *identity* escape, so ECMA-262 reads
+                # '\\A' as the letter 'A' where CPython reads the start
+                # of the string, and '\\a' as 'a' where CPython reads a
+                # bell. Checked as ECMA-262's vocabulary rather than as
+                # a list of Python spellings, for the same reason the
+                # group check below is: of the letters CPython accepts
+                # here (abdfnrstvwABDSWZ) exactly 'a', 'A' and 'Z'
+                # diverge today, and '\\N{NAME}' and '\\U0001F600'
+                # diverge on their first letter too. A digit is a
+                # backreference and a punctuation character an identity
+                # escape in both dialects, so only letters are checked.
+                if (character.isalpha()
+                        and character not in ECMA_262_ESCAPE_LETTERS):
+                    raise exceptions.InvalidAPIDeclaration(
+                        '%s parameter %s declares a pattern using the '
+                        'escape %r, which ECMA-262 does not recognise: %r. '
+                        'An unrecognised escape is not an error there, it '
+                        'is the letter itself, so the two consumers read '
+                        'this pattern differently rather than one of them '
+                        'refusing it'
+                        % (section, name, '\\' + character, pattern))
                 escaped = False
             elif character == '\\':
                 escaped = True
@@ -1092,7 +1119,10 @@ def _validated_constraints(section: str, name: str,
                             '%s parameter %s declares a pattern using the '
                             'group extension %r, which ECMA-262 does not '
                             'have: %r. ECMA-262 has only (?:, (?=, (?!, '
-                            '(?<=, (?<! and (?<name>'
+                            '(?<= and (?<!. A named group is available in '
+                            'neither, because ECMA-262 spells it (?<name> '
+                            'and CPython spells it (?P<name>, so no '
+                            'spelling compiles for both consumers'
                             % (section, name, pattern[index:index + 3],
                                pattern))
             elif character == ')':
