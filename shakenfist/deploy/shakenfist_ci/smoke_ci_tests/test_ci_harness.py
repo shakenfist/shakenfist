@@ -17,6 +17,8 @@ hunting vacuous tests all walked past it. So the guard belongs here,
 where there is an API to be wrong about.
 """
 
+import os
+
 import testtools
 
 from shakenfist_ci import base
@@ -217,3 +219,24 @@ class TestNamespaceHelpers(base.BaseTestCase):
             'A namespaced test ran to completion and left its namespace '
             '%s behind. Every functional run leaks one when this fails, '
             'and on a long-lived cluster they never go away.' % namespace)
+
+
+class TestCapacityWaitTrace(base.BaseTestCase):
+    def test_the_trace_exists_even_when_nothing_waited(self):
+        """An empty trace file is a real observation; an absent one is not.
+
+        A run in which no create was ever refused used to leave no
+        instance-waits.jsonl at all, which is also what a component ref
+        predating the wrapper and a run whose writes all failed leave
+        behind -- so 92% of the first measurement window read as unknown
+        (issue 4337). setUp() now touches the file into existence, and
+        this is the assertion in the one place it can mean anything: on
+        a real cluster node, against the real path the bundle collects.
+        Our own setUp() has run by the time this executes, so the file
+        must exist whether or not any test in this run waited.
+        """
+        self.assertTrue(
+            os.path.exists(base.CAPACITY_WAIT_TRACE_FILE),
+            'The capacity wait trace was not created at start-up, so a '
+            'run with no waits leaves no file and its zero reads as '
+            'unknown to every consumer of the bundle.')
