@@ -20,7 +20,6 @@
 import json
 from unittest import mock
 
-from shakenfist.config import config
 from shakenfist.external_api import app as external_api
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
@@ -94,12 +93,7 @@ class BlobDataBoundsWarnTestCase(BlobDataBoundsTestCase):
 
     def setUp(self):
         super().setUp()
-        self.saved_mode = config.API_VALIDATION_MODE
-        config.API_VALIDATION_MODE = self.mode
-        self.addCleanup(self._restore_mode)
-
-    def _restore_mode(self):
-        config.API_VALIDATION_MODE = self.saved_mode
+        self.set_validation_mode(self.mode)
 
     def test_a_negative_offset_is_refused(self):
         resp = self._get('offset=-1')

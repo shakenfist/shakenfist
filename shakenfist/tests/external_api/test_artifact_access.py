@@ -27,7 +27,6 @@ from unittest import mock
 
 from shakenfist import mariadb
 from shakenfist.artifact import Artifact
-from shakenfist.config import config
 from shakenfist.external_api import app as external_api
 from shakenfist.namespace import Namespace
 from shakenfist.namespace_key import NamespaceKey
@@ -621,12 +620,7 @@ class ArtifactMaxVersionsTestCase(ArtifactAccessFixture):
 
     def setUp(self):
         super().setUp()
-        self.saved_mode = config.API_VALIDATION_MODE
-        config.API_VALIDATION_MODE = self.mode
-        self.addCleanup(self._restore_mode)
-
-    def _restore_mode(self):
-        config.API_VALIDATION_MODE = self.saved_mode
+        self.set_validation_mode(self.mode)
 
     def _post(self, max_versions):
         return self.client.post(

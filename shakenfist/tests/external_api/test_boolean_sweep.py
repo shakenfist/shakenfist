@@ -334,10 +334,20 @@ BOOLEAN_READS = {
     # schema says it is a valid boolean meaning True. Kept: a rollback
     # of this one would widen a destructive route, and the divergence
     # is in the direction of refusing.
+    #
+    # Each spies the per-object destructive call rather than running it,
+    # the way the `clean_wait` row spies `_delete_network`. The verdict's
+    # positive control has to send a JSON `true`, which is the spelling
+    # that actually deletes, so without a spy these rows would run three
+    # real delete-alls against the shared fixture and leave every later
+    # row's observable dependent on which of them ran first. `scratch`
+    # holds nothing today; this is what keeps that from mattering.
     ('ArtifactsEndpoint', 'delete', 'confirm'): {
         'method': 'delete',
         'url': '/artifacts',
         'body': {'namespace': 'scratch'},
+        'spy': {'target': 'shakenfist.artifact.Artifact.delete',
+                'returns': None},
         'read': 'status',
         'verdict': 'refuses_strings',
         'why': ('read with `if confirm is not True`, so a string spelling '
@@ -348,6 +358,8 @@ BOOLEAN_READS = {
         'method': 'delete',
         'url': '/instances',
         'body': {'namespace': 'scratch'},
+        'spy': {'target': 'shakenfist.instance.Instance.enqueue_delete',
+                'returns': None},
         'read': 'status',
         'verdict': 'refuses_strings',
         'why': ('read with `if confirm is not True`, so a string spelling '
@@ -358,6 +370,8 @@ BOOLEAN_READS = {
         'method': 'delete',
         'url': '/networks',
         'body': {'namespace': 'scratch'},
+        'spy': {'target': 'shakenfist.external_api.network._delete_network',
+                'returns': (None, 'network_delete', 'op-uuid')},
         'read': 'status',
         'verdict': 'refuses_strings',
         'why': ('read with `if confirm is not True`, so a string spelling '
@@ -504,8 +518,11 @@ class BooleanSweepTestCase(SweepFixtureTestCase):
 
         These three rows do not get the anti-vacuity gate the rest do.
         That gate compares the two JSON booleans, and this verdict never
-        looks at the falsy one -- so it was asserting nothing here while
-        still sending the JSON ``true`` which runs the real delete-all.
+        looks at the falsy one -- so it was asserting nothing here.
+        Sending the JSON ``true`` is unavoidable, because that is the
+        spelling which has to be accepted; each of these rows therefore
+        spies its per-object delete, so the control exercises the
+        handler's confirm arm without consuming the shared fixture.
         The positive control is what the verdict actually needs: the
         spelling the schema says means true has to be *accepted*, or a
         row claiming that strings are refused would pass just as well

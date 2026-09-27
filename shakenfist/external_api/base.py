@@ -1113,6 +1113,15 @@ def _validated_constraints(section: str, name: str,
                     # generator. Checked as a vocabulary rather than as a
                     # list of Python spellings so a new CPython extension
                     # is refused by default.
+                    #
+                    # '<' is accepted for the two lookbehinds, which also
+                    # lets ECMA-262's '(?<name>' past this check. That
+                    # spelling is refused a few lines above instead, by
+                    # the re.compile() CPython cannot do it with -- an
+                    # ordering this check depends on, pinned by
+                    # test_a_refused_pattern_names_the_right_construct.
+                    # Moving the compile step after this scan means
+                    # narrowing '<' to '<=' and '<!' here.
                     if pattern[index + 2:index + 3] not in (':', '=', '!',
                                                             '<'):
                         raise exceptions.InvalidAPIDeclaration(

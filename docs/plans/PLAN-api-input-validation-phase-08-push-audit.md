@@ -91,7 +91,10 @@ take the SHA from the first-parent range after the merge. Done:
 This is the second time in two phases. #4222 existed solely to fill in
 phase 6's blank cell after the fact. A cell that can only be filled after
 merge will be blank at merge every time, so the closing task belongs to
-whoever merges rather than to the phase -- noted in Future work.
+whoever merges rather than to the phase -- noted in Future work, which
+records that the point was afterwards settled the other way: the close-out
+belongs to the first commit of the next phase, and this phase's own cell
+stays blank permanently.
 
 ### F3. The plan's footprint is twelve merges, not eleven
 
@@ -1117,8 +1120,9 @@ not because anything went wrong.
 #### 1. `pre-commit run --all-files` and `tox`
 
 Both were run to completion (not asserted) against the tree as it stands, per
-decision 2. Full output saved at
-`scratchpad/audit/precommit.log` and `scratchpad/audit/tox.log`.
+decision 2. Full output went to the session scratchpad, which is not
+committed; the material results are quoted inline below, so nothing here
+depends on a file a later reader cannot open.
 
 **`pre-commit run --all-files`** — all eleven hooks passed, exit 0:
 
@@ -3026,6 +3030,58 @@ carry rows of their own; mutating the `float` call site is caught by the
 sweep on both routes and in both row orders, where before it was caught
 only by `test_nested_sweep.py`.
 
+**As of 2026-09-28**, the third round of review raised two `fix` items
+and no item at all about the pattern scanner beyond two `none`
+observations, which is why the third round was asked for. Both fixes were
+documentation, and the first was this audit's own characteristic defect
+turned on the audit: the note under the master plan's Execution table
+still said that whoever merges phase 8 fills in its `Merged` cell, and
+cited this plan's Future work as the authority for it -- while that
+Future work says the opposite, that the merger is the wrong owner and
+nobody fills the cell in later. One place was updated to a new decision
+and another place relying on it was not, which is finding F5's shape
+exactly. The master plan's note now states the settled rule. This plan's
+own F2 finding is left as it was written, because a plan records what a
+phase said at the time; only its forward reference is repaired, so it no
+longer claims that Future work agrees with it.
+
+The second fix was a pointer at `scratchpad/audit/precommit.log` and
+`scratchpad/audit/tox.log`, which are not committed and so cannot be
+opened by a later reader. The material output was already quoted inline
+beneath it and the sentence now says so. The review also asked for the
+worktree path in 8b to be removed as a published personal filesystem
+layout; that is **declined**, because it is this repository's convention
+rather than this plan's lapse -- thirty plan files under `docs/` record
+the worktree the work was done in, three of them push-audit phases -- and
+removing it here alone would make this plan the inconsistent one. The
+two remaining scratchpad references already annotate themselves as
+uncommitted, in the house style `PLAN-scheduler-reservations-phase-00`
+uses.
+
+Of the five `consider` items, all five were about code this branch added
+and all five were taken. The one worth recording is the duplication: four
+new warn-mode guard classes each hand-rolled a save/set/restore of
+`API_VALIDATION_MODE`, and `ShakenFistTestCase.set_validation_mode()`
+already existed to do it, with ten callers. The review proposed adding
+a mixin; a second way to do the same thing is not the fix when the first
+way is already there and already used, so the five copies call the
+existing helper instead -- the fifth was pre-existing, and is included
+because leaving exactly one hand-rolled copy behind after converting four
+is how the next round finds it.
+
+Adding `shakenfist/tests/base.py` to `tools/mutate-nested-sweep.sh`
+exposed a latent defect in that script which destroyed uncommitted work
+the first time it ran: `restore()` keyed its snapshot on the file's
+*basename*, and both `shakenfist/external_api/base.py` and
+`shakenfist/tests/base.py` are `base.py`, so the second snapshot
+overwrote the first and the restore copied the test base's contents over
+the API base. The script now keys on the flattened path and refuses to
+start if two entries in `FILES` share a key, so the same collision cannot
+recur silently as the file list grows. The mutation set is 29, with the
+new one pinning that the shared mode helper really does set the mode --
+without which every warn-mode class would measure the schema at
+`enforce` and report it as the handler.
+
 ### The survey findings
 
 | # | Disposition |
@@ -3406,12 +3462,12 @@ checked against the tree rather than recalled.
     `flake8`, `cover`) passes with no failures, including the new
     `test_boolean_sweep.py` and the four new mode-crossing guard
     classes. `bash tools/mutate-nested-sweep.sh` reported 19 mutations,
-    0 survivors when this was written; it now reports 28, which is two
+    0 survivors when this was written; it now reports 29, which is two
     the rebase onto develop brought in with the #4248 fix, four added by
-    the first round of review and three by the second (see the
-    2026-09-27 notes under *Dispositions*). The count is recorded rather
-    than fixed because the number is only useful alongside the date it
-    was measured.
+    the first round of review, three by the second and one by the third
+    (see the 2026-09-27 and 2026-09-28 notes under *Dispositions*). The
+    count is recorded rather than fixed because the number is only
+    useful alongside the date it was measured.
 12. **Not applicable, and deliberately so.** The item is conditional on
     the audit finding nothing blocking. It found four. *The audit's
     result* above says what they were and what they mean about the plan

@@ -310,9 +310,10 @@ of the following keys:
   fewer spellings than the API does
   ([client-python#401](https://github.com/shakenfist/client-python/issues/401)),
   so a spelling the API would accept can be read as false before the request
-  is sent — at the time of writing only the literal `true` or `True` survive
-  it. That is a claim about a different repository, which nothing here can
-  keep true; the advice below is what does not change. The
+  is sent. Which spellings survive it is a fact about a different
+  repository and is deliberately not enumerated here, because nothing in
+  this repository can keep such a list true; the advice below holds whether
+  #401 is fixed or not. The
   API itself accepts a wider range of string spellings (see
   [the networkspec reference](/developer_guide/api_reference/instances/#networkspec)),
   so sending a real JSON boolean is the only form free of this kind of

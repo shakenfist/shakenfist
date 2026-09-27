@@ -711,9 +711,7 @@ class AuthenticatedStackTestCase(base.ShakenFistTestCase):
         external_api.TESTING = True
         external_api.app.testing = True
 
-        self.saved_mode = config.API_VALIDATION_MODE
-        self.addCleanup(self._restore_mode)
-        config.API_VALIDATION_MODE = self.mode
+        self.set_validation_mode(self.mode)
 
         self.mock_mariadb = MockMariaDB(self, node_count=1)
         self.mock_mariadb.setup()
@@ -725,9 +723,6 @@ class AuthenticatedStackTestCase(base.ShakenFistTestCase):
             data=json.dumps({'namespace': 'system', 'key': 'bar'}))
         self.assertEqual(200, resp.status_code)
         self.token = 'Bearer %s' % resp.get_json()['access_token']
-
-    def _restore_mode(self):
-        config.API_VALIDATION_MODE = self.saved_mode
 
     def _spy_on_check(self):
         """Collect the findings check() produced, without changing them."""

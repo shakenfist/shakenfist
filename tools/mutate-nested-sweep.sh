@@ -37,13 +37,14 @@
 #   bash tools/mutate-nested-sweep.sh
 #
 # Run it from the root of a clean-ish worktree. Your own uncommitted
-# work is safe: the seven files it touches -- the vocabulary, the
-# compiler, two handlers and the three sweeps -- are restored from a copy
+# work is safe: the eight files it touches -- the vocabulary, the
+# compiler, two handlers, the three sweeps and the shared test base --
+# are restored from a copy
 # taken before the first mutation, never with `git checkout`, because a
 # directory-wide checkout discards uncommitted work in that directory
 # and is painful to notice afterwards.
 #
-# What is *not* safe is a concurrent edit to one of those seven files by
+# What is *not* safe is a concurrent edit to one of those eight files by
 # somebody else while this runs: restore() copies the whole file back
 # from the snapshot, so an edit made in between is silently reverted.
 # Do not run this in a worktree another agent is editing.
@@ -58,8 +59,9 @@ SWEEP="shakenfist/tests/external_api/test_nested_sweep.py"
 BOOLSWEEP="shakenfist/tests/external_api/test_boolean_sweep.py"
 DECLARATIONS="shakenfist/tests/external_api/test_parameter_declarations.py"
 ARTIFACT="shakenfist/external_api/artifact.py"
+TESTBASE="shakenfist/tests/base.py"
 FILES=("$BASE" "$VALIDATION" "$HANDLER" "$SWEEP" "$BOOLSWEEP" \
-       "$DECLARATIONS" "$ARTIFACT")
+       "$DECLARATIONS" "$ARTIFACT" "$TESTBASE")
 
 if [ ! -x "$PYTHON" ]; then
     echo "No $PYTHON. Run tox once to build the test environment." >&2
@@ -67,9 +69,21 @@ if [ ! -x "$PYTHON" ]; then
 fi
 
 BACKUP=$(mktemp -d /tmp/mutate-nested-sweep-XXXXXX)
+
+# The snapshot is keyed on the whole path with the separators flattened,
+# not on the basename. Two of the files below are called base.py --
+# shakenfist/external_api/base.py and shakenfist/tests/base.py -- so a
+# basename key silently collides: the second snapshot overwrites the
+# first, and restore() then copies one file's contents over the other,
+# destroying uncommitted work in a file it was supposed to be
+# protecting. That happened once, in the third round of review on phase
+# 8, the moment the test base joined the list.
+snapshot_key() {
+    echo "${BACKUP}/${1//\//_}"
+}
 restore() {
     for f in "${FILES[@]}"; do
-        cp "${BACKUP}/$(basename "${f}")" "${f}"
+        cp "$(snapshot_key "${f}")" "${f}"
     done
 }
 cleanup() {
@@ -79,8 +93,18 @@ cleanup() {
 trap cleanup EXIT
 
 for f in "${FILES[@]}"; do
-    cp "${f}" "${BACKUP}/$(basename "${f}")"
+    cp "${f}" "$(snapshot_key "${f}")"
 done
+
+# A collision would defeat every guarantee above, so it is checked
+# rather than assumed: distinct paths must produce distinct keys.
+if [ "$(printf '%s\n' "${FILES[@]}" | sort -u | wc -l)" \
+        -ne "$(for f in "${FILES[@]}"; do snapshot_key "${f}"; done \
+               | sort -u | wc -l)" ]; then
+    echo "Two entries in FILES share a snapshot key. Fix snapshot_key" >&2
+    echo "before running: restore() would copy one over the other." >&2
+    exit 1
+fi
 
 # mutate <file> <old> <new> -- an exact, unique string replacement.
 # Refuses anything but exactly one match, so a mutation which silently
@@ -505,6 +529,23 @@ mutate "${ARTIFACT}" \
     "        if confirm is not None:" || exit 1
 check "refusal positive control" "from a route which refuses everything" \
     test_boolean_sweep
+
+# ---------------------------------------------------------------------
+# 22. The shared validation-mode helper. The third round of review found
+#     five hand-rolled copies of its save/set/restore pair, four of them
+#     added by this phase, and all five now call it instead. If it
+#     stopped setting the mode, every warn-mode guard class would run at
+#     the `enforce` default and measure the schema while reporting it as
+#     the handler -- which is the precise confusion those classes exist
+#     to prevent, and which none of their own assertions would notice.
+#     The refactor is only safe because this is pinned.
+# ---------------------------------------------------------------------
+run "the shared mode helper stops setting the mode"
+mutate "${TESTBASE}" \
+    "        config.API_VALIDATION_MODE = mode" \
+    "        pass  # mutation: mode left at the default" || exit 1
+check "shared validation mode helper" "offset cannot be negative" \
+    test_blob_data_bounds
 
 echo
 echo "====================================================================="

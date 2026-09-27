@@ -159,12 +159,11 @@ Similarly, a `networkspec` consists of the following fields in a JSON dictionary
   the shipped client and ansible collection both send one. A range of string
   spellings (`true`/`false`, `yes`/`no`, `on`/`off`, `1`/`0`, and some
   single-letter and case variants of each) are also read with the meaning
-  they carry, so `"false"` does not float the interface -- but this
-  acceptance is narrower than it looks, and it is narrower only at the
-  shipped default validation mode: `"tRue"` is not one of the accepted
-  spellings, so `enforce` refuses it with a 400 while the `warn`/`off`
-  rollback reads it as true. Do not rely on either; send a real JSON
-  boolean instead.
+  they carry, so `"false"` does not float the interface. A spelling
+  outside those sets -- `"tRue"` is one -- is refused with a 400 under the
+  shipped `enforce` default, but read as **true** under the `warn`/`off`
+  rollback, where the handler's own `bool()` fallback answers instead of
+  the schema check. Do not rely on either; send a real JSON boolean.
 
 The same structure is passed to
 [POST /instances/{instance_ref}/interfaces](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__interfaces)

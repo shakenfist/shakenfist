@@ -112,12 +112,7 @@ class SnapshotMaxVersionsWarnTestCase(SnapshotMaxVersionsTestCase):
 
     def setUp(self):
         super().setUp()
-        self.saved_mode = config.API_VALIDATION_MODE
-        config.API_VALIDATION_MODE = self.mode
-        self.addCleanup(self._restore_mode)
-
-    def _restore_mode(self):
-        config.API_VALIDATION_MODE = self.saved_mode
+        self.set_validation_mode(self.mode)
 
     def test_a_negative_max_versions_is_refused(self):
         resp, snapshot = self._post(-1)

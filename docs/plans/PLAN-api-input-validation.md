@@ -324,12 +324,18 @@ it, so `<sha>^1..<sha>` is the whole of what that pull request
 put on `develop`. A phase which has not landed reads `—`.
 
 Phase 8's cell therefore reads `—` even though the phase is
-complete, exactly as phase 7's did: a cell which can only be
-filled from the first-parent history *after* the merge cannot be
-filled by the branch being merged. Whoever merges phase 8's pull
-request fills it in. That has now been true of three phases
-running, and phase 8's Future work says the obligation belongs to
-the merger rather than to the phase.
+complete: a cell which can only be filled from the first-parent
+history *after* the merge cannot be filled by the branch being
+merged. Unlike phase 7's, it stays that way, and nobody fills it
+in later. The `plan-phase-landing` shared block puts a phase's
+close-out in the first commit of the *next* phase, which is the
+only ordering that both knows the merge commit and records it
+without spending a pull request on prose — but the push-audit
+phase is the last row of every plan, so no next phase will ever
+carry it. It is the one row permitted to omit a `Merged` cell:
+the column exists so that the push-audit phase can reconstruct
+what to audit, and nothing ever reads the audit's own row. Phase
+8's Future work records how this was settled.
 
 Phases 0 and 1 shared a pull request: #3620 carried the master
 plan, the phase 0 decisions and the declaration audit together.

@@ -34,7 +34,6 @@ from unittest import mock
 from shakenfist import mariadb
 from shakenfist.artifact import Artifact
 from shakenfist.artifact import LABEL_URL
-from shakenfist.config import config
 from shakenfist.external_api import app as external_api
 from shakenfist.namespace import Namespace
 from shakenfist.namespace_key import NamespaceKey
@@ -297,12 +296,7 @@ class LabelWriteTargetWarnTestCase(LabelWriteTargetTestCase):
 
     def setUp(self):
         super().setUp()
-        self.saved_mode = config.API_VALIDATION_MODE
-        config.API_VALIDATION_MODE = self.mode
-        self.addCleanup(self._restore_mode)
-
-    def _restore_mode(self):
-        config.API_VALIDATION_MODE = self.saved_mode
+        self.set_validation_mode(self.mode)
 
     def test_a_negative_max_versions_is_refused(self):
         resp, add_index = self._post(
