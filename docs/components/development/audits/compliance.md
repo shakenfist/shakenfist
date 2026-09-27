@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-26T11:02:45.643764+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-09-27T11:41:28.572984+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -29,35 +29,49 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | compliant | - |
-| agent-python | compliant | - |
-| client-python | compliant | - |
-| client-python-k3s | compliant | - |
+| actions | non-compliant | shakenfist/actions#107 |
+| agent-python | non-compliant | shakenfist/agent-python#145 |
+| client-python | non-compliant | shakenfist/client-python#408 |
+| client-python-k3s | non-compliant | shakenfist/client-python-k3s#78 |
 | clingwrap | non-compliant | shakenfist/clingwrap#121 |
 | cloudgood | non-compliant | shakenfist/cloudgood#1 |
 | development | compliant | - |
-| divergulent | compliant | - |
-| hunkydory | compliant | - |
-| instar | compliant | - |
-| kerbside | compliant | - |
+| divergulent | non-compliant | shakenfist/divergulent#120 |
+| hunkydory | non-compliant | shakenfist/hunkydory#54 |
+| instar | non-compliant | shakenfist/instar#599 |
+| kerbside | non-compliant | shakenfist/kerbside#500 |
 | kerbside-client | non-compliant | shakenfist/kerbside-client#5 |
-| kerbside-patches | compliant | - |
-| library-utilities | compliant | - |
-| occystrap | compliant | - |
+| kerbside-patches | non-compliant | shakenfist/kerbside-patches#1777 |
+| library-utilities | non-compliant | shakenfist/library-utilities#62 |
+| occystrap | non-compliant | shakenfist/occystrap#147 |
 | private-ci | N/A | - |
-| ryll | compliant | - |
+| ryll | non-compliant | shakenfist/ryll#413 |
 | sfui | non-compliant | shakenfist/sfui#26 |
-| shakenfist | compliant | - |
+| shakenfist | non-compliant | shakenfist/shakenfist#4352 |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#16 |
-| visual-digest-rust | compliant | - |
+| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#27 |
 
 Details for non-compliant projects:
 
-- **clingwrap** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
+- **actions** (Status): pr-re-review.yml: job trigger-re-review does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request; pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
+- **agent-python** (Status): pr-re-review.yml: the confirm step is conditional (if: steps.ref.outputs.merged == 'true'), so at least one checkout path goes unconfirmed; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
+- **client-python** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
+- **client-python-k3s** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
+- **clingwrap** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **cloudgood** (Status): Missing workflows: pr-re-review.yml
+- **divergulent** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
+- **hunkydory** (Status): pr-re-review.yml: the confirm step is conditional (if: steps.ref.outputs.merged == 'true'), so at least one checkout path goes unconfirmed; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
+- **instar** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
+- **kerbside** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
 - **kerbside-client** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
-- **sfui** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py); it is unused, and its workflow holds contents: write on the pull request branch
+- **kerbside-patches** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
+- **library-utilities** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
+- **occystrap** (Status): pr-re-review.yml: the confirm step is conditional (if: steps.ref.outputs.merged == 'true'), so at least one checkout path goes unconfirmed; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
+- **ryll** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
+- **sfui** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py); it is unused, and its workflow holds contents: write on the pull request branch
+- **shakenfist** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
 - **uncalibrated-sextant** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
+- **visual-digest-rust** (Status): pr-re-review.yml: the confirm step is conditional (if: steps.ref.outputs.merged == 'true'), so at least one checkout path goes unconfirmed; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
 
 ## console-logging
 
@@ -311,31 +325,45 @@ Criterion: [export-repo-config.md](/components/development/audits/export-repo-co
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | compliant | - |
-| agent-python | compliant | - |
-| client-python | compliant | - |
-| client-python-k3s | compliant | - |
-| clingwrap | compliant | - |
+| agent-python | non-compliant | shakenfist/agent-python#146 |
+| client-python | non-compliant | shakenfist/client-python#409 |
+| client-python-k3s | non-compliant | shakenfist/client-python-k3s#79 |
+| clingwrap | non-compliant | shakenfist/clingwrap#138 |
 | cloudgood | non-compliant | shakenfist/cloudgood#3 |
 | development | compliant | - |
-| divergulent | compliant | - |
-| hunkydory | compliant | - |
-| instar | compliant | - |
-| kerbside | compliant | - |
+| divergulent | non-compliant | shakenfist/divergulent#121 |
+| hunkydory | non-compliant | shakenfist/hunkydory#55 |
+| instar | non-compliant | shakenfist/instar#600 |
+| kerbside | non-compliant | shakenfist/kerbside#501 |
 | kerbside-client | non-compliant | shakenfist/kerbside-client#7 |
-| kerbside-patches | compliant | - |
-| library-utilities | compliant | - |
-| occystrap | compliant | - |
+| kerbside-patches | non-compliant | shakenfist/kerbside-patches#1778 |
+| library-utilities | non-compliant | shakenfist/library-utilities#63 |
+| occystrap | non-compliant | shakenfist/occystrap#148 |
 | private-ci | N/A | - |
-| ryll | compliant | - |
-| sfui | compliant | - |
-| shakenfist | compliant | - |
+| ryll | non-compliant | shakenfist/ryll#414 |
+| sfui | non-compliant | shakenfist/sfui#38 |
+| shakenfist | non-compliant | shakenfist/shakenfist#4353 |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#19 |
 | visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
+- **agent-python** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
+- **client-python** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
+- **client-python-k3s** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
+- **clingwrap** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
 - **cloudgood** (Status): Missing .github/workflows/export-repo-config.yml
+- **divergulent** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
+- **hunkydory** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
+- **instar** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
+- **kerbside** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
 - **kerbside-client** (Status): Missing .github/workflows/export-repo-config.yml
+- **kerbside-patches** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
+- **library-utilities** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
+- **occystrap** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
+- **ryll** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
+- **sfui** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
+- **shakenfist** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
 - **uncalibrated-sextant** (Status): Missing .github/workflows/export-repo-config.yml
 
 ## fuzz-nightly-reporting
@@ -784,7 +812,7 @@ Criterion: [plan-audit-phase.md](/components/development/audits/plan-audit-phase
 
 Details for non-compliant projects:
 
-- **kerbside** (Status): 1 of 4 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-proxmox-source.md (ends with a push audit phase that never names PUSH-AUDIT.md)
+- **kerbside** (Status): 1 of 3 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-proxmox-source.md (ends with a push audit phase that never names PUSH-AUDIT.md)
 - **uncalibrated-sextant** (Status): 5 of 5 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-locked-bootloader.md (no push audit phase; phase 3 is "3. Iteration, documentation, inventory closeout"), PLAN-display-mode-keystrokes.md (no push audit phase; phase 3 is "3. Iteration against ryll display-mode-ui, documentation,..."), PLAN-audit-cleanup.md (no push audit phase; phase 3 is "3. Test coverage and release verification"), PLAN-visual-digest.md (no push audit phase; phase 3 is "3. Repaint integration, format spec, closeout"), PLAN-continuous-digest.md (no push audit phase; phase 3 is "3. Docs, decoder coordination, closeout"); 2 plan(s) with no phases this check can read, not judged: PLAN-language-probes.md, PLAN-headless-readback-bug.md
 
 ## plan-index
@@ -852,7 +880,7 @@ Details for non-compliant projects:
 
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121
 - **client-python-k3s** (Status): 4 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/library-api.md:100, docs/library-api.md:126, docs/library-api.md:169, docs/library-api.md:260
-- **private-ci** (Status): 11 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/dashboard-freshness.md:287, docs/gerrit-reviews.md:17, docs/gerrit-reviews.md:78, docs/gerrit-reviews.md:80, docs/gerrit-reviews.md:85, docs/gerrit-reviews.md:321, docs/gerrit-reviews.md:488, docs/gerrit-reviews.md:495, docs/gerrit-reviews.md:545 (+1 more)
+- **private-ci** (Status): 13 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/dashboard-freshness.md:287, docs/gerrit-reviews.md:17, docs/gerrit-reviews.md:78, docs/gerrit-reviews.md:80, docs/gerrit-reviews.md:85, docs/gerrit-reviews.md:321, docs/gerrit-reviews.md:488, docs/gerrit-reviews.md:495, docs/gerrit-reviews.md:545 (+3 more)
 - **shakenfist** (Status): 3 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/developer_guide/ci.md:428, docs/developer_guide/ci.md:437, docs/operator_guide/capacity_refusals.md:116
 - **uncalibrated-sextant** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137, ARCHITECTURE.md:236 (+12 more)
 
@@ -901,7 +929,7 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
-| divergulent | non-compliant | shakenfist/divergulent#116 |
+| divergulent | compliant | - |
 | hunkydory | N/A | - |
 | instar | compliant | - |
 | kerbside | non-compliant | shakenfist/kerbside#471 |
@@ -919,7 +947,6 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 Details for non-compliant projects:
 
 - **client-python-k3s** (Status): missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
-- **divergulent** (Status): missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
 - **kerbside** (Status): missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
 - **occystrap** (Status): missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
 - **private-ci** (Status): missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
@@ -940,7 +967,7 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
-| divergulent | non-compliant | shakenfist/divergulent#115 |
+| divergulent | compliant | - |
 | hunkydory | compliant | - |
 | instar | non-compliant | shakenfist/instar#597 |
 | kerbside | non-compliant | shakenfist/kerbside#470 |
@@ -958,7 +985,6 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 Details for non-compliant projects:
 
 - **client-python-k3s** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository); missing shared block plan-references-in-code (copy it verbatim from templates/shared-blocks/plan-references-in-code.md in the development repository)
-- **divergulent** (Status): missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository); missing shared block plan-references-in-code (copy it verbatim from templates/shared-blocks/plan-references-in-code.md in the development repository)
 - **instar** (Status): missing shared block plan-references-in-code (copy it verbatim from templates/shared-blocks/plan-references-in-code.md in the development repository)
 - **kerbside** (Status): missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository); missing shared block plan-references-in-code (copy it verbatim from templates/shared-blocks/plan-references-in-code.md in the development repository)
 - **occystrap** (Status): missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository); missing shared block plan-references-in-code (copy it verbatim from templates/shared-blocks/plan-references-in-code.md in the development repository)
@@ -1184,7 +1210,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | compliant | - |
+| actions | non-compliant | shakenfist/actions#108 |
 | agent-python | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
@@ -1200,7 +1226,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
 | private-ci | N/A | - |
-| ryll | non-compliant | shakenfist/ryll#403 |
+| ryll | compliant | - |
 | sfui | N/A | - |
 | shakenfist | N/A | - |
 | uncalibrated-sextant | N/A | - |
@@ -1208,8 +1234,8 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **kerbside** (Status): 126 of 248 in-scope files reviewed at HEAD; 122 need review (threshold 5)
-- **ryll** (Status): 193 of 221 in-scope files reviewed at HEAD; 28 need review (threshold 5)
+- **actions** (Status): 125 of 131 in-scope files reviewed at HEAD; 6 need review (threshold 5)
+- **kerbside** (Status): 122 of 248 in-scope files reviewed at HEAD; 126 need review (threshold 5)
 
 ## review-scope-completeness
 
@@ -1342,7 +1368,7 @@ Criterion: [security-sanitization.md](/components/development/audits/security-sa
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | N/A | - |
+| actions | non-compliant | shakenfist/actions#106 |
 | agent-python | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
@@ -1363,6 +1389,10 @@ Criterion: [security-sanitization.md](/components/development/audits/security-sa
 | shakenfist | compliant | - |
 | uncalibrated-sextant | N/A | - |
 | visual-digest-rust | N/A | - |
+
+Details for non-compliant projects:
+
+- **actions** (Status): 1 of 1 HTTP request handler class(es) do not sanitize header values: tests/test_ci_loki_dump.py:153 (Handler): does not inherit SafeHeaderMixin, so send_header() passes CR and LF straight through
 
 ## sfui-vendor
 
