@@ -18,16 +18,14 @@ wired `stamp` and `prune` into the pre-commit, post-merge,
 post-checkout, and post-rewrite hooks, but review state silently
 changing in the middle of unrelated git operations proved more
 confusing than helpful. That objection does not apply to CI running
-against a repository's own default branch, so in steady state three
-subcommands also run automatically: `prune` from an adopting repo's
-`prune-reviews` workflow on every push to the default branch, and
+against a repository's own default branch, so in steady state four
+subcommands also run automatically: `prune` then `import`, in that
+order, from an adopting repo's `prune-reviews` workflow -- copied
+from `templates/review-tracking/`, see "Adopting a repository"
+below -- on every push to the default branch and once a day, and
 `status` and `scope-orphans` from the consistency audit's
 `review-coverage` and `review-scope-completeness` checks (see
-"Steady state" below). `import` is run by hand today; once the
-review tracking CI template planned in
-`docs/plans/PLAN-review-import.md` is rolled out, that workflow
-will run `prune` and then `import`, in that order, on every push
-and daily.
+"Steady state" below).
 Target repositories carry a thin wrapper (for example ryll's
 `tools/review-tracking.sh`) that locates a local clone of this
 repository and passes through to the script.
@@ -92,6 +90,13 @@ repository and passes through to the script.
    !.vscode/*.weaudit-shas.json
    !.vscode/review-scope.toml
    ```
+
+   The ignore rule must then be `.vscode/*` rather than `.vscode/`:
+   git cannot re-include a file whose parent directory is excluded,
+   so exceptions under a bare `.vscode/` do nothing. The
+   `prune-reviews` workflow fails the run if the imports file it
+   writes is ignored, rather than importing the same reviews every
+   day and committing none of them.
 
    Exceptions rather than un-ignoring `.vscode/` wholesale, because
    weAudit also writes `.vscode/.weauditdaylog`, a log of which files
@@ -232,11 +237,15 @@ repository and passes through to the script.
    backlog has been worked off, since a repo's worth of workflow
    files arrives at once.
 
-5. Add a thin wrapper (e.g. `tools/review-tracking.sh`, copied
-   from ryll) that locates a local clone of this repository --
-   `$SHAKENFIST_DEVELOPMENT`, then a sibling `../development`,
-   then `~/src/shakenfist/development` -- and passes its arguments
-   through to `scripts/review-tracking.py`.
+5. Copy `tools/review-tracking.sh` byte-for-byte from
+   `templates/review-tracking/review-tracking.sh` -- verify with
+   `git hash-object` against the template rather than trusting the
+   copy. It is the thin wrapper: it locates a local clone of this
+   repository -- `$SHAKENFIST_DEVELOPMENT`, then a sibling
+   `../development`, then `~/src/shakenfist/development` -- and
+   passes its arguments through to `scripts/review-tracking.py`.
+   Changes to the wrapper go to the template, not to a repository's
+   copy of it.
 
    This repository is the exception: its own wrapper does not go
    looking, because `scripts/review-tracking.py` is in the tree
@@ -266,11 +275,26 @@ repository and passes through to the script.
    * Commit the wrapper, corrected weAudit state, sidecar, and
      REVIEWS.md together (signed).
 
-7. Copy the steady-state prune automation (see below): the
-   `prune-reviews` workflow and its `tools/ci-prune-reviews.sh`
-   script, from ryll. The consistency audit's `review-coverage`
-   check needs no per-repo setup -- it notices the scope config
-   and starts checking the repo automatically.
+7. Copy `.github/workflows/prune-reviews.yml` and
+   `tools/ci-prune-reviews.sh` byte-for-byte from
+   `templates/review-tracking/` -- again verify with `git
+   hash-object`. This is the steady-state prune-and-import
+   automation (see "Steady state" below): it runs `prune` then
+   `import` on every push to the default branch, once a day, and on
+   manual dispatch, and lands the result as one commit. See
+   [templates/review-tracking/README.md](https://github.com/shakenfist/development/blob/main/templates/review-tracking/README.md)
+   for what else the workflow needs (the `.gitignore` exception,
+   `.vscode/review-scope.toml`, and the `paths-ignore` block from
+   step 8) and for gitsign and the development clone it makes. A
+   repository whose default-branch ruleset requires a pull request
+   needs a `DEPENDENCIES_TOKEN` secret, since GitHub will not accept
+   the built-in Actions app as a bypass actor and shakenfist-bot has
+   to push with a token instead; a repository without that
+   requirement pushes with `GITHUB_TOKEN`. Changes to the workflow
+   or script go to the template, not to a repository's copy of them.
+   The consistency audit's `review-coverage` check needs no per-repo
+   setup -- it notices the scope config and starts checking the repo
+   automatically.
 
 8. Teach the repository's build and analysis workflows to ignore
    review-only changes, so a review session (or a bot prune) does
@@ -551,42 +575,48 @@ so it catches the sidecar and hand-edited rows without making the
 file a hot spot. An adopting repository that copies that hook
 inherits the check; one that does not, does not.
 
-**Automatic pruning.** Each adopting repository carries a
-`prune-reviews` workflow (see ryll's
-`.github/workflows/prune-reviews.yml` and
-`tools/ci-prune-reviews.sh`) that runs on every push to its
-default branch -- the only event that can create staleness there.
-It clones this repository for the script, runs `prune`, and
-commits the updated review state and regenerated `REVIEWS.md`
-whenever either changed -- including a regeneration that pruned
-nothing, which is what corrects a moved header count -- directly
-back to that branch as shakenfist-bot, using the same
-rebase-then-push landing pattern as this repository's audit
-compliance-table commits. A concurrency group serialises
-overlapping merges, and the loop terminates either way: a
-repository that can push with the default `GITHUB_TOKEN` never
+**Automatic pruning and importing.** Each adopting repository
+carries a `prune-reviews` workflow, copied byte-for-byte from
+`templates/review-tracking/` (step 7 of "Adopting a repository"
+above), that runs on every push to its default branch, once a day,
+and on manual dispatch -- the push is the only event that can
+create staleness there, and the daily and dispatch runs are what
+pick up new reviews imported from this repository even when the
+target repository itself is quiet. It clones this repository for
+the script, runs `prune` then `import`, and commits the updated
+review state and regenerated `REVIEWS.md` whenever either changed
+-- including a regeneration that pruned nothing, which is what
+corrects a moved header count -- directly back to that branch as
+shakenfist-bot, in one commit, `Prune and import review marks.`.
+It lands that commit by regenerating rather than rebasing: each of
+up to three attempts fetches the branch, resets to its tip, runs
+`prune` and `import` there, and pushes. Everything in the commit is
+derived from the tree beneath it, so a merge that lands mid-run
+costs a retry, never a conflict, and the retry also prunes the marks
+that merge made stale. A concurrency group serialises the
+workflow's own runs, and the loop terminates either way:
+a repository that can push with the default `GITHUB_TOKEN` never
 retriggers the workflow at all, while one whose ruleset forces a
 PAT instead -- as ryll's does, since develop requires a pull
 request before merging and GitHub will not accept the built-in
 Actions app as a bypass actor, so shakenfist-bot pushes with
 `DEPENDENCIES_TOKEN` -- retriggers exactly once, into a run that
-finds nothing left to prune (observed 2026-09-11 04:57:20 UTC,
-`Prune stale review marks.`, which committed nothing).
+finds nothing left to do (observed 2026-09-11 04:57:20 UTC, before
+ryll carried the merged workflow, `Prune stale review marks.`,
+which committed nothing).
 
-The bot's prune commits are not signed, and do not need to be, and
-that argument is scoped to what prune does: prune can only *remove*
-marks, never add or refresh them ('a stamped entry is never
-re-stamped while it exists', above, is enforced by `stamp`, which
-the automation never runs). The attestations live in the signed
-review-state commits already in history, and verifying a native mark
-means verifying the signed commit that *introduced* its stamp -- an
-unsigned later commit that deletes marks weakens nothing. Removing a
-mark is always safe; it merely queues the file for re-review.
+The bot's commit is not signed, and does not need to be for the
+prune half of it: prune can only *remove* marks, never add or
+refresh them ('a stamped entry is never re-stamped while it
+exists', above, is enforced by `stamp`, which the automation never
+runs). The attestations live in the signed review-state commits
+already in history, and verifying a native mark means verifying the
+signed commit that *introduced* its stamp -- an unsigned later
+commit that deletes marks weakens nothing. Removing a mark is
+always safe; it merely queues the file for re-review.
 
-`import` will also run unsigned from the bot -- it is run by hand
-until the review tracking CI template planned in
-`docs/plans/PLAN-review-import.md` adds it to the `prune-reviews`
-workflow -- and it adds marks, so it needs its own argument rather
+`import` also runs unsigned from the bot, in the same commit as
+prune, and it adds marks, so it needs its own argument rather
 than inheriting prune's. An imported
 entry is not itself an attestation: it is a pointer to one --
 the repository, path, and introducing commit of a signed
@@ -732,8 +762,11 @@ than from a `.weaudit` file in this clone.
 
 This repository does not import from itself. A template and this
 repository's own instance of it could in principle cross-import, but
-the case is rare enough that `import` simply refuses to run when the
-target is this repository, whether this clone or a worktree of it.
+the case is rare enough that `import` run against this repository,
+whether this clone or a worktree of it, is a no-op: it prints
+`review-import: nothing to do; shakenfist/development is the source
+of imported reviews`, writes nothing, and exits zero, so that the
+shared `prune-reviews` workflow can run it here unchanged.
 
 **Backlog alerting.** The daily consistency audit runs a
 `review-coverage` check (`docs/audits/review-coverage.md`) against

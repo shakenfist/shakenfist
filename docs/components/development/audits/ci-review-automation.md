@@ -20,6 +20,13 @@ workflow files alone, so a reviewer confirms it instead.
   rather than open-coding the phrase match, permission lookup, reaction
   and refusal reply.
 * No caller passes `secrets: inherit`.
+* In both developer workflows, the trigger job exports
+  `pr-bot-trigger`'s `same-repo` output, and the job that needs it
+  requires that export to be `'true'` in its `if:`.
+* `pr-re-review.yml` confirms that the tree it checked out is the commit
+  its resolve step validated, on the head fallback path as well as the
+  merge path: the step comparing `HEAD^2` has no `if:` and also
+  compares `HEAD`.
 * The retired comment addresser is gone from the tree, as below.
 
 ### Required, but confirmed by a reviewer
@@ -55,8 +62,31 @@ reads no secrets -- it and `review-pr-with-claude` authenticate with
 `github.token` from the caller's `permissions:` block -- so inheriting
 buys nothing while putting every secret the repository holds, including
 publishing tokens, within reach of a workflow in another repository.
-Callers of `smoke-cluster.yml` and `export-repo-config.yml` do read
-secrets and inherit correctly.
+Callers of `smoke-cluster.yml` do read secrets and inherit correctly.
+`export-repo-config.yml` reads none either, and the
+[export-repo-config](/components/development/audits/export-repo-config/) criterion makes the same
+finding for its callers.
+
+**The fork gate is stated twice.** `pr-bot-trigger` already folds its
+fork check into `authorized`, so requiring `same_repo` on the work job
+again is redundant, and required anyway: both workflows put a pull
+request's code, or a dispatch against its ref, next to a write-scoped
+token, and the action is taken at `@main`, so a regression there must
+not be able to quietly widen what runs. Both halves are measured
+because either alone is no gate -- without the export the `if:` reads
+an empty string and the job silently never runs. The rule covers
+every job which `needs:` the trigger job, not only the one doing the
+work: an adopter who adds a third job downstream of it -- a cleanup or
+a notification -- gates that job too, or hangs it off the work job
+instead.
+
+**Confirm the checkout on both paths.** The resolve step validates a
+sha and the checkout then names a ref, and a push between the two moves
+what the ref reaches. That is as true of `refs/pull/N/head` as of the
+merge ref, so an earlier template confirming only the merge path let a
+fallback review be of a commit nobody validated. Measured rather than
+left to the template because every adopter copied the earlier one
+(shakenfist/development#172).
 
 **Same-repository pull requests only.** The reviewer runs Claude Code
 with `--dangerously-skip-permissions` while holding a write-capable
