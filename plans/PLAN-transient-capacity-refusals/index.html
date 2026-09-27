@@ -16045,7 +16045,11 @@ chosen to defer to here, so that we do not forget them.</p>
   harvests over many bundles and cannot tell the three apart. Writing
   an empty file once at suite start-up would make "empty" mean zero
   and leave "absent" meaning the other two. Found at phase 2's
-  closeout; see that phase's Outcome.</li>
+  closeout; see that phase's Outcome. Now fixed, after phase 5's
+  first measurement window read 92.3% of its qualifying units as
+  unknown (issue 4337): <code>BaseTestCase.setUp()</code> touches the file into
+  existence via <code>ensure_capacity_wait_trace()</code>, which swallows every
+  failure exactly as the append path does.</li>
 <li><strong>Every refused create is a full create-and-delete.</strong>
   <code>enqueue_delete_due_error</code> at the 507 site means each refusal
   costs an object, IPAM allocations, an event trail and a delete
