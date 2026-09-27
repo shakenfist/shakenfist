@@ -30,6 +30,40 @@ sequenceDiagram
     end
 ```
 
+### Link capabilities
+
+The link message carries two capability arrays, common and
+per-channel, each a list of 32-bit words (word `n` holds bits
+`32n` to `32n+31`). By default `perform_link` and
+`SpiceClient::connect_channel` advertise ryll's own set: one
+common word (`AUTH_SELECTION | AUTH_SPICE | MINI_HEADER`) and one
+channel word chosen by channel type (see
+[Display Channel Capabilities](#display-channel-capabilities)).
+
+A proxy that must forward a real client's capabilities to the
+server instead uses `perform_link_with_caps`, or
+`SpiceClient::connect_channel_with_caps`, which take the common
+and channel words as slices, sent verbatim, and return the
+server's `SpiceLinkReply` so the caller can see what the server
+offers. Two common capabilities are mandatory on this path. The
+server decides whether to expect an auth mechanism selector, and
+whether to frame messages with the mini header, from what the
+*client advertised*, and this crate only speaks the
+selector-then-ticket auth exchange and the mini header. So
+advertised caps missing `AUTH_SELECTION` or `MINI_HEADER` are
+refused before anything is sent (as are more than 16 words in
+either array, the limit ryll's own parsers accept).
+
+The server's reply lists the capabilities it supports, not the
+intersection with what was advertised. A reply must list
+`AUTH_SELECTION`, `MINI_HEADER` and `AUTH_SPICE` (a server with
+SASL enabled offers `AUTH_SASL` instead, and refuses SPICE ticket
+auth, which is the only mechanism this crate implements), or it
+fails `SpiceLinkReply::check_client_requirements`, which
+`connect_channel_with_caps` (and so `connect_channel`) runs before
+authenticating. Both refusals are a typed
+`LinkError::MissingRequiredCaps` naming what is missing.
+
 ### Message Format
 
 All SPICE messages use a 6-byte mini-header, immediately followed

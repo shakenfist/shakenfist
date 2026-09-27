@@ -54,14 +54,34 @@ says so in a comment on the pull request**, naming which of the two
 cases it hit. A review of the head is worth having; a reader who
 believes it saw the merge result is not.
 
+On both paths the workflow then confirms that the tree it checked out
+is the commit it validated -- the merge's second parent on the merge
+path, `HEAD` itself on the fallback path -- because a push between
+resolving the ref and checking it out moves what the ref reaches. If
+the head moved in that window the run fails rather than reviewing
+code nobody validated, and the requester comments again to review the
+new head.
+
 ## Security Model
 
 These workflows use `issue_comment` triggers, which run with
 elevated permissions. Security is enforced through multiple layers:
 
 1. **Authorization** -- only repository collaborators with write
-   access can trigger commands (enforced by
-   `shakenfist/actions/pr-bot-trigger`)
+   access can trigger commands, and only on pull requests whose head
+   is in this repository rather than a fork (enforced by
+   `shakenfist/actions/pr-bot-trigger`, which folds both into its
+   `authorized` output)
+
+   The work job in `pr-re-review.yml` and `pr-retest.yml` then
+   requires the trigger job's `same_repo` export to be `'true'` as
+   well as `authorized`. That is deliberately redundant: callers take
+   the action at `@main`, so a regression there would otherwise widen
+   what runs next to a write-scoped token without any change in the
+   calling repository. The trigger job also fails if the action stops
+   reporting the outputs it reads, rather than letting the work job
+   skip silently. The `ci-review-automation` criterion measures both
+   halves of the gate on every adopter.
 2. **Trusted tools** -- scripts are checked out from the base branch,
    not the PR, preventing execution of malicious PR code
 3. **No credential persistence** -- `persist-credentials: false`
