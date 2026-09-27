@@ -12,6 +12,9 @@ from __future__ import annotations
 import time
 
 from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.shakenfist.shakenfist.plugins.module_utils.sf_connection import check_connection
+from ansible_collections.shakenfist.shakenfist.plugins.module_utils.sf_connection import connection_argument_spec
+from ansible_collections.shakenfist.shakenfist.plugins.module_utils.sf_connection import make_client
 
 from shakenfist_client import apiclient
 
@@ -272,78 +275,6 @@ LIMIT_FIELDS = ('limit_cpus', 'limit_memory_mb', 'limit_disk_gb')
 # AttributeError traceback. See _require_claim_verbs().
 CLAIM_VERBS = ('get_namespace_claims', 'create_namespace_claim',
                'update_namespace_claim', 'delete_namespace_claim')
-
-
-def _check_connection(module):
-    """Refuse a partially specified connection, and say what was supplied.
-
-    None of api_url, auth_namespace and key is a connection parameter that can
-    stand alone, so any of them arriving without the other two is a mistake
-    rather than a request to discover: the client that would produce can be
-    pointed at an entirely different cloud than the playbook named, with
-    nothing said about it. auth_namespace is the identity to authenticate as
-    and nothing else -- the claim's target namespace is named by namespace --
-    so on its own it says only "authenticate as this", which is exactly the
-    instruction that would be discarded.
-
-    run_module() calls this immediately after AnsibleModule is built, which is
-    what makes the rule hold on every path -- including the check mode paths
-    that return before a client is ever needed. _make_client() calls it again
-    for callers reaching it directly, the tests today and anything importing
-    the module tomorrow.
-
-    The rule is deliberately not declared on the argument spec. Ansible's
-    required_together and required_by count key presence and never look at the
-    value, so an empty string -- which is what "{{ sf_url | default('') }}"
-    yields in a templated inventory, and which the rest of the collection
-    treats as not supplied -- would be refused outright, while a full set with
-    one member empty would be accepted and only caught later. Checking here
-    keeps one definition of the rule, with one meaning of "supplied".
-    """
-    api_url = module.params.get('api_url')
-    auth_namespace = module.params.get('auth_namespace')
-    key = module.params.get('key')
-
-    supplied = [n for n, v in (('api_url', api_url),
-                               ('auth_namespace', auth_namespace),
-                               ('key', key)) if v]
-    if supplied and len(supplied) != 3:
-        module.fail_json(
-            msg=('api_url, auth_namespace and key must be supplied together '
-                 'or not at all. Got only %s, which would be '
-                 'discarded in favour of discovered '
-                 'configuration.' % ', '.join(supplied)),
-            meta=None, log=[])
-    return supplied
-
-
-def _make_client(module):
-    # Build a quiet, patient, blocking client. When all three connection
-    # parameters are supplied we suppress configuration lookup and use them
-    # verbatim; otherwise we let the client auto-discover from the environment
-    # and sfrc config exactly like the sf-client CLI does.
-    supplied = _check_connection(module)
-    api_url = module.params.get('api_url')
-    auth_namespace = module.params.get('auth_namespace')
-    key = module.params.get('key')
-
-    kwargs = {
-        'verbose': False,
-        'sync_request_timeout': 1800,
-        'async_strategy': apiclient.ASYNC_BLOCK,
-    }
-    if len(supplied) == 3:
-        kwargs.update({
-            'base_url': api_url,
-            'namespace': auth_namespace,
-            'key': key,
-            'suppress_configuration_lookup': True,
-        })
-    try:
-        return apiclient.Client(**kwargs)
-    except apiclient.UnconfiguredException as e:
-        module.fail_json(
-            msg='Could not configure the Shaken Fist client: %s' % e, meta=None, log=[])
 
 
 def _require_claim_verbs(client, module, log):
@@ -643,10 +574,10 @@ def run_module():
             'choices': ['present', 'absent'],
             'type': 'str',
         },
-        'api_url': {'required': False, 'type': 'str'},
-        'auth_namespace': {'required': False, 'type': 'str'},
-        'key': {'required': False, 'type': 'str', 'no_log': True},
     }
+    # The identity is auth_namespace because namespace already names the
+    # namespace the claim covers.
+    argument_spec.update(connection_argument_spec(identity_param='auth_namespace'))
 
     module = AnsibleModule(
         argument_spec=argument_spec, supports_check_mode=True,
@@ -659,7 +590,7 @@ def run_module():
     # Before anything branches. Every other exit from run_module() -- an
     # argument check, a check mode return -- happens after this, so a play
     # that names a cluster half way cannot be told it would have succeeded.
-    _check_connection(module)
+    check_connection(module, identity_param='auth_namespace')
 
     log = []
 
@@ -679,7 +610,7 @@ def run_module():
             msg='renew_within_seconds must be positive when it is set',
             meta=None, log=log)
 
-    client = _make_client(module)
+    client = make_client(module, identity_param='auth_namespace')
     _require_claim_verbs(client, module, log)
 
     if state == 'present':

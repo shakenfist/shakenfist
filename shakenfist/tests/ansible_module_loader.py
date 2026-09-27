@@ -9,11 +9,14 @@ decisions it makes can be tested here rather than only in the ansible
 module CI job, which is merge tier and therefore does not run on a pull
 request.
 
-test_ansible_sf_claim.py and test_ansible_sf_instance.py each carry their
-own copy of this, predating it. They keep their copies for now because the
-exception hierarchies they stub are specific to what those files exercise;
-folding them in belongs with the larger deduplication of _make_client()
-itself, which is issue 4314.
+The modules also import the collection's own
+plugins/module_utils/sf_connection.py through its installed name,
+ansible_collections.shakenfist.shakenfist.plugins.module_utils. That one
+is the code under test rather than a dependency, so it is loaded from
+source too -- inside the same stub installation, which is what makes
+mock.patch.object(module.apiclient, 'Client') reach the client that
+sf_connection.make_client() builds: both files bind the same stubbed
+apiclient module.
 """
 import importlib.util
 import os
@@ -25,28 +28,39 @@ from unittest import mock
 MODULE_DIR = os.path.abspath(os.path.join(
     os.path.dirname(__file__), '..', 'deploy', 'collection', 'plugins',
     'modules'))
+MODULE_UTILS_DIR = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), '..', 'deploy', 'collection', 'plugins',
+    'module_utils'))
+
+# The dotted path the collection's module_utils is importable as once the
+# collection is installed, which is how the modules spell the import.
+MODULE_UTILS_PACKAGE = \
+    'ansible_collections.shakenfist.shakenfist.plugins.module_utils'
+SF_CONNECTION_NAME = MODULE_UTILS_PACKAGE + '.sf_connection'
 
 
-def load_collection_module(name, apiclient_attrs=None):
-    """Load plugins/modules/<name>.py and return it.
+def _stub_modules(apiclient_attrs):
+    """The stub module tree the collection code imports.
 
     apiclient_attrs adds to or overrides the attributes placed on the
     stubbed shakenfist_client.apiclient. The defaults cover everything the
-    five modules read at import time or in _make_client(); a caller
-    testing exception handling wants its own hierarchy instead.
+    five modules read at import time or in make_client(); a caller testing
+    exception handling wants its own hierarchy instead.
     """
     stubs = {}
 
-    ansible = types.ModuleType('ansible')
-    ansible.__path__ = []
-    module_utils = types.ModuleType('ansible.module_utils')
-    module_utils.__path__ = []
+    for name in ('ansible', 'ansible.module_utils',
+                 'ansible_collections', 'ansible_collections.shakenfist',
+                 'ansible_collections.shakenfist.shakenfist',
+                 'ansible_collections.shakenfist.shakenfist.plugins',
+                 MODULE_UTILS_PACKAGE):
+        package = types.ModuleType(name)
+        package.__path__ = []
+        stubs[name] = package
     basic = types.ModuleType('ansible.module_utils.basic')
     basic.AnsibleModule = mock.MagicMock()
-    module_utils.basic = basic
-    ansible.module_utils = module_utils
-    stubs['ansible'] = ansible
-    stubs['ansible.module_utils'] = module_utils
+    stubs['ansible.module_utils'].basic = basic
+    stubs['ansible'].module_utils = stubs['ansible.module_utils']
     stubs['ansible.module_utils.basic'] = basic
 
     client = types.ModuleType('shakenfist_client')
@@ -74,18 +88,46 @@ def load_collection_module(name, apiclient_attrs=None):
     stubs['shakenfist_client'] = client
     stubs['shakenfist_client.apiclient'] = apiclient
 
-    saved = {key: sys.modules.get(key) for key in stubs}
+    return stubs
+
+
+def _load_from_source(module_name, path):
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_sf_connection(apiclient_attrs=None):
+    """Load plugins/module_utils/sf_connection.py and return it."""
+    return load_collection_module(None, apiclient_attrs=apiclient_attrs)
+
+
+def load_collection_module(name, apiclient_attrs=None):
+    """Load plugins/modules/<name>.py and return it.
+
+    A name of None returns the loaded sf_connection itself, for tests that
+    assert on the shared implementation directly.
+    """
+    stubs = _stub_modules(apiclient_attrs)
+
+    saved = {key: sys.modules.get(key)
+             for key in list(stubs) + [SF_CONNECTION_NAME]}
     sys.modules.update(stubs)
     try:
-        spec = importlib.util.spec_from_file_location(
+        # sf_connection has to be executed with the stubs installed (it
+        # imports shakenfist_client) and registered before the module is,
+        # because the module imports it by its installed name.
+        sf_connection = _load_from_source(
+            SF_CONNECTION_NAME, os.path.join(MODULE_UTILS_DIR, 'sf_connection.py'))
+        sys.modules[SF_CONNECTION_NAME] = sf_connection
+        if name is None:
+            return sf_connection
+        return _load_from_source(
             '%s_under_test' % name, os.path.join(MODULE_DIR, '%s.py' % name))
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
     finally:
         for key, previous in saved.items():
             if previous is None:
-                del sys.modules[key]
+                sys.modules.pop(key, None)
             else:
                 sys.modules[key] = previous
-
-    return module

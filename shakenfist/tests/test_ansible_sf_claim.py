@@ -1,22 +1,8 @@
 # Copyright 2026 Michael Still and contributors
-import importlib.util
-import os
-import sys
-import types
 from unittest import mock
 
+from shakenfist.tests import ansible_module_loader
 from shakenfist.tests import base
-
-
-# The collection module is not importable in the normal way: it lives in an
-# ansible collection tree (no __init__.py), and it imports ansible and
-# shakenfist_client, neither of which is a test dependency of this
-# repository. Load it from source with those two imports stubbed out so the
-# decisions the module makes can be tested here rather than only in the
-# ansible module CI job. This mirrors test_ansible_sf_instance.py.
-MODULE_PATH = os.path.abspath(os.path.join(
-    os.path.dirname(__file__), '..', 'deploy', 'collection', 'plugins',
-    'modules', 'sf_claim.py'))
 
 
 class FakeAPIException(Exception):
@@ -41,58 +27,16 @@ class FakeResourceStateConflictException(FakeAPIException):
     ...
 
 
-def _load_sf_claim():
-    stubs = {}
-
-    ansible = types.ModuleType('ansible')
-    ansible.__path__ = []
-    module_utils = types.ModuleType('ansible.module_utils')
-    module_utils.__path__ = []
-    basic = types.ModuleType('ansible.module_utils.basic')
-    basic.AnsibleModule = mock.MagicMock()
-    module_utils.basic = basic
-    ansible.module_utils = module_utils
-    stubs['ansible'] = ansible
-    stubs['ansible.module_utils'] = module_utils
-    stubs['ansible.module_utils.basic'] = basic
-
-    client = types.ModuleType('shakenfist_client')
-    client.__path__ = []
-    apiclient = types.ModuleType('shakenfist_client.apiclient')
-
-    # Mirror the real hierarchy: both of the specific exceptions subclass
-    # APIException, so the exception clause ordering in the module (the
-    # capacity refusal before the generic API failure) is exercised the same
-    # way it runs in production.
-    apiclient.APIException = FakeAPIException
-    apiclient.ResourceNotFoundException = FakeResourceNotFoundException
-    apiclient.InsufficientResourcesException = FakeInsufficientResourcesException
-    apiclient.ResourceStateConflictException = FakeResourceStateConflictException
-    apiclient.UnconfiguredException = Exception
-    apiclient.ASYNC_BLOCK = 'block'
-    apiclient.Client = mock.MagicMock()
-    client.apiclient = apiclient
-    stubs['shakenfist_client'] = client
-    stubs['shakenfist_client.apiclient'] = apiclient
-
-    saved = {name: sys.modules.get(name) for name in stubs}
-    sys.modules.update(stubs)
-    try:
-        spec = importlib.util.spec_from_file_location(
-            'sf_claim_under_test', MODULE_PATH)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-    finally:
-        for name, previous in saved.items():
-            if previous is None:
-                del sys.modules[name]
-            else:
-                sys.modules[name] = previous
-
-    return module
-
-
-sf_claim = _load_sf_claim()
+# The exceptions this file raises carry the attributes _fail_api() reads
+# (message, status_code, text), which the shared loader's defaults do not,
+# so they replace the whole hierarchy the loader stubs in.
+sf_claim = ansible_module_loader.load_collection_module(
+    'sf_claim', apiclient_attrs={
+        'APIException': FakeAPIException,
+        'ResourceNotFoundException': FakeResourceNotFoundException,
+        'InsufficientResourcesException': FakeInsufficientResourcesException,
+        'ResourceStateConflictException': FakeResourceStateConflictException,
+    })
 
 
 class ModuleExited(Exception):
@@ -683,7 +627,7 @@ class SfClaimArgumentSpecTestCase(base.ShakenFistTestCase):
         module = FakeModule(**params)
         client = mock.MagicMock()
         with mock.patch.object(sf_claim, 'AnsibleModule') as ansible_module, \
-                mock.patch.object(sf_claim, '_make_client') as make_client, \
+                mock.patch.object(sf_claim, 'make_client') as make_client, \
                 mock.patch.object(sf_claim, '_ensure_present') as present, \
                 mock.patch.object(sf_claim, '_ensure_absent') as absent:
             ansible_module.return_value = module
@@ -703,7 +647,7 @@ class SfClaimArgumentSpecTestCase(base.ShakenFistTestCase):
         # collection lands exactly there.
         #
         # run_module() checks this itself rather than declaring it to
-        # ansible as required_together. _make_client() is mocked out here,
+        # ansible as required_together. make_client() is mocked out here,
         # so a rule that only lived there would not be reached at all --
         # which is the shape of the hole that check mode used to fall
         # through. See test_ansible_make_client.py for the whole table.

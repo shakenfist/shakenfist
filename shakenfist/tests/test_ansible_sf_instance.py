@@ -1,83 +1,15 @@
 # Copyright 2019 Michael Still and contributors
-import importlib.util
 import itertools
-import os
-import sys
-import types
 from unittest import mock
 
+from shakenfist.tests import ansible_module_loader
 from shakenfist.tests import base
 
 
-# The collection module is not importable in the normal way: it lives in an
-# ansible collection tree (no __init__.py), and it imports ansible and
-# shakenfist_client, neither of which is a test dependency of this
-# repository. Load it from source with those two imports stubbed out so the
-# pure logic in _check_instance() can be tested here rather than only in the
-# ansible module CI job.
-MODULE_PATH = os.path.abspath(os.path.join(
-    os.path.dirname(__file__), '..', 'deploy', 'collection', 'plugins',
-    'modules', 'sf_instance.py'))
-
-
-def _load_sf_instance():
-    stubs = {}
-
-    ansible = types.ModuleType('ansible')
-    ansible.__path__ = []
-    module_utils = types.ModuleType('ansible.module_utils')
-    module_utils.__path__ = []
-    basic = types.ModuleType('ansible.module_utils.basic')
-    basic.AnsibleModule = mock.MagicMock()
-    module_utils.basic = basic
-    ansible.module_utils = module_utils
-    stubs['ansible'] = ansible
-    stubs['ansible.module_utils'] = module_utils
-    stubs['ansible.module_utils.basic'] = basic
-
-    client = types.ModuleType('shakenfist_client')
-    client.__path__ = []
-    apiclient = types.ModuleType('shakenfist_client.apiclient')
-
-    # Mirror the real hierarchy: ResourceNotFoundException subclasses
-    # APIException, so exception clause ordering in the module (the
-    # specific not-found handling before the generic API failure
-    # handling) is exercised the same way it runs in production.
-    class _APIException(Exception):
-        ...
-
-    class _ResourceNotFoundException(_APIException):
-        ...
-
-    apiclient.ResourceNotFoundException = _ResourceNotFoundException
-    apiclient.APIException = _APIException
-    # _make_client() reads both of these, so the stub has to carry them
-    # even though nothing else in this file touches the constructor.
-    apiclient.UnconfiguredException = Exception
-    apiclient.ASYNC_BLOCK = 'block'
-    apiclient.Client = mock.MagicMock()
-    client.apiclient = apiclient
-    stubs['shakenfist_client'] = client
-    stubs['shakenfist_client.apiclient'] = apiclient
-
-    saved = {name: sys.modules.get(name) for name in stubs}
-    sys.modules.update(stubs)
-    try:
-        spec = importlib.util.spec_from_file_location(
-            'sf_instance_under_test', MODULE_PATH)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-    finally:
-        for name, previous in saved.items():
-            if previous is None:
-                del sys.modules[name]
-            else:
-                sys.modules[name] = previous
-
-    return module
-
-
-sf_instance = _load_sf_instance()
+# The shared loader's default apiclient stub carries the exception
+# hierarchy this file raises (ResourceNotFoundException subclassing
+# APIException), so no overrides are needed.
+sf_instance = ansible_module_loader.load_collection_module('sf_instance')
 
 
 class SfInstanceDiskDirtinessTestCase(base.ShakenFistTestCase):
@@ -523,7 +455,7 @@ class SfInstanceCreateBudgetTestCase(base.ShakenFistTestCase):
         with mock.patch.object(
                 sf_instance, 'AnsibleModule', return_value=module), \
                 mock.patch.object(
-                    sf_instance, '_make_client', return_value=client), \
+                    sf_instance, 'make_client', return_value=client), \
                 mock.patch.object(
                     sf_instance.time, 'monotonic',
                     side_effect=lambda: next(clock)):
@@ -745,7 +677,7 @@ class SfInstanceAPIErrorLogTestCase(base.ShakenFistTestCase):
         with mock.patch.object(
                 sf_instance, 'AnsibleModule', return_value=module), \
                 mock.patch.object(
-                    sf_instance, '_make_client', return_value=client), \
+                    sf_instance, 'make_client', return_value=client), \
                 mock.patch.object(
                     sf_instance.time, 'monotonic',
                     side_effect=lambda: next(clock)), \

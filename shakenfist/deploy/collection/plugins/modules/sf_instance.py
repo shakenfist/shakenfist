@@ -11,6 +11,9 @@ import json
 import time
 
 from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.shakenfist.shakenfist.plugins.module_utils.sf_connection import check_connection
+from ansible_collections.shakenfist.shakenfist.plugins.module_utils.sf_connection import connection_argument_spec
+from ansible_collections.shakenfist.shakenfist.plugins.module_utils.sf_connection import make_client
 
 from shakenfist_client import apiclient
 
@@ -241,81 +244,6 @@ def _create_accepts_timeout(client):
         # which has no timeout parameter and so returns False below.
         return False
     return 'timeout' in signature.parameters
-
-
-def _check_connection(module):
-    """Refuse a partially specified connection, and say what was supplied.
-
-    api_url and key are connection parameters and nothing else, so either of
-    them arriving without the full set is a mistake rather than a request to
-    discover: the values passed would be discarded and the module pointed at
-    whatever cloud discovery found, with nothing said about it. namespace is
-    deliberately not held to that rule in this module. It names the namespace
-    to operate in -- it is passed to get_instance() and delete_instance() -- as
-    well as the one to authenticate as, so it is legitimate on its own and
-    keeps meaning "work here, and find the credentials the usual way", which is
-    how the deployment playbooks have always called this. sf_claim,
-    sf_namespace and sf_snapshot hold all three to the rule because their
-    identity parameter is an identity and nothing else.
-
-    run_module() calls this immediately after AnsibleModule is built, which is
-    what makes the rule hold on every path -- including the check mode paths
-    that return before a client is ever needed. _make_client() calls it again
-    for callers reaching it directly, the tests today and anything importing
-    the module tomorrow.
-
-    The rule is deliberately not declared on the argument spec. Ansible's
-    required_together and required_by count key presence and never look at the
-    value, so an empty string -- which is what "{{ sf_url | default('') }}"
-    yields in a templated inventory, and which the rest of the collection
-    treats as not supplied -- would be refused outright, while a full set with
-    one member empty would be accepted and only caught later. Checking here
-    keeps one definition of the rule, with one meaning of "supplied".
-    """
-    api_url = module.params.get('api_url')
-    namespace = module.params.get('namespace')
-    key = module.params.get('key')
-
-    supplied = [n for n, v in (('api_url', api_url),
-                               ('namespace', namespace),
-                               ('key', key)) if v]
-    if supplied and len(supplied) != 3 and supplied != ['namespace']:
-        module.fail_json(
-            msg=('api_url and key are only used when api_url, namespace and '
-                 'key are all supplied. Got only %s, so the connection '
-                 'details passed here would be silently discarded in favour '
-                 'of discovered configuration.' % ', '.join(supplied)),
-            meta=None, log=[])
-    return supplied
-
-
-def _make_client(module):
-    # Build a quiet, patient, blocking client. When all three connection
-    # parameters are supplied we suppress configuration lookup and use them
-    # verbatim; otherwise we auto-discover from the environment / sfrc config
-    # exactly like the sf-client CLI.
-    supplied = _check_connection(module)
-    api_url = module.params.get('api_url')
-    namespace = module.params.get('namespace')
-    key = module.params.get('key')
-
-    kwargs = {
-        'verbose': False,
-        'sync_request_timeout': 1800,
-        'async_strategy': apiclient.ASYNC_BLOCK,
-    }
-    if len(supplied) == 3:
-        kwargs.update({
-            'base_url': api_url,
-            'namespace': namespace,
-            'key': key,
-            'suppress_configuration_lookup': True,
-        })
-    try:
-        return apiclient.Client(**kwargs)
-    except apiclient.UnconfiguredException as e:
-        module.fail_json(
-            msg='Could not configure the Shaken Fist client: %s' % e, meta=None, log=[])
 
 
 def _fail_api_error(module, log, action, error):
@@ -634,10 +562,12 @@ def run_module():
             'choices': ['present', 'absent'],
             'type': 'str',
         },
-        'api_url': {'required': False, 'type': 'str'},
-        'namespace': {'required': False, 'type': 'str'},
-        'key': {'required': False, 'type': 'str', 'no_log': True},
     }
+    # namespace names the namespace to operate in -- it is passed to
+    # get_instance() and delete_instance() -- as well as the one to
+    # authenticate as, so it is exempt from the all-or-nothing connection
+    # rule and may be supplied alone. See check_connection().
+    argument_spec.update(connection_argument_spec())
 
     module = AnsibleModule(
         argument_spec=argument_spec, supports_check_mode=True)
@@ -645,7 +575,7 @@ def run_module():
     # Before anything branches. Every other exit from run_module() -- an
     # argument check, a check mode return -- happens after this, so a play
     # that names a cluster half way cannot be told it would have succeeded.
-    _check_connection(module)
+    check_connection(module, identity_optional=True)
 
     log = []
     state = module.params['state']
@@ -657,7 +587,7 @@ def run_module():
         module.fail_json(
             msg='You must specify one of name or uuid', meta=None, log=log)
 
-    client = _make_client(module)
+    client = make_client(module, identity_optional=True)
 
     if state == 'present':
         try:
