@@ -416,30 +416,161 @@ caught the mistake, which is why it is worth calling out here: read a
 `sufficient_idle_disk` row in a census as a disk I/O problem, never as
 evidence the cloud needs more disk capacity.
 
-### The band warns, the topology assertion fails
+### One bound gates, and everything else is information
 
-Every workflow step this instrumentation added is
-`continue-on-error`, and `ci_headroom_report.py` always exits 0
-whatever it finds -- even an internal error in the report is printed,
-not raised. So no verdict it prints can fail a job.
-
-The band verdict it prints is committed vCPU as a fraction of the
-admission ledger, against bounds of 0.35 and 0.70, plus a per-node
-bound of 0.85. Those bounds are no longer provisional: phase 2 of
+The band verdict `ci_headroom_report.py` prints is committed vCPU as a
+fraction of the admission ledger, against bounds of 0.35 and 0.70, plus a
+per-node bound of 0.85. Those bounds are not provisional: phase 2 of
 [PLAN-ci-cloud-sizing](../plans/PLAN-ci-cloud-sizing.md) defended them
-against a distribution of 204 job-runs. What has not happened is the
-gate. The report's exit code is discarded twice on the way to a human
--- by a `|| true` in `shakenfist/actions`'s collect script and by the
-step's own `continue-on-error` -- so a violation reaches a reader as a
-GitHub annotation and a step summary rather than as a red job. Turning
-that into a gate is a change to `shakenfist/actions`, prepared in
-[shakenfist/actions#94](https://github.com/shakenfist/actions/pull/94),
-and phase 5 decides whether to make it. Read the per-node bound as
-what a topology should achieve rather than as an alarm about one run:
-the statistic saturates, and did so on passing runs.
+against a distribution of 204 job-runs.
 
-One thing here *is* a gate, and it is a test rather than a verdict.
-`cluster_ci_tests/test_nodes.py`'s
+**Exactly one of them can fail a job: the cluster-wide upper bound of
+0.70.** Above it, the report returns status 3 and
+`shakenfist/actions`'s `tools/ci_headroom_verdict.sh` fails the step with
+an annotation titled *Cluster headroom outside the CI sizing band*. That
+is not a test failure and the annotation says so: the tests are whatever
+the log says they are, and the verdict is a statement about the cluster
+they ran on.
+
+Nothing else gates, and the asymmetry is deliberate rather than
+incidental:
+
+* **The lower bound (0.35) never gates.** Being oversized is not urgent,
+  no build is at risk, and the response is a topology change nobody makes
+  from one run. It is also the *common* reading -- 30 of the 40 cluster
+  job-runs phase 5 measured were below it -- so returning a status for it
+  would redden three quarters of cluster CI immediately. Ask the question over
+  a window instead; the command is below.
+* **The per-node bound (0.85) never gates.** The statistic saturates at
+  its ceiling on plenty of passing runs, so it cannot tell a bad run from
+  a good one at the top of its range. Read it as what a topology should
+  achieve, not as an alarm about one run.
+* **The refusal count never gates.** Phase 4 doubled a cluster's ledger
+  and the guard refused at essentially the same rate, because
+  `expected_demand` accumulates until whatever bound it is given fills up.
+  The count is the earliest sign the demand estimator has drifted, and
+  nothing more; `PLAN-transient-capacity-refusals` is what reads it.
+* **A broken report never gates.** An absent census or a bug in the tool
+  itself is printed and exits 0. An instrument that can fail the job it
+  measures changes the failure surface it exists to measure.
+* **Nor does a verdict the report could not read.** An OVERSUBSCRIBED
+  band is withheld, printed with the reason and exit 0, when the p90 rests
+  on fewer than 20 samples which produced a cluster CPU fraction (five
+  minutes at the probe's 15 second interval; the smallest real job-run in
+  the phase 2 baseline had 41), when any sample reported
+  `capacity_degraded`, when any sample predates that flag (a bundle whose
+  probe cannot say whether its read failed), or when any sample was
+  ledger-unreadable *after* the warm-up prefix every run opens with. Each
+  of those is the capacity read failing, not the cloud being full. The
+  summary record carries the decision as `verdict.gates` and the reasons
+  as `verdict.gate_withheld`. Because a single such sample withholds a
+  whole run, the gate can go quiet without anything failing; the window
+  command below counts withheld job-runs so that "the gate never fired"
+  and "the gate was never allowed to fire" can be told apart.
+
+Two switches sit in front of the gate, both of which fail towards *not*
+gating. `ci_headroom_verdict.sh` believes a status of 3 only when the
+string `BAND_VIOLATION_EXIT` appears in the report's source, so a cluster
+running an older checkout cannot have its exit code misread -- the same
+feature detection `ci_headroom_collect.sh` already does before passing a
+flag. And the gate has an off switch that needs no commit: setting the
+`CI_HEADROOM_GATE` **repository variable** to `false` (Settings, Secrets
+and variables, Actions, Variables) turns it off for every run which starts
+afterwards. Both switches matter because `functional-tests.yml` reaches
+that workflow at `@main` with no pin to bump: a change there is live for
+every run in flight and cannot be rolled back from here. The reverse
+also holds: every call site here now passes `headroom_gate`, and GitHub
+rejects a call passing an input the callee does not declare, so
+reverting shakenfist/actions#94 would fail every functional job on an
+undeclared input rather than ungate it. The rollbacks are the variable,
+or removing the input from these call sites before the actions-side
+revert.
+
+The gate is armed only on job shapes a warn window has measured, which
+today means the merge matrix in `functional-tests.yml` -- the four jobs
+phase 5's window read. That call site passes
+`headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}`, so the variable
+being unset leaves the gate on. The other three call sites of
+`smoke-cluster.yml` pass `headroom_gate: false`: the smoke tier job (pull
+requests only, a single node, never harvested because the harvest reads
+`merge_group` runs), the Ansible modules job (its collect step does not
+run at all), and the dispatch-only matrix in `scheduled-tests.yml` (whose
+single machine entry has never been harvested). Every call site has to
+pass one of those two values explicitly. The reusable workflow leaves
+the gate off when nothing is passed (shakenfist/actions#102; before it,
+the default gated), but that default lives in another repository at
+`@main`, so a call site's policy is stated here where a change to it
+shows up in review. `shakenfist/tests/test_headroom_gate_workflow_seams.py` enforces
+both rules: it derives each call site's shape per matrix entry (topology,
+tier, `test_kind`, `stestr_config`) and fails if an armed one is not in
+its `MEASURED_SHAPES`. An armed call site must pass all four inputs
+itself, since the defaults live in shakenfist/actions at `@main` and a
+shape derived from one could drift without anything here changing. The
+base image is deliberately outside the shape: the band measures the
+cloud, and the window covered Debian 12 and Ubuntu 24.04 on the same
+topology. Arming a new shape means adding it there, with a
+window of its own behind it.
+
+#### Asking whether a cloud is oversized
+
+A single OVERSIZED verdict is noise. The question is a window, and
+`tools/ci_headroom_harvest.py` already computes the fraction, so it needs
+a command rather than new infrastructure:
+
+```bash
+python3 tools/ci_headroom_harvest.py \
+    --since 2026-09-21 --until 2026-09-24 \
+    -o /tmp/window.jsonl
+python3 - <<'EOF'
+import collections, json, re
+rows = [json.loads(l) for l in open('/tmp/window.jsonl')]
+by = collections.defaultdict(list)
+skipped = 0
+pregate = 0
+withheld = collections.Counter()
+for r in rows:
+    v = (r.get('summary') or {}).get('verdict') or {}
+    if v.get('p90_cpu_fraction') is not None:
+        by[(r['topology'], r['job'])].append(v)
+    else:
+        skipped += 1
+    # Absent on records written before the gate existed, which is not
+    # the same as a series the gate was allowed to judge.
+    if 'gate_withheld' not in v:
+        pregate += 1
+        continue
+    for reason in v['gate_withheld']:
+        withheld[re.sub(r'\d+', 'N', reason)] += 1
+for key, verdicts in sorted(by.items()):
+    bands = collections.Counter(v['band'] for v in verdicts)
+    fractions = sorted(v['p90_cpu_fraction'] for v in verdicts)
+    print(key, len(verdicts), 'max %.3f' % fractions[-1], dict(bands))
+print(skipped, 'job-runs had no fraction to judge and are not counted')
+verdicts = [(r.get('summary') or {}).get('verdict') or {} for r in rows]
+print(sum(1 for v in verdicts if v.get('gate_withheld')),
+      'job-runs had a series which could not have supported a violation:',
+      dict(withheld))
+print(sum(1 for v in verdicts if v.get('gate_withheld')
+          and v.get('band') == 'OVERSUBSCRIBED'),
+      'of those read OVERSUBSCRIBED, so withholding changed the outcome')
+print(pregate, 'job-runs predate the gate and say nothing about it')
+EOF
+```
+
+Filter on the fraction rather than on `series_present`: a series which
+exists but produced no usable CPU sample (an aborted job, a probe that
+died early) has a `p90_cpu_fraction` of null, and sorting that among
+floats raises.
+
+Name both ends of the window. `--since` alone grows with every merge, and
+`--limit` moves with the day the harvest is run on, so neither reproduces
+the dataset it produced.
+
+### The topology assertion fails rather than skipping
+
+The other gate here is a test rather than a verdict, and it asks a
+different question: not how full the cluster got, but whether it was ever
+the right shape. `cluster_ci_tests/test_nodes.py`'s
 `test_cluster_topology_meets_the_structural_minimum` fails the job when
 the deployed cluster reports fewer than three nodes, three hypervisors,
 two non-network hypervisors, or a summed hypervisor ledger below 24. It
@@ -453,9 +584,9 @@ what `scheduled-tests.yml` runs `cluster-ci.conf` against on purpose --
 where it skips, because none of those minimums means anything on one
 node.
 
-That is not the same as the instrumentation being invisible to the
-checks that do gate, which is what this section used to say and what
-issue 3975 disproved -- see below.
+Neither gate is the same thing as the instrumentation being invisible to
+the checks that were already gating, which is what this part of the page
+used to claim and what issue 3975 disproved -- see below.
 
 ### The probe's traffic is exempted from the idle-load check
 
