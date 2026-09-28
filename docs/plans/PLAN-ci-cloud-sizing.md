@@ -1014,7 +1014,7 @@ those are corrected here as well.
 | 2. Baseline measurement window: the peak-demand distribution that has never existed | [PLAN-ci-cloud-sizing-phase-02-baseline.md](PLAN-ci-cloud-sizing-phase-02-baseline.md) | Complete | `e951ee42d` (#4089), `3546fabed` (#4138) |
 | 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | [PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md](PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md) | Complete | `ead1ccba5` (#4152), `f3b245304` (#4170), `c13d2c6fd` (#4186), `210fb4469` (#4193) |
 | 4. Re-shape the topologies against the phase 2 data | [PLAN-ci-cloud-sizing-phase-04-topologies.md](PLAN-ci-cloud-sizing-phase-04-topologies.md) | Complete | `870a5fbec` (#4202), `6856aad74` (#4289) |
-| 5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger | [PLAN-ci-cloud-sizing-phase-05-guardrails.md](PLAN-ci-cloud-sizing-phase-05-guardrails.md) | Complete | `de87bcde2` (#4308), `633c56b31` (shakenfist/actions#94) |
+| 5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger | [PLAN-ci-cloud-sizing-phase-05-guardrails.md](PLAN-ci-cloud-sizing-phase-05-guardrails.md) | Complete | `de87bcde2` (#4308), `633c56b31` (shakenfist/actions#94), `704416829` (#4328), `e2243a554` (shakenfist/actions#102) |
 | 6. Documentation and downstream propagation | PLAN-ci-cloud-sizing-phase-06-docs.md | Not started | — |
 | 7. Push audit | PLAN-ci-cloud-sizing-phase-07-push-audit.md | Not started | — |
 
@@ -1039,16 +1039,19 @@ code that sits in no range is a diff nothing audits. It is recorded
 `PLAN-transient-capacity-refusals.md`, whose phase 2 added the guard,
 because the defect was in this phase's test file.
 
-Phase 5's cell is deliberately incomplete, and this says so rather
-than letting it read as finished. It records the two merges that are
-knowable -- `de87bcde2` (#4308) here and `633c56b31`
-(shakenfist/actions#94) there -- but its steps 5e, 5f and 5g ran
-*after* #4308 merged, because 5e needs merge runs carrying 5b-5d and
-5f needs 5e. They land as a third pull request, whose merge commit no
-commit inside it can name. **Phase 6's planning must append that SHA
-to the cell**, the same after-the-fact repair the phase 3 note above
-describes, and for the same reason: a diff that sits in no range is a
-diff the push audit does not read.
+Phase 5's cell records four merges, and the last two were appended
+after the fact by phase 6's planning, which is the earliest point they
+could be known. Its steps 5e, 5f and 5g ran *after* #4308 merged --
+5e needs merge runs carrying 5b-5d, and 5f needs 5e -- so they landed
+as a third pull request, `704416829` (#4328), whose merge commit no
+commit inside it could name. `e2243a554` (shakenfist/actions#102) is
+the fourth: it turned `smoke-cluster.yml`'s `headroom_gate` default
+off, after #4328's review found two single-node callers that would
+have been gated on a band no window measured the moment #4328 put
+`BAND_VIOLATION_EXIT` on `develop`. It is recorded here for the same
+reason the phase 3 note above gives: a diff that sits in no range is a
+diff the push audit does not read. **Phase 6's own `Merged` cell is
+empty for the same reason, and phase 7's planning must append it.**
 
 The master plan itself landed as `ab2158cb2` (#3938), ahead of
 phase 0. Phase 1's other half -- the invocation in the reusable
