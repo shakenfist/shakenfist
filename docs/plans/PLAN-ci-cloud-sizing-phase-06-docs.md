@@ -383,7 +383,8 @@ It gets an issue naming both call sites, the composite action as the
 seam, and the two Future work entries that already describe it. The cost
 of leaving it is recorded and unchanged: `Node lifecycle` is the best
 performer in the failure table and the utilisation-versus-failure
-correlation cannot speak to it.
+correlation cannot speak to it. Filed as
+[#4367](https://github.com/shakenfist/shakenfist/issues/4367).
 
 ### D5 -- No new shape is armed, and no downstream window is opened
 

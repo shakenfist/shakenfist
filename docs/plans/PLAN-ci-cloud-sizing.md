@@ -1716,10 +1716,31 @@ which is what `tools/check-plan-status.py` enforces.
   moving them into (or duplicating them beside) the action is a
   change to how *every* caller deploys. That is the same seam as the
   entry above; phase 6's 6e files an issue for this half rather than
-  closing it, tracked there. The cost of leaving it is concrete
-  and already paid: `Node lifecycle` is the best performer in the
-  failure table, and the baseline's utilisation-versus-failure
-  correlation cannot speak to it.
+  closing it, tracked as
+  [#4367](https://github.com/shakenfist/shakenfist/issues/4367). The
+  cost of leaving it is concrete and already paid: `Node lifecycle`
+  is the best performer in the failure table, and the baseline's
+  utilisation-versus-failure correlation cannot speak to it.
+- **Arm the headroom gate on a downstream or single-node cloud.**
+  Phase 6's D5 found this is three changes and a window, not a
+  decision. `tools/ci_headroom_harvest.py`'s `list_runs()` hardcodes
+  `event=merge_group` in the API path (`:445`), so it can only read
+  merge-queue runs. `client-python/.github/workflows/functional-tests.yml`
+  triggers on `pull_request:` only (`:11-12`), and that repository has
+  no merge queue, so there are no `merge_group` runs to read even
+  once the filter moves. `BUNDLE_TOPOLOGIES`
+  (`tools/ci_headroom_harvest.py:152-164`) is keyed on shakenfist's
+  own bundle artifact names, and an unrecognised name raises
+  `UnknownBundleError` by design, so `--repo` exists but stops the
+  harvest on the first bundle from anywhere else. Phase 5 established,
+  and phase 6 did not change, that the shape most worth arming
+  eventually is the single-node smoke cloud that already runs on
+  every pull request in this repository (`smoke_collection`,
+  `functional-tests.yml`) -- it is the one developers hit first -- but
+  it is also the one the harvest cannot currently see, for the same
+  `pull_request`-versus-`merge_group` reason as client-python. Not
+  attempted in phase 6, which is documentation-only; the next attempt
+  starts from this list of three changes rather than rediscovering it.
 
 ### Bugs fixed during this work
 
