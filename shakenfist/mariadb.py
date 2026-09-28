@@ -103,6 +103,7 @@ from shakenfist.schema.relationship_types import RelationshipType
 from shakenfist.schema.sqlalchemy import get_table_columns
 from shakenfist.schema.sqlalchemy import pydantic_to_sqlalchemy_table
 from shakenfist.schema.sqlalchemy import TABLE_CREATION_LOCK
+from shakenfist.schema.sqlalchemy import uuid_column_type
 from shakenfist.schema.upload import UploadData
 from shakenfist.util import callstack as util_callstack
 from shakenfist.util.caller_identity import get_caller_daemon
@@ -1556,9 +1557,9 @@ def _build_object_filter_query(
     if criteria.name is not None:
         stmt = stmt.where(table.c.name == criteria.name)
     if criteria.network_uuid is not None:
-        # Convert string UUIDs to uuid.UUID objects when the column uses
-        # native MariaDB UUID type (sa.Uuid), which expects objects with
-        # a .hex attribute rather than plain strings.
+        # Convert string UUIDs to uuid.UUID objects when the column is a
+        # uuid_column_type() (CHAR(32)) column, whose bind processor
+        # expects objects with a .hex attribute rather than plain strings.
         net_uuid: UUID | str = criteria.network_uuid
         if isinstance(net_uuid, str):
             net_uuid = UUID(net_uuid)
@@ -1947,7 +1948,7 @@ def _get_node_metrics_table() -> sa.Table:
             _node_metrics_table = sa.Table(
                 'node_metrics',
                 metadata,
-                sa.Column('node_uuid', sa.Uuid(), primary_key=True),
+                sa.Column('node_uuid', uuid_column_type(), primary_key=True),
                 sa.Column('fqdn', sa.String(255), nullable=False),
                 sa.Column('timestamp', sa.Double(), nullable=False),
                 sa.Column('metrics_json', sa.JSON(), nullable=True),
@@ -2069,12 +2070,12 @@ def _get_cluster_operations_table() -> sa.Table:
             _cluster_operations_table = sa.Table(
                 'cluster_operations',
                 metadata,
-                sa.Column('uuid', sa.Uuid(), primary_key=True),
+                sa.Column('uuid', uuid_column_type(), primary_key=True),
                 sa.Column('operation_type', sa.String(64), nullable=False),
                 sa.Column('created_at', sa.Double(), nullable=False),
-                sa.Column('node_uuid', sa.Uuid(), nullable=True),
-                sa.Column('instance_uuid', sa.Uuid(), nullable=True),
-                sa.Column('network_uuid', sa.Uuid(), nullable=True),
+                sa.Column('node_uuid', uuid_column_type(), nullable=True),
+                sa.Column('instance_uuid', uuid_column_type(), nullable=True),
+                sa.Column('network_uuid', uuid_column_type(), nullable=True),
                 sa.Column('priority', sa.String(32), nullable=True),
                 sa.Column('metadata_json', sa.JSON(), nullable=False),
                 sa.Index('ix_cluster_ops_node', 'node_uuid'),
@@ -2142,7 +2143,7 @@ def _get_cluster_operation_errors_table() -> sa.Table:
             _cluster_operation_errors_table = sa.Table(
                 'cluster_operation_errors',
                 metadata,
-                sa.Column('op_uuid', sa.Uuid(), primary_key=True),
+                sa.Column('op_uuid', uuid_column_type(), primary_key=True),
                 sa.Column('error_report', sa.JSON(), nullable=False),
                 sa.Column('created_at', sa.Double(), nullable=False),
             )
@@ -2228,7 +2229,7 @@ def _get_federation_replay_table() -> sa.Table:
                 sa.Column('token_id',
                           sa.String(128, collation='utf8mb4_nopad_bin'),
                           primary_key=True),
-                sa.Column('rule_uuid', sa.Uuid(), primary_key=True),
+                sa.Column('rule_uuid', uuid_column_type(), primary_key=True),
                 sa.Column('expires_at', sa.Double(), nullable=False),
                 sa.Index('idx_federation_replay_expires', 'expires_at'),
             )
@@ -2744,12 +2745,12 @@ def _get_ipam_reservations_table() -> sa.Table:
             _ipam_reservations_table = sa.Table(
                 'ipam_reservations',
                 metadata,
-                sa.Column('ipam_uuid', sa.Uuid(), nullable=False),
+                sa.Column('ipam_uuid', uuid_column_type(), nullable=False),
                 sa.Column('address', INET4(), nullable=False),
                 sa.Column('reservation_type', sa.Enum(ReservationType),
                           nullable=False),
                 sa.Column('user_type', sa.Enum(ObjectType), nullable=True),
-                sa.Column('user_uuid', sa.Uuid(), nullable=True),
+                sa.Column('user_uuid', uuid_column_type(), nullable=True),
                 sa.Column('reserved_at', sa.Double(), nullable=False),
                 sa.Column('comment', sa.Text(), nullable=True),
                 # Composite primary key ensures uniqueness
@@ -3318,7 +3319,7 @@ def _get_blob_attributes_table() -> sa.Table:
             _blob_attributes_table = sa.Table(
                 'blob_attributes',
                 metadata,
-                sa.Column('uuid', sa.Uuid(), primary_key=True),
+                sa.Column('uuid', uuid_column_type(), primary_key=True),
                 sa.Column('size', sa.BigInteger(), nullable=False, default=0),
                 sa.Column('info', sa.JSON(), nullable=True),
                 sa.Column('last_used', sa.Double(), nullable=True),
@@ -3409,7 +3410,7 @@ def _get_artifact_attributes_table() -> sa.Table:
             _artifact_attributes_table = sa.Table(
                 'artifact_attributes',
                 metadata,
-                sa.Column('uuid', sa.Uuid(), primary_key=True),
+                sa.Column('uuid', uuid_column_type(), primary_key=True),
                 sa.Column('max_versions', sa.Integer(), nullable=False, default=0),
                 sa.Column('shared', sa.Boolean(), nullable=False, default=False),
                 sa.Column('highest_index', sa.Integer(), nullable=False, default=0),
@@ -3433,9 +3434,9 @@ def _get_artifact_indexes_table() -> sa.Table:
             _artifact_indexes_table = sa.Table(
                 'artifact_indexes',
                 metadata,
-                sa.Column('artifact_uuid', sa.Uuid(), nullable=False),
+                sa.Column('artifact_uuid', uuid_column_type(), nullable=False),
                 sa.Column('index_number', sa.Integer(), nullable=False),
-                sa.Column('blob_uuid', sa.Uuid(), nullable=False),
+                sa.Column('blob_uuid', uuid_column_type(), nullable=False),
                 sa.PrimaryKeyConstraint('artifact_uuid', 'index_number'),
                 sa.Index('idx_artifact_idx_blob_uuid', 'blob_uuid'),
             )
@@ -3593,7 +3594,7 @@ def _get_scheduler_node_capacity_table() -> sa.Table:
             _scheduler_node_capacity_table = sa.Table(
                 'scheduler_node_capacity',
                 metadata,
-                sa.Column('node_uuid', sa.Uuid(), primary_key=True),
+                sa.Column('node_uuid', uuid_column_type(), primary_key=True),
                 # BIGINT to match the int64 proto fields. Per-node
                 # counters can not realistically overflow INT, but the
                 # cluster singleton sums them and the tables are new in
@@ -3645,7 +3646,7 @@ def _get_namespace_claims_table() -> sa.Table:
             _namespace_claims_table = sa.Table(
                 'namespace_claims',
                 metadata,
-                sa.Column('uuid', sa.Uuid(), primary_key=True),
+                sa.Column('uuid', uuid_column_type(), primary_key=True),
                 sa.Column('namespace', sa.String(255), nullable=False),
                 # BIGINT to match the int64 proto fields; see the
                 # scheduler_node_capacity definition.
@@ -10650,7 +10651,7 @@ def _get_node_attributes_table() -> sa.Table:
             _node_attributes_table = sa.Table(
                 'node_attributes',
                 metadata,
-                sa.Column('uuid', sa.Uuid(), primary_key=True),
+                sa.Column('uuid', uuid_column_type(), primary_key=True),
                 sa.Column(
                     'last_seen', sa.Double(),
                     nullable=False, default=0.0
@@ -10848,7 +10849,7 @@ def _get_node_daemon_states_table() -> sa.Table:
             _node_daemon_states_table = sa.Table(
                 'node_daemon_states',
                 metadata,
-                sa.Column('node_uuid', sa.Uuid(), nullable=False),
+                sa.Column('node_uuid', uuid_column_type(), nullable=False),
                 sa.Column('daemon', sa.String(32), nullable=False),
                 sa.Column('value', sa.String(32), nullable=True),
                 sa.Column(

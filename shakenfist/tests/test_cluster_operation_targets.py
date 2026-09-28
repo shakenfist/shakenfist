@@ -7,6 +7,7 @@ from shakenfist.baseobject import DatabaseBackedObjectWithOperations
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.sqlalchemy import uuid_column_type
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
@@ -1191,7 +1192,7 @@ class DirectListClusterOperationsForTargetTestCase(
             sa.Column('target_uuid', sa.String(36), nullable=False),
             sa.Column('created_at', sa.Double(), nullable=False),
         )
-        # cluster_operations.uuid is a Uuid() column exactly as in
+        # cluster_operations.uuid is a uuid_column_type() column exactly as in
         # production. An earlier version of this fixture used String(36)
         # here, which stored the dashed UUID form and so happened to
         # match the dashed String in cluster_operation_targets on a
@@ -1202,12 +1203,12 @@ class DirectListClusterOperationsForTargetTestCase(
         self._ops_table = sa.Table(
             'cluster_operations',
             self._metadata,
-            sa.Column('uuid', sa.Uuid(), primary_key=True),
+            sa.Column('uuid', uuid_column_type(), primary_key=True),
             sa.Column('operation_type', sa.String(64), nullable=False),
             sa.Column('created_at', sa.Double(), nullable=False),
-            sa.Column('node_uuid', sa.Uuid(), nullable=True),
-            sa.Column('instance_uuid', sa.Uuid(), nullable=True),
-            sa.Column('network_uuid', sa.Uuid(), nullable=True),
+            sa.Column('node_uuid', uuid_column_type(), nullable=True),
+            sa.Column('instance_uuid', uuid_column_type(), nullable=True),
+            sa.Column('network_uuid', uuid_column_type(), nullable=True),
             sa.Column('priority', sa.String(32), nullable=True),
             sa.Column('metadata_json', sa.JSON(), nullable=False),
         )
