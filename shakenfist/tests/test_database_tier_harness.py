@@ -410,8 +410,10 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
             'roster on a timer during a CI run any more. That is the entire '
             'justification for exempting GetNode/api, GetNodeAttributes/api, '
             'GetAllNodeDaemonStates/api and GetNodeMetrics/api in '
-            'HARNESS_DRIVEN_PAIRS -- drop those four and let the idle load '
-            'check see the pairs again.')
+            'HARNESS_DRIVEN_PAIRS, and most of the justification for '
+            'GetObjectsByState/api -- drop the four, re-derive the fifth '
+            'against the capacity wait, and let the idle load check see the '
+            'pairs again.')
 
         tree = _parse('tools', 'ci_headroom_probe.py')
 
@@ -451,9 +453,91 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
             'HARNESS_DRIVEN_PAIRS', ast.get_docstring(tree) or '',
             'tools/ci_headroom_probe.py\'s docstring no longer names '
             'HARNESS_DRIVEN_PAIRS, so nothing in the file a decommission '
-            'starts from says that retiring the probe means trimming four '
+            'starts from says that retiring the probe means trimming five '
             'pairs from shakenfist/deploy/shakenfist_ci/load_budget.py. Put '
             'the note back, or drop the exemption with the probe.')
+
+    def test_the_iterator_uuid_list_read_is_exempt(self):
+        # The fifth probe-driven pair (issue 4359). Unlike the four
+        # per-node pairs it is one read per sampled endpoint -- Nodes has
+        # no _find override, so the default iterator opens with a
+        # get_objects_by_state() for the uuid list the per-node reads then
+        # hydrate -- so it does not scale with node count and clears only
+        # the 0.25/s floor of the unbudgeted ceiling, which only the
+        # one-node smoke topology meets. The #3975 and #4028 fixes each
+        # enumerated the reads they could see downstream of the iterator
+        # and missed the iterator's own; this is the check that was
+        # missing both times.
+        self.assertTrue(
+            harness.harness_driven(('GetObjectsByState', 'api')),
+            'GetObjectsByState/api is not exempt, so the uuid-list read '
+            'underneath the headroom probe\'s two endpoints will fail '
+            'test_no_unbudgeted_fixed_rate_database_polling again on any '
+            'one-node smoke job, where the 0.25/s floor of the unbudgeted '
+            'ceiling binds (issue 4359).')
+
+        # Scoped to the caller the harness actually paces. The same
+        # operation from the cluster daemon is the elected maintenance
+        # sweep, ordinary server-side traffic with a budget entry, and a
+        # new fixed-rate GetObjectsByState poll from any other daemon must
+        # still be visible.
+        self.assertFalse(
+            harness.harness_driven(('GetObjectsByState', 'cluster')))
+        self.assertFalse(
+            harness.harness_driven(('GetObjectsByState', 'queues')))
+
+    def test_the_roster_iterator_still_reads_a_uuid_list(self):
+        # The argument for exempting GetObjectsByState/api is that both of
+        # the probe's endpoints iterate Nodes, which has no _find override
+        # and so takes baseobject.py's default -- whose first act is one
+        # get_objects_by_state() for the uuid list it then hydrates.
+        # Derived rather than asserted, like the probe checks above: the
+        # #3975 and #4028 fixes both went stale because the derivation was
+        # only prose, and nothing noticed when it stopped describing the
+        # code.
+        tree = _parse('shakenfist', 'node.py')
+        nodes_class = None
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name == 'Nodes':
+                nodes_class = node
+        self.assertIsNotNone(
+            nodes_class,
+            'shakenfist/node.py no longer defines a Nodes iterator, so the '
+            'derivation behind the GetObjectsByState/api exemption in '
+            'HARNESS_DRIVEN_PAIRS no longer describes anything. Re-derive '
+            'the exemption from what GET /nodes and GET /admin/resources '
+            'now iterate.')
+
+        overrides = [n.name for n in nodes_class.body
+                     if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                     and n.name == '_find']
+        self.assertEqual(
+            [], overrides,
+            'Nodes now overrides _find, so iterating it no longer issues '
+            'the default uuid-list GetObjectsByState the probe\'s exemption '
+            'is written against -- its samples now produce whatever RPC the '
+            'override calls instead, which is unbudgeted for the api caller '
+            'and will fail test_no_unbudgeted_fixed_rate_database_polling. '
+            'Re-derive: move the GetObjectsByState/api exemption in '
+            'HARNESS_DRIVEN_PAIRS onto the new RPC\'s pair (issue 4359).')
+
+        # And the default the iterator therefore takes really does open
+        # with the uuid-list read the exemption names.
+        tree = _parse('shakenfist', 'baseobject.py')
+        default_find_calls = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == '_find':
+                for sub in ast.walk(node):
+                    if (isinstance(sub, ast.Call)
+                            and isinstance(sub.func, ast.Attribute)):
+                        default_find_calls.add(sub.func.attr)
+        self.assertIn(
+            'get_objects_by_state', default_find_calls,
+            'The default _find in shakenfist/baseobject.py no longer calls '
+            'get_objects_by_state, so iterating Nodes no longer produces '
+            'the GetObjectsByState/api traffic HARNESS_DRIVEN_PAIRS exempts '
+            '-- drop the exemption, or re-derive it from what the default '
+            'iterator now reads (issue 4359).')
 
     def test_harness_reads_the_shipped_budget_not_a_copy(self):
         # If the harness ever grows its own copy of the numbers this stops
