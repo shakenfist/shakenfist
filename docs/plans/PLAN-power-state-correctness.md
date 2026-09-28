@@ -224,7 +224,7 @@ phases 0, 1b and 3 all rely on `create()` failing when power on fails.
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 0. Assert power state in the existing lifecycle tests | [PLAN-power-state-correctness-phase-00-assertions.md](PLAN-power-state-correctness-phase-00-assertions.md) | Complete | `250a40871` |
-| 1a. Honest libvirt domain listing | PLAN-power-state-correctness-phase-01a-listing.md | Not started | — |
+| 1a. Honest libvirt domain listing | [PLAN-power-state-correctness-phase-01a-listing.md](PLAN-power-state-correctness-phase-01a-listing.md) | In progress | — |
 | 1b. The cleaner sees powered off domains | PLAN-power-state-correctness-phase-01b-inactive-domains.md | Not started | — |
 | 2. Autostart and instance restore | PLAN-power-state-correctness-phase-02-autostart-restore.md | Not started | — |
 | 3. Power operations answer truthfully | PLAN-power-state-correctness-phase-03-power-api.md | Not started | — |
@@ -268,6 +268,13 @@ expect inactive domains to be seen will then fail, which is correct, and
 are marked as expected failures for phase 1b to turn on. Plan at medium
 effort.
 
+The phase survey found a third helper, `get_active_domain_ids()`, added
+for the resources daemon's 5 second poll after this plan's audit. It is
+honestly named already and stays on `listDomainsID()`. The survey also
+found that only the shutoff expectation fails under an honest fake,
+because a crashed domain is active in libvirt's model; see S4 and S5 in
+the phase plan.
+
 ### Phase 1b: the cleaner sees powered off domains
 
 Point the cleaner's second loop and its apparmor sweep at the inactive
@@ -302,7 +309,10 @@ mostly the guards that the dead code never needed:
   shutoff reason in the event's `extra`, so that a qemu killed by the
   OOM killer is distinguishable from a guest `poweroff`. Decide whether
   a `CRASHED` shutoff reason maps to `crashed` -- the case F3 was trying
-  to catch.
+  to catch. Note that `on_crash` is `restart` in `libvirt.tmpl` and there
+  is no panic device, so libvirt never reports a crash for our domains
+  today, and the first loop's `crashed` branch is unreachable (phase 1a
+  S4). The decision covers both.
 
 Note the new database load: every pass now runs `place_instance()` for
 every powered off instance, and the phase plan should estimate it
