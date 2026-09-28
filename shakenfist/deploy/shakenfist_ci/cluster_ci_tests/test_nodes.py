@@ -391,10 +391,22 @@ class TestNodes(base.BaseNamespacedTestCase):
         # published on a flat 60 s cadence, so a node kept refusing new
         # work for up to a minute after its last instance was deleted even
         # though the ledger had already cleared. sf-resources now
-        # republishes within about 5 s of the active-domain set changing,
-        # which this asserts against the same /admin/resources fields
-        # test_cluster_resources_reservations() does above -- raw
-        # node_metrics rows are not exposed over REST.
+        # republishes within about 5 s of the active-domain set changing.
+        #
+        # What is asserted is *when the node looked*, not what it counted.
+        # This suite's cluster is shared: other tests' instances start and
+        # stop on the watched node while this test runs, so a vCPU count
+        # read from it cannot be attributed to this test's instance. Issue
+        # 4214 traced every inspected failure of the count-based version of
+        # this test to exactly that -- siblings arriving on the node (it
+        # read 8 where it expected 0), or one arriving in the same second
+        # this instance's domain went away and holding the figure where it
+        # was -- with sf-resources publishing the correct value throughout.
+        # Instead, each power event records libvirt_requested_at, taken on
+        # the node's clock just before libvirt was asked, and each publish
+        # records domains_enumerated_at on the same clock. A publish which
+        # enumerated at or after the request is one which has seen the
+        # change, whatever else is running.
         resources = self.system_client.get_cluster_resources()
         candidates = [
             n for n in self._hypervisor_nodes()
@@ -402,26 +414,16 @@ class TestNodes(base.BaseNamespacedTestCase):
                 'cpu_available', 0) >= 1]
         if not candidates:
             self.skipTest('No hypervisor with a vCPU of headroom')
-        # The emptiest, not the first, for the same reason
-        # test_cluster_resources_charges_unbooted_placements above picks
-        # that way: the suite runs several tests at once, and the node with
-        # the most headroom is the one least likely to have a sibling's
-        # instance arrive on it while this test is watching.
+        # Any node with room would do now that siblings on it cannot fail
+        # the assertion; the emptiest is kept so that the create below is
+        # the least likely to be refused.
         node = max(
             candidates,
             key=lambda n: resources['per_node'][n['uuid']]['cpu_available'])
 
-        # What the node measured before this test put anything on it.
-        # Taken here rather than after the create, because the rise below
-        # has to be measured against a reading which certainly predates
-        # the new domain.
-        idle_measured = resources['per_node'][node['uuid']]['cpu_measured']
-
         # The instance is pinned so the node this test watches is known
         # in advance -- the pin is the assertion's subject (which node's
-        # cpu_measured to read), not a workaround for capacity. The node
-        # was already chosen above for having room for one more vCPU, so
-        # the pin is not doing any capacity work either.
+        # measurement to read), not a workaround for capacity.
         cpus = 1
         inst = self.create_instance(
             'metrics-drop', cpus, 128, None, [{'size': 1, 'type': 'disk'}],
@@ -431,52 +433,43 @@ class TestNodes(base.BaseNamespacedTestCase):
             inst, indent=4, sort_keys=True)))
         self.assertEqual(node['uuid'], inst['node'])
 
-        # cpu_measured counts running libvirt domains, not placements
-        # (that is what test_cluster_resources_charges_unbooted_placements
-        # above exercises), so the domain has to actually start before a
-        # baseline read of it means anything.
+        # 'created' is set immediately after power_on(), so the poweron
+        # event exists once this returns.
         self._await_instance_create(inst['uuid'])
+        started_at = self._libvirt_requested_at(inst['uuid'], 'poweron')
 
-        # ...and starting is not enough either. _await_instance_create()
-        # returns as soon as the instance reaches 'created', which
-        # Instance.create() sets immediately after power_on(), while the
-        # figure read here has to travel through a five second domain poll,
-        # a publish, and the scheduler's SCHEDULER_CACHE_TIMEOUT cache. A
-        # baseline taken before that arrives is the node's *idle*
-        # measurement, the threshold below it is one the node can never
-        # return to, and the test then fails at its deadline for the
-        # opposite of the reason it exists.
-        #
-        # So wait for the rise first. That wait is not overhead: a
-        # measurement which follows a domain starting is the same claim as
-        # one which follows a domain going away, so this asserts the
-        # phase's behaviour in the other direction, and says so distinctly
-        # when it is publish-on-start that is broken.
-        baseline_measured = self._await_cpu_measured(
-            node['uuid'], lambda measured: measured >= idle_measured + cpus,
-            'rise to at least %d, including the %d vCPUs of an instance '
-            'which has started' % (idle_measured + cpus, cpus))
+        # A publish enumerated after the start was requested can still
+        # predate the domain becoming active, because domain.create() takes
+        # a while and a sibling changing the domain set mid-create triggers
+        # a publish of its own. So the start side also requires the figure
+        # to hold at least this instance's vCPUs. Siblings can satisfy that
+        # early -- a false pass -- but cannot make it fail: the publish
+        # which does see this domain is enumerated later still, and the
+        # wait keeps polling until it arrives.
+        self._await_measurement_after(
+            node['uuid'], started_at,
+            lambda per_node: per_node['cpu_measured'] >= cpus,
+            'the domain start requested at %.3f and counting at least the %d '
+            'vCPUs of the started instance' % (started_at, cpus))
         self.addDetail('resources before delete', content.text_content(
             json.dumps(self.system_client.get_cluster_resources(),
                        indent=4, sort_keys=True)))
 
         # self.system_client uses ASYNC_PAUSE, so this blocks until the
-        # instance's state is 'deleted' -- the 20 s poll below starts
-        # counting from that point, not from when the request was issued.
+        # instance's state is 'deleted', which is after power_off().
         self.system_client.delete_instance(inst['uuid'])
+        stopped_at = self._libvirt_requested_at(inst['uuid'], 'poweroff')
 
-        # A drop by the instance's vCPUs rather than a drop to zero,
-        # because the node is not assumed to be otherwise idle -- this
-        # suite's cluster is shared and the node may be carrying load this
-        # test did not create. It does not make the assertion immune to a
-        # sibling *arriving* mid-window, which would raise cpu_measured by
-        # its own vCPUs and could hold the value above the threshold; the
-        # emptiest-node choice above reduces that, and it remains the one
-        # known flake source here.
-        self._await_cpu_measured(
-            node['uuid'], lambda measured: measured <= baseline_measured - cpus,
-            'fall to at most %d, by the %d vCPUs of a deleted instance'
-            % (baseline_measured - cpus, cpus))
+        # No bound on the figure here: whatever the node now counts
+        # belongs to other instances. An enumeration that started at or
+        # after the destroy request and saw the domain anyway would need
+        # destroy() still to be in flight, and a publish from it would
+        # need a sibling to change the set in that same instant; the
+        # publish which follows the domain actually going away is always
+        # enumerated after the request, so this cannot fail falsely.
+        self._await_measurement_after(
+            node['uuid'], stopped_at, lambda per_node: True,
+            'the domain destroy requested at %.3f' % stopped_at)
         self.addDetail('resources after delete', content.text_content(
             json.dumps(self.system_client.get_cluster_resources(),
                        indent=4, sort_keys=True)))
@@ -489,16 +482,34 @@ class TestNodes(base.BaseNamespacedTestCase):
     CPU_MEASURED_DEADLINE_SECONDS = 20
     CPU_MEASURED_POLL_SECONDS = 5
 
-    def _await_cpu_measured(self, node_uuid, predicate, expectation):
-        """Wait for a node's published cpu_measured to satisfy predicate.
+    def _libvirt_requested_at(self, instance_uuid, message):
+        """When this instance's first ``message`` power event asked libvirt.
 
-        Returns the value which satisfied it. ``expectation`` completes
-        the sentence "cpu_measured did not ..." in the failure message, so
-        a broken publish-on-start and a broken publish-on-delete do not
-        report identically.
+        The earliest, because deleting an instance calls power_off() more
+        than once and only the first finds a running domain to destroy.
+        """
+        requested = [
+            (e.get('extra') or {}).get('libvirt_requested_at')
+            for e in self.system_client.get_instance_events(instance_uuid)
+            if e.get('message') == message]
+        requested = [r for r in requested if r is not None]
+        self.assertNotEqual(
+            [], requested,
+            'Instance %s has no %s event carrying libvirt_requested_at'
+            % (instance_uuid, message))
+        return min(requested)
+
+    def _await_measurement_after(self, node_uuid, since, predicate, change):
+        """Wait for a node to publish a measurement taken at or after since.
+
+        ``predicate`` is further applied to the node's /admin/resources
+        entry, and the wait continues until both hold. ``change`` completes
+        the sentence "published no measurement following ..." in the
+        failure message, so a broken publish-on-start and a broken
+        publish-on-delete do not report identically.
         """
         deadline = time.time() + self.CPU_MEASURED_DEADLINE_SECONDS
-        measured = None
+        per_node = None
         while True:
             resources = self.system_client.get_cluster_resources()
             per_node = resources['per_node'].get(node_uuid)
@@ -506,17 +517,21 @@ class TestNodes(base.BaseNamespacedTestCase):
                 per_node,
                 'Node %s is absent from /admin/resources per_node'
                 % node_uuid)
-            measured = per_node['cpu_measured']
-            if predicate(measured):
-                return measured
+            enumerated_at = per_node.get('domains_enumerated_at')
+            self.assertIsNotNone(
+                enumerated_at,
+                'Node %s publishes no domains_enumerated_at' % node_uuid)
+            if enumerated_at >= since and predicate(per_node):
+                return per_node
 
             if time.time() > deadline:
                 break
             time.sleep(self.CPU_MEASURED_POLL_SECONDS)
 
         self.fail(
-            'Node %s publishes cpu_measured %r, which did not %s within '
-            '%ds. The measurement should follow the running-domain set '
-            'within seconds, not within a minute.'
-            % (node_uuid, measured, expectation,
-               self.CPU_MEASURED_DEADLINE_SECONDS))
+            'Node %s published no measurement following %s within %ds; its '
+            'latest enumerated domains at %.3f and counts cpu_measured %r. '
+            'The measurement should follow the running-domain set within '
+            'seconds, not within a minute.'
+            % (node_uuid, change, self.CPU_MEASURED_DEADLINE_SECONDS,
+               per_node['domains_enumerated_at'], per_node['cpu_measured']))

@@ -1107,6 +1107,14 @@ class Scheduler:
             # diagnosable if you can see which of the two is binding.
             resources['per_node'][n]['cpu_hard_max'] = hard_max_cpus
             resources['per_node'][n]['cpu_measured'] = measured_cpus
+            # When the node enumerated the domains cpu_measured counts, on
+            # the node's own clock (None from a node which predates the
+            # field). A figure on a shared node can move because of any
+            # instance; this says whether the measurement is recent enough
+            # to have seen a particular domain start or stop, compared with
+            # the libvirt_requested_at on that instance's power event.
+            resources['per_node'][n]['domains_enumerated_at'] = \
+                self.metrics[n].get('domains_enumerated_at')
             resources['per_node'][n]['cpu_committed'] = committed_cpus
             current_cpu = max(measured_cpus, committed_cpus)
             resources['per_node'][n]['cpu_available'] = hard_max_cpus - current_cpu

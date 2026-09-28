@@ -860,6 +860,17 @@ guarded capacity claim](#admission-is-a-guarded-capacity-claim) for what
 `cpu_committed` and its `cpu_committed_row_present` companion actually
 mean.
 
+Each node also reports `domains_enumerated_at`: when, on that node's
+own clock, `sf-resources` listed the libvirt domains behind
+`cpu_measured` (`null` from a node which predates the field). A node
+publishes within a few seconds of any domain starting or stopping, so on
+a busy node `cpu_measured` moves for reasons unrelated to any one
+instance. To ask whether the published figure has caught up with a
+particular instance, compare `domains_enumerated_at` with the
+`libvirt_requested_at` recorded in that instance's `poweron` or
+`poweroff` event (same node, same clock): a measurement enumerated at or
+after the request has seen the change.
+
 ### Was affinity ignored, or was there no choice?
 
 This is the question almost every affinity report turns out to be,
