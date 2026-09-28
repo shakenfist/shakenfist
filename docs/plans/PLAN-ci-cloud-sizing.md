@@ -1015,7 +1015,7 @@ those are corrected here as well.
 | 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | [PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md](PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md) | Complete | `ead1ccba5` (#4152), `f3b245304` (#4170), `c13d2c6fd` (#4186), `210fb4469` (#4193) |
 | 4. Re-shape the topologies against the phase 2 data | [PLAN-ci-cloud-sizing-phase-04-topologies.md](PLAN-ci-cloud-sizing-phase-04-topologies.md) | Complete | `870a5fbec` (#4202), `6856aad74` (#4289) |
 | 5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger | [PLAN-ci-cloud-sizing-phase-05-guardrails.md](PLAN-ci-cloud-sizing-phase-05-guardrails.md) | Complete | `de87bcde2` (#4308), `633c56b31` (shakenfist/actions#94), `704416829` (#4328), `e2243a554` (shakenfist/actions#102) |
-| 6. Documentation and downstream propagation | PLAN-ci-cloud-sizing-phase-06-docs.md | Not started | — |
+| 6. Documentation, and the instrument seam the propagation half turned out to be | [PLAN-ci-cloud-sizing-phase-06-docs.md](PLAN-ci-cloud-sizing-phase-06-docs.md) | In progress | — |
 | 7. Push audit | PLAN-ci-cloud-sizing-phase-07-push-audit.md | Not started | — |
 
 The `Merged` column records what put each phase on `develop`. These
@@ -1303,13 +1303,37 @@ topology edit which halves capacity fails as itself rather than as
 a flake in an unrelated test. Follow the warn-window-then-gate
 pattern the API-validation plan used.
 
-### Phase 6 -- Documentation and downstream propagation
+### Phase 6 -- Documentation, and the instrument seam the propagation half turned out to be
 
-Document the sizing model in `docs/developer_guide/ci.md` --
-the ledger arithmetic, the band, and how to re-measure -- and
-propagate the reshaped topologies to the downstream repositories
-that consume the reusable workflow, per the copy-paste-drift
-finding in `project-sf-ecosystem-ci`.
+Document the sizing model -- the ledger arithmetic, the shapes the
+two cluster topologies actually have, the band, and how to
+re-measure. This half stands as written, and the phase 6 survey
+found it is needed more than it looks: the ledger arithmetic
+appears nowhere in `docs/developer_guide/ci.md`, which uses the
+ledger as the band's denominator throughout, and the *Situation*
+table above still records `slim-tier` at the pre-phase-4 ledger of
+12 with nothing in this document saying it is now 24.
+
+The propagation half no longer exists. It was written against the
+copy-paste-drift finding in `project-sf-ecosystem-ci`, and that
+drift is gone: there is exactly one copy of the topologies, in
+`shakenfist/actions/ansible/`, and every cluster-deploying call
+site in the ecosystem reads it from there. The reusable-workflow
+migration -- `remove-primary` phase 8 -- already did the
+propagating. Phase 6's F1 records the full inventory that
+establishes this.
+
+What that inventory turns up instead is the same concern in
+structural form, and it is what phase 6 does with the half:
+**three of the eight call sites build a cloud the probe never
+sees.** `Ansible modules` reaches the reusable workflow but with
+`test_kind: ansible-modules`, which every probe step is gated
+against; `Node lifecycle` here and kerbside's end-to-end job call
+the `build-smoke-cluster` composite action directly, and the probe
+steps live in the workflow rather than the action. Phase 6 closes
+the first, which is one `if:` condition, and files an issue for the
+other two, which would change how every caller deploys through an
+action consumed at `@main` with no pin.
 
 ### Phase 7 -- Push audit
 
