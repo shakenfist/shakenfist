@@ -33,6 +33,11 @@ jobs:
     runs-on: [self-hosted, static]
     # Just a few gh API calls, so anything beyond this is a hang.
     timeout-minutes: 10
+    outputs:
+      authorized: ${{ steps.trigger.outputs.authorized }}
+      same_repo: ${{ steps.trigger.outputs.same-repo }}
+      pr_ref: ${{ steps.trigger.outputs.pr-ref }}
+      pr_number: ${{ github.event.issue.number }}
 
     steps:
       - name: Handle trigger
@@ -42,12 +47,89 @@ jobs:
           trigger-phrase: 'please retest'
           reaction: 'rocket'
 
+      # The retest job below requires same_repo as well as authorized,
+      # so if pr-bot-trigger renames or drops its same-repo output the
+      # retest silently never runs after the rocket reaction. Fail
+      # loudly instead. pr-re-review.yml carries the same step.
+      #
+      # Every output the job below depends on is checked, not only
+      # same-repo: a step gated on authorized == 'true' would skip
+      # itself exactly when authorized goes missing. triggered is read
+      # first because the job's contains() is case-insensitive and the
+      # action's phrase match is not, so a comment that differs only in
+      # case legitimately gets triggered=false and no authorized at all.
+      - name: Confirm pr-bot-trigger reported the pull request's origin
+        env:
+          TRIGGERED: ${{ steps.trigger.outputs.triggered }}
+          AUTHORIZED: ${{ steps.trigger.outputs.authorized }}
+          SAME_REPO: ${{ steps.trigger.outputs.same-repo }}
+        run: |
+          fail() {
+            echo "$1"
+            echo "Either the output was renamed or dropped in"
+            echo "shakenfist/actions, or the action and this file disagree."
+            echo "Refusing to go on to a retest that would not run."
+            exit 1
+          }
+          case "${TRIGGERED}" in
+            false) exit 0 ;;
+            true) ;;
+            *) fail "pr-bot-trigger reported triggered as '${TRIGGERED}'." ;;
+          esac
+          case "${AUTHORIZED}" in
+            false) exit 0 ;;
+            true) ;;
+            *) fail "pr-bot-trigger reported authorized as '${AUTHORIZED}'." ;;
+          esac
+          if [ "${SAME_REPO}" != "true" ]; then
+            fail "pr-bot-trigger authorized this request but reported same-repo as '${SAME_REPO}'."
+          fi
+
+  retest:
+    name: "Retest PR"
+    needs: trigger-retest
+    # same_repo is redundant -- pr-bot-trigger already folds it into
+    # authorized -- and it is here anyway. This job dispatches a
+    # workflow against the pull request's ref with a write-scoped
+    # token, so the fork guard is worth stating twice: a regression in
+    # the shared action cannot quietly widen what runs here, and a
+    # reader can see the restriction without leaving the file.
+    # pr-re-review.yml does the same for the same reason.
+    if: >-
+      needs.trigger-retest.outputs.authorized == 'true' &&
+      needs.trigger-retest.outputs.same_repo == 'true'
+    runs-on: [self-hosted, static]
+    # A dispatch and a comment, so anything beyond this is a hang.
+    timeout-minutes: 10
+    # Someone commenting the phrase twice should not dispatch the test
+    # suite twice. The dispatched workflow's own concurrency groups
+    # limit the damage downstream, but they cancel a run that has
+    # already started work; not starting it is cheaper. The last
+    # request wins, which is why cancel-in-progress is true: a
+    # cancelled trigger may have dispatched already, and the request
+    # that cancelled it posts its own confirmation.
+    #
+    # The group is on this job rather than on trigger-retest, which is
+    # why the dispatch and the confirmation live here at all.
+    # trigger-retest runs for any non-bot comment carrying the phrase
+    # and decides authorisation inside itself, so a group there would
+    # let an unauthorised commenter cancel an authorised run in flight
+    # -- leaving a dispatched test suite whose only trace on the pull
+    # request is a refusal. This job is entered only once
+    # pr-bot-trigger has said yes, so the group holds authorised
+    # requests against each other and nothing else. pr-re-review.yml
+    # has the same shape for the same reason.
+    concurrency:
+      group: pr-retest-${{ github.event.issue.number }}
+      cancel-in-progress: true
+
+    steps:
       - name: Trigger functional tests
         id: dispatch
-        if: steps.trigger.outputs.authorized == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_REF: ${{ steps.trigger.outputs.pr-ref }}
+          PR_REF: ${{ needs.trigger-retest.outputs.pr_ref }}
+          REPO: ${{ github.repository }}
         run: |
           echo "Triggering functional tests on branch: ${PR_REF}"
 
@@ -56,7 +138,7 @@ jobs:
           # refuses them and says why -- so what is left is a workflow
           # file that is missing, renamed or disabled.
           if gh workflow run functional-tests.yml \
-            --repo "${{ github.repository }}" \
+            --repo "${REPO}" \
             --ref "${PR_REF}"; then
             echo "dispatched=true" >> $GITHUB_OUTPUT
             echo "Functional tests triggered successfully"
@@ -66,19 +148,21 @@ jobs:
           fi
 
       - name: Post confirmation
-        if: steps.trigger.outputs.authorized == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_REF: ${{ steps.trigger.outputs.pr-ref }}
+          PR_REF: ${{ needs.trigger-retest.outputs.pr_ref }}
+          PR_NUMBER: ${{ needs.trigger-retest.outputs.pr_number }}
+          REPO: ${{ github.repository }}
+          DISPATCHED: ${{ steps.dispatch.outputs.dispatched }}
         run: |
-          if [ "${{ steps.dispatch.outputs.dispatched }}" = "true" ]; then
-            gh pr comment "${{ github.event.issue.number }}" \
-              --repo "${{ github.repository }}" \
+          if [ "${DISPATCHED}" = "true" ]; then
+            gh pr comment "${PR_NUMBER}" \
+              --repo "${REPO}" \
               --body "Triggered functional tests on branch \`${PR_REF}\`.
 
-          [View workflow runs](https://github.com/${{ github.repository }}/actions/workflows/functional-tests.yml)"
+          [View workflow runs](https://github.com/${REPO}/actions/workflows/functional-tests.yml)"
           else
-            gh pr comment "${{ github.event.issue.number }}" \
-              --repo "${{ github.repository }}" \
+            gh pr comment "${PR_NUMBER}" \
+              --repo "${REPO}" \
               --body "Unable to trigger functional tests on \`${PR_REF}\`. Check that \`functional-tests.yml\` exists on the default branch, carries a \`workflow_dispatch\` trigger, and is not disabled -- or re-run the failed workflow from the Actions tab instead."
           fi
