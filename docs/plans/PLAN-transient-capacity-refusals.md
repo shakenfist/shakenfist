@@ -422,7 +422,33 @@ say so.
 
 ### 8. Should the server queue a create that does not fit?
 
-**Decide in phase 5, from phase 2's wait data.** The machinery
+**Not answered yet.** Phase 5 took its first reading, over 26
+qualifying `merge_group` runs on the reshaped `slim-tier`, and the
+window was **not readable**: 96 of its 104 instrumented bundles carry
+no capacity-wait trace at all, an unknown fraction of **92.3%**
+against the 25% ceiling phase 5's pre-registered rule sets for
+calling a window readable. The cause is not lost plumbing -- every
+absent bundle carries a fully populated `bundle/traces/` -- but that
+the trace file is created on first write and so cannot express
+"nothing was refused"
+([#4337](https://github.com/shakenfist/shakenfist/issues/4337)). That
+is the rule's *unreadable* case, which is deliberately not one of its
+three outcomes and deliberately does not resolve to Abandon, so the
+phase **extends its window once** rather than deciding on the eight
+readable units. The full reading, the arithmetic for all three
+outcome clauses under both candidate denominators, and what the second
+reading owes before it is taken are in
+[phase 5's Outcome](PLAN-transient-capacity-refusals-phase-05-queue-decision.md).
+
+What the eight readable waits say, held loosely because they are 7.7%
+of the window: waits from 0.036 s to 270.858 s against the suite's
+420 s deadline, none of which reached it; all eight pinned creates,
+which means the fairness assertion below is still unevidenced rather
+than confirmed; seven bound on `cpus`. On the reshaped `slim-tier`
+alone the longest was 180.490 s, below the 210 s line the rule draws.
+None of that decides anything.
+
+**The arguments, which the reading did not disturb.** The machinery
 exists -- `BaseClusterOperation.defer_with_backoff()` already
 re-enqueues with a delay for artifact fetches and network
 operations -- and a `202` with the instance held in `initial` (or a
@@ -431,15 +457,15 @@ passes looks like a contained change. Against it: it is exactly the
 "hold-until-fittable" that scheduler-reservations D8 rejected as
 queue-state surface the project does not want; it has no fairness
 model (a waiting 4-vCPU create starves behind a stream of 1-vCPU
-ones, and a pinned create starves worst); waiting instances hold
-IPAM allocations, so a CPU shortage can become an address shortage;
-and the client's create-and-await path has a ceiling that bounds any
-useful deadline. If phase 2 shows the suite waits are
-short and few once the topology is right, the answer is no and the
-phase closes as Abandoned with the numbers. If they are long or
-many, the phase designs the queue -- FIFO by request time, pinned
-placements admitted against their node only -- and reverses D8 in
-writing.
+ones, and a pinned create starves worst -- an assertion no data
+supports yet, because every refusal phase 5 could read was pinned and
+there was no comparison arm); waiting instances hold IPAM
+allocations, so a CPU shortage can become an address shortage; and
+the client's create-and-await path has a ceiling that bounds any
+useful deadline. Which way those arguments fall is decided by phase
+5's numeric rule on the second reading, not by "short and few" versus
+"long or many" -- that informal test is what the phase plan replaced
+with thresholds fixed before the data existed.
 
 Phase 5's survey corrected four of the sentences above, and the
 corrections move the arithmetic rather than the prose. See
@@ -837,11 +863,16 @@ Planned in
 which fixes the numeric decision rule *before* the data is read,
 because "small" and "near its deadline" above are not numbers and a
 phase which reads twenty runs and then decides what those words meant
-is narrating a decision rather than taking one. That plan's gate is
-closed as written: the sizing plan's phase 4 reshape has not been
-applied to `shakenfist/actions`, whose `ci-topology-slim-tier.yml`
-still carries `cpu: 4` on all three nodes, so the data available today
-describes the cloud the reshape exists to replace.
+is narrating a decision rather than taking one.
+
+The gate has since opened -- the sizing plan's reshape landed as
+`shakenfist/actions#88` (`f78576e`) and its step 4d reported -- and the
+first reading has been taken. It was **unreadable**: 92.3% of the
+window's instrumented bundles carry no capacity-wait trace, because the
+trace cannot express "nothing was refused"
+([#4337](https://github.com/shakenfist/shakenfist/issues/4337)). The
+phase therefore extends its window once, remains `In progress`, and has
+decided nothing. See open question 8 above and that plan's Outcome.
 
 ### Phase 6 -- Documentation and close-out
 
