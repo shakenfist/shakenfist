@@ -609,7 +609,17 @@ that issue exempted only the three RPCs its body named, so the
 probe's pairs clears the check's activity-spread bar varies run to
 run, and on those runs `GetNode` cleared it alone.
 
-Those four `(operation, caller)` pairs are therefore listed in
+The iterator also has a read of its own, above all of that per-node
+hydration: `Nodes` has no `_find` override, so both endpoints take
+`baseobject.py`'s default, which opens with one `GetObjectsByState` to
+fetch the uuid list the per-node reads then hydrate. That read is once
+per call rather than once per node, so it does not scale with cluster
+size and clears only the 0.25/s floor of the ceiling -- which only the
+one-node smoke topology meets. It failed there as issue 4359, the
+second omission of the same kind: the 4028 fix enumerated the reads
+downstream of the iterator and missed the iterator's own.
+
+Those five `(operation, caller)` pairs are therefore listed in
 `HARNESS_DRIVEN_PAIRS` in
 `shakenfist/deploy/shakenfist_ci/load_budget.py`, alongside the events
 reads the suite's own await helpers make. The budget file is
@@ -622,11 +632,13 @@ Two consequences worth knowing:
 
 * **The exemption costs coverage.** CI can no longer see a *new*
   fixed-rate poll of node state made through sf-api, whatever its
-  rate. The blind spot is CI's alone -- none of the four pairs is
-  budgeted for the `api` caller, so the
+  rate, nor one which lists objects through an iterator with no
+  `_find` override -- `GetObjectsByState` reaches sf-api through every
+  such listing, not only the node roster. The blind spot is CI's alone
+  -- none of the five pairs is budgeted for the `api` caller, so the
   `ShakenFistUnbudgetedDatabasePolling` alert, which reads its
   exclusions from the budget file rather than from that set, still
-  watches all four at the unbudgeted ceiling on every real cluster.
+  watches all five at the unbudgeted ceiling on every real cluster.
   The pairs also stay visible in a run's `harness_driven` list rather
   than being dropped from the report.
 * **Retiring the probe means trimming the exemption.** It outlives

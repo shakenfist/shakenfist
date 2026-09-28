@@ -233,17 +233,47 @@ POLL_OVERCOUNT_TOLERANCE = 1.60
 # issue 4028 recurrences saw GetNode alone -- so a run failing on one of
 # these does not mean the others stopped.
 #
+# The iterator has one read of its own above all of that per-node
+# hydration, and it is the fifth pair (issue 4359): Nodes has no _find
+# override, so both endpoints take baseobject.py's default, whose first act
+# is one get_objects_by_state() to fetch the uuid list the per-node reads
+# then hydrate. GET /nodes iterates Nodes([]) directly, and
+# GET /admin/resources constructs a Scheduler whose
+# get_active_node_metrics() iterates Nodes([], prefilter='active'), so each
+# sample is two GetObjectsByState from api -- per call, not per node. That
+# is the second omission of the same kind: the #3975 fix was written from
+# the RPCs named in that issue's body and missed the hydration's GetNode
+# (#4028), and the #4028 fix enumerated the reads downstream of the
+# iterator and missed the iterator's own. Because this pair does not scale
+# with node count it clears only the 0.25/s floor of the ceiling, which
+# only the one-node smoke topology meets: there the probe's flat
+# 2/15 = 0.13/s, with wait_for_capacity()'s GET /admin/resources polls and
+# the suite's own roster reads riding on top, gave fixed_rate() a
+# minimum-window rate of 0.27/s. On the six node merge cluster the same
+# traffic sits under the 0.30/s ceiling, which is why every earlier member
+# of this family was found there and this one could not be. If Nodes ever
+# gains a _find override (a FindNodes RPC), the probe stops producing this
+# pair and starts producing that RPC's -- re-derive this set rather than
+# leaving both entries behind;
+# test_the_roster_iterator_still_reads_a_uuid_list watches for that.
+#
 # The budget is the wrong home for these for the reason above and one more:
 # no deployed cluster runs the headroom probe at all, so an entry would
 # model load which exists nowhere outside a CI job. It would also have to be
 # a per_node term, since the traffic scales with node count, and that raises
 # every real cluster's ceiling in proportion to its size.
+# GetObjectsByState is the exception to the per-node clause -- it is per
+# call -- but the model has no term for once-per-request traffic either: a
+# flat cluster_base_qps would just encode the rate CI's harness happens to
+# sample at, which is the hand-fitting the yaml header forbids.
 #
 # What it costs, again said plainly: this check can no longer see a new
-# fixed-rate poll of node state made through sf-api, whatever its rate. That
-# is a wider blind spot than the events one. It is still CI's alone -- none
-# of these four pairs is budgeted for the api caller, so
-# ShakenFistUnbudgetedDatabasePolling goes on watching all four at the
+# fixed-rate poll of node state made through sf-api, whatever its rate, nor
+# one which lists objects through an iterator with no _find override --
+# GetObjectsByState reaches sf-api through every such listing, not only the
+# node roster. That is a wider blind spot than the events one. It is still
+# CI's alone -- none of these five pairs is budgeted for the api caller, so
+# ShakenFistUnbudgetedDatabasePolling goes on watching all five at the
 # unbudgeted ceiling on every real cluster.
 #
 # The exemption is load bearing only while the probe is: phase 1
@@ -255,7 +285,7 @@ POLL_OVERCOUNT_TOLERANCE = 1.60
 # and the workflow steps live in shakenfist/actions, so a decommission done
 # there, which is the likely way it happens because that is where the wiring
 # is, stops the probe running while leaving this file, that test and this
-# exemption exactly as they are. The obligation to trim these four is
+# exemption exactly as they are. The obligation to trim these five is
 # therefore written where whoever retires the tool will actually be reading:
 # in ci_headroom_probe.py's own docstring, in the CI headroom section of
 # docs/developer_guide/ci.md, and against #3975 in PLAN-ci-cloud-sizing.md.
@@ -275,9 +305,11 @@ POLL_OVERCOUNT_TOLERANCE = 1.60
 # rather than ignoring it. This does not widen the trim obligation above:
 # GetAllNodeDaemonStates/api, GetNode/api and GetNodeAttributes/api still
 # have only the probe behind them, and dropping the probe still means
-# dropping those three: GetNodeMetrics/api is the one pair of the four
-# that outlives the probe's retirement, because the wrapper keeps calling
-# GET /admin/resources on its own.
+# dropping those three: GetNodeMetrics/api and GetObjectsByState/api are
+# the two pairs of the five that outlive the probe's retirement, because
+# the wrapper keeps calling GET /admin/resources on its own, and every one
+# of those calls costs the node iterator's uuid-list read as well as the
+# per-node metric reads.
 #
 # Sizing note for whoever reads this while working out why a full cluster
 # is busy: one poll is not one read. GET /admin/resources constructs a
@@ -345,6 +377,10 @@ HARNESS_DRIVEN_PAIRS = frozenset([
     ('GetNode', 'api'),
     ('GetNodeAttributes', 'api'),
     ('GetNodeMetrics', 'api'),
+    # The node iterator's own uuid-list read, once per sampled endpoint
+    # before any per-node hydration -- not a per-node read like the four
+    # above, and the second omission of the same kind (issue 4359).
+    ('GetObjectsByState', 'api'),
     # shakenfist_ci/base.py's _await_command(), on a time.sleep(1)
     # timer, and the sidechannel daemon serving the agent operation
     # stream that timer paces.
