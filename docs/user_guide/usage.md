@@ -306,9 +306,20 @@ of the following keys:
   [the networkspec reference](/developer_guide/api_reference/instances/#networkspec)
   for more detail.
 * _float_ if true indicates to immediately float the interface once the instance
-  is created. `true`, `yes`, `on`, `1` and their cases all mean yes and
-  `false`, `no`, `off` and `0` all mean no; the `sf-client` and ansible
-  interfaces convert what you type before it reaches the API.
+  is created. `sf-client`'s own parsing of this flag currently recognises
+  fewer spellings than the API does
+  ([client-python#401](https://github.com/shakenfist/client-python/issues/401)),
+  so a spelling the API would accept can be read as false before the request
+  is sent. Which spellings survive it is a fact about a different
+  repository and is deliberately not enumerated here, because nothing in
+  this repository can keep such a list true; the advice below holds whether
+  #401 is fixed or not. The
+  API itself accepts a wider range of string spellings (see
+  [the networkspec reference](/developer_guide/api_reference/instances/#networkspec)),
+  so sending a real JSON boolean is the only form free of this kind of
+  surprise. The ansible collection's `networkspecs:` list parses its own,
+  differently narrow, set (`true`, `1` and `yes`, case-insensitively), so
+  the same string typed at `-N` and in a playbook can mean opposite things.
 
 Since v0.8 those five are the only keys accepted here too, and anything else is
 refused with a 400 naming it. See

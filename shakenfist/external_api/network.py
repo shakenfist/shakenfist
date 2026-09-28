@@ -26,6 +26,7 @@ from shakenfist.constants import FLOATING_NETWORK_UUID
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
 from shakenfist.external_api import util as api_util
+from shakenfist.external_api import validation
 from shakenfist.schema.ipam_reservation import ReservationType
 from shakenfist.schema.operations.baseclusteroperation \
     import PRIORITY
@@ -213,6 +214,11 @@ class NetworksEndpoint(api_base.Resource):
         [(200, 'A list of information about visible networks.', networks_get_example)]))
     @api_base.log_token_use
     def get(self, all=False):
+        # declared_boolean rather than `if not all:` on the raw body:
+        # see test_boolean_sweep.py. A falsy string spelling would
+        # otherwise widen the listing to include deleted networks.
+        all = validation.declared_boolean(all)
+
         filters = [partial(baseobject.namespace_filter,
                            request_namespace())]
         prefilter = None
@@ -253,6 +259,23 @@ class NetworksEndpoint(api_base.Resource):
         # the field" (None) from "the caller explicitly asked for False".
         # Using `if not provide_nat` collapses both cases and silently
         # re-enables NAT (and DHCP) when --no-nat / --no-dhcp was requested.
+        #
+        # These three are the one place in the API where a declared
+        # boolean is deliberately *not* read with
+        # validation.declared_boolean(), and the reason is the None test
+        # immediately below: `declared_boolean(None)` is False, which
+        # would turn "the caller omitted the field" into "the caller
+        # asked for False" and take DHCP and NAT away from every caller
+        # who did not mention them. A string spelling agrees with the
+        # published schema anyway, one layer down --
+        # `shakenfist/schema/network_data.py` types provide_dhcp,
+        # provide_nat and provide_dns as pydantic `bool`, whose lax
+        # coercion reads 'off' as False before the value is stored. That
+        # is a cross-layer dependency, so it is written here rather than
+        # left to be discovered: if those fields are ever retyped, or if
+        # a declared_boolean() call is ever added *before* the None
+        # tests, test_boolean_sweep.py's three NetworksEndpoint.post
+        # rows are what fails.
         if provide_dhcp is None:
             provide_dhcp = True
         if provide_nat is None:
@@ -351,6 +374,16 @@ class NetworksEndpoint(api_base.Resource):
 
         if confirm is not True:
             return sf_api.error(400, 'parameter confirm is not set true')
+
+        # declared_boolean rather than the raw body: see
+        # test_boolean_sweep.py. `clean_wait` decides whether a network
+        # which still has interfaces is deleted anyway, so a falsy
+        # string spelling meant deleting a network in use for a caller
+        # who had asked not to. `confirm` above is deliberately not
+        # read this way -- an identity test on a destructive route
+        # refuses every string spelling, which is the safe direction,
+        # and the sweep pins that as a decision.
+        clean_wait = validation.declared_boolean(clean_wait)
 
         if request_namespace() == 'system':
             if not isinstance(namespace, str):

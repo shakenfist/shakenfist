@@ -559,6 +559,11 @@ class InstancesEndpoint(api_base.Resource):
          (404, 'Instance not found.', None)]))
     @api_base.log_token_use
     def get(self, all=False):
+        # declared_boolean rather than `if not all:` on the raw body:
+        # see test_boolean_sweep.py. A falsy string spelling would
+        # otherwise widen the listing to include deleted instances.
+        all = validation.declared_boolean(all)
+
         prefilter = None
         filters = [partial(baseobject.namespace_filter,
                            request_namespace())]
@@ -701,10 +706,12 @@ class InstancesEndpoint(api_base.Resource):
         # docs/developer_guide/writing_an_endpoint.md.
 
         # A name has to be a string before anything can ask whether it is a
-        # good one. `name` is declared required, but required-ness is
-        # deliberately not enforced (decision D17 of
-        # PLAN-api-input-validation), and the compiled field is nullable, so
-        # an omitted name and an explicit JSON null both arrive here as None.
+        # good one. Required-ness is enforced since phase 6 of
+        # PLAN-api-input-validation (decisions D32/D37 retired D17's
+        # exemption), so at 'enforce' an omitted or null name is refused
+        # before the handler runs -- but 'warn' and 'off' are the operator's
+        # rollback and hand the handler whatever the caller sent, and both an
+        # omitted name and an explicit JSON null arrive here as None.
         # validators.hostname() *returns* a falsy ValidationError for None
         # rather than raising, so without this guard execution reaches
         # `'.' in name` and the interpreter raises TypeError -- which until
@@ -747,6 +754,8 @@ class InstancesEndpoint(api_base.Resource):
         # to store the exact combination it exists to refuse.
         # declared_boolean() is the one reading, keyed on marshmallow's
         # own sets so the check and the read cannot drift.
+        # test_boolean_sweep.py measures every declared boolean this
+        # way, so a new one cannot join the class quietly.
         uefi = validation.declared_boolean(uefi)
         secure_boot = validation.declared_boolean(secure_boot)
 

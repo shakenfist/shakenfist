@@ -37,6 +37,7 @@ from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.external_api import base as api_base
+from shakenfist.external_api import validation
 from shakenfist.instance import instance_blob_usage
 from shakenfist.namespace import get_api_token
 from shakenfist.namespace import namespace_is_trusted
@@ -446,6 +447,16 @@ class ArtifactsEndpoint(api_base.Resource):
     @api_base.log_token_use
     @api_base.requires_namespace_exist_if_specified
     def post(self, url=None, shared=False, namespace=None):
+        # declared_boolean rather than the raw body: see
+        # test_boolean_sweep.py. `{"shared": "false"}` is published as a
+        # valid boolean meaning False and shared the artifact with every
+        # namespace. The authorisation check below sits inside the
+        # `if shared:` branch, so an unprivileged caller got a 403
+        # rather than a shared artifact -- this was a system operator's
+        # foot-gun, not a tenant escalation, and it was still the
+        # opposite of what the specification promised.
+        shared = validation.declared_boolean(shared)
+
         # The only artifact type you can force the cluster to fetch is an
         # image, so TYPE_IMAGE is assumed here. We ensure that the image exists
         # in the database in an initial state here so that it will show up in
@@ -572,6 +583,10 @@ class ArtifactUploadEndpoint(api_base.Resource):
     @api_base.requires_namespace_exist_if_specified
     def post(self, artifact_name=None, upload_uuid=None, blob_uuid=None,
              source_url=None, shared=False, namespace=None, artifact_type='image'):
+        # declared_boolean rather than the raw body, as on the fetch
+        # route above: see test_boolean_sweep.py.
+        shared = validation.declared_boolean(shared)
+
         if upload_uuid and blob_uuid:
             return sf_api.error(400, 'only specify one of upload_uuid and blob_uuid')
 

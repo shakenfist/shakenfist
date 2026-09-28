@@ -120,6 +120,17 @@ metrics. The headlines:
   violate without a local failure. See
   [docs/developer_guide/standards.md](docs/developer_guide/standards.md).
 
+- **Request validation is check-only, so a handler reads the raw body.**
+  A declared `boolean` must be read with
+  `validation.declared_boolean()`: `if flag:` calls the string `"false"`
+  true, which is the opposite of what the published schema promises. The
+  exception is a handler which must tell an omitted parameter from an
+  explicit false: `provide_dhcp`, `provide_nat` and `provide_dns` on
+  network create do, and reading an omitted one as False would take DHCP
+  and NAT away from every caller who did not mention them. All of them are
+  enumerated in
+  [docs/developer_guide/writing_an_endpoint.md](docs/developer_guide/writing_an_endpoint.md).
+
 - **Events and logs are different channels.** An event is a durable,
   queryable record on an object; a log line is not. See
   [docs/operator_guide/events.md](docs/operator_guide/events.md).

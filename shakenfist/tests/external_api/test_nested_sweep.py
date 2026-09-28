@@ -47,22 +47,23 @@ and ``NestedSweepOffTestCase`` re-runs the same table at ``off``,
 where ``check()`` does not run at all.
 
 Ten rows deliberately answer 400 at ``warn`` where they used to
-answer 507 or 200, and they are the phase's two new *handler* guards
-rather than schema checks -- D42 keeps every existing guard, and step 4
-added two more because a rollback must not hand back the bug the phase
-just closed. They are marked ``moves at warn`` in the notes:
-``{"network_uuid": null}`` on either route, and the six shapes of
-diskspec which ask for neither a size nor a base -- one of which is a
-diskspec whose only key is a typo, since a typo'd ``size`` leaves the
-spec asking for nothing, and one of which asks for a base of the
-literal string ``none``, which ``util_general.noneish`` reads as no
-base at all.
+answer 507 or 200, and they are the phase's three new *handler* guards
+rather than schema checks -- D42 keeps every existing guard, and the
+phase added three more because a rollback must not hand back the bug
+the phase just closed. They are marked ``moves at warn`` in the notes,
+in three classes:
 
-A third handler guard joined them in review: the videospec's ``model``
-and ``memory`` checks were presence tests, so an explicit null passed
-them and was stored. They are value tests now, which is why
-``video.model.null`` and ``video.memory.null`` are refused in every
-column.
+* ``{"network_uuid": null}`` on either route (2 rows).
+* The six shapes of diskspec which ask for neither a size nor a base
+  (6 rows) -- one of which is a diskspec whose only key is a typo,
+  since a typo'd ``size`` leaves the spec asking for nothing, and one
+  of which asks for a base of the literal string ``none``, which
+  ``util_general.noneish`` reads as no base at all.
+* ``video.model.null`` and ``video.memory.null`` (2 rows). That third
+  guard joined the other two in review: the videospec's ``model`` and
+  ``memory`` checks were presence tests, so an explicit null passed
+  them and was stored. They are value tests now, which is why those
+  two rows are refused in every column.
 
 A fourth handler guard was added after the phase, by the issue 4248
 fix: a diskspec size which reads as a negative number is refused in

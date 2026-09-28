@@ -21,6 +21,7 @@ from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
 from shakenfist.exceptions import InvalidMaxVersions
 from shakenfist.external_api import base as api_base
+from shakenfist.external_api import validation
 from shakenfist.instance import instance_blob_usage
 
 
@@ -61,6 +62,16 @@ class InstanceSnapshotEndpoint(api_base.Resource):
     @api_base.log_token_use
     def post(self, instance_ref=None, instance_from_db=None, all=None,
              device=None, max_versions=0, thin=None):
+        # Read both declared booleans the way the published schema
+        # reads them, before the falsiness test below leans on one:
+        # this layer is check-only, so `{"thin": "false"}` arrived as a
+        # non-empty string and took a thin snapshot for a caller the
+        # specification had just told the value meant False. See
+        # test_boolean_sweep.py. declared_boolean(None) is False, which
+        # is what the fallback below already did with an absent value.
+        all = validation.declared_boolean(all)
+        thin = validation.declared_boolean(thin)
+
         # Falsiness rather than `is None`, deliberately: the official
         # client has always transmitted `thin: false` when the caller did
         # not ask for thin (the CLI flag defaults to False), so honouring

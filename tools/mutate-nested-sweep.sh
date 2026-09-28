@@ -1,10 +1,17 @@
 #!/bin/bash
 # Copyright 2019 Michael Still and contributors
 #
-# mutate-nested-sweep.sh -- break each structured-parameter schema and
-# each handler guard on purpose, and check that the right row of
-# shakenfist/tests/external_api/test_nested_sweep.py fails with the
-# right message.
+# mutate-nested-sweep.sh -- break each structured-parameter schema,
+# each handler guard and each declaration-time check on purpose, and
+# check that the right row of the right sweep fails with the right
+# message.
+#
+# The name is historical: it started as the nested sweep's mutations and
+# now also covers test_boolean_sweep.py and the declaration checks in
+# test_parameter_declarations.py, which is why `check` takes the test
+# filter to run. It is not renamed because the phase plans in
+# docs/plans/ cite it by name, and those record what a phase said at the
+# time rather than being corrected afterwards.
 #
 # Reading a guard cannot distinguish "this holds" from "this cannot
 # fail". A sweep row which passes for the wrong reason is worse than a
@@ -22,19 +29,25 @@
 # This is a developer tool, not a CI job: it edits the tree in place,
 # and it takes about a minute. Run it after changing ARGTYPES'
 # structured schemas, the object branch of validation._field(), the
-# nested finding flattener, or either of the two instance handler
+# nested finding flattener, or any of the three instance handler
 # guards phase 7 added.
 #
 # Usage:
 #
 #   bash tools/mutate-nested-sweep.sh
 #
-# Run it from the root of a clean-ish worktree. Uncommitted work is
-# safe: the four files it touches -- the vocabulary, the compiler, the
-# handler and the sweep itself -- are restored from a copy taken before
-# the first mutation, never with `git checkout`, because a
+# Run it from the root of a clean-ish worktree. Your own uncommitted
+# work is safe: the eight files it touches -- the vocabulary, the
+# compiler, two handlers, the three sweeps and the shared test base --
+# are restored from a copy
+# taken before the first mutation, never with `git checkout`, because a
 # directory-wide checkout discards uncommitted work in that directory
 # and is painful to notice afterwards.
+#
+# What is *not* safe is a concurrent edit to one of those eight files by
+# somebody else while this runs: restore() copies the whole file back
+# from the snapshot, so an edit made in between is silently reverted.
+# Do not run this in a worktree another agent is editing.
 
 set -uo pipefail
 
@@ -43,7 +56,12 @@ BASE="shakenfist/external_api/base.py"
 VALIDATION="shakenfist/external_api/validation.py"
 HANDLER="shakenfist/external_api/instance.py"
 SWEEP="shakenfist/tests/external_api/test_nested_sweep.py"
-FILES=("$BASE" "$VALIDATION" "$HANDLER" "$SWEEP")
+BOOLSWEEP="shakenfist/tests/external_api/test_boolean_sweep.py"
+DECLARATIONS="shakenfist/tests/external_api/test_parameter_declarations.py"
+ARTIFACT="shakenfist/external_api/artifact.py"
+TESTBASE="shakenfist/tests/base.py"
+FILES=("$BASE" "$VALIDATION" "$HANDLER" "$SWEEP" "$BOOLSWEEP" \
+       "$DECLARATIONS" "$ARTIFACT" "$TESTBASE")
 
 if [ ! -x "$PYTHON" ]; then
     echo "No $PYTHON. Run tox once to build the test environment." >&2
@@ -51,9 +69,21 @@ if [ ! -x "$PYTHON" ]; then
 fi
 
 BACKUP=$(mktemp -d /tmp/mutate-nested-sweep-XXXXXX)
+
+# The snapshot is keyed on the whole path with the separators flattened,
+# not on the basename. Two of the files below are called base.py --
+# shakenfist/external_api/base.py and shakenfist/tests/base.py -- so a
+# basename key silently collides: the second snapshot overwrites the
+# first, and restore() then copies one file's contents over the other,
+# destroying uncommitted work in a file it was supposed to be
+# protecting. That happened once, in the third round of review on phase
+# 8, the moment the test base joined the list.
+snapshot_key() {
+    echo "${BACKUP}/${1//\//_}"
+}
 restore() {
     for f in "${FILES[@]}"; do
-        cp "${BACKUP}/$(basename "${f}")" "${f}"
+        cp "$(snapshot_key "${f}")" "${f}"
     done
 }
 cleanup() {
@@ -63,8 +93,18 @@ cleanup() {
 trap cleanup EXIT
 
 for f in "${FILES[@]}"; do
-    cp "${f}" "${BACKUP}/$(basename "${f}")"
+    cp "${f}" "$(snapshot_key "${f}")"
 done
+
+# A collision would defeat every guarantee above, so it is checked
+# rather than assumed: distinct paths must produce distinct keys.
+if [ "$(printf '%s\n' "${FILES[@]}" | sort -u | wc -l)" \
+        -ne "$(for f in "${FILES[@]}"; do snapshot_key "${f}"; done \
+               | sort -u | wc -l)" ]; then
+    echo "Two entries in FILES share a snapshot key. Fix snapshot_key" >&2
+    echo "before running: restore() would copy one over the other." >&2
+    exit 1
+fi
 
 # mutate <file> <old> <new> -- an exact, unique string replacement.
 # Refuses anything but exactly one match, so a mutation which silently
@@ -93,8 +133,9 @@ PYEOF
 # fixture, a half-finished edit -- then every mutation below is
 # "caught" by a failure this script did not cause, and it exits 0
 # having proved nothing.
-echo "=== baseline: the sweep must pass before anything is mutated"
-if ! "${PYTHON}" -m stestr run --no-subunit-trace 'test_nested_sweep' \
+echo "=== baseline: every sweep must pass before anything is mutated"
+if ! "${PYTHON}" -m stestr run --no-subunit-trace \
+        '(test_nested_sweep|test_boolean_sweep|test_parameter_declarations)' \
         > "${BACKUP}/baseline.log" 2>&1; then
     echo >&2
     echo "The sweep fails with no mutation applied, so no verdict below" >&2
@@ -108,18 +149,21 @@ echo "  green"
 SURVIVORS=0
 CHECKED=0
 
-# check <name> <expected row substring>
-# Runs the sweep against the mutated tree and requires the named row to
-# be in the failure output.
+# check <name> <expected row substring> [test filter]
+# Runs the named tests against the mutated tree and requires the named
+# row to be in the failure output. The filter defaults to the nested
+# sweep, which is what most of the mutations below break; a mutation to
+# a declaration-time check or to a declared boolean names its own.
 check() {
     local name="$1"
     local expected="$2"
+    local filter="${3:-test_nested_sweep}"
     local output
     local status
 
     CHECKED=$((CHECKED + 1))
     output=$("${PYTHON}" -m stestr run --no-subunit-trace \
-        'test_nested_sweep' 2>&1)
+        "${filter}" 2>&1)
     status=$?
 
     # The run has to have failed, not merely to have mentioned the row.
@@ -301,6 +345,47 @@ mutate "${HANDLER}" \
 check "videospec null guard" "video.model.null"
 
 # ---------------------------------------------------------------------
+# 11b. The videospec `memory` guard, which is the other half of the
+#      same review item and a separate line of code. Added by the phase
+#      8 audit, which found the script was behind the code: the review
+#      round added three guards and only one of them was mutated here.
+# ---------------------------------------------------------------------
+run "the videospec memory guard tests presence again (review item 1)"
+mutate "${HANDLER}" \
+    "            if video.get('memory') is None:" \
+    "            if 'memory' not in video:" || exit 1
+check "videospec memory guard" "video.memory.null"
+
+# ---------------------------------------------------------------------
+# 11c. The `vdi` defaulting, which is what
+#      test_a_null_video_key_is_never_stored exists for. That test is a
+#      mock call_args assertion behind a 507 precondition and is the
+#      most plausibly-vacuous test in the file, so this mutation is
+#      really a test of the test.
+# ---------------------------------------------------------------------
+run "the videospec vdi defaulting tests presence again (review item 1)"
+mutate "${HANDLER}" \
+    "            if video.get('vdi') is None:" \
+    "            if 'vdi' not in video:" || exit 1
+check "videospec vdi defaulting" "test_a_null_video_key_is_never_stored"
+
+# ---------------------------------------------------------------------
+# 11d. The shape guard the review had to add in front of the value
+#      tests. Without it a non-mapping videospec reaches
+#      video.get('model') and is an AttributeError, where the presence
+#      tests it replaced answered 400 by accident. Caught at warn and
+#      off, where the schema is not refusing it first.
+# ---------------------------------------------------------------------
+run "the videospec shape guard is gone (review item 1)"
+mutate "${HANDLER}" \
+    "            if not isinstance(video, dict):
+                return sf_api.error(
+                    400, 'video specification should be a JSON object')
+" \
+    "" || exit 1
+check "videospec shape guard" "video.not_a_mapping"
+
+# ---------------------------------------------------------------------
 # 12. `float` is read with a bare truthiness test again, so the string
 #     "false" floats the interface the schema just called false. The
 #     status code cannot see this, which is why the row that catches it
@@ -310,7 +395,7 @@ run "float is read truthily again (review item 2)"
 mutate "${HANDLER}" \
     "        if validation.declared_boolean(netdesc.get('float')):" \
     "        if netdesc.get('float'):" || exit 1
-check "declared_boolean" "test_a_falsy_float_spelling_does_not_float"
+check "float call site" "test_a_falsy_float_spelling_does_not_float"
 
 # ---------------------------------------------------------------------
 # 13. _diskspec_value_absent stops reading util_general.noneish, so a
@@ -337,6 +422,130 @@ mutate "${SWEEP}" \
     "    Case('net.model.int', CREATE, 'networkspec', 'model'," \
     "    Case('net.model.int', CREATE, 'networkspec', 'wombat'," || exit 1
 check "accepted-value coverage" "only ever refused in the table"
+
+# ---------------------------------------------------------------------
+# 15. The character class's first position, which is the defect the
+#     first round of review on phase 8 found: CPython reads a leading
+#     ']' as a literal class member, ECMA-262 reads '[]' as an empty
+#     class, and the scanner used to call the disagreement a top level
+#     alternation. Reverting the check makes '^[]|]$' fall through to
+#     the alternation message, which is what the pinned message refuses
+#     to accept.
+# ---------------------------------------------------------------------
+run "a leading ']' in a class is blamed on the alternation again"
+mutate "${BASE}" \
+    "                elif was_class_start and character == ']':" \
+    "                elif False:" || exit 1
+check "class-start bracket" "first position of a character class" \
+    test_parameter_declarations
+
+# ---------------------------------------------------------------------
+# 16. The group extension vocabulary. Widening it to anything CPython
+#     compiles is exactly the state the token list was in, where '(?>'
+#     and the conditional '(?(1)a|b)' reached a JSON Schema validator
+#     which has neither.
+# ---------------------------------------------------------------------
+run "the group extension check accepts whatever CPython compiles"
+mutate "${BASE}" \
+    "                    if pattern[index + 2:index + 3] not in (':', '=', '!'," \
+    "                    if pattern[index + 2:index + 3] not in (':', '=', '!', '>', '(', 'i'," || exit 1
+# Named by test rather than by message: with the vocabulary widened
+# nothing is raised at all, so the message the refusal *would* have
+# carried is not in the output to grep for.
+check "group extension vocabulary" \
+    "test_a_refused_pattern_names_the_right_construct" \
+    test_parameter_declarations
+
+# ---------------------------------------------------------------------
+# 17. declared_boolean stops consulting marshmallow's sets, which is the
+#     whole class test_boolean_sweep.py exists to close: every falsy
+#     string spelling is a non-empty string and Python calls it true.
+# ---------------------------------------------------------------------
+run "declared_boolean is a bare truthiness test again (finding B-4)"
+mutate "${VALIDATION}" \
+    "    if isinstance(value, str):
+        if value in fields.Boolean.falsy:
+            return False
+        if value in fields.Boolean.truthy:
+            return True
+    return bool(value)" \
+    "    return bool(value)" || exit 1
+# Named by test rather than by a fragment of the assertion message:
+# "rather than" is ordinary English and appears in docstrings, comments
+# and unrelated assertions throughout the suite, which is exactly the
+# "signs off a failure it did not cause" hazard check's own comment
+# warns about.
+check "declared_boolean reading" \
+    "test_every_reading_agrees_with_the_declaration" test_boolean_sweep
+
+# ---------------------------------------------------------------------
+# 18. The boolean sweep's derived enumeration, which is the guard that
+#     stops a twentieth declared boolean joining the class quietly. It
+#     is computed from the source rather than from a request, so nothing
+#     else here would notice if it had stopped meaning anything.
+# ---------------------------------------------------------------------
+run "a declared boolean has no reading in the table (derived guard)"
+mutate "${BOOLSWEEP}" \
+    "    ('NetworksEndpoint', 'post', 'provide_dns'): {" \
+    "    ('NetworksEndpoint', 'post', 'wombat'): {" || exit 1
+check "derived boolean enumeration" "nothing here measures how" \
+    test_boolean_sweep
+
+# ---------------------------------------------------------------------
+# 19. The escape vocabulary, which replaced a substring test for '\A'
+#     and '\Z' in the second round of review. The substring test both
+#     missed nothing it claimed and refused '^\\\\Administrator$',
+#     where the two characters appear without being the anchor.
+# ---------------------------------------------------------------------
+run "the Python-only escapes are no longer refused"
+mutate "${BASE}" \
+    "                if (character.isalpha()" \
+    "                if (False and character.isalpha()" || exit 1
+check "escape vocabulary" \
+    "test_a_refused_pattern_names_the_right_construct" \
+    test_parameter_declarations
+
+# ---------------------------------------------------------------------
+# 20. The boolean sweep's descent into the structured schemas, which is
+#     what makes network[].float -- the one member of the class already
+#     known to have failed -- visible to the enumeration at all.
+# ---------------------------------------------------------------------
+run "the boolean enumeration stops descending into netdescs"
+mutate "${BOOLSWEEP}" \
+    "                for prop in _nested_booleans(dec.argtype):" \
+    "                for prop in []:" || exit 1
+check "nested boolean descent" "no longer exists" test_boolean_sweep
+
+# ---------------------------------------------------------------------
+# 21. The positive control on the three deliberate-refusal rows. Without
+#     it a row asserting that string spellings are refused passes just
+#     as well against a route which refuses every spelling, which is the
+#     shape the anti-vacuity gate was covering for the other rows and
+#     never covered for these.
+# ---------------------------------------------------------------------
+run "a delete-all route refuses a JSON true as well"
+mutate "${ARTIFACT}" \
+    "        if confirm is not True:" \
+    "        if confirm is not None:" || exit 1
+check "refusal positive control" "from a route which refuses everything" \
+    test_boolean_sweep
+
+# ---------------------------------------------------------------------
+# 22. The shared validation-mode helper. The third round of review found
+#     five hand-rolled copies of its save/set/restore pair, four of them
+#     added by this phase, and all five now call it instead. If it
+#     stopped setting the mode, every warn-mode guard class would run at
+#     the `enforce` default and measure the schema while reporting it as
+#     the handler -- which is the precise confusion those classes exist
+#     to prevent, and which none of their own assertions would notice.
+#     The refactor is only safe because this is pinned.
+# ---------------------------------------------------------------------
+run "the shared mode helper stops setting the mode"
+mutate "${TESTBASE}" \
+    "        config.API_VALIDATION_MODE = mode" \
+    "        pass  # mutation: mode left at the default" || exit 1
+check "shared validation mode helper" "offset cannot be negative" \
+    test_blob_data_bounds
 
 echo
 echo "====================================================================="

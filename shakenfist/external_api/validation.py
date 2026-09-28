@@ -602,6 +602,18 @@ def _field(spec: dict[str, Any], required: bool = False) -> fields.Field[Any]:
     if declared == 'array':
         # items is always present: swagger_helper() renders the array
         # tokens with it, and OpenAPI 2.0 requires it.
+        #
+        # Unlike the three branches below, this one keeps any
+        # `validate` kwarg built above rather than popping it -- and a
+        # validator on fields.List applies to the whole list, not to
+        # each element, which is a different meaning from every other
+        # shape here. It is unreachable today:
+        # base._validated_constraints() refuses minimum/maximum/pattern
+        # on anything but a numeric or string rendered type, and no
+        # array-typed fragment carries an enum or a semantic format. A
+        # future token which rendered one would want to decide
+        # deliberately between the two meanings rather than inherit
+        # this one by accident (phase 8 audit, 2a).
         return fields.List(_field(spec.get('items', {})), **kwargs)
 
     element_properties = spec.get('properties')
@@ -1102,9 +1114,11 @@ def check(compiled: CompiledEndpoint, body: Any,
                 % (len(unknown) - MAX_UNKNOWN_PARAMETER_FINDINGS)))
 
     # An explicit JSON null counts as missing too, for a required
-    # parameter only: every compiled field is allow_none=True (see
-    # _field()), so a null reaches the schema check indistinguishable
-    # from a value that just happens to be absent, and a caller who
+    # parameter only: an *optional* compiled field is allow_none=True
+    # (_field() builds every field `allow_none=not required`, see the
+    # kwargs at the top of it), so for those a null reaches the schema
+    # check indistinguishable from a value that just happens to be
+    # absent, and a caller who
     # sent `{"key": null}` gets exactly the same answer as one who
     # sent no `key` at all -- one reason code, one message, for what
     # is one fact from the handler's side: it was not given a key.

@@ -143,7 +143,7 @@ REQUEST_ARGS = [
      None, 'key which is not a literal'),
 ]
 
-MODULE = '''import flask
+MODULE = """import flask
 from flasgger import swag_from
 from webargs.flaskparser import use_kwargs
 
@@ -161,7 +161,7 @@ class FakeEndpoint(api_base.Resource):
         [('alpha', '%(location)s', 'string', 'A parameter.', %(required)s)],
         []))
 %(decorator)sdef get(self, alpha=None):
-%(body)s'''
+%(body)s"""
 
 
 class DerivationGeneratorTestCase(base.ShakenFistTestCase):

@@ -104,11 +104,13 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         back is buying "requests that were working keep working", not a
         tidier error for requests that were already being refused.
 
-        The five metadata delete handlers are the one thing the
+        The five metadata delete handlers are one of the things the
         rollback does not undo at all: they no longer accept the
         `value` kwarg they used to ignore, in any mode. That was
         UNDECLARED_BY_DESIGN's last entry, and removing it is what
-        emptied the set.
+        emptied the set. Phase 7's three handler guards are three more,
+        and `test_nested_sweep.py`'s `NestedSweepWarnTestCase` is where
+        they are measured.
         """
         config.API_VALIDATION_MODE = 'warn'
 
@@ -709,9 +711,7 @@ class AuthenticatedStackTestCase(base.ShakenFistTestCase):
         external_api.TESTING = True
         external_api.app.testing = True
 
-        self.saved_mode = config.API_VALIDATION_MODE
-        self.addCleanup(self._restore_mode)
-        config.API_VALIDATION_MODE = self.mode
+        self.set_validation_mode(self.mode)
 
         self.mock_mariadb = MockMariaDB(self, node_count=1)
         self.mock_mariadb.setup()
@@ -723,9 +723,6 @@ class AuthenticatedStackTestCase(base.ShakenFistTestCase):
             data=json.dumps({'namespace': 'system', 'key': 'bar'}))
         self.assertEqual(200, resp.status_code)
         self.token = 'Bearer %s' % resp.get_json()['access_token']
-
-    def _restore_mode(self):
-        config.API_VALIDATION_MODE = self.saved_mode
 
     def _spy_on_check(self):
         """Collect the findings check() produced, without changing them."""

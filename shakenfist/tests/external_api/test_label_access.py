@@ -281,6 +281,40 @@ class LabelWriteTargetTestCase(LabelAccessFixture):
         self.assertIsNotNone(self._labels_owned_by('owner', 'brandnew'))
 
 
+class LabelWriteTargetWarnTestCase(LabelWriteTargetTestCase):
+    """The write route with the schema layer not refusing.
+
+    Added by the phase 8 audit of PLAN-api-input-validation. At the
+    shipped default `max_versions` carries `unsignedinteger`'s
+    `minimum: 0`, so the compiled schema refuses a negative before the
+    handler is entered and `external_api/label.py`'s own
+    `except InvalidMaxVersions` arm -- the only defence at `warn` and
+    `off` -- never executed in the whole suite.
+    """
+
+    mode = 'warn'
+
+    def setUp(self):
+        super().setUp()
+        self.set_validation_mode(self.mode)
+
+    def test_a_negative_max_versions_is_refused(self):
+        resp, add_index = self._post(
+            'owner', label_name='owner/brandnew',
+            extra_body={'max_versions': -1})
+        self.assertEqual(400, resp.status_code, resp.get_json())
+        self.assertEqual('max version cannot be negative',
+                         resp.get_json()['error'])
+        add_index.assert_not_called()
+        self.assertIsNone(self._labels_owned_by('owner', 'brandnew'))
+
+
+class LabelWriteTargetOffTestCase(LabelWriteTargetWarnTestCase):
+    """And with the layer not running at all."""
+
+    mode = 'off'
+
+
 class LabelReadTestCase(LabelAccessFixture):
     """GET /label/<namespace>/<label>.
 

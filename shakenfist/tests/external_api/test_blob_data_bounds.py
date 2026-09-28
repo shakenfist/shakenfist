@@ -74,3 +74,41 @@ class BlobDataBoundsTestCase(base.ShakenFistTestCase):
         for query in ('offset=0', 'limit=0', 'offset=10&limit=20'):
             with self.subTest(query=query):
                 self.assertNotEqual(400, self._get(query).status_code)
+
+
+class BlobDataBoundsWarnTestCase(BlobDataBoundsTestCase):
+    """The same assertions with the schema layer not refusing.
+
+    Added by the phase 8 audit of PLAN-api-input-validation. At the
+    shipped default the declared `minimum: 0` refuses a negative bound
+    before the handler is entered, so `assertIn('offset', error)` above
+    is satisfied by `offset: Must be greater than or equal to 0.` and
+    the handler guard this file was written for never executed. That
+    guard is the only defence at `warn` and `off`, and the assertion on
+    its own message below is what identifies the answering layer rather
+    than inferring it from a status code both layers produce.
+    """
+
+    mode = 'warn'
+
+    def setUp(self):
+        super().setUp()
+        self.set_validation_mode(self.mode)
+
+    def test_a_negative_offset_is_refused(self):
+        resp = self._get('offset=-1')
+        self.assertEqual(400, resp.status_code, resp.get_data())
+        self.assertEqual('offset cannot be negative',
+                         resp.get_json()['error'])
+
+    def test_a_negative_limit_is_refused(self):
+        resp = self._get('limit=-1')
+        self.assertEqual(400, resp.status_code, resp.get_data())
+        self.assertEqual('limit cannot be negative',
+                         resp.get_json()['error'])
+
+
+class BlobDataBoundsOffTestCase(BlobDataBoundsWarnTestCase):
+    """And with the layer not running at all."""
+
+    mode = 'off'

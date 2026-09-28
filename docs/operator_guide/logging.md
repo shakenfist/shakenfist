@@ -171,9 +171,15 @@ After upgrading you may see `API request validation finding` lines
 from `sf-api` in your log stream. Each records a request which did not
 match its endpoint's published parameter declarations.
 
-`API_VALIDATION_MODE` decides what happens to such a request, and
-since v0.8.0 it defaults to **`enforce`**: a finding refuses the
-request with a 400 in the usual
+`API_VALIDATION_MODE` is a cluster-wide setting, and the ansible
+collection does not render it -- set it with
+`sf-ctl set-config API_VALIDATION_MODE warn` and restart `sf-api` on
+each API node, since the value is read into the process environment at
+start. `sf-ctl unset-config API_VALIDATION_MODE` restores the default.
+
+It decides what happens to such a request, and since v0.8.0 it
+defaults to **`enforce`**: a finding refuses the request with a 400
+in the usual
 `{"error": "<parameter>: <reason>", "status": 400}` shape, and the
 finding line records the refusal. A refusal names the first finding
 only, so a request with several problems is fixed one round trip at a
@@ -185,14 +191,56 @@ explicit JSON `null`, answers
 
 The other two modes are the rollback, in order of severity:
 
-* `warn` restores the pre-v0.8.0 behaviour: findings are recorded and
-  change no response, so the request is answered exactly as it always
-  was. Set this if a caller of yours breaks against enforcement while
-  you fix it — the finding lines tell you which parameter to fix.
+* `warn` records findings and leaves the response to the handler, so a
+  request enforcement would refuse is answered the way it was before
+  enforcement was turned on. Set this if a caller of yours breaks
+  against enforcement while you fix it — the finding lines tell you
+  which parameter to fix. It is a rollback of *enforcement*, not of
+  everything v0.8.0 changed about request handling, and four classes of
+  request do not roll back:
+    * An **undeclared body key** answers `500 server error` rather
+      than the 400 it answered before v0.8.0, because the handler is
+      handed a keyword argument it does not accept. Each such request
+      also writes an exception record and an ERROR line, so a chatty
+      caller is expensive as well as broken.
+    * The **handler guards** added in v0.8.0 refuse in every mode,
+      deliberately. There are five: a network specification whose
+      `network_uuid` is an explicit null, a video specification with a
+      null `model` or `memory`, a disk specification asking for neither
+      a size nor a base, a disk specification whose size reads as a
+      negative number, and a custom DNS entry whose `value` is not an
+      IP address. Each of those used to be accepted and to do something
+      wrong — the last two deflated a node's used-capacity counters and
+      injected extra lines into a hosts file respectively — so the
+      rollback does not hand the defect back.
+    * A **declared boolean sent as a string** is read the way the
+      published schema reads it, in every mode. `"false"`, `"no"`,
+      `"off"` and `"0"` are all non-empty strings, which ten handlers
+      used to call true — `uefi` and `secure_boot` among them, and the
+      `shared` flag on both artifact routes which accept one. A
+      rollback to a reading which contradicts the published API would
+      be a rollback to the bug, so this holds too.
+    * An **object reference which is null or not a string** answers
+      `404 not found` rather than faulting. That check is in the object
+      lookup layer rather than in the validation layer, so no
+      validation mode restores the 500 it used to be.
+
+  The first three are described in full in the
+  [v0.7 to v0.8 release notes](../release_notes/v07-v08.md). Each is
+  also measured rather than asserted, which is where to look if you are
+  planning a rollback and want to know exactly what it gives back:
+  `test_nested_sweep.py`'s `NestedSweepWarnTestCase` and
+  `NestedSweepOffTestCase` drive every specification value through the
+  whole stack at `warn` and at `off`, `test_network.py`'s
+  `NetworkDNSAddressValueGuard*TestCase` pair does the same for the DNS
+  entry guard, and `test_boolean_sweep.py` covers every declared
+  boolean.
 * `off` disables the layer entirely, including the log lines. This is
   the valve for the lines themselves becoming a problem: a chatty
   caller sending an undeclared key on every request is an extra line
-  per request.
+  per request. The same four exceptions apply as for `warn`, and the
+  undeclared key is still a 500 — it is just no longer logged as a
+  finding.
 
 The caller-visible consequences of enforcement — including requests
 which used to answer 404 or 403 and now answer 400 — are described in

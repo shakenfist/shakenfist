@@ -836,7 +836,20 @@ class SweepFixtureTestCase(AuthenticatedStackTestCase):
         ``shakenfist.util.exceptions.record_exception``; the base test
         case already replaces that with a mock, so this counts its
         calls rather than installing a second spy). The body rides
-        along so a failure says what the server actually answered.
+        along so a failure says what the server actually answered,
+        truncated because it only has to be readable in a failure
+        message.
+        """
+        status, recorded, response = self._send(method, recipe, omit=omit)
+        return status, recorded, response.get_data(as_text=True)[:200]
+
+    def _send(self, method, recipe, omit=None):
+        """Send one request and return ``(status, recorded, response)``.
+
+        The whole response, for a caller which needs to read the body
+        rather than only quote it -- test_boolean_sweep.py compares one
+        key of it across four requests. ``_request`` above is the
+        truncating wrapper this file's own sweep uses.
         """
         self.unique += 1
         if recipe.get('reset'):
@@ -870,8 +883,7 @@ class SweepFixtureTestCase(AuthenticatedStackTestCase):
         before = self.mock_record_exception.call_count
         response = getattr(self.client, method)(url, **kwargs)
         recorded = self.mock_record_exception.call_count > before
-        return (response.status_code, recorded,
-                response.get_data(as_text=True)[:200])
+        return response.status_code, recorded, response
 
     @staticmethod
     def _verdict(status, recorded):

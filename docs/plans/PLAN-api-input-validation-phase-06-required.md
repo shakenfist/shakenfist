@@ -973,9 +973,18 @@ the server does not require. Step 6's release note says so explicitly.
    `test_a_partial_overlap_cannot_be_expressed` recording why no fifth
    case exists.
 9. **Not yet met, deliberately.** Per this step's brief I have not
-   closed either issue. #3269 and #323 both carry `Fixes #NNNN` in
-   their commits (`03ea26514` and `d6b84b365`) and will auto-close on
-   merge; the commit and the check that proves each is named in my
+   closed either issue. #3269 and #323 both carried `Fixes #NNNN` in
+   their commits and auto-closed on merge. This item originally named
+   those commits as `03ea26514` and `d6b84b365`, which is what they
+   were before #4199 was rebased onto `develop` shortly before it
+   merged; those objects exist in no clone but the one that wrote them.
+   They landed as `ec406a78a` and `c7a432886`. #4222 corrected the same
+   pair in the master plan and did not reach this file; phase 8's
+   survey found it here. A SHA recorded while a branch is in flight is
+   a SHA a rebase can invalidate — read them off the first-parent range
+   after the merge.
+
+   The commit and the check that proves each is named in my
    final report and in the master plan's *Where the tracked issues
    stand* section, for the management session to post as closing
    comments. #534 was already closed by #4183 before this phase
