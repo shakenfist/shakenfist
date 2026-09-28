@@ -1,5 +1,226 @@
 # CI cloud sizing and headroom
 
+## How the clouds are sized
+
+A CI cluster is sized against a number which has very little to do
+with the machines it runs on. What runs out first in CI is the
+scheduler's **admission ledger** -- an allocation figure derived from a
+node's thread count and two configuration values -- and not real CPU or
+memory. The conductor's per-instance samples put a `slim-primary`
+cluster VM at 0.71 cores of its 4 vCPU allocation, about 18%, and peak
+memory on a 12 GB node at 4.9-7.6 GB, with zero swap-out on every node
+of every job ([PLAN-ci-cloud-sizing](../plans/PLAN-ci-cloud-sizing.md),
+*Allocation is roughly double actual usage*). So a CI cloud can refuse
+a create while four fifths idle, and the lever that relieves it is a
+wider node rather than a quieter one.
+
+The ledger is also the denominator of every band verdict in the rest of
+this page, which is why it is described first.
+
+### What admission actually tests
+
+`Scheduler._has_sufficient_cpu` (`shakenfist/scheduler.py:332`) keeps a
+node in the candidate set only while
+
+```
+max(measured, committed) + requested <= cpu_schedulable x CPU_OVERCOMMIT_RATIO
+```
+
+Both of the terms on the left count *vCPU*, not load: `measured` is the
+running-domain census the resources daemon republishes once a minute
+(`cpu_total_instance_vcpus`), and `committed` is the `used_cpus`
+counter the placement transaction maintains. The node is charged
+whichever is larger, so an instance which is placed but not yet running
+counts against the cloud for the whole time it spends fetching images.
+
+That filter is a pre-filter rather than the decision: since
+scheduler-reservations phase 3 the binding guard is the atomic `UPDATE`
+`Instance.place_instance()` makes against `scheduler_node_capacity`,
+whose `limit_cpus` is `floor(cpu_schedulable x CPU_OVERCOMMIT_RATIO)`
+(`shakenfist/mariadb.py:24805`). The two therefore test the same
+arithmetic on purpose, and for sizing they can be read as one bound.
+The full stage list, and the four other things admission can refuse on,
+are in [the placement
+pipeline](../operator_guide/scheduler.md#the-placement-pipeline).
+
+Throughout this page, **a cluster's ledger** is that right-hand side
+summed over the cluster's hypervisors.
+
+### Where each term comes from
+
+`cpu_schedulable` is published per node by the resources daemon as
+`max(1, cpu_threads - cpu_reservation_threads)`
+(`shakenfist/daemons/resources/main.py:136`). The floor of one thread
+is a clamp for over-large reservations, and in CI it is load-bearing
+rather than theoretical -- see "Two things the topology files do not
+show" below.
+
+The reservation is `NODE_CPU_RESERVATION_THREADS`, a per-node value in
+each host's `/etc/sf/config` rather than cluster config
+([system reservations](../operator_guide/scheduler.md#system-reservations)
+covers all three reservations and both clamps). Nothing in the
+scheduler bumps it for a node's roles; what does is the deploy, which
+computes a per-host *default* of `(1 + (network or database ? 1 : 0)) *
+2` threads and fills it in only where the operator has not set the
+value (`examples/_shared/site.yml:360-363`). In CI nobody sets it, so
+the default is what runs: **2 threads on a plain hypervisor, 4 on a
+network or database node**.
+
+`CPU_OVERCOMMIT_RATIO` is cluster-wide and defaults to 3.0. What it
+means, why it is 3.0 rather than the historic 16, and how to restore
+the old behaviour are in [CPU
+overcommit](../operator_guide/scheduler.md#cpu-overcommit) and the
+[configuration
+reference](../operator_guide/scheduler.md#configuration-reference);
+they are not repeated here.
+
+### The two CI topologies, and the ledgers they yield
+
+Both cluster topologies are defined in the **`shakenfist/actions`**
+repository, as `ansible/ci-topology-slim-tier.yml` and
+`ansible/ci-topology-slim-primary.yml`. There is no copy of them in
+this repository, and every caller reaches them at `@main` with no pin,
+so an edit there is live for every run in flight. They are the source
+of truth for the two tables below; if the tables and the files
+disagree, the files are right and the tables are stale.
+
+Every node is in `allsf`, which is elided below.
+
+**`slim-tier`** -- three VMs, all of them hypervisors:
+
+| Node | vCPU | Other groups | Reserved | Schedulable | Ledger |
+|---|---|---|---|---|---|
+| `primary` | 6 | `database_node`, `primary_node`, `network_node` | 4 | 2 | 6 |
+| `sf1` | 6 | `database_node` | 4 | 2 | 6 |
+| `sf2` | 6 | -- | 2 | 4 | 12 |
+| **Total** | | | | | **24** |
+
+**`slim-primary`** -- six VMs, five of them hypervisors:
+
+| Node | vCPU | Groups | Reserved | Schedulable | Ledger |
+|---|---|---|---|---|---|
+| `primary` | 4 | `database_node`, `primary_node` -- not `hypervisors` | -- | -- | 0 |
+| `sf1` | 4 | `hypervisors`, `network_node` | 4 | 1 (floored) | 3 |
+| `sf2`-`sf5` | 4 | `hypervisors` | 2 | 2 | 6 each |
+| **Total** | | | | | **27** |
+
+24 is not a round number chosen for a test: it is exactly `slim-tier`'s
+total, and it is `MINIMUM_HYPERVISOR_LEDGER` in
+`shakenfist/deploy/shakenfist_ci/sizing.py`, which "The topology
+assertion fails rather than skipping" below asserts against every
+deployed cluster. The floor therefore sits directly on the topology
+with no slack, so a change which takes capacity out of `slim-tier`
+fails by name, in a test whose message says the cluster is too small,
+rather than as a scheduling flake somewhere else in the suite. The
+deliberate cost is that a smaller-on-purpose topology cannot be
+deployed without editing that constant in the same change.
+
+27 is not derived on paper either. Phase 2 of the sizing plan read a
+cluster ledger of exactly 27.0 in all 154 `slim-primary` job-runs of
+its baseline window, which is what makes the arithmetic above a
+description of the system rather than a model of it.
+
+### Two things the topology files do not show
+
+**`slim-primary`'s primary contributes nothing.** It carries
+`database_node,primary_node` and *not* `hypervisors`, so it is not a
+scheduling candidate at all, and `summarize_resources()` leaves it out
+of `/admin/resources`'s `per_node` mapping entirely. Six VMs, five of
+them in the ledger, and a report which counts nodes reads one fewer
+than the topology creates.
+
+**The reservation is a fixed per-node tax, so small nodes are
+disproportionately expensive.** Two threads off a 4 vCPU node is half
+of it; off a 6 vCPU node, a third. Worse, a 4 vCPU node carrying a
+network or database role reserves all four threads and is clamped to
+one schedulable thread, which is how `slim-primary`'s `sf1` yields a
+ledger of 3 where its identically-sized siblings yield 6. Widening the
+nodes of a topology therefore buys more ledger than adding nodes of the
+same size does, per vCPU spent on the under-cloud, and that is why
+phase 4 reshaped `slim-tier` by widening rather than by adding a
+fourth node. It is the first thing to check against any proposed new
+topology.
+
+### Re-measuring this from scratch
+
+Three steps, none of which depends on the others being believed.
+
+**Harvest a window.** `tools/ci_headroom_harvest.py` enumerates
+`merge_group` runs and writes one record per job per run; its flags,
+its caching and the reasons it refuses to guess are under "Where the
+output lands" above. Name both ends of the window with `--since` and
+`--until` if the output is going to be committed -- `--since` alone
+grows with every merge and `--limit` moves with the day the harvest is
+run on, so neither reproduces its own dataset.
+
+**Read the verdicts.** Each record's `summary.verdict` carries the
+band, the p90 CPU fraction and whether the gate was allowed to judge
+it; the script under
+[Asking whether a cloud is oversized](#asking-whether-a-cloud-is-oversized)
+counts those over a window by topology and job.
+
+**Recompute a topology's ledger by hand**, from its file in
+`shakenfist/actions`, applying the rules above: skip any node not in
+`hypervisors`, reserve 2 threads (4 with `network_node` or
+`database_node`), floor the remainder at 1, and multiply by 3.0. The
+script below does exactly that and nothing else. Run it from a
+`shakenfist/actions` checkout; it prints 24 and 27.
+
+```python
+import re
+import sys
+
+RATIO = 3.0  # CPU_OVERCOMMIT_RATIO default
+
+
+def ledger(path):
+    text = open(path).read()
+    cpus = [int(m) for m in re.findall(r'^\s+cpu:\s*(\d+)\s*$', text, re.M)]
+    groups = re.findall(r'^\s+groups:\s*(.+)$', text, re.M)
+    if len(cpus) != len(groups):
+        sys.exit('%s: %d cpu values but %d groups' % (path, len(cpus), len(groups)))
+    total = 0
+    for cpu, group in zip(cpus, groups):
+        g = [x.strip() for x in group.split(',')]
+        if 'hypervisors' not in g:
+            continue
+        network_or_database = 'network_node' in g or 'database_node' in g
+        reservation = 2 * (1 + (1 if network_or_database else 0))
+        total += int(max(1, cpu - reservation) * RATIO)
+    return total
+
+
+for path in sys.argv[1:]:
+    print('%s: ledger %d' % (path, ledger(path)))
+```
+
+It pairs each `cpu:` with the `groups:` that follows because every
+topology file creates an instance and adds it to ansible in that order,
+and it exits loudly rather than mispairing silently if that stops being
+true. `slim-primary`'s `sf-absent` is not an instance at all -- it is an
+inventory entry in `absent_deploy_hypervisors`, deliberately never
+deployed -- so it correctly never appears in either count.
+
+### An open question: `slim-primary` reads OVERSIZED
+
+Phase 5's window read `slim-primary` below the band's lower bound in 25
+of 30 job-runs, against `slim-tier`'s 5 of 10. The topology phase 4
+deliberately left alone is the emptier of the two, the lower bound
+exists precisely to detect that, it has detected it, and nobody has
+acted on it.
+
+This is recorded rather than answered. Asking it properly means a
+window and not a run --
+[Asking whether a cloud is oversized](#asking-whether-a-cloud-is-oversized)
+is the command -- and acting on it means shrinking a topology, which is
+a change to the cloud every functional job runs on. Phase 4 set the bar
+for that: a prediction of what the reshape would do to the band and to
+the refusal census, and a falsification criterion stated before the
+window was harvested, so the reshape could be shown to have failed. A
+shrink argued from these readings alone would have neither, and the
+`MINIMUM_HYPERVISOR_LEDGER` floor means `slim-tier` cannot be shrunk at
+all without that argument being made in the same change.
+
 ## CI headroom instrumentation
 
 Every functional cluster job carries two data-gathering instruments,
