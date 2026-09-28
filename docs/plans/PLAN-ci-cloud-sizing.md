@@ -128,6 +128,13 @@ gives away half its threads, a 6 vCPU node a third.
 | `slim-primary` | 6 (1 database + 5 hypervisors) | 24 vCPU / 64 GB | **27 vCPU** (1x3 + 4x6) | 154 job-runs, every one |
 | `slim-tier` | 3 (all hypervisors) | 12 vCPU / 36 GB | **12 vCPU** (3+3+6) | 50 job-runs, every one |
 
+**This table is a measurement record, not the current state.** Phase 4
+reshaped `slim-tier` from three 4 vCPU nodes to three 6 vCPU nodes and
+doubled its ledger to 24 (phase 4's 4d, in
+`PLAN-ci-cloud-sizing-phase-04-topologies.md`); `slim-primary` is
+unchanged. See `docs/developer_guide/ci_cloud_sizing.md` for the
+topologies' current shapes and ledgers.
+
 Those ledgers are not derived on paper. Across the whole baseline
 window the cluster ledger read exactly 27.0 in all 154
 `slim-primary` job-runs and exactly 12.0 in all 50 `slim-tier`
@@ -1673,12 +1680,16 @@ which is what `tools/check-plan-status.py` enforces.
   under-cloud. Reducing per-cloud footprint helps; bounding the right
   quantity would help more, and is a change to queue configuration
   rather than to anything in this plan.
-- **Generalise to the other repositories' clouds.** The
-  downstream repositories fork these topologies. Phase 6
-  propagates the shapes; making the headroom probe part of the
-  reusable workflow means they inherit the measurement too. Same
-  structural cause as the entry below: a cloud built by something
-  other than the workflow the probe steps live in is unmeasured.
+- **Generalise to the other repositories' clouds.** There is exactly
+  one copy of these topologies, in `shakenfist/actions/ansible/`, and
+  every cluster-deploying call site in the ecosystem already reads it
+  from there -- the reusable-workflow migration (`remove-primary`
+  phase 8) did the propagating this entry used to call for, so there
+  is nothing left to propagate. What is still undone is making the
+  headroom probe part of the reusable workflow, so downstream
+  inherits the measurement too. Same structural cause as the entry
+  below: a cloud built by something other than the workflow the probe
+  steps live in is unmeasured.
 - **Count what became of a guard denial, not just the denial.**
   Step 2g measured 3,480 denials over 32 job-runs and cannot say how
   many of them ended in a failed create, because the census filter
@@ -1696,15 +1707,16 @@ which is what `tools/check-plan-status.py` enforces.
   carry the phase 1 probe, for two different reasons. `Ansible
   modules` runs through the reusable `smoke-cluster` workflow but
   with `test_kind: ansible-modules`
-  (`functional-tests.yml:514`), and every probe step is gated `if:
+  (`functional-tests.yml:528`), and every probe step is gated `if:
   inputs.test_kind == 'functional'`; widening that gate is the whole
-  fix. `Node lifecycle` never reaches that workflow at all -- it
-  calls the `build-smoke-cluster` composite action directly
-  (`functional-tests.yml:554-557`), and the probe steps live in the
-  workflow rather than in the action, so moving them into (or
-  duplicating them beside) the action is a change to how *every*
-  caller deploys. That is the same seam as the entry above, and the
-  two should be done together. The cost of leaving it is concrete
+  fix, and is what phase 6's 6d does. `Node lifecycle` never reaches
+  that workflow at all -- it calls the `build-smoke-cluster`
+  composite action directly (`functional-tests.yml:581`), and the
+  probe steps live in the workflow rather than in the action, so
+  moving them into (or duplicating them beside) the action is a
+  change to how *every* caller deploys. That is the same seam as the
+  entry above; phase 6's 6e files an issue for this half rather than
+  closing it, tracked there. The cost of leaving it is concrete
   and already paid: `Node lifecycle` is the best performer in the
   failure table, and the baseline's utilisation-versus-failure
   correlation cannot speak to it.

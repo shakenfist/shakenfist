@@ -116,7 +116,7 @@ BundleKind = collections.namedtuple(
 
 
 # D17's table, sourced from the merge matrix at
-# .github/workflows/functional-tests.yml:436-480. Three of the four jobs run
+# .github/workflows/functional-tests.yml:440-495. Three of the four jobs run
 # the *same* topology, which is the point: if slim-primary's three jobs
 # differ from each other in peak demand then the difference is the suite and
 # not the shape, and phase 4 must not respond to it by resizing the cloud.
@@ -149,12 +149,12 @@ BUNDLE_TOPOLOGIES = {
 # their reasons rather than as a bare set:
 #
 # * 'Ansible modules' does run through the reusable smoke-cluster workflow,
-#   but with test_kind: ansible-modules (functional-tests.yml:514), and every
+#   but with test_kind: ansible-modules (functional-tests.yml:528), and every
 #   probe step in that workflow is gated `if: inputs.test_kind ==
 #   'functional'`.
 # * 'Node lifecycle' never reaches that workflow at all. It calls the
 #   build-smoke-cluster composite action directly
-#   (functional-tests.yml:554-557), and the probe steps live in the workflow
+#   (functional-tests.yml:581), and the probe steps live in the workflow
 #   rather than in the action, so they are not in its job.
 #
 # Skipping them by name, deliberately, is the difference between a dataset

@@ -835,12 +835,14 @@ why phase 5 is not fixing it. It is in the master plan's Future work.
   pull request, after #4308. Its SHA belongs in the master plan's phase 5
   `Merged` cell and no commit inside it can name it -- see the note under
   the Execution table.
-* **The propagation half of the sizing model is still undone.** The
-  downstream repositories fork these topologies and none of them has the
-  structural assertion or an armed gate. Those that call
-  `smoke-cluster.yml` (client-python, and the actions canary) get the
-  band and its annotation as information, and are gated only if they opt
-  in, which needs a window of their own. That is phase 6's own scope.
+* **The propagation half of the sizing model is still undone.** There is
+  exactly one copy of these topologies, in `shakenfist/actions/ansible/`,
+  and every cluster-deploying call site already reads it from there --
+  but none of the downstream call sites has the structural assertion or
+  an armed gate. Those that call `smoke-cluster.yml` (client-python, and
+  the actions canary) get the band and its annotation as information, and
+  are gated only if they opt in, which needs a window of their own. That
+  is phase 6's own scope.
 
 ## Back brief
 
