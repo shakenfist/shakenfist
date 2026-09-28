@@ -2689,6 +2689,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/scheduled-workflow-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Scheduled workflow health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/sfui-vendor/" class="md-nav__link">
         
   
@@ -8312,6 +8340,34 @@
     
   
     Proxy dev releases phase 6: push audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-rdp-gateway/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDP out: a transcoding gateway for SPICE consoles
   
 
     
@@ -15701,7 +15757,9 @@ reconnect UX correctly.</p>
   <code>http://</code>), and <code>user:pass@</code> credentials in the URI (proxy
   authentication is not supported). A malformed or refused <code>proxy=</code>
   value fails the <code>.vv</code> load, naming the <code>proxy</code> key, before any
-  connection is attempted.</p>
+  connection is attempted. The error quotes the value unless it
+  contains an <code>@</code>, whatever the scheme, so credentials never reach
+  stderr, logs or a bug report.</p>
 <p>A tunnelled connection is TLS-only and must be pinned: a <code>.vv</code> that
   sets <code>proxy</code> must also set both <code>tls-port</code> and <code>host-subject</code>. ryll
   refuses to dial -- before opening a socket -- a <code>.vv</code> that sets
@@ -15780,8 +15838,9 @@ suppresses ryll's auto-reconnect for this single-use ticket, per the
 <a href="#ticket-lifecycle-keys">Ticket lifecycle keys</a> above.</p>
 <p>This example is exercised, not just documented: <a href="/components/ryll/ci/#the-proxmox-lane">the Proxmox
 lane</a> mints a <code>.vv</code> in this shape against a
-real Proxmox VE node on every pull request that touches the CONNECT
-tunnelling code, and asserts that ryll connects through it.</p>
+real Proxmox VE node on every pull request from this repository that
+touches the CONNECT tunnelling code, and asserts that ryll connects
+through it.</p>
 <h2 id="keyboard-shortcuts">Keyboard Shortcuts<a class="headerlink" href="#keyboard-shortcuts" title="Permanent link">&para;</a></h2>
 <p>These shortcuts are available during a GUI session. They are consumed
 by ryll and not forwarded to the guest VM.</p>

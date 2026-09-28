@@ -2689,6 +2689,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/scheduled-workflow-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Scheduled workflow health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/sfui-vendor/" class="md-nav__link">
         
   
@@ -8314,6 +8342,34 @@
     
   
     Proxy dev releases phase 6: push audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-rdp-gateway/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDP out: a transcoding gateway for SPICE consoles
   
 
     
@@ -14992,7 +15048,7 @@ set only when the row is first inserted
 (<code>kerbside/db.py:303-318</code>), and the <code>.vv</code> handler then
 deliberately leaves the stored value alone for a static source,
 on the grounds that the driver persisted it at enumeration time
-(<code>kerbside/api.py:509-512</code>). An edited password is therefore
+(<code>kerbside/api.py:512-515</code>). An edited password is therefore
 parsed, yielded by the driver, passed to the database layer and
 dropped, with no log line, no audit event and no errored source.
 Removing the entry, letting the removal land, and adding it back
@@ -15181,7 +15237,7 @@ termination.</p>
 </tr>
 <tr>
 <td>A changed SPICE password is never applied</td>
-<td>Every other field of an entry which already exists is reassigned on the next pass; the password is not. It is set only when the console row is first inserted (<code>kerbside/db.py:303-318</code>), and the <code>.vv</code> handler leaves the stored value alone for a static source (<code>kerbside/api.py:509-512</code>), so an edit to it is parsed and discarded with no log line, no audit event and no errored source. The file and the database disagree and nothing says so; the first sign is the target refusing the handshake. Remove the entry, let the removal land, and add it back to change one. Tracked as <a href="https://github.com/shakenfist/kerbside/issues/463">#463</a>.</td>
+<td>Every other field of an entry which already exists is reassigned on the next pass; the password is not. It is set only when the console row is first inserted (<code>kerbside/db.py:303-318</code>), and the <code>.vv</code> handler leaves the stored value alone for a static source (<code>kerbside/api.py:512-515</code>), so an edit to it is parsed and discarded with no log line, no audit event and no errored source. The file and the database disagree and nothing says so; the first sign is the target refusing the handshake. Remove the entry, let the removal land, and add it back to change one. Tracked as <a href="https://github.com/shakenfist/kerbside/issues/463">#463</a>.</td>
 </tr>
 <tr>
 <td>The inventory is only as good as your editing</td>

@@ -2689,6 +2689,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/scheduled-workflow-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Scheduled workflow health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/sfui-vendor/" class="md-nav__link">
         
   
@@ -8312,6 +8340,34 @@
     
   
     Proxy dev releases phase 6: push audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-rdp-gateway/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDP out: a transcoding gateway for SPICE consoles
   
 
     
@@ -15641,7 +15697,7 @@ not just against the direct-qemu and Shaken Fist targets the
 other functional lanes cover. It deploys a single-node PVE 9
 through <code>shakenfist/actions</code>'
 <a href="https://github.com/shakenfist/actions/blob/main/docs/actions.md"><code>deploy-proxmox-on-shakenfist</code></a>,
-builds this branch's <code>ryll</code> first so a compile error never books
+builds the <code>ryll</code> under test first so a compile error never books
 the ~20-minute node deploy, and then runs
 <code>tools/proxmox-smoke.py</code>'s four checks (positive, expired ticket,
 wrong pin, missing pin) against the node's spiceproxy, each

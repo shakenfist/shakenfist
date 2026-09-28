@@ -2689,6 +2689,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/scheduled-workflow-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Scheduled workflow health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/sfui-vendor/" class="md-nav__link">
         
   
@@ -8314,6 +8342,34 @@
     
   
     Proxy dev releases phase 6: push audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-rdp-gateway/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDP out: a transcoding gateway for SPICE consoles
   
 
     
@@ -14844,7 +14900,7 @@ to check before you do.</p>
 <p><strong>The address in the <code>.vv</code> file is free.</strong> Every <code>.vv</code>
 Kerbside emits builds the client-facing address from the
 configuration of the Kerbside that generated it —
-<code>config.PUBLIC_FQDN</code>, at <code>kerbside/api.py:533</code> for a direct
+<code>config.PUBLIC_FQDN</code>, at <code>kerbside/api.py:536</code> for a direct
 request, <code>:686</code> for the Nova token exchange and <code>:814</code> for the
 Shaken Fist one. An office instance therefore hands out its
 own address without being told anything about the others, and
@@ -14858,7 +14914,7 @@ it differs by source.</p>
   <code>shakenfist</code> source cached during its own scrape
   (<code>kerbside/sf_token.py</code>). The exchange route deliberately
   carries no <code>@verify_token</code> decorator, and the comment at
-  <code>kerbside/api.py:707-711</code> says why. Any Kerbside that
+  <code>kerbside/api.py:723-727</code> says why. Any Kerbside that
   scrapes the cluster can therefore serve any of the cluster's
   tokens, so an office instance needs no coordination with the
   others.</li>
@@ -14941,7 +14997,7 @@ a lane.</p>
 </tr>
 <tr>
 <td>The WAN hop is not protected by moving it</td>
-<td>TLS on the backend leg happens only when the hypervisor rejects plaintext by asking for a secure connection and a secure port is configured to escalate to (<code>rust/kerbside-proxy/src/backend.rs:85-108</code>), and the certificate subject is pinned only when the source supplied one — an empty subject maps to <code>None</code> and leaves the leg unpinned (<code>backend.rs:198-211</code>). The OpenStack path supplies neither: <code>kerbside/api.py:665-671</code> is the only <code>db.add_console()</code> on that path, and it passes no <code>host_subject</code> and no <code>ca_cert</code>. Putting a wide-area hop on this leg therefore does not encrypt or pin it by itself.</td>
+<td>TLS on the backend leg happens only when the hypervisor rejects plaintext by asking for a secure connection and a secure port is configured to escalate to (<code>rust/kerbside-proxy/src/backend.rs:85-108</code>), and the certificate subject is pinned only when the source supplied one — an empty subject maps to <code>None</code> and leaves the leg unpinned (<code>backend.rs:198-211</code>). The OpenStack path supplies neither: <code>kerbside/api.py:681-687</code> is the only <code>db.add_console()</code> on that path, and it passes no <code>host_subject</code> and no <code>ca_cert</code>. Putting a wide-area hop on this leg therefore does not encrypt or pin it by itself.</td>
 </tr>
 <tr>
 <td>Each instance is its own session and audit view</td>

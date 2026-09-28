@@ -2689,6 +2689,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/scheduled-workflow-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Scheduled workflow health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/sfui-vendor/" class="md-nav__link">
         
   
@@ -8316,6 +8344,34 @@
     
   
     Proxy dev releases phase 6: push audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-rdp-gateway/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDP out: a transcoding gateway for SPICE consoles
   
 
     
@@ -15881,6 +15937,14 @@ become the next plan:</p>
 <li>Report spice-server 0.15.2's crash when a client connects
   while streams already exist, once it has been reproduced
   against spice-server's current master.</li>
+<li><strong>RDP out.</strong> <code>PLAN-rdp-gateway.md</code> (proposed 2026-09-27)
+  depends on phase 3. It reuses the terminating renderer, the
+  damage stream and the per-session worker to serve RDP to
+  clients whose networks block SPICE. Its case is
+  reachability, not latency, so phase 3's write-up should say
+  separately whether renderer accuracy and CPU per session
+  would support it, even if the verdict for SPICE out is
+  no-go.</li>
 </ul>
 <h2 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h2>
 <p>None yet.</p>

@@ -2689,6 +2689,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/scheduled-workflow-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Scheduled workflow health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/sfui-vendor/" class="md-nav__link">
         
   
@@ -8385,6 +8413,34 @@
     
   
     Proxy dev releases phase 6: push audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-rdp-gateway/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDP out: a transcoding gateway for SPICE consoles
   
 
     
@@ -14789,6 +14845,13 @@ repo root. For pre-push audits of our own work see
 <td>Make SPICE sessions through Kerbside measurably faster in three horizons: proxy socket backpressure now (the relay hides congestion from spice-server), a qemu <code>ui/spice-display.c</code> damage-path patch series soon (unioned damage cut into 32px columns defeats stream detection on virtio-gpu), and a feasibility spike for a Rust SPICE server on qemu's D-Bus display. Carries the ranked upstream wishlist from the 2026-09-23 research. Same-day measurement overturned the proxy finding (spice-server's ACK window, not proxy buffering, bounds the backlog) and found a sticky <code>ignore_damage_clips</code> bug making virtio-gpu guests report full-plane damage</td>
 <td>In progress</td>
 <td><a href="/components/kerbside/plans/PLAN-spice-performance-phase-01-proxy-backpressure/">phase 1</a> (complete), phase 2 (in progress -- import merged, kernel fix to submit), <a href="/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/">phase 3</a> (in progress -- transcoding spike planned), phase 4 (not started), phase 5 (not started -- spice-server patches), phase 6 (not started -- push audit of phases 1-5), phase 7 (not started -- QUIC client leg experiments), phase 8 (not started -- QUIC implementation, if go), phase 9 (not started -- push audit of phases 7-8)</td>
+</tr>
+<tr>
+<td>2026-09-27</td>
+<td><a href="/components/kerbside/plans/PLAN-rdp-gateway/">RDP out: a transcoding gateway</a></td>
+<td>A statement of direction, not a schedule: let users on networks that allow only outbound RDP reach Kerbside consoles with a stock RDP client. A per-session gateway terminates the SPICE session with Ryll and serves RDP with IronRDP, as an opt-in fallback that keeps SPICE relay the default. Depends on SPICE session performance phase 3 (the display transcoding spike)</td>
+<td>Proposed</td>
+<td>phase 1 to phase 7 (not yet planned)</td>
 </tr>
 </tbody>
 </table>

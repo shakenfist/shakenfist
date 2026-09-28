@@ -2689,6 +2689,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/scheduled-workflow-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Scheduled workflow health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/sfui-vendor/" class="md-nav__link">
         
   
@@ -8455,6 +8483,34 @@
     
   
     Proxy dev releases phase 6: push audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-rdp-gateway/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDP out: a transcoding gateway for SPICE consoles
   
 
     
@@ -15047,7 +15103,9 @@ the network prerequisites, and what is and is not proven.</p>
 periodically scraping for available consoles, Kerbside validates authentication
 tokens issued by Nova when users request SPICE direct console access.</p>
 <p>Nova 2025.1 (Epoxy) and later includes native support for SPICE direct consoles
-via the "spice-direct" console type. When a user requests a console, Nova returns
+via the "spice-direct" console type, which the Kerbside developers proposed to
+Nova and landed with the Nova team (see
+<a href="/components/kerbside/use-cases/openstack/#value-proposition">Kerbside for OpenStack</a>). When a user requests a console, Nova returns
 a URL pointing to Kerbside with an authentication token. Kerbside validates this
 token via Nova's <code>/os-console-auth-tokens/</code> API and establishes the proxied
 connection to the hypervisor.</p>
@@ -15084,6 +15142,10 @@ connection to the hypervisor.</p>
 <tr>
 <td>verify</td>
 <td>Optional: how to verify TLS certificates on the session Kerbside uses to reach this cloud -- both the Keystone authentication and the Nova console token validation call, since they share one session. It does not affect <code>ca_cert</code>, which is the hypervisor VDI leg. Accepts a boolean, the strings <code>true</code>/<code>false</code> case-insensitively, or a path to a CA bundle on the Kerbside container's filesystem, which is what a deployment with a private Keystone CA usually wants. Defaults to true. Any other string is passed through as a bundle path and fails at connection time, so a typo disables nothing and breaks the exchange</td>
+</tr>
+<tr>
+<td>interface</td>
+<td>Optional: the Keystone catalogue interface Kerbside resolves Nova on for console token validation -- <code>internal</code>, <code>public</code> or <code>admin</code>. Defaults to <code>internal</code>, because Kerbside is a control plane service that already sits on the management network to reach the compute nodes. Use <code>public</code> only for a Kerbside outside the cloud it brokers, such as a <a href="/components/kerbside/use-cases/multi-cloud/">multi-cloud</a> deployment. Keystone authentication itself goes to <code>url</code> and is not affected. Any other value is a configuration error and fails the exchange</td>
 </tr>
 <tr>
 <td>project_name</td>

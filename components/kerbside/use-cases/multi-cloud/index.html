@@ -2689,6 +2689,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/scheduled-workflow-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Scheduled workflow health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/sfui-vendor/" class="md-nav__link">
         
   
@@ -8314,6 +8342,34 @@
     
   
     Proxy dev releases phase 6: push audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-rdp-gateway/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDP out: a transcoding gateway for SPICE consoles
   
 
     
@@ -14857,7 +14913,7 @@ its consoles arrive:</p>
 <p><strong>Several OpenStack clouds behind one Kerbside.</strong> More than one
 OpenStack cloud can be configured at once, and a presented
 token is offered to each in turn, in <code>sources.yaml</code> order,
-until one validates it. <code>kerbside/api.py:612-645</code> iterates the
+until one validates it. <code>kerbside/api.py:615-661</code> iterates the
 parsed sources in file order, skips every entry whose type is
 not <code>openstack</code>, and continues past both a <code>NotFoundException</code>
 and an empty validation result — so the first cloud that
@@ -14937,11 +14993,11 @@ lanes the sibling pages describe.</p>
 </tr>
 <tr>
 <td>Configured OpenStack clouds share a trust domain</td>
-<td>A presented token is offered to each OpenStack entry in turn until one accepts it (<code>kerbside/api.py:612-645</code>), so every configured cloud is asked to validate tokens minted by the others, and any of them can claim a token it recognises. Nothing scopes the exchange to one cloud. This suits several clouds under one operator; it is not a boundary between clouds in separate trust domains.</td>
+<td>A presented token is offered to each OpenStack entry in turn until one accepts it (<code>kerbside/api.py:615-661</code>), so every configured cloud is asked to validate tokens minted by the others, and any of them can claim a token it recognises. Nothing scopes the exchange to one cloud. This suits several clouds under one operator; it is not a boundary between clouds in separate trust domains.</td>
 </tr>
 <tr>
 <td>One broken cloud degrades the others</td>
-<td>Only a clean "not mine" moves the exchange on to the next cloud: a <code>NotFoundException</code> (<code>kerbside/api.py:647</code>) or an empty validation result. Every other failure ends the whole request rather than stepping over that cloud — an SSL failure talking to its Keystone returns a 500 immediately (<code>kerbside/api.py:649-656</code>), and anything else, such as bad credentials or an unreachable Keystone, is caught by the enclosing handler and returns a 500 too. Either way the clouds after it in the file are never asked, and their users cannot get a console either.</td>
+<td>Only a clean "not mine" moves the exchange on to the next cloud: a <code>NotFoundException</code> (<code>kerbside/api.py:647</code>) or an empty validation result. Every other failure ends the whole request rather than stepping over that cloud — an SSL failure talking to its Keystone returns a 500 immediately (<code>kerbside/api.py:665-672</code>), and anything else, such as bad credentials or an unreachable Keystone, is caught by the enclosing handler and returns a 500 too. Either way the clouds after it in the file are never asked, and their users cannot get a console either.</td>
 </tr>
 <tr>
 <td>Two sources publishing one identifier are one console</td>
