@@ -708,8 +708,8 @@ class DatabaseTierTestsMixin:
             'standing_instances_per_sample': shape.samples,
             'shape_samples_attempted': shape.attempted,
             'shape_known': shape_known,
-            # Per node, how many of the samples it failed to answer and
-            # why the last one failed. The detail is what says why the
+            # Per node, how many of the samples it failed to answer, why
+            # the last one failed, and how stale its lastseen was then. The detail is what says why the
             # shape is unknown rather than only that it is.
             'shape_unread_nodes': shape.unread,
             'window_seconds': lb.LOAD_WINDOW_SECONDS,
@@ -755,7 +755,10 @@ class DatabaseTierTestsMixin:
             'shape of this cluster is unknown and every per-instance budget '
             'ceiling went unenforced. That is not a transient failure: '
             'check that sf-resources is running there and that the port is '
-            'reachable from this node. unread=%s'
+            'reachable from this node -- unless a node\'s '
+            'lastseen_age_seconds below is large, in which case the node '
+            'itself stopped checking in during the measurement and that is '
+            'the failure to chase. unread=%s'
             % (lb.RESOURCES_METRICS_PORT, shape.attempted,
                json.dumps(shape.unread, sort_keys=True)))
 

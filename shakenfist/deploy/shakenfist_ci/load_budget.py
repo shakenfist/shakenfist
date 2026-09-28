@@ -561,8 +561,10 @@ def parse_gauge(text, name):
     for line in text.splitlines():
         # A '# HELP' or '# TYPE' line splits to '#' first, so the name
         # check below rejects it without a comment guard of its own.
+        # A third field is the optional sample timestamp the exposition
+        # format allows; the value is the second either way.
         fields = line.split()
-        if len(fields) != 2 or fields[0] != name:
+        if len(fields) not in (2, 3) or fields[0] != name:
             continue
         try:
             return float(fields[1])
@@ -651,14 +653,24 @@ class ShapeSampler:
     deleted part way through the measurement stops being a hypervisor in
     the created state from then on, and a snapshot would carry it as a
     node which never answers.
+
+    Each unread node also carries how long before its last miss the
+    cluster had last heard from it (lastseen_age_seconds, None where the
+    roster did not say). A node which went down during the measurement
+    stays a hypervisor in the created state and misses every sample just
+    as a closed port does, and only its age tells the two apart: a node
+    that is still checking in has a port problem, one that stopped
+    minutes ago has a node problem.
     """
 
     def __init__(self, attempts, retry_seconds,
-                 scrape=scrape_instances_active, sleep=time.sleep):
+                 scrape=scrape_instances_active, sleep=time.sleep,
+                 clock=time.time):
         self._attempts = attempts
         self._retry_seconds = retry_seconds
         self._scrape = scrape
         self._sleep = sleep
+        self._clock = clock
         self.samples = []
         self.attempted = 0
         self.unread = {}
@@ -670,10 +682,16 @@ class ShapeSampler:
             scrape=self._scrape, sleep=self._sleep)
         if count is not None:
             self.samples.append(count)
+        now = self._clock()
+        lastseen = {n.get('name', n['ip']): n.get('lastseen')
+                    for n in shape_nodes(nodes)}
         for name, reason in unread.items():
             seen = self.unread.setdefault(name, {'samples': 0})
             seen['samples'] += 1
             seen['last_error'] = reason
+            last = lastseen.get(name)
+            seen['lastseen_age_seconds'] = (
+                None if last is None else round(now - last))
 
     def busiest(self):
         return busiest_shape(self.samples)

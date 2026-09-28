@@ -22,6 +22,7 @@ import textwrap
 import tomllib
 from unittest import mock
 
+from shakenfist import config
 from shakenfist.schema import database_load_budget
 from shakenfist.tests import base
 
@@ -477,8 +478,6 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         # node, which the load check tolerates by reporting rather than
         # enforcing its per-instance ceilings. A silently unenforced
         # detector is the failure this test exists to prevent.
-        from shakenfist import config
-
         self.assertEqual(
             config.SFConfig.model_fields['RESOURCES_METRICS_PORT'].default,
             harness.RESOURCES_METRICS_PORT)
@@ -489,14 +488,22 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         # succeeds, the gauge is absent, and every per-instance ceiling
         # quietly stops being enforced. Pinned by name because that is the
         # only thing the scrape knows about it.
+        #
+        # Read as a key of a dict literal, not as any string in the file:
+        # the daemon exports every key of its stats dict as a gauge of the
+        # same name (the loop over stats in its metrics update), so a key
+        # is what publishing looks like, and a log message or comment
+        # naming the gauge is not.
         source = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             'daemons', 'resources', 'main.py')
         with open(source) as f:
             tree = ast.parse(f.read())
-        published = {node.value for node in ast.walk(tree)
-                     if isinstance(node, ast.Constant)
-                     and isinstance(node.value, str)}
+        published = {key.value for node in ast.walk(tree)
+                     if isinstance(node, ast.Dict)
+                     for key in node.keys
+                     if isinstance(key, ast.Constant)
+                     and isinstance(key.value, str)}
         self.assertIn('instances_active', published)
 
     def test_instances_active_is_read_from_the_node(self):
@@ -519,6 +526,15 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         # cluster whose nodes gave the first is how #4039 came to evaluate
         # the model against a cluster that was not there.
         self.assertIsNone(harness.parse_gauge(RESOURCE_METRICS, 'nonesuch'))
+
+    def test_a_sample_with_a_timestamp_is_still_read(self):
+        # The exposition format allows a timestamp after the value.
+        # prometheus_client does not write one for these gauges, but a node
+        # which did would otherwise read as not publishing the gauge at
+        # all, and never answering fails the load check.
+        self.assertEqual(
+            3.0, harness.parse_gauge('instances_active 3.0 1770000000000\n',
+                                     'instances_active'))
 
     def test_a_published_zero_is_a_value_not_an_absence(self):
         # The other half of test_an_absent_gauge_is_not_zero.
@@ -631,7 +647,8 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         self.assertEqual([6], sampler.samples)
         self.assertEqual(6, sampler.busiest())
         self.assertEqual(
-            {'sf2': {'samples': 2, 'last_error': harness.UNPUBLISHED_GAUGE}},
+            {'sf2': {'samples': 2, 'last_error': harness.UNPUBLISHED_GAUGE,
+                     'lastseen_age_seconds': None}},
             sampler.unread)
         # sf2 answered one sample, so its port works: transient, tolerated.
         self.assertEqual([], sampler.never_read())
@@ -659,6 +676,33 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
             sampler.sample(nodes)
         self.assertEqual(['sf2'], sampler.never_read())
         self.assertIsNone(sampler.busiest())
+
+    def test_an_unread_node_says_how_long_since_it_checked_in(self):
+        # A node which died during the measurement misses every sample
+        # just as a closed port does. Its lastseen age is what tells the
+        # two apart, so it is recorded at each miss rather than once.
+        nodes = [
+            {'name': 'sf1', 'ip': '10.0.0.1', 'is_hypervisor': True,
+             'state': 'created', 'lastseen': 1000.0},
+            {'name': 'sf2', 'ip': '10.0.0.2', 'is_hypervisor': True,
+             'state': 'created', 'lastseen': 700.0},
+        ]
+        now = [1010.0]
+
+        def scrape(ip):
+            if ip == '10.0.0.2':
+                raise harness.requests.ConnectionError('refused')
+            return 1.0
+
+        sampler = harness.ShapeSampler(1, 0, scrape=scrape,
+                                       sleep=lambda s: None,
+                                       clock=lambda: now[0])
+        sampler.sample(nodes)
+        self.assertEqual(310, sampler.unread['sf2']['lastseen_age_seconds'])
+        now[0] = 1070.0
+        sampler.sample(nodes)
+        self.assertEqual(370, sampler.unread['sf2']['lastseen_age_seconds'])
+        self.assertNotIn('sf1', sampler.unread)
 
     def test_the_sampler_reads_the_roster_it_is_given_each_time(self):
         # A node deleted part way through leaves the created state, and a
