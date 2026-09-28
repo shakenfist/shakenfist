@@ -492,7 +492,7 @@ not just against the direct-qemu and Shaken Fist targets the
 other functional lanes cover. It deploys a single-node PVE 9
 through `shakenfist/actions`'
 [`deploy-proxmox-on-shakenfist`](https://github.com/shakenfist/actions/blob/main/docs/actions.md),
-builds this branch's `ryll` first so a compile error never books
+builds the `ryll` under test first so a compile error never books
 the ~20-minute node deploy, and then runs
 `tools/proxmox-smoke.py`'s four checks (positive, expired ticket,
 wrong pin, missing pin) against the node's spiceproxy, each

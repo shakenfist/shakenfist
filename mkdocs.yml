@@ -149,6 +149,7 @@ nav:
                 - "Audit: Renovate for dependency bumps": components/development/audits/renovate.md
                 - "Audit: Renovate groups for lockstep dependency families": components/development/audits/renovate-lockstep-groups.md
                 - "Audit: Rust unwrap lint": components/development/audits/rust-unwrap-lint.md
+                - "Audit: Scheduled workflow health": components/development/audits/scheduled-workflow-health.md
                 - "Audit: sfui vendored copy": components/development/audits/sfui-vendor.md
                 - "Audit: Test coverage": components/development/audits/test-coverage.md
                 - "Audit: Workflow standards": components/development/audits/workflow-standards.md
@@ -338,6 +339,7 @@ nav:
                 - "Proxy dev releases phase 4: docs, downstream cleanup, verification": components/kerbside/plans/PLAN-proxy-dev-releases-phase-04-docs-and-downstream.md
                 - "Proxy dev releases phase 5: bounding the dev release set": components/kerbside/plans/PLAN-proxy-dev-releases-phase-05-pypi-prune.md
                 - "Proxy dev releases phase 6: push audit": components/kerbside/plans/PLAN-proxy-dev-releases-phase-06-push-audit.md
+                - "RDP out: a transcoding gateway for SPICE consoles": components/kerbside/plans/PLAN-rdp-gateway.md
                 - "Rolling kerbside-proxy dev releases": components/kerbside/plans/PLAN-proxy-dev-releases.md
                 - "Rust proxy phase 1: server-side SPICE primitives": components/kerbside/plans/PLAN-rust-proxy-phase-01-server-primitives.md
                 - "Rust proxy phase 2: gRPC contract and Python UDS server": components/kerbside/plans/PLAN-rust-proxy-phase-02-grpc-contract.md

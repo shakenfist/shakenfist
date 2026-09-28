@@ -202,7 +202,9 @@ reconnect UX correctly.
   `http://`), and `user:pass@` credentials in the URI (proxy
   authentication is not supported). A malformed or refused `proxy=`
   value fails the `.vv` load, naming the `proxy` key, before any
-  connection is attempted.
+  connection is attempted. The error quotes the value unless it
+  contains an `@`, whatever the scheme, so credentials never reach
+  stderr, logs or a bug report.
 
   A tunnelled connection is TLS-only and must be pinned: a `.vv` that
   sets `proxy` must also set both `tls-port` and `host-subject`. ryll
@@ -299,8 +301,9 @@ suppresses ryll's auto-reconnect for this single-use ticket, per the
 
 This example is exercised, not just documented: [the Proxmox
 lane](/components/ryll/ci/#the-proxmox-lane) mints a `.vv` in this shape against a
-real Proxmox VE node on every pull request that touches the CONNECT
-tunnelling code, and asserts that ryll connects through it.
+real Proxmox VE node on every pull request from this repository that
+touches the CONNECT tunnelling code, and asserts that ryll connects
+through it.
 
 ## Keyboard Shortcuts
 
