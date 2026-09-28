@@ -382,9 +382,12 @@ files staged.
       `util/libvirt.py` and `tests/test_util_libvirt.py`.
 * [ ] `grep -n 'listDomainsID\|lookupByID' shakenfist/tests/test_daemon_cleaner.py`
       prints nothing.
-* [ ] `stestr run shakenfist.tests.test_daemon_cleaner` reports exactly
-      one expected failure, `test_update_power_states_detects_shutoff`,
-      and no failure.
+* [ ] `stestr run shakenfist.tests.test_daemon_cleaner` reports no
+      failure, and its only expected failures are
+      `test_update_power_states_detects_shutoff`. It is reported three
+      times, because `CleanerCrashedInstanceTestCase` and
+      `CleanerIOErrorPausedInstanceTestCase` subclass `CleanerTestCase`
+      and so rerun every test it defines.
 * [ ] `stestr run shakenfist.tests.test_util_libvirt` passes, and the
       step 1 report says that both mutations in brief 1 failed a test.
 * [ ] `tox -emypy` and `pre-commit run --all-files` pass.

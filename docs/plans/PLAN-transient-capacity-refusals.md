@@ -1227,17 +1227,14 @@ chosen to defer to here, so that we do not forget them.
   since the create. Found at phase 3's closeout; see that phase's
   Outcome.
 
-- **Make `get_all_domains()` one libvirt call.**
-  `LibvirtConnection.get_all_domains()`
-  (`shakenfist/util/libvirt.py:192`) is `listDomainsID()` followed
-  by a `lookupByID()` and a `name()` per domain, where
-  `listAllDomains(VIR_CONNECT_LIST_DOMAINS_ACTIVE)` would return
-  the objects in one round trip. It has three callers
-  (`daemons/cleaner/scheduled_tasks.py:222`,
-  `daemons/resources/main.py:401`, `util/libvirt.py:183`), so it is
-  a small change with a blast radius rather than a free one, and
-  phase 3 deliberately added a separate id-only helper instead of
-  reworking it. Found at phase 3's planning survey; see D22 there.
+- **Make `get_all_domains()` one libvirt call.** Resolved: phase 1a of
+  `PLAN-power-state-correctness.md` removed
+  `LibvirtConnection.get_all_domains()`, which was `listDomainsID()`
+  followed by a `lookupByID()` and a `name()` per domain, and moved
+  its callers (`daemons/cleaner/scheduled_tasks.py`,
+  `daemons/resources/main.py`) onto `get_active_sf_domains()`, the
+  single-call `listAllDomains(VIR_CONNECT_LIST_DOMAINS_ACTIVE)`
+  replacement. Found at phase 3's planning survey; see D22 there.
 
 - **Stop re-scheduling an already-charged placement.**
   `NodeInstNetdescOp._instance_preflight()`
