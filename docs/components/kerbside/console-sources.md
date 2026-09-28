@@ -186,7 +186,9 @@ periodically scraping for available consoles, Kerbside validates authentication
 tokens issued by Nova when users request SPICE direct console access.
 
 Nova 2025.1 (Epoxy) and later includes native support for SPICE direct consoles
-via the "spice-direct" console type. When a user requests a console, Nova returns
+via the "spice-direct" console type, which the Kerbside developers proposed to
+Nova and landed with the Nova team (see
+[Kerbside for OpenStack](/components/kerbside/use-cases/openstack/#value-proposition)). When a user requests a console, Nova returns
 a URL pointing to Kerbside with an authentication token. Kerbside validates this
 token via Nova's `/os-console-auth-tokens/` API and establishes the proxied
 connection to the hypervisor.
@@ -202,6 +204,7 @@ The following options are used to configure an OpenStack console source
 | username | The username for the service account |
 | password | The password for the service account |
 | verify | Optional: how to verify TLS certificates on the session Kerbside uses to reach this cloud -- both the Keystone authentication and the Nova console token validation call, since they share one session. It does not affect `ca_cert`, which is the hypervisor VDI leg. Accepts a boolean, the strings `true`/`false` case-insensitively, or a path to a CA bundle on the Kerbside container's filesystem, which is what a deployment with a private Keystone CA usually wants. Defaults to true. Any other string is passed through as a bundle path and fails at connection time, so a typo disables nothing and breaks the exchange |
+| interface | Optional: the Keystone catalogue interface Kerbside resolves Nova on for console token validation -- `internal`, `public` or `admin`. Defaults to `internal`, because Kerbside is a control plane service that already sits on the management network to reach the compute nodes. Use `public` only for a Kerbside outside the cloud it brokers, such as a [multi-cloud](/components/kerbside/use-cases/multi-cloud/) deployment. Keystone authentication itself goes to `url` and is not affected. Any other value is a configuration error and fails the exchange |
 | project_name | The OpenStack project name for the service account |
 | user_domain_id | The OpenStack user domain ID (typically "default") |
 | project_domain_id | The OpenStack project domain ID (typically "default") |
