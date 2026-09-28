@@ -48,7 +48,7 @@ ESCAPE_ONLY_DIRS = ('plans',)
 
 # Root markdown files which link into docs/. These are not part of the mkdocs
 # site, so nothing else validates them.
-ROOT_FILES = ('AGENTS.md', 'ARCHITECTURE.md', 'CLAUDE.md', 'README.md')
+ROOT_FILES = ('AGENTS.md', 'ARCHITECTURE.md', 'README.md')
 
 HEADING_RE = re.compile(r'^(#{1,6})\s+(.*?)\s*$')
 ATTR_ID_RE = re.compile(r'\{#([^}]+)\}')

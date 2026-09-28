@@ -8,6 +8,26 @@ It should also record why the choice was made.
 
 (This is actually just notes to save our future selves from tripping over the same problems.)
 
+## Development goals
+
+These apply to every change, and a reviewer will ask about each:
+
+- An object's `hard_delete()` cleans up everything the object owns. A new
+  table, reference row or on-disk artifact is not finished until
+  `hard_delete()` removes it.
+- New code carries mypy annotations, and a module a change touches is a
+  candidate to join the incremental rollout; see [mypy.md](mypy.md).
+- New code has tests. Functional tests (in
+  `shakenfist/deploy/shakenfist_ci/`) are preferred over unit tests where
+  only one is practical, because they exercise the real daemons and
+  database.
+- Event coverage is preserved. The wording of an event may change, but a
+  change must not remove the audit trail an operator debugs from; see
+  [Events vs logs](#events-vs-logs).
+- Filtering is pushed down into SQL, and a new query arrives with the index
+  that serves it; see
+  [SQL Filter-Pushdown Discipline](database_internals.md#sql-filter-pushdown-discipline).
+
 ## Memory
 
 Memory is measured in MiB in Shaken Fist. All references to memory size are stored and transmitted in MiB: Gigabytes can be too big if you want a lot of small machines. Kilobytes is just too many numbers to type. The ```libvirt``` API measures memory in KiB. Therefore, interactions with the library need to be careful to convert from MiB to KiB.
@@ -20,11 +40,16 @@ Memory is measured in MiB in Shaken Fist. All references to memory size are stor
 - Trim trailing whitespace
 - All imports at the top of the file. A late import inside a function is
   only for breaking a circular import, and carries a comment saying so
-- Import order is standard library, third party, then `shakenfist`
+- Import order is standard library, third party, then `shakenfist`. The
+  `shakenfist_utilities` import carries a `# noreorder` marker to keep it
+  in that position
+- Every module sets up logging with `LOG, _ = logs.setup(__name__)` (from
+  `shakenfist_utilities`), and attaches structured context with
+  `LOG.with_fields({'instance_uuid': uuid})` rather than formatting it into
+  the message
 - Every file starts with `# Copyright 2019 Michael Still and contributors`
 
-This page is the style guide; `CLAUDE.md` and `AGENTS.md` summarise it
-and link here.
+This page is the style guide; `AGENTS.md` summarises it and links here.
 
 ## Attribute updates use field masks
 
@@ -221,6 +246,13 @@ tox -ecover                      # Coverage report
 stestr run {test_name}           # Run specific test
 ```
 
+Unit tests use `stestr` with `testtools`; the base class is
+`ShakenFistTestCase` in `shakenfist/tests/base.py`. MariaDB and other
+external dependencies are replaced with `mock.patch`
+(`shakenfist/tests/mock_mariadb.py` provides the common database fakes).
+Tests live in `shakenfist/tests/` as `test_<subject>.py`, with
+subdirectories for `external_api`, `operations` and `schema`.
+
 ## Pre-commit Hooks
 
 The repository uses pre-commit hooks to validate code before commits:
@@ -232,7 +264,10 @@ pre-commit run --all-files       # Run all hooks manually
 ```
 
 Current hooks:
-- `actionlint` - Validates GitHub Actions workflow files
+- `actionlint` - Validates GitHub Actions workflow files. It is not a
+  Python package: install it with `brew install actionlint` on macOS, or
+  from the [actionlint releases](https://github.com/rhysd/actionlint/releases)
+  on Linux
 - `ansible-lint` - Validates the `shakenfist.shakenfist` Ansible collection
   (`shakenfist/deploy/collection/`)
 - `flake8` - Style check via tox, on changed files

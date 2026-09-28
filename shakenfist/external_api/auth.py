@@ -1684,7 +1684,8 @@ class AuthNamespaceClaimEndpoint(api_base.Resource):
         # one there is no way to tell a deliberate zero from an argument
         # the caller never sent, and an unmasked write would shrink
         # every dimension the caller did not mention to nothing
-        # (CLAUDE.md pitfall 3).
+        # (see "Attribute updates use field masks" in
+        # docs/developer_guide/standards.md).
         fields = []
         values = {'limit_cpus': 0, 'limit_memory_mb': 0, 'limit_disk_gb': 0,
                   'expires_in_seconds': 0}

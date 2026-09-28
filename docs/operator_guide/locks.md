@@ -15,6 +15,22 @@ brief `sf-database` outage) and still keep the lock. These constants
 are kept aligned in `shakenfist.locks.LEASE_SECONDS` and
 `shakenfist.mariadb.CLUSTER_LOCK_LEASE_SECONDS`.
 
+## Using ClusterLock in code
+
+```python
+from shakenfist.locks import ClusterLock
+
+with ClusterLock('lock_name', timeout=30):
+    ...  # critical section
+```
+
+`timeout` is how long `acquire()` keeps trying before giving up, and
+defaults to 120 seconds. Pass one sized to the caller: a request handler
+should not wait two minutes for a lock, and a caller that can retry later
+should give up quickly. A body that holds the lock for more than a few
+seconds polls `lost_event`, as described under
+[Lease loss handling](#lease-loss-handling).
+
 ## Inspecting locks
 
 The easiest way to see who is holding what is `sf-client admin lock
@@ -54,8 +70,11 @@ When the refresher confirms a lock has been stolen it sets
 `ClusterLock.lost_event` (a `threading.Event`) and exits. Long-held
 holders should poll this event between iterations of their critical
 section and abort cleanly when it fires. The cluster maintainer's
-inner loop already does this -- it sleeps on `lock.lost_event.wait(60)`
-and re-enters election when the wait returns truthy.
+inner loop already does this -- it sleeps on
+`lock.lost_event.wait(ELECTED_LOOP_POLL_SECONDS)` (5 seconds, in
+`shakenfist/daemons/cluster/main.py`), so it wakes promptly on loss and
+stays inside the systemd stop and watchdog windows, and re-enters
+election when the wait returns truthy.
 
 `ClusterLock.release()` raises `shakenfist.exceptions.LockNotHeld` if
 the database has no record of us holding the lock at release time;

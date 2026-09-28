@@ -71,6 +71,28 @@ startup, not a runtime health signal.
 See [`database.md`](../operator_guide/database.md) —
 "MARIADB_HOST vs MARIADB_GATEWAY_HOSTS" — for the operator-facing detail.
 
+### Caller identity decides direct access
+
+Going direct to MariaDB needs *both* `MARIADB_HOST` and a caller identity
+in `mariadb.DIRECT_MARIADB_CALLERS` (`database` and `ctl`). `MARIADB_HOST`
+alone is not enough, because it is rendered into `/etc/sf/config`, the
+systemd `EnvironmentFile` every daemon on a database-tier node shares.
+Only `sf-database` (which would otherwise call itself) and `sf-ctl` (which
+runs `ensure-mariadb-schema` and `initialise-node` before `sf-database`
+starts) act on it. Every other daemon uses the tier even when co-located
+with MariaDB: going direct would hide its load from the tier's metrics
+and connection accounting.
+
+The identity is process-global, so an entry point calls
+`set_caller_identity()` (`shakenfist/util/caller_identity.py`) before
+anything that might dispatch. An unset identity reads as `unknown`, which
+routes an ordinary daemon to the tier correctly but would make
+`sf-database` call itself; `sf-database` therefore claims its identity as
+the first statement of `main()`, before `write_pid_file()` starts the
+eventlog drainer. The one exempt path is `config.load_cluster_config()`,
+which runs at import time before any identity exists -- see its
+docstring.
+
 Schema management (`ensure_schema()` in `mariadb.py`, run via `sf-ctl
 ensure-mariadb-schema`) is version-gated per table, plus one un-gated
 pass: native MariaDB `ENUM` columns are reconciled against their Python
@@ -392,6 +414,17 @@ returns the most important eligible work first across an arbitrary
 number of queues. The previous one-RPC-per-queue polling loop is
 replaced by one RPC per iteration regardless of how many priority
 lanes the worker drains.
+
+The lanes, from `PRIORITY` in
+`shakenfist/schema/operations/baseclusteroperation.py`, highest first:
+`user_waiting` (a user is blocked on the result, so latency matters
+most), `user_facing` (ordinary user-initiated work), `background`
+(maintenance nobody is waiting for), and `user_facing_high_io` /
+`background_high_io`, which carry the same meaning for disk-heavy work.
+A worker skips the `high_io` lanes while its node's disk is more than
+about 80% busy (see `shakenfist/daemons/daemon.py`), so that work waits
+rather than piling onto a saturated disk. Each lane exists both per node
+and globally.
 
 Lower-priority rows only spill in when the higher-priority queues
 yield fewer rows than `limit`, so sustained heavy load on

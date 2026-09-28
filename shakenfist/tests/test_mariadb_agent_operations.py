@@ -238,7 +238,7 @@ class AgentOperationGrpcClientTestCase(base.ShakenFistTestCase):
         # test_mariadb_instance_attributes.py, but nothing asserted the
         # mask actually crossed the wire. Without that, a client which
         # dropped `fields` would write every column -- the
-        # cross-attribute lost update CLAUDE.md warns about -- on the
+        # cross-attribute lost update the field masks exist to prevent -- on the
         # path every daemon except sf-database uses.
         data = AgentOperationAttributesData(
             uuid=AOP_UUID, results={'0': {'status': 0}},

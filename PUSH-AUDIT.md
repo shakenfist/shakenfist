@@ -115,7 +115,8 @@ style questions need a sub-agent to read code:
 **Brief for sub-agent (only if wave 1 passes):**
 
 Check `git diff $RANGE` for adherence to project
-conventions in `CLAUDE.md` and `AGENTS.md`:
+conventions in `AGENTS.md` and
+`docs/developer_guide/standards.md`:
 
 - Python conventions: import ordering, logging via the
   `shakenfist_utilities.logs` pattern, single quotes for

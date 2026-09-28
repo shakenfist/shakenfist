@@ -30,8 +30,8 @@
 # against the claims table's own index. Moving that predicate to
 # object_states would turn the hot probe into a join across the two uuid
 # storage conventions -- object_states.object_uuid holds the dashed 36
-# character form, sa.Uuid columns here hold undashed CHAR(32) (CLAUDE.md
-# pitfall 6) -- which is both slower and the exact shape this codebase
+# character form, sa.Uuid columns here hold undashed CHAR(32), which silently
+# never match when compared directly -- which is both slower and the exact shape this codebase
 # has been burned by. Do not "simplify" this into one state.
 
 from typing import Any
@@ -300,8 +300,8 @@ class NamespaceClaim(dbo):
         """Grow, shrink or re-date this claim (D8).
 
         ``fields`` names which of the arguments this call actually sets,
-        exactly as the update_*_attributes field masks do (CLAUDE.md
-        pitfall 3): without it there is no way to tell a deliberate zero
+        exactly as the update_*_attributes field masks do (see
+        docs/developer_guide/standards.md): without it there is no way to tell a deliberate zero
         from an argument the caller never passed, and an unmasked write
         would shrink every dimension the caller did not mention to zero.
 

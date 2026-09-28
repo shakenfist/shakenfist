@@ -17,8 +17,8 @@ to break:
   ON ERROR clauses against genuinely malformed disk_spec payloads and
   its half-away-from-zero rounding of fractional sizes,
 * the REPLACE(dashed, '-', '') joins landing on the instances CHAR(32)
-  primary key (CLAUDE.md pitfall 6: comparing the two uuid forms
-  directly silently never matches, so a broken join returns zero rows
+  primary key (comparing the two uuid forms directly silently never
+  matches, so a broken join returns zero rows
   rather than an error),
 * the enum storage conventions -- object_states persists member names
   while object_references stores member values, so this suite runs

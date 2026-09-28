@@ -17,8 +17,9 @@ uncertainty explicitly rather than guessing.
 
 Consult `ARCHITECTURE.md` for the system architecture
 overview, object types, and daemon structure. Consult
-`CLAUDE.md` for build commands, project conventions, and
-database access patterns. Consult `GOALS.md` for current
+`AGENTS.md` for project conventions and the index into
+`docs/`, including build commands and database access
+patterns. Consult `GOALS.md` for current
 development priorities. Key references inside the repo
 include `shakenfist/baseobject.py` (object lifecycle and state
 machine), `shakenfist/mariadb.py` (three-layer database

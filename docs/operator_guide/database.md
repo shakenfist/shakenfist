@@ -1564,6 +1564,9 @@ print(state.update_time)  # 1234567890.123
 print(state.obj_dict())   # {'value': 'created', 'update_time': 1234567890.123}
 ```
 
+Construct it with keyword arguments, and pass `update_time` as a float
+(seconds since the epoch, as `time.time()` returns), not an int.
+
 ## IPAM Reservation Storage
 
 IPAM (IP Address Manager) reservations are stored in MariaDB for atomic address
