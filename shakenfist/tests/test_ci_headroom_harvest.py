@@ -16,9 +16,14 @@ So the coverage here is deliberately weighted towards the silent failures:
   in the merge matrix must stop the harvest so a human says which topology it
   is, because the alternatives are a fabricated label on a real measurement
   or a job missing from the dataset with nothing to say it is missing.
-* The two known-uninstrumented bundles are skipped *by name*, and skipping
-  them is not the same code path as failing on an unknown one -- a test pins
-  that they produce no record and no exception.
+* The known-uninstrumented bundle is skipped *by name*, and skipping it is
+  not the same code path as failing on an unknown one -- a test pins that it
+  produces no record and no exception. A separate test pins the two tables'
+  *shape*: no bundle name is in both, every ``BundleKind`` is fully filled
+  in, and every topology it names is one that actually exists -- so a bundle
+  moved between the tables (as the Ansible modules one was, by phase 6 of
+  PLAN-ci-cloud-sizing-phase-06-docs.md) cannot end up in neither, or in
+  both.
 * The bundle is a nested zip. The traces live inside ``bundle.zip`` inside
   the artifact zip, and a tool which looked only at the outer namelist would
   report every run in the window as having no probe.
@@ -292,10 +297,11 @@ class ClassificationTestCase(HarvestTestCase):
     def test_the_uninstrumented_bundles_are_skipped_not_raised(self):
         # Skipping these is a different code path from failing on an unknown
         # bundle, and it has to stay that way: they are known to carry no
-        # traces/ directory, for two different reasons, and treating them as
-        # missing data would put eight bogus probe-absent records in every
-        # window.
-        for name in (ANSIBLE_BUNDLE, LIFECYCLE_BUNDLE):
+        # traces/ directory, and treating them as missing data would put a
+        # bogus probe-absent record in every window. Iterates the table
+        # itself rather than a hardcoded tuple, so this does not go stale the
+        # next time a bundle moves between the two tables.
+        for name in harvest.UNINSTRUMENTED_BUNDLES:
             action, reason = harvest.classify_artifact(name)
             self.assertEqual('skip', action)
             self.assertTrue(reason)
@@ -309,6 +315,19 @@ class ClassificationTestCase(HarvestTestCase):
         self.assertEqual('slim-tier', harvest.classify_artifact(TIER_BUNDLE)[1].topology)
         self.assertEqual(
             'Guests', harvest.classify_artifact('bundle-shakenfist-full-guests')[1].job)
+
+    def test_the_ansible_modules_bundle_is_now_instrumented(self):
+        # Phase 6 of PLAN-ci-cloud-sizing-phase-06-docs.md (D3) moved this
+        # bundle out of UNINSTRUMENTED_BUNDLES once the matching
+        # shakenfist/actions change widened the probe-step gate onto that
+        # job. job_prefix is read from two real runs (36343591915,
+        # 36316642104), not derived, because the derivation broke once
+        # before -- see the comment above BUNDLE_TOPOLOGIES.
+        action, kind = harvest.classify_artifact(ANSIBLE_BUNDLE)
+        self.assertEqual('harvest', action)
+        self.assertEqual('slim-primary', kind.topology)
+        self.assertEqual('Ansible modules', kind.job)
+        self.assertEqual('Ansible modules (collection)', kind.job_prefix)
 
 
 class BundleReadingTestCase(HarvestTestCase):
@@ -469,16 +488,37 @@ class RecordTestCase(HarvestTestCase):
         self.assertIn('expired', record['absent_reason'])
         self.assertEqual([], github.downloaded)
 
-    def test_the_uninstrumented_bundles_produce_no_records(self):
+    def test_the_uninstrumented_bundle_produces_no_record(self):
         github = self._github({
             PRIMARY_BUNDLE: instrumented_members(),
-            ANSIBLE_BUNDLE: {'bundle/logs/syslog': 'x\n'},
             LIFECYCLE_BUNDLE: {'bundle/logs/syslog': 'x\n'},
             'coverage': {'x': 'y'},
         })
         count, lines = self._harvest(github)
         self.assertEqual(1, count)
         self.assertEqual(PRIMARY_BUNDLE, json.loads(lines[0])['artifact_name'])
+
+    def test_an_ansible_modules_bundle_with_no_traces_yet_is_recorded_absent(self):
+        # The bundle-table half of D3 (phase 6) can land before the matching
+        # shakenfist/actions change is pushed -- the plan's Prepared changes
+        # section says so explicitly. Until then a real 'Ansible modules'
+        # bundle still uploads (the job already produced one; only its
+        # contents change), so a harvest run in that window must not raise
+        # and must not silently drop it: it is now classified 'harvest', so
+        # it goes through the same no-series path as any other instrumented
+        # bundle whose probe did not run, and is recorded with a reason
+        # rather than dropped.
+        github = self._github({
+            PRIMARY_BUNDLE: instrumented_members(),
+            ANSIBLE_BUNDLE: {'bundle/logs/syslog': 'x\n'},
+        })
+        count, lines = self._harvest(github)
+        self.assertEqual(2, count)
+        by_name = {json.loads(line)['artifact_name']: json.loads(line) for line in lines}
+        self.assertFalse(by_name[ANSIBLE_BUNDLE]['series_present'])
+        self.assertIsNone(by_name[ANSIBLE_BUNDLE]['summary'])
+        self.assertIn('headroom.jsonl', by_name[ANSIBLE_BUNDLE]['absent_reason'])
+        self.assertEqual('slim-primary', by_name[ANSIBLE_BUNDLE]['topology'])
 
     def test_an_unknown_bundle_stops_the_whole_harvest(self):
         github = self._github({
@@ -718,3 +758,48 @@ class RunListingTestCase(HarvestTestCase):
         # command the dataset's README quotes.
         parsed = harvest.parse_since('2026-08-30')
         self.assertEqual('UTC', str(parsed.tzinfo))
+
+
+class BundleTableShapeTestCase(HarvestTestCase):
+    """Pin the shape of the two bundle-name tables themselves.
+
+    Distinct from ClassificationTestCase, which checks what classify_artifact
+    does with individual names: these tests check the tables it reads never
+    drift into an inconsistent shape, which is exactly what moving a bundle
+    between them (as D3 of phase 6 did for the Ansible modules one) risks
+    getting wrong -- a bundle left in both tables would be classified by
+    whichever dict.__contains__ check runs first (classify_artifact tries
+    UNINSTRUMENTED_BUNDLES before BUNDLE_TOPOLOGIES), silently skipping real
+    data; a bundle in neither raises UnknownBundleError and stops the
+    harvest the next time it is run.
+    """
+
+    # The topologies a BundleKind is allowed to name. Sourced from D17's
+    # table (PLAN-ci-cloud-sizing.md) and F1's inventory
+    # (PLAN-ci-cloud-sizing-phase-06-docs.md): every merge_group cluster job
+    # this tool ever harvests deploys one of these two shapes. 'localhost'
+    # (the single-node smoke topology) is deliberately excluded -- the smoke
+    # job runs on pull_request, not merge_group, so this tool never sees a
+    # bundle from it (list_runs() only reads merge_group runs), and a
+    # BundleKind naming it would be an error, not a new case to allow.
+    KNOWN_TOPOLOGIES = frozenset({'slim-primary', 'slim-tier'})
+
+    def test_no_bundle_name_is_in_both_tables(self):
+        overlap = set(harvest.UNINSTRUMENTED_BUNDLES) & set(harvest.BUNDLE_TOPOLOGIES)
+        self.assertEqual(set(), overlap)
+
+    def test_every_bundle_kind_has_a_job_topology_and_job_prefix(self):
+        for name, kind in harvest.BUNDLE_TOPOLOGIES.items():
+            self.assertTrue(kind.job, '%s has an empty job' % name)
+            self.assertTrue(kind.topology, '%s has an empty topology' % name)
+            self.assertTrue(kind.job_prefix, '%s has an empty job_prefix' % name)
+
+    def test_every_uninstrumented_bundle_has_a_non_empty_reason(self):
+        for name, reason in harvest.UNINSTRUMENTED_BUNDLES.items():
+            self.assertTrue(reason, '%s has an empty reason' % name)
+
+    def test_every_bundle_kind_names_a_topology_that_exists(self):
+        for name, kind in harvest.BUNDLE_TOPOLOGIES.items():
+            self.assertIn(
+                kind.topology, self.KNOWN_TOPOLOGIES,
+                '%s names unknown topology %r' % (name, kind.topology))

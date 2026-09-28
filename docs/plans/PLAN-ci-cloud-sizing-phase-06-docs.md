@@ -450,6 +450,129 @@ brief and must land before 6c, which writes into the page 6b creates.
 should not merge long before the actions half is pushed, or the next
 harvest skips a bundle that now has data. 6e is independent. 6f is last.
 
+## Prepared changes
+
+6d's `shakenfist/actions` half, for the operator to review and push. Only
+the operator can push that repository (phase 4's F7), so this is a diff to
+apply, not an applied edit.
+
+### The seven gates, judged
+
+| Line | Step | Verdict |
+|---|---|---|
+| `:222` | Make the traces directory | **Widen.** The trap: without it the probe starts, fails to write, and the job still exits 0. Evidence below. |
+| `:235` | Authorise the primary to reach other nodes over the mesh | **Leave alone.** Serves the functional suite's own cross-node assertions (`test_federation.py` and friends inspecting host state on *other* cluster nodes); neither `ci_headroom_launch.sh` nor `ci_headroom_collect.sh` ever ssh anywhere but the primary. |
+| `:262` | Trust a throwaway JWKS certificate authority | **Leave alone.** Already double-gated on `inputs.stestr_config == 'cluster-ci.conf'`, and the Ansible modules call site (`functional-tests.yml:528-538`) never sets `stestr_config` (it defaults to `smoke-ci.conf`, and the input is ignored for `test_kind: ansible-modules` regardless), so widening `test_kind` alone cannot turn this step on. |
+| `:299` | Start the cluster headroom probe | **Widen.** One of the two probe steps proper. |
+| `:309` | Run functional tests | Leave alone -- this is the functional suite itself. |
+| `:388` | List slowest tests | Leave alone -- this is the functional suite itself. |
+| `:432` | Collect the cluster headroom series, refusal census and capacity waits | **Widen.** The other probe step; already `if: always() && ...`. |
+
+### `:222` is the trap -- verified, not assumed
+
+`/srv/ci` is created by the `Make /srv/ci` ansible task in every
+`ansible/ci-topology-*.yml` (e.g. `ci-topology-slim-primary.yml:302-306`),
+inside the play at `ci-topology-slim-primary.yml:256` (`hosts: allsf,
+become: true`). The `file` module runs as root under `become: true` with no
+`owner:`/`group:` override, and `mode: u+rw,g+rw,o-rwx` -- so `/srv/ci` ends
+up `root:root`, mode `0660`. `base_image_user` (`debian`) is in neither the
+owning user nor group, so it has **no** access to that directory at all --
+not even to list it, let alone create a subdirectory under it.
+
+`tools/ci_headroom_launch.sh:69-71` does:
+
+```bash
+# Already created and chowned by the workflow's "Make the traces directory"
+# step; this is belt and braces for a caller that skipped it.
+mkdir -p /srv/ci/traces 2>/dev/null || true
+```
+
+Unprivileged, and it swallows its own failure. Without `:222`'s `sudo mkdir
+-p /srv/ci/traces; sudo chown -R debian:debian /srv/ci/traces`, that `mkdir`
+fails with permission denied and is silently ignored. The probe launcher
+then backgrounds `ci_headroom_probe.py` with
+`>/srv/ci/traces/headroom-probe.log 2>&1` -- redirecting into a directory
+that does not exist -- which fails the `nohup` invocation, but the whole
+remote heredoc is itself wrapped in `... <<'REMOTE_EOF' || true` in
+`ci_headroom_launch.sh`, and the script's last line is `exit 0`
+unconditionally. So the failure is invisible at every layer: the step
+succeeds, the job succeeds, and the collect step (`:432`, `if: always()`)
+finds no `headroom.jsonl` and reports "no probe" rather than an error. That
+is a worse outcome than the gate staying narrow, because a harvest of that
+run cannot tell "probe never ran" from "this specific run's traces
+directory was never made writable" -- both already collapse to the same
+`absent_reason` in `tools/ci_headroom_harvest.py`, which is exactly why
+`:222` has to be included rather than left to the belt-and-braces fallback.
+
+### The diff
+
+```diff
+--- a/.github/workflows/smoke-cluster.yml
++++ b/.github/workflows/smoke-cluster.yml
+@@ -219,7 +219,16 @@
+               "${setup} cirros /srv/ci/cirros --shared"
+ 
+       - name: Make the traces directory
+-        if: inputs.test_kind == 'functional'
++        # Widened for D3 (PLAN-ci-cloud-sizing-phase-06-docs.md): the Ansible
++        # modules job also runs the probe (see the "Start the cluster
++        # headroom probe" step below) and needs a writable /srv/ci/traces
++        # first. /srv/ci itself is created root:root, mode 0660
++        # (ansible/ci-topology-*.yml's "Make /srv/ci" task), so an
++        # unprivileged mkdir from ci_headroom_launch.sh cannot create the
++        # traces/ subdirectory under it -- only this sudo mkdir + chown can.
++        # Without this step the probe silently fails to write and the job
++        # still exits 0, which is worse than not probing at all.
++        if: inputs.test_kind == 'functional' || inputs.test_kind == 'ansible-modules'
+         run: |
+           . ${GITHUB_WORKSPACE}/ci-environment.sh
+           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+@@ -296,7 +305,9 @@
+       # would poll a cancelled job's leaked cluster. It caps itself because
+       # cancel-in-progress means the stop step below is not guaranteed to run.
+       - name: Start the cluster headroom probe
+-        if: inputs.test_kind == 'functional'
++        # Widened for D3: this is one of the two probe steps the Ansible
++        # modules job was missing (the other is the collect step below).
++        if: inputs.test_kind == 'functional' || inputs.test_kind == 'ansible-modules'
+         continue-on-error: true
+         run: |
+           . ${GITHUB_WORKSPACE}/ci-environment.sh
+@@ -429,7 +440,8 @@
+       # CI_HEADROOM_GATE. See also D7 in
+       # https://github.com/shakenfist/shakenfist/blob/develop/docs/plans/PLAN-ci-cloud-sizing-phase-05-guardrails.md
+       - name: Collect the cluster headroom series, refusal census and capacity waits
+-        if: always() && inputs.test_kind == 'functional'
++        # Widened for D3, matching the probe start step above.
++        if: always() && (inputs.test_kind == 'functional' || inputs.test_kind == 'ansible-modules')
+         env:
+           CI_HEADROOM_GATE: ${{ inputs.headroom_gate }}
+         run: |
+```
+
+Verified: the resulting file parses as valid YAML, and `:235` and `:262`
+are untouched so the functional-suite-only steps still run only for
+`test_kind: functional`.
+
+### Why this is safe to push
+
+Unchanged from D3's own reasoning: the Ansible modules call site
+(`functional-tests.yml:535`) passes `headroom_gate: false`, `:299`'s launch
+step carries `continue-on-error: true`, and `:432`'s collect step already
+runs `if: always()`. Nothing here changes the suite the job runs
+(`ansiblemoduletests.sh`, gated separately at line ~346), only adds a
+side-channel probe and its supporting directory. Worst case is an
+uninformative headroom record, not a failed or slower job.
+
+### After pushing
+
+One `Ansible modules (collection)` merge-group run after the push should
+carry `traces/headroom.jsonl` and `traces/headroom-census.json` in its
+bundle. `tools/ci_headroom_harvest.py` (6d's applied half, see below) is
+ready to read it the moment it exists; until then a harvest still succeeds
+and records the bundle with `series_present: false` and an `absent_reason`
+naming the missing series, per Definition of done item 8.
+
 ## Risks and mitigations
 
 | Risk | Mitigation |
