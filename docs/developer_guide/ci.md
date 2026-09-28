@@ -352,8 +352,8 @@ actually watched: `/admin/resources` keys that mapping by node UUID
 while the suite pins by node name, so the two differ and the wait has
 to resolve one to the other before it can read anything.
 Because the report already runs over a downloaded bundle rather than
-only inside a live job, this summary is available from the moment the
-phase that writes the trace merges -- the evidence does not wait for
+only inside a live job, this summary is available for any run that wrote the
+trace -- the evidence does not wait for
 `ci_headroom_collect.sh` to grow its own `--waits` plumbing and print
 it into the job log, which is a separate, later change.
 
@@ -367,8 +367,8 @@ A file that was read but whose every line was malformed is reported
 the same way, for the same reason, and carries its own `state` of
 `unparseable` in the machine-readable record rather than an
 `available` file with a count of zero -- the prose and the record have
-to say the same thing, because the later phases that read this are
-consumers of the record.
+to say the same thing, because the tooling that reads this consumes
+the record, not the prose.
 
 ### The series record format
 
@@ -411,8 +411,9 @@ easy to swap: `sufficient_free_disk` is disk *space*, but
 `sufficient_idle_disk` is disk *bandwidth* -- a rate predicate on
 disk-busy delta, not a capacity check at all, and not something that
 more or bigger disks in the same shape would fix. The cloud-sizing
-plan itself named the wrong one as "disk" before this phase's survey
-caught the mistake, which is why it is worth calling out here: read a
+plan itself named the wrong one as "disk" until a survey of the
+admission code caught the mistake, which is why it is worth calling
+out here: read a
 `sufficient_idle_disk` row in a census as a disk I/O problem, never as
 evidence the cloud needs more disk capacity.
 
@@ -420,9 +421,9 @@ evidence the cloud needs more disk capacity.
 
 The band verdict `ci_headroom_report.py` prints is committed vCPU as a
 fraction of the admission ledger, against bounds of 0.35 and 0.70, plus a
-per-node bound of 0.85. Those bounds are not provisional: phase 2 of
-[PLAN-ci-cloud-sizing](../plans/PLAN-ci-cloud-sizing.md) defended them
-against a distribution of 204 job-runs.
+per-node bound of 0.85. Those bounds are not provisional: they were
+defended against a baseline distribution of 204 job-runs, recorded in
+[PLAN-ci-cloud-sizing](../plans/PLAN-ci-cloud-sizing.md).
 
 **Exactly one of them can fail a job: the cluster-wide upper bound of
 0.70.** Above it, the report returns status 3 and
@@ -438,15 +439,15 @@ incidental:
 * **The lower bound (0.35) never gates.** Being oversized is not urgent,
   no build is at risk, and the response is a topology change nobody makes
   from one run. It is also the *common* reading -- 30 of the 40 cluster
-  job-runs phase 5 measured were below it -- so returning a status for it
-  would redden three quarters of cluster CI immediately. Ask the question over
+  job-runs in the warn window that preceded the gate were below it -- so
+  returning a status for it would redden three quarters of cluster CI immediately. Ask the question over
   a window instead; the command is below.
 * **The per-node bound (0.85) never gates.** The statistic saturates at
   its ceiling on plenty of passing runs, so it cannot tell a bad run from
   a good one at the top of its range. Read it as what a topology should
   achieve, not as an alarm about one run.
-* **The refusal count never gates.** Phase 4 doubled a cluster's ledger
-  and the guard refused at essentially the same rate, because
+* **The refusal count never gates.** Reshaping a cluster to double its
+  ledger left the guard refusing at essentially the same rate, because
   `expected_demand` accumulates until whatever bound it is given fills up.
   The count is the earliest sign the demand estimator has drifted, and
   nothing more; `PLAN-transient-capacity-refusals` is what reads it.
@@ -457,7 +458,7 @@ incidental:
   band is withheld, printed with the reason and exit 0, when the p90 rests
   on fewer than 20 samples which produced a cluster CPU fraction (five
   minutes at the probe's 15 second interval; the smallest real job-run in
-  the phase 2 baseline had 41), when any sample reported
+  the 204-run baseline had 41), when any sample reported
   `capacity_degraded`, when any sample predates that flag (a bundle whose
   probe cannot say whether its read failed), or when any sample was
   ledger-unreadable *after* the warm-up prefix every run opens with. Each
@@ -488,7 +489,7 @@ revert.
 
 The gate is armed only on job shapes a warn window has measured, which
 today means the merge matrix in `functional-tests.yml` -- the four jobs
-phase 5's window read. That call site passes
+the warn window read. That call site passes
 `headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}`, so the variable
 being unset leaves the gate on. The other three call sites of
 `smoke-cluster.yml` pass `headroom_gate: false`: the smoke tier job (pull
