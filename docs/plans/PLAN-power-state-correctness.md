@@ -223,7 +223,7 @@ phases 0, 1b and 3 all rely on `create()` failing when power on fails.
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 0. Assert power state in the existing lifecycle tests | [PLAN-power-state-correctness-phase-00-assertions.md](PLAN-power-state-correctness-phase-00-assertions.md) | In progress | — |
+| 0. Assert power state in the existing lifecycle tests | [PLAN-power-state-correctness-phase-00-assertions.md](PLAN-power-state-correctness-phase-00-assertions.md) | Complete | `250a40871` |
 | 1a. Honest libvirt domain listing | PLAN-power-state-correctness-phase-01a-listing.md | Not started | — |
 | 1b. The cleaner sees powered off domains | PLAN-power-state-correctness-phase-01b-inactive-domains.md | Not started | — |
 | 2. Autostart and instance restore | PLAN-power-state-correctness-phase-02-autostart-restore.md | Not started | — |
@@ -237,16 +237,24 @@ rather than leaving them to a trailing test phase.
 
 Add `power_state` assertions to every lifecycle test in
 `guest_ci_tests/test_state_changes.py` (six tests across two classes)
-and to the power cycle in `test_interface_plug_and_exec_reboot`, which
-exists twice -- in `smoke_ci_tests`, run on every pull request, and in
-`guest_ci_tests`, run in the merge queue -- and gets the assertions in
-both: `on` after create, `off` after power off, `paused` then `on`
-around pause, `on` after each reboot. These pass on `develop` today,
-because the power methods write those values before the API returns.
+and to the power cycle in `test_interface_plug_and_exec_reboot`: `on`
+after create, `off` after power off, `paused` then `on` around pause,
+`on` after each reboot. These pass on `develop` today, because the power
+methods write those values before the API returns.
 The point is to have the net in place before phase 1b adds a second
 writer that can race them. The survey found that the first loop can
 already race them (F13); the phase plan decides how the assertions
 treat that. Plan at medium effort.
+
+Landed as [#4327](https://github.com/shakenfist/shakenfist/pull/4327).
+The phase was planned against two drifted copies of
+`test_interface_plug_and_exec_reboot`, one in the smoke suite and one in
+the guest suite. [#4333](https://github.com/shakenfist/shakenfist/pull/4333)
+merged first and replaced both with `InstanceHotplugTestsMixin` in
+`shakenfist_ci/instance_hotplug.py`, which both suites inherit, so the
+branch was rebased and its three hotplug assertions live there once
+rather than twice. That closed
+[#4318](https://github.com/shakenfist/shakenfist/issues/4318).
 
 ### Phase 1a: honest libvirt domain listing
 
@@ -757,10 +765,6 @@ chosen to defer to here, so that we do not forget them.
 - Whether `instances_total` in the resources daemon should count
   defined-but-inactive domains (open question 4). This plan keeps
   today's semantics.
-- [#4318](https://github.com/shakenfist/shakenfist/issues/4318):
-  `test_interface_plug_and_exec_reboot` is duplicated between the smoke
-  and guest suites and the copies have drifted. Phase 0 edits both
-  rather than deduplicating them.
 
 ### Bugs fixed during this work
 

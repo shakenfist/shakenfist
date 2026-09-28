@@ -344,6 +344,26 @@ confirm the count: 11 in `test_state_changes.py` and 3 in each
       `git diff --stat develop... -- shakenfist ':!shakenfist/deploy/shakenfist_ci' ':!shakenfist/tests'`
       prints nothing.
 
+## Outcome
+
+Landed as [#4327](https://github.com/shakenfist/shakenfist/pull/4327),
+merge commit `250a40871`. The Guests and Smoke jobs of the dispatched
+run ([36057518023](https://github.com/shakenfist/shakenfist/actions/runs/36057518023))
+passed, and every new assertion ran; F13 did not show up.
+
+One item in the Definition of done no longer describes the tree, and
+the reason is not a gap in the work.
+[#4333](https://github.com/shakenfist/shakenfist/pull/4333) merged while
+this phase was in review. It replaced the two copies of
+`test_interface_plug_and_exec_reboot` (S1, D2) with
+`InstanceHotplugTestsMixin` in `shakenfist_ci/instance_hotplug.py`,
+which both suites inherit. The branch was rebased onto it, so the grep
+for three assertions per copy is now three in `instance_hotplug.py`, and
+they still run in both suites. That closed
+[#4318](https://github.com/shakenfist/shakenfist/issues/4318). Everything
+else in the Definition of done holds as written: 11 assertions in
+`test_state_changes.py`, and no production file changed.
+
 ## Back brief
 
 Before starting step 1, back brief Mikal on what will change:
