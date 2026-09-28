@@ -15290,12 +15290,13 @@ both covered in full in the "VHD/VHDX differencing" section of
 <p>This has its own error code (<code>ERROR_BACKING_DIFFERENCING</code>) rather than
 the generic <code>ERROR_BACKING_PARSE_FAILED</code>, because the backing header
 parses perfectly well — the image is valid, just not one instar can read
-through yet. Every read path in instar refuses a
-differencing image because the parent cannot be composed yet, so an
-overlay stacked on one would be a chain that can never be read back.
-Refusing at create time is the only outcome that does not hand you a
-dead image. Their plain dynamic parents are accepted normally. See the
-"VHD/VHDX differencing" section of <a href="/components/instar/quirks/">quirks.md</a>.</p>
+through yet. Every read path in instar that composes sector data
+refuses a differencing image because the parent cannot be composed
+yet, so an overlay stacked on one would be a chain that can never be
+read back. Refusing at create time is the only outcome that does not
+hand you a dead image. Their plain dynamic parents are accepted
+normally. See the "VHD/VHDX differencing" section of
+<a href="/components/instar/quirks/">quirks.md</a>.</p>
 <h2 id="preallocation-modes">Preallocation modes<a class="headerlink" href="#preallocation-modes" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -15340,9 +15341,11 @@ the <code>MetadataPlan</code>. The host's <code>apply_preallocation</code> helpe
 <code>falloc</code> and <code>full</code> post-emission.</p>
 <h2 id="known-divergences-from-qemu-img-create">Known divergences from <code>qemu-img create</code><a class="headerlink" href="#known-divergences-from-qemu-img-create" title="Permanent link">&para;</a></h2>
 <p>The cross-version baseline matrix passes for the bulk of supported
-options, but four categories of writer divergence are documented and
+options, but five categories of writer divergence are documented and
 tracked as future work. The canonical list (with per-case rationale)
-is <code>KNOWN_WRITER_DIVERGENCES</code> in <code>tests/test_create.py</code>.</p>
+for the first four is <code>KNOWN_WRITER_DIVERGENCES</code> in
+<code>tests/test_create.py</code>; the fifth has no entry there because there is
+no baseline to skip — qemu-img cannot produce the output at all.</p>
 <ul>
 <li><strong>VHD <code>virtual_size</code></strong>: qemu-img rounds up to the next CHS-aligned
   multiple (legacy VHD geometry); instar emits exact bytes. The

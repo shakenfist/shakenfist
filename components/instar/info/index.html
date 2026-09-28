@@ -4135,10 +4135,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#vhdx-parent-actual-path-can-contain-a-literal-backslash" class="md-nav__link">
+  <a href="#a-windows-convention-parent-makes-actual-path-unresolvable" class="md-nav__link">
     <span class="md-ellipsis">
       
-        VHDX parent "actual path" can contain a literal backslash
+        A Windows-convention parent makes "actual path" unresolvable
       
     </span>
   </a>
@@ -14704,10 +14704,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#vhdx-parent-actual-path-can-contain-a-literal-backslash" class="md-nav__link">
+  <a href="#a-windows-convention-parent-makes-actual-path-unresolvable" class="md-nav__link">
     <span class="md-ellipsis">
       
-        VHDX parent "actual path" can contain a literal backslash
+        A Windows-convention parent makes "actual path" unresolvable
       
     </span>
   </a>
@@ -14799,22 +14799,29 @@ path, a relative traversal, a UNC share or a URL — so treat
 <code>backing-filename</code> on a differencing image as a string the image
 claims, not a file instar has validated.</p>
 <h2 id="known-limitations">Known limitations<a class="headerlink" href="#known-limitations" title="Permanent link">&para;</a></h2>
-<h3 id="vhdx-parent-actual-path-can-contain-a-literal-backslash">VHDX parent "actual path" can contain a literal backslash<a class="headerlink" href="#vhdx-parent-actual-path-can-contain-a-literal-backslash" title="Permanent link">&para;</a></h3>
-<p>A VHDX differencing parent's locator is Windows-shaped — e.g.
-<code>.\vhdx-diff-parent.vhdx</code> — and <code>info</code>'s "actual path" resolution treats
-any non-absolute backing-file string as a POSIX-relative path, joining
-it onto the image's directory. Because the backslash is not a path
-separator on Linux, the result is a single, literal filename containing
-a backslash that cannot exist on the filesystem, e.g.:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>backing file: .\vhdx-diff-parent.vhdx (actual path: /images/.\vhdx-diff-parent.vhdx)
+<h3 id="a-windows-convention-parent-makes-actual-path-unresolvable">A Windows-convention parent makes "actual path" unresolvable<a class="headerlink" href="#a-windows-convention-parent-makes-actual-path-unresolvable" title="Permanent link">&para;</a></h3>
+<p><code>info</code>'s "actual path" resolution treats any backing-file string that
+is not POSIX-absolute as relative and joins it onto the image's
+directory. A parent recorded in Windows convention therefore comes out
+as a single literal filename containing backslashes, which cannot exist
+on the filesystem:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>backing file: \\attacker\share\probe (actual path: /images/\\attacker\share\probe)
 </code></pre></div>
-<p>The <code>backing file:</code> field itself is correct — it is exactly what the
-VHDX header records — and qemu-img would print the same field
-unconditionally if it could open a differencing VHDX at all. Fixing the
-"actual path" resolution is path normalisation, which belongs to phase
-11 of <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>, not this
-output path. Suppressing the field instead of fixing the resolution
-would paper over the underlying issue rather than close it.</p>
+<p>This affects <strong>both</strong> differencing formats, not just VHDX: a VHD parent
+unicode name and a VHDX <code>absolute_win32_path</code> or <code>volume_path</code> locator
+key are all reported exactly as stored. A relative VHDX locator is the
+one case that is <em>not</em> affected — <code>info</code> renders the <code>relative_path</code>
+key back into POSIX convention, so <code>create -f vhdx -b parent.vhdx</code>
+followed by <code>info</code> reports <code>parent.vhdx</code> and resolves correctly.</p>
+<p>The <code>backing file:</code> field itself is correct in every case — it is what
+the image's own header records, and reporting it is the point. Fixing
+the "actual path" resolution is path normalisation, which belongs with
+the composition work in
+<a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>, not this output
+path; suppressing the field instead would paper over the underlying
+issue rather than close it. The full account, including which locator
+key <code>info</code> prefers and why the relative case is rendered back, is the
+"VHD/VHDX differencing" section of <a href="/components/instar/quirks/">quirks.md</a>.</p>
 
 
 

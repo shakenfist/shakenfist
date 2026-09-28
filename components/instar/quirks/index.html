@@ -24710,7 +24710,7 @@ gates its cleanliness-convergence check on the <code>all</code> tier precisely b
 the two tools' <code>leaks</code> tiers have deliberately different scope.</p>
 <h2 id="copy-on-write-for-snapshot-bearing-qcow2-images">Copy-on-write for snapshot-bearing qcow2 images<a class="headerlink" href="#copy-on-write-for-snapshot-bearing-qcow2-images" title="Permanent link">&para;</a></h2>
 <p><strong>Classification: Safe behaviour</strong> (qemu-parity, not a divergence).</p>
-<p>Since the PLAN-q workcow2-write-infrastructure, writes into a
+<p>Since the PLAN-qcow2-write-infrastructure work, writes into a
 snapshot-bearing qcow2 image <strong>copy-on-write</strong> the shared clusters
 instead of refusing (the phase-2 interim gates) or corrupting them.
 This cross-cutting change lifts the snapshot caveats from <code>commit</code>
@@ -24808,7 +24808,7 @@ map section for the parser-side twin.</p>
 snapshot-bearing iterations (0 divergences) by <code>scripts/cow-soak.py</code>;
 <code>tests/helpers/snapshot_readback.py</code> is the reusable read-back oracle.</p>
 <h2 id="parallels-bochs-cloop-and-dmg-detection">Parallels, Bochs, cloop and DMG detection<a class="headerlink" href="#parallels-bochs-cloop-and-dmg-detection" title="Permanent link">&para;</a></h2>
-<p>The PLAN-f workormat-coverage.md` added content-based detection and
+<p>The <code>PLAN-format-coverage.md</code> work added content-based detection and
 info parity for Parallels, Bochs, cloop, and DMG. The five entries below
 record the deliberate divergences this introduced, plus the closure of a
 pre-existing consumer defect the phase surfaced along the way. See
@@ -24994,9 +24994,9 @@ it refuses DMG outright (exit 63) rather than reading it, but still
 names the format "raw" because its own dispatch never runs the koly
 probe either; see the format-coverage sections below.</p>
 <h2 id="vdi-convert-from-read-path">VDI convert-from (read path)<a class="headerlink" href="#vdi-convert-from-read-path" title="Permanent link">&para;</a></h2>
-<p>The PLAN-f workormat-coverage.md<code>graduated VDI (VirtualBox Disk
+<p>The <code>PLAN-format-coverage.md</code> work graduated VDI (VirtualBox Disk
 Image) from detect + info only to a full read format for convert,
-compare, and dd, via a new</code>src/crates/vdi/` parser crate wired into
+compare, and dd, via a new <code>src/crates/vdi/</code> parser crate wired into
 the qcow2 crate's chain reader (the same pattern VHD and VHDX use).
 The five entries below record the deliberate qemu-parity choices this
 introduced and the divergences that remain. See
@@ -25111,11 +25111,12 @@ output for all four ops across the five malformed fixtures without
 pinning instar's exact error string (only qemu-img's error strings are
 version-stable enough to pin).</p>
 <h2 id="parallels-convert-from-read-path">Parallels convert-from (read path)<a class="headerlink" href="#parallels-convert-from-read-path" title="Permanent link">&para;</a></h2>
-<p>The PLAN-f workormat-coverage.md<code>graduated Parallels from detect +
+<p>The <code>PLAN-format-coverage.md</code> work graduated Parallels from detect +
 info only to a full read format for convert, compare, dd, and bench,
-via a new</code>src/crates/parallels/<code>parser crate wired into the qcow2
+via a new <code>src/crates/parallels/</code> parser crate wired into the qcow2
 crate's chain reader (the same pattern VDI, VHD, and VHDX use). Both
-magics — the legacy</code>WithoutFreeSpace<code>(v1) and the newer</code>WithouFreSpacExt` (v2/ext) — are supported. The entries below record
+magics — the legacy <code>WithoutFreeSpace</code> (v1) and the newer
+<code>WithouFreSpacExt</code> (v2/ext) — are supported. The entries below record
 the deliberate qemu-parity choices this introduced and the
 divergences that remain. See
 <a href="/components/instar/plans/PLAN-format-coverage-phase-03-parallels-read/">docs/plans/PLAN-format-coverage-phase-03-parallels-read.md</a>
@@ -25305,13 +25306,15 @@ crate's boundary unit tests reference the constant symbolically and
 needed no rewrite. Pinned by the <code>parallels-huge-tracks</code> fixture
 (<code>tracks</code> patched to 4186128, the smallest refused value).</p>
 <h2 id="qcow1-convert-from-read-path">QCOW1 convert-from (read path)<a class="headerlink" href="#qcow1-convert-from-read-path" title="Permanent link">&para;</a></h2>
-<p>The PLAN-f workormat-coverage.md<code>graduated QCOW1 ("qcow", qemu's
-original deprecated format, magic</code>QFI\xfb<code>+ version 1) from a
+<p>The <code>PLAN-format-coverage.md</code> work graduated QCOW1 ("qcow", qemu's
+original deprecated format, magic <code>QFI\xfb</code> + version 1) from a
 misdetected-as-QCOW2 dead end to a full read format for convert,
-compare, dd, and bench, via a new</code>src/crates/qcow1/<code>parser crate
+compare, dd, and bench, via a new <code>src/crates/qcow1/</code> parser crate
 wired into the qcow2 crate's chain reader (the same pattern VDI,
-Parallels, VHD, and VHDX use) — commits</code>23b240f<code>(crate),</code>77f32ca<code>(reader arm),</code>3aa7f50<code>/</code>467d24a<code>/</code>c421f75<code>/</code>a0f757b<code>(info, naming,
-emitters, detection split, pins),</code>7b3762f<code>(fixtures/oslo),</code>efdc42e<code>(integration matrix),</code>dbb5ff2` (fuzz). QCOW1 is the first non-QCOW2
+Parallels, VHD, and VHDX use) — commits <code>23b240f</code> (crate), <code>77f32ca</code>
+(reader arm), <code>3aa7f50</code>/<code>467d24a</code>/<code>c421f75</code>/<code>a0f757b</code> (info, naming,
+emitters, detection split, pins), <code>7b3762f</code> (fixtures/oslo), <code>efdc42e</code>
+(integration matrix), <code>dbb5ff2</code> (fuzz). QCOW1 is the first non-QCOW2
 format with backing-chain support. See
 <a href="/components/instar/plans/PLAN-format-coverage-phase-04-qcow1-read/">docs/plans/PLAN-format-coverage-phase-04-qcow1-read.md</a>
 for the full design and findings.</p>
@@ -25621,12 +25624,14 @@ instar regression.</p>
 <code>qcow1-odd-size</code> diverges on vsize, per the odd-size section above)
 — confirmed live against real oslo.utils during step 4d.</p>
 <h2 id="dmg-convert-from-read-path">DMG convert-from (read path)<a class="headerlink" href="#dmg-convert-from-read-path" title="Permanent link">&para;</a></h2>
-<p>The PLAN-f workormat-coverage.md<code>graduated DMG (Apple UDIF,
+<p>The <code>PLAN-format-coverage.md</code> work graduated DMG (Apple UDIF,
 detect + info only now) to a full read format for convert,
-compare, dd, and bench, via a new</code>src/crates/dmg/<code>parser crate
+compare, dd, and bench, via a new <code>src/crates/dmg/</code> parser crate
 wired into the qcow2 crate's chain reader (the same pattern VDI,
-Parallels, and QCOW1 use) — commits</code>f53817f<code>(plan),</code>e77b30b<code>(plan correction),</code>71a20d9<code>(5a crate),</code>ba78d35<code>(5b reader arm),</code>ede8fd4<code>(5c graduation),</code>9033505<code>(5c pins),</code>a0ea960<code>(5d
-manifest/oslo),</code>8904592<code>(5f fuzz),</code>9d8111c` (5e integration
+Parallels, and QCOW1 use) — commits <code>f53817f</code> (plan), <code>e77b30b</code>
+(plan correction), <code>71a20d9</code> (5a crate), <code>ba78d35</code> (5b reader arm),
+<code>ede8fd4</code> (5c graduation), <code>9033505</code> (5c pins), <code>a0ea960</code> (5d
+manifest/oslo), <code>8904592</code> (5f fuzz), <code>9d8111c</code> (5e integration
 matrix). DMG is the fifth format-coverage read path and the first
 whose error model <em>inverts</em> every prior phase's zero-fill posture.
 See
@@ -26021,7 +26026,7 @@ new region. Binary size grew by roughly +9.5 KB per DMG-enabled
 guest operation (convert now sits at roughly 41% of the 768 KB
 per-operation cap, per <code>make check-binary-sizes</code>).</p>
 <h2 id="qed-read-refusal-as-policy">QED read-refusal as policy<a class="headerlink" href="#qed-read-refusal-as-policy" title="Permanent link">&para;</a></h2>
-<p>The PLAN-f workormat-coverage.md<code>resolved the master plan's Open
+<p>The <code>PLAN-format-coverage.md</code> work resolved the master plan's Open
 question 1 — does QED get a read path, like VDI/Parallels/QCOW1/DMG in
 earlier work, or a principled, documented, fully-tested refusal? — by
 choosing refusal as deliberate policy, not a read path. Step 6a added
@@ -26029,7 +26034,7 @@ QED-named refusal pins for every op that lacked one (check, map,
 measure, bench, resize, rebase, commit, amend, snapshot, bitmap;
 convert/compare/dd/oslo were already pinned) and reconciled a stale,
 unconsumed testdata baseline set; step 6b is this documentation
-record. Commits:</code>3fd48e6<code>(pins, instar),</code>cecb16565a` (baseline
+record. Commits: <code>3fd48e6</code> (pins, instar), <code>cecb16565a</code> (baseline
 retirement, instar-testdata main). See
 <a href="/components/instar/plans/PLAN-format-coverage-phase-06-qed/">docs/plans/PLAN-format-coverage-phase-06-qed.md</a>
 for the full decision record and findings.</p>
@@ -26255,7 +26260,12 @@ records qemu-img's unchanged behaviour; each "instar Behavior" is split
 into a "(before commit <code>10ab838</code>)" and a "(since commit <code>10ab838</code>)" pair
 recording what changed. A "Known limitations of the refusal" subsection
 near the end of this section records what that commit deliberately left
-unfixed.</p>
+unfixed. The <code>file:line</code> citations in the before/after pairs above are as of
+commit <code>10ab838</code> and the code it changed; they are a record of where
+the behaviour lived when it was measured, not a current index, and
+several have since moved. The "Known limitations" subsection is
+maintained against the tree as it stands and cites symbol names rather
+than line numbers, so it does not carry that caveat.</p>
 <h3 id="qemu-img-creates-neither-differencing-vhd-nor-differencing-vhdx-instar-now-creates-both">qemu-img creates neither differencing VHD nor differencing VHDX; instar now creates both<a class="headerlink" href="#qemu-img-creates-neither-differencing-vhd-nor-differencing-vhdx-instar-now-creates-both" title="Permanent link">&para;</a></h3>
 <p><strong>Classification: Not applicable, for qemu-img's unchanged side</strong> — there
 is still no qemu-img write path for either format. instar's own output
@@ -26351,9 +26361,12 @@ visible to users, because the locator is the string <code>info</code> reports
 back: <code>create -f vhdx -b ./sub//parent.vhdx</code> then <code>info</code> reports
 <code>sub/parent.vhdx</code>. That path resolves to the same file, but it is not
 the one that was typed.</p>
-<p><strong><code>instar info</code> reports a parent path in POSIX convention, whichever
-format it came from.</strong> The normalisation above is a property of what is
-<em>written</em>, not of what instar reports back. A VHD child's parent is
+<p><strong><code>instar info</code> reports a parent path in POSIX convention where the
+stored form permits it, whichever format it came from.</strong> A parent
+already recorded in Windows convention is reported verbatim; see
+limitation 2 under "Known limitations of the refusal" below. The
+normalisation above is a property of what is <em>written</em>, not of what
+instar reports back. A VHD child's parent is
 read from the parent unicode name field, which keeps the typed bytes,
 so it reported the typed path already. A VHDX child's parent is read
 from the locator, so <code>info</code> renders the <code>relative_path</code> key back --
@@ -26737,12 +26750,28 @@ rather than fixed, because none of them was that change's job to close:</p>
    change which failure a user sees. The composition work in
    <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> lifts this per
    operation as it lands. See <a href="/components/instar/chain-discovery/#known-limitations">chain-discovery.md</a>.</li>
-<li><strong><code>instar info</code> prints an unresolvable "actual path" for a VHDX
-   parent.</strong> VHDX parent locators are Windows-shaped
-   (e.g. <code>.\vhdx-diff-parent.vhdx</code>), and the host renders that as a POSIX
-   path, producing a filename containing a literal backslash that cannot
-   exist on the filesystem. Path normalisation belongs with the composition
-   work in <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>. See
+<li><strong><code>instar info</code> prints an unresolvable "actual path" for a parent
+   recorded in Windows convention — in either format.</strong> The host's
+   "actual path" resolution treats any string that is not POSIX-absolute
+   as relative and joins it onto the image's directory, so a parent name
+   carrying backslashes becomes a single literal filename that cannot
+   exist on the filesystem. This was originally recorded as a VHDX-only
+   limitation, on the strength of an instar-created child reporting
+   <code>.\vhdx-diff-parent.vhdx</code>; that particular case is now closed. <code>info</code>
+   renders the VHDX <code>relative_path</code> locator key back into POSIX
+   convention — see "<strong><code>instar info</code> reports a parent path in POSIX
+   convention where the stored form permits it</strong>" above — so a relative
+   VHDX locator reports and resolves correctly today. What remains open
+   is every parent string that is <em>already</em> in Windows convention and so
+   is reported verbatim: a VHDX <code>absolute_win32_path</code> or <code>volume_path</code>
+   locator key, and a VHD parent unicode name, which is never normalised
+   in either direction. The adversarial fixture <code>vhd-diff-locator-unc</code>
+   is the concrete case — a VHD whose parent name is
+   <code>\\attacker\share\probe</code>, reported exactly as stored
+   (<code>ADVERSARIAL_LOCATOR_FIXTURES</code> in <code>tests/test_differencing.py</code>) and
+   then joined onto the image
+   directory. Path normalisation belongs with the composition work in
+   <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>. See
    <a href="/components/instar/info/#known-limitations">info.md</a>.</li>
 <li><strong><code>instar resize</code> still accepts a differencing VHDX.</strong> This is a write
    path, predates the differencing work, and <code>resize</code> never called

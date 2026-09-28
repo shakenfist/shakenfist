@@ -15394,13 +15394,13 @@ records <code>instar-testdata &lt;sha&gt; (#pr)</code> and is audited there.</p>
 <tr>
 <td>9. Coverage fuzzing of the locator parsers</td>
 <td><a href="/components/instar/plans/PLAN-differencing-phase-09-fuzz/">PLAN-differencing-phase-09-fuzz.md</a></td>
-<td>Planned</td>
-<td></td>
+<td>Complete</td>
+<td><code>044ad77</code> (#594)</td>
 </tr>
 <tr>
 <td>10. Documentation</td>
-<td>PLAN-differencing-phase-10-docs.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-differencing-phase-10-docs/">PLAN-differencing-phase-10-docs.md</a></td>
+<td>Planned</td>
 <td></td>
 </tr>
 <tr>
@@ -15568,7 +15568,10 @@ rather than left as one phase to be split later, the way
   have documented a refusal that phase 14 removes: at minimum
   <code>docs/chain-discovery.md</code>, <code>docs/chain-config.md</code> and the
   read-side rows and divergence notes of
-  <code>docs/format-coverage.md</code>.</li>
+  <code>docs/format-coverage.md</code>. Both chain pages already exist (209
+  and 210 lines, describing qcow2 chain discovery), so phase 16
+  extends them rather than authoring them; phase 10's survey
+  confirmed this on 2026-09-26.</li>
 </ul>
 <p>Two specifics phases 12 and 13 must confront, both already
 visible in the crates:</p>
@@ -15710,8 +15713,11 @@ restating it. What is specific to this plan:</p>
   <code>docs/chain-discovery.md</code>, <code>docs/chain-config.md</code>,
   <code>ARCHITECTURE.md</code> and <code>CHANGELOG.md</code> describe what shipped,
   and the false "differencing with backing chains" input claim
-  at <code>CHANGELOG.md:1922</code> is reconciled by a current statement of
-  what is actually supported.</li>
+  at <code>CHANGELOG.md:2314</code> is reconciled by a current statement of
+  what is actually supported. (Phase 10's survey corrected this
+  reference: it read <code>:1922</code> until 2026-09-26, which is a line
+  about vhdx parent <code>virtual_size</code> recovery. The claim had drifted
+  392 lines.)</li>
 <li>The push audit in phase 17 has run <code>PUSH-AUDIT.md</code> over the
   union of the merged ranges, and its findings are resolved or
   declined in writing.</li>

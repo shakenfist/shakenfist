@@ -15209,7 +15209,7 @@ guest refuses the write test:</p>
 </tbody>
 </table>
 <p><strong>Internal snapshots are now supported (copy-on-write).</strong> Before
-the PLAN-q workcow2-write-infrastructure, <code>bench -w</code> refused any
+the PLAN-qcow2-write-infrastructure work, <code>bench -w</code> refused any
 image with <code>nb_snapshots &gt; 0</code> because its overwrite path had no
 per-write ownership check. Now (step 7d) the qcow2 <code>-w</code>
 path runs the crate's copy-on-write branch: a snapshot-shared data

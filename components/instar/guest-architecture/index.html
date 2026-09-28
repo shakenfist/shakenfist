@@ -15158,7 +15158,35 @@ provides a modular architecture with:
  target and backing are both vmdk, the guest also reads the
  parent's descriptor via <code>vmdk::read_and_parse_descriptor</code> and
  plumbs the real <code>parentCID</code> into the new image's descriptor
- (no longer the phase-1d deadbeef sentinel). The host CLI
+ (no longer the phase-1d deadbeef sentinel). A <code>vpc</code> or <code>vhdx</code>
+ target with a backing reference is not merely a backing pointer
+ but a <em>differencing child</em>, and the planner emits it as one:
+ <code>crates/create::plan_vhd</code>'s Dynamic arm stamps
+ <code>vhd::DISK_TYPE_DIFFERENCING</code> (<code>disk_type = 4</code>) into both footer
+ copies, writes the parent path into the dynamic header's parent
+ unicode name as UTF-16BE, and fills one 512-byte locator sector
+ via <code>vhd::build_parent_locator_data</code> plus a single
+ <code>vhd::build_parent_locator_entry</code> in the first of the eight
+ slots (platform code <code>W2ku</code> for a POSIX-absolute path, <code>W2ru</code>
+ for a relative one, which is rewritten to the Windows
+ convention). <code>plan_vhdx</code> sets the File Parameters <code>HasParent</code>
+ bit and appends a sixth metadata item through
+ <code>vhdx::build_parent_locator</code>, which leaves the file layout — and
+ so <code>minimum_file_size</code> — the same either way. The parent's
+ identity is read off the parent on input device 0 and written
+ into the child: footer <code>uuid</code> plus creation <code>timestamp</code> for vpc
+ (<code>vhd_opts_from</code>), the active header's <code>DataWriteGuid</code> as
+ <code>parent_linkage</code> for vhdx (<code>vhdx_opts_from</code>); a backing file
+ whose identity is not the target's own format is
+ <code>ERROR_PARENT_FORMAT_MISMATCH</code> rather than an all-zero linkage.
+ A <code>Fixed</code> vpc target refuses a backing reference outright
+ (<code>BackingFileUnsupported</code>) because a differencing VHD is
+ Dynamic-only — a fixed VHD has neither a BAT nor a dynamic
+ header to hold the locators. instar emits these children but
+ does not read them back: the ops that compose sector data
+ refuse a differencing source, and composition is deferred and
+ tracked in
+ <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>. The host CLI
  (<code>run_create</code> in <code>src/vmm/src/main.rs</code>, wired) handles
  the raw target entirely host-side via open + ftruncate +
  optional posix_fallocate; for every other format it opens the
@@ -15288,21 +15316,31 @@ provides a modular architecture with:
  disks; vhdx differencing is already rejected by
  <code>VhdxState::init</code>; vmdk multi-extent layouts fail the
  binary-header parse naturally), and dispatches to the matching
- per-format <code>&lt;Format&gt;State::map_extents</code> walker from the PLAN-m workap. Streams one <code>MapExtentRecord</code> per coalesced extent
+ per-format <code>&lt;Format&gt;State::map_extents</code> walker from the
+ PLAN-map work. Refusing a differencing source is uniform
+ policy across the ops that compose sector data, not a <code>map</code>
+ quirk: composition is deferred and tracked in
+ <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>. What is
+ particular to <code>map</code> is the signalling — it reports the refusal
+ through its own <code>MapResult::ERROR_HAS_BACKING</code> code, where the
+ other ops raise <code>shared::DifferencingRefusal</code> on the call
+ table's <code>send_error</code> channel for the host's
+ <code>differencing_refusal_error</code> to render. Streams one
+ <code>MapExtentRecord</code> per coalesced extent
  through the call table's <code>send_map_extent</code> function pointer,
  followed by a <code>MapResult</code> summary through <code>send_map_result</code>.
  The emit closure clips each extent against the configured
  window (with file-offset adjustment for front-trimmed Data
  extents) and signals walker abort once the window is
  exhausted. Single-image v1; chain composition is a follow-up.
- Binary builds at ~28 KiB / 384 KiB (7%). Host CLI (the PLAN-m workap) wires <code>instar map [-f FMT] [--output={human,json}]
+ Binary builds at ~28 KiB / 384 KiB (7%). Host CLI (the PLAN-map work) wires <code>instar map [-f FMT] [--output={human,json}]
  [--start-offset=OFFSET] [--max-length=LEN] [--sector-size=N]
  FILENAME</code>: <code>run_map</code> in <code>src/vmm/src/main.rs</code> parses args
  (refusing <code>--image-opts</code>, VMDK monolithicFlat sources via
  <code>peek_is_vmdk_descriptor</code>, and <code>--start-offset &gt;= file_size</code>
  on the host before launching the guest), writes <code>MapConfig</code>
  per-field at <code>OPERATION_CONFIG_ADDR</code>, attaches the source
- read-only as input device 0, and runs the vCPU loop. The PLAN-m workap ships the streaming <code>MapRenderer&lt;'a, W: Write&gt;</code>
+ read-only as input device 0, and runs the vCPU loop. The PLAN-map work ships the streaming <code>MapRenderer&lt;'a, W: Write&gt;</code>
  that writes each extent to stdout (via a <code>BufWriter</code> over
  <code>stdout().lock()</code>) as the <code>MapExtentMessage</code> arrives in the
  vCPU loop; host memory stays O(1) regardless of how
@@ -15467,21 +15505,28 @@ provides a modular architecture with:
  subcommand. <code>MeasureConfig</code> and <code>MeasureResult</code> structs carry
  options and results across OPERATION_CONFIG_ADDR and the
  <code>send_measure_result</code> CallTable callback (CallTable VERSION 14).
- The PLAN-c workreate.md<code>adds</code>CreateConfig<code>/</code>CreateResult<code>/</code>GUEST_CREATE_SCRATCH_LIMIT<code>here and a new</code>send_create_result<code>CallTable function pointer (appended at the end of the struct so
- existing operation binaries keep working unchanged). The PLAN-r workesize.md</code> adds <code>ResizeConfig</code> / <code>ResizeResult</code> plus two
+ The <code>PLAN-create.md</code> work adds <code>CreateConfig</code> / <code>CreateResult</code> /
+ <code>GUEST_CREATE_SCRATCH_LIMIT</code> here and a new <code>send_create_result</code>
+ CallTable function pointer (appended at the end of the struct so
+ existing operation binaries keep working unchanged). The <code>PLAN-resize.md</code> work adds <code>ResizeConfig</code> / <code>ResizeResult</code> plus two
  more CallTable function pointers: <code>read_output_sector</code> (lets a
  guest read from the same device it writes to — the first
  in-place-mutation primitive, reusable by <code>rebase</code> / <code>commit</code>
  / snapshot-delete) and <code>send_resize_result</code>. Same
- append-at-end discipline. The PLAN-s worknapshot.md<code>adds</code>SnapshotConfig<code>(magic</code>b"SNAP"<code>, carrying the mode, the
- snapshot name/needle argument, and the create-mode</code>date_sec<code>/</code>date_nsec<code>wall-clock fields) /</code>SnapshotResult<code>/
- the</code>SnapshotEntryRecord<code>wire record, and three more CallTable
- entries —</code>send_snapshot_entry<code>(streams one listed snapshot
- per call),</code>send_snapshot_result<code>, and</code>fsync_input<code>(the
+ append-at-end discipline. The <code>PLAN-snapshot.md</code> work adds
+ <code>SnapshotConfig</code> (magic <code>b"SNAP"</code>, carrying the mode, the
+ snapshot name/needle argument, and the create-mode
+ <code>date_sec</code>/<code>date_nsec</code> wall-clock fields) / <code>SnapshotResult</code> /
+ the <code>SnapshotEntryRecord</code> wire record, and three more CallTable
+ entries — <code>send_snapshot_entry</code> (streams one listed snapshot
+ per call), <code>send_snapshot_result</code>, and <code>fsync_input</code> (the
  guest-visible write barrier the mutating modes use between
  write groups) — bumping CallTable VERSION from 16 to 17, same
- append-at-end discipline.</code>PLAN-amend.md<code>and</code>PLAN-bitmap.md<code>each append one more entry (</code>send_amend_result<code>,</code>send_bitmap_result<code>), bumping VERSION 17→18→19;</code>PLAN-bench.md<code>appends two —</code>send_bench_start<code>(the timing-bracket start marker)
- and</code>send_bench_result` (the terminal result) — bumping VERSION
+ append-at-end discipline. <code>PLAN-amend.md</code> and <code>PLAN-bitmap.md</code>
+ each append one more entry (<code>send_amend_result</code>,
+ <code>send_bitmap_result</code>), bumping VERSION 17→18→19; <code>PLAN-bench.md</code>
+ appends two — <code>send_bench_start</code> (the timing-bracket start marker)
+ and <code>send_bench_result</code> (the terminal result) — bumping VERSION
  from 19 to 20, same append-at-end discipline throughout.</p>
 <p><strong>Chain validation in check (<code>--chain</code>):</strong>
 The check operation supports an optional <code>--chain</code> flag that uses the host-side
