@@ -14859,8 +14859,11 @@ shipped. <code>additionalProperties: false</code> refuses a caller-supplied
 (<code>instance.py:935</code>, <code>:974</code>); the documented spelling
 <code>base: "sf://blob/&lt;uuid&gt;"</code> reaches the identical branch and is
 unaffected. And D45's size-or-base guard is a handler guard, so it
-holds at <code>warn</code> and <code>off</code> too — it is the one narrowing in this phase
-an operator cannot roll back.</p>
+holds at <code>warn</code> and <code>off</code> too — it is one of the three refusals in this
+phase an operator cannot roll back (the other two are the null
+<code>network_uuid</code> and the null <code>video.model</code>/<code>video.memory</code>, both also
+handler guards; corrected by the phase 8 audit, which found this
+sentence written the day before the third guard was added).</p>
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
 <p>The compiler already recurses. <code>_field()</code>
 (<code>shakenfist/external_api/validation.py:400</code>) reads a rendered schema
@@ -15642,8 +15645,10 @@ refused; if it finds one the handler ignores, the decision is re-argued
 in writing before step 3 writes the schemas.</p>
 <p><strong>D42. Every existing handler guard stays.</strong> Not one of the checks in
 <code>_netdesc_safety_checks</code>, the disk-bus check, the IDE refusal or the
-videospec presence checks is deleted, even where a schema now subsumes
-it.</p>
+videospec <code>model</code> and <code>memory</code> value tests is deleted, even where a
+schema now subsumes it. (Those two were <em>presence</em> tests when this
+decision was written; the review round turned them into value tests,
+which is where D42's third new handler guard comes from.)</p>
 <p>This is phase 6's D34 in a new setting. <code>warn</code> and <code>off</code> are rollbacks:
 an operator who turns validation off because this phase broke their
 fleet must get the behaviour they had before it, not a newly
@@ -15852,10 +15857,12 @@ see the second amendment. The three that shipped are:</p>
 <li><strong>A diskspec with neither <code>size</code> nor <code>base</code> is refused</strong>, by D45's
    handler guard, including a <code>size</code> of <code>0</code> with no <code>base</code>. Because it
    is a handler guard rather than a schema check it holds at <code>warn</code> and
-   <code>off</code> too, which makes it the only narrowing in this phase an
-   operator cannot roll back. That is deliberate — a disk that asks for
-   nothing is not a rollback-worthy behaviour — but it should be said
-   out loud.</li>
+   <code>off</code> too, which makes it one of the three refusals in this phase an
+   operator cannot roll back — the other two being the null
+   <code>network_uuid</code> and the null <code>video.model</code>/<code>video.memory</code>, which are
+   handler guards for the same reason. That is deliberate — a disk that
+   asks for nothing is not a rollback-worthy behaviour — but it should
+   be said out loud.</li>
 </ol>
 <p>What is <strong>not</strong> narrowed, despite the original text of this decision:
 <code>disk[].size</code> as the string <code>"20"</code> is accepted, because D46 refuses a
@@ -15885,7 +15892,7 @@ these before and after rather than asserting any of it.</p>
 <td>high</td>
 <td>opus</td>
 <td>none</td>
-<td><strong>The compiler's object branch.</strong> In <code>shakenfist/external_api/validation.py</code>, add a branch to <code>_field()</code> (around line 430, beside the existing <code>array</code> branch) for a rendered <code>{'type': 'object', 'properties': {...}}</code>: build a marshmallow schema from the properties with <code>Schema.from_dict</code>, honour <code>required</code> and <code>additionalProperties: false</code> (<code>unknown=RAISE</code>), and return <code>fields.Nested</code>. An object with no <code>properties</code> must keep compiling to <code>fields.Dict</code> exactly as now, because <code>metadata</code> and <code>bound_claims</code> rely on it (D47). Apply D46 in the same step: <code>fields.Integer(strict=True)</code> wherever the rendered type is <code>integer</code>. Then D48: make <code>_schema_findings</code> flatten marshmallow's nested error dict into dotted, indexed paths so a finding reads <code>disk[0].size</code>; <code>side_channels[0]</code> is the shape to match. Read the comments in that file first — they explain why every check is keyed on the rendered specification rather than on the type token, and that rule binds this change.</td>
+<td><strong>The compiler's object branch.</strong> In <code>shakenfist/external_api/validation.py</code>, add a branch to <code>_field()</code> (around line 430, beside the existing <code>array</code> branch) for a rendered <code>{'type': 'object', 'properties': {...}}</code>: build a marshmallow schema from the properties with <code>Schema.from_dict</code>, honour <code>required</code> and <code>additionalProperties: false</code> (<code>unknown=RAISE</code>), and return <code>fields.Nested</code>. An object with no <code>properties</code> must keep compiling to <code>fields.Dict</code> exactly as now, because <code>metadata</code> and <code>bound_claims</code> rely on it (D47). Apply D46 in the same step: a field subclass bound into <code>_SCALARS</code> which refuses a fractional number wherever the rendered type is <code>integer</code>. (Corrected by the phase 8 audit: this brief originally said <code>fields.Integer(strict=True)</code>, which is the instruction D46's rewrite exists to retract -- applying it literally broke <code>test_blob_data_bounds</code> within a minute, because it also refuses the numeric strings the API accepts.) Then D48: make <code>_schema_findings</code> flatten marshmallow's nested error dict into dotted, indexed paths so a finding reads <code>disk[0].size</code>; <code>side_channels[0]</code> is the shape to match. Read the comments in that file first — they explain why every check is keyed on the rendered specification rather than on the type token, and that rule binds this change.</td>
 </tr>
 <tr>
 <td>3</td>
@@ -15913,7 +15920,7 @@ these before and after rather than asserting any of it.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td><strong>Documentation.</strong> <code>docs/developer_guide/api_reference/instances.md:67-130</code> gains, per spec, which keys are required, what each value's type and enum are, and that an unknown key is now refused. <code>docs/developer_guide/writing_an_endpoint.md</code> gains the structured tokens beside the rest of the vocabulary and says how to add another one. A release note in <code>docs/release_notes/v07-v08.md</code> says plainly that a request carrying an undocumented key inside a diskspec, networkspec or videospec now answers 400 where it used to be ignored, names the two narrowings of D50, names the client version D49 requires, and names <code>API_VALIDATION_MODE=warn</code> as the rollback. <strong>Also fix the three documentation bugs the census found, none of which this phase caused:</strong> <code>docs/user_guide/usage.md:237</code> lists <code>ide</code> as a valid disk bus and <code>config.DISK_BUS</code>'s description at <code>shakenfist/config.py:1028</code> does the same, while <code>external_api/instance.py:825</code> answers <code>400 IDE disks are no longer supported</code>; and <code>usage.md:288</code> lists nine NIC models where <code>instances.md:105</code> lists eight, the extra being <code>ne2k_isa</code>. Per D43 neither list is a specification, so say that the set is the hypervisor's rather than reconciling two prose lists into a third.</td>
+<td><strong>Documentation.</strong> <code>docs/developer_guide/api_reference/instances.md:67-130</code> gains, per spec, which keys are required, what each value's type and enum are, and that an unknown key is now refused. <code>docs/developer_guide/writing_an_endpoint.md</code> gains the structured tokens beside the rest of the vocabulary and says how to add another one. A release note in <code>docs/release_notes/v07-v08.md</code> says plainly that a request carrying an undocumented key inside a diskspec, networkspec or videospec now answers 400 where it used to be ignored, names the three narrowings of D50 and names <code>API_VALIDATION_MODE=warn</code> and <code>off</code> as the rollback. (Corrected by the phase 8 audit: this brief said two narrowings, named a client version as a release requirement -- which D49's retraction removed, <code>client-python#398</code> being a tidy-up rather than a release gate -- and named only one of the two rollback modes. What shipped is right; the brief was not.) <strong>Also fix the three documentation bugs the census found, none of which this phase caused:</strong> <code>docs/user_guide/usage.md:237</code> lists <code>ide</code> as a valid disk bus and <code>config.DISK_BUS</code>'s description at <code>shakenfist/config.py:1028</code> does the same, while <code>external_api/instance.py:825</code> answers <code>400 IDE disks are no longer supported</code>; and <code>usage.md:288</code> lists nine NIC models where <code>instances.md:105</code> lists eight, the extra being <code>ne2k_isa</code>. Per D43 neither list is a specification, so say that the set is the hypervisor's rather than reconciling two prose lists into a third.</td>
 </tr>
 <tr>
 <td>7</td>
@@ -16169,7 +16176,7 @@ found in this audit and is item 5 below.</p>
    <code>enforce</code>, and never <code>IDE disks are no longer supported</code>.</li>
 <li><strong>Met.</strong> <code>disk.empty</code> answers <code>400 disk specification must specify
    at least one of size or base</code> at all three modes, as do the other
-   four spellings listed under item 7.</li>
+   five spellings listed under item 7.</li>
 <li><strong>Met.</strong> <code>test_openapi_spec.py</code> passes, including
     <code>test_every_published_structure_or_bound_is_registered</code>, whose
     completeness is derived from the published specification. Every
@@ -16222,16 +16229,18 @@ found in this audit and is item 5 below.</p>
     the surviving scope is an explicit JSON <code>null</code> for a
     <code>required=False</code> scalar whose handler cannot take one — and that
     items 2 and 3 are closed, quoting their new answers.</li>
-<li><strong>Not met, and cannot be met from a branch.</strong> The <code>Merged</code> column
-    stays <code>—</code> until the pull request merges, by the rule the column's
+<li><strong>Met after the merge, as the item said it would be.</strong> The
+    <code>Merged</code> column stays <code>—</code> until the pull request merges, by the rule the column's
     own note states: every SHA there is the <em>merge commit</em> of a pull
     request, so that <code>&lt;sha&gt;^1..&lt;sha&gt;</code> is the whole of what it put on
     <code>develop</code>. Reading it from the branch, or from a path-filtered
     <code>git log</code>, is what #4222 exists to correct for phase 6. After the
     merge, take the SHA from the first-parent range —
     <code>git log --first-parent --oneline develop</code> — and record it beside
-    the pull request number. The rest of the item is met: the Execution
-    table reads <code>Complete</code> for phase 7 with a rewritten description, and
+    the pull request number. Done: #4232 merged on 2026-09-17 and the
+    first-parent range gives <code>91312b9a3</code>, which phase 8's planning
+    commit recorded in the cell. The rest of the item was already
+    met: the Execution table reads <code>Complete</code> for phase 7 with a rewritten description, and
     <code>docs/plans/index.md</code> reads <code>8 of 9</code> with the status still
     <code>In progress</code>, because phase 8, the push audit, has not run.</li>
 <li><strong>Met.</strong> <code>pre-commit run --all-files</code> is clean, including the
@@ -16400,12 +16409,15 @@ survey found</em> section because none of them were visible from outside.</p>
 <p><em>From the sweep (step 5):</em></p>
 <ol>
 <li><strong>A third class of <code>warn</code>-mover.</strong> The plan expected two rows not to
-    roll back and there are seven, in three classes: the null
-    <code>network_uuid</code> on both routes, the four spellings of a diskspec
-    which asks for nothing, and one nobody had seen — a diskspec
-    carrying <em>only</em> a typo'd key has neither a size nor a base, so the
+    roll back and there are ten, in three classes: the null
+    <code>network_uuid</code> on both routes (2), the six spellings of a diskspec
+    which asks for nothing (6), and the null <code>video.model</code> and
+    <code>video.memory</code> the review round turned into value tests (2). One of
+    the diskspec spellings is one nobody had seen — a diskspec carrying
+    <em>only</em> a typo'd key has neither a size nor a base, so the
     size-or-base guard answers it at every mode rather than the schema
-    answering it at <code>enforce</code>.</li>
+    answering it at <code>enforce</code>. (Counts corrected by the phase 8 audit;
+    definition-of-done item 7 states the final ten correctly.)</li>
 <li><strong>D48 has a limit, recorded rather than fixed.</strong> "One fact, one
     message" holds within a nesting level and not across them: an
     omitted required <em>parameter</em> answers <code>missing-required</code>, an omitted

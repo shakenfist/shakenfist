@@ -15463,7 +15463,15 @@
   below for when that changed, later in this cycle.
   If a caller breaks against this, set <code>API_VALIDATION_MODE=warn</code> to
   log findings without refusing anything while you fix it, or <code>off</code> to
-  disable the layer entirely.
+  disable the layer entirely. It is a cluster-wide setting rather than
+  an ansible variable -- the collection does not render it -- so the
+  way to set it is <code>sf-ctl set-config API_VALIDATION_MODE warn</code>
+  followed by a restart of <code>sf-api</code> on every API node, because the
+  value is read into the process environment at start. <code>sf-ctl
+  unset-config API_VALIDATION_MODE</code> puts it back to the <code>enforce</code>
+  default. See <a href="../../operator_guide/logging/#api-request-validation-findings">the operator guide's account of the finding
+  lines</a>
+  for what the three modes do and what they do not roll back.
   Two narrower changes come with the flip. Eleven refusals that a
   handler's own guard already produced now speak with validation's
   wording instead, because validation answers first: <code>key is not a
@@ -15660,6 +15668,28 @@
   boolean meaning false while the server floated the interface
   anyway. A JSON boolean is unaffected, and it is what <code>sf-client</code>
   and the ansible collection both send.</li>
+<li><strong>Every other parameter the API declares <code>boolean</code> is now read the
+  same way</strong>, which the phase 8 audit of this work found was not
+  true of ten of them. The visible cases: <code>uefi</code> and <code>secure_boot</code>
+  on <code>POST /instances</code> (<code>{"uefi": "false"}</code> booted with UEFI, and
+  <code>{"secure_boot": "off"}</code> turned secure boot on <em>and</em> defeated the
+  "secure boot requires UEFI" refusal, because both operands were
+  truthy strings), <code>shared</code> on <code>POST /artifacts</code> and
+  <code>POST /artifacts/upload/&lt;name&gt;</code> (a <code>system</code> operator sending
+  <code>"false"</code> got an artifact shared with every namespace), <code>thin</code> and
+  <code>all</code> on <code>POST /instances/&lt;ref&gt;/snapshot</code>, <code>all</code> on the instance,
+  network and agent-operation listings (a falsy string included
+  deleted objects and completed operations), and <code>clean_wait</code> on
+  <code>DELETE /networks</code> (a falsy string deleted a network which still
+  had interfaces on it). As with <code>float</code>, a JSON boolean is
+  unaffected, and this is a <em>reading</em> rather than a schema check, so
+  it holds in every <code>API_VALIDATION_MODE</code>.
+  <code>confirm</code> on the three delete-all routes is deliberately left
+  reading only a JSON <code>true</code>: a string spelling is refused rather
+  than acted on, which is the safe direction on a destructive route.
+  <code>shakenfist/tests/external_api/test_boolean_sweep.py</code> measures
+  every declared boolean this way, so a new one cannot join the
+  class quietly.</li>
 <li>A <code>network[].address</code> of an explicit JSON <code>null</code> now allocates a
   random address, exactly as omitting the key does and exactly as
   the published schema has always said it does. It used to fall
@@ -15684,14 +15714,21 @@
   every validation mode).
   <code>API_VALIDATION_MODE=warn</code> rolls all of the above back to logging
   without refusing, as it does for the rest of the validation layer.
-  Three new <strong>handler</strong> guards are deliberately not rolled back,
+  Five new <strong>handler</strong> guards are deliberately not rolled back,
   because a rollback must not hand back the bug this work just closed:
-  the size-or-base guard above, the <code>videospec</code> null guard above, and a
+  the size-or-base guard above, the <code>videospec</code> null guard above, a
   <code>networkspec</code> whose <code>network_uuid</code> is an explicit <code>null</code>, which is
-  now refused in every mode exactly as an omitted one always was. That second one previously resolved to an
-  arbitrary network in the caller's namespace — on interface hotplug it
-  answered <code>200</code> and created an interface on a network the caller never
-  named.</li>
+  now refused in every mode exactly as an omitted one always was, a
+  <code>disk[].size</code> which reads as a negative number, and a custom DNS
+  entry whose <code>value</code> is not an IP address. The null <code>network_uuid</code>
+  case previously resolved to an arbitrary network in the caller's
+  namespace — on interface hotplug it answered <code>200</code> and created an
+  interface on a network the caller never named. A negative
+  <code>disk[].size</code> was summed into the scheduler's requested capacity and
+  deflated the node's used-disk counter, which every other namespace's
+  capacity claims are then admitted against; a DNS <code>value</code> carrying
+  whitespace injected extra entries into the hosts file the network
+  serves.</li>
 </ul>
 </li>
 <li>You can now reserve a specific address in a network with

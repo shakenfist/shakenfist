@@ -15240,9 +15240,14 @@ metrics endpoint:</p>
 <p>After upgrading you may see <code>API request validation finding</code> lines
 from <code>sf-api</code> in your log stream. Each records a request which did not
 match its endpoint's published parameter declarations.</p>
-<p><code>API_VALIDATION_MODE</code> decides what happens to such a request, and
-since v0.8.0 it defaults to <strong><code>enforce</code></strong>: a finding refuses the
-request with a 400 in the usual
+<p><code>API_VALIDATION_MODE</code> is a cluster-wide setting, and the ansible
+collection does not render it -- set it with
+<code>sf-ctl set-config API_VALIDATION_MODE warn</code> and restart <code>sf-api</code> on
+each API node, since the value is read into the process environment at
+start. <code>sf-ctl unset-config API_VALIDATION_MODE</code> restores the default.</p>
+<p>It decides what happens to such a request, and since v0.8.0 it
+defaults to <strong><code>enforce</code></strong>: a finding refuses the request with a 400
+in the usual
 <code>{"error": "&lt;parameter&gt;: &lt;reason&gt;", "status": 400}</code> shape, and the
 finding line records the refusal. A refusal names the first finding
 only, so a request with several problems is fixed one round trip at a
@@ -15253,15 +15258,58 @@ explicit JSON <code>null</code>, answers
 <code>400 &lt;parameter&gt;: declared required but not supplied</code>.</p>
 <p>The other two modes are the rollback, in order of severity:</p>
 <ul>
-<li><code>warn</code> restores the pre-v0.8.0 behaviour: findings are recorded and
-  change no response, so the request is answered exactly as it always
-  was. Set this if a caller of yours breaks against enforcement while
-  you fix it — the finding lines tell you which parameter to fix.</li>
-<li><code>off</code> disables the layer entirely, including the log lines. This is
+<li><code>warn</code> records findings and leaves the response to the handler, so a
+  request enforcement would refuse is answered the way it was before
+  enforcement was turned on. Set this if a caller of yours breaks
+  against enforcement while you fix it — the finding lines tell you
+  which parameter to fix. It is a rollback of <em>enforcement</em>, not of
+  everything v0.8.0 changed about request handling, and four classes of
+  request do not roll back:<ul>
+<li>An <strong>undeclared body key</strong> answers <code>500 server error</code> rather
+  than the 400 it answered before v0.8.0, because the handler is
+  handed a keyword argument it does not accept. Each such request
+  also writes an exception record and an ERROR line, so a chatty
+  caller is expensive as well as broken.</li>
+<li>The <strong>handler guards</strong> added in v0.8.0 refuse in every mode,
+  deliberately. There are five: a network specification whose
+  <code>network_uuid</code> is an explicit null, a video specification with a
+  null <code>model</code> or <code>memory</code>, a disk specification asking for neither
+  a size nor a base, a disk specification whose size reads as a
+  negative number, and a custom DNS entry whose <code>value</code> is not an
+  IP address. Each of those used to be accepted and to do something
+  wrong — the last two deflated a node's used-capacity counters and
+  injected extra lines into a hosts file respectively — so the
+  rollback does not hand the defect back.</li>
+<li>A <strong>declared boolean sent as a string</strong> is read the way the
+  published schema reads it, in every mode. <code>"false"</code>, <code>"no"</code>,
+  <code>"off"</code> and <code>"0"</code> are all non-empty strings, which ten handlers
+  used to call true — <code>uefi</code> and <code>secure_boot</code> among them, and the
+  <code>shared</code> flag on both artifact routes which accept one. A
+  rollback to a reading which contradicts the published API would
+  be a rollback to the bug, so this holds too.</li>
+<li>An <strong>object reference which is null or not a string</strong> answers
+  <code>404 not found</code> rather than faulting. That check is in the object
+  lookup layer rather than in the validation layer, so no
+  validation mode restores the 500 it used to be.</li>
+</ul>
+</li>
+</ul>
+<p>The first three are described in full in the
+  <a href="../../release_notes/v07-v08/">v0.7 to v0.8 release notes</a>. Each is
+  also measured rather than asserted, which is where to look if you are
+  planning a rollback and want to know exactly what it gives back:
+  <code>test_nested_sweep.py</code>'s <code>NestedSweepWarnTestCase</code> and
+  <code>NestedSweepOffTestCase</code> drive every specification value through the
+  whole stack at <code>warn</code> and at <code>off</code>, <code>test_network.py</code>'s
+  <code>NetworkDNSAddressValueGuard*TestCase</code> pair does the same for the DNS
+  entry guard, and <code>test_boolean_sweep.py</code> covers every declared
+  boolean.
+* <code>off</code> disables the layer entirely, including the log lines. This is
   the valve for the lines themselves becoming a problem: a chatty
   caller sending an undeclared key on every request is an extra line
-  per request.</li>
-</ul>
+  per request. The same four exceptions apply as for <code>warn</code>, and the
+  undeclared key is still a 500 — it is just no longer logged as a
+  finding.</p>
 <p>The caller-visible consequences of enforcement — including requests
 which used to answer 404 or 403 and now answer 400 — are described in
 the <a href="../../release_notes/v07-v08/">v0.7 to v0.8 release notes</a>, and the

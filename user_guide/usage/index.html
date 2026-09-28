@@ -15125,9 +15125,20 @@ of the following keys:</p>
   <a href="/developer_guide/api_reference/instances/#networkspec">the networkspec reference</a>
   for more detail.</li>
 <li><em>float</em> if true indicates to immediately float the interface once the instance
-  is created. <code>true</code>, <code>yes</code>, <code>on</code>, <code>1</code> and their cases all mean yes and
-  <code>false</code>, <code>no</code>, <code>off</code> and <code>0</code> all mean no; the <code>sf-client</code> and ansible
-  interfaces convert what you type before it reaches the API.</li>
+  is created. <code>sf-client</code>'s own parsing of this flag currently recognises
+  fewer spellings than the API does
+  (<a href="https://github.com/shakenfist/client-python/issues/401">client-python#401</a>),
+  so a spelling the API would accept can be read as false before the request
+  is sent. Which spellings survive it is a fact about a different
+  repository and is deliberately not enumerated here, because nothing in
+  this repository can keep such a list true; the advice below holds whether
+  #401 is fixed or not. The
+  API itself accepts a wider range of string spellings (see
+  <a href="/developer_guide/api_reference/instances/#networkspec">the networkspec reference</a>),
+  so sending a real JSON boolean is the only form free of this kind of
+  surprise. The ansible collection's <code>networkspecs:</code> list parses its own,
+  differently narrow, set (<code>true</code>, <code>1</code> and <code>yes</code>, case-insensitively), so
+  the same string typed at <code>-N</code> and in a playbook can mean opposite things.</li>
 </ul>
 <p>Since v0.8 those five are the only keys accepted here too, and anything else is
 refused with a 400 naming it. See

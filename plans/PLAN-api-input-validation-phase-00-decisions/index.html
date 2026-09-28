@@ -15132,13 +15132,21 @@ can be queried per signature. Warn records must carry endpoint,
 parameter, declared type, and the offending value's <em>type</em> —
 not its value, which may be user data.</p>
 <h3 id="d6-query-string-fallback-open-question-6">D6 — Query-string fallback (open question 6)<a class="headerlink" href="#d6-query-string-fallback-open-question-6" title="Permanent link">&para;</a></h3>
-<p><strong>Accept <code>location=('json', 'query')</code> for parameters declared
+<p><strong>Accept a query-string fallback for parameters declared
 <code>query</code>, keeping the JSON body authoritative.</strong> Purely additive:
 the official client sends everything in the body regardless of
 method, so nothing that exists today can break. It removes the
 GET-with-a-body fragility for anyone using curl or a browser,
 and it makes the OpenAPI honest, where today a <code>query</code>
 declaration is a documented lie.</p>
+<p><em>Amended by phase 3.</em> This decision originally named its mechanism
+as <code>location=('json', 'query')</code>. That was tried and rejected before
+phase 3 began: a tuple location key is not JSON-serialisable, so the
+422 webargs raises is rendered as a 500. The shipped mechanism is the
+<code>json_or_query</code> custom loader — see
+<a href="../PLAN-api-input-validation-phase-03-compile-and-warn/">phase 3</a>'s
+inherited-constraints section, which says in as many words that phase
+3 must not re-derive this. The decision's substance is unchanged.</p>
 <h3 id="d7-response-validation-open-question-7">D7 — Response validation (open question 7)<a class="headerlink" href="#d7-response-validation-open-question-7" title="Permanent link">&para;</a></h3>
 <p><strong>Out of scope, and not deferred to a later phase of this
 plan.</strong> It has a different risk profile — a wrong response
@@ -15153,6 +15161,11 @@ a 400 naming it. Nothing relies on the override, and
 <code>passed_uuid</code> (<code>base.py:593-594</code>) specifically to dodge one
 instance of this collision — evidence that it is a known hazard
 rather than a feature.</p>
+<p><em>Amended by phase 3.</em> That supporting evidence no longer exists:
+D11 removed the <code>passed_uuid</code> remap, so <code>base.py:593-594</code> does not
+contain it (the surviving note is at <code>base.py:1740-1741</code>). The
+decision stands on its own reasoning; the master plan's copy of D8
+carries the same amendment.</p>
 <p>One documented exception must keep working: <code>arg_is_artifact_ref</code>
 accepts an <code>artifact_uuid</code> supplied in the body by internal
 flows (<code>artifact.py:66-72</code>). That is not a path parameter on any
@@ -15231,7 +15244,12 @@ registered against a token, not part of the token itself.</p>
 <li>Twenty undeclared-but-accepted parameters to either declare
    or deliberately hide.</li>
 <li>Four hand-authored <code>get_args</code> schemas to fold into the
-   compiled path so they stop being a second source of truth.</li>
+   compiled path so they stop being a second source of truth.
+   <em>Superseded by D19 (phase 4):</em> read literally this is a bug
+   rather than a refactor, because deleting the <code>@use_kwargs</code>
+   decorators would silently revert <code>offset</code>/<code>limit</code> on
+   <code>GET /blobs/&lt;uuid&gt;/data</code> to their signature defaults. Deferred
+   as <a href="https://github.com/shakenfist/shakenfist/issues/4098">#4098</a>.</li>
 </ol>
 
 

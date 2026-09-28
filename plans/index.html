@@ -15041,9 +15041,9 @@ checker's blind spot, and the only numbers here it cannot recompute.</p>
 <tr>
 <td>2026-08-03</td>
 <td><a href="PLAN-api-input-validation/">API input validation</a></td>
-<td>Declarative request validation and a consistent error contract for the REST API</td>
-<td>In progress</td>
-<td>8 of 9</td>
+<td>Declarative request validation and a consistent error contract for the REST API. The <a href="PLAN-api-input-validation-phase-08-push-audit/">push audit</a> closed the plan and was not a formality: reading the fifty decisions as one set before any code, it found that three of the four places the error contract is written down still described a world phase 6 had ended -- including the rendered operator configuration reference -- and then found a real behavioural defect the twelve pull-request reviews had not, that <code>validation.declared_boolean()</code> had been applied at one of nineteen declared-boolean sites, so <code>{"uefi": "false"}</code> booted with UEFI and <code>{"secure_boot": "off"}</code> both enabled secure boot and defeated the guard which exists to catch an inconsistent pair. All four blocking findings are fixed, the class is now held closed by a derived differential test over every declared boolean, and eight advisory findings were filed as issues -- see Known defects in the plan</td>
+<td>Complete</td>
+<td>9 of 9</td>
 </tr>
 <tr>
 <td>2026-08-14</td>

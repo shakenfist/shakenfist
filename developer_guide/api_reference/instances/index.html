@@ -14927,10 +14927,14 @@ describes a disk nobody asked for.</p>
 <li>float (boolean): whether to associate a floating IP with this interface to enable external
   accessibility to the instance. Note that you can float and unfloat an interface
   after instance creation if desired. A JSON boolean is the expected form, and
-  the shipped client and ansible collection both send one; the string spellings
-  the validation layer accepts (<code>true</code>, <code>yes</code>, <code>on</code>, <code>1</code>, <code>false</code>, <code>no</code>, <code>off</code>,
-  <code>0</code>, and their cases) are read with the meaning the validation layer gives
-  them, so <code>"false"</code> does not float the interface.</li>
+  the shipped client and ansible collection both send one. A range of string
+  spellings (<code>true</code>/<code>false</code>, <code>yes</code>/<code>no</code>, <code>on</code>/<code>off</code>, <code>1</code>/<code>0</code>, and some
+  single-letter and case variants of each) are also read with the meaning
+  they carry, so <code>"false"</code> does not float the interface. A spelling
+  outside those sets -- <code>"tRue"</code> is one -- is refused with a 400 under the
+  shipped <code>enforce</code> default, but read as <strong>true</strong> under the <code>warn</code>/<code>off</code>
+  rollback, where the handler's own <code>bool()</code> fallback answers instead of
+  the schema check. Do not rely on either; send a real JSON boolean.</li>
 </ul>
 <p>The same structure is passed to
 <a href="https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__interfaces">POST /instances/{instance_ref}/interfaces</a>

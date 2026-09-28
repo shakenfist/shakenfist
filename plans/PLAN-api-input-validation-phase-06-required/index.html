@@ -16599,22 +16599,31 @@ the server does not require. Step 6's release note says so explicitly.</p>
    <code>test_a_partial_overlap_cannot_be_expressed</code> recording why no fifth
    case exists.</li>
 <li><strong>Not yet met, deliberately.</strong> Per this step's brief I have not
-   closed either issue. #3269 and #323 both carry <code>Fixes #NNNN</code> in
-   their commits (<code>03ea26514</code> and <code>d6b84b365</code>) and will auto-close on
-   merge; the commit and the check that proves each is named in my
+   closed either issue. #3269 and #323 both carried <code>Fixes #NNNN</code> in
+   their commits and auto-closed on merge. This item originally named
+   those commits as <code>03ea26514</code> and <code>d6b84b365</code>, which is what they
+   were before #4199 was rebased onto <code>develop</code> shortly before it
+   merged; those objects exist in no clone but the one that wrote them.
+   They landed as <code>ec406a78a</code> and <code>c7a432886</code>. #4222 corrected the same
+   pair in the master plan and did not reach this file; phase 8's
+   survey found it here. A SHA recorded while a branch is in flight is
+   a SHA a rebase can invalidate — read them off the first-parent range
+   after the merge.</li>
+</ol>
+<p>The commit and the check that proves each is named in my
    final report and in the master plan's <em>Where the tracked issues
    stand</em> section, for the management session to post as closing
    comments. #534 was already closed by #4183 before this phase
-   started, as the item itself notes.</li>
-<li><strong>Met.</strong> <code>CompiledEndpoint</code>'s and <code>validate_request</code>'s docstrings
+   started, as the item itself notes.
+10. <strong>Met.</strong> <code>CompiledEndpoint</code>'s and <code>validate_request</code>'s docstrings
     were rewritten in step 3;
     <code>docs/developer_guide/writing_an_endpoint.md</code>'s required-ness
     paragraph and <code>docs/release_notes/v07-v08.md</code> were corrected in
     this step (two stale in-progress mentions of "required is recorded
     and never enforced" earlier in the release note were also updated
     to point at the new entry, rather than left standing as
-    contradictions).</li>
-<li><strong>Met, except the index number is different from the item's own
+    contradictions).
+11. <strong>Met, except the index number is different from the item's own
     wording.</strong> The master plan's Execution table has nine rows, phase
     7 is <em>Structured parameter schemas</em>, phase 8 is <em>Push audit</em>. The
     item says the index row should read <code>6 of 9</code>, but that number was
@@ -16626,10 +16635,9 @@ the server does not require. Step 6's release note says so explicitly.</p>
     <code>11 of 14</code>, <code>PLAN-cluster-op-visibility.md</code>'s <code>2 of 7</code>). I have set
     it to <code>7 of 9</code> rather than the <code>6 of 9</code> the item names, per this
     step's own instruction not to leave the arithmetic unchanged when
-    the completed-phase count genuinely changed.</li>
-<li><strong>Met.</strong> <code>pre-commit run --all-files</code> and the full <code>stestr</code> suite
-    were run for this step; results are in the final report.</li>
-</ol>
+    the completed-phase count genuinely changed.
+12. <strong>Met.</strong> <code>pre-commit run --all-files</code> and the full <code>stestr</code> suite
+    were run for this step; results are in the final report.</p>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step, back brief the operator on the understanding
 of this plan and how the intended work aligns with it.</p>
