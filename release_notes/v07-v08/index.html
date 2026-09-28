@@ -16503,6 +16503,30 @@ wall-clock deadline has passed. It runs automatically; no operator
 action is required, but see
 <a href="../../operator_guide/agent_operations/">Agent Operations</a> for what it
 recovers and what it deliberately cannot.</p>
+<p>The reaper costs one instance attributes read per monitored instance
+every 30 seconds, which is the second such sweep the sidechannel daemon
+runs -- the dispatch check is the first, at one per agent-ready instance
+every five seconds. The expected database load model in
+<code>shakenfist/data/database_load_budget.yaml</code> predates it and understated
+the pair by that much, so its <code>per_instance_qps</code> term is now derived
+from those two intervals rather than from the earlier measurement, and
+the shipped Prometheus rules are regenerated to match. A deployer using
+those rules will see the modelled rate for
+<code>(GetInstanceAttributes, sidechannel)</code> rise from 0.134 to 0.233 per
+standing instance; nothing about the load itself changed. That is the
+cost of an instance with a ready agent, and an instance without one
+costs about a seventh of it, so on a cluster of mostly agentless guests
+the alert for this pair has correspondingly more headroom.</p>
+<p>The same rules file, and the generator that writes it, previously told
+deployers to scrape sf-resources on port 13007. That is the cluster
+daemon's <code>CLUSTER_METRICS_PORT</code>; sf-resources publishes on
+<code>RESOURCES_METRICS_PORT</code>, 13001 by default, and the text now says so.
+If you set up scraping from those instructions, Prometheus has no
+<code>instances_active</code> series from your nodes, so every modelled value in
+the rules is empty and the over-budget alerts cannot fire. Point the
+sf-resources scrape at 13001, then check whether
+<code>ShakenFistDatabaseLoadModelBlind</code> has been firing: it is the alert
+which says the model cannot see the cluster's shape.</p>
 <h3 id="the-client-deadline-and-a-faster-failure-on-a-terminal-state">The client: <code>--deadline</code> and a faster failure on a terminal state<a class="headerlink" href="#the-client-deadline-and-a-faster-failure-on-a-terminal-state" title="Permanent link">&para;</a></h3>
 <p><code>sf-client instance execute</code>, <code>upload</code> and <code>download</code> gained a
 <code>--deadline</code> option, and <code>upload</code> and <code>download</code> also gained
