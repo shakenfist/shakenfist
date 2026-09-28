@@ -73,23 +73,31 @@ claims, not a file instar has validated.
 
 ## Known limitations
 
-### VHDX parent "actual path" can contain a literal backslash
+### A Windows-convention parent makes "actual path" unresolvable
 
-A VHDX differencing parent's locator is Windows-shaped — e.g.
-`.\vhdx-diff-parent.vhdx` — and `info`'s "actual path" resolution treats
-any non-absolute backing-file string as a POSIX-relative path, joining
-it onto the image's directory. Because the backslash is not a path
-separator on Linux, the result is a single, literal filename containing
-a backslash that cannot exist on the filesystem, e.g.:
+`info`'s "actual path" resolution treats any backing-file string that
+is not POSIX-absolute as relative and joins it onto the image's
+directory. A parent recorded in Windows convention therefore comes out
+as a single literal filename containing backslashes, which cannot exist
+on the filesystem:
 
 ```
-backing file: .\vhdx-diff-parent.vhdx (actual path: /images/.\vhdx-diff-parent.vhdx)
+backing file: \\attacker\share\probe (actual path: /images/\\attacker\share\probe)
 ```
 
-The `backing file:` field itself is correct — it is exactly what the
-VHDX header records — and qemu-img would print the same field
-unconditionally if it could open a differencing VHDX at all. Fixing the
-"actual path" resolution is path normalisation, which belongs to phase
-11 of [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/), not this
-output path. Suppressing the field instead of fixing the resolution
-would paper over the underlying issue rather than close it.
+This affects **both** differencing formats, not just VHDX: a VHD parent
+unicode name and a VHDX `absolute_win32_path` or `volume_path` locator
+key are all reported exactly as stored. A relative VHDX locator is the
+one case that is *not* affected — `info` renders the `relative_path`
+key back into POSIX convention, so `create -f vhdx -b parent.vhdx`
+followed by `info` reports `parent.vhdx` and resolves correctly.
+
+The `backing file:` field itself is correct in every case — it is what
+the image's own header records, and reporting it is the point. Fixing
+the "actual path" resolution is path normalisation, which belongs with
+the composition work in
+[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/), not this output
+path; suppressing the field instead would paper over the underlying
+issue rather than close it. The full account, including which locator
+key `info` prefers and why the relative case is rendered back, is the
+"VHD/VHDX differencing" section of [quirks.md](/components/instar/quirks/).

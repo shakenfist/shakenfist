@@ -217,7 +217,10 @@ better looking, in three horizons:
   for years, and by having Kerbside re-encode the display for
   clients on slow links, which works against any qemu;
 - **later**, by testing whether a Rust SPICE server on qemu's
-  D-Bus display is a better foundation than spice-server.
+  D-Bus display is a better foundation than spice-server, and
+  whether carrying a session's channels over one QUIC
+  connection between ryll and Kerbside beats a TCP connection
+  per channel.
 
 Every change is measured before and after; Kerbside has no
 recorded latency figures today (the latency loadtest only
@@ -277,7 +280,10 @@ first phase.
 | 3. Display transcoding in Kerbside: feasibility spike | [PLAN-spice-performance-phase-03-transcoding.md](/components/kerbside/plans/PLAN-spice-performance-phase-03-transcoding/) | In progress | 2e19d737aa (#489), ryll fdb5ead5b4 (#406) |
 | 4. Son of SPICE: D-Bus display feasibility spike | | Not started | |
 | 5. Small spice-server patches (item 9, and item 4 if still wanted) | | Not started | |
-| 6. Push audit (kerbside and kerbside-patches) | | Not started | |
+| 6. Push audit of phases 1-5 (kerbside and kerbside-patches) | | Not started | |
+| 7. QUIC client leg: experiments | | Not started | |
+| 8. QUIC client leg: implementation, if phase 7 says go | | Not started | |
+| 9. Push audit of phases 7-8 (kerbside and ryll) | | Not started | |
 
 **Phase 1** sets `TCP_NOTSENT_LOWAT` on the client leg and caps
 the backend leg's receive buffer, with the values made
@@ -660,6 +666,95 @@ server-internal, in two parts:
   and 60 fps ceilings,** waits for phases 3 and 4, because a
   go in either moves encoding for slow links out of
   spice-server and reduces its value.
+
+**Phase 6** is the push audit for the plan as first written,
+phases 1-5, run before the QUIC work starts so that the two
+bodies of work are audited separately. It follows the shared
+block below over the ranges recorded in phases 1-5's `Merged`
+cells, and cites kerbside-patches' own audits for the work
+that landed there.
+
+**Phases 7 and 8** (added 2026-09-27) put the ryll-to-Kerbside
+client leg on QUIC, so that one UDP connection carries every
+SPICE channel of a session. They are deliberately loosely
+worded; phase 7's plan is where they get grounded in the code.
+
+The case, as argued on 2026-09-27, is more operational than
+it is about throughput:
+- **One connection is one session.** Behind a load balancer
+  the channels of one session can land on different proxy
+  nodes today (`docs/proxy-architecture.md`, "The
+  distributed-deployment constraint"), which is why session
+  termination is a DB-mediated intent every node acts on. A
+  QUIC session lands on one node.
+- **Streams without head-of-line blocking.** Multiplexing
+  SPICE's channels over one TCP stream would make a keystroke
+  wait behind a retransmitted display frame, on exactly the
+  lossy links where the other benefits matter. QUIC streams are
+  independent, with per-stream flow control.
+- **Faster connects.** One 1-RTT (or 0-RTT on resume)
+  handshake, instead of TCP, TLS, link and ticket per channel,
+  in at least two serial rounds (main, then the rest).
+- **Connection migration.** A client moving from Wi-Fi to LTE
+  keeps its session instead of tearing down every channel.
+- **One authentication on the client leg.** The per-channel
+  ticket re-check and the late-channel ticket lifetime floor
+  (finding 3) stay on the backend leg, which Kerbside controls.
+- **Room for datagrams.** RFC 9221 unreliable datagrams are
+  available later for display frames not worth retransmitting,
+  which lines up with phase 3's transcoder and phase 4's UDP
+  design input.
+
+The shape, as agreed:
+- **Client leg only.** The backend leg stays stock SPICE over
+  TCP, so no hypervisor, qemu or spice-server changes. Inside
+  the proxy each QUIC stream becomes an ordinary SPICE channel
+  before the firewall inspects it.
+- **Opt-in through the `.vv` file.** Kerbside advertises the
+  QUIC endpoint in a new ryll extension key
+  (`docs/spice/console-vv-extensions.md`). remote-viewer and
+  other clients ignore it.
+- **The fallback is today's code.** If QUIC cannot establish
+  on a path (UDP blocked, say), ryll connects exactly as it
+  does now, one TCP connection per channel. There is no TCP
+  multiplex.
+- Both ends are ours, Kerbside and ryll, so nothing waits on
+  an upstream.
+
+**Phase 7** is a time-boxed experiment. It should answer at
+least:
+- whether QUIC ties or beats per-channel TCP on
+  input-to-echo latency under packet loss while the display
+  is busy, on the shaped-link rig's profiles plus 1-2% loss.
+  This is the measurement that decides the phase;
+- connect time, and behaviour across a path change;
+- how ryll decides QUIC has failed and how long the fallback
+  costs;
+- how SPICE channel identity (`connection_id`, channel type
+  and id) maps onto QUIC streams, and what that does to the
+  firewall and the audit trail;
+- the operational cost: a UDP port, load balancer and NAT
+  behaviour, and whether this is the same UDP exposure
+  decision phase 3's WebRTC output and phase 4's transport
+  input raise. Phase 3 already says that decision should be
+  made once for Kerbside; phase 7 should make it or defer to
+  whichever of those comes first;
+- whether a Rust QUIC stack (`quinn` is the obvious
+  candidate) fits the proxy's runtime and packaging.
+
+Its output is a go or no-go recommendation, and if go, a
+phase plan for phase 8.
+
+**Phase 8** builds what phase 7 recommends, in Kerbside and
+ryll, if it recommends anything. If phase 7 is a no-go, phase
+8 is marked `Abandoned` with the reason, and phase 9 audits
+phase 7 alone.
+
+**Phase 9** is the push audit for phases 7 and 8. It audits
+their accumulated diff and cites phase 6 for phases 1-5,
+rather than re-auditing work that has already been audited.
+Work that lands in ryll is audited under ryll's own push
+audit, and phase 9 cites it.
 
 <!-- shared-block: plan-push-audit-phase v3 -->
 Push audit phase (shared block; do not edit -- the canonical

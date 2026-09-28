@@ -403,6 +403,7 @@ phase plan links are tracked under *Execution*.
 | 4. The source driver | `kerbside/sources/proxmox.py`: discovery over `/nodes/{node}/qemu`, console details over `spiceproxy`, CA and subject handling, and the direct `.vv` handler refusing Proxmox sources |
 | 5. CI lane | A lane that proves an end-to-end proxied session, per open question 5 |
 | 6. Docs | The use-case page PLAN-use-case-docs.md has been holding a row for, plus `console-sources.md` |
+| 7. Push audit | Work through `PUSH-AUDIT.md` over the accumulated kerbside diff of phases 3a to 6, deriving the range from the `Merged` cells with `tools/audit/plan-range.sh`. Phases that land in ryll or shakenfist/actions are audited there, not here |
 
 Phases 2 and 3a are independent and can run in parallel.
 Phase 3a is the natural first kerbside phase: it has value on

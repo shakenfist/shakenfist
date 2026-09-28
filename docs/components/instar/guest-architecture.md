@@ -424,7 +424,35 @@ provides a modular architecture with:
  target and backing are both vmdk, the guest also reads the
  parent's descriptor via `vmdk::read_and_parse_descriptor` and
  plumbs the real `parentCID` into the new image's descriptor
- (no longer the phase-1d deadbeef sentinel). The host CLI
+ (no longer the phase-1d deadbeef sentinel). A `vpc` or `vhdx`
+ target with a backing reference is not merely a backing pointer
+ but a *differencing child*, and the planner emits it as one:
+ `crates/create::plan_vhd`'s Dynamic arm stamps
+ `vhd::DISK_TYPE_DIFFERENCING` (`disk_type = 4`) into both footer
+ copies, writes the parent path into the dynamic header's parent
+ unicode name as UTF-16BE, and fills one 512-byte locator sector
+ via `vhd::build_parent_locator_data` plus a single
+ `vhd::build_parent_locator_entry` in the first of the eight
+ slots (platform code `W2ku` for a POSIX-absolute path, `W2ru`
+ for a relative one, which is rewritten to the Windows
+ convention). `plan_vhdx` sets the File Parameters `HasParent`
+ bit and appends a sixth metadata item through
+ `vhdx::build_parent_locator`, which leaves the file layout — and
+ so `minimum_file_size` — the same either way. The parent's
+ identity is read off the parent on input device 0 and written
+ into the child: footer `uuid` plus creation `timestamp` for vpc
+ (`vhd_opts_from`), the active header's `DataWriteGuid` as
+ `parent_linkage` for vhdx (`vhdx_opts_from`); a backing file
+ whose identity is not the target's own format is
+ `ERROR_PARENT_FORMAT_MISMATCH` rather than an all-zero linkage.
+ A `Fixed` vpc target refuses a backing reference outright
+ (`BackingFileUnsupported`) because a differencing VHD is
+ Dynamic-only — a fixed VHD has neither a BAT nor a dynamic
+ header to hold the locators. instar emits these children but
+ does not read them back: the ops that compose sector data
+ refuse a differencing source, and composition is deferred and
+ tracked in
+ [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/). The host CLI
  (`run_create` in `src/vmm/src/main.rs`, wired) handles
  the raw target entirely host-side via open + ftruncate +
  optional posix_fallocate; for every other format it opens the
@@ -554,21 +582,31 @@ provides a modular architecture with:
  disks; vhdx differencing is already rejected by
  `VhdxState::init`; vmdk multi-extent layouts fail the
  binary-header parse naturally), and dispatches to the matching
- per-format `<Format>State::map_extents` walker from the PLAN-m workap. Streams one `MapExtentRecord` per coalesced extent
+ per-format `<Format>State::map_extents` walker from the
+ PLAN-map work. Refusing a differencing source is uniform
+ policy across the ops that compose sector data, not a `map`
+ quirk: composition is deferred and tracked in
+ [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/). What is
+ particular to `map` is the signalling — it reports the refusal
+ through its own `MapResult::ERROR_HAS_BACKING` code, where the
+ other ops raise `shared::DifferencingRefusal` on the call
+ table's `send_error` channel for the host's
+ `differencing_refusal_error` to render. Streams one
+ `MapExtentRecord` per coalesced extent
  through the call table's `send_map_extent` function pointer,
  followed by a `MapResult` summary through `send_map_result`.
  The emit closure clips each extent against the configured
  window (with file-offset adjustment for front-trimmed Data
  extents) and signals walker abort once the window is
  exhausted. Single-image v1; chain composition is a follow-up.
- Binary builds at ~28 KiB / 384 KiB (7%). Host CLI (the PLAN-m workap) wires `instar map [-f FMT] [--output={human,json}]
+ Binary builds at ~28 KiB / 384 KiB (7%). Host CLI (the PLAN-map work) wires `instar map [-f FMT] [--output={human,json}]
  [--start-offset=OFFSET] [--max-length=LEN] [--sector-size=N]
  FILENAME`: `run_map` in `src/vmm/src/main.rs` parses args
  (refusing `--image-opts`, VMDK monolithicFlat sources via
  `peek_is_vmdk_descriptor`, and `--start-offset >= file_size`
  on the host before launching the guest), writes `MapConfig`
  per-field at `OPERATION_CONFIG_ADDR`, attaches the source
- read-only as input device 0, and runs the vCPU loop. The PLAN-m workap ships the streaming `MapRenderer<'a, W: Write>`
+ read-only as input device 0, and runs the vCPU loop. The PLAN-map work ships the streaming `MapRenderer<'a, W: Write>`
  that writes each extent to stdout (via a `BufWriter` over
  `stdout().lock()`) as the `MapExtentMessage` arrives in the
  vCPU loop; host memory stays O(1) regardless of how
@@ -733,15 +771,15 @@ provides a modular architecture with:
  subcommand. `MeasureConfig` and `MeasureResult` structs carry
  options and results across OPERATION_CONFIG_ADDR and the
  `send_measure_result` CallTable callback (CallTable VERSION 14).
- The PLAN-c workreate.md` adds `CreateConfig` / `CreateResult` /
+ The `PLAN-create.md` work adds `CreateConfig` / `CreateResult` /
  `GUEST_CREATE_SCRATCH_LIMIT` here and a new `send_create_result`
  CallTable function pointer (appended at the end of the struct so
- existing operation binaries keep working unchanged). The PLAN-r workesize.md` adds `ResizeConfig` / `ResizeResult` plus two
+ existing operation binaries keep working unchanged). The `PLAN-resize.md` work adds `ResizeConfig` / `ResizeResult` plus two
  more CallTable function pointers: `read_output_sector` (lets a
  guest read from the same device it writes to — the first
  in-place-mutation primitive, reusable by `rebase` / `commit`
  / snapshot-delete) and `send_resize_result`. Same
- append-at-end discipline. The PLAN-s worknapshot.md` adds
+ append-at-end discipline. The `PLAN-snapshot.md` work adds
  `SnapshotConfig` (magic `b"SNAP"`, carrying the mode, the
  snapshot name/needle argument, and the create-mode
  `date_sec`/`date_nsec` wall-clock fields) / `SnapshotResult` /

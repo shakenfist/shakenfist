@@ -365,8 +365,8 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 | 6. `plan_vhdx` differencing emitter | [PLAN-differencing-phase-06-vhdx-emitter.md](/components/instar/plans/PLAN-differencing-phase-06-vhdx-emitter/) | Complete | `882d098` (#577) |
 | 7. Guest create op and host CLI wiring | [PLAN-differencing-phase-07-guest-host.md](/components/instar/plans/PLAN-differencing-phase-07-guest-host/) | Complete | `99d7d24` (#581) |
 | 8. Rust unit tests and Python integration tests | [PLAN-differencing-phase-08-tests.md](/components/instar/plans/PLAN-differencing-phase-08-tests/) | Complete | `c416abd` (#588) |
-| 9. Coverage fuzzing of the locator parsers | [PLAN-differencing-phase-09-fuzz.md](/components/instar/plans/PLAN-differencing-phase-09-fuzz/) | Planned | |
-| 10. Documentation | PLAN-differencing-phase-10-docs.md | Not started | |
+| 9. Coverage fuzzing of the locator parsers | [PLAN-differencing-phase-09-fuzz.md](/components/instar/plans/PLAN-differencing-phase-09-fuzz/) | Complete | `044ad77` (#594) |
+| 10. Documentation | [PLAN-differencing-phase-10-docs.md](/components/instar/plans/PLAN-differencing-phase-10-docs/) | Planned | |
 | 11. Composition: host chain discovery, device attachment, `info --chain` | PLAN-differencing-phase-11-chain-host.md | Not started | |
 | 12. Composition: guest VHD sector-bitmap read path | PLAN-differencing-phase-12-vhd-compose.md | Not started | |
 | 13. Composition: guest VHDX sector-bitmap read path | PLAN-differencing-phase-13-vhdx-compose.md | Not started | |
@@ -505,7 +505,10 @@ rather than left as one phase to be split later, the way
   have documented a refusal that phase 14 removes: at minimum
   `docs/chain-discovery.md`, `docs/chain-config.md` and the
   read-side rows and divergence notes of
-  `docs/format-coverage.md`.
+  `docs/format-coverage.md`. Both chain pages already exist (209
+  and 210 lines, describing qcow2 chain discovery), so phase 16
+  extends them rather than authoring them; phase 10's survey
+  confirmed this on 2026-09-26.
 
 Two specifics phases 12 and 13 must confront, both already
 visible in the crates:
@@ -653,8 +656,11 @@ We will know this plan has been implemented because:
   `docs/chain-discovery.md`, `docs/chain-config.md`,
   `ARCHITECTURE.md` and `CHANGELOG.md` describe what shipped,
   and the false "differencing with backing chains" input claim
-  at `CHANGELOG.md:1922` is reconciled by a current statement of
-  what is actually supported.
+  at `CHANGELOG.md:2314` is reconciled by a current statement of
+  what is actually supported. (Phase 10's survey corrected this
+  reference: it read `:1922` until 2026-09-26, which is a line
+  about vhdx parent `virtual_size` recovery. The claim had drifted
+  392 lines.)
 * The push audit in phase 17 has run `PUSH-AUDIT.md` over the
   union of the merged ranges, and its findings are resolved or
   declined in writing.

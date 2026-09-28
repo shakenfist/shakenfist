@@ -162,7 +162,7 @@ and the overlay becomes standalone.
  rejects vmdk rebase entirely (there is no upstream vmdk
  rebase at all). The vmdk smoke tests use unsafe mode.
 - **Safe-mode rebase copy-on-writes snapshot-bearing
- overlays.** Since the PLAN-q workcow2-write-infrastructure (issue #421 resolved),
+ overlays.** Since the PLAN-qcow2-write-infrastructure work (issue #421 resolved),
  safe mode (including safe-mode detach) no longer refuses
  an overlay with internal snapshots — it succeeds by
  copying. Where the safe-mode allocator would previously

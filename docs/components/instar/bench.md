@@ -189,7 +189,7 @@ guest refuses the write test:
 | Dirty / corrupt | The image's dirty or corrupt incompatible bits are set. |
 
 **Internal snapshots are now supported (copy-on-write).** Before
-the PLAN-q workcow2-write-infrastructure, `bench -w` refused any
+the PLAN-qcow2-write-infrastructure work, `bench -w` refused any
 image with `nb_snapshots > 0` because its overwrite path had no
 per-write ownership check. Now (step 7d) the qcow2 `-w`
 path runs the crate's copy-on-write branch: a snapshot-shared data

@@ -182,7 +182,7 @@ behaviour.
  via `backing_file`. Tracked separately under
  PLAN-info's vmdk follow-ups.
 - **Snapshot-bearing images copy-on-write (backing
- snapshots preserved).** Since the PLAN-q workcow2-write-infrastructure (issues #420 and #423
+ snapshots preserved).** Since the PLAN-qcow2-write-infrastructure work (issues #420 and #423
  resolved), commit no longer refuses images with internal
  snapshots — it copies the shared clusters instead (the
  shared allocate-on-write and copy-on-write machinery is
@@ -247,7 +247,7 @@ behaviour.
  existing refcount blocks provide refuse (error 11);
  qemu-img grows the refcount table and completes. v1
  never appends refblocks; retiring the ceiling is the
- refcount-growth generalization (the PLAN-q workcow2-write-infrastructure). Backing staging
+ refcount-growth generalization (the PLAN-qcow2-write-infrastructure work). Backing staging
  capacity itself is byte-driven now:
  `min(2048, 3 MiB / cluster_size)` staged refblocks
  (formerly a flat 32) and a windowed backing-L2 model
