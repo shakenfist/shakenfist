@@ -23092,7 +23092,7 @@ def _coalescible_key_clause(
     return key_column == value
 
 
-def _work_queue_references_op_clause(cluster_ops_table: sa.Table) -> Any:
+def _work_queue_references_op_clause(dashed_op_uuid: Any) -> Any:
     """An EXISTS predicate: some work_queue row references this op.
 
     Every live cluster operation is referenced by exactly one
@@ -23100,16 +23100,21 @@ def _work_queue_references_op_clause(cluster_ops_table: sa.Table) -> Any:
     a defer inserts the replacement row before flipping the state back
     to queued. An operation in a non-terminal state with no row is
     therefore permanently stranded: no dispatcher will ever dequeue
-    it (issue 4303). The payload comparison goes through
-    ``_dashed_uuid_expr`` because the payload stores the dashed uuid
-    string while ``cluster_operations.uuid`` is undashed CHAR(32).
+    it (issue 4303).
+
+    ``dashed_op_uuid`` is a SQL expression yielding the operation's
+    uuid in the dashed 36 character form the payload stores. Queries
+    already joined to object_states pass ``object_states.object_uuid``
+    unchanged; a query with only cluster_operations in scope would
+    pass ``_dashed_uuid_expr(cluster_operations.uuid)``, because that
+    column is undashed CHAR(32).
     """
     work_queue_table = _get_work_queue_table()
     return sa.exists(
         sa.select(work_queue_table.c.id).where(
             sa.func.json_unquote(sa.func.json_extract(
                 work_queue_table.c.payload, '$.operation_uuid'))
-            == _dashed_uuid_expr(cluster_ops_table.c.uuid)))
+            == dashed_op_uuid))
 
 
 def _direct_find_existing_coalescible_op(
@@ -23202,8 +23207,11 @@ def _direct_find_existing_coalescible_op(
                 # row will never run, so reusing it wedges the caller
                 # in raise_for_error() until its timeout (issue 4303).
                 # Enqueue fresh work instead; the reaper's orphan pass
-                # errors the dead op out separately.
-                .where(_work_queue_references_op_clause(cluster_ops_table))
+                # errors the dead op out separately. The joined states
+                # row already carries the dashed uuid the payload
+                # stores, so no per-row transformation is needed.
+                .where(_work_queue_references_op_clause(
+                    states_table.c.object_uuid))
                 .order_by(cluster_ops_table.c.created_at.asc())
                 .limit(1)
             )
@@ -23365,6 +23373,60 @@ def _direct_claim_coalescible_siblings(
         return []
 
 
+def _orphaned_cluster_operations_stmt(threshold_seconds: float) -> Any:
+    """The SELECT behind ``_direct_list_orphaned_cluster_operations``,
+    split out so the query-shape test can compile it.
+
+    The join is written ``cluster_operations.uuid =
+    <undashed object_states.object_uuid>``: the uuid transformation
+    sits on the object_states side, so the optimizer drives from the
+    handful of non-terminal state rows (a range over
+    idx_object_states_type_state) and reaches cluster_operations by
+    primary key. The first version dashed ``cluster_operations.uuid``
+    instead, which left no usable index on the states side of the
+    join, so every once-a-minute sweep walked all of
+    cluster_operations and ran the work_queue NOT EXISTS scan per row:
+    824 slow-query log entries in 18 hours on a six node cluster, with
+    runs past the caller's 30s gRPC deadline (issue 4355). Keep every
+    per-row expression on the object_states side.
+    """
+    cluster_ops_table = _get_cluster_operations_table()
+    states_table = _get_object_states_table()
+
+    op_object_types = [
+        ObjectType(t)  # type: ignore[call-arg]
+        for t in OPERATION_NAMES_TO_CLASSES]
+
+    cutoff = (sa.func.unix_timestamp(sa.func.now(6)) - threshold_seconds)
+    return (
+        sa.select(
+            cluster_ops_table.c.uuid,
+            cluster_ops_table.c.operation_type,
+            states_table.c.state_value,
+            states_table.c.update_time,
+        )
+        .select_from(
+            states_table.join(
+                cluster_ops_table,
+                cluster_ops_table.c.uuid
+                == _undashed_uuid_expr(states_table.c.object_uuid)))
+        # Derivable from the pairing OR below, but stated as a
+        # single-table condition so idx_object_states_type_state can
+        # serve it before the join.
+        .where(states_table.c.object_type.in_(op_object_types))
+        .where(sa.or_(*[
+            sa.and_(
+                cluster_ops_table.c.operation_type == ot.value,
+                states_table.c.object_type == ot)
+            for ot in op_object_types]))
+        .where(states_table.c.state_value.in_(['queued', 'executing']))
+        .where(states_table.c.update_time <= cutoff)
+        .where(~_work_queue_references_op_clause(
+            states_table.c.object_uuid))
+        .order_by(states_table.c.update_time.asc())
+    )
+
+
 def _direct_list_orphaned_cluster_operations(
         threshold_seconds: float) -> list[dict[str, Any]]:
     """Cluster operations stranded in a non-terminal state with no
@@ -23387,46 +23449,17 @@ def _direct_list_orphaned_cluster_operations(
     while ``cluster_operations.operation_type`` holds the enum
     *value*, so the join binds one ObjectType per operation type
     rather than comparing the two columns (which silently never
-    matches -- see docs/developer_guide/coding_rules.md).
+    matches -- see docs/developer_guide/coding_rules.md). See
+    ``_orphaned_cluster_operations_stmt`` for why the join drives
+    from object_states (issue 4355).
     """
     engine = _get_engine()
-    cluster_ops_table = _get_cluster_operations_table()
-    states_table = _get_object_states_table()
-
-    op_object_types = [
-        ObjectType(t)  # type: ignore[call-arg]
-        for t in OPERATION_NAMES_TO_CLASSES]
 
     try:
         with engine.connect() as conn:
-            cutoff = (sa.func.unix_timestamp(sa.func.now(6))
-                      - threshold_seconds)
-            stmt = (
-                sa.select(
-                    cluster_ops_table.c.uuid,
-                    cluster_ops_table.c.operation_type,
-                    states_table.c.state_value,
-                    states_table.c.update_time,
-                )
-                .select_from(
-                    cluster_ops_table.join(
-                        states_table,
-                        sa.and_(
-                            states_table.c.object_uuid
-                            == _dashed_uuid_expr(cluster_ops_table.c.uuid),
-                            sa.or_(*[
-                                sa.and_(
-                                    cluster_ops_table.c.operation_type
-                                    == ot.value,
-                                    states_table.c.object_type == ot)
-                                for ot in op_object_types]))))
-                .where(states_table.c.state_value.in_(
-                    ['queued', 'executing']))
-                .where(states_table.c.update_time <= cutoff)
-                .where(~_work_queue_references_op_clause(cluster_ops_table))
-                .order_by(states_table.c.update_time.asc())
-            )
-            rows = conn.execute(stmt).fetchall()
+            rows = conn.execute(
+                _orphaned_cluster_operations_stmt(threshold_seconds)
+                ).fetchall()
             return [
                 {
                     'uuid': str(r.uuid),
@@ -24517,6 +24550,19 @@ def _dashed_uuid_expr(col: Any) -> Any:
 
     return (part(1, 8) + '-' + part(9, 4) + '-' + part(13, 4) + '-' +
             part(17, 4) + '-' + part(21, 12))
+
+
+def _undashed_uuid_expr(col: Any) -> Any:
+    """Render a dashed 36 character uuid column (the
+    object_states.object_uuid form) as the undashed CHAR(32) form the
+    ``sa.Uuid`` static-table columns store.
+
+    This is ``_dashed_uuid_expr``'s inverse, and choosing between them
+    is a performance decision rather than a correctness one: both make
+    the same rows match, but a transformed column cannot use its index,
+    so the transformation belongs on the driving (small) side of a join
+    and the bare column on the looked-up side (issue 4355)."""
+    return sa.func.replace(col, '-', '')
 
 
 def _static_table_for_object_type(
