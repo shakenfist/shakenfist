@@ -16,6 +16,7 @@ harness puts it. What must not be duplicated is the data.
 
 import os
 import re
+import time
 
 import requests
 import yaml
@@ -23,6 +24,22 @@ import yaml
 
 METRICS_PORT = 13006
 METRICS_TIMEOUT = 5
+
+# Where sf-resources publishes its own metrics, on every node rather than
+# only on the database tier. The budget's per-instance coefficient is a
+# regression against sum(instances_active), and that gauge is here: the
+# number of libvirt domains this node is running. Duplicated from
+# config.RESOURCES_METRICS_PORT rather than imported, like every other
+# constant in this file, and asserted against the real default by
+# test_database_tier_harness.py.
+#
+# Reading the cluster's shape from this rather than from the API's
+# power_state field is not a preference. _doc.method in the budget says
+# every consumer must count standing instances the way the coefficients
+# were fitted, or it evaluates the model against a quantity it was never
+# fitted against; sf-ctl database-load and the generated Prometheus rules
+# both read instances_active, and this is the third consumer.
+RESOURCES_METRICS_PORT = 13001
 
 # The load check watches several consecutive windows rather than one long
 # one, because the cluster it runs on is not idle: stestr runs the suite in
@@ -521,6 +538,207 @@ def scrape_request_pairs(mesh_ip):
             continue
         pairs[(operation, caller)] = pairs.get((operation, caller), 0.0) + value
     return pairs
+
+
+# What standing_instances() records for a node which answered but did not
+# publish the gauge. There is no exception to describe that case, and it
+# is the one which says sf-resources is up but not what the check expects.
+UNPUBLISHED_GAUGE = 'instances_active not published'
+
+
+def parse_gauge(text, name):
+    """The value of one unlabelled Prometheus gauge, or None.
+
+    Deliberately narrow. The gauges sf-resources publishes carry no
+    labels, so a sample line is the metric name, whitespace and a value,
+    and anything else with this name as a prefix -- instances_total when
+    asked for instances_active, say -- is a different metric and must not
+    match. Returns None rather than zero when the gauge is absent,
+    because "this node is running nothing" and "this node does not
+    publish that" are different answers and only one of them can be
+    summed.
+    """
+    for line in text.splitlines():
+        # A '# HELP' or '# TYPE' line splits to '#' first, so the name
+        # check below rejects it without a comment guard of its own.
+        # A third field is the optional sample timestamp the exposition
+        # format allows; the value is the second either way.
+        fields = line.split()
+        if len(fields) not in (2, 3) or fields[0] != name:
+            continue
+        try:
+            return float(fields[1])
+        except ValueError:
+            continue
+    return None
+
+
+def scrape_instances_active(ip):
+    """How many libvirt domains one node is running, or None.
+
+    The regressor the budget's per_instance_qps terms were fitted
+    against, read from the node itself. See RESOURCES_METRICS_PORT.
+    """
+    url = 'http://%s:%d/metrics' % (ip, RESOURCES_METRICS_PORT)
+    resp = requests.get(url, timeout=METRICS_TIMEOUT)
+    resp.raise_for_status()
+    return parse_gauge(resp.text, 'instances_active')
+
+
+def shape_nodes(nodes):
+    """The nodes whose instances_active the cluster's shape is summed over.
+
+    Hypervisors in the created state. A node which is not a hypervisor
+    runs no libvirt domains by definition, so leaving it out cannot change
+    the sum, and GET /nodes is a roster which does not shrink when a node
+    goes away (see shakenfist_ci/sizing.py) -- a deleted node's record
+    would otherwise be a node which never answers, and standing_instances()
+    is all or nothing.
+    """
+    return [n for n in nodes
+            if n.get('is_hypervisor') and n.get('state') == 'created']
+
+
+def standing_instances(nodes, attempts, retry_seconds,
+                       scrape=scrape_instances_active, sleep=time.sleep):
+    """How many libvirt domains the cluster is running, and who did not say.
+
+    Returns (count, unread), where count is None unless every node in
+    shape_nodes(nodes) answered. All or nothing, because a partial sum is
+    a smaller cluster than the real one and every per-instance ceiling is
+    a multiple of it -- under-reporting the shape fails the build for load
+    sitting exactly where the model says it should, which is issue #4039.
+    unread maps each node which did not answer to why its last attempt
+    failed, so that a run which fell back to reporting says why: a
+    refused connection, a timeout and a gauge nobody published call for
+    three different responses.
+
+    An absent gauge is retried like a failed request: sf-resources creates
+    its gauges on its first metrics update, up to a minute after it
+    starts, so "not published yet" is as transient as a refused
+    connection. Each node is still read at most attempts times.
+    """
+    total = 0.0
+    unread = {}
+    for node in shape_nodes(nodes):
+        active = None
+        reason = None
+        for attempt in range(attempts):
+            try:
+                active = scrape(node['ip'])
+                reason = UNPUBLISHED_GAUGE
+            except Exception as e:
+                active = None
+                reason = repr(e)
+            if active is not None:
+                break
+            if attempt < attempts - 1:
+                sleep(retry_seconds)
+        if active is None:
+            unread[node.get('name', node['ip'])] = reason
+        else:
+            total += active
+    if unread:
+        return None, unread
+    return int(total), unread
+
+
+class ShapeSampler:
+    """The cluster's shape, sampled at each window boundary of a load check.
+
+    Keeps what the load check needs from its samples: every count which
+    survived, and for each node which did not answer, how many samples it
+    missed and why the last one failed. The roster is passed to every
+    sample rather than fixed when the sampler is made, because a node
+    deleted part way through the measurement stops being a hypervisor in
+    the created state from then on, and a snapshot would carry it as a
+    node which never answers.
+
+    Each unread node also carries how long before its last miss the
+    cluster had last heard from it (lastseen_age_seconds, None where the
+    roster did not say). A node which went down during the measurement
+    stays a hypervisor in the created state and misses every sample just
+    as a closed port does, and only its age tells the two apart: a node
+    that is still checking in has a port problem, one that stopped
+    minutes ago has a node problem.
+    """
+
+    def __init__(self, attempts, retry_seconds,
+                 scrape=scrape_instances_active, sleep=time.sleep,
+                 clock=time.time):
+        self._attempts = attempts
+        self._retry_seconds = retry_seconds
+        self._scrape = scrape
+        self._sleep = sleep
+        self._clock = clock
+        self.samples = []
+        self.attempted = 0
+        self.unread = {}
+
+    def sample(self, nodes):
+        self.attempted += 1
+        count, unread = standing_instances(
+            nodes, self._attempts, self._retry_seconds,
+            scrape=self._scrape, sleep=self._sleep)
+        if count is not None:
+            self.samples.append(count)
+        now = self._clock()
+        lastseen = {n.get('name', n['ip']): n.get('lastseen')
+                    for n in shape_nodes(nodes)}
+        for name, reason in unread.items():
+            seen = self.unread.setdefault(name, {'samples': 0})
+            seen['samples'] += 1
+            seen['last_error'] = reason
+            last = lastseen.get(name)
+            seen['lastseen_age_seconds'] = (
+                None if last is None else round(now - last))
+
+    def busiest(self):
+        return busiest_shape(self.samples)
+
+    def never_read(self):
+        """The nodes which answered none of the samples, sorted.
+
+        The line between a transient failure and a configuration one. A
+        node which missed some samples and answered others has a metrics
+        port which works; one which missed every sample across the whole
+        measurement, each with its own retries, has a port which is never
+        open -- a firewall, a daemon which is not running, a port constant
+        which has drifted -- and that disables the per-instance half of
+        the check on every run rather than on this one.
+        """
+        if not self.attempted:
+            return []
+        return sorted(name for name, seen in self.unread.items()
+                      if seen['samples'] == self.attempted)
+
+
+def busiest_shape(samples):
+    """The largest standing instance count sampled, or None if none was.
+
+    The largest, not the mean and not the last, because of which way the
+    load check's comparisons err: each pair is judged at its lowest
+    observed rate (see fixed_rate()), and the matching choice for the
+    shape the model is evaluated against is the largest, so that a
+    failure means a pair ran high against every reasonable reading of the
+    cluster rather than against the least generous one. The last sample
+    is the least generous of all -- it is taken after the suite has
+    tidied up, which is issue #4039.
+    """
+    return max(samples) if samples else None
+
+
+def enforceable(entry, shape_known):
+    """Whether exceeding this budget entry fails the build on this run.
+
+    enforced(), and additionally not when the entry has a per-instance
+    term and no shape sample survived: the shape term of the model is then
+    unknown rather than zero, and zero is the answer which fails a build
+    for load the model accounts for. An entry with no per-instance term
+    needs no shape and is enforced regardless.
+    """
+    return enforced(entry) and (
+        shape_known or not entry.get('per_instance_qps'))
 
 
 def activity_levels(rates_per_window):

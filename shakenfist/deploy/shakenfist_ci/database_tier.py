@@ -62,6 +62,14 @@ INSTANCE_WALK_CEILING_PER_GET = 2
 SCRAPE_ATTEMPTS = 3
 SCRAPE_RETRY_SECONDS = 2
 
+# The cluster's shape is scraped from every hypervisor at every window
+# boundary, so it gets a shorter budget than the scrapes above: five
+# independent samples of which the largest wins already absorb one that
+# failed, and a full budget against an unreachable node costs 21s per
+# sample -- minutes of merge queue per run for a node which is not coming
+# back.
+SHAPE_SCRAPE_ATTEMPTS = 2
+
 
 def scrape_database_counters(mesh_ip):
     url = 'http://%s:%d/metrics' % (mesh_ip, METRICS_PORT)
@@ -456,10 +464,33 @@ class DatabaseTierTestsMixin:
         windows = []
         elapsed_seconds = []
         restarted = []
+        # The cluster's shape is sampled at every boundary rather than
+        # once when the measurement is over. The suite creates and
+        # destroys instances throughout these four minutes and tidies up
+        # after itself, so a count taken at the end is the count of what
+        # nobody got round to deleting -- which on the run in #4039 was
+        # zero, on a cluster whose sidechannel daemon had plainly been
+        # monitoring instances for the whole measurement. Every
+        # per_instance_qps ceiling below is a multiple of this number, so
+        # reading it after the load has gone makes the model predict a
+        # cluster which was not there.
+        #
+        # Summed over every hypervisor, not only the database tier: an
+        # instance loads the sf-database tier from wherever it is placed.
+        # A sample that fails is dropped rather than failing the build,
+        # because five samples per run on every node would otherwise turn
+        # one refused connection into a red pull request; a node which
+        # never answers at all is a different matter, and is asserted on
+        # below. The roster is re-read for each sample for the reason
+        # lb.ShapeSampler gives.
+        shape = lb.ShapeSampler(SHAPE_SCRAPE_ATTEMPTS, SCRAPE_RETRY_SECONDS)
+
         counters, read_at = self._all_pairs(database_nodes)
+        shape.sample(nodes)
         for _ in range(lb.LOAD_WINDOW_COUNT):
             time.sleep(lb.LOAD_WINDOW_SECONDS)
             later, later_read_at = self._all_pairs(database_nodes)
+            shape.sample(self.system_client.get_nodes())
 
             # Divide by what was actually measured, not by what was
             # slept. See _all_pairs().
@@ -589,17 +620,28 @@ class DatabaseTierTestsMixin:
                    for e in budget['entries']}
         node_count = len(nodes)
 
-        # Powered on instances, not every instance. The per-instance
-        # coefficients were fitted against instances_active, which counts
-        # running libvirt domains, so a powered off instance contributes
-        # nothing to the model and must not contribute here either --
-        # counting it would raise every ceiling below by its coefficient
-        # for load it does not produce. power_state is the closest thing
-        # the API offers to that series; it is what the hypervisor last
-        # reported for the domain.
-        standing_instances = len(
-            [i for i in self.system_client.get_instances()
-             if i.get('power_state') == 'on'])
+        # The busiest shape seen while the load was being measured, and
+        # the reason the samples are taken at all five boundaries rather
+        # than once at the end. Why the busiest is in lb.busiest_shape().
+        #
+        # What this still cannot see is an instance which was created and
+        # deleted entirely inside one sixty second window. That costs
+        # this daemon a monitor start rather than a window of sweeps, so
+        # it belongs to the churn the base terms absorb (see the
+        # (GetInstanceAttributes, sidechannel) note in the budget) rather
+        # than to the per-instance term being evaluated here.
+        #
+        # None when not a single sample survived, across five attempts
+        # each with its own retries. Every pair whose budget has a
+        # per-instance term is then reported below instead of enforced --
+        # see lb.enforceable() -- unless some node answered none of them,
+        # which fails the run below. The unbudgeted half of this test
+        # needs no shape at all and still runs -- losing the detector for
+        # brand new polling loops because one metrics port refused a
+        # connection would be the worse trade.
+        busiest = shape.busiest()
+        shape_known = busiest is not None
+        standing_instances = busiest if shape_known else 0
         # Steady is not yet metronomic. A blob heavy test running at a
         # level rate for the whole measurement is steady too, which is how
         # the first version of this check came to report twelve pairs of
@@ -655,7 +697,7 @@ class DatabaseTierTestsMixin:
                        + defaults['tolerance_floor_qps'])
             if measured <= ceiling:
                 continue
-            if lb.enforced(entry):
+            if lb.enforceable(entry, shape_known):
                 over.append((key, measured, modelled, ceiling))
             else:
                 reported.append((key, measured, modelled, ceiling))
@@ -663,6 +705,13 @@ class DatabaseTierTestsMixin:
         summary = {
             'nodes': node_count,
             'standing_instances': standing_instances,
+            'standing_instances_per_sample': shape.samples,
+            'shape_samples_attempted': shape.attempted,
+            'shape_known': shape_known,
+            # Per node, how many of the samples it failed to answer, why
+            # the last one failed, and how stale its lastseen was then. The detail is what says why the
+            # shape is unknown rather than only that it is.
+            'shape_unread_nodes': shape.unread,
             'window_seconds': lb.LOAD_WINDOW_SECONDS,
             'unbudgeted_ceiling_qps': round(unbudgeted_ceiling, 3),
             'measured_seconds': elapsed_seconds,
@@ -690,6 +739,28 @@ class DatabaseTierTestsMixin:
         }
         self.addDetail('database_load', content.text_content(
             json.dumps(summary, indent=2, sort_keys=True)))
+
+        # Before either skip below, because it is true whatever they
+        # conclude. A node which failed a sample or two is tolerated above;
+        # one which answered none of five, each with its own retries, has a
+        # metrics port which is never open, and that turns off every
+        # per-instance ceiling on every run rather than on this one. Left
+        # to the fallback, the only evidence would be shape_known: false
+        # in the detail of a passing test.
+        never_read = shape.never_read()
+        self.assertEqual(
+            [], never_read,
+            'These hypervisors did not publish instances_active on port %d '
+            'in any of the %d samples taken during the measurement, so the '
+            'shape of this cluster is unknown and every per-instance budget '
+            'ceiling went unenforced. That is not a transient failure: '
+            'check that sf-resources is running there and that the port is '
+            'reachable from this node -- unless a node\'s '
+            'lastseen_age_seconds below is large, in which case the node '
+            'itself stopped checking in during the measurement and that is '
+            'the failure to chase. unread=%s'
+            % (lb.RESOURCES_METRICS_PORT, shape.attempted,
+               json.dumps(shape.unread, sort_keys=True)))
 
         # Both assertions below read the metronomic set, so both are
         # vacuous unless this run could tell metronomic from busy. Where it
@@ -737,5 +808,10 @@ class DatabaseTierTestsMixin:
             'model predicts for a cluster of this shape. Do not raise the '
             'budget to make this pass: either the load is a regression '
             'worth fixing, or the model has changed and that change '
-            'belongs in a commit which says so. summary=%s'
+            'belongs in a commit which says so. "A cluster of this shape" '
+            'is the busiest one seen while these rates were measured, not '
+            'whatever was left standing at the end -- '
+            'standing_instances_per_sample is every sample taken, one per '
+            'window boundary, and standing_instances is the largest of '
+            'them. summary=%s'
             % json.dumps(summary, sort_keys=True))
