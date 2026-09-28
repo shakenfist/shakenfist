@@ -901,14 +901,25 @@ is not a rerun of the first.
 
 1. **Settle the `absent` question in writing first**, per the open
    question above. Before the data.
-2. **Land #4337 before the second window opens**, or the second window
-   is the first window again. The extension is bounded to one by D37,
-   and spending it on the same instrument would spend it for nothing.
+2. **#4337 has landed** -- `62bb1ddeb`, merged 2026-09-27T19:10:31Z,
+   which adds `ensure_capacity_wait_trace()` and calls it from
+   `BaseTestCase.setUp()`. It opens the file `'a'`, so it creates
+   without ever truncating and concurrent stestr workers cannot lose a
+   sibling's line. The second window therefore starts at the first
+   `merge_group` run whose base contains that commit; identify it the
+   way sizing 4d identified the first window's start, rather than
+   assuming the next run after the merge carries it. This condition is
+   met and needs no further action -- it is recorded because the
+   extension is bounded to one by D37, and opening the second window
+   on the old instrument would spend it for nothing.
 3. **Count qualifying runs, not enumerated runs**, against D36
    condition 2. See *Gate thinness*.
 4. **Reconsider A2 and B3.** They are structurally pinned at 100%
-   under the current instrument and would remain so after #4337 unless
-   `empty` is admitted to the denominator. Reconsidering them is an
+   under the instrument this window was read with, and #4337 landing
+   does not by itself unpin them: D37 discards `empty` alongside
+   `absent`, so a zero-wait run that now writes an empty file is still
+   thrown out of the denominator. They stay pinned until `empty` is
+   admitted to it. Reconsidering them is an
    amendment to a pre-registered rule and must therefore happen before
    the second reading, alongside (1), and be recorded as a new decision
    rather than as a reinterpretation of D37.
