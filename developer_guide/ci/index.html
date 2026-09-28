@@ -15741,7 +15741,16 @@ that issue exempted only the three RPCs its body named, so the
 <code>GetNode</code> the iterator issues came back as issue 4028 -- which of the
 probe's pairs clears the check's activity-spread bar varies run to
 run, and on those runs <code>GetNode</code> cleared it alone.</p>
-<p>Those four <code>(operation, caller)</code> pairs are therefore listed in
+<p>The iterator also has a read of its own, above all of that per-node
+hydration: <code>Nodes</code> has no <code>_find</code> override, so both endpoints take
+<code>baseobject.py</code>'s default, which opens with one <code>GetObjectsByState</code> to
+fetch the uuid list the per-node reads then hydrate. That read is once
+per call rather than once per node, so it does not scale with cluster
+size and clears only the 0.25/s floor of the ceiling -- which only the
+one-node smoke topology meets. It failed there as issue 4359, the
+second omission of the same kind: the 4028 fix enumerated the reads
+downstream of the iterator and missed the iterator's own.</p>
+<p>Those five <code>(operation, caller)</code> pairs are therefore listed in
 <code>HARNESS_DRIVEN_PAIRS</code> in
 <code>shakenfist/deploy/shakenfist_ci/load_budget.py</code>, alongside the events
 reads the suite's own await helpers make. The budget file is
@@ -15753,11 +15762,13 @@ cluster's ceiling in proportion to its size.</p>
 <ul>
 <li><strong>The exemption costs coverage.</strong> CI can no longer see a <em>new</em>
   fixed-rate poll of node state made through sf-api, whatever its
-  rate. The blind spot is CI's alone -- none of the four pairs is
-  budgeted for the <code>api</code> caller, so the
+  rate, nor one which lists objects through an iterator with no
+  <code>_find</code> override -- <code>GetObjectsByState</code> reaches sf-api through every
+  such listing, not only the node roster. The blind spot is CI's alone
+  -- none of the five pairs is budgeted for the <code>api</code> caller, so the
   <code>ShakenFistUnbudgetedDatabasePolling</code> alert, which reads its
   exclusions from the budget file rather than from that set, still
-  watches all four at the unbudgeted ceiling on every real cluster.
+  watches all five at the unbudgeted ceiling on every real cluster.
   The pairs also stay visible in a run's <code>harness_driven</code> list rather
   than being dropped from the report.</li>
 <li><strong>Retiring the probe means trimming the exemption.</strong> It outlives
