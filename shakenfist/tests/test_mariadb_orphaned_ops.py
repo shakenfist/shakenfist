@@ -156,6 +156,71 @@ class OrphanedClusterOperationsTestCase(
             [], mariadb._direct_list_orphaned_cluster_operations(THRESHOLD))
 
     @mock.patch('shakenfist.mariadb._get_engine')
+    def test_a_phantom_state_row_is_not_reported(self, mock_get_engine):
+        # A state row whose cluster_operations row is gone is a
+        # phantom (the reconciliation sweep owns those), not an
+        # orphaned operation.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        states = mariadb._get_object_states_table()
+        with engine.connect() as conn:
+            conn.execute(sa.insert(states).values(
+                object_uuid=ORPHAN_UUID,
+                object_type='net_op',
+                state_value='queued',
+                update_time=100.0,
+                message=None))
+            conn.commit()
+
+        self.assertEqual(
+            [], mariadb._direct_list_orphaned_cluster_operations(THRESHOLD))
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_a_mismatched_state_row_type_is_not_reported(
+            self, mock_get_engine):
+        # The pairing between operation_type and the state row's
+        # object_type is part of the join: a state row of a different
+        # operation type sharing the uuid (a leaked phantom whose uuid
+        # was reused) must not stand in for the op's own state.
+        engine = self._build_engine()
+        mock_get_engine.return_value = engine
+        ops = mariadb._get_cluster_operations_table()
+        states = mariadb._get_object_states_table()
+        with engine.connect() as conn:
+            conn.execute(sa.insert(ops).values(
+                uuid=uuid.UUID(ORPHAN_UUID),
+                operation_type='net_op',
+                created_at=100.0,
+                network_uuid=uuid.UUID(NETWORK_UUID),
+                priority='user_facing',
+                metadata_json={'tasks': [TASK]}))
+            conn.execute(sa.insert(states).values(
+                object_uuid=ORPHAN_UUID,
+                object_type='imgcache_op',
+                state_value='queued',
+                update_time=100.0,
+                message=None))
+            conn.commit()
+
+        self.assertEqual(
+            [], mariadb._direct_list_orphaned_cluster_operations(THRESHOLD))
+
+    def test_uuid_transformation_sits_on_the_states_side(self):
+        # The join must render as cluster_operations.uuid =
+        # replace(object_states.object_uuid, ...), never as a
+        # transformation of cluster_operations.uuid: the transformed
+        # column cannot use an index, and with the expression on the
+        # cluster_operations side the once-a-minute sweep walked every
+        # cluster_operations row and routinely outlived its 30s gRPC
+        # deadline (issue 4355). _dashed_uuid_expr renders via SUBSTR,
+        # so its absence pins the direction.
+        engine = self._build_engine()
+        sql = str(mariadb._orphaned_cluster_operations_stmt(
+            THRESHOLD).compile(engine)).lower()
+        self.assertIn('replace(object_states.object_uuid', sql)
+        self.assertNotIn('substr', sql)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
     def test_orphans_come_back_oldest_first(self, mock_get_engine):
         engine = self._build_engine()
         mock_get_engine.return_value = engine
