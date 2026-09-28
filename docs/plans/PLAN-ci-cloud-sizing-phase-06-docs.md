@@ -644,6 +644,107 @@ Falsifiable, in order. Run them; do not read them.
     `python3 tools/check-plan-status.py` reports agreement.
 11. `pre-commit run --all-files` passes.
 
+## Outcome
+
+Every item below was run, not read. Ten of eleven pass outright; item 8's
+harvest half cannot pass yet because it depends on a push only the
+operator can make, and is recorded as outstanding rather than ticked.
+
+| Item | Command | Result |
+|---|---|---|
+| 1 | `ls -la docs/developer_guide/ci_cloud_sizing.md` | Exists (663 lines). |
+| 2 | The script under *The arithmetic, checked* extracted verbatim from the published page (`sed -n '169,195p' docs/developer_guide/ci_cloud_sizing.md`, fence lines stripped) and run as `python3 ledger_script.py ansible/ci-topology-slim-tier.yml ansible/ci-topology-slim-primary.yml` from a `shakenfist/actions` checkout at `main` (`87f4138`, fetched against `origin/main` first -- three commits behind, none touching the topology files) | `ansible/ci-topology-slim-tier.yml: ledger 24` / `ansible/ci-topology-slim-primary.yml: ledger 27`. Matches the page exactly. |
+| 3 | `grep -c 'MINIMUM_HYPERVISOR_LEDGER' docs/developer_guide/ci_cloud_sizing.md` | `2` (>= 1); both the term and `shakenfist/deploy/shakenfist_ci/sizing.py` are named. |
+| 4 | `grep -rn 'ledger' docs/developer_guide/ tools/ shakenfist/deploy/ AGENTS.md ARCHITECTURE.md docs/plans/PLAN-ci-cloud-sizing.md`, filtered to numeric figures | Every present-tense figure reads 24 (`slim-tier`) / 27 (`slim-primary`), including `MINIMUM_HYPERVISOR_LEDGER = 24` in `sizing.py` and the `(27 and 24 of ledger...)` comment in `test_nodes.py:154`. The plan's own "12" mentions (`:150`) are the Situation table's measurement-record prose about the pre-reshape baseline and #3907, which item 4 explicitly excludes; the table itself carries D7's annotation pointing at the new page. |
+| 5 | `python3 -c "import io,re; print(len(re.findall(r'defaults\s+to\s+gating', io.open('shakenfist/tests/test_headroom_gate_workflow_seams.py').read())))"`, then `.tox/py3/bin/python3 -m unittest shakenfist.tests.test_headroom_gate_workflow_seams -v` | grep returns `0` (was 1 before 6a). All 3 tests in the module pass. |
+| 6 | Read each `functional-tests.yml:NNN` reference in `tools/ci_headroom_harvest.py` (`:120` "440-495", `:178` "581") against the real file | `:120` names the merge-matrix block, which runs 438-495 (`uses:` at `:495`) -- the comment's range is accurate. `:178`'s `581` is exactly the `uses: shakenfist/actions/build-smoke-cluster@main` line in `node_lifecycle_collection`. Both correct; the two drifted references F7 found (`:151`, `:156`) no longer exist as line citations -- 6d restructured that text when it moved the Ansible modules bundle into `BUNDLE_TOPOLOGIES`. |
+| 7 | `grep -rn 'fork these topologies\|repositories fork' docs/ --include=*.md \| grep -v phase-06-docs` | Empty. |
+| 8 | See below. | Checkable half confirmed; harvest half outstanding. |
+| 9 | `gh issue view 4367 --repo shakenfist/shakenfist --json number,title,state,url`; `grep -n 4367` and the D5 blocker text in both `PLAN-ci-cloud-sizing.md` and this plan | Issue #4367 is open (*"CI: Node lifecycle and kerbside's cluster deploy have no headroom instrumentation"*). Its number appears in this plan's D4 and in the master plan's Future work (`:1677-1721`), which also carries a **Arm the headroom gate on a downstream or single-node cloud** entry naming all three of F5's blockers (`event=merge_group`, client-python's missing merge queue, `BUNDLE_TOPOLOGIES`'s shakenfist-specific keys). |
+| 10 | `docs/plans/index.md` row rewritten (below); `python3 tools/check-plan-status.py` | `Plan statuses, index arithmetic and phase links agree.` |
+| 11 | `pre-commit run --all-files` | Exit code 0. `stestr` reports 5205 tests passed, 0 failed; every named hook (`Check documentation links and anchors resolve`, `Check plan statuses and index arithmetic agree`, `Type check with mypy` and the rest) reports `Passed`. |
+
+**Item 8, in full.** The checkable half: imported `tools/ci_headroom_harvest.py`
+and confirmed `'bundle-shakenfist-full-ansible-modules' in BUNDLE_TOPOLOGIES`
+is `True` and `... in UNINSTRUMENTED_BUNDLES` is `False`. Ran the full
+`shakenfist.tests.test_ci_headroom_harvest` module (45 tests, including
+`BundleTableShapeTestCase` and `test_the_ansible_modules_bundle_is_now_instrumented`,
+both of which pin this table's shape) -- all pass.
+
+The harvest half is **not satisfiable from this worktree** and is **not
+ticked**: it requires a `tools/ci_headroom_harvest.py` run over a
+`merge_group` run of `functional-tests.yml` created *after*
+`shakenfist/actions`'s `smoke-cluster.yml` is widened per this plan's
+*Prepared changes*, and that diff has not been pushed -- only the operator
+can push that repository (phase 4's F7). Until it lands, the `Ansible
+modules` bundle is armed in `BUNDLE_TOPOLOGIES` but carries no series;
+`test_an_ansible_modules_bundle_with_no_traces_yet_is_recorded_absent`
+pins exactly that interim state (`series_present: false`, `absent_reason`
+naming the missing traces), which is `bundle_record()`'s designed
+handling of a probe that has not run yet, not a bug.
+
+**What will confirm the outstanding half:** after the operator pushes the
+prepared diff to `shakenfist/actions` and one `merge_group` run of
+`functional-tests.yml` completes, run
+`tools/ci_headroom_harvest.py --since <push time> --until <after that run>`
+and confirm it enumerates all five instrumented cluster bundles --
+`Debian 13 cluster`, `Ubuntu 24.04 cluster`, `Guests`, `Debian 13 tier`
+and `Ansible modules` -- with no `UnknownBundleError`, and that the
+`Ansible modules` record carries `series_present: true` rather than an
+`absent_reason`. Whoever pushes the diff owns confirming this; phase 7's
+audit should check it has been (or note that it still has not).
+
+### What phase 7 inherits
+
+* **The `shakenfist/actions` diff is prepared and unpushed.** It lives in
+  this plan's *Prepared changes* section, and widens three `if:`
+  conditions in `smoke-cluster.yml` (*Make the traces directory*, *Start
+  the cluster headroom probe*, *Collect the cluster headroom series...*)
+  so the `Ansible modules` job also runs the probe. Only the operator can
+  push `shakenfist/actions` (phase 4's F7). Until it lands, the `Ansible
+  modules` bundle is armed in `BUNDLE_TOPOLOGIES` but carries no series --
+  a case `test_an_ansible_modules_bundle_with_no_traces_yet_is_recorded_absent`
+  (added by 6d) exists specifically to pin.
+* **Two clouds remain uninstrumented.** `Node lifecycle`
+  (`functional-tests.yml:581`) and kerbside's `sf-e2e-functional.yml:104`
+  both reach a cluster through the `build-smoke-cluster` composite action
+  rather than the reusable workflow the probe steps live in, and are
+  tracked as [#4367](https://github.com/shakenfist/shakenfist/issues/4367).
+  D4 declined to fix this here because the composite action is consumed
+  at `@main` with no pin by every caller -- shakenfist's five call sites,
+  client-python's, kerbside's and the canary's -- so moving or duplicating
+  the probe steps into it would change how every one of them deploys, an
+  irreversible cross-repository act phase 5 already established does not
+  belong in a phase whose revert is a single `if:` condition.
+* **D5's three blockers to arming any new shape** are recorded as a
+  Future work entry in the master plan (`Arm the headroom gate on a
+  downstream or single-node cloud`): `list_runs()` hardcodes
+  `event=merge_group` (`tools/ci_headroom_harvest.py:421`), client-python
+  has no merge queue to supply `merge_group` runs even if that filter
+  moved (`functional-tests.yml:11-12`), and `BUNDLE_TOPOLOGIES` is keyed
+  on shakenfist's own artifact names, so `--repo` alone cannot point the
+  harvest at another repository's bundles.
+* **D6's open question is recorded, not answered.** `slim-primary` reads
+  OVERSIZED more often (25 of 30 job-runs) than `slim-tier`, the topology
+  phase 4 actually reshaped (5 of 10) -- phase 5 measured it and handed it
+  over. `docs/developer_guide/ci_cloud_sizing.md` now records the reading
+  and the harvest command that asks the question over a window, and says
+  what a shrink would need first (a prediction and a falsification
+  criterion). Nobody has acted on it.
+* **This phase's own merge commit is not in the master plan's `Merged`
+  cell for phase 6.** It reads `—` by design -- no commit inside this
+  phase's pull request can name its own merge SHA -- and phase 7's
+  planning must append it, the same after-the-fact repair phase 6's own
+  planning made for phase 5's third merge.
+* **The `shakenfist/actions` half of the audit runs elsewhere.** The
+  master plan's *Phase 7* section says the work is split across
+  repositories and "the audit of the half that landed elsewhere runs
+  against that repository's default branch, as part of the pull request
+  that lands it, and this phase cites that audit rather than re-running
+  it." This plan's `shakenfist/actions` diff is that half; once the
+  operator pushes it, phase 7 cites the resulting pull request's own
+  audit rather than re-auditing `smoke-cluster.yml` from this repository.
+
 ## Back brief
 
 **One gate, before any editing starts.** D2 moves 440 lines out of
