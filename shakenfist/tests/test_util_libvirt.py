@@ -41,6 +41,9 @@ class FakeLibvirtModule:
     VIR_DOMAIN_DISK_ERROR_UNSPEC = 1
     VIR_DOMAIN_DISK_ERROR_NO_SPACE = 2
 
+    VIR_CONNECT_LIST_DOMAINS_ACTIVE = 1
+    VIR_CONNECT_LIST_DOMAINS_INACTIVE = 2
+
 
 class FakeDomain:
     def __init__(self, memory_stats=None, block_info=None):
@@ -204,6 +207,80 @@ class UtilLibvirtActiveDomainIds(base.ShakenFistTestCase):
 
         self.assertEqual(1, lc.conn.listDomainsID.call_count)
         self.assertEqual(0, lc.conn.lookupByID.call_count)
+
+
+class FakeNamedDomain:
+    def __init__(self, name):
+        self._name = name
+
+    def name(self):
+        return self._name
+
+
+class UtilLibvirtSfDomains(base.ShakenFistTestCase):
+    def test_get_active_sf_domains_issues_one_call(self):
+        lc = _connection()
+        lc.conn = mock.Mock()
+        lc.conn.listAllDomains.return_value = []
+
+        list(lc.get_active_sf_domains())
+
+        lc.conn.listAllDomains.assert_called_once_with(
+            FakeLibvirtModule.VIR_CONNECT_LIST_DOMAINS_ACTIVE)
+        self.assertEqual(0, lc.conn.listDomainsID.call_count)
+        self.assertEqual(0, lc.conn.lookupByID.call_count)
+
+    def test_get_inactive_sf_domains_issues_one_call(self):
+        lc = _connection()
+        lc.conn = mock.Mock()
+        lc.conn.listAllDomains.return_value = []
+
+        list(lc.get_inactive_sf_domains())
+
+        lc.conn.listAllDomains.assert_called_once_with(
+            FakeLibvirtModule.VIR_CONNECT_LIST_DOMAINS_INACTIVE)
+        self.assertEqual(0, lc.conn.listDomainsID.call_count)
+        self.assertEqual(0, lc.conn.lookupByID.call_count)
+
+    def test_get_active_sf_domains_filters_foreign_names(self):
+        lc = _connection()
+        lc.conn = mock.Mock()
+        lc.conn.listAllDomains.return_value = [
+            FakeNamedDomain('sf:one'),
+            FakeNamedDomain('apache2'),
+            FakeNamedDomain('sf:two'),
+        ]
+
+        self.assertEqual(
+            ['sf:one', 'sf:two'],
+            [d.name() for d in lc.get_active_sf_domains()])
+
+    def test_get_inactive_sf_domains_filters_foreign_names(self):
+        lc = _connection()
+        lc.conn = mock.Mock()
+        lc.conn.listAllDomains.return_value = [
+            FakeNamedDomain('sf:one'),
+            FakeNamedDomain('apache2'),
+            FakeNamedDomain('sf:two'),
+        ]
+
+        self.assertEqual(
+            ['sf:one', 'sf:two'],
+            [d.name() for d in lc.get_inactive_sf_domains()])
+
+    def test_get_active_sf_domains_empty(self):
+        lc = _connection()
+        lc.conn = mock.Mock()
+        lc.conn.listAllDomains.return_value = []
+
+        self.assertEqual([], list(lc.get_active_sf_domains()))
+
+    def test_get_inactive_sf_domains_empty(self):
+        lc = _connection()
+        lc.conn = mock.Mock()
+        lc.conn.listAllDomains.return_value = []
+
+        self.assertEqual([], list(lc.get_inactive_sf_domains()))
 
 
 class UtilLibvirtStatistics(base.ShakenFistTestCase):

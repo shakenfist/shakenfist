@@ -214,6 +214,24 @@ class LibvirtConnection():
         """
         return set(self.conn.listDomainsID())
 
+    def _list_sf_domains(self, flags: int) -> Iterator[Any]:
+        """One listAllDomains() call, filtered to Shaken Fist domains."""
+        for domain in self.conn.listAllDomains(flags):
+            if domain.name().startswith('sf:'):
+                yield domain
+
+    def get_active_sf_domains(self) -> Iterator[Any]:
+        """Shaken Fist domains libvirt considers active: running, paused or
+        PM suspended. A powered off domain is not in this list."""
+        return self._list_sf_domains(
+            self.libvirt.VIR_CONNECT_LIST_DOMAINS_ACTIVE)
+
+    def get_inactive_sf_domains(self) -> Iterator[Any]:
+        """Shaken Fist domains which are defined but not running. Our
+        domains are persistent, so a powered off instance is here."""
+        return self._list_sf_domains(
+            self.libvirt.VIR_CONNECT_LIST_DOMAINS_INACTIVE)
+
     def get_all_domains(self) -> Iterator[Any]:
         # Active VMs have an ID. Active means running in libvirt
         # land.
