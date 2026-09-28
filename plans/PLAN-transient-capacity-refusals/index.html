@@ -15225,7 +15225,31 @@ of 6 each and <code>sf2</code> 12, which is the smallest shape in its table
 that changes the number that binds. The sizing plan is updated to
 say so.</p>
 <h3 id="8-should-the-server-queue-a-create-that-does-not-fit">8. Should the server queue a create that does not fit?<a class="headerlink" href="#8-should-the-server-queue-a-create-that-does-not-fit" title="Permanent link">&para;</a></h3>
-<p><strong>Decide in phase 5, from phase 2's wait data.</strong> The machinery
+<p><strong>Not answered yet.</strong> Phase 5 took its first reading, over 26
+qualifying <code>merge_group</code> runs on the reshaped <code>slim-tier</code>, and the
+window was <strong>not readable</strong>: 96 of its 104 instrumented bundles carry
+no capacity-wait trace at all, an unknown fraction of <strong>92.3%</strong>
+against the 25% ceiling phase 5's pre-registered rule sets for
+calling a window readable. The cause is not lost plumbing -- every
+absent bundle carries a fully populated <code>bundle/traces/</code> -- but that
+the trace file is created on first write and so cannot express
+"nothing was refused"
+(<a href="https://github.com/shakenfist/shakenfist/issues/4337">#4337</a>). That
+is the rule's <em>unreadable</em> case, which is deliberately not one of its
+three outcomes and deliberately does not resolve to Abandon, so the
+phase <strong>extends its window once</strong> rather than deciding on the eight
+readable units. The full reading, the arithmetic for all three
+outcome clauses under both candidate denominators, and what the second
+reading owes before it is taken are in
+<a href="../PLAN-transient-capacity-refusals-phase-05-queue-decision/">phase 5's Outcome</a>.</p>
+<p>What the eight readable waits say, held loosely because they are 7.7%
+of the window: waits from 0.036 s to 270.858 s against the suite's
+420 s deadline, none of which reached it; all eight pinned creates,
+which means the fairness assertion below is still unevidenced rather
+than confirmed; seven bound on <code>cpus</code>. On the reshaped <code>slim-tier</code>
+alone the longest was 180.490 s, below the 210 s line the rule draws.
+None of that decides anything.</p>
+<p><strong>The arguments, which the reading did not disturb.</strong> The machinery
 exists -- <code>BaseClusterOperation.defer_with_backoff()</code> already
 re-enqueues with a delay for artifact fetches and network
 operations -- and a <code>202</code> with the instance held in <code>initial</code> (or a
@@ -15234,15 +15258,15 @@ passes looks like a contained change. Against it: it is exactly the
 "hold-until-fittable" that scheduler-reservations D8 rejected as
 queue-state surface the project does not want; it has no fairness
 model (a waiting 4-vCPU create starves behind a stream of 1-vCPU
-ones, and a pinned create starves worst); waiting instances hold
-IPAM allocations, so a CPU shortage can become an address shortage;
-and the client's create-and-await path has a ceiling that bounds any
-useful deadline. If phase 2 shows the suite waits are
-short and few once the topology is right, the answer is no and the
-phase closes as Abandoned with the numbers. If they are long or
-many, the phase designs the queue -- FIFO by request time, pinned
-placements admitted against their node only -- and reverses D8 in
-writing.</p>
+ones, and a pinned create starves worst -- an assertion no data
+supports yet, because every refusal phase 5 could read was pinned and
+there was no comparison arm); waiting instances hold IPAM
+allocations, so a CPU shortage can become an address shortage; and
+the client's create-and-await path has a ceiling that bounds any
+useful deadline. Which way those arguments fall is decided by phase
+5's numeric rule on the second reading, not by "short and few" versus
+"long or many" -- that informal test is what the phase plan replaced
+with thresholds fixed before the data existed.</p>
 <p>Phase 5's survey corrected four of the sentences above, and the
 corrections move the arithmetic rather than the prose. See
 <a href="../PLAN-transient-capacity-refusals-phase-05-queue-decision/">its <em>What the survey found</em></a>
@@ -15645,11 +15669,15 @@ fairness questions are the expensive kind.</p>
 which fixes the numeric decision rule <em>before</em> the data is read,
 because "small" and "near its deadline" above are not numbers and a
 phase which reads twenty runs and then decides what those words meant
-is narrating a decision rather than taking one. That plan's gate is
-closed as written: the sizing plan's phase 4 reshape has not been
-applied to <code>shakenfist/actions</code>, whose <code>ci-topology-slim-tier.yml</code>
-still carries <code>cpu: 4</code> on all three nodes, so the data available today
-describes the cloud the reshape exists to replace.</p>
+is narrating a decision rather than taking one.</p>
+<p>The gate has since opened -- the sizing plan's reshape landed as
+<code>shakenfist/actions#88</code> (<code>f78576e</code>) and its step 4d reported -- and the
+first reading has been taken. It was <strong>unreadable</strong>: 92.3% of the
+window's instrumented bundles carry no capacity-wait trace, because the
+trace cannot express "nothing was refused"
+(<a href="https://github.com/shakenfist/shakenfist/issues/4337">#4337</a>). The
+phase therefore extends its window once, remains <code>In progress</code>, and has
+decided nothing. See open question 8 above and that plan's Outcome.</p>
 <h3 id="phase-6-documentation-and-close-out">Phase 6 -- Documentation and close-out<a class="headerlink" href="#phase-6-documentation-and-close-out" title="Permanent link">&para;</a></h3>
 <p>Document the transient-refusal contract in
 <code>docs/operator_guide/scheduler.md</code> and the API reference, the suite

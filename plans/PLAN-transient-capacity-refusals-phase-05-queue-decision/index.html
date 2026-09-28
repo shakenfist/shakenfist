@@ -14818,6 +14818,78 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#outcome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Outcome">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-distribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The distribution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-eight-readable-waits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The eight readable waits
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-rules-arithmetic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The rule's arithmetic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#three-objections-to-d37-recorded-rather-than-acted-on" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three objections to D37, recorded rather than acted on
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14975,21 +15047,30 @@ one it is told nothing about. The failure would move from a surface
 that phase 4 just made machine-readable to one that is still prose.</p>
 <h3 id="f5-the-suite-already-waits-client-side-for-420-s">F5 -- The suite already waits, client side, for 420 s<a class="headerlink" href="#f5-the-suite-already-waits-client-side-for-420-s" title="Permanent link">&para;</a></h3>
 <p><code>CLUSTER_HEADROOM_WAIT = 420</code> at
-<code>shakenfist/deploy/shakenfist_ci/base.py:52</code>, polling every
-<code>CAPACITY_POLL_INTERVAL = 10</code> s (<code>:58</code>) with
+<code>shakenfist/deploy/shakenfist_ci/base.py:58</code>, polling every
+<code>CAPACITY_POLL_INTERVAL = 10</code> s (<code>:64</code>) with
 <code>MAX_CREATE_ATTEMPTS = CLUSTER_HEADROOM_WAIT // CAPACITY_POLL_INTERVAL + 2</code>
-(<code>:68</code>).</p>
+(<code>:74</code>).</p>
 <p>This is the fact that makes the question a real question rather than a
 formality. The waiting the queue would do is waiting the suite already
 does, in the caller, where D8 said deferral belongs. A server-side
 queue does not add the wait; it moves it, and for the duration of the
 move both exist.</p>
 <h3 id="f6-the-reading-tool-is-built-and-needs-no-new-work">F6 -- The reading tool is built and needs no new work<a class="headerlink" href="#f6-the-reading-tool-is-built-and-needs-no-new-work" title="Permanent link">&para;</a></h3>
-<p><code>tools/ci_headroom_report.py --waits &lt;file&gt;</code> (<code>:2648</code>) reads
-<code>/srv/ci/traces/instance-waits.jsonl</code> from a downloaded bundle and
-prints total seconds waited, the number of waits, the longest wait and
-its test, and the informed/degraded split. <code>docs/developer_guide/ci.md:331</code>
-documents it.</p>
+<p><code>tools/ci_headroom_report.py --waits &lt;file&gt;</code> (<code>:2910</code>) reads the
+capacity-wait trace from a downloaded bundle and prints total seconds
+waited, the number of waits, the longest wait and its test, and the
+informed/degraded split. <code>docs/developer_guide/ci.md:331</code> documents it.</p>
+<p>Two mechanical corrections, both found while step 5c tried to run this
+invocation, and both recorded here rather than fixed in the tool
+because no code change is in scope (see the Outcome, and #4337).
+<code>--series</code> is <code>required=True</code> (<code>:2879</code>), so <code>--waits</code> cannot be passed
+on its own: a reading of the trace must also hand the tool that
+bundle's <code>headroom.jsonl</code>. And the trace's path <em>inside a bundle</em> is
+<code>bundle/traces/instance-waits.jsonl</code>; <code>/srv/ci/traces/instance-waits.jsonl</code>
+-- which the <code>--waits</code> help text and an earlier draft of this plan both
+gave as the in-bundle path -- is where the suite writes it on the CI
+node, before the "Gather logs" step relocates it.</p>
 <p>Two properties of it matter to this phase's rule. An absent or empty
 file reports as <strong>unknown, never as zero</strong> -- so a run that never
 collected the trace cannot be silently counted as a run with no waits.
@@ -15052,7 +15133,7 @@ reached is a failed run and the margin here is smaller than the totals
 suggest."</p>
 <p>The rule, fixed here:</p>
 <p><strong>Denominator.</strong> <code>CLUSTER_HEADROOM_WAIT</code>, 420 s
-(<code>shakenfist_ci/base.py:52</code>). If phase 6 or a later change moves that
+(<code>shakenfist_ci/base.py:58</code>). If phase 6 or a later change moves that
 constant, the thresholds move with it and are re-expressed as
 fractions, not frozen as seconds.</p>
 <p><strong>Unit of observation.</strong> One <code>merge_group</code> run of a topology that
@@ -15225,7 +15306,7 @@ that registers this phase, so they are not a step here.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td><strong>Gather (gated behind 5b).</strong> For each qualifying <code>merge_group</code> run on the reshaped <code>slim-tier</code>, download the bundle and run <code>tools/ci_headroom_report.py --waits &lt;bundle&gt;/srv/ci/traces/instance-waits.jsonl</code>. Record per run: the number of waits, the total, the longest wait and its test id, the informed/degraded split, the <code>binding_dimension</code> of each wait, and whether the create was pinned (<code>node</code> set). A run whose trace is absent, empty or unparseable is recorded as <strong>unknown</strong> and excluded from the rule's denominator (F6) -- the tool already distinguishes these from zero, do not collapse them. Do <strong>not</strong> sum <code>attempt_number</code>; it is a 1-indexed position, not a count. Produce a table and the raw per-wait records, and nothing else: this step does not interpret.</td>
+<td><strong>Gather (gated behind 5b).</strong> For each qualifying <code>merge_group</code> run on the reshaped <code>slim-tier</code>, download the bundle and read <code>bundle/traces/instance-waits.jsonl</code> from it with <code>tools/ci_headroom_report.py --series bundle/traces/headroom.jsonl --waits bundle/traces/instance-waits.jsonl</code> -- <code>--series</code> is a required argument, so <code>--waits</code> alone cannot run, and inside a bundle the trace is at <code>bundle/traces/</code>, not at the <code>/srv/ci/traces/</code> path the tool's own help text gives (F6). Record per run: the number of waits, the total, the longest wait and its test id, the informed/degraded split, the <code>binding_dimension</code> of each wait, and whether the create was pinned (<code>node</code> set). A run whose trace is absent, empty or unparseable is recorded as <strong>unknown</strong> and excluded from the rule's denominator (F6) -- the tool already distinguishes these from zero, do not collapse them. Do <strong>not</strong> sum <code>attempt_number</code>; it is a 1-indexed position, not a count. Produce a table and the raw per-wait records, and nothing else: this step does not interpret.</td>
 </tr>
 <tr>
 <td>5d</td>
@@ -15353,6 +15434,828 @@ reconcile pass stays behind <code>cluster_stable()</code>; the <code>409</code> 
 refusal is never retried. No step in this phase touches any of them --
 the phase edits plan documents only -- and that is itself worth
 stating so a sub-agent does not improve one in passing.</p>
+<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
+<p><strong>The window is not readable, and the phase extends it -- once.</strong> This
+section is step 5e.</p>
+<p>96 of 104 qualifying units carry no capacity-wait trace at all. The
+unknown fraction is <strong>92.3%</strong> against D37's ceiling of 25%, so D37's
+readability gate fires before any of the three outcome clauses are
+consulted. That is the <em>unreadable</em> case, which D37 states explicitly
+is <strong>not one of the three outcomes</strong> and explicitly does <strong>not</strong>
+resolve to Abandon.</p>
+<p>Therefore:</p>
+<ul>
+<li><strong>Open question 8 is not answered.</strong> The phase stays <code>In progress</code> in
+  the master plan's Execution table and in <code>docs/plans/index.md</code>, whose
+  arithmetic remains <code>4 of 7</code>. It is neither <code>Abandoned</code> nor
+  <code>Complete</code>.</li>
+<li><strong>Nothing was designed</strong> (D42), and <strong>no code changed</strong> -- not even
+  the instrument defect this reading found, which is filed as
+  <a href="https://github.com/shakenfist/shakenfist/issues/4337">#4337</a> and is
+  deliberately outside this phase's scope.</li>
+<li><strong>scheduler-reservations D8 is untouched.</strong> Reversing it is a
+  Build-only action, and this is not a Build.</li>
+</ul>
+<h3 id="the-window">The window<a class="headerlink" href="#the-window" title="Permanent link">&para;</a></h3>
+<p>45 <code>merge_group</code> runs of <code>Functional tests</code>, from
+2026-09-19T22:00:54Z -- the first run on the reshaped <code>slim-tier</code>, per
+the sizing plan's step 4d -- to 2026-09-25T08:12:01Z.</p>
+<p>19 of them ran no topology at all (17 with no artifacts, 2 with
+artifacts but no instrumented cluster bundle) and are excluded from the
+qualifying set rather than counted as unknown: a run that never ran the
+suite is not a run whose trace went missing.</p>
+<p>That leaves <strong>26 runs x 4 instrumented bundles = 104 qualifying
+units</strong>. The unit is the <em>bundle</em>, not the <code>(run, topology)</code> pair,
+because three of the four instrumented jobs run <code>slim-primary</code> and one
+runs <code>slim-tier</code> (<code>tools/ci_headroom_harvest.py:133</code>) -- so a run
+contributes four observations, not two.</p>
+<h3 id="the-distribution">The distribution<a class="headerlink" href="#the-distribution" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Units</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>absent</code> -- no trace file in the bundle</td>
+<td>96</td>
+</tr>
+<tr>
+<td><code>read</code></td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>empty</code></td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>unparseable</code></td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Unknown fraction 96/104 = 92.3%.</strong> The gate is 25%. Every
+alternative scoping is also far past it, so the finding does not turn
+on how the denominator is drawn:</p>
+<table>
+<thead>
+<tr>
+<th>Scoping</th>
+<th>Unknown</th>
+<th>Total</th>
+<th>Fraction</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Qualifying bundles (the unit D37 reads)</td>
+<td>96</td>
+<td>104</td>
+<td>92.3%</td>
+</tr>
+<tr>
+<td><code>slim-tier</code> bundles alone</td>
+<td>23</td>
+<td>26</td>
+<td>88.5%</td>
+</tr>
+<tr>
+<td><code>slim-primary</code> bundles alone</td>
+<td>73</td>
+<td>78</td>
+<td>93.6%</td>
+</tr>
+<tr>
+<td>Pooled per <code>(run, topology)</code></td>
+<td>44</td>
+<td>52</td>
+<td>84.6%</td>
+</tr>
+<tr>
+<td>Counting the 19 no-topology runs as unknown</td>
+<td>115</td>
+<td>123</td>
+<td>93.5%</td>
+</tr>
+</tbody>
+</table>
+<p>Per qualifying run, with the bundle-level census stated as counts
+because 104 rows is not a table anyone reads. <code>Waits</code> and the two
+second columns are over that run's readable bundles only; <code>longest</code> is
+the largest single wait anywhere in the run.</p>
+<table>
+<thead>
+<tr>
+<th>Run</th>
+<th>Started</th>
+<th>Read</th>
+<th>Absent</th>
+<th>Readable topologies</th>
+<th>Waits</th>
+<th>Total s</th>
+<th>Longest s</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35472090760">35472090760</a></td>
+<td>2026-09-19 22:00</td>
+<td>1</td>
+<td>3</td>
+<td>tier</td>
+<td>1</td>
+<td>10.163</td>
+<td>10.163</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35478084378">35478084378</a></td>
+<td>2026-09-20 00:10</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35482487953">35482487953</a></td>
+<td>2026-09-20 01:51</td>
+<td>2</td>
+<td>2</td>
+<td>primary, tier</td>
+<td>2</td>
+<td>180.526</td>
+<td>180.490</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35485863474">35485863474</a></td>
+<td>2026-09-20 03:09</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35490705886">35490705886</a></td>
+<td>2026-09-20 05:03</td>
+<td>1</td>
+<td>3</td>
+<td>primary</td>
+<td>1</td>
+<td>50.210</td>
+<td>50.210</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35495432148">35495432148</a></td>
+<td>2026-09-20 06:54</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35533932764">35533932764</a></td>
+<td>2026-09-20 19:56</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35539199464">35539199464</a></td>
+<td>2026-09-20 21:35</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35547540638">35547540638</a></td>
+<td>2026-09-21 00:23</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35554184855">35554184855</a></td>
+<td>2026-09-21 02:26</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35560502830">35560502830</a></td>
+<td>2026-09-21 04:18</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35570212416">35570212416</a></td>
+<td>2026-09-21 06:50</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35580135033">35580135033</a></td>
+<td>2026-09-21 08:52</td>
+<td>1</td>
+<td>3</td>
+<td>primary</td>
+<td>1</td>
+<td>10.079</td>
+<td>10.079</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35666222479">35666222479</a></td>
+<td>2026-09-21 23:09</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35677335839">35677335839</a></td>
+<td>2026-09-22 01:51</td>
+<td>2</td>
+<td>2</td>
+<td>primary, tier</td>
+<td>2</td>
+<td>361.145</td>
+<td>270.858</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35713308961">35713308961</a></td>
+<td>2026-09-22 09:57</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35781045381">35781045381</a></td>
+<td>2026-09-22 20:33</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35792467388">35792467388</a></td>
+<td>2026-09-22 22:27</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35804030364">35804030364</a></td>
+<td>2026-09-23 00:54</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35851169069">35851169069</a></td>
+<td>2026-09-23 10:51</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35940203974">35940203974</a></td>
+<td>2026-09-24 00:50</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35946925675">35946925675</a></td>
+<td>2026-09-24 02:21</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/35954362019">35954362019</a></td>
+<td>2026-09-24 04:08</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/36048955931">36048955931</a></td>
+<td>2026-09-24 19:33</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/36076487106">36076487106</a></td>
+<td>2026-09-25 00:12</td>
+<td>0</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://github.com/shakenfist/shakenfist/actions/runs/36084308218">36084308218</a></td>
+<td>2026-09-25 01:58</td>
+<td>1</td>
+<td>3</td>
+<td>primary</td>
+<td>1</td>
+<td>120.408</td>
+<td>120.408</td>
+</tr>
+</tbody>
+</table>
+<p>Twenty of the 26 runs produced no readable bundle at all.</p>
+<h3 id="the-eight-readable-waits">The eight readable waits<a class="headerlink" href="#the-eight-readable-waits" title="Permanent link">&para;</a></h3>
+<p>Every readable unit contains exactly <strong>one</strong> wait, so its total equals
+its longest. <code>attempt_number</code> is 1 for all eight and is not summed
+(F6). The mode split is <strong>8 informed, 0 degraded, 0 other</strong>. The
+<code>binding_dimension</code> census is <strong><code>cpus</code> x 7, <code>null</code> x 1</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Longest s</th>
+<th>% of 420 s</th>
+<th>Topology</th>
+<th>Test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>270.858</td>
+<td>64.5%</td>
+<td>slim-primary</td>
+<td><code>test_lifecycle_reboot_powered_off</code></td>
+</tr>
+<tr>
+<td>180.490</td>
+<td>43.0%</td>
+<td>slim-tier</td>
+<td><code>test_vanished_source_server_instance</code></td>
+</tr>
+<tr>
+<td>120.408</td>
+<td>28.7%</td>
+<td>slim-primary</td>
+<td><code>test_vanished_source_server_instance</code></td>
+</tr>
+<tr>
+<td>90.287</td>
+<td>21.5%</td>
+<td>slim-tier</td>
+<td><code>test_network_plumbing_lifecycle</code></td>
+</tr>
+<tr>
+<td>50.210</td>
+<td>12.0%</td>
+<td>slim-primary</td>
+<td><code>test_vanished_source_server_instance</code></td>
+</tr>
+<tr>
+<td>10.163</td>
+<td>2.4%</td>
+<td>slim-tier</td>
+<td><code>test_network_plumbing_lifecycle</code></td>
+</tr>
+<tr>
+<td>10.079</td>
+<td>2.4%</td>
+<td>slim-primary</td>
+<td><code>test_vanished_source_server_instance</code></td>
+</tr>
+<tr>
+<td>0.036</td>
+<td>0.0%</td>
+<td>slim-primary</td>
+<td><code>test_vanished_source_server_instance</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-rules-arithmetic">The rule's arithmetic<a class="headerlink" href="#the-rules-arithmetic" title="Permanent link">&para;</a></h3>
+<p>Recorded because D37 requires it and because the Definition of done
+checks it -- <strong>not</strong> because it selected the outcome. It did not: the
+readability gate fires first, and an outcome read off eight units out
+of 104 would be exactly the "deciding from runs that never reported"
+that D37 names as the worst available result. Computed on the 8
+readable units, denominator <code>CLUSTER_HEADROOM_WAIT</code> = 420 s.</p>
+<p><strong>Abandon</strong> needs all three of its clauses:</p>
+<table>
+<thead>
+<tr>
+<th>Clause</th>
+<th>Threshold</th>
+<th>Observed</th>
+<th>Holds?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A1</td>
+<td>no single wait reaches 210 s</td>
+<td>max 270.858 s</td>
+<td><strong>no</strong></td>
+</tr>
+<tr>
+<td>A2</td>
+<td>fewer than 25% of qualifying runs record any wait</td>
+<td>8/8 = 100%</td>
+<td><strong>no</strong></td>
+</tr>
+<tr>
+<td>A3</td>
+<td>no wait reached the deadline</td>
+<td>0 of 8 reached 420 s</td>
+<td>yes</td>
+</tr>
+</tbody>
+</table>
+<p>Two of three fail, so Abandon is <strong>rejected</strong>.</p>
+<p><strong>Build</strong> needs any one of its clauses:</p>
+<table>
+<thead>
+<tr>
+<th>Clause</th>
+<th>Threshold</th>
+<th>Observed</th>
+<th>Fires?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>B1</td>
+<td>a wait reached the deadline</td>
+<td>0 of 8</td>
+<td>no</td>
+</tr>
+<tr>
+<td>B2</td>
+<td>longest &gt; 210 s in more than 10% of runs</td>
+<td>1/8 = 12.5%</td>
+<td><strong>yes</strong></td>
+</tr>
+<tr>
+<td>B3</td>
+<td>more than 50% of runs record any wait</td>
+<td>8/8 = 100%</td>
+<td><strong>yes</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Two clauses fire, so on the readable set alone Build <strong>would be
+selected</strong>.</p>
+<p><code>slim-tier</code> alone -- the topology the reshape was for, 3 readable units
+-- reads differently and is worth writing down: A1 <strong>holds</strong> (max
+180.490 s &lt; 210 s), A2 fails, A3 holds; B1 no, B2 no (0/3), B3 yes. On
+the reshaped topology the longest observed wait is <em>below</em> the 210 s
+line.</p>
+<h3 id="three-objections-to-d37-recorded-rather-than-acted-on">Three objections to D37, recorded rather than acted on<a class="headerlink" href="#three-objections-to-d37-recorded-rather-than-acted-on" title="Permanent link">&para;</a></h3>
+<p>D37 instructs 5d to apply the rule even over its own objection and to
+record the objection instead of acting on it. There are three, and they
+are one defect wearing three faces.</p>
+<p>The mechanism, verified directly: the trace is opened <code>'a'</code>
+(<code>shakenfist/deploy/shakenfist_ci/base.py:482</code>) and so is created on
+first write. A unit that <em>has</em> a trace file therefore necessarily
+contains at least one wait. D37 excludes unknowns from the denominator,
+so "qualifying runs" in A2 and B3 means the <em>readable</em> set -- the set
+in which the wait count is guaranteed non-zero. Hence:</p>
+<ol>
+<li><strong>A2 is structurally unsatisfiable.</strong> "Fewer than 25% of qualifying
+   runs record any wait" is permanently 100% and can never be below
+   25%. Abandon is unreachable under this instrument no matter how
+   quiet the cluster is.</li>
+<li><strong>B3 is the same artefact with its sign flipped.</strong> "More than 50% of
+   qualifying runs record any wait" is permanently 100% &gt; 50%, so Build
+   fires on any readable window whatever it contains. Taken with (1),
+   D37 can only ever return Build or unreadable. It has no path to
+   Abandon at all, which sits badly against D38's argument that the
+   burden of proof rests on building.</li>
+<li><strong>The readability gate collides with the same defect.</strong> A quiet
+   cluster produces absent traces; absent reads as unknown; unknowns
+   trip the 25% gate. So quiet and broken are indistinguishable <em>in
+   aggregate</em>, not merely per record -- and the quieter the cluster,
+   the more certainly the window is declared unreadable.</li>
+</ol>
+<p><strong>The outcome is robust to the defect.</strong> Under the alternative
+denominator -- all 104 qualifying units, absent counted as a run with
+no wait -- A1 is still false (max 270.858 s), A2 becomes true
+(8/104 = 7.7% &lt; 25%) and A3 true, so <strong>Abandon is still rejected</strong>;
+B1 false, B2 = 1/104 = 0.96% (not &gt; 10%), B3 = 7.7% (not &gt; 50%), so
+<strong>Build is rejected</strong>. The data fall between the two, and between is
+D37's middle ground, which selects <strong>Extend</strong>. Both readings extend.</p>
+<p>They differ only in what a <em>second</em> reading does: the middle ground
+resolves to Abandon on the second reading, and the unreadable case
+explicitly does not. <strong>That question must be settled before the second
+reading is taken, and it is deliberately left open here.</strong> Amending a
+pre-registered rule after seeing the data is the exact failure
+pre-registration exists to prevent, so this section states the question
+and does not answer it:</p>
+<blockquote>
+<p><strong>Open for the second reading.</strong> Is <code>absent</code> to be counted as
+<code>unknown</code> (D37 as written), or as an observation of zero waits once</p>
+<h1 id="4337-makes-zero-expressible-the-two-give-the-same-answer-today-and">4337 makes zero expressible? The two give the same answer today and<a class="headerlink" href="#4337-makes-zero-expressible-the-two-give-the-same-answer-today-and" title="Permanent link">&para;</a></h1>
+<p>different answers on the second reading. Settle it, in writing,
+<em>before</em> the second window's data is looked at.</p>
+</blockquote>
+<h3 id="the-fairness-input-d37-requires-it-whatever-the-outcome">The fairness input (D37 requires it whatever the outcome)<a class="headerlink" href="#the-fairness-input-d37-requires-it-whatever-the-outcome" title="Permanent link">&para;</a></h3>
+<p>All 8 readable waits were <strong>pinned</strong> creates -- <code>pinned_to</code> set from
+the test's <code>force_placement</code>. <strong>Zero unpinned.</strong> The single wait longer
+than 210 s (270.858 s, <code>test_lifecycle_reboot_powered_off</code>) was pinned,
+so the pinned-versus-unpinned split above 210 s is <strong>1 pinned, 0
+unpinned</strong>.</p>
+<p>The absence is real rather than an artefact of the instrument:
+<code>pinned_to</code> is set unconditionally from <code>force_placement</code>
+(<code>base.py:398</code>) and <code>_record_capacity_wait()</code> is called unconditionally
+(<code>:405</code>), so an unpinned refusal would have been recorded had one
+occurred.</p>
+<p>But with no comparison arm there is nothing to compare against. These
+data can neither support nor refute open question 8's assertion that "a
+pinned create starves worst": <strong>the assertion remains unevidenced, and
+this window could not test it.</strong> A window in which every observed
+refusal is pinned tells you what the suite does, not what the scheduler
+prefers.</p>
+<h3 id="the-diagnosis-is-narrower-than-d37-predicted">The diagnosis is narrower than D37 predicted<a class="headerlink" href="#the-diagnosis-is-narrower-than-d37-predicted" title="Permanent link">&para;</a></h3>
+<p>D37 says the unreadable case means "the trace is not reaching the
+bundles reliably". That prediction is <strong>wrong</strong>, and the correction
+matters because it changes what the extension can achieve.</p>
+<p>The trace <em>is</em> reaching them. Every absent bundle carries a fully
+populated <code>bundle/traces/</code> -- <code>headroom.jsonl</code>, <code>headroom-census.json</code>,
+<code>headroom-label</code>, <code>headroom-probe.log</code>, <code>headroom-start</code> and the
+per-test JSON files -- and only <code>instance-waits.jsonl</code> is missing. That
+is exactly the signature create-on-first-write predicts for a run in
+which nothing was refused. The eight readable units are spread across
+the whole window, from its first run to its last but one, so the
+<code>shakenfist/actions</code> collection step demonstrably worked throughout.</p>
+<p>The real diagnosis: <strong>the instrument cannot express zero.</strong> An absent
+file conflates "nothing was refused", "the component ref predates the
+wrapper" and "every write failed", and a consumer reading many bundles
+cannot tell them apart.</p>
+<p><strong>So extending the window cannot, on its own, resolve the
+unreadability.</strong> The cause is structural, not sampling: twenty more
+runs of this instrument produce the same ~90% absent rate. This is
+filed as
+<a href="https://github.com/shakenfist/shakenfist/issues/4337">#4337</a>, which
+also names the fix -- create the file empty at suite start-up, so
+<code>empty</code> means zero and <code>absent</code> retains only the other two meanings.
+The tool already distinguishes the three states, so nothing downstream
+needs to change to benefit. That issue also carries the in-bundle path
+error in <code>ci_headroom_report.py</code>'s <code>--waits</code> help text (F6), which this
+phase could not fix because it changes code.</p>
+<h3 id="other-observations-from-the-window">Other observations from the window<a class="headerlink" href="#other-observations-from-the-window" title="Permanent link">&para;</a></h3>
+<p>Recorded because a later reader of this window will meet them, not
+because any of them implies an action here.</p>
+<ul>
+<li><strong>Every one of the 26 runs that ran cluster jobs concluded
+  <code>failure</code></strong>, and <code>Node lifecycle (collection)</code> failed in 25 of the 25
+  the API would serve job detail for. The window sits almost entirely
+  before the <code>Node lifecycle</code> shutdown-check false positive
+  (<a href="https://github.com/shakenfist/shakenfist/issues/4209">#4209</a>) was
+  fixed, which landed on <code>develop</code> at 2026-09-25T03:49Z in <code>45021093d</code>,
+  so #4209 is plausibly most of it. Phase 4's own closeout described
+  the same failure without filing it.</li>
+<li><strong>Seven runs also had an instrumented cluster job fail</strong>, none of
+  them attributable to a capacity wait: no wait in the window came
+  within 149 s of its deadline.</li>
+<li><strong>One refusal the ledger cannot explain.</strong> The 0.036 s wait has
+  <code>binding_dimension: null</code> and <code>headroom_at_first_refusal</code> showing 6
+  CPUs free -- a refusal with headroom, which is the #3813 / #3772
+  family's shape rather than a capacity shortage. One occurrence, no
+  action implied, and it is the only unit in the window whose binding
+  dimension is not <code>cpus</code>.</li>
+</ul>
+<h3 id="gate-thinness">Gate thinness<a class="headerlink" href="#gate-thinness" title="Permanent link">&para;</a></h3>
+<p>D36 condition 2 wanted 20 <code>merge_group</code> runs on the reshaped tier. 45
+runs were enumerated, but only 26 of them ran a topology, so the gate
+passed with <strong>six</strong> runs of margin rather than twenty-five. That is
+still a pass on its own terms -- the condition counts runs, and 26 &gt; 20
+-- but it is thinner than the enumeration makes it look, and the second
+reading should count qualifying runs rather than runs.</p>
+<h3 id="what-the-evidence-could-not-cover-d40">What the evidence could not cover (D40)<a class="headerlink" href="#what-the-evidence-could-not-cover-d40" title="Permanent link">&para;</a></h3>
+<p>D40 requires these three whatever the outcome, and they apply with more
+force to an Extend than to a decision, because an extension invites a
+reader to assume the next reading will be better-founded on all three
+counts. It will not be; these are properties of the measurement, not of
+the window's length.</p>
+<ol>
+<li><strong>CI-only.</strong> Every observation here is the functional suite on
+   <code>slim-primary</code> and <code>slim-tier</code>. An operator script against a
+   genuinely full production cluster is not represented, and that is
+   D38's strongest counter-argument. Nothing in this window speaks to
+   it.</li>
+<li><strong>post-reshape.</strong> The window opens at the first run on the reshaped
+   <code>slim-tier</code>, by construction (D36). It therefore says nothing about
+   whether a queue would have helped the ledger-3 cloud that produced
+   #3772 -- the cloud the reshape exists to replace.</li>
+<li><strong>Client retry off.</strong> Phase 4's D33 ships the client <code>retry</code>
+   switched off, and the suite deliberately does not turn it on, so no
+   client in this window was retrying on its own behalf. Every wait
+   recorded here is the suite's own wrapper waiting, not a client
+   exercising the phase 4 contract.</li>
+</ol>
+<h3 id="source-corrections-made-in-this-commit">Source corrections made in this commit<a class="headerlink" href="#source-corrections-made-in-this-commit" title="Permanent link">&para;</a></h3>
+<p>D41 corrected four claims at source when this phase was registered.
+Executing steps 5c and 5d found three more, each verified against the
+tree, and all three are corrected above:</p>
+<ol>
+<li><strong>The in-bundle trace path.</strong> This plan and
+   <code>tools/ci_headroom_report.py</code>'s <code>--waits</code> help text both gave
+   <code>/srv/ci/traces/instance-waits.jsonl</code> as the path "in the bundle".
+   Inside a bundle it is at <code>bundle/traces/instance-waits.jsonl</code>;
+   <code>/srv/ci/traces/</code> is where the suite writes it on the CI node.
+   Corrected in F6 and in 5c's brief. <strong>The tool is not edited</strong> --
+   that is a code change and out of scope -- so the error is left
+   stated here and on #4337 for whoever fixes it.</li>
+<li><strong>5c's invocation could not run.</strong> <code>--series</code> is <code>required=True</code>
+   (<code>tools/ci_headroom_report.py:2879</code>), so
+   <code>ci_headroom_report.py --waits &lt;file&gt;</code> exits on a usage error. The
+   brief now passes both files.</li>
+<li><strong><code>CLUSTER_HEADROOM_WAIT</code> is at <code>base.py:58</code>, not <code>:52</code>.</strong> Value
+   unchanged at 420. F5's other two citations had drifted by the same
+   six lines and are corrected with it (<code>CAPACITY_POLL_INTERVAL</code> at
+   <code>:64</code>, <code>MAX_CREATE_ATTEMPTS</code> at <code>:74</code>), as is D37's denominator
+   citation and F6's argparse line (<code>:2910</code>, from <code>:2648</code>).</li>
+</ol>
+<h3 id="definition-of-done-item-by-item">Definition of done, item by item<a class="headerlink" href="#definition-of-done-item-by-item" title="Permanent link">&para;</a></h3>
+<p>Several items assume a decision was taken and cannot be met by an
+Extend. They are recorded as deferred rather than reinterpreted into a
+pass, because an item bent to fit the outcome it was written to test is
+worse than an item plainly marked unmet.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Result</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>Met</strong></td>
+<td>Run: <code>grep -n '_await_instance_create\|900 s ceiling'</code> over the master plan returns nothing.</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Met</strong></td>
+<td>Run, with <code>tr -s ' '</code> as the item insists: the count is 1.</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Met</strong></td>
+<td>Run: open question 8's section names the 105 s budget.</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Met</strong></td>
+<td>Run: the <code>awk</code> range check returns 1.</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Partly met</strong></td>
+<td>Open question 8 no longer reads "Decide in phase 5" and links here. It does <strong>not</strong> state a decision, because there is none to state; it states that the first reading was unreadable and that the question is open. Deferred in full to the second reading.</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>Met, on the run reading of the item</strong></td>
+<td>The item says "the qualifying-run count 5c reported". 5c reported 26 qualifying <em>runs</em> and 104 qualifying <em>units</em>, the unit being the bundle -- an ambiguity the item did not anticipate, because the plan was written assuming one bundle per run. The table above has 26 rows, one per qualifying run, with the bundle-level census given as counts; the 104-row bundle table is in the step 5c dataset rather than here, because it is 96 identical rows. The unknown count is stated as a number, <code>96</code>.</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>Met</strong></td>
+<td>All three clauses' arithmetic is above, for both denominators, with the explicit note that it did not select the outcome.</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>Met</strong></td>
+<td>1 pinned, 0 unpinned above 210 s; 8 pinned, 0 unpinned overall.</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>Met</strong></td>
+<td><code>CI-only</code>, <code>post-reshape</code> and <code>retry</code> all appear in <em>What the evidence could not cover</em>.</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>Deferred</strong></td>
+<td>Cannot be met. The item requires exactly one of <code>Abandoned</code> or <code>Complete</code>; the phase is correctly neither. It reads <code>In progress</code> in both places and the index arithmetic (<code>4 of 7</code>) agrees -- which was checked, and is what <code>tools/check-plan-status.py</code> verifies. The item is met on the second reading.</td>
+</tr>
+<tr>
+<td>11</td>
+<td><strong>Not applicable</strong></td>
+<td>Build-only, and this is not a Build. <code>PLAN-scheduler-reservations-phase-00-decisions.md</code> is untouched.</td>
+</tr>
+<tr>
+<td>12</td>
+<td><strong>Met</strong></td>
+<td><code>python3 tools/check-plan-status.py</code> passes.</td>
+</tr>
+<tr>
+<td>13</td>
+<td><strong>Met</strong></td>
+<td><code>pre-commit run --all-files</code> passes.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="what-the-second-reading-must-do">What the second reading must do<a class="headerlink" href="#what-the-second-reading-must-do" title="Permanent link">&para;</a></h3>
+<p>Not a design, and not a step plan -- the phase's step table already
+ends at 5e. This is what the extension owes, so that the second reading
+is not a rerun of the first.</p>
+<ol>
+<li><strong>Settle the <code>absent</code> question in writing first</strong>, per the open
+   question above. Before the data.</li>
+<li><strong>#4337 has landed</strong> -- <code>62bb1ddeb</code>, merged 2026-09-27T19:10:31Z,
+   which adds <code>ensure_capacity_wait_trace()</code> and calls it from
+   <code>BaseTestCase.setUp()</code>. It opens the file <code>'a'</code>, so it creates
+   without ever truncating and concurrent stestr workers cannot lose a
+   sibling's line. The second window therefore starts at the first
+   <code>merge_group</code> run whose base contains that commit; identify it the
+   way sizing 4d identified the first window's start, rather than
+   assuming the next run after the merge carries it. This condition is
+   met and needs no further action -- it is recorded because the
+   extension is bounded to one by D37, and opening the second window
+   on the old instrument would spend it for nothing.</li>
+<li><strong>Count qualifying runs, not enumerated runs</strong>, against D36
+   condition 2. See <em>Gate thinness</em>.</li>
+<li><strong>Reconsider A2 and B3.</strong> They are structurally pinned at 100%
+   under the instrument this window was read with, and #4337 landing
+   does not by itself unpin them: D37 discards <code>empty</code> alongside
+   <code>absent</code>, so a zero-wait run that now writes an empty file is still
+   thrown out of the denominator. They stay pinned until <code>empty</code> is
+   admitted to it. Reconsidering them is an
+   amendment to a pre-registered rule and must therefore happen before
+   the second reading, alongside (1), and be recorded as a new decision
+   rather than as a reinterpretation of D37.</li>
+</ol>
+<h3 id="what-phase-6-inherits">What phase 6 inherits<a class="headerlink" href="#what-phase-6-inherits" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Open question 8 is <strong>still open</strong>, so phase 6's documentation sweep
+  cannot describe a settled position on server-side queued placement.</li>
+<li>The transient contract does fire in CI, but rarely and only under an
+  instrument that cannot count its own silences: 8 waits over 26 runs
+  of the suite, all pinned, all <code>informed</code>, one above half the
+  deadline. Phase 6's #3772 comment should quote those numbers with the
+  92.3% unknown fraction beside them, or it will overstate what is
+  known.</li>
+<li>
+<h1 id="4337-is-a-phase-2-instrument-defect-found-by-phase-5-and-owned-by">4337 is a phase 2 instrument defect found by phase 5 and owned by<a class="headerlink" href="#4337-is-a-phase-2-instrument-defect-found-by-phase-5-and-owned-by" title="Permanent link">&para;</a></h1>
+  neither: it is a candidate for phase 6's sweep or for the issue-fix
+  workflow, but it is not this phase's work.</li>
+</ul>
 
 
 
