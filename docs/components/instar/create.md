@@ -316,12 +316,13 @@ instar cannot yet compose; an overlay on it could not be read back
 This has its own error code (`ERROR_BACKING_DIFFERENCING`) rather than
 the generic `ERROR_BACKING_PARSE_FAILED`, because the backing header
 parses perfectly well — the image is valid, just not one instar can read
-through yet. Every read path in instar refuses a
-differencing image because the parent cannot be composed yet, so an
-overlay stacked on one would be a chain that can never be read back.
-Refusing at create time is the only outcome that does not hand you a
-dead image. Their plain dynamic parents are accepted normally. See the
-"VHD/VHDX differencing" section of [quirks.md](/components/instar/quirks/).
+through yet. Every read path in instar that composes sector data
+refuses a differencing image because the parent cannot be composed
+yet, so an overlay stacked on one would be a chain that can never be
+read back. Refusing at create time is the only outcome that does not
+hand you a dead image. Their plain dynamic parents are accepted
+normally. See the "VHD/VHDX differencing" section of
+[quirks.md](/components/instar/quirks/).
 
 ## Preallocation modes
 
@@ -341,9 +342,11 @@ the `MetadataPlan`. The host's `apply_preallocation` helper handles
 ## Known divergences from `qemu-img create`
 
 The cross-version baseline matrix passes for the bulk of supported
-options, but four categories of writer divergence are documented and
+options, but five categories of writer divergence are documented and
 tracked as future work. The canonical list (with per-case rationale)
-is `KNOWN_WRITER_DIVERGENCES` in `tests/test_create.py`.
+for the first four is `KNOWN_WRITER_DIVERGENCES` in
+`tests/test_create.py`; the fifth has no entry there because there is
+no baseline to skip — qemu-img cannot produce the output at all.
 
 - **VHD `virtual_size`**: qemu-img rounds up to the next CHS-aligned
   multiple (legacy VHD geometry); instar emits exact bytes. The
