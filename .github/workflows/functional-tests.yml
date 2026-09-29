@@ -448,7 +448,7 @@ jobs:
           {
             name: 'Debian 12 cluster',
             job_name: 'debian-12-slim-primary',
-            base_image: 'sf://label/ci-images/debian-12',
+            base_image: 'sf://label/ci-images/debian-13',
             base_image_user: 'debian',
             topology: 'slim-primary',
             concurrency: 5,
@@ -468,7 +468,7 @@ jobs:
           {
             name: 'Guests',
             job_name: 'guests',
-            base_image: 'sf://label/ci-images/debian-12',
+            base_image: 'sf://label/ci-images/debian-13',
             base_image_user: 'debian',
             topology: 'slim-primary',
             concurrency: 5,
@@ -484,7 +484,7 @@ jobs:
             # carries the same headroom the other entries have.
             name: 'Debian 12 tier',
             job_name: 'debian-12-slim-tier',
-            base_image: 'sf://label/ci-images/debian-12',
+            base_image: 'sf://label/ci-images/debian-13',
             base_image_user: 'debian',
             topology: 'slim-tier',
             concurrency: 5,
@@ -535,7 +535,7 @@ jobs:
       headroom_gate: false
       tier: full
       topology: slim-primary
-      base_image: 'sf://label/ci-images/debian-12'
+      base_image: 'sf://label/ci-images/debian-13'
       base_image_user: debian
       test_kind: ansible-modules
       concurrency_key: ansible-modules
