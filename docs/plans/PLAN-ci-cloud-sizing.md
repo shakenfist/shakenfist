@@ -1724,12 +1724,12 @@ which is what `tools/check-plan-status.py` enforces.
 - **Arm the headroom gate on a downstream or single-node cloud.**
   Phase 6's D5 found this is three changes and a window, not a
   decision. `tools/ci_headroom_harvest.py`'s `list_runs()` hardcodes
-  `event=merge_group` in the API path (`:445`), so it can only read
+  `event=merge_group` in the API path, so it can only read
   merge-queue runs. `client-python/.github/workflows/functional-tests.yml`
   triggers on `pull_request:` only (`:11-12`), and that repository has
   no merge queue, so there are no `merge_group` runs to read even
   once the filter moves. `BUNDLE_TOPOLOGIES`
-  (`tools/ci_headroom_harvest.py:152-164`) is keyed on shakenfist's
+  (in `tools/ci_headroom_harvest.py`) is keyed on shakenfist's
   own bundle artifact names, and an unrecognised name raises
   `UnknownBundleError` by design, so `--repo` exists but stops the
   harvest on the first bundle from anywhere else. Phase 5 established,

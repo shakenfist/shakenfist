@@ -19,7 +19,7 @@ this page, which is why it is described first.
 
 ### What admission actually tests
 
-`Scheduler._has_sufficient_cpu` (`shakenfist/scheduler.py:332`) keeps a
+`Scheduler._has_sufficient_cpu` (`shakenfist/scheduler.py`) keeps a
 node in the candidate set only while
 
 ```
@@ -37,7 +37,7 @@ That filter is a pre-filter rather than the decision: since
 scheduler-reservations phase 3 the binding guard is the atomic `UPDATE`
 `Instance.place_instance()` makes against `scheduler_node_capacity`,
 whose `limit_cpus` is `floor(cpu_schedulable x CPU_OVERCOMMIT_RATIO)`
-(`shakenfist/mariadb.py:24805`). The two therefore test the same
+(`_derive_cpu_memory_limits()` in `shakenfist/mariadb.py`). The two therefore test the same
 arithmetic on purpose, and for sizing they can be read as one bound.
 The full stage list, and the four other things admission can refuse on,
 are in [the placement
@@ -50,7 +50,7 @@ summed over the cluster's hypervisors.
 
 `cpu_schedulable` is published per node by the resources daemon as
 `max(1, cpu_threads - cpu_reservation_threads)`
-(`shakenfist/daemons/resources/main.py:136`). The floor of one thread
+(`_compute_reservations()` in `shakenfist/daemons/resources/main.py`). The floor of one thread
 is a clamp for over-large reservations, and in CI it is load-bearing
 rather than theoretical -- see "Two things the topology files do not
 show" below.
@@ -62,7 +62,8 @@ covers all three reservations and both clamps). Nothing in the
 scheduler bumps it for a node's roles; what does is the deploy, which
 computes a per-host *default* of `(1 + (network or database ? 1 : 0)) *
 2` threads and fills it in only where the operator has not set the
-value (`examples/_shared/site.yml:360-363`). In CI nobody sets it, so
+value (the *Default the per-host CPU thread reservation* task in
+`examples/_shared/site.yml`). In CI nobody sets it, so
 the default is what runs: **2 threads on a plain hypervisor, 4 on a
 network or database node**.
 
@@ -147,8 +148,8 @@ Three steps, none of which depends on the others being believed.
 
 **Harvest a window.** `tools/ci_headroom_harvest.py` enumerates
 `merge_group` runs and writes one record per job per run; its flags,
-its caching and the reasons it refuses to guess are under "Where the
-output lands" above. Name both ends of the window with `--since` and
+its caching and the reasons it refuses to guess are under
+[Where the output lands](#where-the-output-lands) below. Name both ends of the window with `--since` and
 `--until` if the output is going to be committed -- `--since` alone
 grows with every merge and `--limit` moves with the day the harvest is
 run on, so neither reproduces its own dataset.
@@ -229,7 +230,9 @@ handful of hand-collected numbers
 [PLAN-ci-cloud-sizing](../plans/PLAN-ci-cloud-sizing.md) started from;
 `docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md` records
 the decisions behind them. Neither instrument gates anything itself
--- see "Nothing here is a quality gate" below -- but the poller's own traffic
+-- see
+[One bound gates, and everything else is information](#one-bound-gates-and-everything-else-is-information)
+below -- but the poller's own traffic
 does interact with a check that gates, which is the one reason a
 reader troubleshooting a CI failure might need this section; see "The
 probe's traffic is exempted from the idle-load check". Otherwise it
@@ -326,8 +329,8 @@ moves with the day it is run on.
 ### A third file: the capacity-wait trace (`--waits`)
 
 A third file lands beside the other two, written by a different
-mechanism. The `self.create_instance()` wrapper (see "Creating
-instances in the functional suite" above) appends one JSON line to
+mechanism. The `self.create_instance()` wrapper (see [Creating instances in the functional
+suite](ci.md#creating-instances-in-the-functional-suite)) appends one JSON line to
 `/srv/ci/traces/instance-waits.jsonl` every time a create waits out a
 transient 507. It reaches the bundle through the same "Gather logs"
 scp as `headroom.jsonl` and `headroom-census.json`, with no separate
@@ -354,7 +357,9 @@ it into the job log, which is a separate, later change.
 
 An absent or empty file reports as unknown, never as zero waits, for
 the same reason an absent or empty census reports as unknown rather
-than as zero refusals (see "Nothing here is a quality gate" below): "no
+than as zero refusals (see
+[One bound gates, and everything else is information](#one-bound-gates-and-everything-else-is-information)
+below): "no
 one collected this" and "the wrapper never had to wait" are different
 findings, and the reading that looks reassuring -- zero -- is exactly
 the wrong one to print when the file was never written or never read.

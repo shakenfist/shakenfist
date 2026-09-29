@@ -5,7 +5,7 @@
 PLAN-ci-cloud-sizing phase 5 made a cluster-wide band violation fail the
 cluster job, in `shakenfist/actions`'s smoke-cluster.yml, which this
 repository reaches at `@main` with no pin. Two rules follow, and this is
-what enforces them; docs/developer_guide/ci.md states them.
+what enforces them; docs/developer_guide/ci_cloud_sizing.md states them.
 
 A call site which is gated must pass the CI_HEADROOM_GATE repository
 variable through as `headroom_gate`, because the recovery for a spurious

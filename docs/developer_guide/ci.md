@@ -232,8 +232,10 @@ CI's clouds are sized against the scheduler's admission ledger rather
 than against real CPU, because the ledger is what the scheduler
 actually admits onto. Of the bounds checked against it, only the
 cluster-wide upper bound can fail a job -- nothing else does. A probe
-samples every cluster job and publishes a series recording what the
-cluster actually carried. See
+samples every cluster job that runs through the reusable smoke-cluster
+workflow and publishes a series recording what the cluster actually
+carried; the jobs that deploy through the composite action instead are
+not probed yet ([#4367](https://github.com/shakenfist/shakenfist/issues/4367)). See
 [CI cloud sizing and headroom](ci_cloud_sizing.md) for the sizing
 model, the instrumentation and how to re-measure it.
 

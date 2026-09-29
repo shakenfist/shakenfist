@@ -15,8 +15,8 @@ Three properties are covered:
   or ``nodes``. The report distinguishes an errored sample from an empty
   one, and would count a record carrying ``resources: null`` as a
   successful sample of nothing.
-* The roster is reduced to exactly five keys. ``ci.md`` documents that
-  reduction as load-bearing for phase 2, which needs the role booleans to
+* The roster is reduced to exactly five keys. ``ci_cloud_sizing.md``
+  documents that reduction as load-bearing for phase 2, which needs the role booleans to
   tell the four reasons a node can be missing from ``per_node`` apart.
 * The write is guarded on the same terms as the sample. A value the json
   module cannot serialise degrades to an error line rather than to a
@@ -143,7 +143,7 @@ class TakeSampleTestCase(base.ShakenFistTestCase):
             self.assertIn('error', record)
 
     def test_a_roster_entry_is_reduced_to_the_five_documented_keys(self):
-        """ci.md calls this reduction load-bearing for phase 2."""
+        """ci_cloud_sizing.md calls this reduction load-bearing for phase 2."""
         client = FakeClient(nodes=[{
             'uuid': 'u1', 'fqdn': 'node1.local', 'is_hypervisor': True,
             'is_network_node': False, 'is_database_node': True,

@@ -178,11 +178,11 @@ request runs, and `tools/ci_headroom_harvest.py` reads only `merge_group`
 runs today". It is worse than one blocker:
 
 1. `list_runs()` hardcodes `event=merge_group` in the API path
-   (`tools/ci_headroom_harvest.py:421`).
+   (in `tools/ci_headroom_harvest.py`).
 2. `client-python/.github/workflows/functional-tests.yml:11-12` triggers
    on `pull_request:` only -- that repository has no merge queue, so
    there are no `merge_group` runs to read even if the filter moved.
-3. `BUNDLE_TOPOLOGIES` (`:133-143`) is keyed on shakenfist's own bundle
+3. `BUNDLE_TOPOLOGIES` (same file) is keyed on shakenfist's own bundle
    artifact names, and an unrecognised name raises `UnknownBundleError`
    by design. `--repo` exists, but pointing it at another repository
    stops the harvest on the first bundle.
@@ -652,8 +652,8 @@ operator can make, and is recorded as outstanding rather than ticked.
 
 | Item | Command | Result |
 |---|---|---|
-| 1 | `ls -la docs/developer_guide/ci_cloud_sizing.md` | Exists (663 lines). |
-| 2 | The script under *The arithmetic, checked* extracted verbatim from the published page (`sed -n '169,195p' docs/developer_guide/ci_cloud_sizing.md`, fence lines stripped) and run as `python3 ledger_script.py ansible/ci-topology-slim-tier.yml ansible/ci-topology-slim-primary.yml` from a `shakenfist/actions` checkout at `main` (`87f4138`, fetched against `origin/main` first -- three commits behind, none touching the topology files) | `ansible/ci-topology-slim-tier.yml: ledger 24` / `ansible/ci-topology-slim-primary.yml: ledger 27`. Matches the page exactly. |
+| 1 | `ls -la docs/developer_guide/ci_cloud_sizing.md` | Exists. (An earlier draft of this row also gave a line count, which the command does not produce and which went stale as the page grew.) |
+| 2 | The script under *The arithmetic, checked* extracted verbatim from the published page by its fences rather than a line range, so it survives the page changing around it (`` awk '/^### Re-measuring this from scratch/{f=1} f&&/^```python/{g=1;next} g&&/^```/{exit} g' docs/developer_guide/ci_cloud_sizing.md > ledger_script.py ``), and run as `python3 ledger_script.py ansible/ci-topology-slim-tier.yml ansible/ci-topology-slim-primary.yml` against the two topology files at `shakenfist/actions` `origin/main` (`9301cfc`) | `ci-topology-slim-tier.yml: ledger 24` / `ci-topology-slim-primary.yml: ledger 27`. Matches the page exactly. (First run with a fixed `sed -n` range at `87f4138`, with the same result; re-run by fence when that range went stale.) |
 | 3 | `grep -c 'MINIMUM_HYPERVISOR_LEDGER' docs/developer_guide/ci_cloud_sizing.md` | `2` (>= 1); both the term and `shakenfist/deploy/shakenfist_ci/sizing.py` are named. |
 | 4 | `grep -rn 'ledger' docs/developer_guide/ tools/ shakenfist/deploy/ AGENTS.md ARCHITECTURE.md docs/plans/PLAN-ci-cloud-sizing.md`, filtered to numeric figures | Every present-tense figure reads 24 (`slim-tier`) / 27 (`slim-primary`), including `MINIMUM_HYPERVISOR_LEDGER = 24` in `sizing.py` and the `(27 and 24 of ledger...)` comment in `test_nodes.py:154`. The plan's own "12" mentions (`:150`) are the Situation table's measurement-record prose about the pre-reshape baseline and #3907, which item 4 explicitly excludes; the table itself carries D7's annotation pointing at the new page. |
 | 5 | `python3 -c "import io,re; print(len(re.findall(r'defaults\s+to\s+gating', io.open('shakenfist/tests/test_headroom_gate_workflow_seams.py').read())))"`, then `.tox/py3/bin/python3 -m unittest shakenfist.tests.test_headroom_gate_workflow_seams -v` | grep returns `0` (was 1 before 6a). All 3 tests in the module pass. |
@@ -692,7 +692,10 @@ and confirm it enumerates all five instrumented cluster bundles --
 and `Ansible modules` -- with no `UnknownBundleError`, and that the
 `Ansible modules` record carries `series_present: true` rather than an
 `absent_reason`. Whoever pushes the diff owns confirming this; phase 7's
-audit should check it has been (or note that it still has not).
+audit should check it has been (or note that it still has not). Both
+halves are tracked as
+[#4377](https://github.com/shakenfist/shakenfist/issues/4377), so the
+outstanding item is not recorded only in this prose.
 
 ### What phase 7 inherits
 
@@ -704,7 +707,9 @@ audit should check it has been (or note that it still has not).
   push `shakenfist/actions` (phase 4's F7). Until it lands, the `Ansible
   modules` bundle is armed in `BUNDLE_TOPOLOGIES` but carries no series --
   a case `test_an_ansible_modules_bundle_with_no_traces_yet_is_recorded_absent`
-  (added by 6d) exists specifically to pin.
+  (added by 6d) exists specifically to pin. The push, and the harvest
+  confirming `series_present: true` afterwards, are tracked as
+  [#4377](https://github.com/shakenfist/shakenfist/issues/4377).
 * **Two clouds remain uninstrumented.** `Node lifecycle`
   (`functional-tests.yml:581`) and kerbside's `sf-e2e-functional.yml:104`
   both reach a cluster through the `build-smoke-cluster` composite action
@@ -719,7 +724,7 @@ audit should check it has been (or note that it still has not).
 * **D5's three blockers to arming any new shape** are recorded as a
   Future work entry in the master plan (`Arm the headroom gate on a
   downstream or single-node cloud`): `list_runs()` hardcodes
-  `event=merge_group` (`tools/ci_headroom_harvest.py:421`), client-python
+  `event=merge_group` (in `tools/ci_headroom_harvest.py`), client-python
   has no merge queue to supply `merge_group` runs even if that filter
   moved (`functional-tests.yml:11-12`), and `BUNDLE_TOPOLOGIES` is keyed
   on shakenfist's own artifact names, so `--repo` alone cannot point the

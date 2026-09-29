@@ -329,6 +329,21 @@ class ClassificationTestCase(HarvestTestCase):
         self.assertEqual('Ansible modules', kind.job)
         self.assertEqual('Ansible modules (collection)', kind.job_prefix)
 
+    def test_the_ansible_modules_prefix_finds_both_reported_job_names(self):
+        # Real runs have reported this job both as the caller alone and as
+        # '<caller> / <called job>'. The prefix comes from the table rather
+        # than a literal, so a table edit which breaks either shape fails
+        # here rather than as a harvest that silently finds no job.
+        _, kind = harvest.classify_artifact(ANSIBLE_BUNDLE)
+        prefix = kind.job_prefix
+        for name in (prefix, prefix + ' / Smoke tests (collection)'):
+            jobs = [('Ansible modules (collection)-extra', 'failure'),
+                    (name, 'success')]
+            self.assertEqual((name, 'success'), harvest.find_job(jobs, prefix))
+        self.assertEqual(
+            (None, None),
+            harvest.find_job([('Ansible modules (collection)-extra', 'success')], prefix))
+
 
 class BundleReadingTestCase(HarvestTestCase):
     def test_the_traces_are_found_inside_the_nested_zip(self):
