@@ -14759,6 +14759,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-uuid-columns-type-is-uuid_column_type-never-a-bare-sauuid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A uuid column's type is uuid_column_type(), never a bare sa.Uuid()
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-frozen-model-is-not-a-deep-frozen-model" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15219,6 +15230,29 @@ that proves it matches something. Asserting the statement's <em>shape</em>
 against a mocked engine cannot do that, and neither can a test that
 rewrites the query to suit sqlite -- register the missing SQL functions
 instead, so the statement under test is the statement that ships.</p>
+<h2 id="a-uuid-columns-type-is-uuid_column_type-never-a-bare-sauuid">A uuid column's type is <code>uuid_column_type()</code>, never a bare <code>sa.Uuid()</code><a class="headerlink" href="#a-uuid-columns-type-is-uuid_column_type-never-a-bare-sauuid" title="Permanent link">&para;</a></h2>
+<p><code>sa.Uuid()</code> decides how to bind, read and render itself per dialect.
+SQLAlchemy 2.0 treated MariaDB as having no native UUID type, so every
+<code>sa.Uuid()</code> column became CHAR(32) holding undashed hex, and that is what
+every existing Shaken Fist table contains. SQLAlchemy 2.1 made the MariaDB
+dialect report native UUID support, and a bare <code>sa.Uuid()</code> stopped
+converting: <code>uuid.UUID</code> binds reached the driver unconverted instead of as
+the hex those CHAR(32) columns hold, reads came back as plain strings, and
+newly created columns would have been MariaDB <code>UUID</code>. Nothing raised. The
+coalescing keys on <code>cluster_operations.network_uuid</code> and <code>node_uuid</code>
+simply matched no rows, and the SQLAlchemy 2.1 upgrade failed only in the
+merge queue, as the coalescing cluster tests reporting the #3878 symptom
+again.</p>
+<p><code>shakenfist.schema.sqlalchemy.uuid_column_type()</code> returns
+<code>sa.Uuid(native_uuid=False)</code>, which keeps the CHAR(32) behaviour on every
+SQLAlchemy version. Use it for every uuid column, including the
+<code>SQLNativeUUID</code> marker's (whose name predates this and is misleading: it
+has never been a native UUID). <code>shakenfist/tests/test_uuid_column_type.py</code>
+builds every table <code>mariadb.py</code> defines and fails on any <code>sa.Uuid</code> column
+that could go native, and checks the bind, result and DDL behaviour
+against the MariaDB dialect itself. The sqlite-backed coalescing tests
+could not catch this: sqlite has no native UUID, so a bare <code>sa.Uuid()</code>
+still behaves there exactly as it used to on MariaDB.</p>
 <h2 id="a-frozen-model-is-not-a-deep-frozen-model">A frozen model is not a deep frozen model<a class="headerlink" href="#a-frozen-model-is-not-a-deep-frozen-model" title="Permanent link">&para;</a></h2>
 <p><code>mariadb.get_&lt;type&gt;()</code> returns a Pydantic model with
 <code>model_config = ConfigDict(frozen=True)</code>, and that model is the one
