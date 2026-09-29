@@ -402,11 +402,22 @@ class TestNodes(base.BaseNamespacedTestCase):
         # read 8 where it expected 0), or one arriving in the same second
         # this instance's domain went away and holding the figure where it
         # was -- with sf-resources publishing the correct value throughout.
-        # Instead, each power event records libvirt_requested_at, taken on
-        # the node's clock just before libvirt was asked, and each publish
-        # records domains_enumerated_at on the same clock. A publish which
-        # enumerated at or after the request is one which has seen the
-        # change, whatever else is running.
+        # Instead, each power event records libvirt_returned_at, taken on
+        # the node's clock once libvirt's create() or destroy() has
+        # returned -- by which point the domain is active or inactive --
+        # and each publish records domains_enumerated_at on the same clock.
+        # A publish which enumerated at or after the return is one which
+        # has seen the change, whatever else is running.
+        #
+        # What this cannot do is tell a publish triggered by this change
+        # from one which happened to arrive in the window anyway: the flat
+        # METRICS_PUBLISH_INTERVAL_SECONDS tick, or a sibling changing the
+        # node's domain set. Either satisfies a wait, so with publish-on-
+        # change broken each wait would still pass perhaps a third of the
+        # time on an idle node and more often on a busy one. That is the
+        # price of a test siblings cannot fail; the decision to publish on
+        # a domain-set change is pinned deterministically by the
+        # _should_publish_metrics unit tests in test_daemon_resources.py.
         resources = self.system_client.get_cluster_resources()
         candidates = [
             n for n in self._hypervisor_nodes()
@@ -436,21 +447,16 @@ class TestNodes(base.BaseNamespacedTestCase):
         # 'created' is set immediately after power_on(), so the poweron
         # event exists once this returns.
         self._await_instance_create(inst['uuid'])
-        started_at = self._libvirt_requested_at(inst['uuid'], 'poweron')
-
-        # A publish enumerated after the start was requested can still
-        # predate the domain becoming active, because domain.create() takes
-        # a while and a sibling changing the domain set mid-create triggers
-        # a publish of its own. So the start side also requires the figure
-        # to hold at least this instance's vCPUs. Siblings can satisfy that
-        # early -- a false pass -- but cannot make it fail: the publish
-        # which does see this domain is enumerated later still, and the
-        # wait keeps polling until it arrives.
-        self._await_measurement_after(
+        started_at = self._libvirt_returned_at(inst['uuid'], 'poweron')
+        per_node = self._await_measurement_after(
             node['uuid'], started_at,
-            lambda per_node: per_node['cpu_measured'] >= cpus,
-            'the domain start requested at %.3f and counting at least the %d '
-            'vCPUs of the started instance' % (started_at, cpus))
+            'the domain start which returned at %.3f' % started_at)
+
+        # Not a wait condition: an enumeration after create() returned
+        # counted this domain, so the figure holds at least its vCPUs
+        # whatever siblings are doing. This checks the count path rather
+        # than the timing.
+        self.assertGreaterEqual(per_node['cpu_measured'], cpus)
         self.addDetail('resources before delete', content.text_content(
             json.dumps(self.system_client.get_cluster_resources(),
                        indent=4, sort_keys=True)))
@@ -458,18 +464,13 @@ class TestNodes(base.BaseNamespacedTestCase):
         # self.system_client uses ASYNC_PAUSE, so this blocks until the
         # instance's state is 'deleted', which is after power_off().
         self.system_client.delete_instance(inst['uuid'])
-        stopped_at = self._libvirt_requested_at(inst['uuid'], 'poweroff')
+        stopped_at = self._libvirt_returned_at(inst['uuid'], 'poweroff')
 
         # No bound on the figure here: whatever the node now counts
-        # belongs to other instances. An enumeration that started at or
-        # after the destroy request and saw the domain anyway would need
-        # destroy() still to be in flight, and a publish from it would
-        # need a sibling to change the set in that same instant; the
-        # publish which follows the domain actually going away is always
-        # enumerated after the request, so this cannot fail falsely.
+        # belongs to other instances.
         self._await_measurement_after(
-            node['uuid'], stopped_at, lambda per_node: True,
-            'the domain destroy requested at %.3f' % stopped_at)
+            node['uuid'], stopped_at,
+            'the domain destroy which returned at %.3f' % stopped_at)
         self.addDetail('resources after delete', content.text_content(
             json.dumps(self.system_client.get_cluster_resources(),
                        indent=4, sort_keys=True)))
@@ -482,31 +483,32 @@ class TestNodes(base.BaseNamespacedTestCase):
     CPU_MEASURED_DEADLINE_SECONDS = 20
     CPU_MEASURED_POLL_SECONDS = 5
 
-    def _libvirt_requested_at(self, instance_uuid, message):
-        """When this instance's first ``message`` power event asked libvirt.
+    def _libvirt_returned_at(self, instance_uuid, message):
+        """When libvirt returned from this instance's ``message`` power call.
 
-        The earliest, because deleting an instance calls power_off() more
-        than once and only the first finds a running domain to destroy.
+        Exactly one such event is expected: the instance is started once
+        and stopped once, and although deleting it calls power_off() more
+        than once, only the call which actually stopped the domain records
+        the field.
         """
-        requested = [
-            (e.get('extra') or {}).get('libvirt_requested_at')
+        returned = [
+            (e.get('extra') or {}).get('libvirt_returned_at')
             for e in self.system_client.get_instance_events(instance_uuid)
             if e.get('message') == message]
-        requested = [r for r in requested if r is not None]
-        self.assertNotEqual(
-            [], requested,
-            'Instance %s has no %s event carrying libvirt_requested_at'
-            % (instance_uuid, message))
-        return min(requested)
+        returned = [r for r in returned if r is not None]
+        self.assertEqual(
+            1, len(returned),
+            'Instance %s should have exactly one %s event carrying '
+            'libvirt_returned_at, found %r' % (instance_uuid, message, returned))
+        return returned[0]
 
-    def _await_measurement_after(self, node_uuid, since, predicate, change):
+    def _await_measurement_after(self, node_uuid, since, change):
         """Wait for a node to publish a measurement taken at or after since.
 
-        ``predicate`` is further applied to the node's /admin/resources
-        entry, and the wait continues until both hold. ``change`` completes
-        the sentence "published no measurement following ..." in the
-        failure message, so a broken publish-on-start and a broken
-        publish-on-delete do not report identically.
+        Returns the node's /admin/resources entry. ``change`` completes the
+        sentence "published no measurement following ..." in the failure
+        message, so a broken publish-on-start and a broken publish-on-delete
+        do not report identically.
         """
         deadline = time.time() + self.CPU_MEASURED_DEADLINE_SECONDS
         per_node = None
@@ -521,7 +523,7 @@ class TestNodes(base.BaseNamespacedTestCase):
             self.assertIsNotNone(
                 enumerated_at,
                 'Node %s publishes no domains_enumerated_at' % node_uuid)
-            if enumerated_at >= since and predicate(per_node):
+            if enumerated_at >= since:
                 return per_node
 
             if time.time() > deadline:

@@ -866,10 +866,16 @@ own clock, `sf-resources` listed the libvirt domains behind
 publishes within a few seconds of any domain starting or stopping, so on
 a busy node `cpu_measured` moves for reasons unrelated to any one
 instance. To ask whether the published figure has caught up with a
-particular instance, compare `domains_enumerated_at` with the
-`libvirt_requested_at` recorded in that instance's `poweron` or
-`poweroff` event (same node, same clock): a measurement enumerated at or
-after the request has seen the change.
+particular instance, compare `domains_enumerated_at` with the timestamps
+recorded in that instance's `poweron` or `poweroff` event (same node,
+same clock). `libvirt_returned_at` is when libvirt's start or stop call
+returned, by which point the domain is active or inactive respectively:
+a measurement enumerated at or after it has seen the change.
+`libvirt_requested_at` is when that call was made: a measurement
+enumerated before it has not. Between the two the call was still
+running, and a measurement may or may not reflect it. A `poweroff`
+event carries these fields only when that call is the one which stopped
+the domain; deleting an instance powers it off more than once.
 
 ### Was affinity ignored, or was there no choice?
 

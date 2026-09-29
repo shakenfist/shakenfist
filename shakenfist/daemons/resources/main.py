@@ -495,10 +495,10 @@ class Monitor(daemon.Daemon):
             total_instance_cpu_time = 0
 
             # When this measurement looked, on this node's clock. It is taken
-            # before the enumeration starts, so a domain which libvirt was
-            # asked to start or stop earlier than this is reflected in the
+            # before the enumeration starts, so a domain whose libvirt start
+            # or stop had already returned by this moment is reflected in the
             # figures below. Instance power events record the matching
-            # libvirt_requested_at; comparing the two is how a reader tells
+            # libvirt_returned_at; comparing the two is how a reader tells
             # "this publish has seen my domain change" apart from "this
             # figure moved", which other instances on a shared node can
             # cause on their own.

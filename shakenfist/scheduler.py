@@ -1112,7 +1112,7 @@ class Scheduler:
             # field). A figure on a shared node can move because of any
             # instance; this says whether the measurement is recent enough
             # to have seen a particular domain start or stop, compared with
-            # the libvirt_requested_at on that instance's power event.
+            # the libvirt_returned_at on that instance's power event.
             resources['per_node'][n]['domains_enumerated_at'] = \
                 self.metrics[n].get('domains_enumerated_at')
             resources['per_node'][n]['cpu_committed'] = committed_cpus

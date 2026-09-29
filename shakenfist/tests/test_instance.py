@@ -708,10 +708,8 @@ class InstanceRebootTestCase(base.ShakenFistTestCase):
             self.inst.reboot(hard=True)
 
 
-class InstancePowerStateTestCase(base.ShakenFistTestCase):
-    """A missing domain is not powered on, and create() must not mark an
-    instance created when every power on attempt failed (issue 4280).
-    """
+class InstanceLibvirtTestCase(base.ShakenFistTestCase):
+    """An instance in the database with a faked libvirt connection."""
 
     def setUp(self):
         super().setUp()
@@ -748,6 +746,12 @@ class InstancePowerStateTestCase(base.ShakenFistTestCase):
             return_value=conn)
         lc.start()
         self.addCleanup(lc.stop)
+
+
+class InstancePowerStateTestCase(InstanceLibvirtTestCase):
+    """A missing domain is not powered on, and create() must not mark an
+    instance created when every power on attempt failed (issue 4280).
+    """
 
     def test_is_powered_on_no_domain(self):
         self._mock_libvirt(None)
@@ -793,6 +797,93 @@ class InstancePowerStateTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             instance.Instance.STATE_CREATED, self.inst.state.value)
         mock_enqueue_delete.assert_not_called()
+
+
+class ClockedDomain(FakeDomain):
+    """A domain which records the fake clock when libvirt is asked."""
+
+    def __init__(self, clock, destroy_error=None, **kwargs):
+        super().__init__(**kwargs)
+        self._clock = clock
+        self._destroy_error = destroy_error
+        self.called_at = None
+
+    def create(self):
+        self.called_at = self._clock.time()
+
+    def destroy(self):
+        self.called_at = self._clock.time()
+        if self._destroy_error:
+            raise self._destroy_error
+
+    def setAutostart(self, flag):
+        pass
+
+
+class InstancePowerEventTimestampsTestCase(InstanceLibvirtTestCase):
+    """Power events bracket the libvirt call with node-clock timestamps.
+
+    Issue 4214's CI test compares them with sf-resources'
+    domains_enumerated_at, and an enumeration at or after
+    libvirt_returned_at is only guaranteed to have seen the change if that
+    timestamp really is taken after libvirt returned. These pin the order
+    rather than the values.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.clock = mock.MagicMock()
+        self.clock.time.side_effect = [float(t) for t in range(100, 200)]
+        p = mock.patch('shakenfist.instance.time', self.clock)
+        p.start()
+        self.addCleanup(p.stop)
+
+        p = mock.patch.object(instance.Instance, 'add_event')
+        self.mock_add_event = p.start()
+        self.addCleanup(p.stop)
+
+    def _event_extra(self, message):
+        extras = [c.kwargs.get('extra')
+                  for c in self.mock_add_event.call_args_list
+                  if c.args[1] == message]
+        self.assertEqual(1, len(extras))
+        return extras[0]
+
+    def test_poweron_brackets_create(self):
+        domain = ClockedDomain(self.clock)
+        self._mock_libvirt(domain)
+        self.assertTrue(self.inst._power_on_inner())
+
+        extra = self._event_extra('poweron')
+        self.assertLess(extra['libvirt_requested_at'], domain.called_at)
+        self.assertGreater(extra['libvirt_returned_at'], domain.called_at)
+
+    def test_poweroff_brackets_destroy(self):
+        domain = ClockedDomain(self.clock)
+        self._mock_libvirt(domain)
+        self.inst.power_off()
+
+        extra = self._event_extra('poweroff')
+        self.assertLess(extra['libvirt_requested_at'], domain.called_at)
+        self.assertGreater(extra['libvirt_returned_at'], domain.called_at)
+
+    def test_poweroff_of_stopped_domain_records_no_timestamps(self):
+        # Delete powers an instance off more than once; only the call which
+        # stopped the domain says when it went away.
+        domain = ClockedDomain(self.clock, destroy_error=FakeLibvirtError(
+            'Requested operation is not valid: domain is not running'))
+        self._mock_libvirt(domain)
+        self.inst.power_off()
+
+        self.assertIsNone(self._event_extra('poweroff'))
+
+    def test_poweroff_failure_records_no_timestamps(self):
+        domain = ClockedDomain(self.clock, destroy_error=FakeLibvirtError(
+            'internal error: something else entirely'))
+        self._mock_libvirt(domain)
+        self.inst.power_off()
+
+        self.assertIsNone(self._event_extra('poweroff'))
 
 
 class InstanceDomainXMLEscapingTestCase(base.ShakenFistTestCase):

@@ -2347,16 +2347,20 @@ class Instance(dbowo):
                         needs_port_reallocation=True)
                     return False
 
-            # Taken on this node's clock immediately before libvirt is asked,
-            # and recorded on the poweron event below. sf-resources stamps
-            # each metrics publish with when it enumerated domains on the
-            # same clock, so a publish enumerated at or after this moment is
-            # one which can have seen this domain -- which is how a reader
-            # attributes a node's measurement to this instance when other
-            # instances are starting and stopping on the node too.
+            # Both taken on this node's clock and recorded on the poweron
+            # event below. sf-resources stamps each metrics publish with when
+            # it enumerated domains, on the same clock. create() returns once
+            # the domain is active, so an enumeration which started at or
+            # after libvirt_returned_at has certainly counted this domain,
+            # and one which started before libvirt_requested_at certainly has
+            # not; between the two, create() was still running and either is
+            # possible. That is how a reader attributes a node's measurement
+            # to this instance when other instances are starting and stopping
+            # on the node too.
             libvirt_requested_at = time.time()
             try:
                 domain.create()
+                libvirt_returned_at = time.time()
             except lc.libvirt.libvirtError as e:
                 if str(e).startswith('Requested operation is not valid: '
                                      'domain is already running'):
@@ -2400,7 +2404,8 @@ class Instance(dbowo):
 
             self.add_event(
                 EVENT_TYPE_AUDIT, 'poweron',
-                extra={'libvirt_requested_at': libvirt_requested_at})
+                extra={'libvirt_requested_at': libvirt_requested_at,
+                       'libvirt_returned_at': libvirt_returned_at})
             return True
 
     def power_off(self):
@@ -2409,13 +2414,23 @@ class Instance(dbowo):
             if not inst:
                 return
 
-            # The same node-clock anchor power_on() records, for the same
-            # reason: the event below is only written after two attribute
-            # writes, so its own timestamp can post-date the first domain
-            # enumeration which no longer saw this domain.
+            # The same node-clock anchors power_on() records, with the same
+            # meaning: destroy() returns once the domain is inactive. The
+            # event's own timestamp is no substitute, because it is only
+            # written after two attribute writes and so can post-date the
+            # first enumeration which no longer saw this domain. They are
+            # recorded only when this call is the one which stopped the
+            # domain -- deleting an instance calls power_off() more than
+            # once, and a destroy() which found the domain already stopped,
+            # or failed, says nothing about when it went away.
+            extra = None
             libvirt_requested_at = time.time()
             try:
                 inst.destroy()
+                extra = {
+                    'libvirt_requested_at': libvirt_requested_at,
+                    'libvirt_returned_at': time.time()
+                }
             except lc.libvirt.libvirtError as e:
                 if not str(e).startswith('Requested operation is not valid: '
                                          'domain is not running'):
@@ -2423,9 +2438,7 @@ class Instance(dbowo):
 
             self.agent_state = constants.AGENT_INSTANCE_OFF
             self.update_power_state('off')
-            self.add_event(
-                EVENT_TYPE_AUDIT, 'poweroff',
-                extra={'libvirt_requested_at': libvirt_requested_at})
+            self.add_event(EVENT_TYPE_AUDIT, 'poweroff', extra=extra)
 
     def reboot(self, hard=False):
         with util_libvirt.LibvirtConnection() as lc:
