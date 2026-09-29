@@ -239,7 +239,7 @@ class RequestedDiskTestCase(test_base.ShakenFistTestCase):
         """
         self.assertEqual(8, retries.requested_disk_gb(
             [{'size': 8, 'type': 'disk'},
-             {'type': 'cdrom', 'base': 'sf://upload/system/debian-12'},
+             {'type': 'cdrom', 'base': 'sf://upload/system/debian'},
              {'size': None, 'type': 'disk'}]))
 
     def test_no_disk_spec_at_all_asks_for_nothing(self):
