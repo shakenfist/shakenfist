@@ -39,7 +39,7 @@ jobs:
           {
             description: 'develop branch on debian 12 single machine',
             job_name: 'develop-debian-12-localhost',
-            base_image: 'sf://label/ci-images/debian-12',
+            base_image: 'sf://label/ci-images/debian-13',
             base_image_user: 'debian',
             topology: 'localhost',
             tier: 'smoke',
@@ -49,7 +49,7 @@ jobs:
           {
             description: 'develop branch on debian 12 cluster',
             job_name: 'develop-debian-12-slim-primary',
-            base_image: 'sf://label/ci-images/debian-12',
+            base_image: 'sf://label/ci-images/debian-13',
             base_image_user: 'debian',
             topology: 'slim-primary',
             tier: 'full',

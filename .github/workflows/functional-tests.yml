@@ -446,9 +446,9 @@ jobs:
       matrix:
         merge: [
           {
-            name: 'Debian 12 cluster',
-            job_name: 'debian-12-slim-primary',
-            base_image: 'sf://label/ci-images/debian-12',
+            name: 'Debian 13 cluster',
+            job_name: 'debian-13-slim-primary',
+            base_image: 'sf://label/ci-images/debian-13',
             base_image_user: 'debian',
             topology: 'slim-primary',
             concurrency: 5,
@@ -468,7 +468,7 @@ jobs:
           {
             name: 'Guests',
             job_name: 'guests',
-            base_image: 'sf://label/ci-images/debian-12',
+            base_image: 'sf://label/ci-images/debian-13',
             base_image_user: 'debian',
             topology: 'slim-primary',
             concurrency: 5,
@@ -482,9 +482,9 @@ jobs:
             # 6 vCPU reshape took its cluster ledger from 12 to 24.
             # Six merge runs on that shape took 27 to 42 minutes, so 60
             # carries the same headroom the other entries have.
-            name: 'Debian 12 tier',
-            job_name: 'debian-12-slim-tier',
-            base_image: 'sf://label/ci-images/debian-12',
+            name: 'Debian 13 tier',
+            job_name: 'debian-13-slim-tier',
+            base_image: 'sf://label/ci-images/debian-13',
             base_image_user: 'debian',
             topology: 'slim-tier',
             concurrency: 5,
@@ -535,7 +535,7 @@ jobs:
       headroom_gate: false
       tier: full
       topology: slim-primary
-      base_image: 'sf://label/ci-images/debian-12'
+      base_image: 'sf://label/ci-images/debian-13'
       base_image_user: debian
       test_kind: ansible-modules
       concurrency_key: ansible-modules
@@ -603,7 +603,7 @@ jobs:
 
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               debian@${UPLOAD_TARGET} \
-              "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"
+              "${setup} debian /srv/ci/debian:13 --shared --no-checksum"
 
 
       - name: Run node lifecycle tests

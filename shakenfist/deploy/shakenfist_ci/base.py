@@ -37,7 +37,7 @@ TRACE_PATH = '/srv/ci/traces'
 CAPACITY_WAIT_TRACE_FILE = os.path.join(TRACE_PATH, 'instance-waits.jsonl')
 
 
-CLUSTER_CI_IMAGE = 'sf://upload/system/debian-12'
+CLUSTER_CI_IMAGE = 'sf://upload/system/debian'
 
 
 # How long create_instance() waits out a capacity refusal before failing

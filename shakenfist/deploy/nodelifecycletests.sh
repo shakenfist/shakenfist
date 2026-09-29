@@ -214,7 +214,7 @@ for hypervisor in ${hypervisors}; do
 	    log "Created network ${hypervisor}-${i}"
 
         sf-client instance create ${hypervisor}-${i} 1 1024 \
-            -d 20@sf://upload/system/debian-12 -f ${hypervisor}-${i} \
+            -d 20@sf://upload/system/debian -f ${hypervisor}-${i} \
             -p ${hypervisor}
 	    log "Created instance ${hypervisor}-${i}"
     done

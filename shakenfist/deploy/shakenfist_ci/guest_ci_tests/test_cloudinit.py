@@ -46,7 +46,7 @@ sudo echo 'banana' >  /tmp/output"""
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-12',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
             ],
@@ -94,7 +94,7 @@ sudo echo 'banana' >  /tmp/output"""
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-12',
+                    'base': base.CLUSTER_CI_IMAGE,
                     'type': 'disk'
                 }
             ], None, None)

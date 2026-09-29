@@ -37,7 +37,7 @@ class InstanceHotplugTestsMixin:
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-12',
+                    'base': 'sf://upload/system/debian',
                     'type': 'disk'
                 }
             ], None, None)
@@ -106,7 +106,7 @@ class InstanceHotplugTestsMixin:
             [
                 {
                     'size': 8,
-                    'base': 'sf://upload/system/debian-12',
+                    'base': 'sf://upload/system/debian',
                     'type': 'disk'
                 }
             ], None, None)

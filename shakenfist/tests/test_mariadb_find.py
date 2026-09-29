@@ -1542,8 +1542,8 @@ class BuildObjectFilterQueryJoinTestCase(base.ShakenFistTestCase):
             conn.execute(sa.insert(artifacts).values(
                 uuid=a_uuid,
                 artifact_type='image',
-                source_url='sf://upload/system/debian-12',
-                name='debian-12',
+                source_url='sf://upload/system/debian',
+                name='debian',
                 namespace='system',
                 version=9))
             # ``mariadb.set_state`` writes the dashed string form.
@@ -1561,7 +1561,7 @@ class BuildObjectFilterQueryJoinTestCase(base.ShakenFistTestCase):
             rows = conn.execute(stmt).fetchall()
 
         self.assertEqual(1, len(rows))
-        self.assertEqual('debian-12', rows[0].name)
+        self.assertEqual('debian', rows[0].name)
 
     def test_join_excludes_other_object_types(self):
         from shakenfist.schema.object_types import ObjectType
