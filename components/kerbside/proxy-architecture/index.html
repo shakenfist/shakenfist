@@ -8580,6 +8580,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-proxmox-source-phase-03a-connect-time-minting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 3a: minting at connect time
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -15432,9 +15460,25 @@ certificate's name must match the host dialled unless a <code>host_subject</code
 pinned. This is narrower than earlier releases, where a configured
 <code>ca_cert</code> was added to the public roots rather than replacing them, so a
 certificate from any public CA also passed the chain check (ryll commit
-3050082, picked up with the fix for issue #477). A deployment whose
-hypervisors present publicly issued certificates must therefore leave
-<code>ca_cert</code> empty for that source rather than set it to an unrelated CA.</p>
+3050082, picked up with the fix for issue #477).</p>
+<p>What that means depends on the source type, because <code>ca_cert</code> is not
+always a free choice:</p>
+<ul>
+<li><strong>Shaken Fist and oVirt.</strong> One <code>ca_cert</code> field serves both the cloud
+  API and the hypervisor VDI leg, and the source driver requires it to
+  match the CA the cloud itself publishes, exactly, or the source is
+  marked errored (<code>kerbside/sources/shakenfist.py</code>,
+  <code>kerbside/sources/ovirt.py</code>). So it can be neither left empty nor
+  extended into a bundle. Both platforms issue hypervisor SPICE
+  certificates from that same cluster (or engine) CA, so the narrower
+  trust changes nothing for them. A hypervisor whose SPICE certificate
+  was replaced with one from another CA will now fail the backend
+  connect.</li>
+<li><strong>Static and OpenStack.</strong> <code>ca_cert</code> is only the VDI trust anchor
+  (see <a href="/components/kerbside/console-sources/">Console Sources</a>). A deployment whose
+  hypervisors present publicly issued certificates must leave it empty
+  for that source rather than set it to an unrelated CA.</li>
+</ul>
 <p>For Shaken Fist consoles the enforced <code>host_subject</code> is not configured on the
 proxy: it is pinned at scrape time from the hosting node's published SPICE
 server certificate subject (<code>spice_server_cert_subject</code>), and carried through

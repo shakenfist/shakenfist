@@ -8357,6 +8357,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-proxmox-source-phase-03a-connect-time-minting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 3a: minting at connect time
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -15044,19 +15072,23 @@ client, then assert the session was clean:</p>
 <p>The proxy advertises the connected client's link capabilities to qemu
 rather than its own (see "Link capabilities" in
 <a href="/components/kerbside/proxy-architecture/#link-capabilities">Proxy Architecture</a>). To see
-what each backend link sent and was granted, bring the path up with
-debug logging and connect a client other than ryll, whose capabilities
-differ:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nv">RUST_LOG</span><span class="o">=</span><span class="nv">kerbside_proxy</span><span class="o">=</span>debug<span class="w"> </span>tools/direct-qemu/verify-rust-proxy.sh<span class="w"> </span>up
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>remote-viewer<span class="w"> </span>/tmp/kerbside-rust-proxy-verify/console.vv
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>grep<span class="w"> </span><span class="s1">'backend link capabilities'</span><span class="w"> </span>/tmp/kerbside-rust-proxy-verify/rust-proxy.log
+what each backend link sent and was granted, bring the path up (the
+harness already runs the proxy at debug level) and connect a client
+other than ryll, whose capabilities differ. The mock control plane
+needs a Python with <code>grpc</code>, such as the tox environment's:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MOCK_GRPC_PYTHON</span><span class="o">=</span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">/.tox/py3/bin/python"</span><span class="w"> </span><span class="nv">PYTHONPATH</span><span class="o">=</span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">"</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>tools/direct-qemu/verify-rust-proxy.sh<span class="w"> </span>up
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>remote-viewer<span class="w"> </span>/tmp/kerbside-rust-proxy-verify/console.vv
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>grep<span class="w"> </span><span class="s1">'backend link capabilities'</span><span class="w"> </span>/tmp/kerbside-rust-proxy-verify/rust-proxy.log
 </code></pre></div>
 <p>Each line carries <code>sent_channel_caps</code> (the client's, forwarded) and
 <code>backend_channel_caps</code> (qemu's reply). On the display channel ryll
 sends <code>[7039]</code>; any other value there is the client's own set. A
 <code>backend lacks capabilities Kerbside offered the client</code> warning means
 qemu's spice-server was built without a capability the proxy offers by
-default, such as Opus.</p>
+default, such as Opus. A backend that lacks MINI_HEADER, AUTH_SELECTION or
+AUTH_SPICE is not a warning: the backend connect fails and is audited
+as a hypervisor connection failure.</p>
 <p><code>assert-firewall</code> (with the default <code>FIREWALL_EXPECT=clean</code>) waits for
 a real session — <code>kerbside_proxy_authorized_total &gt;= 1</code> and
 <code>kerbside_proxy_bytes_relayed_total &gt; 0</code> in both directions — then

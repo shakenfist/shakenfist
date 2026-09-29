@@ -8265,6 +8265,34 @@
   
   
     <li class="md-nav__item">
+      <a href="PLAN-proxmox-source-phase-03a-connect-time-minting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 3a: minting at connect time
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -14837,7 +14865,7 @@ repo root. For pre-push audits of our own work see
 <td><a href="/components/kerbside/plans/PLAN-proxmox-source/">Proxmox console source</a></td>
 <td>A Proxmox VE source driver and the transport work it needs: PVE reaches qemu's SPICE listener only through an HTTP CONNECT to its <code>spiceproxy</code>, which the backend dialer cannot do, and mints both credentials per request, which the authorize path has no way to ask for. Carries the feasibility research promoted out of PLAN-two-tier-ci.md's future-work section on 2026-09-20, now measured against an ephemeral PVE 9.2.20 deployment built by private prototype Ansible. Promoted to a master plan on 2026-09-24 when phase 2 was planned, which brings the mandatory push-audit phase (phase 7) with it</td>
 <td>In progress</td>
-<td>phase 1 (complete -- ticket semantics, measured against an ephemeral deployment on 2026-09-20 before the plan was scheduled; no code and no plan file, and its results are the master plan's <em>What the measurements settled</em>), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/">phase 1b</a> (in progress -- a Proxmox deployment action in shakenfist/actions and a ryll lane on it, replacing phase 2's operator-assisted step 2f. The survey found there was never a standing node, that the measurements never minted with the API token or resolved the node's FQDN off-node, and that ryll's VM lanes carry no fork guard. The decision most likely to be argued with is landing the lane's ryll commits inside phase 2's pull request), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect/">phase 2</a> (in progress -- 2a and 2b committed in ryll. HTTP CONNECT in ryll's <code>shakenfist-spice-protocol</code>, plus <code>.vv</code> <code>proxy=</code> support in the ryll binary, so ryll opens a Proxmox <code>.vv</code> without kerbside. The survey found open question 2 is a correctness requirement rather than hardening: <code>ServerName::try_from</code> rejects a pseudo-hostname outright, so every tunnelled handshake would fail. It also found the pseudo-hostname, which carries a signed ticket, written into ryll's logs, capture metadata and bug reports; an IPv6-literal dial bug the rewrite fixes in passing; and that kerbside's <code>build_config</code> escalates to TLS only on <code>NEED_SECURED</code>, which phase 3b must change for tunnels. Both settled open questions are recorded at source. The decision most likely to be argued with is redacting the whole tunnel target from ryll's output rather than parsing Proxmox's format to show the vmid and node), phase 3a (not started), phase 3b (not started), phase 4 (not started), phase 5 (not started), phase 6 (not started), phase 7 (not started -- push audit)</td>
+<td>phase 1 (complete -- ticket semantics, measured against an ephemeral deployment on 2026-09-20 before the plan was scheduled; no code and no plan file, and its results are the master plan's <em>What the measurements settled</em>), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/">phase 1b</a> (complete, merged actions 5399c4f (#96), its ryll half inside phase 2's merge -- a Proxmox deployment action in shakenfist/actions and a ryll lane on it, replacing phase 2's operator-assisted step 2f. The survey found there was never a standing node, that the measurements never minted with the API token or resolved the node's FQDN off-node, and that ryll's VM lanes carry no fork guard. The decision most likely to be argued with is landing the lane's ryll commits inside phase 2's pull request. The node deploys in about seven minutes; the lane went red at the expired check alone on a deliberate-failure run, after review found it could not fail at all without <code>pipefail</code>), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect/">phase 2</a> (complete, merged ryll ea4bf67 (#402) -- HTTP CONNECT in ryll's <code>shakenfist-spice-protocol</code>, plus <code>.vv</code> <code>proxy=</code> support in the ryll binary, so ryll opens a Proxmox <code>.vv</code> without kerbside. The survey found open question 2 is a correctness requirement rather than hardening: <code>ServerName::try_from</code> rejects a pseudo-hostname outright, so every tunnelled handshake would fail. It also found the pseudo-hostname, which carries a signed ticket, written into ryll's logs, capture metadata and bug reports; an IPv6-literal dial bug the rewrite fixes in passing; and that kerbside's <code>build_config</code> escalates to TLS only on <code>NEED_SECURED</code>, which phase 3b must change for tunnels. Both settled open questions are recorded at source. The decision most likely to be argued with is redacting the whole tunnel target from ryll's output rather than parsing Proxmox's format to show the vmid and node. Its push audit ran after merge and raised only low and advisory findings, fixed in ryll #411), <a href="/components/kerbside/plans/PLAN-proxmox-source-phase-03a-connect-time-minting/">phase 3a</a> (in progress -- minting moved into the authorize path through a source-driver hook, with <code>ovirt.py</code> requesting an explicit expiry and no longer storing its ticket on the <code>Console</code> row. The survey overturned the master plan's in-memory ticket store: a load balancer may send one session's channels to different proxy nodes, so the ticket lives on the session's token row in the shared database, under a row lock so one channel mints. It also found that no channel can arrive after the session's one-minute token expires, so an oVirt ticket covering the token never needs replacing, and settled supersession from the oVirt, libvirt, qemu and Proxmox sources: a new SPICE password keeps connected clients. The decision most likely to be argued with is that database store, which puts a live password in the database the master plan meant to keep it out of -- for about a minute and a half, where today's oVirt path leaves one on the console row for two hours), phase 3b (not started), phase 4 (not started), phase 5 (not started), phase 6 (not started), phase 7 (not started -- push audit)</td>
 </tr>
 <tr>
 <td>2026-09-23</td>

@@ -8447,6 +8447,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-proxmox-source-phase-03a-connect-time-minting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 3a: minting at connect time
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -15811,7 +15839,8 @@ covers ryll's output, not the file.</p>
   - the CONNECT target and <code>Host:</code> header must both be
     <code>&lt;host&gt;:&lt;tls-port&gt;</code>
     (homelab <code>tools/pve-ticket-probe.py:53-66,83-90</code>);
-  - spiceproxy answers <code>HTTP/1.0 200</code>;
+  - spiceproxy answers <code>HTTP/1.1 200</code> (the homelab notes said
+    <code>1.0</code>; the lane saw <code>1.1</code>, and ryll accepts either);
   - the node's root CA is <code>/etc/pve/pve-root-ca.pem</code>. It is
     the same CA the ticket's <code>ca</code> field carries, so fetch it
     to the runner for <code>curl --cacert</code>.
@@ -15991,45 +16020,45 @@ reason.</p>
 </ul>
 <h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>deploy-proxmox-on-shakenfist/action.yml</code> exists, and
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>deploy-proxmox-on-shakenfist/action.yml</code> exists, and
       every input and output it declares is documented in
       actions <code>docs/actions.md</code>. A reviewer diffing the two
       lists finds no difference.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>tests/test_ansible_readiness.py</code> names
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>tests/test_ansible_readiness.py</code> names
       <code>proxmox-single-node.yml</code> among the creating
       playbooks, and <code>python3 -m unittest discover -s tests
       -t .</code> passes in actions.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -rn -E 'homelab|id_general|proxmoxproxmox|sfcbr'
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>grep -rn -E 'homelab|id_general|proxmoxproxmox|sfcbr'
       deploy-proxmox-on-shakenfist ansible/proxmox-single-node.yml
       ansible/tasks/proxmox ansible/vars/proxmox.yml
       tools/proxmox-*</code> in actions finds nothing.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Every task in <code>ansible/tasks/proxmox/api.yml</code> that
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Every task in <code>ansible/tasks/proxmox/api.yml</code> that
       creates the token or registers its output carries
       <code>no_log: true</code>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A green <code>proxmox-substrate.yml</code> run on the actions
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A green <code>proxmox-substrate.yml</code> run on the actions
       pull request is linked under <em>Outcome</em>, with the
       deploy's wall time. In its log, the FQDN assertion
       prints four matching names.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>gh run view &lt;that run&gt; --log | grep -E
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>gh run view &lt;that run&gt; --log | grep -E
       'PVEAPIToken=|"value"'</code> returns only masked output.
       The command and its result are recorded under
       <em>Outcome</em>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A green <code>proxmox-functional.yml</code> run on phase 2's pull
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A green <code>proxmox-functional.yml</code> run on phase 2's pull
       request is linked in phase 2's <em>Outcome</em>. Its log
       shows four summary lines: positive (four channels,
       alive at mint+120 s), expired (401 with the hint),
       wrong pin (TLS, both subjects), missing pin (refused,
       no dial).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Every positive-case mint-to-launch time in that run is
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Every positive-case mint-to-launch time in that run is
       under 10 seconds, and all are recorded.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A deliberate-failure run turned the lane red at the
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A deliberate-failure run turned the lane red at the
       expired check alone, and its URL is recorded.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No <code>.vv</code> file appears in either lane's uploaded
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> No <code>.vv</code> file appears in either lane's uploaded
       artifacts.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The actions push-audit substitute (1b.6) is recorded
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The actions push-audit substitute (1b.6) is recorded
       under <em>Outcome</em>, and 2g's audit covered the lane's
       ryll commits.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The master plan's Execution table carries a 1b row
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The master plan's Execution table carries a 1b row
       with <code>Merged</code> set to <code>actions &lt;sha&gt; (#pr)</code>, and its
       open question 5 no longer mentions a validated node.
       Phase 2's step 2f and <em>Validation against a real node</em>
@@ -16074,13 +16103,127 @@ work</em> and deliberately not fixed here.</p>
   matters to something.</li>
 </ul>
 <h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
-<p>In progress. Actions branch <code>proxmox-substrate</code>: 1b.1
-<code>5d7aaca</code>, 1b.2 <code>8f7cec6</code>, 1b.3 <code>72454bf</code>, 1b.4 <code>9beb04b</code>;
-1b.5 (drive the lane green) is under way. Ryll branch
-<code>spice-http-connect</code>: 1b.7 <code>dd83856</code>, 1b.8 <code>5487b04</code>, 1b.9
-<code>edd43e8</code>. 1b.7's local runs, against qemu behind a fake
-spiceproxy, found that headless ryll exited 0 on a failed
-connect; fixed in ryll <code>189bff3</code> (see phase 2's <em>Outcome</em>).</p>
+<p>Complete. The actions half merged as actions <code>5399c4f</code>
+(#96) on 2026-09-24; the ryll half merged inside phase 2's
+pull request, ryll <code>ea4bf67</code> (#402), on 2026-09-26.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Commit</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1b.1</td>
+<td>actions <code>5d7aaca</code></td>
+<td>The playbook.</td>
+</tr>
+<tr>
+<td>1b.2</td>
+<td>actions <code>8f7cec6</code></td>
+<td>The composite action.</td>
+</tr>
+<tr>
+<td>1b.3</td>
+<td>actions <code>72454bf</code></td>
+<td>Its own lane, <code>proxmox-substrate.yml</code>.</td>
+</tr>
+<tr>
+<td>1b.4</td>
+<td>actions <code>9beb04b</code></td>
+<td>Docs.</td>
+</tr>
+<tr>
+<td>1b.5</td>
+<td>actions <code>e6990ea</code>, <code>6f660ad</code></td>
+<td>Driven green. Two defects found by running it: published SHA-256 checksums tripped gitleaks, now allowlisted; and the node's names came back mixed case, so the FQDN assertion compares them case-sensitively rather than folding.</td>
+</tr>
+<tr>
+<td>1b.6</td>
+<td>actions <code>62dbafe</code> to <code>202b6d3</code></td>
+<td>The review rounds, below.</td>
+</tr>
+<tr>
+<td>1b.7</td>
+<td>ryll <code>dd83856</code></td>
+<td><code>tools/proxmox-smoke.py</code>. Its local runs, against qemu behind a fake spiceproxy, found headless ryll exiting 0 on a failed connect; fixed in ryll <code>189bff3</code> (phase 2's <em>Outcome</em>).</td>
+</tr>
+<tr>
+<td>1b.8</td>
+<td>ryll <code>5487b04</code></td>
+<td><code>proxmox-functional.yml</code>.</td>
+</tr>
+<tr>
+<td>1b.9</td>
+<td>ryll <code>edd43e8</code></td>
+<td>Docs.</td>
+</tr>
+<tr>
+<td>1b.10</td>
+<td>ryll <code>a45b632</code></td>
+<td>The lane could not fail: its step piped the driver through <code>tee</code> under the default shell, which has no <code>pipefail</code>. Fixed with <code>shell: bash</code>, found in review.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The actions lane.</strong> The last pull-request run,
+<a href="https://github.com/shakenfist/actions/actions/runs/35977836549">35977836549</a>
+on <code>202b6d3</code>, deployed the node in 7 minutes 2 seconds, well
+inside the twenty-minute worst case <em>Risks</em> allowed for. Its
+FQDN assertion printed four matching names: <code>hostname -f</code>,
+the certificate CN, the ticket's proxy host and the ticket's
+<code>host-subject</code> CN. <code>gh run view 35977836549 --log | grep -E
+'PVEAPIToken=|"value"'</code> returns nothing at all, masked or
+otherwise. The first scheduled run on <code>main</code>,
+<a href="https://github.com/shakenfist/actions/actions/runs/36308899083">36308899083</a>
+on 2026-09-27, was green.</p>
+<p><strong>1b.6, the push-audit substitute.</strong> <code>pre-commit run
+--all-files</code>, the unit tests (254), <code>tools/ansible-syntax-check.sh</code>
+(16 playbooks) and <code>tools/gitleaks-scan.sh</code> (positive control
+fired, 400-commit history clean) all passed. The walk of the
+eleven traps in actions <code>AGENTS.md</code> found five that applied,
+each already handled (composite steps carry no
+<code>timeout-minutes</code>, every runner label is in
+<code>actionlint.yaml</code>, the <code>vm</code> job names its size, and the two
+about asking for and reading the automated review). The
+review rounds took 2 fix items and 6 of 7 consider items in
+the first round, and the last round removed every reference
+to this plan from the action's code and docs, per the
+shakenfist/development rule that landed code describes itself
+rather than the plan that built it.</p>
+<p><strong>The ryll lane.</strong> Green on phase 2's merged head,
+<a href="https://github.com/shakenfist/ryll/actions/runs/36181594273">36181594273</a>
+on <code>6559905</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>positive: PASS in 120.2s -- mint-&gt;launch 0.04s; main, display, inputs, cursor authenticated 0.7s after launch; 1 surface(s); screenshot 720x400 PNG, 92264 bytes; send_key accepted; alive at mint+120.0s; second screenshot 720x400 PNG, 78248 bytes; exited 0 0.2s after SIGINT
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>expired: PASS in 50.0s -- mint-&gt;launch 50.00s (0.00s past the 50s wait); exited 1 0.0s after launch; 401 with the ticket hint
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>wrong-pin: PASS in 0.1s -- mint-&gt;launch 0.10s; exited 1 0.0s after launch; pin warning names the pinned and the presented CN; TLS handshake refused
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>missing-pin: PASS in 0.1s -- mint-&gt;launch 0.10s; exited 1 0.0s after launch; refused to tunnel without a host_subject; no dial
+</code></pre></div>
+<p>The positive check's mint-to-launch time was 0.04 s. The
+expired check's 50.00 s is its deliberate wait, with nothing
+past it. It had passed four for four on <code>50a9cc0</code> and
+<code>a45b632</code> too.</p>
+<p><strong>The deliberate-failure run</strong>,
+<a href="https://github.com/shakenfist/ryll/actions/runs/36285313301">36285313301</a>,
+dispatched on 2026-09-27 against a throwaway branch that set
+the expired check's delay to 0. It went red at the expired
+check alone (<code>FAIL in 30.3s -- ryll was still running 30 s
+after the launch; no "HTTP proxy refused the CONNECT:
+...401..." error</code>), with positive, wrong-pin and missing-pin
+passing, the build and the deploy green, and the red coming
+from the checks step. The branch was deleted afterwards. The
+lane could not have failed before <code>a45b632</code>, so no earlier
+red run counts as this.</p>
+<p>No <code>.vv</code> appeared in either lane's artifacts. The ryll
+artifact holds only <code>proxmox-smoke.log</code> and one <code>ryll.log</code>
+per check; ryll #411 has since made that a structural
+property rather than a clean-up one (phase 2's <em>Outcome</em>).</p>
+<p><strong>Survey finding 6.</strong> The runners' Shaken Fist credentials
+worked on the first run that reached the deploy step,
+35978158789 on <code>50a9cc0</code>. The one earlier failure,
+35950514235, died in <em>Set up job</em>, before any credential was
+used.</p>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step of this plan, back brief the
 operator on the intended approach and on any deviation from

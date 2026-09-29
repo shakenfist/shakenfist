@@ -8381,6 +8381,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-proxmox-source-phase-03a-connect-time-minting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 3a: minting at connect time
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -15238,13 +15266,19 @@ race the client wins only by luck.</p>
 <p>So the default is <strong>one ticket per session</strong>: the first
 channel's authorize call mints, and later channels in the
 same session reuse that ticket for as long as it is valid.
-A channel that arrives after the ticket has aged out (a
-usbredir channel on a device plug, say) mints a replacement.
-That is safe only if qemu does not re-check an established
-channel's password when it changes, which is what the
-supersession section says has not been proven. The ticket is
-held in the daemon's memory, keyed by session, and never
-written to the <code>Console</code> row. The failure mode this adds is
+A channel that arrives after the ticket has aged out mints a
+replacement. No channel can arrive after the session's
+kerbside token expires (one minute by default), because
+authorize refuses an expired token, so that window is
+bounded; within it, a replacement is safe because qemu keeps
+connected clients when its password changes (settled in
+<a href="/components/kerbside/plans/PLAN-proxmox-source-phase-03a-connect-time-minting/">phase 3a</a>,
+survey finding 3). The ticket is held on the session's token
+row in the shared database, never on the <code>Console</code> row, and
+cleared once it expires. It cannot be held in the daemon's
+memory, as this section first said: a load balancer may
+send one session's channels to different proxy nodes, each
+with its own daemon. The failure mode this adds is
 unavoidable whichever shape is chosen: PVE being unreachable
 now breaks connection setup, not just discovery.</p>
 <h3 id="three-protocol-details-that-cost-an-afternoon">Three protocol details that cost an afternoon<a class="headerlink" href="#three-protocol-details-that-cost-an-afternoon" title="Permanent link">&para;</a></h3>
@@ -15355,11 +15389,10 @@ session-scoped design that replaced it: a replacement ticket
 minted for a late channel revokes the credential every
 earlier channel authenticated with. Whether that matters
 depends on whether qemu re-checks an established channel's
-password (it does not appear to — the six concurrent
-channels stayed up) but "appears not to" is not a foundation
-to build on. <strong>Phase 3a cannot be designed without settling
-this</strong>, so it belongs in that phase's scope rather than as an
-open question here.</p>
+password. It does not: QMP <code>set_password</code> keeps connected
+clients unless told otherwise, and neither oVirt nor Proxmox
+tells it otherwise. Phase 3a settled this from their sources
+and measures it in the direct-qemu lane.</p>
 <h2 id="proposed-phases">Proposed phases<a class="headerlink" href="#proposed-phases" title="Permanent link">&para;</a></h2>
 <p>The decomposition, with each phase's intent. Status and
 phase plan links are tracked under <em>Execution</em>.</p>
@@ -15385,7 +15418,7 @@ phase plan links are tracked under <em>Execution</em>.</p>
 </tr>
 <tr>
 <td>3a. Minting at connect time</td>
-<td>Minting moved into the authorize path through a source-driver hook, with one ticket per session held in daemon memory, and <code>ovirt.py</code> converted to request a short explicit expiry and stop persisting the ticket on the <code>Console</code> row. Settles the supersession behaviour above first. Not Proxmox-only, and needs nothing from ryll</td>
+<td>Minting moved into the authorize path through a source-driver hook, with one ticket per session held on the session's token row in the shared database, and <code>ovirt.py</code> converted to request a short explicit expiry and stop persisting the ticket on the <code>Console</code> row. Settles the supersession behaviour above first. Not Proxmox-only, and needs nothing from ryll</td>
 </tr>
 <tr>
 <td>3b. Tunnel transport</td>
@@ -15436,8 +15469,10 @@ measurement against a deployment, it changed no code, and
 its results are the <em>What the measurements settled</em> section
 above. The push audit has nothing of it to read.</p>
 <p>Phase 1b's <code>Merged</code> cell holds <code>actions &lt;sha&gt; (#pr)</code>; its
-ryll half lands inside phase 2's merge and carries no
-separate <code>Merged</code> entry of its own.</p>
+ryll half landed inside phase 2's merge and carries no
+separate <code>Merged</code> entry of its own. Phase 2's push-audit
+findings landed as ryll <code>d787520</code> (#411), audited in ryll
+and cited from phase 2's <em>Outcome</em>.</p>
 <table>
 <thead>
 <tr>
@@ -15457,19 +15492,19 @@ separate <code>Merged</code> entry of its own.</p>
 <tr>
 <td>1b. CI substrate</td>
 <td><a href="/components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/">PLAN-proxmox-source-phase-01b-ci-substrate.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>actions 5399c4f (#96)</td>
 </tr>
 <tr>
 <td>2. Tunnelled transport in ryll</td>
 <td><a href="/components/kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect/">PLAN-proxmox-source-phase-02-ryll-connect.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>ryll ea4bf67 (#402)</td>
 </tr>
 <tr>
 <td>3a. Minting at connect time</td>
-<td></td>
-<td>Not started</td>
+<td><a href="/components/kerbside/plans/PLAN-proxmox-source-phase-03a-connect-time-minting/">PLAN-proxmox-source-phase-03a-connect-time-minting.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -15519,10 +15554,10 @@ separate <code>Merged</code> entry of its own.</p>
   is why a <code>Target</code> change couples the daemon and the binary.</li>
 </ul>
 <h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
-<p>In progress. Phase 1 is complete, and phases 1b and 2 are
-planned. Phase 2 is in progress in ryll (steps 2a and 2b
-committed on <code>spice-http-connect</code>); its validation waits on
-phase 1b.</p>
+<p>In progress. Phases 1, 1b and 2 are complete: CI can build a
+Proxmox VE node on demand, and ryll tunnels through
+<code>spiceproxy</code>, proven against a real node on every ryll pull
+request that touches the tunnel. Phase 3a is planned.</p>
 
 
 

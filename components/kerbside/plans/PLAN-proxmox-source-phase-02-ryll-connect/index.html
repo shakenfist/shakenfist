@@ -16,7 +16,7 @@
         <link rel="prev" href="../PLAN-proxmox-source-phase-01b-ci-substrate/">
       
       
-        <link rel="next" href="../PLAN-proxy-dev-releases-phase-01-publish-workflow/">
+        <link rel="next" href="../PLAN-proxmox-source-phase-03a-connect-time-minting/">
       
       
         
@@ -8397,6 +8397,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-proxmox-source-phase-03a-connect-time-minting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxmox source phase 3a: minting at connect time
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-proxy-dev-releases-phase-01-publish-workflow/" class="md-nav__link">
         
   
@@ -15513,31 +15541,34 @@ check confirms that rather than assuming it.</p>
 </ul>
 <h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>SpiceClient::new</code> refuses <code>proxy</code> without
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>SpiceClient::new</code> refuses <code>proxy</code> without
       <code>host_subject</code>, and <code>proxy</code> without <code>tls_port</code>. Two
       tests assert each error names the missing field.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> With <code>proxy: None</code>, every pre-existing crate test
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> With <code>proxy: None</code>, every pre-existing crate test
       passes unchanged. No existing test was edited except
       to add <code>proxy</code> where a struct literal requires it.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A test proves that bytes following the CONNECT
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A test proves that bytes following the CONNECT
       response's blank line are still readable by the
       caller.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -rn 'config.host' ryll/src
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>grep -rn 'config.host' ryll/src
       shakenfist-spice-protocol/src</code> finds no site that logs,
       writes or reports the host without going through
       <code>display_target()</code>. Any remaining hit is a dial or a
       <code>From</code> conversion.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>tools/fuzz-targets.sh</code> lists <code>fuzz_parse_proxy_uri</code>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>tools/fuzz-targets.sh</code> lists <code>fuzz_parse_proxy_uri</code>
       and <code>fuzz_parse_connect_response</code>, and each ran
-      100,000 iterations without a crash.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>docs/configuration.md</code> documents <code>proxy</code>, and nothing
+      100,000 iterations without a crash. (The script reads
+      its targets from the <code>[[bin]]</code> tables in
+      <code>shakenfist-spice-protocol/fuzz/Cargo.toml</code> rather than
+      naming them, so it is the manifest that lists both.)</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>docs/configuration.md</code> documents <code>proxy</code>, and nothing
       in ryll's docs says a <code>.vv</code>'s proxy is ignored.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>proxmox-functional.yml</code> is green on this pull
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>proxmox-functional.yml</code> is green on this pull
       request, and its run URL and four summary lines are
       recorded under <em>Outcome</em>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Ryll's <code>PUSH-AUDIT.md</code> has been run over the branch,
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Ryll's <code>PUSH-AUDIT.md</code> has been run over the branch,
       and its result is recorded under <em>Outcome</em>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The ryll pull request is merged to <code>develop</code>, and the
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> The ryll pull request is merged to <code>develop</code>, and the
       master plan's Execution table records
       <code>ryll &lt;sha&gt; (#pr)</code>.</li>
 </ul>
@@ -15553,13 +15584,16 @@ check confirms that rather than assuming it.</p>
 <li>The <code>SPICE_PROXY</code> environment fallback, for parity with
   remote-viewer.</li>
 <li>A connect timeout inside the crate, for callers that are
-  not kerbside.</li>
+  not kerbside. Only the CONNECT exchange is bounded (10 s);
+  the TCP dial to the proxy and the TLS handshake are not,
+  exactly as on the direct path.</li>
+<li>Consider requiring <code>ca=</code> for a tunnelled <code>.vv</code>, rather than
+  checking a tunnel against the public roots plus the pin.</li>
 <li>A friendlier <code>display_target()</code> for Proxmox, showing the
   vmid and node, if debugging demands it (decision 6).</li>
 </ul>
 <h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
-<p>In progress. On ryll branch <code>spice-http-connect</code>, not yet
-pushed:</p>
+<p>Complete. Merged as ryll <code>ea4bf67</code> (#402) on 2026-09-26.</p>
 <table>
 <thead>
 <tr>
@@ -15601,7 +15635,43 @@ pushed:</p>
 </tr>
 </tbody>
 </table>
-<p>Steps 2f (replaced by phase 1b's lane) and 2g remain.</p>
+<p>| — | <code>34da4a3</code>, <code>50a9cc0</code>, <code>a45b632</code>, <code>6559905</code> | Review rounds, below. |</p>
+<p><strong>Review.</strong> Two rounds of the automated review. The first
+found the lane unable to fail (no <code>pipefail</code>, see phase 1b's
+<em>Outcome</em>), the CONNECT exchange unbounded in time (now 10 s,
+<code>CONNECT_EXCHANGE_TIMEOUT</code>), and the capture metadata's split
+target fields; all three fixed in <code>a45b632</code>. <code>50a9cc0</code>
+removed every reference to this plan from ryll's code and
+docs. The merge queue then failed on Windows only: <code>a45b632</code>
+had cut <code>headless_connect_failure_is_an_error</code>'s limit to 2 s,
+and Windows retries a refused SYN for about that long, so
+<code>6559905</code> restored 10 s.</p>
+<p><strong>2f</strong> was replaced by phase 1b's lane; its green run and
+summary lines are in phase 1b's <em>Outcome</em>.</p>
+<p><strong>2g, the push audit</strong>, ran over the merged diff
+(<code>ea4bf67^1..ea4bf67</code>, lane commits included) on 2026-09-27,
+after merge rather than before, because the merge landed
+first. Wave 1 passed. It raised nothing critical or high.
+Eight of its ten low and advisory findings were fixed in
+ryll <code>d787520</code> (#411): a refused <code>user:pass@</code> proxy value was
+echoed whole into the <code>.vv</code> load error; the lane spliced the
+deploy action's outputs into its shell script; a run killed
+before a check's cleanup could upload an unscrubbed
+<code>ryll.log</code>; the workflow header still explained a pre-merge
+arrangement, and called the ryll it built "this branch's",
+which a dispatched run is not; two comments described the connect-error race as
+history; <code>configuration.md</code> omitted the fork guard; and
+<code>ARCHITECTURE.md</code> did not mention the tunnel. Declined: type
+hints across <code>tools/proxmox-smoke.py</code> (a style change to a
+whole file, not a defect); its double-quoted dict keys, which
+all sit inside single-quoted f-strings and cannot change
+before Python 3.12; a long line in <code>config.rs</code> older than this
+phase; and a note on why <code>proxy.rs</code> does not use
+<code>BoundedReader</code>, whose input is HTTP text rather than SPICE
+framing and is fuzzed. The audit's informational notes, that
+the TCP connect to the proxy and the TLS handshake carry no
+timeout of their own and that a tunnel with no <code>ca=</code> checks
+against public roots plus the pin, stand as <em>Future work</em>.</p>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step of this plan, back brief the
 operator on the intended approach and on any deviation from
