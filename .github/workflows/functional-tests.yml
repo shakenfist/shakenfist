@@ -603,7 +603,7 @@ jobs:
 
           ssh -i /srv/github/id_ci -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               debian@${UPLOAD_TARGET} \
-              "${setup} debian-12 /srv/ci/debian:12 --shared --no-checksum"
+              "${setup} debian /srv/ci/debian:13 --shared --no-checksum"
 
 
       - name: Run node lifecycle tests
