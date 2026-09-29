@@ -186,7 +186,7 @@ class RealTopologyTestCase(base.ShakenFistTestCase):
 
         ``slim-primary``'s primary is the only member of its database
         tier, so a minimum of two database nodes would fail the
-        ``Debian 12 cluster`` and ``Ubuntu 24.04 cluster`` jobs on every
+        ``Debian 13 cluster`` and ``Ubuntu 24.04 cluster`` jobs on every
         run. This asserts the asymmetry the decision rests on rather
         than any behaviour of the function.
         """

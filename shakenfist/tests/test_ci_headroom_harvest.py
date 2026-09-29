@@ -58,8 +58,8 @@ REPORT_PATH = os.path.join(TOOLS, 'ci_headroom_report.py')
 NODE_ONE = '11111111-1111-1111-1111-111111111111'
 NODE_TWO = '22222222-2222-2222-2222-222222222222'
 
-PRIMARY_BUNDLE = 'bundle-shakenfist-full-debian-12-slim-primary'
-TIER_BUNDLE = 'bundle-shakenfist-full-debian-12-slim-tier'
+PRIMARY_BUNDLE = 'bundle-shakenfist-full-debian-13-slim-primary'
+TIER_BUNDLE = 'bundle-shakenfist-full-debian-13-slim-tier'
 ANSIBLE_BUNDLE = 'bundle-shakenfist-full-ansible-modules'
 LIFECYCLE_BUNDLE = 'bundle-functional-node-lifecycle-collection'
 
@@ -364,9 +364,9 @@ class RecordTestCase(HarvestTestCase):
                 zips[artifact_id] = self._zip(str(artifact_id), members)
         if jobs is None:
             jobs = [
-                {'name': 'Debian 12 cluster (collection) / Smoke tests (collection)',
+                {'name': 'Debian 13 cluster (collection) / Smoke tests (collection)',
                  'conclusion': 'success'},
-                {'name': 'Debian 12 tier (collection) / Smoke tests (collection)',
+                {'name': 'Debian 13 tier (collection) / Smoke tests (collection)',
                  'conclusion': 'failure'},
             ]
         return FakeGitHub([run], {run['id']: artifacts}, {run['id']: jobs}, zips)
@@ -380,9 +380,9 @@ class RecordTestCase(HarvestTestCase):
         self.assertEqual('a' * 40, record['head_sha'])
         self.assertEqual('2026-09-01T00:00:00Z', record['run_created_at'])
         self.assertEqual('success', record['run_conclusion'])
-        self.assertEqual('Debian 12 cluster', record['job'])
+        self.assertEqual('Debian 13 cluster', record['job'])
         self.assertEqual(
-            'Debian 12 cluster (collection) / Smoke tests (collection)',
+            'Debian 13 cluster (collection) / Smoke tests (collection)',
             record['github_job_name'])
         self.assertEqual('success', record['job_conclusion'])
         self.assertEqual('slim-primary', record['topology'])
@@ -404,7 +404,7 @@ class RecordTestCase(HarvestTestCase):
         record = json.loads(lines[0])
         self.assertEqual('failure', record['run_conclusion'])
         self.assertEqual('failure', record['job_conclusion'])
-        self.assertEqual('Debian 12 tier', record['job'])
+        self.assertEqual('Debian 13 tier', record['job'])
 
     def test_a_job_which_cannot_be_matched_is_null_not_guessed(self):
         github = self._github({PRIMARY_BUNDLE: instrumented_members()}, jobs=[
@@ -563,7 +563,7 @@ class CacheTestCase(HarvestTestCase):
         run = self._run_payload()
         artifacts = [{'id': 9700, 'name': PRIMARY_BUNDLE, 'expired': False}]
         zips = {9700: self._zip('9700', instrumented_members())}
-        jobs = [{'name': 'Debian 12 cluster (collection) / Smoke tests (collection)',
+        jobs = [{'name': 'Debian 13 cluster (collection) / Smoke tests (collection)',
                  'conclusion': 'success'}]
 
         first = FakeGitHub([run], {run['id']: artifacts}, {run['id']: jobs}, zips)

@@ -126,20 +126,20 @@ BundleKind = collections.namedtuple(
 # 'job_prefix' is the name GitHub gives the job in the runs/<id>/jobs
 # listing, which is *not* the matrix's 'name': the reusable smoke-cluster
 # workflow contributes its own job name, so what the API returns is
-# 'Debian 12 cluster (collection) / Smoke tests (collection)'. The prefix is
+# 'Debian 13 cluster (collection) / Smoke tests (collection)'. The prefix is
 # stored explicitly rather than derived, because the derivation ('name' plus
 # ' (collection)') is a fact about how functional-tests.yml happens to name
 # the calling job today and would break silently if that changed.
 BUNDLE_TOPOLOGIES = {
-    'bundle-shakenfist-full-debian-12-slim-primary': BundleKind(
-        'Debian 12 cluster', 'slim-primary', 'Debian 12 cluster (collection)'),
+    'bundle-shakenfist-full-debian-13-slim-primary': BundleKind(
+        'Debian 13 cluster', 'slim-primary', 'Debian 13 cluster (collection)'),
     'bundle-shakenfist-full-ubuntu-2404-slim-primary': BundleKind(
         'Ubuntu 24.04 cluster', 'slim-primary',
         'Ubuntu 24.04 cluster (collection)'),
     'bundle-shakenfist-full-guests': BundleKind(
         'Guests', 'slim-primary', 'Guests (collection)'),
-    'bundle-shakenfist-full-debian-12-slim-tier': BundleKind(
-        'Debian 12 tier', 'slim-tier', 'Debian 12 tier (collection)'),
+    'bundle-shakenfist-full-debian-13-slim-tier': BundleKind(
+        'Debian 13 tier', 'slim-tier', 'Debian 13 tier (collection)'),
 }
 
 

@@ -446,8 +446,8 @@ jobs:
       matrix:
         merge: [
           {
-            name: 'Debian 12 cluster',
-            job_name: 'debian-12-slim-primary',
+            name: 'Debian 13 cluster',
+            job_name: 'debian-13-slim-primary',
             base_image: 'sf://label/ci-images/debian-13',
             base_image_user: 'debian',
             topology: 'slim-primary',
@@ -482,8 +482,8 @@ jobs:
             # 6 vCPU reshape took its cluster ledger from 12 to 24.
             # Six merge runs on that shape took 27 to 42 minutes, so 60
             # carries the same headroom the other entries have.
-            name: 'Debian 12 tier',
-            job_name: 'debian-12-slim-tier',
+            name: 'Debian 13 tier',
+            job_name: 'debian-13-slim-tier',
             base_image: 'sf://label/ci-images/debian-13',
             base_image_user: 'debian',
             topology: 'slim-tier',
