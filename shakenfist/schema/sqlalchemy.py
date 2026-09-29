@@ -157,18 +157,33 @@ class SQLUniqueIndex:
 
 
 class SQLNativeUUID:
-    """Marker to indicate this UUID field should use native MariaDB UUID type.
+    """Marker to indicate this UUID field should use a uuid_column_type() column.
 
-    By default, UUID fields are stored as CHAR(36) strings. Use this marker
-    to store them using MariaDB's native UUID type instead, which provides
-    better storage efficiency (16 bytes vs 36 bytes) and indexing performance.
+    By default, UUID fields are stored as VARCHAR(36) dashed strings. Use
+    this marker to store them as undashed CHAR(32) hex instead, bound and
+    read back as uuid.UUID objects. Despite the name this is not MariaDB's
+    native UUID type -- see uuid_column_type() for why.
 
     Usage:
         uuid: Annotated[UUID4, SQLNativeUUID()]
-
-    Note: This requires MariaDB 10.7+ which has native UUID support.
     """
     pass
+
+
+def uuid_column_type() -> sa.Uuid[Any]:
+    """The column type for every uuid column stored as undashed CHAR(32).
+
+    Every SQLAlchemy Uuid column in Shaken Fist must use this rather than a
+    bare sa.Uuid(). The existing tables were all created as CHAR(32), and
+    SQLAlchemy 2.1 made its MariaDB dialect report native UUID support: a
+    bare sa.Uuid() then renders new columns as UUID, hands uuid.UUID binds
+    to the driver unconverted rather than as the undashed hex the CHAR(32)
+    columns hold (so nothing matches), and returns plain strings instead of
+    UUID objects. That silently disabled coalescing in the SQLAlchemy 2.1 merge
+    queue run. native_uuid=False keeps the CHAR(32) hex behaviour on every
+    SQLAlchemy version, and test_uuid_column_type enforces its use.
+    """
+    return sa.Uuid(native_uuid=False)
 
 
 class SQLLongText:
@@ -357,7 +372,7 @@ def _get_sqlalchemy_type(
     # UUID fields - check for native UUID marker first
     if _is_uuid_type(annotation):
         if field_metadata and _has_native_uuid_marker(field_metadata):
-            return sa.Uuid()
+            return uuid_column_type()
         return sa.String(36)
 
     # Enum fields -> VARCHAR to store the name
