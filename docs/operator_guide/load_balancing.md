@@ -33,7 +33,8 @@ exception -- the Swagger UI fetches them from the server root, so they are
 passed through unchanged rather than living under `/api`.
 
 This is why the `api_url` you give the deployer ends in `/api`: that prefix is
-what the proxy expects and strips.
+what the proxy expects and strips. There is no version segment after it --
+no `/v1/` -- so `<lb>/api/instances` reaches `/instances` on the backend.
 
 | External path | Backend path | Notes |
 |---------------|--------------|-------|

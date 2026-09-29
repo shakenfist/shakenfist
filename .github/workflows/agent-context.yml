@@ -1,5 +1,5 @@
-# Lints the agent context -- AGENTS.md, CLAUDE.md and the skills under
-# .claude/ -- for malformed frontmatter, smuggled instructions,
+# Lints the agent context -- AGENTS.md and the skills under .claude/ --
+# for malformed frontmatter, smuggled instructions,
 # embedded credentials and dangerous hook or settings configuration.
 #
 # The job runs the pre-commit hook rather than invoking skillsaw
@@ -39,7 +39,6 @@ on:
       - develop
     paths:
       - 'AGENTS.md'
-      - 'CLAUDE.md'
       - '.claude/**'
       - '.pre-commit-config.yaml'
       - 'tools/ci/pre-commit-requirements.txt'
@@ -47,7 +46,6 @@ on:
   pull_request:
     paths:
       - 'AGENTS.md'
-      - 'CLAUDE.md'
       - '.claude/**'
       - '.pre-commit-config.yaml'
       - 'tools/ci/pre-commit-requirements.txt'

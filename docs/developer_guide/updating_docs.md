@@ -33,7 +33,7 @@ The navigation bar is configured via the `mkdocs.yml` file in the repository roo
 ## Link Checking
 
 `tools/check-doc-anchors.py` resolves every markdown link in `docs/` and in
-the root markdown files (`AGENTS.md`, `ARCHITECTURE.md`, `CLAUDE.md`,
+the root markdown files (`AGENTS.md`, `ARCHITECTURE.md`,
 `README.md`), reporting links whose target file is missing and anchored links
 whose target heading does not exist. Neither mkdocs nor the docs-tests
 workflow notices either failure — the link still renders and drops the reader

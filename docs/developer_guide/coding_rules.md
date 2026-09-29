@@ -274,7 +274,10 @@ the wrapper untouched. Handling only the return value covers the oversized-reply
 case and misses the tier outage -- which is the more likely reason a read fails,
 and the condition an alert on the streak most needs to see. Cover both, and
 prove it with a test that sets `side_effect = DatabaseUnavailable(...)` rather
-than a `None` return.
+than a `None` return. Code which is meant to ride out an unreachable
+database catches `DatabaseUnavailable` explicitly and says so;
+`Daemon.check_daemon_state()` and `ClusterLock.__enter__` are the
+examples to copy.
 
 Having covered both, do not then treat them alike inside a loop. The two shapes
 differ in blast radius. A `None` return is per-reply, so the next object type is

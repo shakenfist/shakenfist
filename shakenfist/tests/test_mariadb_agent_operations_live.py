@@ -134,8 +134,8 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
         Named explicitly rather than via the cached Table objects,
         which already carry the new columns.
 
-        The uuid columns are the undashed 32 character form -- see the
-        two-uuid-formats note in CLAUDE.md -- so raw SQL has to pass
+        The uuid columns are the undashed 32 character form, while
+        object_states holds the dashed one, so raw SQL has to pass
         .hex rather than str(). Comparing the dashed form here does not
         error, it silently matches nothing.
         """

@@ -324,6 +324,8 @@ Two decisions deliberately diverge from placement admission:
   probe round trip, and the namespaces that want claims are the ones
   creating instances hardest; it also leaves the eventual flip to hard
   enforcement as moving an existing predicate into a `WHERE` clause.
+  That flip is `CLAIM_ENFORCEMENT_HARD` and nothing else: do not add an
+  enforcement knob or a 403 path ahead of it.
 
 `NamespaceClaim` (`shakenfist/namespace_claim.py`) is an ordinary
 `DatabaseBackedObject` over these rows, with two states that are two
@@ -378,6 +380,28 @@ deleted-node path but errors rather than deletes.
 Node error never clears automatically; `sf-ctl clear-node-error` is the
 operator recovery path, documented in
 [`node_health.md`](../operator_guide/node_health.md).
+
+## Daemon start ordering
+
+Each daemon is a systemd unit rendered from
+`shakenfist/deploy/collection/roles/node/templates/sf.service`, grouped
+under `sf.target`, and the ordering there is load bearing:
+
+1. `sf-database` starts first, after `mariadb.service`. It is the gRPC
+   path to MariaDB for every other daemon, and it records its own
+   startup and shutdown state by going direct, since it cannot call
+   itself.
+2. `sf-sentinel-first` starts after it and marks the node as starting.
+3. `sf-privexec` and `sf-nodelock` start after sentinel-first.
+4. Every other daemon, and `sf-api` (its own `sf-api.service`), starts
+   after privexec, nodelock and the database.
+5. `sf-sentinel-last` starts after all of them.
+
+Stop runs in reverse: sentinel-last stops first and marks the node as
+stopping, the control plane stops, and sentinel-first stops last and
+records a graceful stop. A daemon started ahead of `sf-database` hangs
+on its first database call -- `sf-api` in particular -- so a new unit
+must keep the `After=sf-database.service` ordering.
 
 ## Daemon liveness (systemd watchdog)
 

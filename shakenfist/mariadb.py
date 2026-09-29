@@ -580,10 +580,8 @@ def _use_database_service() -> bool:
     the tier to reach itself.
 
     MARIADB_GATEWAY_HOSTS provides one or more sf-database
-    endpoints for processes without direct access. Phase 3 of
-    PLAN-byo-mariadb will reshape the consuming code into a
-    client-side load-balanced channel; today the channel
-    construction simply takes the first entry.
+    endpoints for processes without direct access; the channel
+    round-robins across all of them (shakenfist/util/grpc_channel.py).
     """
     if not config.MARIADB_GATEWAY_HOSTS:
         # No tier to route to, so use whatever direct access we have. This
@@ -20211,7 +20209,7 @@ def _direct_get_consumed_ports_for_node(
     the target node UUID in the WHERE clause so we never load rows
     for instances on other nodes, and the three port fields are
     extracted directly from the ports JSON column rather than
-    being parsed in Python. Per the project guidance in CLAUDE.md,
+    being parsed in Python. As everywhere in this layer,
     object/attribute filtering is pushed down to the SQL layer so
     it can later benefit from a generated-column index if port
     allocation becomes a hotspot.
@@ -26494,7 +26492,9 @@ def _instance_location_nodes(
     object_references stores the dashed uuid form in both endpoint
     columns while scheduler_node_capacity keys on sa.Uuid (undashed
     CHAR(32) on MariaDB), so the source uuids are parsed here rather
-    than compared across the two forms (CLAUDE.md pitfall 6).
+    than compared across the two forms, which silently never match (see
+    "A column-to-column comparison has no bind processor" in
+    docs/developer_guide/coding_rules.md).
     """
     refs = _get_object_references_table()
     rows = conn.execute(sa.select(refs.c.source_uuid).where(sa.and_(
@@ -26692,8 +26692,9 @@ def _delete_instance_location_rows(
         refs.c.target_uuid == instance_uuid,
     ]
     if source_nodes is not None:
-        # object_references stores the dashed uuid form (CLAUDE.md
-        # pitfall 6), which is what str() of a UUID produces.
+        # object_references stores the dashed uuid form, which is what
+        # str() of a UUID produces; the undashed sa.Uuid form would
+        # silently match nothing.
         clauses.append(refs.c.source_uuid.in_(
             [str(n) for n in source_nodes]))
     return int(conn.execute(
@@ -27713,7 +27714,8 @@ CLAIM_STATE_ACTIVE = 'active'
 
 # The claim fields an update request may name in its field mask. The mask
 # is what tells a deliberate zero from an unset proto3 int, exactly as
-# the update_*_attributes field masks do (CLAUDE.md pitfall 3).
+# the update_*_attributes field masks do (see "Attribute updates use
+# field masks" in docs/developer_guide/standards.md).
 CLAIM_UPDATE_FIELDS = (
     'limit_cpus', 'limit_memory_mb', 'limit_disk_gb', 'expires_in_seconds')
 
@@ -28843,10 +28845,10 @@ def _grpc_get_namespace_claim(
     """Read one namespace claim via the database microservice.
 
     DatabaseUnavailable is deliberately left to propagate rather than
-    collapsed into None. CLAUDE.md's rule for this layer is that a
-    "not found" return value always means the object genuinely is not
-    there -- a claim that read as absent because the tier blinked would
-    have the object layer conclude it had been deleted.
+    collapsed into None, so that a None here means the claim is not
+    there rather than that the tier blinked -- a claim that read as
+    absent because of an outage would have the object layer conclude it
+    had been deleted.
     """
     stub = _get_database_stub()
     request = database_pb2.GetNamespaceClaimRequest(uuid=claim_uuid)

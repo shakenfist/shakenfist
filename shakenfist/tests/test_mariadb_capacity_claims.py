@@ -923,8 +923,8 @@ class ClaimGrpcWrapperTestCase(base.ShakenFistTestCase):
         self.assertIn('database unavailable', result['error'])
 
     def test_a_read_raises_rather_than_reading_as_absent(self):
-        # CLAUDE.md's rule for this layer: a None return has to mean the
-        # claim genuinely is not there.
+        # A None return has to mean the claim genuinely is not there, so
+        # a tier outage must raise rather than read as absent.
         with mock.patch('shakenfist.mariadb._grpc_call',
                         side_effect=exceptions.DatabaseUnavailable('gone')):
             self.assertRaises(

@@ -359,8 +359,8 @@ class Child:
 
 ## Priority Files for Type Coverage
 
-Improving mypy coverage is a standing development goal (see `CLAUDE.md`).
-Files not yet in `tox.ini` `[testenv:mypy]` with high impact include:
+Improving mypy coverage is a standing development goal (see
+"Development goals" in `docs/developer_guide/standards.md`). Files not yet in `tox.ini` `[testenv:mypy]` with high impact include:
 
 - `shakenfist/baseobject.py` - Base framework for all persistable objects
 - `shakenfist/constants.py` - Constants and object type mappings

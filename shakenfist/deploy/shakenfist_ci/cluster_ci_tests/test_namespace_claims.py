@@ -545,7 +545,8 @@ class TestNamespaceClaimLifecycle(ClaimAPIMixin, base.BaseNamespacedTestCase):
 
         # An update with no fields is a client error, not a silent
         # zeroing of every dimension the caller did not mention (the
-        # field mask, CLAUDE.md pitfall 3).
+        # field mask; see "Attribute updates use field masks" in
+        # docs/developer_guide/standards.md).
         status, body = self._claim_api(
             'PUT', self._claim_target(claim['uuid']))
         self.assertEqual(

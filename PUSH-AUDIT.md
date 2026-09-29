@@ -115,7 +115,8 @@ style questions need a sub-agent to read code:
 **Brief for sub-agent (only if wave 1 passes):**
 
 Check `git diff $RANGE` for adherence to project
-conventions in `CLAUDE.md` and `AGENTS.md`:
+conventions in `AGENTS.md` and
+`docs/developer_guide/standards.md`:
 
 - Python conventions: import ordering, logging via the
   `shakenfist_utilities.logs` pattern, single quotes for
@@ -222,13 +223,15 @@ Add the judgment-level review on the diff
   reviewer to ask: *is this a list of child-object UUIDs
   that a `WHERE <fk> = ?` query against the child table
   could provide live?* If yes, the property must be
-  query-backed and the cache column must not exist. Phase
-  7 of the SQL-pushdown plan removed two such
-  caches (`network_attributes.networkinterfaces`,
-  `instance_attributes.interfaces`); legitimate non-FK
-  list fields (e.g. `node_attributes.daemons`,
-  `namespace_attributes.trust`) are not flagged. See
-  [docs/plans/PLAN-sql-pushdown-filtering-phase-07-denorm-lists.md](docs/plans/PLAN-sql-pushdown-filtering-phase-07-denorm-lists.md).
+  query-backed and the cache column must not exist. Two
+  such caches (`network_attributes.networkinterfaces`,
+  `instance_attributes.interfaces`) have already been
+  replaced by one indexed query against the child table,
+  which also removed an N+1 hydration loop from every
+  caller; legitimate non-FK list fields (e.g.
+  `node_attributes.daemons`, `namespace_attributes.trust`)
+  are not flagged. See
+  [docs/plans/PLAN-sql-pushdown-filtering.md](docs/plans/PLAN-sql-pushdown-filtering.md).
 - **Three-layer pattern:** Does every new MariaDB function
   have the direct/gRPC/public trio, with the corresponding
   counter registered and proto definition (if needed)?
@@ -280,6 +283,74 @@ copy lives in shakenfist/development at
 - Prose that documents user-visible behaviour rather than the
   implementation usually belongs in `docs/`, with the comment
   reduced to a pointer.
+<!-- shared-block-end -->
+
+<!-- shared-block: source-file-size v1 -->
+Source file size (shared block; do not edit -- the canonical
+copy lives in shakenfist/development at
+`templates/shared-blocks/source-file-size.md`):
+
+- Where a repository tracks whole-file human review, a file's cost
+  is its length times how often it is touched: every change
+  discards the review of the whole file, and the next session
+  re-reads all of it. That, rather than taste, is why length is
+  worth raising in review at all.
+- Treat a source file over roughly 800 lines as a candidate to
+  split, and one over roughly 1,500 as wanting a stated reason to
+  stay whole. These hold whether or not a repository tracks review
+  per file: tracking is what makes the cost repeat and become
+  measurable, not what makes a long file expensive to read. Both
+  are advisory. Neither is a gate, there is no hard cap, and a
+  reviewer who raises one is opening a question, not recording a
+  defect.
+- Generated files, vendored trees and protocol or data tables are
+  exempt: they are not read the way source is, and a tool that
+  counts them is measuring the wrong thing.
+- Split along a seam that already exists -- one module's public
+  entry point, one check, one subcommand, one endpoint -- so that
+  a later change touches one of the pieces rather than all of
+  them. A file split at a line number rather than at a seam is
+  worse than the long file it replaced.
+- Length is never reduced by deleting the comments and docstrings
+  that explain why the code is the way it is. Those are what make
+  a long file reviewable, and trading them for a line count makes
+  the review worse while making the number better. Cut duplicated
+  scaffolding first; see `comment-proportion` for what earns its
+  length.
+<!-- shared-block-end -->
+
+<!-- shared-block: plan-references-in-code v1 -->
+Plan references in code (shared block; do not edit -- the
+canonical copy lives in shakenfist/development at
+`templates/shared-blocks/plan-references-in-code.md`):
+
+- Code, comments, docstrings, test names, fixture descriptions and
+  configuration describe the software as it is now. Which plan,
+  phase, step or decision produced a line is history, and the plan
+  and the commit log already keep it. Do not write "added in phase
+  5", "per decision 3", "pending step 5f" or "the phase-4 leaks
+  pass": a reader of the code has not read the plan, and the
+  number tells them nothing.
+- Where a comment cites a plan to explain why the code is the way
+  it is, the explanation belongs in the comment. Write the reason
+  -- the constraint, the measurement, the failure it prevents --
+  and drop the citation. A pointer standing in for the reasoning
+  costs every reader a detour, and rots when the plan is archived
+  or renumbered.
+- A plan link is acceptable only for work that is not built yet: a
+  deliberate gap or refusal whose lifting is planned, where
+  "deferred; see `PLAN-foo.md`" tells the reader the gap is known.
+  The link comes out when the work lands. Prefer an issue link
+  where one exists, and write a plan in another repository as an
+  absolute URL; the `plan-source-references` audit checks that
+  these links resolve.
+- Plan documents and commit messages may cite phases and decisions
+  freely; recording that history is their job.
+- "Phase" in its ordinary sense -- a two-phase commit, a compiler's
+  link phase -- is not a plan reference.
+- A plan reference a diff adds to code is a finding to fix before
+  pushing. References on lines the diff does not touch are backlog,
+  not findings against the change.
 <!-- shared-block-end -->
 
 Report findings as a bullet list. For each finding, state

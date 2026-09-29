@@ -23,8 +23,8 @@ cannot exercise the parts most likely to break:
 * the uuid forms landing on the right keys: scheduler_node_capacity,
   node_metrics and instance_attributes key on sa.Uuid (undashed CHAR(32)
   on MariaDB) while object_references stores the dashed 36 character
-  form (CLAUDE.md pitfall 6, where the failure mode is silently matching
-  nothing rather than an error),
+  form (the failure mode is silently matching nothing rather than an
+  error),
 * the enum storage conventions in object_references, which this suite
   runs under utf8mb4_bin to make case-sensitive,
 * GREATEST() clamping and the demand subselect against real NULLs.

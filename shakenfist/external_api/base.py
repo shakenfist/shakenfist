@@ -1893,8 +1893,8 @@ def requires_network_not_dead(func):
     Dead is still refused, and not only because writing to a network on
     its way out is pointless: ``Network.__init__`` builds a *deleted*
     network's IPAM with ``in_memory_only=True``, so a write against one
-    is accepted, kept in process memory, and lost -- the silent failure
-    CLAUDE.md's in-memory-only pitfall describes.
+    is accepted, kept in process memory, and lost (see "In-memory only
+    objects never touch the database" in docs/developer_guide/standards.md).
 
     Requires that @arg_is_network_ref has already run.
     """

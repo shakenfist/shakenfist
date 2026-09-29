@@ -90,7 +90,14 @@ metrics. The headlines:
 - **Protobuf enums are generated, not hand-written.**
   `shakenfist/schema/` is the source of truth. Add a member with the next
   available `proto_id`, run `tox -e genprotos`, and never change or reuse
-  an existing `proto_id`.
+  an existing `proto_id`. Never run `grpc_tools.protoc` directly: the
+  tox environment pins the library versions and rewrites the generated
+  `import foo_pb2` lines into `from shakenfist.protos import foo_pb2`.
+
+- **A new entry point calls `set_caller_identity()` before anything that
+  touches the database.** Whether a process may go direct to MariaDB is
+  decided by that identity, not by `MARIADB_HOST`; see
+  [docs/developer_guide/database_internals.md](docs/developer_guide/database_internals.md#caller-identity-decides-direct-access).
 
 - **Secret-carrying fields are `SecretStr`.** Stringifying one yields
   `**********`; unwrap with `.get_secret_value()` only at named

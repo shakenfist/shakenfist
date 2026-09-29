@@ -402,12 +402,14 @@ class ForcedCapacityReconcileTestCase(base.ShakenFistTestCase):
         # rest of this class uses, and one source handing back a UUID
         # object rather than a string, because the set arithmetic joins
         # three independently sourced spellings of a node uuid and
-        # CLAUDE.md pitfall 6 records that a mismatch between them fails
-        # silently. If the str() normalisation were dropped, the guarded
-        # node would never subtract from the capacity rows, and the
-        # unguarded one would never intersect with the active set: the
-        # first spelling mismatch forces the five minute pass every
-        # sixty seconds forever, the second silently forces nothing.
+        # a mismatch between uuid spellings fails silently (see "A
+        # column-to-column comparison has no bind processor" in
+        # docs/developer_guide/coding_rules.md). If the str()
+        # normalisation were dropped, the guarded node would never
+        # subtract from the capacity rows, and the unguarded one would
+        # never intersect with the active set: the first spelling
+        # mismatch forces the five minute pass every sixty seconds
+        # forever, the second silently forces nothing.
         guarded = '2f9a1c74-0b3d-4a1e-9c8f-7d6e5b4a3c21'
         unguarded = 'a1b2c3d4-e5f6-4708-9a0b-1c2d3e4f5061'
         self._patch(
