@@ -15253,13 +15253,13 @@ phases 0, 1b and 3 all rely on <code>create()</code> failing when power on fails
 <tr>
 <td>0. Assert power state in the existing lifecycle tests</td>
 <td><a href="../PLAN-power-state-correctness-phase-00-assertions/">PLAN-power-state-correctness-phase-00-assertions.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>250a40871</code></td>
 </tr>
 <tr>
 <td>1a. Honest libvirt domain listing</td>
-<td>PLAN-power-state-correctness-phase-01a-listing.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-power-state-correctness-phase-01a-listing/">PLAN-power-state-correctness-phase-01a-listing.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -15293,16 +15293,23 @@ rather than leaving them to a trailing test phase.</p>
 <h3 id="phase-0-assert-power-state-in-the-existing-lifecycle-tests">Phase 0: assert power state in the existing lifecycle tests<a class="headerlink" href="#phase-0-assert-power-state-in-the-existing-lifecycle-tests" title="Permanent link">&para;</a></h3>
 <p>Add <code>power_state</code> assertions to every lifecycle test in
 <code>guest_ci_tests/test_state_changes.py</code> (six tests across two classes)
-and to the power cycle in <code>test_interface_plug_and_exec_reboot</code>, which
-exists twice -- in <code>smoke_ci_tests</code>, run on every pull request, and in
-<code>guest_ci_tests</code>, run in the merge queue -- and gets the assertions in
-both: <code>on</code> after create, <code>off</code> after power off, <code>paused</code> then <code>on</code>
-around pause, <code>on</code> after each reboot. These pass on <code>develop</code> today,
-because the power methods write those values before the API returns.
+and to the power cycle in <code>test_interface_plug_and_exec_reboot</code>: <code>on</code>
+after create, <code>off</code> after power off, <code>paused</code> then <code>on</code> around pause,
+<code>on</code> after each reboot. These pass on <code>develop</code> today, because the power
+methods write those values before the API returns.
 The point is to have the net in place before phase 1b adds a second
 writer that can race them. The survey found that the first loop can
 already race them (F13); the phase plan decides how the assertions
 treat that. Plan at medium effort.</p>
+<p>Landed as <a href="https://github.com/shakenfist/shakenfist/pull/4327">#4327</a>.
+The phase was planned against two drifted copies of
+<code>test_interface_plug_and_exec_reboot</code>, one in the smoke suite and one in
+the guest suite. <a href="https://github.com/shakenfist/shakenfist/pull/4333">#4333</a>
+merged first and replaced both with <code>InstanceHotplugTestsMixin</code> in
+<code>shakenfist_ci/instance_hotplug.py</code>, which both suites inherit, so the
+branch was rebased and its three hotplug assertions live there once
+rather than twice. That closed
+<a href="https://github.com/shakenfist/shakenfist/issues/4318">#4318</a>.</p>
 <h3 id="phase-1a-honest-libvirt-domain-listing">Phase 1a: honest libvirt domain listing<a class="headerlink" href="#phase-1a-honest-libvirt-domain-listing" title="Permanent link">&para;</a></h3>
 <p>No behaviour change. Replace <code>get_all_domains()</code> and <code>get_sf_domains()</code>
 with helpers whose names say whether they return active or inactive
@@ -15313,6 +15320,12 @@ replacement, returns only active domains; the existing tests which
 expect inactive domains to be seen will then fail, which is correct, and
 are marked as expected failures for phase 1b to turn on. Plan at medium
 effort.</p>
+<p>The phase survey found a third helper, <code>get_active_domain_ids()</code>, added
+for the resources daemon's 5 second poll after this plan's audit. It is
+honestly named already and stays on <code>listDomainsID()</code>. The survey also
+found that only the shutoff expectation fails under an honest fake,
+because a crashed domain is active in libvirt's model; see S4 and S5 in
+the phase plan.</p>
 <h3 id="phase-1b-the-cleaner-sees-powered-off-domains">Phase 1b: the cleaner sees powered off domains<a class="headerlink" href="#phase-1b-the-cleaner-sees-powered-off-domains" title="Permanent link">&para;</a></h3>
 <p>Point the cleaner's second loop and its apparmor sweep at the inactive
 listing. This makes live code that deletes things, so this phase is
@@ -15346,7 +15359,10 @@ mostly the guards that the dead code never needed:</p>
   shutoff reason in the event's <code>extra</code>, so that a qemu killed by the
   OOM killer is distinguishable from a guest <code>poweroff</code>. Decide whether
   a <code>CRASHED</code> shutoff reason maps to <code>crashed</code> -- the case F3 was trying
-  to catch.</li>
+  to catch. Note that <code>on_crash</code> is <code>restart</code> in <code>libvirt.tmpl</code> and there
+  is no panic device, so libvirt never reports a crash for our domains
+  today, and the first loop's <code>crashed</code> branch is unreachable (phase 1a
+  S4). The decision covers both.</li>
 </ul>
 <p>Note the new database load: every pass now runs <code>place_instance()</code> for
 every powered off instance, and the phase plan should estimate it
@@ -15796,10 +15812,6 @@ chosen to defer to here, so that we do not forget them.</p>
 <li>Whether <code>instances_total</code> in the resources daemon should count
   defined-but-inactive domains (open question 4). This plan keeps
   today's semantics.</li>
-<li><a href="https://github.com/shakenfist/shakenfist/issues/4318">#4318</a>:
-  <code>test_interface_plug_and_exec_reboot</code> is duplicated between the smoke
-  and guest suites and the copies have drifted. Phase 0 edits both
-  rather than deduplicating them.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>This section should list any bugs we encounter during development

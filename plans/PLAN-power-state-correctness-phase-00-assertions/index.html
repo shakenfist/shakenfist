@@ -14815,6 +14815,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#outcome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#back-brief" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15211,6 +15222,23 @@ confirm the count: 11 in <code>test_state_changes.py</code> and 3 in each
       <code>git diff --stat develop... -- shakenfist ':!shakenfist/deploy/shakenfist_ci' ':!shakenfist/tests'</code>
       prints nothing.</li>
 </ul>
+<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
+<p>Landed as <a href="https://github.com/shakenfist/shakenfist/pull/4327">#4327</a>,
+merge commit <code>250a40871</code>. The Guests and Smoke jobs of the dispatched
+run (<a href="https://github.com/shakenfist/shakenfist/actions/runs/36057518023">36057518023</a>)
+passed, and every new assertion ran; F13 did not show up.</p>
+<p>One item in the Definition of done no longer describes the tree, and
+the reason is not a gap in the work.
+<a href="https://github.com/shakenfist/shakenfist/pull/4333">#4333</a> merged while
+this phase was in review. It replaced the two copies of
+<code>test_interface_plug_and_exec_reboot</code> (S1, D2) with
+<code>InstanceHotplugTestsMixin</code> in <code>shakenfist_ci/instance_hotplug.py</code>,
+which both suites inherit. The branch was rebased onto it, so the grep
+for three assertions per copy is now three in <code>instance_hotplug.py</code>, and
+they still run in both suites. That closed
+<a href="https://github.com/shakenfist/shakenfist/issues/4318">#4318</a>. Everything
+else in the Definition of done holds as written: 11 assertions in
+<code>test_state_changes.py</code>, and no production file changed.</p>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before starting step 1, back brief Mikal on what will change:</p>
 <ul>

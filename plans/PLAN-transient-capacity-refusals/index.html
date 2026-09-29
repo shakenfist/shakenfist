@@ -16111,17 +16111,14 @@ chosen to defer to here, so that we do not forget them.</p>
   Outcome.</p>
 </li>
 <li>
-<p><strong>Make <code>get_all_domains()</code> one libvirt call.</strong>
-  <code>LibvirtConnection.get_all_domains()</code>
-  (<code>shakenfist/util/libvirt.py:192</code>) is <code>listDomainsID()</code> followed
-  by a <code>lookupByID()</code> and a <code>name()</code> per domain, where
-  <code>listAllDomains(VIR_CONNECT_LIST_DOMAINS_ACTIVE)</code> would return
-  the objects in one round trip. It has three callers
-  (<code>daemons/cleaner/scheduled_tasks.py:222</code>,
-  <code>daemons/resources/main.py:401</code>, <code>util/libvirt.py:183</code>), so it is
-  a small change with a blast radius rather than a free one, and
-  phase 3 deliberately added a separate id-only helper instead of
-  reworking it. Found at phase 3's planning survey; see D22 there.</p>
+<p><strong>Make <code>get_all_domains()</code> one libvirt call.</strong> Resolved: phase 1a of
+  <code>PLAN-power-state-correctness.md</code> removed
+  <code>LibvirtConnection.get_all_domains()</code>, which was <code>listDomainsID()</code>
+  followed by a <code>lookupByID()</code> and a <code>name()</code> per domain, and moved
+  its callers (<code>daemons/cleaner/scheduled_tasks.py</code>,
+  <code>daemons/resources/main.py</code>) onto <code>get_active_sf_domains()</code>, the
+  single-call <code>listAllDomains(VIR_CONNECT_LIST_DOMAINS_ACTIVE)</code>
+  replacement. Found at phase 3's planning survey; see D22 there.</p>
 </li>
 <li>
 <p><strong>Stop re-scheduling an already-charged placement.</strong>
