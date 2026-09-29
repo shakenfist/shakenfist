@@ -179,25 +179,15 @@ class LibvirtConnection():
     def define_xml(self, xml: str) -> Any:
         return self.conn.defineXML(xml)
 
-    def get_sf_domains(self) -> Iterator[Any]:
-        for domain in self.get_all_domains():
-            try:
-                if not domain.name().startswith('sf:'):
-                    continue
-                yield domain
-
-            except self.libvirt.libvirtError:
-                pass
-
     def get_active_domain_ids(self) -> set[int]:
         """Cheap active domain id set, for change detection only.
 
-        A single listDomainsID() call, unlike get_all_domains() which
-        follows it with a lookupByID() and a name() per domain. That
-        N+1 cost is fine for the callers get_all_domains() already
-        has, but this method exists for a 5 second poll loop that only
-        needs to know whether the set of running domains changed, so
-        it deliberately does not resolve ids to domains.
+        A single listDomainsID() call. get_active_sf_domains() is also
+        one libvirt call (listAllDomains()), but it returns domain
+        objects and filters them by name; this method needs neither the
+        objects nor the filter, because it exists for a 5 second poll
+        loop that only needs to know whether the set of running domains
+        changed, so it deliberately does not resolve ids to domains.
 
         Two consequences of skipping that resolution, both accepted:
 
@@ -214,19 +204,23 @@ class LibvirtConnection():
         """
         return set(self.conn.listDomainsID())
 
-    def get_all_domains(self) -> Iterator[Any]:
-        # Active VMs have an ID. Active means running in libvirt
-        # land.
-        for domain_id in self.conn.listDomainsID():
-            try:
-                domain = self.conn.lookupByID(domain_id)
-                if not domain.name().startswith('sf:'):
-                    continue
-
+    def _list_sf_domains(self, flags: int) -> Iterator[Any]:
+        """One listAllDomains() call, filtered to Shaken Fist domains."""
+        for domain in self.conn.listAllDomains(flags):
+            if domain.name().startswith('sf:'):
                 yield domain
 
-            except self.libvirt.libvirtError:
-                pass
+    def get_active_sf_domains(self) -> Iterator[Any]:
+        """Shaken Fist domains libvirt considers active: running, paused or
+        PM suspended. A powered off domain is not in this list."""
+        return self._list_sf_domains(
+            self.libvirt.VIR_CONNECT_LIST_DOMAINS_ACTIVE)
+
+    def get_inactive_sf_domains(self) -> Iterator[Any]:
+        """Shaken Fist domains which are defined but not running. Our
+        domains are persistent, so a powered off instance is here."""
+        return self._list_sf_domains(
+            self.libvirt.VIR_CONNECT_LIST_DOMAINS_INACTIVE)
 
     def get_cpu_map(self) -> tuple[int, int, list[bool]]:
         return self.conn.getCPUMap()

@@ -105,7 +105,7 @@ def update_power_states(pet_watchdog=None):
 
             # Active VMs have an ID. Active means running in libvirt
             # land.
-            for domain in lc.get_sf_domains():
+            for domain in lc.get_active_sf_domains():
                 pet()
                 instance_uuid = domain.name().split(':')[1]
                 log_ctx = LOG.with_fields({'instance': instance_uuid})
@@ -216,10 +216,12 @@ def update_power_states(pet_watchdog=None):
             LOG.debug(f'Failed to lookup running domains: {e}')
 
         try:
-            # Inactive VMs just have a name, and are powered off
-            # in our state system.
+            # This loop deliberately still iterates active domains, so it
+            # only acts on domains the first loop failed to add to `seen`.
+            # Phase 1b of docs/plans/PLAN-power-state-correctness.md points
+            # it at get_inactive_sf_domains() instead.
             all_libvirt_uuids = []
-            for domain in lc.get_all_domains():
+            for domain in lc.get_active_sf_domains():
                 pet()
                 domain_name = domain.name()
                 all_libvirt_uuids.append(domain.UUIDString())

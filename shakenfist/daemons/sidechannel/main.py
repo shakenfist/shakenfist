@@ -2031,7 +2031,7 @@ class Monitor(daemon.Daemon):
                     # also be powered off. Instead, we ask libvirt what domains are
                     # running.
                     with util_libvirt.LibvirtConnection() as lc:
-                        for domain in lc.get_sf_domains():
+                        for domain in lc.get_active_sf_domains():
                             state = lc.extract_power_state(domain)
                             if state in ['off', 'crashed', 'paused']:
                                 # If the domain isn't running, it shouldn't have a

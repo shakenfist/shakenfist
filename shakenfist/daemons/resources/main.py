@@ -494,7 +494,7 @@ class Monitor(daemon.Daemon):
             total_instance_vcpus = 0
             total_instance_cpu_time = 0
 
-            for domain in lc.get_all_domains():
+            for domain in lc.get_active_sf_domains():
                 try:
                     active = domain.isActive() == 1
                     if active:

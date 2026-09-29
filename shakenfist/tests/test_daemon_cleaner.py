@@ -1,6 +1,7 @@
 import datetime
 import os
 import tempfile
+import unittest
 import uuid
 from unittest import mock
 
@@ -32,6 +33,9 @@ class FakeLibvirt:
     VIR_DOMAIN_SHUTOFF = 7
     VIR_DOMAIN_PMSUSPENDED = 8
 
+    VIR_CONNECT_LIST_DOMAINS_ACTIVE = 1
+    VIR_CONNECT_LIST_DOMAINS_INACTIVE = 2
+
     VIR_DOMAIN_PAUSED_USER = 1
     VIR_DOMAIN_PAUSED_IOERROR = 5
 
@@ -46,16 +50,14 @@ class FakeLibvirt:
 
 
 class FakeLibvirtConnection:
-    def listDomainsID(self):
-        ids = ['id1', 'id2', 'id3', 'id4', 'id5', 'id6']
-        # The ioerror-paused domain only exists for tests which create an
-        # instance for it, so that the other tests don't see an unknown
-        # domain (which the cleaner would try to virsh destroy).
-        if 'ioerror' in _test_instance_uuids:
-            ids.append('id7')
-        return ids
+    def listAllDomains(self, flags):
+        # Mirrors how libvirt's listAllDomains() lists domains, not our
+        # domain template: every defined domain, filtered by whether libvirt
+        # considers it active. This is why the crashed domain comes back
+        # active here even though our hypervisors never produce an active
+        # crashed domain in production (on_crash is restart); see D4 in
+        # docs/plans/PLAN-power-state-correctness-phase-01a-listing.md.
 
-    def lookupByID(self, id):
         # Map domain IDs to (name_key, state, pause_reason) where name_key is
         # used to look up the actual UUID from _test_instance_uuids
         domain_map = {
@@ -71,24 +73,38 @@ class FakeLibvirtConnection:
                     FakeLibvirt.VIR_DOMAIN_PAUSED_USER),
             'id6': ('suspended', FakeLibvirt.VIR_DOMAIN_PMSUSPENDED,
                     FakeLibvirt.VIR_DOMAIN_PAUSED_USER),
-            'id7': ('ioerror', FakeLibvirt.VIR_DOMAIN_PAUSED,
-                    FakeLibvirt.VIR_DOMAIN_PAUSED_IOERROR),
         }
+        # The ioerror-paused domain only exists for tests which create an
+        # instance for it, so that the other tests don't see an unknown
+        # domain (which the cleaner would try to virsh destroy).
+        if 'ioerror' in _test_instance_uuids:
+            domain_map['id7'] = (
+                'ioerror', FakeLibvirt.VIR_DOMAIN_PAUSED,
+                FakeLibvirt.VIR_DOMAIN_PAUSED_IOERROR)
 
-        name_key, state, reason = domain_map.get(id)
-        if name_key == 'apache2':
-            # Non-SF domain, return as-is
-            return FakeLibvirtDomain('apache2', state)
-        # SF domain - use the actual instance UUID
-        inst_uuid = _test_instance_uuids.get(name_key, name_key)
-        disk_errors = {}
-        if name_key == 'ioerror':
-            disk_errors = {
-                'vda': FakeLibvirt.VIR_DOMAIN_DISK_ERROR_UNSPEC,
-                'vdb': FakeLibvirt.VIR_DOMAIN_DISK_ERROR_NONE,
-            }
-        return FakeLibvirtDomain(
-            f'sf:{inst_uuid}', state, reason=reason, disk_errors=disk_errors)
+        domains = []
+        for name_key, state, reason in domain_map.values():
+            if name_key == 'apache2':
+                # Non-SF domain, return as-is
+                domains.append(FakeLibvirtDomain('apache2', state))
+                continue
+
+            # SF domain - use the actual instance UUID
+            inst_uuid = _test_instance_uuids.get(name_key, name_key)
+            disk_errors = {}
+            if name_key == 'ioerror':
+                disk_errors = {
+                    'vda': FakeLibvirt.VIR_DOMAIN_DISK_ERROR_UNSPEC,
+                    'vdb': FakeLibvirt.VIR_DOMAIN_DISK_ERROR_NONE,
+                }
+            domains.append(FakeLibvirtDomain(
+                f'sf:{inst_uuid}', state, reason=reason,
+                disk_errors=disk_errors))
+
+        wants_active = flags == FakeLibvirt.VIR_CONNECT_LIST_DOMAINS_ACTIVE
+        return [d for d in domains
+                if (d.state()[0] != FakeLibvirt.VIR_DOMAIN_SHUTOFF) ==
+                wants_active]
 
     def lookupByName(self, name):
         return FakeLibvirtDomain(name, FakeLibvirt.VIR_DOMAIN_RUNNING)
@@ -173,7 +189,6 @@ class CleanerTestCase(base.ShakenFistTestCase):
         cleaner_st.update_power_states()
 
         for name, state in [('running', 'on'),
-                            ('shutoff', 'off'),
                             ('crashed', 'crashed'),
                             ('paused', 'paused'),
                             ('suspended', 'paused')]:
@@ -187,6 +202,40 @@ class CleanerTestCase(base.ShakenFistTestCase):
             self.assertEqual(
                 state, inst_attrs.power_state['power_state'],
                 f'State for instance "{name}" does not match "{state}"')
+
+    @unittest.expectedFailure
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_update_power_states_detects_shutoff(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists):
+        """The cleaner cannot see inactive domains (F1).
+
+        get_active_sf_domains() only lists domains libvirt considers
+        active, so a shutoff domain is never seen by either of the
+        cleaner's loops and its instance keeps whatever power_state it
+        had before. Phase 1b points the cleaner at inactive domains too,
+        and removes this decorator in the same change that makes this
+        test pass.
+        """
+        global _test_instance_uuids
+
+        instance_uuids = {}
+        for name in ['running', 'shutoff', 'crashed', 'paused', 'suspended']:
+            inst = self.mock_mariadb.create_instance(
+                name, set_state=instance.Instance.STATE_CREATED)
+            instance_uuids[name] = str(inst.uuid)
+        _test_instance_uuids = instance_uuids
+
+        cleaner_st.update_power_states()
+
+        inst_uuid = instance_uuids['shutoff']
+        inst_attrs = self.mock_mariadb.get_mariadb_instance_attributes(
+            inst_uuid)
+        self.assertIsNotNone(
+            inst_attrs, 'No MariaDB attributes for instance "shutoff"')
+        self.assertEqual('off', inst_attrs.power_state['power_state'])
 
     @mock.patch('os.path.exists', side_effect=fake_exists)
     @mock.patch('time.time', return_value=7)
