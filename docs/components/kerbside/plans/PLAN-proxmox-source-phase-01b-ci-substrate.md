@@ -681,7 +681,8 @@ committed, 2b in progress, not yet pushed).
   - the CONNECT target and `Host:` header must both be
     `<host>:<tls-port>`
     (homelab `tools/pve-ticket-probe.py:53-66,83-90`);
-  - spiceproxy answers `HTTP/1.0 200`;
+  - spiceproxy answers `HTTP/1.1 200` (the homelab notes said
+    `1.0`; the lane saw `1.1`, and ryll accepts either);
   - the node's root CA is `/etc/pve/pve-root-ca.pem`. It is
     the same CA the ticket's `ca` field carries, so fetch it
     to the runner for `curl --cacert`.
@@ -798,45 +799,45 @@ ryll PR (spice-http-connect)
 
 ## Definition of done
 
-- [ ] `deploy-proxmox-on-shakenfist/action.yml` exists, and
+- [x] `deploy-proxmox-on-shakenfist/action.yml` exists, and
       every input and output it declares is documented in
       actions `docs/actions.md`. A reviewer diffing the two
       lists finds no difference.
-- [ ] `tests/test_ansible_readiness.py` names
+- [x] `tests/test_ansible_readiness.py` names
       `proxmox-single-node.yml` among the creating
       playbooks, and `python3 -m unittest discover -s tests
       -t .` passes in actions.
-- [ ] `grep -rn -E 'homelab|id_general|proxmoxproxmox|sfcbr'
+- [x] `grep -rn -E 'homelab|id_general|proxmoxproxmox|sfcbr'
       deploy-proxmox-on-shakenfist ansible/proxmox-single-node.yml
       ansible/tasks/proxmox ansible/vars/proxmox.yml
       tools/proxmox-*` in actions finds nothing.
-- [ ] Every task in `ansible/tasks/proxmox/api.yml` that
+- [x] Every task in `ansible/tasks/proxmox/api.yml` that
       creates the token or registers its output carries
       `no_log: true`.
-- [ ] A green `proxmox-substrate.yml` run on the actions
+- [x] A green `proxmox-substrate.yml` run on the actions
       pull request is linked under *Outcome*, with the
       deploy's wall time. In its log, the FQDN assertion
       prints four matching names.
-- [ ] `gh run view <that run> --log | grep -E
+- [x] `gh run view <that run> --log | grep -E
       'PVEAPIToken=|"value"'` returns only masked output.
       The command and its result are recorded under
       *Outcome*.
-- [ ] A green `proxmox-functional.yml` run on phase 2's pull
+- [x] A green `proxmox-functional.yml` run on phase 2's pull
       request is linked in phase 2's *Outcome*. Its log
       shows four summary lines: positive (four channels,
       alive at mint+120 s), expired (401 with the hint),
       wrong pin (TLS, both subjects), missing pin (refused,
       no dial).
-- [ ] Every positive-case mint-to-launch time in that run is
+- [x] Every positive-case mint-to-launch time in that run is
       under 10 seconds, and all are recorded.
-- [ ] A deliberate-failure run turned the lane red at the
+- [x] A deliberate-failure run turned the lane red at the
       expired check alone, and its URL is recorded.
-- [ ] No `.vv` file appears in either lane's uploaded
+- [x] No `.vv` file appears in either lane's uploaded
       artifacts.
-- [ ] The actions push-audit substitute (1b.6) is recorded
+- [x] The actions push-audit substitute (1b.6) is recorded
       under *Outcome*, and 2g's audit covered the lane's
       ryll commits.
-- [ ] The master plan's Execution table carries a 1b row
+- [x] The master plan's Execution table carries a 1b row
       with `Merged` set to `actions <sha> (#pr)`, and its
       open question 5 no longer mentions a validated node.
       Phase 2's step 2f and *Validation against a real node*
@@ -884,13 +885,88 @@ work* and deliberately not fixed here.
 
 ## Outcome
 
-In progress. Actions branch `proxmox-substrate`: 1b.1
-`5d7aaca`, 1b.2 `8f7cec6`, 1b.3 `72454bf`, 1b.4 `9beb04b`;
-1b.5 (drive the lane green) is under way. Ryll branch
-`spice-http-connect`: 1b.7 `dd83856`, 1b.8 `5487b04`, 1b.9
-`edd43e8`. 1b.7's local runs, against qemu behind a fake
-spiceproxy, found that headless ryll exited 0 on a failed
-connect; fixed in ryll `189bff3` (see phase 2's *Outcome*).
+Complete. The actions half merged as actions `5399c4f`
+(#96) on 2026-09-24; the ryll half merged inside phase 2's
+pull request, ryll `ea4bf67` (#402), on 2026-09-26.
+
+| Step | Commit | Notes |
+|------|--------|-------|
+| 1b.1 | actions `5d7aaca` | The playbook. |
+| 1b.2 | actions `8f7cec6` | The composite action. |
+| 1b.3 | actions `72454bf` | Its own lane, `proxmox-substrate.yml`. |
+| 1b.4 | actions `9beb04b` | Docs. |
+| 1b.5 | actions `e6990ea`, `6f660ad` | Driven green. Two defects found by running it: published SHA-256 checksums tripped gitleaks, now allowlisted; and the node's names came back mixed case, so the FQDN assertion compares them case-sensitively rather than folding. |
+| 1b.6 | actions `62dbafe` to `202b6d3` | The review rounds, below. |
+| 1b.7 | ryll `dd83856` | `tools/proxmox-smoke.py`. Its local runs, against qemu behind a fake spiceproxy, found headless ryll exiting 0 on a failed connect; fixed in ryll `189bff3` (phase 2's *Outcome*). |
+| 1b.8 | ryll `5487b04` | `proxmox-functional.yml`. |
+| 1b.9 | ryll `edd43e8` | Docs. |
+| 1b.10 | ryll `a45b632` | The lane could not fail: its step piped the driver through `tee` under the default shell, which has no `pipefail`. Fixed with `shell: bash`, found in review. |
+
+**The actions lane.** The last pull-request run,
+[35977836549](https://github.com/shakenfist/actions/actions/runs/35977836549)
+on `202b6d3`, deployed the node in 7 minutes 2 seconds, well
+inside the twenty-minute worst case *Risks* allowed for. Its
+FQDN assertion printed four matching names: `hostname -f`,
+the certificate CN, the ticket's proxy host and the ticket's
+`host-subject` CN. `gh run view 35977836549 --log | grep -E
+'PVEAPIToken=|"value"'` returns nothing at all, masked or
+otherwise. The first scheduled run on `main`,
+[36308899083](https://github.com/shakenfist/actions/actions/runs/36308899083)
+on 2026-09-27, was green.
+
+**1b.6, the push-audit substitute.** `pre-commit run
+--all-files`, the unit tests (254), `tools/ansible-syntax-check.sh`
+(16 playbooks) and `tools/gitleaks-scan.sh` (positive control
+fired, 400-commit history clean) all passed. The walk of the
+eleven traps in actions `AGENTS.md` found five that applied,
+each already handled (composite steps carry no
+`timeout-minutes`, every runner label is in
+`actionlint.yaml`, the `vm` job names its size, and the two
+about asking for and reading the automated review). The
+review rounds took 2 fix items and 6 of 7 consider items in
+the first round, and the last round removed every reference
+to this plan from the action's code and docs, per the
+shakenfist/development rule that landed code describes itself
+rather than the plan that built it.
+
+**The ryll lane.** Green on phase 2's merged head,
+[36181594273](https://github.com/shakenfist/ryll/actions/runs/36181594273)
+on `6559905`:
+
+```
+positive: PASS in 120.2s -- mint->launch 0.04s; main, display, inputs, cursor authenticated 0.7s after launch; 1 surface(s); screenshot 720x400 PNG, 92264 bytes; send_key accepted; alive at mint+120.0s; second screenshot 720x400 PNG, 78248 bytes; exited 0 0.2s after SIGINT
+expired: PASS in 50.0s -- mint->launch 50.00s (0.00s past the 50s wait); exited 1 0.0s after launch; 401 with the ticket hint
+wrong-pin: PASS in 0.1s -- mint->launch 0.10s; exited 1 0.0s after launch; pin warning names the pinned and the presented CN; TLS handshake refused
+missing-pin: PASS in 0.1s -- mint->launch 0.10s; exited 1 0.0s after launch; refused to tunnel without a host_subject; no dial
+```
+
+The positive check's mint-to-launch time was 0.04 s. The
+expired check's 50.00 s is its deliberate wait, with nothing
+past it. It had passed four for four on `50a9cc0` and
+`a45b632` too.
+
+**The deliberate-failure run**,
+[36285313301](https://github.com/shakenfist/ryll/actions/runs/36285313301),
+dispatched on 2026-09-27 against a throwaway branch that set
+the expired check's delay to 0. It went red at the expired
+check alone (`FAIL in 30.3s -- ryll was still running 30 s
+after the launch; no "HTTP proxy refused the CONNECT:
+...401..." error`), with positive, wrong-pin and missing-pin
+passing, the build and the deploy green, and the red coming
+from the checks step. The branch was deleted afterwards. The
+lane could not have failed before `a45b632`, so no earlier
+red run counts as this.
+
+No `.vv` appeared in either lane's artifacts. The ryll
+artifact holds only `proxmox-smoke.log` and one `ryll.log`
+per check; ryll #411 has since made that a structural
+property rather than a clean-up one (phase 2's *Outcome*).
+
+**Survey finding 6.** The runners' Shaken Fist credentials
+worked on the first run that reached the deploy step,
+35978158789 on `50a9cc0`. The one earlier failure,
+35950514235, died in *Set up job*, before any credential was
+used.
 
 ## Back brief
 

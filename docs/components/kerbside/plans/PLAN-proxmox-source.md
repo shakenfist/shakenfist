@@ -281,13 +281,19 @@ race the client wins only by luck.
 So the default is **one ticket per session**: the first
 channel's authorize call mints, and later channels in the
 same session reuse that ticket for as long as it is valid.
-A channel that arrives after the ticket has aged out (a
-usbredir channel on a device plug, say) mints a replacement.
-That is safe only if qemu does not re-check an established
-channel's password when it changes, which is what the
-supersession section says has not been proven. The ticket is
-held in the daemon's memory, keyed by session, and never
-written to the `Console` row. The failure mode this adds is
+A channel that arrives after the ticket has aged out mints a
+replacement. No channel can arrive after the session's
+kerbside token expires (one minute by default), because
+authorize refuses an expired token, so that window is
+bounded; within it, a replacement is safe because qemu keeps
+connected clients when its password changes (settled in
+[phase 3a](/components/kerbside/plans/PLAN-proxmox-source-phase-03a-connect-time-minting/),
+survey finding 3). The ticket is held on the session's token
+row in the shared database, never on the `Console` row, and
+cleared once it expires. It cannot be held in the daemon's
+memory, as this section first said: a load balancer may
+send one session's channels to different proxy nodes, each
+with its own daemon. The failure mode this adds is
 unavoidable whichever shape is chosen: PVE being unreachable
 now breaks connection setup, not just discovery.
 
@@ -382,11 +388,10 @@ session-scoped design that replaced it: a replacement ticket
 minted for a late channel revokes the credential every
 earlier channel authenticated with. Whether that matters
 depends on whether qemu re-checks an established channel's
-password (it does not appear to — the six concurrent
-channels stayed up) but "appears not to" is not a foundation
-to build on. **Phase 3a cannot be designed without settling
-this**, so it belongs in that phase's scope rather than as an
-open question here.
+password. It does not: QMP `set_password` keeps connected
+clients unless told otherwise, and neither oVirt nor Proxmox
+tells it otherwise. Phase 3a settled this from their sources
+and measures it in the direct-qemu lane.
 
 ## Proposed phases
 
@@ -398,7 +403,7 @@ phase plan links are tracked under *Execution*.
 | ~~1. Ticket semantics~~ | Done 2026-09-20, before the plan was scheduled, because it gated the design. See *What the measurements settled* |
 | 1b. CI substrate | A Proxmox deployment action in shakenfist/actions with its own lane, and a ryll lane on it that replaces phase 2's operator-assisted step 2f. Kerbside's lane follows on the same action |
 | 2. Tunnelled transport in ryll | CONNECT support on the backend dial, with the `ServerName` and no-`host_subject` refusal decided and tested both ways |
-| 3a. Minting at connect time | Minting moved into the authorize path through a source-driver hook, with one ticket per session held in daemon memory, and `ovirt.py` converted to request a short explicit expiry and stop persisting the ticket on the `Console` row. Settles the supersession behaviour above first. Not Proxmox-only, and needs nothing from ryll |
+| 3a. Minting at connect time | Minting moved into the authorize path through a source-driver hook, with one ticket per session held on the session's token row in the shared database, and `ovirt.py` converted to request a short explicit expiry and stop persisting the ticket on the `Console` row. Settles the supersession behaviour above first. Not Proxmox-only, and needs nothing from ryll |
 | 3b. Tunnel transport | `Target`/proto change (open question 3), an Alembic migration giving the `Console` row somewhere to record the node and the `spiceproxy` URL (the columns it has today assume a direct address), and `backend.rs` passing the tunnel through. `build_config` (`backend.rs:183`) builds `ConnectionConfig` by struct literal with `tls_port: None` and escalates to TLS only on `NEED_SECURED`, but phase 2 refuses a tunnel without a TLS port, so a tunnelled target must set `tls_port` from the start. Needs phase 2 merged and the pin bumped |
 | 4. The source driver | `kerbside/sources/proxmox.py`: discovery over `/nodes/{node}/qemu`, console details over `spiceproxy`, CA and subject handling, and the direct `.vv` handler refusing Proxmox sources |
 | 5. CI lane | A lane that proves an end-to-end proxied session, per open question 5 |
@@ -438,15 +443,17 @@ its results are the *What the measurements settled* section
 above. The push audit has nothing of it to read.
 
 Phase 1b's `Merged` cell holds `actions <sha> (#pr)`; its
-ryll half lands inside phase 2's merge and carries no
-separate `Merged` entry of its own.
+ryll half landed inside phase 2's merge and carries no
+separate `Merged` entry of its own. Phase 2's push-audit
+findings landed as ryll `d787520` (#411), audited in ryll
+and cited from phase 2's *Outcome*.
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. Ticket semantics | | Complete | |
-| 1b. CI substrate | [PLAN-proxmox-source-phase-01b-ci-substrate.md](/components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/) | In progress | |
-| 2. Tunnelled transport in ryll | [PLAN-proxmox-source-phase-02-ryll-connect.md](/components/kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect/) | In progress | |
-| 3a. Minting at connect time | | Not started | |
+| 1b. CI substrate | [PLAN-proxmox-source-phase-01b-ci-substrate.md](/components/kerbside/plans/PLAN-proxmox-source-phase-01b-ci-substrate/) | Complete | actions 5399c4f (#96) |
+| 2. Tunnelled transport in ryll | [PLAN-proxmox-source-phase-02-ryll-connect.md](/components/kerbside/plans/PLAN-proxmox-source-phase-02-ryll-connect/) | Complete | ryll ea4bf67 (#402) |
+| 3a. Minting at connect time | [PLAN-proxmox-source-phase-03a-connect-time-minting.md](/components/kerbside/plans/PLAN-proxmox-source-phase-03a-connect-time-minting/) | In progress | |
 | 3b. Tunnel transport | | Not started | |
 | 4. The source driver | | Not started | |
 | 5. CI lane | | Not started | |
@@ -469,7 +476,7 @@ separate `Merged` entry of its own.
 
 ## Status
 
-In progress. Phase 1 is complete, and phases 1b and 2 are
-planned. Phase 2 is in progress in ryll (steps 2a and 2b
-committed on `spice-http-connect`); its validation waits on
-phase 1b.
+In progress. Phases 1, 1b and 2 are complete: CI can build a
+Proxmox VE node on demand, and ryll tunnels through
+`spiceproxy`, proven against a real node on every ryll pull
+request that touches the tunnel. Phase 3a is planned.

@@ -462,31 +462,34 @@ check confirms that rather than assuming it.
 
 ## Definition of done
 
-- [ ] `SpiceClient::new` refuses `proxy` without
+- [x] `SpiceClient::new` refuses `proxy` without
       `host_subject`, and `proxy` without `tls_port`. Two
       tests assert each error names the missing field.
-- [ ] With `proxy: None`, every pre-existing crate test
+- [x] With `proxy: None`, every pre-existing crate test
       passes unchanged. No existing test was edited except
       to add `proxy` where a struct literal requires it.
-- [ ] A test proves that bytes following the CONNECT
+- [x] A test proves that bytes following the CONNECT
       response's blank line are still readable by the
       caller.
-- [ ] `grep -rn 'config.host' ryll/src
+- [x] `grep -rn 'config.host' ryll/src
       shakenfist-spice-protocol/src` finds no site that logs,
       writes or reports the host without going through
       `display_target()`. Any remaining hit is a dial or a
       `From` conversion.
-- [ ] `tools/fuzz-targets.sh` lists `fuzz_parse_proxy_uri`
+- [x] `tools/fuzz-targets.sh` lists `fuzz_parse_proxy_uri`
       and `fuzz_parse_connect_response`, and each ran
-      100,000 iterations without a crash.
-- [ ] `docs/configuration.md` documents `proxy`, and nothing
+      100,000 iterations without a crash. (The script reads
+      its targets from the `[[bin]]` tables in
+      `shakenfist-spice-protocol/fuzz/Cargo.toml` rather than
+      naming them, so it is the manifest that lists both.)
+- [x] `docs/configuration.md` documents `proxy`, and nothing
       in ryll's docs says a `.vv`'s proxy is ignored.
-- [ ] `proxmox-functional.yml` is green on this pull
+- [x] `proxmox-functional.yml` is green on this pull
       request, and its run URL and four summary lines are
       recorded under *Outcome*.
-- [ ] Ryll's `PUSH-AUDIT.md` has been run over the branch,
+- [x] Ryll's `PUSH-AUDIT.md` has been run over the branch,
       and its result is recorded under *Outcome*.
-- [ ] The ryll pull request is merged to `develop`, and the
+- [x] The ryll pull request is merged to `develop`, and the
       master plan's Execution table records
       `ryll <sha> (#pr)`.
 
@@ -504,14 +507,17 @@ None. The IPv6-literal dial bug this plan expected to fix
 - The `SPICE_PROXY` environment fallback, for parity with
   remote-viewer.
 - A connect timeout inside the crate, for callers that are
-  not kerbside.
+  not kerbside. Only the CONNECT exchange is bounded (10 s);
+  the TCP dial to the proxy and the TLS handshake are not,
+  exactly as on the direct path.
+- Consider requiring `ca=` for a tunnelled `.vv`, rather than
+  checking a tunnel against the public roots plus the pin.
 - A friendlier `display_target()` for Proxmox, showing the
   vmid and node, if debugging demands it (decision 6).
 
 ## Outcome
 
-In progress. On ryll branch `spice-http-connect`, not yet
-pushed:
+Complete. Merged as ryll `ea4bf67` (#402) on 2026-09-26.
 
 | Step | Commit | Notes |
 |------|--------|-------|
@@ -522,7 +528,46 @@ pushed:
 | 2e | `2c99faa` | Docs. |
 | — | `189bff3` | Found by 1b.7: headless ryll exited 0 on a failed connect, and a `select!` race could drop the error unlogged. Both fixed, operator-approved. |
 
-Steps 2f (replaced by phase 1b's lane) and 2g remain.
+| — | `34da4a3`, `50a9cc0`, `a45b632`, `6559905` | Review rounds, below. |
+
+**Review.** Two rounds of the automated review. The first
+found the lane unable to fail (no `pipefail`, see phase 1b's
+*Outcome*), the CONNECT exchange unbounded in time (now 10 s,
+`CONNECT_EXCHANGE_TIMEOUT`), and the capture metadata's split
+target fields; all three fixed in `a45b632`. `50a9cc0`
+removed every reference to this plan from ryll's code and
+docs. The merge queue then failed on Windows only: `a45b632`
+had cut `headless_connect_failure_is_an_error`'s limit to 2 s,
+and Windows retries a refused SYN for about that long, so
+`6559905` restored 10 s.
+
+**2f** was replaced by phase 1b's lane; its green run and
+summary lines are in phase 1b's *Outcome*.
+
+**2g, the push audit**, ran over the merged diff
+(`ea4bf67^1..ea4bf67`, lane commits included) on 2026-09-27,
+after merge rather than before, because the merge landed
+first. Wave 1 passed. It raised nothing critical or high.
+Eight of its ten low and advisory findings were fixed in
+ryll `d787520` (#411): a refused `user:pass@` proxy value was
+echoed whole into the `.vv` load error; the lane spliced the
+deploy action's outputs into its shell script; a run killed
+before a check's cleanup could upload an unscrubbed
+`ryll.log`; the workflow header still explained a pre-merge
+arrangement, and called the ryll it built "this branch's",
+which a dispatched run is not; two comments described the connect-error race as
+history; `configuration.md` omitted the fork guard; and
+`ARCHITECTURE.md` did not mention the tunnel. Declined: type
+hints across `tools/proxmox-smoke.py` (a style change to a
+whole file, not a defect); its double-quoted dict keys, which
+all sit inside single-quoted f-strings and cannot change
+before Python 3.12; a long line in `config.rs` older than this
+phase; and a note on why `proxy.rs` does not use
+`BoundedReader`, whose input is HTTP text rather than SPICE
+framing and is fuzzed. The audit's informational notes, that
+the TCP connect to the proxy and the TLS handshake carry no
+timeout of their own and that a tunnel with no `ca=` checks
+against public roots plus the pin, stand as *Future work*.
 
 ## Back brief
 
