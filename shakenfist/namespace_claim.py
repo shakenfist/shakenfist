@@ -30,9 +30,10 @@
 # against the claims table's own index. Moving that predicate to
 # object_states would turn the hot probe into a join across the two uuid
 # storage conventions -- object_states.object_uuid holds the dashed 36
-# character form, sa.Uuid columns here hold undashed CHAR(32), which silently
-# never match when compared directly -- which is both slower and the exact shape this codebase
-# has been burned by. Do not "simplify" this into one state.
+# character form, sa.Uuid columns here hold undashed CHAR(32), and the
+# two silently never match when compared directly -- which is both
+# slower and the exact shape this codebase has been burned by. Do not
+# "simplify" this into one state.
 
 from typing import Any
 from typing import Optional
@@ -301,9 +302,11 @@ class NamespaceClaim(dbo):
 
         ``fields`` names which of the arguments this call actually sets,
         exactly as the update_*_attributes field masks do (see
-        docs/developer_guide/standards.md): without it there is no way to tell a deliberate zero
-        from an argument the caller never passed, and an unmasked write
-        would shrink every dimension the caller did not mention to zero.
+        "Attribute updates use field masks" in
+        docs/developer_guide/standards.md): without it there is no way
+        to tell a deliberate zero from an argument the caller never
+        passed, and an unmasked write would shrink every dimension the
+        caller did not mention to zero.
 
         Growing is guarded against the cluster exactly as creation is,
         shrinking is permitted down to the claim's current usage and no

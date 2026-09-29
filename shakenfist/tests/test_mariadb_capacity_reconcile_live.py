@@ -18,8 +18,7 @@ to break:
   its half-away-from-zero rounding of fractional sizes,
 * the REPLACE(dashed, '-', '') joins landing on the instances CHAR(32)
   primary key (comparing the two uuid forms directly silently never
-  matches, so a broken join returns zero rows
-  rather than an error),
+  matches, so a broken join returns zero rows rather than an error),
 * the enum storage conventions -- object_states persists member names
   while object_references stores member values, so this suite runs
   under utf8mb4_bin, where a binding naming the wrong convention

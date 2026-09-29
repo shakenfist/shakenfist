@@ -352,8 +352,8 @@ actually watched: `/admin/resources` keys that mapping by node UUID
 while the suite pins by node name, so the two differ and the wait has
 to resolve one to the other before it can read anything.
 Because the report already runs over a downloaded bundle rather than
-only inside a live job, this summary is available for any run that wrote the
-trace -- the evidence does not wait for
+only inside a live job, this summary is available for any run that
+wrote the trace -- the evidence does not wait for
 `ci_headroom_collect.sh` to grow its own `--waits` plumbing and print
 it into the job log, which is a separate, later change.
 
@@ -413,9 +413,8 @@ disk-busy delta, not a capacity check at all, and not something that
 more or bigger disks in the same shape would fix. The cloud-sizing
 plan itself named the wrong one as "disk" until a survey of the
 admission code caught the mistake, which is why it is worth calling
-out here: read a
-`sufficient_idle_disk` row in a census as a disk I/O problem, never as
-evidence the cloud needs more disk capacity.
+out here: read a `sufficient_idle_disk` row in a census as a disk I/O
+problem, never as evidence the cloud needs more disk capacity.
 
 ### One bound gates, and everything else is information
 
@@ -440,8 +439,9 @@ incidental:
   no build is at risk, and the response is a topology change nobody makes
   from one run. It is also the *common* reading -- 30 of the 40 cluster
   job-runs in the warn window that preceded the gate were below it -- so
-  returning a status for it would redden three quarters of cluster CI immediately. Ask the question over
-  a window instead; the command is below.
+  returning a status for it would redden three quarters of cluster CI
+  immediately. Ask the question over a window instead; the command is
+  below.
 * **The per-node bound (0.85) never gates.** The statistic saturates at
   its ceiling on plenty of passing runs, so it cannot tell a bad run from
   a good one at the top of its range. Read it as what a topology should

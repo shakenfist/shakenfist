@@ -26446,6 +26446,7 @@ def _instance_location_nodes(
     columns while scheduler_node_capacity keys on sa.Uuid (undashed
     CHAR(32) on MariaDB), so the source uuids are parsed here rather
     than compared across the two forms, which silently never match (see
+    "A column-to-column comparison has no bind processor" in
     docs/developer_guide/coding_rules.md).
     """
     refs = _get_object_references_table()
@@ -27666,7 +27667,8 @@ CLAIM_STATE_ACTIVE = 'active'
 
 # The claim fields an update request may name in its field mask. The mask
 # is what tells a deliberate zero from an unset proto3 int, exactly as
-# the update_*_attributes field masks do (see docs/developer_guide/standards.md).
+# the update_*_attributes field masks do (see "Attribute updates use
+# field masks" in docs/developer_guide/standards.md).
 CLAIM_UPDATE_FIELDS = (
     'limit_cpus', 'limit_memory_mb', 'limit_disk_gb', 'expires_in_seconds')
 

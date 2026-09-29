@@ -115,8 +115,7 @@ refusal happens, so it cannot compute how long until freed capacity reappears.
 A computed number would imply knowledge the server lacks. `15` is instead chosen
 to clear the metrics path with good margin: measured across three CI topologies,
 a node's `cpu_measured` drops 5.3-5.6 seconds after an instance is destroyed, so
-15 seconds clears that lag by roughly three times (see
-[PLAN-transient-capacity-refusals](../plans/PLAN-transient-capacity-refusals.md)).
+15 seconds clears that lag by roughly three times.
 
 The `Retry-After` header is **not** configurable per-cluster or per-request. If
 your workload or network requires a different retry delay, it belongs in a client
