@@ -132,12 +132,14 @@ Repeat step 2 for each supported client: **virt-viewer**,
 The proxy advertises the connected client's link capabilities to qemu
 rather than its own (see "Link capabilities" in
 [Proxy Architecture](/components/kerbside/proxy-architecture/#link-capabilities)). To see
-what each backend link sent and was granted, bring the path up with
-debug logging and connect a client other than ryll, whose capabilities
-differ:
+what each backend link sent and was granted, bring the path up (the
+harness already runs the proxy at debug level) and connect a client
+other than ryll, whose capabilities differ. The mock control plane
+needs a Python with `grpc`, such as the tox environment's:
 
 ```sh
-RUST_LOG=kerbside_proxy=debug tools/direct-qemu/verify-rust-proxy.sh up
+export MOCK_GRPC_PYTHON="$PWD/.tox/py3/bin/python" PYTHONPATH="$PWD"
+tools/direct-qemu/verify-rust-proxy.sh up
 remote-viewer /tmp/kerbside-rust-proxy-verify/console.vv
 grep 'backend link capabilities' /tmp/kerbside-rust-proxy-verify/rust-proxy.log
 ```
@@ -147,7 +149,9 @@ Each line carries `sent_channel_caps` (the client's, forwarded) and
 sends `[7039]`; any other value there is the client's own set. A
 `backend lacks capabilities Kerbside offered the client` warning means
 qemu's spice-server was built without a capability the proxy offers by
-default, such as Opus.
+default, such as Opus. A backend that lacks MINI_HEADER, AUTH_SELECTION or
+AUTH_SPICE is not a warning: the backend connect fails and is audited
+as a hypervisor connection failure.
 
 `assert-firewall` (with the default `FIREWALL_EXPECT=clean`) waits for
 a real session — `kerbside_proxy_authorized_total >= 1` and

@@ -68,9 +68,25 @@ certificate's name must match the host dialled unless a `host_subject` is
 pinned. This is narrower than earlier releases, where a configured
 `ca_cert` was added to the public roots rather than replacing them, so a
 certificate from any public CA also passed the chain check (ryll commit
-3050082, picked up with the fix for issue #477). A deployment whose
-hypervisors present publicly issued certificates must therefore leave
-`ca_cert` empty for that source rather than set it to an unrelated CA.
+3050082, picked up with the fix for issue #477).
+
+What that means depends on the source type, because `ca_cert` is not
+always a free choice:
+
+- **Shaken Fist and oVirt.** One `ca_cert` field serves both the cloud
+  API and the hypervisor VDI leg, and the source driver requires it to
+  match the CA the cloud itself publishes, exactly, or the source is
+  marked errored (`kerbside/sources/shakenfist.py`,
+  `kerbside/sources/ovirt.py`). So it can be neither left empty nor
+  extended into a bundle. Both platforms issue hypervisor SPICE
+  certificates from that same cluster (or engine) CA, so the narrower
+  trust changes nothing for them. A hypervisor whose SPICE certificate
+  was replaced with one from another CA will now fail the backend
+  connect.
+- **Static and OpenStack.** `ca_cert` is only the VDI trust anchor
+  (see [Console Sources](/components/kerbside/console-sources/)). A deployment whose
+  hypervisors present publicly issued certificates must leave it empty
+  for that source rather than set it to an unrelated CA.
 
 For Shaken Fist consoles the enforced `host_subject` is not configured on the
 proxy: it is pinned at scrape time from the hosting node's published SPICE

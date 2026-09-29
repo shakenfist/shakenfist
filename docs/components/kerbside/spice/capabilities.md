@@ -74,6 +74,7 @@ Offset  Size  Type    Field
 | 12 | PrefVideoCodecType | Client video codec preference |
 | 13 | CodecVP9 | VP9 video codec |
 | 14 | CodecH265 | H.265/HEVC video codec |
+| 15 | GLScanout2 | GL scanout with multiple planes |
 
 ### GL Scanout
 
