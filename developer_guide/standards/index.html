@@ -14682,6 +14682,25 @@
 <p>This document records the standards and common language used within the Shaken Fist software system.</p>
 <p>It should also record why the choice was made.</p>
 <p>(This is actually just notes to save our future selves from tripping over the same problems.)</p>
+<h2 id="development-goals">Development goals<a class="headerlink" href="#development-goals" title="Permanent link">&para;</a></h2>
+<p>These apply to every change, and a reviewer will ask about each:</p>
+<ul>
+<li>An object's <code>hard_delete()</code> cleans up everything the object owns. A new
+  table, reference row or on-disk artifact is not finished until
+  <code>hard_delete()</code> removes it.</li>
+<li>New code carries mypy annotations, and a module a change touches is a
+  candidate to join the incremental rollout; see <a href="../mypy/">mypy.md</a>.</li>
+<li>New code has tests. Functional tests (in
+  <code>shakenfist/deploy/shakenfist_ci/</code>) are preferred over unit tests where
+  only one is practical, because they exercise the real daemons and
+  database.</li>
+<li>Event coverage is preserved. The wording of an event may change, but a
+  change must not remove the audit trail an operator debugs from; see
+  <a href="#events-vs-logs">Events vs logs</a>.</li>
+<li>Filtering is pushed down into SQL, and a new query arrives with the index
+  that serves it; see
+  <a href="../database_internals/#sql-filter-pushdown-discipline">SQL Filter-Pushdown Discipline</a>.</li>
+</ul>
 <h2 id="memory">Memory<a class="headerlink" href="#memory" title="Permanent link">&para;</a></h2>
 <p>Memory is measured in MiB in Shaken Fist. All references to memory size are stored and transmitted in MiB: Gigabytes can be too big if you want a lot of small machines. Kilobytes is just too many numbers to type. The <code>libvirt</code> API measures memory in KiB. Therefore, interactions with the library need to be careful to convert from MiB to KiB.</p>
 <h2 id="code-style">Code Style<a class="headerlink" href="#code-style" title="Permanent link">&para;</a></h2>
@@ -14692,11 +14711,16 @@
 <li>Trim trailing whitespace</li>
 <li>All imports at the top of the file. A late import inside a function is
   only for breaking a circular import, and carries a comment saying so</li>
-<li>Import order is standard library, third party, then <code>shakenfist</code></li>
+<li>Import order is standard library, third party, then <code>shakenfist</code>. The
+  <code>shakenfist_utilities</code> import carries a <code># noreorder</code> marker to keep it
+  in that position</li>
+<li>Every module sets up logging with <code>LOG, _ = logs.setup(__name__)</code> (from
+  <code>shakenfist_utilities</code>), and attaches structured context with
+  <code>LOG.with_fields({'instance_uuid': uuid})</code> rather than formatting it into
+  the message</li>
 <li>Every file starts with <code># Copyright 2019 Michael Still and contributors</code></li>
 </ul>
-<p>This page is the style guide; <code>CLAUDE.md</code> and <code>AGENTS.md</code> summarise it
-and link here.</p>
+<p>This page is the style guide; <code>AGENTS.md</code> summarises it and links here.</p>
 <h2 id="attribute-updates-use-field-masks">Attribute updates use field masks<a class="headerlink" href="#attribute-updates-use-field-masks" title="Permanent link">&para;</a></h2>
 <p>The <code>update_*_attributes</code> functions in <code>shakenfist/mariadb.py</code> require a
 <code>fields</code> argument naming exactly the model fields the caller changed;
@@ -14870,6 +14894,12 @@ and <a href="../../operator_guide/events/"><code>events.md</code></a>.</p>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>tox<span class="w"> </span>-ecover<span class="w">                      </span><span class="c1"># Coverage report</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>stestr<span class="w"> </span>run<span class="w"> </span><span class="o">{</span>test_name<span class="o">}</span><span class="w">           </span><span class="c1"># Run specific test</span>
 </code></pre></div>
+<p>Unit tests use <code>stestr</code> with <code>testtools</code>; the base class is
+<code>ShakenFistTestCase</code> in <code>shakenfist/tests/base.py</code>. MariaDB and other
+external dependencies are replaced with <code>mock.patch</code>
+(<code>shakenfist/tests/mock_mariadb.py</code> provides the common database fakes).
+Tests live in <code>shakenfist/tests/</code> as <code>test_&lt;subject&gt;.py</code>, with
+subdirectories for <code>external_api</code>, <code>operations</code> and <code>schema</code>.</p>
 <h2 id="pre-commit-hooks">Pre-commit Hooks<a class="headerlink" href="#pre-commit-hooks" title="Permanent link">&para;</a></h2>
 <p>The repository uses pre-commit hooks to validate code before commits:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>pre-commit<span class="w">           </span><span class="c1"># Install pre-commit</span>
@@ -14877,7 +14907,10 @@ and <a href="../../operator_guide/events/"><code>events.md</code></a>.</p>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>pre-commit<span class="w"> </span>run<span class="w"> </span>--all-files<span class="w">       </span><span class="c1"># Run all hooks manually</span>
 </code></pre></div>
 <p>Current hooks:
-- <code>actionlint</code> - Validates GitHub Actions workflow files
+- <code>actionlint</code> - Validates GitHub Actions workflow files. It is not a
+  Python package: install it with <code>brew install actionlint</code> on macOS, or
+  from the <a href="https://github.com/rhysd/actionlint/releases">actionlint releases</a>
+  on Linux
 - <code>ansible-lint</code> - Validates the <code>shakenfist.shakenfist</code> Ansible collection
   (<code>shakenfist/deploy/collection/</code>)
 - <code>flake8</code> - Style check via tox, on changed files

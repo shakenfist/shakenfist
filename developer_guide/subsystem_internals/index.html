@@ -14688,6 +14688,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#daemon-start-ordering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Daemon start ordering
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#daemon-liveness-systemd-watchdog" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15088,7 +15099,9 @@ bargain the branch probe strikes.</p>
   probe-then-force would make every create in a claimed namespace pay a
   probe round trip, and the namespaces that want claims are the ones
   creating instances hardest; it also leaves the eventual flip to hard
-  enforcement as moving an existing predicate into a <code>WHERE</code> clause.</li>
+  enforcement as moving an existing predicate into a <code>WHERE</code> clause.
+  That flip is <code>CLAIM_ENFORCEMENT_HARD</code> and nothing else: do not add an
+  enforcement knob or a 403 path ahead of it.</li>
 </ul>
 <p><code>NamespaceClaim</code> (<code>shakenfist/namespace_claim.py</code>) is an ordinary
 <code>DatabaseBackedObject</code> over these rows, with two states that are two
@@ -15138,6 +15151,26 @@ deleted-node path but errors rather than deletes.</p>
 <p>Node error never clears automatically; <code>sf-ctl clear-node-error</code> is the
 operator recovery path, documented in
 <a href="../../operator_guide/node_health/"><code>node_health.md</code></a>.</p>
+<h2 id="daemon-start-ordering">Daemon start ordering<a class="headerlink" href="#daemon-start-ordering" title="Permanent link">&para;</a></h2>
+<p>Each daemon is a systemd unit rendered from
+<code>shakenfist/deploy/collection/roles/node/templates/sf.service</code>, grouped
+under <code>sf.target</code>, and the ordering there is load bearing:</p>
+<ol>
+<li><code>sf-database</code> starts first, after <code>mariadb.service</code>. It is the gRPC
+   path to MariaDB for every other daemon, and it records its own
+   startup and shutdown state by going direct, since it cannot call
+   itself.</li>
+<li><code>sf-sentinel-first</code> starts after it and marks the node as starting.</li>
+<li><code>sf-privexec</code> and <code>sf-nodelock</code> start after sentinel-first.</li>
+<li>Every other daemon, and <code>sf-api</code> (its own <code>sf-api.service</code>), starts
+   after privexec, nodelock and the database.</li>
+<li><code>sf-sentinel-last</code> starts after all of them.</li>
+</ol>
+<p>Stop runs in reverse: sentinel-last stops first and marks the node as
+stopping, the control plane stops, and sentinel-first stops last and
+records a graceful stop. A daemon started ahead of <code>sf-database</code> hangs
+on its first database call -- <code>sf-api</code> in particular -- so a new unit
+must keep the <code>After=sf-database.service</code> ordering.</p>
 <h2 id="daemon-liveness-systemd-watchdog">Daemon liveness (systemd watchdog)<a class="headerlink" href="#daemon-liveness-systemd-watchdog" title="Permanent link">&para;</a></h2>
 <p><code>Daemon.pet_watchdog()</code> in <code>shakenfist/daemons/daemon.py</code> is the
 liveness seam for every non-trivial daemon. It writes

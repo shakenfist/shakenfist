@@ -15162,7 +15162,7 @@ commands available on a PR.</p>
 </tr>
 <tr>
 <td><code>agent-context.yml</code></td>
-<td>Lint the agent context -- <code>AGENTS.md</code>, <code>CLAUDE.md</code> and <code>.claude/</code> -- for malformed frontmatter, smuggled instructions, embedded credentials and dangerous hook configuration, by running the <code>skillsaw</code> pre-commit hook. Advisory: see Branch Protection</td>
+<td>Lint the agent context -- <code>AGENTS.md</code> and <code>.claude/</code> -- for malformed frontmatter, smuggled instructions, embedded credentials and dangerous hook configuration, by running the <code>skillsaw</code> pre-commit hook. Advisory: see Branch Protection</td>
 <td>PR or push to <code>develop</code> touching the agent context, <code>.pre-commit-config.yaml</code> or the workflow itself</td>
 </tr>
 <tr>
@@ -15535,8 +15535,8 @@ actually watched: <code>/admin/resources</code> keys that mapping by node UUID
 while the suite pins by node name, so the two differ and the wait has
 to resolve one to the other before it can read anything.
 Because the report already runs over a downloaded bundle rather than
-only inside a live job, this summary is available from the moment the
-phase that writes the trace merges -- the evidence does not wait for
+only inside a live job, this summary is available for any run that
+wrote the trace -- the evidence does not wait for
 <code>ci_headroom_collect.sh</code> to grow its own <code>--waits</code> plumbing and print
 it into the job log, which is a separate, later change.</p>
 <p>An absent or empty file reports as unknown, never as zero waits, for
@@ -15549,8 +15549,8 @@ A file that was read but whose every line was malformed is reported
 the same way, for the same reason, and carries its own <code>state</code> of
 <code>unparseable</code> in the machine-readable record rather than an
 <code>available</code> file with a count of zero -- the prose and the record have
-to say the same thing, because the later phases that read this are
-consumers of the record.</p>
+to say the same thing, because the tooling that reads this consumes
+the record, not the prose.</p>
 <h3 id="the-series-record-format">The series record format<a class="headerlink" href="#the-series-record-format" title="Permanent link">&para;</a></h3>
 <p><code>headroom.jsonl</code> is parsed as a contract, so treat the shape below as
 load-bearing rather than as prose to paraphrase; the tool's own
@@ -15588,16 +15588,16 @@ easy to swap: <code>sufficient_free_disk</code> is disk <em>space</em>, but
 <code>sufficient_idle_disk</code> is disk <em>bandwidth</em> -- a rate predicate on
 disk-busy delta, not a capacity check at all, and not something that
 more or bigger disks in the same shape would fix. The cloud-sizing
-plan itself named the wrong one as "disk" before this phase's survey
-caught the mistake, which is why it is worth calling out here: read a
-<code>sufficient_idle_disk</code> row in a census as a disk I/O problem, never as
-evidence the cloud needs more disk capacity.</p>
+plan itself named the wrong one as "disk" until a survey of the
+admission code caught the mistake, which is why it is worth calling
+out here: read a <code>sufficient_idle_disk</code> row in a census as a disk I/O
+problem, never as evidence the cloud needs more disk capacity.</p>
 <h3 id="one-bound-gates-and-everything-else-is-information">One bound gates, and everything else is information<a class="headerlink" href="#one-bound-gates-and-everything-else-is-information" title="Permanent link">&para;</a></h3>
 <p>The band verdict <code>ci_headroom_report.py</code> prints is committed vCPU as a
 fraction of the admission ledger, against bounds of 0.35 and 0.70, plus a
-per-node bound of 0.85. Those bounds are not provisional: phase 2 of
-<a href="../../plans/PLAN-ci-cloud-sizing/">PLAN-ci-cloud-sizing</a> defended them
-against a distribution of 204 job-runs.</p>
+per-node bound of 0.85. Those bounds are not provisional: they were
+defended against a baseline distribution of 204 job-runs, recorded in
+<a href="../../plans/PLAN-ci-cloud-sizing/">PLAN-ci-cloud-sizing</a>.</p>
 <p><strong>Exactly one of them can fail a job: the cluster-wide upper bound of
 0.70.</strong> Above it, the report returns status 3 and
 <code>shakenfist/actions</code>'s <code>tools/ci_headroom_verdict.sh</code> fails the step with
@@ -15611,15 +15611,16 @@ incidental:</p>
 <li><strong>The lower bound (0.35) never gates.</strong> Being oversized is not urgent,
   no build is at risk, and the response is a topology change nobody makes
   from one run. It is also the <em>common</em> reading -- 30 of the 40 cluster
-  job-runs phase 5 measured were below it -- so returning a status for it
-  would redden three quarters of cluster CI immediately. Ask the question over
-  a window instead; the command is below.</li>
+  job-runs in the warn window that preceded the gate were below it -- so
+  returning a status for it would redden three quarters of cluster CI
+  immediately. Ask the question over a window instead; the command is
+  below.</li>
 <li><strong>The per-node bound (0.85) never gates.</strong> The statistic saturates at
   its ceiling on plenty of passing runs, so it cannot tell a bad run from
   a good one at the top of its range. Read it as what a topology should
   achieve, not as an alarm about one run.</li>
-<li><strong>The refusal count never gates.</strong> Phase 4 doubled a cluster's ledger
-  and the guard refused at essentially the same rate, because
+<li><strong>The refusal count never gates.</strong> Reshaping a cluster to double its
+  ledger left the guard refusing at essentially the same rate, because
   <code>expected_demand</code> accumulates until whatever bound it is given fills up.
   The count is the earliest sign the demand estimator has drifted, and
   nothing more; <code>PLAN-transient-capacity-refusals</code> is what reads it.</li>
@@ -15630,7 +15631,7 @@ incidental:</p>
   band is withheld, printed with the reason and exit 0, when the p90 rests
   on fewer than 20 samples which produced a cluster CPU fraction (five
   minutes at the probe's 15 second interval; the smallest real job-run in
-  the phase 2 baseline had 41), when any sample reported
+  the 204-run baseline had 41), when any sample reported
   <code>capacity_degraded</code>, when any sample predates that flag (a bundle whose
   probe cannot say whether its read failed), or when any sample was
   ledger-unreadable <em>after</em> the warm-up prefix every run opens with. Each
@@ -15660,7 +15661,7 @@ or removing the input from these call sites before the actions-side
 revert.</p>
 <p>The gate is armed only on job shapes a warn window has measured, which
 today means the merge matrix in <code>functional-tests.yml</code> -- the four jobs
-phase 5's window read. That call site passes
+the warn window read. That call site passes
 <code>headroom_gate: ${{ vars.CI_HEADROOM_GATE != 'false' }}</code>, so the variable
 being unset leaves the gate on. The other three call sites of
 <code>smoke-cluster.yml</code> pass <code>headroom_gate: false</code>: the smoke tier job (pull

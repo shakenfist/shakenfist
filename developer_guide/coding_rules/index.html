@@ -15084,7 +15084,10 @@ the wrapper untouched. Handling only the return value covers the oversized-reply
 case and misses the tier outage -- which is the more likely reason a read fails,
 and the condition an alert on the streak most needs to see. Cover both, and
 prove it with a test that sets <code>side_effect = DatabaseUnavailable(...)</code> rather
-than a <code>None</code> return.</p>
+than a <code>None</code> return. Code which is meant to ride out an unreachable
+database catches <code>DatabaseUnavailable</code> explicitly and says so;
+<code>Daemon.check_daemon_state()</code> and <code>ClusterLock.__enter__</code> are the
+examples to copy.</p>
 <p>Having covered both, do not then treat them alike inside a loop. The two shapes
 differ in blast radius. A <code>None</code> return is per-reply, so the next object type is
 still worth reading. A <code>DatabaseUnavailable</code> is tier-wide: every remaining read

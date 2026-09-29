@@ -17780,6 +17780,8 @@ class. It provides the same interface for backwards compatibility:</p>
 <a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">update_time</span><span class="p">)</span>  <span class="c1"># 1234567890.123</span>
 <a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">obj_dict</span><span class="p">())</span>   <span class="c1"># {'value': 'created', 'update_time': 1234567890.123}</span>
 </code></pre></div>
+<p>Construct it with keyword arguments, and pass <code>update_time</code> as a float
+(seconds since the epoch, as <code>time.time()</code> returns), not an int.</p>
 <h2 id="ipam-reservation-storage">IPAM Reservation Storage<a class="headerlink" href="#ipam-reservation-storage" title="Permanent link">&para;</a></h2>
 <p>IPAM (IP Address Manager) reservations are stored in MariaDB for atomic address
 allocation. This provides:</p>

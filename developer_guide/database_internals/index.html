@@ -14649,6 +14649,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#caller-identity-decides-direct-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caller identity decides direct access
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#static-object-value-cache" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14852,6 +14863,25 @@ unreachable. Schema currency is a refuse-to-start precondition enforced at
 startup, not a runtime health signal.
 See <a href="../../operator_guide/database/"><code>database.md</code></a> —
 "MARIADB_HOST vs MARIADB_GATEWAY_HOSTS" — for the operator-facing detail.</p>
+<h3 id="caller-identity-decides-direct-access">Caller identity decides direct access<a class="headerlink" href="#caller-identity-decides-direct-access" title="Permanent link">&para;</a></h3>
+<p>Going direct to MariaDB needs <em>both</em> <code>MARIADB_HOST</code> and a caller identity
+in <code>mariadb.DIRECT_MARIADB_CALLERS</code> (<code>database</code> and <code>ctl</code>). <code>MARIADB_HOST</code>
+alone is not enough, because it is rendered into <code>/etc/sf/config</code>, the
+systemd <code>EnvironmentFile</code> every daemon on a database-tier node shares.
+Only <code>sf-database</code> (which would otherwise call itself) and <code>sf-ctl</code> (which
+runs <code>ensure-mariadb-schema</code> and <code>initialise-node</code> before <code>sf-database</code>
+starts) act on it. Every other daemon uses the tier even when co-located
+with MariaDB: going direct would hide its load from the tier's metrics
+and connection accounting.</p>
+<p>The identity is process-global, so an entry point calls
+<code>set_caller_identity()</code> (<code>shakenfist/util/caller_identity.py</code>) before
+anything that might dispatch. An unset identity reads as <code>unknown</code>, which
+routes an ordinary daemon to the tier correctly but would make
+<code>sf-database</code> call itself; <code>sf-database</code> therefore claims its identity as
+the first statement of <code>main()</code>, before <code>write_pid_file()</code> starts the
+eventlog drainer. The one exempt path is <code>config.load_cluster_config()</code>,
+which runs at import time before any identity exists -- see its
+docstring.</p>
 <p>Schema management (<code>ensure_schema()</code> in <code>mariadb.py</code>, run via <code>sf-ctl
 ensure-mariadb-schema</code>) is version-gated per table, plus one un-gated
 pass: native MariaDB <code>ENUM</code> columns are reconciled against their Python
@@ -15143,6 +15173,16 @@ returns the most important eligible work first across an arbitrary
 number of queues. The previous one-RPC-per-queue polling loop is
 replaced by one RPC per iteration regardless of how many priority
 lanes the worker drains.</p>
+<p>The lanes, from <code>PRIORITY</code> in
+<code>shakenfist/schema/operations/baseclusteroperation.py</code>, highest first:
+<code>user_waiting</code> (a user is blocked on the result, so latency matters
+most), <code>user_facing</code> (ordinary user-initiated work), <code>background</code>
+(maintenance nobody is waiting for), and <code>user_facing_high_io</code> /
+<code>background_high_io</code>, which carry the same meaning for disk-heavy work.
+A worker skips the <code>high_io</code> lanes while its node's disk is more than
+about 80% busy (see <code>shakenfist/daemons/daemon.py</code>), so that work waits
+rather than piling onto a saturated disk. Each lane exists both per node
+and globally.</p>
 <p>Lower-priority rows only spill in when the higher-priority queues
 yield fewer rows than <code>limit</code>, so sustained heavy load on
 <code>user_facing</code> can still crowd <code>background</code> out -- explicit fairness

@@ -15753,7 +15753,7 @@
   anyway. A JSON boolean is unaffected, and it is what <code>sf-client</code>
   and the ansible collection both send.</li>
 <li><strong>Every other parameter the API declares <code>boolean</code> is now read the
-  same way</strong>, which the phase 8 audit of this work found was not
+  same way</strong>, which the pre-push audit of this work found was not
   true of ten of them. The visible cases: <code>uefi</code> and <code>secure_boot</code>
   on <code>POST /instances</code> (<code>{"uefi": "false"}</code> booted with UEFI, and
   <code>{"secure_boot": "off"}</code> turned secure boot on <em>and</em> defeated the

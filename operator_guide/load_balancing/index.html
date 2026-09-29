@@ -15144,7 +15144,8 @@ the <code>/api</code> prefix and forwards the request to a backend <code>sf-api<
 exception -- the Swagger UI fetches them from the server root, so they are
 passed through unchanged rather than living under <code>/api</code>.</p>
 <p>This is why the <code>api_url</code> you give the deployer ends in <code>/api</code>: that prefix is
-what the proxy expects and strips.</p>
+what the proxy expects and strips. There is no version segment after it --
+no <code>/v1/</code> -- so <code>&lt;lb&gt;/api/instances</code> reaches <code>/instances</code> on the backend.</p>
 <table>
 <thead>
 <tr>

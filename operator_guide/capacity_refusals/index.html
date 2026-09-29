@@ -14906,9 +14906,9 @@ before re-examining deferred work were chosen to match.</p>
 <p>The server has no way to know which instances are being deleted at the moment a
 refusal happens, so it cannot compute how long until freed capacity reappears.
 A computed number would imply knowledge the server lacks. <code>15</code> is instead chosen
-to clear the metrics path with good margin: phase 3 of the sizing plan measured
-that a node's <code>cpu_measured</code> drops 5.3-5.6 seconds after an instance is destroyed,
-so 15 seconds clears that lag by roughly three times.</p>
+to clear the metrics path with good margin: measured across three CI topologies,
+a node's <code>cpu_measured</code> drops 5.3-5.6 seconds after an instance is destroyed, so
+15 seconds clears that lag by roughly three times.</p>
 <p>The <code>Retry-After</code> header is <strong>not</strong> configurable per-cluster or per-request. If
 your workload or network requires a different retry delay, it belongs in a client
 library or operator tooling that wraps the API, not in the server.</p>
