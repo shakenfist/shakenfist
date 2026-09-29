@@ -176,6 +176,7 @@ attached rather than quietly disappearing from the table.
 | [expensive-lane-path-filter.md](/components/development/audits/expensive-lane-path-filter/) | Expensive PR lanes skip docs-only and review-marks-only changes |
 | [fuzz-nightly-reporting.md](/components/development/audits/fuzz-nightly-reporting/) | Fuzz targets run nightly and file issues for crashes, rather than gating the merge queue |
 | [scheduled-workflow-health.md](/components/development/audits/scheduled-workflow-health/) | No workflow that fires unattended has failed without ever succeeding |
+| [reusable-workflow-secrets.md](/components/development/audits/reusable-workflow-secrets/) | Reusable workflows are passed named secrets, never `secrets: inherit` |
 | [console-logging.md](/components/development/audits/console-logging/) | Console script logging setup |
 | [python-version.md](/components/development/audits/python-version/) | Python version targeting and type hints |
 | [pyproject-usage.md](/components/development/audits/pyproject-usage/) | Python projects use pyproject.toml |
