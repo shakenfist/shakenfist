@@ -817,4 +817,8 @@ class BundleTableShapeTestCase(HarvestTestCase):
         for name, kind in harvest.BUNDLE_TOPOLOGIES.items():
             self.assertIn(
                 kind.topology, self.KNOWN_TOPOLOGIES,
-                '%s names unknown topology %r' % (name, kind.topology))
+                '%s names unknown topology %r. The real list is the '
+                'shakenfist/actions/ansible/ci-topology-*.yml files; a new one '
+                'belongs in KNOWN_TOPOLOGIES and in the topology tables in '
+                'docs/developer_guide/ci_cloud_sizing.md'
+                % (name, kind.topology))

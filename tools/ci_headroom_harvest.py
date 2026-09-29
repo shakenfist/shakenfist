@@ -28,10 +28,13 @@ was checked against a real artifact rather than reasoned about:
   *that*, at ``bundle/traces/``. Reading the outer zip's namelist for
   ``traces/headroom.jsonl`` finds nothing and would have looked exactly like
   a run whose probe never started.
-* **Only five of the six cluster bundles carry the probe at all** (D17;
-  phase 6's D3 closed one of the original two gaps), so the remaining one
-  is skipped by name rather than recorded as missing data. See
-  ``UNINSTRUMENTED_BUNDLES`` below.
+* **Only four of the six cluster bundles carry the probe today** (D17).
+  Five are classified for harvest: phase 6's D3 moved 'Ansible modules'
+  into ``BUNDLE_TOPOLOGIES`` ahead of the shakenfist/actions change that
+  instruments it (#4377), so until that is pushed its records carry
+  ``series_present`` false -- an expected absence, not a probe failure. The
+  sixth, 'Node lifecycle', is skipped by name rather than recorded as
+  missing data. See ``UNINSTRUMENTED_BUNDLES`` below.
 * **The topology is not in the series.** It is passed to the report at run
   time and never written down, so a bundle on disk does not say which shape
   produced it. D20 fixes that prospectively by having the collect script
@@ -118,8 +121,9 @@ BundleKind = collections.namedtuple(
 
 # D17's table, sourced from the merge matrix at
 # .github/workflows/functional-tests.yml:440-495, plus the Ansible modules
-# entry phase 6 of PLAN-ci-cloud-sizing-phase-06-docs.md added once its 6d
-# widened the probe gate onto that job (D3 there). Four of the five jobs run
+# entry phase 6 of PLAN-ci-cloud-sizing-phase-06-docs.md added in its 6d
+# (D3 there), ahead of the shakenfist/actions change which widens the probe
+# gate onto that job (tracked as #4377). Four of the five jobs run
 # the *same* topology, which is the point: if slim-primary's four jobs
 # differ from each other in peak demand then the difference is the suite and
 # not the shape, and phase 4 must not respond to it by resizing the cloud.
@@ -141,7 +145,9 @@ BundleKind = collections.namedtuple(
 #
 # 'Ansible modules' depends on a change in shakenfist/actions
 # (.github/workflows/smoke-cluster.yml) which may not be pushed yet -- see
-# this plan's Prepared changes section. Until it lands, a harvest still
+# the Prepared changes section of
+# docs/plans/PLAN-ci-cloud-sizing-phase-06-docs.md, tracked as #4377. Until
+# it lands, a harvest still
 # finds the 'bundle-shakenfist-full-ansible-modules' artifact (the job
 # already uploads a bundle; only its contents change), classifies it here
 # rather than skipping it, and records it with series_present False and
@@ -164,14 +170,15 @@ BUNDLE_TOPOLOGIES = {
 }
 
 
-# The one cluster bundle which carries no traces/ directory at all, checked
-# empirically against merge run 33944911413. Originally there were two, for
-# two different causes -- see D17 of PLAN-ci-cloud-sizing.md and D3 of
-# PLAN-ci-cloud-sizing-phase-06-docs.md. Phase 6's 6d closed the 'Ansible
-# modules' half by widening smoke-cluster.yml's probe-step gate (a change
-# prepared in that plan's Prepared changes section, for the operator to push
-# to shakenfist/actions) and moving that bundle into BUNDLE_TOPOLOGIES
-# above. What remains is the composite-action seam:
+# The one cluster bundle skipped by name because it carries no traces/
+# directory at all, checked empirically against merge run 33944911413.
+# Originally there were two, for two different causes -- see D17 of
+# PLAN-ci-cloud-sizing.md and D3 of PLAN-ci-cloud-sizing-phase-06-docs.md.
+# Phase 6's 6d moved the 'Ansible modules' bundle into BUNDLE_TOPOLOGIES
+# above, and prepared the widening of smoke-cluster.yml's probe-step gate
+# that instruments it (the Prepared changes section of that plan, for the
+# operator to push to shakenfist/actions, tracked as #4377). What remains
+# here is the composite-action seam:
 #
 # * 'Node lifecycle' never reaches the reusable smoke-cluster workflow at
 #   all. It calls the build-smoke-cluster composite action directly

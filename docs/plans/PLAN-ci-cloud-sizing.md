@@ -1337,8 +1337,11 @@ sees.** `Ansible modules` reaches the reusable workflow but with
 `test_kind: ansible-modules`, which every probe step is gated
 against; `Node lifecycle` here and kerbside's end-to-end job call
 the `build-smoke-cluster` composite action directly, and the probe
-steps live in the workflow rather than the action. Phase 6 closes
-the first, which is one `if:` condition, and files an issue for the
+steps live in the workflow rather than the action. Phase 6 prepares
+the fix for the first, which is one `if:` condition in
+`shakenfist/actions` for the operator to push
+([#4377](https://github.com/shakenfist/shakenfist/issues/4377)), and
+files an issue for the
 other two, which would change how every caller deploys through an
 action consumed at `@main` with no pin.
 
@@ -1709,7 +1712,8 @@ which is what `tools/check-plan-status.py` enforces.
   with `test_kind: ansible-modules`
   (`functional-tests.yml:528`), and every probe step is gated `if:
   inputs.test_kind == 'functional'`; widening that gate is the whole
-  fix, and is what phase 6's 6d does. `Node lifecycle` never reaches
+  fix, and is what phase 6's 6d prepares (pushing it is
+  [#4377](https://github.com/shakenfist/shakenfist/issues/4377)). `Node lifecycle` never reaches
   that workflow at all -- it calls the `build-smoke-cluster`
   composite action directly (`functional-tests.yml:581`), and the
   probe steps live in the workflow rather than in the action, so
