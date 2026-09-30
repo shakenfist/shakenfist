@@ -12,15 +12,15 @@ class TestBoot(testscenarios.WithScenarios, base.BaseNamespacedTestCase):
 
     scenarios = [
         (
-            'debian-12',
+            'debian',
             {
-                'base': 'debian-12'
+                'base': 'debian'
             }
         ),
         (
-            'debian-12',
+            'debian',
             {
-                'base': 'debian-12'
+                'base': 'debian'
             }
         ),
     ]
