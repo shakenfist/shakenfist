@@ -140,7 +140,7 @@ directly relevant the moment instar parses a locator table.
 The host is further along than the rest of this picture
 suggests, which phase 1's survey established and which matters
 most to phase 11. `discover_backing_chain`
-(`src/vmm/src/main.rs:2501`) is not qcow2-only: it walks a chain
+(`src/vmm/src/main.rs:2519`) is not qcow2-only: it walks a chain
 with circular-reference detection, a depth limit and a path
 allowlist, and it already carries a non-qcow2 special case in the
 VMDK flat-descriptor short-circuit that resolves
@@ -314,7 +314,7 @@ Out of scope, and deliberately left to their own work:
    RESOLVED 2026-09-05 by phase 1's survey, and the resolution
    is a description of code that already exists rather than a
    new rule to write. `discover_backing_chain`
-   (`src/vmm/src/main.rs:2501`) is not qcow2-only: it already
+   (`src/vmm/src/main.rs:2519`) is not qcow2-only: it already
    performs circular-reference detection, depth limiting and
    allowlist checking for every chain the host walks, governed
    by `security.backing_path_allowlist` and
@@ -366,8 +366,8 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 | 7. Guest create op and host CLI wiring | [PLAN-differencing-phase-07-guest-host.md](/components/instar/plans/PLAN-differencing-phase-07-guest-host/) | Complete | `99d7d24` (#581) |
 | 8. Rust unit tests and Python integration tests | [PLAN-differencing-phase-08-tests.md](/components/instar/plans/PLAN-differencing-phase-08-tests/) | Complete | `c416abd` (#588) |
 | 9. Coverage fuzzing of the locator parsers | [PLAN-differencing-phase-09-fuzz.md](/components/instar/plans/PLAN-differencing-phase-09-fuzz/) | Complete | `044ad77` (#594) |
-| 10. Documentation | [PLAN-differencing-phase-10-docs.md](/components/instar/plans/PLAN-differencing-phase-10-docs/) | Planned | |
-| 11. Composition: host chain discovery, device attachment, `info --chain` | PLAN-differencing-phase-11-chain-host.md | Not started | |
+| 10. Documentation | [PLAN-differencing-phase-10-docs.md](/components/instar/plans/PLAN-differencing-phase-10-docs/) | Complete | `036252f` (#598) |
+| 11. Composition: host chain discovery and `info --chain` | [PLAN-differencing-phase-11-chain-host.md](/components/instar/plans/PLAN-differencing-phase-11-chain-host/) | Planned | |
 | 12. Composition: guest VHD sector-bitmap read path | PLAN-differencing-phase-12-vhd-compose.md | Not started | |
 | 13. Composition: guest VHDX sector-bitmap read path | PLAN-differencing-phase-13-vhdx-compose.md | Not started | |
 | 14. Composition: per-op rollout, replacing phase 4's refusals | PLAN-differencing-phase-14-op-rollout.md | Not started | |
@@ -476,12 +476,22 @@ output half touches only the writer -- so it is decomposed here
 rather than left as one phase to be split later, the way
 `PLAN-resize-followup-01` split its own:
 
-* **Phase 11, host side.** Resolving a locator path to a real
-  parent, applying the same resolution and depth rules qcow2
-  backing chains get, and attaching each chain member as its own
-  virtio device. Ends with `info --chain` walking a VHD or VHDX
-  chain, which is the cheapest possible proof the host half
-  works and needs no guest change at all.
+* **Phase 11, host side.** Resolving a differencing parent to a
+  real file, applying the same resolution and depth rules qcow2
+  backing chains get, so that `info --chain` walks a VHD or VHDX
+  chain -- the cheapest possible proof the host half works, and it
+  needs no guest change at all. **Narrowed by phase 11's survey on
+  2026-09-28**, which found two-thirds of this bullet already
+  built. `info --chain` exists and already annotates a
+  differencing child with the parent it declined to follow
+  (`run_info`, `src/vmm/src/main.rs:10269`), and chain-member
+  device attachment is format-agnostic already
+  (`open_chain_devices` at `:2831` and
+  `write_chain_device_entries` at `:2765` dispatch on nothing, and
+  device format codes for `Vhd` and `Vhdx` are allocated --
+  `docs/chain-config.md:63`). What is actually left is the
+  seven-line VHD/VHDX gate at `:2701`, one resolution rule per
+  format, and that command's output.
 * **Phases 12 and 13, guest side.** The two formats are not the
   same problem and each is a self-contained read-path change, so
   they are separate phases that can be planned, reviewed and
@@ -508,7 +518,14 @@ rather than left as one phase to be split later, the way
   `docs/format-coverage.md`. Both chain pages already exist (209
   and 210 lines, describing qcow2 chain discovery), so phase 16
   extends them rather than authoring them; phase 10's survey
-  confirmed this on 2026-09-26.
+  confirmed this on 2026-09-26. Phase 11 takes two pieces of this
+  early, because they stop being true the moment it lands rather
+  than when phase 14 does: `docs/chain-discovery.md`'s
+  backing-file-support table and its Known limitations section,
+  one of whose two stated reasons was already falsified by
+  `vhdx::posix_relative_path` before phase 11 began, and
+  `docs/info.md`'s claim that `--chain` stops at one image. The
+  compose-side rows stay with phase 16.
 
 Two specifics phases 12 and 13 must confront, both already
 visible in the crates:
@@ -605,7 +622,11 @@ restating it. What is specific to this plan:
   reference implementation in reach will double-check for us.
   Phases 2, 8, 9 and 10 can be planned at medium effort with
   good briefs. Phase 7 is high effort only because it touches
-  the guest/host boundary; the change itself is small.
+  the guest/host boundary; the change itself is small. Phase 11
+  is high effort despite a small diff: it decides what the host
+  may resolve out of an untrusted image, and it has to preserve
+  an invariant phase 4 established deliberately -- that a refusal
+  never depends on whether a parent file happens to exist.
 * **Model choice.** Skew to opus for the emitters and the parse
   layer. Phase 5 and 6 briefs must name the exact byte offsets
   and the checksum algorithm, because a plausible-looking wrong

@@ -62,14 +62,19 @@ recorded. A differencing image records no backing-format field of its
 own, but SPEC(VHD) and SPEC(VHDX) both require a parent to be the same
 format as its child, so the format is known without one.
 
-**A reported parent is not a resolved parent.** `info` decodes the
-parent name and the parent locator entries from the image's own header
-and prints what it finds; it does not open the result, and `--chain`
-stops at the one image (see [chain-discovery.md](/components/instar/chain-discovery/)).
-A parent locator is attacker-controlled data — it can name an absolute
-path, a relative traversal, a UNC share or a URL — so treat
-`backing-filename` on a differencing image as a string the image
-claims, not a file instar has validated.
+**A reported parent is not a resolved parent.** `info` on its own
+decodes the parent name and the parent locator entries from the image's
+own header and prints what it finds; it does not open the result.
+`--chain` does resolve a VHD or VHDX parent and walk into it, under the
+same allowlist and depth checks a qcow2 backing file gets — but only
+when it can: whenever a parent cannot be resolved, the walk ends at the
+last image it did resolve, and that image's own unresolved reference is
+reported rather than the command erroring (see
+[chain-discovery.md](/components/instar/chain-discovery/) for the reasons and the exact
+stderr line). A parent locator is attacker-controlled
+data — it can name an absolute path, a relative traversal, a UNC share
+or a URL — so treat `backing-filename` on a differencing image as a
+string the image claims, not a file instar has validated.
 
 ## Known limitations
 

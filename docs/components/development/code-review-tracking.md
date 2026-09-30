@@ -298,7 +298,14 @@ repository and passes through to the script.
 
 8. Teach the repository's build and analysis workflows to ignore
    review-only changes, so a review session (or a bot prune) does
-   not burn a CI run on files no build reads:
+   not burn a CI run on files no build reads. Apply it to the
+   code-shaped workflows (unit tests, lint, CodeQL, functional
+   lanes) but *not* to content scanners like gitleaks or the
+   bidi/zero-width check: review notes are prose, and prose is a
+   place secrets or Unicode smuggling could land.
+
+   For a workflow whose checks are **not** required, a trigger-level
+   `paths-ignore` is the simple answer:
 
    ```yaml
    on:
@@ -311,18 +318,112 @@ repository and passes through to the script.
          - '.vscode/review-scope.toml'
    ```
 
-   Apply it to the code-shaped workflows (unit tests, lint, CodeQL,
-   functional lanes) but *not* to content scanners like gitleaks or
-   the bidi/zero-width check: review notes are prose, and prose is a
-   place secrets or Unicode smuggling could land. This is only safe
-   while no skipped workflow is a required status check -- a skipped
-   required check sits "expected" forever and blocks the merge.
+   That form is unsafe once a workflow backs a **required** status
+   check, and the two failure modes look similar but are not the
+   same thing. A `paths-ignore`'d workflow whose trigger conditions
+   are not met never starts at all, so it never reports any of its
+   jobs -- a required check that was waiting on one of those jobs
+   simply never arrives, and GitHub blocks the merge forever waiting
+   for it. A job skipped by an `if:` condition is different: the
+   workflow still runs, the job still reports a result (skipped),
+   and a required check satisfied by a "skipped" report unblocks the
+   merge normally. So a workflow that provides a required check
+   needs the skip pushed down to the job level instead of left on
+   the trigger.
 
-   Which workflows count as "code-shaped" differs per project, so
-   verifying this step is judgment work rather than a deterministic
-   audit: the `review-tracking-adoption` Claude skill (in this
-   repository's `.claude/skills/`) carries the verification
+   The job-level form uses a `check_paths` job running
+   `dorny/paths-filter` to compute whether anything outside the
+   review paths changed, and gates the real job on that output with
+   `needs:` and `if:`. hunkydory's
+   [`codeql-analysis.yml`](https://github.com/shakenfist/hunkydory/blob/develop/.github/workflows/codeql-analysis.yml)
+   is the worked example: `Analyze` is a required check on
+   hunkydory's default branch, so pull requests skip it at the job
+   level rather than with a trigger-level filter, while `push`
+   carries no required check and keeps `paths-ignore` directly
+   (trimmed). The fleet's CodeQL template,
+   [`templates/codeql/codeql-analysis.yml`](https://github.com/shakenfist/development/blob/main/templates/codeql/codeql-analysis.yml),
+   has the same shape and also skips `docs/**` and fork pull
+   requests:
+
+   ```yaml
+   on:
+     push:
+       branches: [develop]
+       paths-ignore:
+         - 'REVIEWS.md'
+         - '.vscode/*.weaudit'
+         - '.vscode/*.weaudit-shas.json'
+         - '.vscode/review-scope.toml'
+     pull_request:
+       branches: [develop]
+
+   jobs:
+     check_paths:
+       permissions:
+         pull-requests: read
+       outputs:
+         code_changed: ${{ steps.filter.outputs.code || 'true' }}
+       steps:
+         - uses: dorny/paths-filter@v4
+           id: filter
+           if: github.event_name == 'pull_request'
+           with:
+             predicate-quantifier: 'every'
+             filters: |
+               code:
+                 - '**'
+                 - '!REVIEWS.md'
+                 - '!.vscode/*.weaudit'
+                 - '!.vscode/*.weaudit-shas.json'
+                 - '!.vscode/review-scope.toml'
+
+     analyze:
+       needs: [check_paths]
+       if: |
+         !cancelled()
+         && needs.check_paths.outputs.code_changed != 'false'
+       steps:
+         - uses: actions/checkout@v7
+         # ... the rest of the analysis
+   ```
+
+   A few details in that shape are load-bearing:
+
+   * `check_paths` has no checkout step. `dorny/paths-filter` reads
+     the pull request's changed-file list from the GitHub API rather
+     than from a working tree, so a fork's content never reaches the
+     runner -- and the job needs only `pull-requests: read`, not
+     `contents: read`.
+   * The filter step runs only `if: github.event_name ==
+     'pull_request'`. On `push` or `schedule` it is skipped, and its
+     output falls back through `|| 'true'` to "code changed", so
+     those events always run the gated job.
+   * `predicate-quantifier: 'every'` is what makes the `!`
+     exclusions work at all: `dorny/paths-filter`'s default is
+     ANY-match, under which the bare `'**'` entry would already
+     match and every `!` exclusion would be a no-op.
+   * The output fails open (`${{ steps.filter.outputs.code ||
+     'true' }}`): if the filter step never ran or produced nothing,
+     the gated job still runs rather than being silently skipped.
+   * The gated job's condition needs `!cancelled()`, not just the
+     path check. Without it, if `check_paths` itself failed or was
+     cancelled, GitHub Actions' default propagation would skip
+     `analyze` too -- and a required check reporting "skipped"
+     because its own dependency failed still reads as green to the
+     merge gate. `!cancelled()` forces `analyze`'s own `if:` to be
+     evaluated instead of inheriting that failure as a silent pass.
+
+   Which mechanism a given workflow needs is a property of whether
+   it backs a required status check, not of what kind of workflow it
+   is, so verifying this step is judgment work rather than a
+   deterministic audit: the `review-tracking-adoption` Claude skill
+   (in this repository's `.claude/skills/`) carries the verification
    procedure. Re-run it when new workflows land in an adopted repo.
+   `docs/audits/expensive-lane-path-filter.md` checks the same
+   required-checks-need-the-job-level-form rule for a different set
+   of expensive lanes (VM-runner jobs, with kerbside's `check_paths`
+   jobs as its worked example), and endorses the same
+   `dorny/paths-filter` shape used above.
 
 ## The review account
 
