@@ -28,9 +28,13 @@ was checked against a real artifact rather than reasoned about:
   *that*, at ``bundle/traces/``. Reading the outer zip's namelist for
   ``traces/headroom.jsonl`` finds nothing and would have looked exactly like
   a run whose probe never started.
-* **Only four of the six cluster bundles carry the probe at all** (D17), for
-  two different reasons, so the other two are skipped by name rather than
-  recorded as missing data. See ``UNINSTRUMENTED_BUNDLES`` below.
+* **Only four of the six cluster bundles carry the probe today** (D17).
+  Five are classified for harvest: phase 6's D3 moved 'Ansible modules'
+  into ``BUNDLE_TOPOLOGIES`` ahead of the shakenfist/actions change that
+  instruments it (#4377), so until that is pushed its records carry
+  ``series_present`` false -- an expected absence, not a probe failure. The
+  sixth, 'Node lifecycle', is skipped by name rather than recorded as
+  missing data. See ``UNINSTRUMENTED_BUNDLES`` below.
 * **The topology is not in the series.** It is passed to the report at run
   time and never written down, so a bundle on disk does not say which shape
   produced it. D20 fixes that prospectively by having the collect script
@@ -116,8 +120,11 @@ BundleKind = collections.namedtuple(
 
 
 # D17's table, sourced from the merge matrix at
-# .github/workflows/functional-tests.yml:436-480. Three of the four jobs run
-# the *same* topology, which is the point: if slim-primary's three jobs
+# .github/workflows/functional-tests.yml:440-495, plus the Ansible modules
+# entry phase 6 of PLAN-ci-cloud-sizing-phase-06-docs.md added in its 6d
+# (D3 there), ahead of the shakenfist/actions change which widens the probe
+# gate onto that job (tracked as #4377). Four of the five jobs run
+# the *same* topology, which is the point: if slim-primary's four jobs
 # differ from each other in peak demand then the difference is the suite and
 # not the shape, and phase 4 must not respond to it by resizing the cloud.
 # Pooling by topology would hide that, so the harvest records the job as well
@@ -129,7 +136,25 @@ BundleKind = collections.namedtuple(
 # 'Debian 13 cluster (collection) / Smoke tests (collection)'. The prefix is
 # stored explicitly rather than derived, because the derivation ('name' plus
 # ' (collection)') is a fact about how functional-tests.yml happens to name
-# the calling job today and would break silently if that changed.
+# the calling job today and would break silently if that changed -- the
+# 'Ansible modules' entry below hit exactly that trap once already: its
+# prefix is read from two real runs (36343591915, where the API reported
+# 'Ansible modules (collection) / Smoke tests (collection)', and
+# 36316642104, where it reported just 'Ansible modules (collection)'), not
+# derived from the matrix's job name.
+#
+# 'Ansible modules' depends on a change in shakenfist/actions
+# (.github/workflows/smoke-cluster.yml) which may not be pushed yet -- see
+# the Prepared changes section of
+# docs/plans/PLAN-ci-cloud-sizing-phase-06-docs.md, tracked as #4377. Until
+# it lands, a harvest still
+# finds the 'bundle-shakenfist-full-ansible-modules' artifact (the job
+# already uploads a bundle; only its contents change), classifies it here
+# rather than skipping it, and records it with series_present False and
+# absent_reason set, because its bundle carries no traces/headroom.jsonl
+# yet. That is bundle_record()'s designed handling of a probe that has not
+# run, not a bug -- see 'A bundle with no series is a record, not a gap'
+# above.
 BUNDLE_TOPOLOGIES = {
     'bundle-shakenfist-full-debian-13-slim-primary': BundleKind(
         'Debian 13 cluster', 'slim-primary', 'Debian 13 cluster (collection)'),
@@ -140,32 +165,38 @@ BUNDLE_TOPOLOGIES = {
         'Guests', 'slim-primary', 'Guests (collection)'),
     'bundle-shakenfist-full-debian-13-slim-tier': BundleKind(
         'Debian 13 tier', 'slim-tier', 'Debian 13 tier (collection)'),
+    'bundle-shakenfist-full-ansible-modules': BundleKind(
+        'Ansible modules', 'slim-primary', 'Ansible modules (collection)'),
 }
 
 
-# The two cluster bundles which carry no traces/ directory at all. Both were
-# checked empirically against merge run 33944911413 rather than reasoned
-# about, and the two causes are different, which is why they are listed with
-# their reasons rather than as a bare set:
+# The one cluster bundle skipped by name because it carries no traces/
+# directory at all, checked empirically against merge run 33944911413.
+# Originally there were two, for two different causes -- see D17 of
+# PLAN-ci-cloud-sizing.md and D3 of PLAN-ci-cloud-sizing-phase-06-docs.md.
+# Phase 6's 6d moved the 'Ansible modules' bundle into BUNDLE_TOPOLOGIES
+# above, and prepared the widening of smoke-cluster.yml's probe-step gate
+# that instruments it (the Prepared changes section of that plan, for the
+# operator to push to shakenfist/actions, tracked as #4377). What remains
+# here is the composite-action seam:
 #
-# * 'Ansible modules' does run through the reusable smoke-cluster workflow,
-#   but with test_kind: ansible-modules (functional-tests.yml:514), and every
-#   probe step in that workflow is gated `if: inputs.test_kind ==
-#   'functional'`.
-# * 'Node lifecycle' never reaches that workflow at all. It calls the
-#   build-smoke-cluster composite action directly
-#   (functional-tests.yml:554-557), and the probe steps live in the workflow
-#   rather than in the action, so they are not in its job.
+# * 'Node lifecycle' never reaches the reusable smoke-cluster workflow at
+#   all. It calls the build-smoke-cluster composite action directly
+#   (functional-tests.yml:581), and the probe steps live in the workflow
+#   rather than in the action, so they are not in its job. Fixing this means
+#   moving or duplicating the probe steps into the composite action, which
+#   changes how *every* caller deploys -- shakenfist's five call sites,
+#   client-python's, kerbside's and the canary's -- through an action
+#   consumed at @main with no pin. D4 of phase 6 files an issue for this
+#   rather than making that change in a documentation phase; kerbside's
+#   'sf-e2e-functional.yml' reaches the same seam but uploads no cluster
+#   bundle this tool would ever see, so it is not listed here.
 #
-# Skipping them by name, deliberately, is the difference between a dataset
-# which is missing two jobs and one which quietly records four failed
-# harvests per run. Step 2f files the Future work entry for instrumenting
-# them; D17 puts doing so out of this phase's scope.
+# Skipping the remaining bundle by name, deliberately, is the difference
+# between a dataset missing one job and one which quietly records a failed
+# harvest per run. D17 (PLAN-ci-cloud-sizing.md) and D4 (phase 6) are where
+# instrumenting it is tracked.
 UNINSTRUMENTED_BUNDLES = {
-    'bundle-shakenfist-full-ansible-modules': (
-        'the Ansible modules job runs smoke-cluster.yml with test_kind: '
-        'ansible-modules, and every probe step in that workflow is gated on '
-        'test_kind == functional'),
     'bundle-functional-node-lifecycle-collection': (
         'the Node lifecycle job calls the build-smoke-cluster composite '
         'action directly and never reaches the workflow the probe steps '

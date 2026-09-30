@@ -128,6 +128,13 @@ gives away half its threads, a 6 vCPU node a third.
 | `slim-primary` | 6 (1 database + 5 hypervisors) | 24 vCPU / 64 GB | **27 vCPU** (1x3 + 4x6) | 154 job-runs, every one |
 | `slim-tier` | 3 (all hypervisors) | 12 vCPU / 36 GB | **12 vCPU** (3+3+6) | 50 job-runs, every one |
 
+**This table is a measurement record, not the current state.** Phase 4
+reshaped `slim-tier` from three 4 vCPU nodes to three 6 vCPU nodes and
+doubled its ledger to 24 (phase 4's 4d, in
+`PLAN-ci-cloud-sizing-phase-04-topologies.md`); `slim-primary` is
+unchanged. See `docs/developer_guide/ci_cloud_sizing.md` for the
+topologies' current shapes and ledgers.
+
 Those ledgers are not derived on paper. Across the whole baseline
 window the cluster ledger read exactly 27.0 in all 154
 `slim-primary` job-runs and exactly 12.0 in all 50 `slim-tier`
@@ -1014,8 +1021,8 @@ those are corrected here as well.
 | 2. Baseline measurement window: the peak-demand distribution that has never existed | [PLAN-ci-cloud-sizing-phase-02-baseline.md](PLAN-ci-cloud-sizing-phase-02-baseline.md) | Complete | `e951ee42d` (#4089), `3546fabed` (#4138) |
 | 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | [PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md](PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md) | Complete | `ead1ccba5` (#4152), `f3b245304` (#4170), `c13d2c6fd` (#4186), `210fb4469` (#4193) |
 | 4. Re-shape the topologies against the phase 2 data | [PLAN-ci-cloud-sizing-phase-04-topologies.md](PLAN-ci-cloud-sizing-phase-04-topologies.md) | Complete | `870a5fbec` (#4202), `6856aad74` (#4289) |
-| 5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger | [PLAN-ci-cloud-sizing-phase-05-guardrails.md](PLAN-ci-cloud-sizing-phase-05-guardrails.md) | Complete | `de87bcde2` (#4308), `633c56b31` (shakenfist/actions#94) |
-| 6. Documentation and downstream propagation | PLAN-ci-cloud-sizing-phase-06-docs.md | Not started | — |
+| 5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger | [PLAN-ci-cloud-sizing-phase-05-guardrails.md](PLAN-ci-cloud-sizing-phase-05-guardrails.md) | Complete | `de87bcde2` (#4308), `633c56b31` (shakenfist/actions#94), `704416829` (#4328), `e2243a554` (shakenfist/actions#102) |
+| 6. Documentation, and the instrument seam the propagation half turned out to be | [PLAN-ci-cloud-sizing-phase-06-docs.md](PLAN-ci-cloud-sizing-phase-06-docs.md) | Complete | — |
 | 7. Push audit | PLAN-ci-cloud-sizing-phase-07-push-audit.md | Not started | — |
 
 The `Merged` column records what put each phase on `develop`. These
@@ -1039,16 +1046,19 @@ code that sits in no range is a diff nothing audits. It is recorded
 `PLAN-transient-capacity-refusals.md`, whose phase 2 added the guard,
 because the defect was in this phase's test file.
 
-Phase 5's cell is deliberately incomplete, and this says so rather
-than letting it read as finished. It records the two merges that are
-knowable -- `de87bcde2` (#4308) here and `633c56b31`
-(shakenfist/actions#94) there -- but its steps 5e, 5f and 5g ran
-*after* #4308 merged, because 5e needs merge runs carrying 5b-5d and
-5f needs 5e. They land as a third pull request, whose merge commit no
-commit inside it can name. **Phase 6's planning must append that SHA
-to the cell**, the same after-the-fact repair the phase 3 note above
-describes, and for the same reason: a diff that sits in no range is a
-diff the push audit does not read.
+Phase 5's cell records four merges, and the last two were appended
+after the fact by phase 6's planning, which is the earliest point they
+could be known. Its steps 5e, 5f and 5g ran *after* #4308 merged --
+5e needs merge runs carrying 5b-5d, and 5f needs 5e -- so they landed
+as a third pull request, `704416829` (#4328), whose merge commit no
+commit inside it could name. `e2243a554` (shakenfist/actions#102) is
+the fourth: it turned `smoke-cluster.yml`'s `headroom_gate` default
+off, after #4328's review found two single-node callers that would
+have been gated on a band no window measured the moment #4328 put
+`BAND_VIOLATION_EXIT` on `develop`. It is recorded here for the same
+reason the phase 3 note above gives: a diff that sits in no range is a
+diff the push audit does not read. **Phase 6's own `Merged` cell is
+empty for the same reason, and phase 7's planning must append it.**
 
 The master plan itself landed as `ab2158cb2` (#3938), ahead of
 phase 0. Phase 1's other half -- the invocation in the reusable
@@ -1300,13 +1310,40 @@ topology edit which halves capacity fails as itself rather than as
 a flake in an unrelated test. Follow the warn-window-then-gate
 pattern the API-validation plan used.
 
-### Phase 6 -- Documentation and downstream propagation
+### Phase 6 -- Documentation, and the instrument seam the propagation half turned out to be
 
-Document the sizing model in `docs/developer_guide/ci.md` --
-the ledger arithmetic, the band, and how to re-measure -- and
-propagate the reshaped topologies to the downstream repositories
-that consume the reusable workflow, per the copy-paste-drift
-finding in `project-sf-ecosystem-ci`.
+Document the sizing model -- the ledger arithmetic, the shapes the
+two cluster topologies actually have, the band, and how to
+re-measure. This half stands as written, and the phase 6 survey
+found it is needed more than it looks: the ledger arithmetic
+appears nowhere in `docs/developer_guide/ci.md`, which uses the
+ledger as the band's denominator throughout, and the *Situation*
+table above still records `slim-tier` at the pre-phase-4 ledger of
+12 with nothing in this document saying it is now 24.
+
+The propagation half no longer exists. It was written against the
+copy-paste-drift finding in `project-sf-ecosystem-ci`, and that
+drift is gone: there is exactly one copy of the topologies, in
+`shakenfist/actions/ansible/`, and every cluster-deploying call
+site in the ecosystem reads it from there. The reusable-workflow
+migration -- `remove-primary` phase 8 -- already did the
+propagating. Phase 6's F1 records the full inventory that
+establishes this.
+
+What that inventory turns up instead is the same concern in
+structural form, and it is what phase 6 does with the half:
+**three of the eight call sites build a cloud the probe never
+sees.** `Ansible modules` reaches the reusable workflow but with
+`test_kind: ansible-modules`, which every probe step is gated
+against; `Node lifecycle` here and kerbside's end-to-end job call
+the `build-smoke-cluster` composite action directly, and the probe
+steps live in the workflow rather than the action. Phase 6 prepares
+the fix for the first, which is one `if:` condition in
+`shakenfist/actions` for the operator to push
+([#4377](https://github.com/shakenfist/shakenfist/issues/4377)), and
+files an issue for the
+other two, which would change how every caller deploys through an
+action consumed at `@main` with no pin.
 
 ### Phase 7 -- Push audit
 
@@ -1646,12 +1683,16 @@ which is what `tools/check-plan-status.py` enforces.
   under-cloud. Reducing per-cloud footprint helps; bounding the right
   quantity would help more, and is a change to queue configuration
   rather than to anything in this plan.
-- **Generalise to the other repositories' clouds.** The
-  downstream repositories fork these topologies. Phase 6
-  propagates the shapes; making the headroom probe part of the
-  reusable workflow means they inherit the measurement too. Same
-  structural cause as the entry below: a cloud built by something
-  other than the workflow the probe steps live in is unmeasured.
+- **Generalise to the other repositories' clouds.** There is exactly
+  one copy of these topologies, in `shakenfist/actions/ansible/`, and
+  every cluster-deploying call site in the ecosystem already reads it
+  from there -- the reusable-workflow migration (`remove-primary`
+  phase 8) did the propagating this entry used to call for, so there
+  is nothing left to propagate. What is still undone is making the
+  headroom probe part of the reusable workflow, so downstream
+  inherits the measurement too. Same structural cause as the entry
+  below: a cloud built by something other than the workflow the probe
+  steps live in is unmeasured.
 - **Count what became of a guard denial, not just the denial.**
   Step 2g measured 3,480 denials over 32 job-runs and cannot say how
   many of them ended in a failed create, because the census filter
@@ -1669,18 +1710,41 @@ which is what `tools/check-plan-status.py` enforces.
   carry the phase 1 probe, for two different reasons. `Ansible
   modules` runs through the reusable `smoke-cluster` workflow but
   with `test_kind: ansible-modules`
-  (`functional-tests.yml:514`), and every probe step is gated `if:
+  (`functional-tests.yml:528`), and every probe step is gated `if:
   inputs.test_kind == 'functional'`; widening that gate is the whole
-  fix. `Node lifecycle` never reaches that workflow at all -- it
-  calls the `build-smoke-cluster` composite action directly
-  (`functional-tests.yml:554-557`), and the probe steps live in the
-  workflow rather than in the action, so moving them into (or
-  duplicating them beside) the action is a change to how *every*
-  caller deploys. That is the same seam as the entry above, and the
-  two should be done together. The cost of leaving it is concrete
-  and already paid: `Node lifecycle` is the best performer in the
-  failure table, and the baseline's utilisation-versus-failure
-  correlation cannot speak to it.
+  fix, and is what phase 6's 6d prepares (pushing it is
+  [#4377](https://github.com/shakenfist/shakenfist/issues/4377)). `Node lifecycle` never reaches
+  that workflow at all -- it calls the `build-smoke-cluster`
+  composite action directly (`functional-tests.yml:581`), and the
+  probe steps live in the workflow rather than in the action, so
+  moving them into (or duplicating them beside) the action is a
+  change to how *every* caller deploys. That is the same seam as the
+  entry above; phase 6's 6e files an issue for this half rather than
+  closing it, tracked as
+  [#4367](https://github.com/shakenfist/shakenfist/issues/4367). The
+  cost of leaving it is concrete and already paid: `Node lifecycle`
+  is the best performer in the failure table, and the baseline's
+  utilisation-versus-failure correlation cannot speak to it.
+- **Arm the headroom gate on a downstream or single-node cloud.**
+  Phase 6's D5 found this is three changes and a window, not a
+  decision. `tools/ci_headroom_harvest.py`'s `list_runs()` hardcodes
+  `event=merge_group` in the API path, so it can only read
+  merge-queue runs. `client-python/.github/workflows/functional-tests.yml`
+  triggers on `pull_request:` only (`:11-12`), and that repository has
+  no merge queue, so there are no `merge_group` runs to read even
+  once the filter moves. `BUNDLE_TOPOLOGIES`
+  (in `tools/ci_headroom_harvest.py`) is keyed on shakenfist's
+  own bundle artifact names, and an unrecognised name raises
+  `UnknownBundleError` by design, so `--repo` exists but stops the
+  harvest on the first bundle from anywhere else. Phase 5 established,
+  and phase 6 did not change, that the shape most worth arming
+  eventually is the single-node smoke cloud that already runs on
+  every pull request in this repository (`smoke_collection`,
+  `functional-tests.yml`) -- it is the one developers hit first -- but
+  it is also the one the harvest cannot currently see, for the same
+  `pull_request`-versus-`merge_group` reason as client-python. Not
+  attempted in phase 6, which is documentation-only; the next attempt
+  starts from this list of three changes rather than rediscovering it.
 
 ### Bugs fixed during this work
 

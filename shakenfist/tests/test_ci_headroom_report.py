@@ -3095,7 +3095,7 @@ class BandGateTestCase(HeadroomReportTestCase):
     def test_the_gate_is_withheld_on_bands_which_could_not_gate(self):
         """Withholding is computed for every band, not only a violation.
 
-        The ci.md window command counts how often the gate was withheld,
+        The ci_cloud_sizing.md window command counts how often the gate was withheld,
         and that count is only an instrument-health figure if a thin series
         reads as withheld whatever its band. Short-circuiting the reasons
         when the band is not OVERSUBSCRIBED would leave the command

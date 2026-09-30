@@ -305,7 +305,7 @@ POLL_OVERCOUNT_TOLERANCE = 1.60
 # exemption exactly as they are. The obligation to trim these five is
 # therefore written where whoever retires the tool will actually be reading:
 # in ci_headroom_probe.py's own docstring, in the CI headroom section of
-# docs/developer_guide/ci.md, and against #3975 in PLAN-ci-cloud-sizing.md.
+# docs/developer_guide/ci_cloud_sizing.md, and against #3975 in PLAN-ci-cloud-sizing.md.
 #
 # GetNodeMetrics/api gained a second producer with
 # PLAN-transient-capacity-refusals phase 2: create_instance() on

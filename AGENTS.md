@@ -18,6 +18,7 @@ developer. The component map is [ARCHITECTURE.md](ARCHITECTURE.md).
 | What are the code conventions, and how do I test? | [docs/developer_guide/standards.md](docs/developer_guide/standards.md) |
 | What rules exist because of a past bug? | [docs/developer_guide/coding_rules.md](docs/developer_guide/coding_rules.md) |
 | How does CI work, what gates a PR, what bot commands exist? | [docs/developer_guide/ci.md](docs/developer_guide/ci.md) |
+| How are the CI clouds sized, and what gates on headroom? | [docs/developer_guide/ci_cloud_sizing.md](docs/developer_guide/ci_cloud_sizing.md) |
 | How do I write an endpoint? | [docs/developer_guide/writing_an_endpoint.md](docs/developer_guide/writing_an_endpoint.md) |
 | How does the database layer behave? | [docs/developer_guide/database_internals.md](docs/developer_guide/database_internals.md) |
 | How are network operations dispatched? | [docs/developer_guide/network_dispatcher.md](docs/developer_guide/network_dispatcher.md) |

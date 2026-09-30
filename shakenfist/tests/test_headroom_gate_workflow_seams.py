@@ -5,15 +5,17 @@
 PLAN-ci-cloud-sizing phase 5 made a cluster-wide band violation fail the
 cluster job, in `shakenfist/actions`'s smoke-cluster.yml, which this
 repository reaches at `@main` with no pin. Two rules follow, and this is
-what enforces them; docs/developer_guide/ci.md states them.
+what enforces them; docs/developer_guide/ci_cloud_sizing.md states them.
 
 A call site which is gated must pass the CI_HEADROOM_GATE repository
 variable through as `headroom_gate`, because the recovery for a spurious
-gate is that variable rather than a revert. The reusable workflow defaults
-to gating, so a call site which passes nothing is gated with no way to
-switch it off, and nothing about the job would say so until the day the
-switch was needed. Every call site therefore passes `headroom_gate`
-explicitly, either as the off switch or as a literal false.
+gate is that variable rather than a revert. The reusable workflow's
+default (`false`, shakenfist/actions#102, smoke-cluster.yml:73) lives in
+another repository at `@main` with no pin, so it can change without
+anything here changing. Every call site therefore states its own policy
+explicitly, either as the off switch or as a literal false, so a change
+to the default shows up in review instead of silently altering a job's
+gating.
 
 And a call site may only be gated on a job shape a warn window measured.
 D7's test for arming the gate was that it would not have failed runs which
