@@ -15237,7 +15237,7 @@ directly relevant the moment instar parses a locator table.</p>
 <p>The host is further along than the rest of this picture
 suggests, which phase 1's survey established and which matters
 most to phase 11. <code>discover_backing_chain</code>
-(<code>src/vmm/src/main.rs:2501</code>) is not qcow2-only: it walks a chain
+(<code>src/vmm/src/main.rs:2519</code>) is not qcow2-only: it walks a chain
 with circular-reference detection, a depth limit and a path
 allowlist, and it already carries a non-qcow2 special case in the
 VMDK flat-descriptor short-circuit that resolves
@@ -15406,7 +15406,7 @@ as though they had none.</p>
    RESOLVED 2026-09-05 by phase 1's survey, and the resolution
    is a description of code that already exists rather than a
    new rule to write. <code>discover_backing_chain</code>
-   (<code>src/vmm/src/main.rs:2501</code>) is not qcow2-only: it already
+   (<code>src/vmm/src/main.rs:2519</code>) is not qcow2-only: it already
    performs circular-reference detection, depth limiting and
    allowlist checking for every chain the host walks, governed
    by <code>security.backing_path_allowlist</code> and
@@ -15512,13 +15512,13 @@ records <code>instar-testdata &lt;sha&gt; (#pr)</code> and is audited there.</p>
 <tr>
 <td>10. Documentation</td>
 <td><a href="/components/instar/plans/PLAN-differencing-phase-10-docs/">PLAN-differencing-phase-10-docs.md</a></td>
-<td>Planned</td>
-<td></td>
+<td>Complete</td>
+<td><code>036252f</code> (#598)</td>
 </tr>
 <tr>
-<td>11. Composition: host chain discovery, device attachment, <code>info --chain</code></td>
-<td>PLAN-differencing-phase-11-chain-host.md</td>
-<td>Not started</td>
+<td>11. Composition: host chain discovery and <code>info --chain</code></td>
+<td><a href="/components/instar/plans/PLAN-differencing-phase-11-chain-host/">PLAN-differencing-phase-11-chain-host.md</a></td>
+<td>Planned</td>
 <td></td>
 </tr>
 <tr>
@@ -15651,12 +15651,22 @@ output half touches only the writer -- so it is decomposed here
 rather than left as one phase to be split later, the way
 <code>PLAN-resize-followup-01</code> split its own:</p>
 <ul>
-<li><strong>Phase 11, host side.</strong> Resolving a locator path to a real
-  parent, applying the same resolution and depth rules qcow2
-  backing chains get, and attaching each chain member as its own
-  virtio device. Ends with <code>info --chain</code> walking a VHD or VHDX
-  chain, which is the cheapest possible proof the host half
-  works and needs no guest change at all.</li>
+<li><strong>Phase 11, host side.</strong> Resolving a differencing parent to a
+  real file, applying the same resolution and depth rules qcow2
+  backing chains get, so that <code>info --chain</code> walks a VHD or VHDX
+  chain -- the cheapest possible proof the host half works, and it
+  needs no guest change at all. <strong>Narrowed by phase 11's survey on
+  2026-09-28</strong>, which found two-thirds of this bullet already
+  built. <code>info --chain</code> exists and already annotates a
+  differencing child with the parent it declined to follow
+  (<code>run_info</code>, <code>src/vmm/src/main.rs:10269</code>), and chain-member
+  device attachment is format-agnostic already
+  (<code>open_chain_devices</code> at <code>:2831</code> and
+  <code>write_chain_device_entries</code> at <code>:2765</code> dispatch on nothing, and
+  device format codes for <code>Vhd</code> and <code>Vhdx</code> are allocated --
+  <code>docs/chain-config.md:63</code>). What is actually left is the
+  seven-line VHD/VHDX gate at <code>:2701</code>, one resolution rule per
+  format, and that command's output.</li>
 <li><strong>Phases 12 and 13, guest side.</strong> The two formats are not the
   same problem and each is a self-contained read-path change, so
   they are separate phases that can be planned, reviewed and
@@ -15683,7 +15693,14 @@ rather than left as one phase to be split later, the way
   <code>docs/format-coverage.md</code>. Both chain pages already exist (209
   and 210 lines, describing qcow2 chain discovery), so phase 16
   extends them rather than authoring them; phase 10's survey
-  confirmed this on 2026-09-26.</li>
+  confirmed this on 2026-09-26. Phase 11 takes two pieces of this
+  early, because they stop being true the moment it lands rather
+  than when phase 14 does: <code>docs/chain-discovery.md</code>'s
+  backing-file-support table and its Known limitations section,
+  one of whose two stated reasons was already falsified by
+  <code>vhdx::posix_relative_path</code> before phase 11 began, and
+  <code>docs/info.md</code>'s claim that <code>--chain</code> stops at one image. The
+  compose-side rows stay with phase 16.</li>
 </ul>
 <p>Two specifics phases 12 and 13 must confront, both already
 visible in the crates:</p>
@@ -15776,7 +15793,11 @@ restating it. What is specific to this plan:</p>
   reference implementation in reach will double-check for us.
   Phases 2, 8, 9 and 10 can be planned at medium effort with
   good briefs. Phase 7 is high effort only because it touches
-  the guest/host boundary; the change itself is small.</li>
+  the guest/host boundary; the change itself is small. Phase 11
+  is high effort despite a small diff: it decides what the host
+  may resolve out of an untrusted image, and it has to preserve
+  an invariant phase 4 established deliberately -- that a refusal
+  never depends on whether a parent file happens to exist.</li>
 <li><strong>Model choice.</strong> Skew to opus for the emitters and the parse
   layer. Phase 5 and 6 briefs must name the exact byte offsets
   and the checksum algorithm, because a plausible-looking wrong

@@ -14879,6 +14879,11 @@ recorded version became another stream of bump pull requests.</p>
   unchanged from the template. It demotes existing pins to pip
   constraints for a fresh resolve; see its header comment for details
   including the <code># never-pin: &lt;name&gt;</code> escape hatch.</li>
+<li>Every other <code>tools/*.sh</code> script the workflow runs, such as
+  <code>tools/pin-indirect-dependencies-apt.sh</code> -- the list is read from the
+  deployed workflow (comments ignored), so a repository that re-syncs
+  the workflow but not a helper it now calls is caught before the
+  daily run fails with "No such file or directory".</li>
 <li><code># START_OF_INDIRECT_DEPS</code> and <code># END_OF_INDIRECT_DEPS</code> markers in
   <code>pyproject.toml</code> delimiting the block the script regenerates (without
   both markers the script refuses to run).</li>

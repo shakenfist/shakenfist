@@ -15567,7 +15567,10 @@ answers.</p>
    the fleet yet proves the runners have; the first scheduled run
    in phase 2 is the test. If verification cannot run there, import
    records provenance without verifying it and says so on stderr on
-   every run.
+   every run. <em>Settled 2026-09-30:</em> the first runs after the
+   rollout imported 16 entries across the four repositories (actions
+   3, hunkydory 6, kerbside 4, ryll 3), every one <code>verified: true</code>,
+   so the static runners reach Rekor and the TUF root.
 6. <strong>The checkout token.</strong> <em>Answered by step 2a, 2026-09-24:</em>
    <code>DEPENDENCIES_TOKEN</code> is a per-repository secret, present in
    exactly the three adopted repositories whose <code>develop</code> ruleset
@@ -15593,12 +15596,12 @@ answers.</p>
 </tr>
 <tr>
 <td>2. Review tracking CI template and rollout</td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>02d6dbb (#186); actions 74a33c9 (#111); hunkydory f24d413 (#57); kerbside 62ccbcb (#504); ryll ce3ebb3 (#418)</td>
 </tr>
 <tr>
 <td>3. Template convergence</td>
-<td>Not started</td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -16035,6 +16038,18 @@ match.</p>
 </tr>
 </tbody>
 </table>
+<p><strong>Outcome.</strong> All four rollout pull requests merged on 2026-09-28,
+and each repository's copies match the template. Two things came up
+that the steps above did not anticipate. actions carried a test
+(<code>PruneGuardTest</code>) asserting the old workflow's literal
+<code>refs/heads/main</code> guard, updated in its rollout pull request. And
+hunkydory had never done adoption step 8: its expensive workflows
+ran in full on review-only changes, and since <code>Build, test and
+lint</code>, <code>Pre-commit hooks</code> and <code>Analyze</code> are required checks there,
+its rollout pull request added a job-level <code>check_paths</code> skip rather
+than a trigger-level <code>paths-ignore</code>. Step 8 and the adoption skill
+still describe only the trigger-level form, and phase 3 picks that
+up.</p>
 <h3 id="phase-3-template-convergence">Phase 3: template convergence<a class="headerlink" href="#phase-3-template-convergence" title="Permanent link">&para;</a></h3>
 <p>Planning effort: high. Each template needs a judgement about which
 kind of drift it has, and some of the answers change the template
@@ -16059,10 +16074,74 @@ copy into the four kinds in "Situation", and act:</p>
 <p>Record the classification as a table in this section: template,
 repositories, kind, action taken. The survey in "Situation" is the
 starting point but was taken from local clones, so re-measure.</p>
-<p><strong>Survey (step 3a, 2026-09-24, fresh clones).</strong> 6 of the 29 real
-copies of a template in the four adopted repositories are
-byte-identical today (hunkydory 3, kerbside 2, ryll 1, actions 0).
-In order of copies made identical per unit of work:</p>
+<p><strong>What the survey found (step 3a, re-run 2026-09-30).</strong> The
+2026-09-24 survey had drifted in six days. That is the argument
+for this phase in miniature: copies change under the plan as well
+as under the template. Re-measured against the default branches of
+all five repositories:</p>
+<ul>
+<li><strong>5 of 29 copies are byte-identical, down from 6.</strong> The
+  denominator excludes <code>review-tracking</code> (phase 2 made all 12 of
+  its copies identical) and <code>release-automation</code> (per-repository;
+  counting it gives 5 of 34).</li>
+<li>pr-re-review in kerbside and ryll was re-synchronised by other
+    work on 2026-09-27: +2.</li>
+<li>Template commit 488a2b0 (2026-09-25) added a comment to
+    <code>export-repo-config.yml</code>, so the kerbside and ryll copies now
+    lag: -2.</li>
+<li><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/hunkydory/issues/57" title="GitHub Issue: shakenfist/hunkydory #57">hunkydory#57</a> gave hunkydory's <code>codeql-analysis.yml</code> a job-level
+    review-only skip, so it no longer matches: -1.</li>
+<li><strong>Four claims in the earlier table were false by 2026-09-30:</strong></li>
+<li>actions' <code>pr-re-review.yml</code> already has
+    <code>persist-credentials: false</code>. Its only divergence is two
+    comments that say <code>pr-auto-review.yml</code> is "alongside this
+    file".</li>
+<li>kerbside's and ryll's <code>pr-retest.yml</code> already have the bot
+    guard, and all four copies carry the current template body.
+    What remains is the dispatched-workflow parameter.</li>
+<li>The template's <code>renovate.json</code> no longer says "Automatically
+    merge" (fixed in 488a2b0). The hunkydory and ryll copies still
+    do.</li>
+<li><code>export-repo-config.yml</code> is identical in only one of three
+    repositories, not three.</li>
+<li><strong>Four claims still hold:</strong></li>
+<li>The mermaid-lint copies in kerbside and ryll lag.</li>
+<li>actions' <code>renovate.yml</code> has <code>timeout-minutes</code> and
+    <code>concurrency</code> that the template lacks.</li>
+<li>kerbside's and ryll's CodeQL copies still check out <code>HEAD^2</code>.</li>
+<li>kerbside's <code>pin-indirect-dependencies.yml</code> adds apt packages.</li>
+<li><strong>Three things the plan did not know:</strong></li>
+<li>kerbside's <code>pr-retest.yml</code> notes that dispatching
+    <code>functional-tests.yml</code> runs the merge tier, not the lanes that
+    gate a pull request.</li>
+<li>ryll's CodeQL cancels in-progress push and scheduled runs as
+    well as pull request runs.</li>
+<li>actions' CodeQL <code>paths-ignore</code> lacks the review paths, so it
+    misses adoption step 8.</li>
+<li><strong>Decision 3 as first written counted only the five
+  review-tracking repositories</strong>, which made <code>ci.yml</code> look like the
+  majority default; across the fleet it is <code>functional-tests.yml</code>.</li>
+<li><strong>Required checks:</strong> only hunkydory has status checks CodeQL
+  would affect (<code>Analyze</code>). kerbside and ryll require only their
+  merge-queue gates; actions and this repository require none.</li>
+<li><strong>Audit criteria:</strong> none of those under <code>scripts/audit/checks/</code>
+  inspects anything the actions below change. <code>CiReviewAutomation</code>
+  does require pr-re-review's <code>rev-parse HEAD^2</code> confirm step and
+  the fork gates on both review automation files, and the template
+  change keeps both.</li>
+<li><strong>Step 8 of "Adopting a repository"</strong> and the
+  <code>review-tracking-adoption</code> skill describe only the trigger-level
+  <code>paths-ignore</code>. Both say a skipped required check "sits expected
+  forever", which is true of a workflow that never starts but not
+  of a job skipped by <code>if:</code>, which satisfies the check. Neither
+  offers the job-level skip that hunkydory, kerbside and actions
+  already use for required checks.</li>
+</ul>
+<p>This section's table and decisions are corrected to match. The
+"Situation" measurements are left as the 2026-09-24 baseline that
+phase 4 re-measures against.</p>
+<p><strong>Classification and actions</strong>, in order of copies gained per unit
+of work:</p>
 <table>
 <thead>
 <tr>
@@ -16083,66 +16162,112 @@ In order of copies made identical per unit of work:</p>
 </tr>
 <tr>
 <td>2</td>
-<td><code>ci-review-automation/pr-re-review.yml</code></td>
+<td><code>export-repo-config.yml</code></td>
 <td>lagging</td>
-<td>Re-sync actions, kerbside and ryll verbatim; actions first, as its copy lacks <code>persist-credentials: false</code></td>
-<td>3</td>
+<td>Re-sync kerbside and ryll verbatim; the template README says actions' file at that path is the reusable workflow, not a copy (likewise <code>issue-link-check.yml</code>)</td>
+<td>2</td>
 </tr>
 <tr>
 <td>3</td>
 <td><code>renovate/renovate.yml</code></td>
 <td>parameter, local improvement</td>
-<td>Filter becomes <code>${{ github.repository }}</code>; upstream actions' <code>timeout-minutes</code> and <code>concurrency</code>; re-sync</td>
+<td>Filter becomes <code>${{ github.repository }}</code>; upstream actions' <code>timeout-minutes</code> and <code>concurrency</code>; re-sync all four and this repository</td>
 <td>4</td>
 </tr>
 <tr>
 <td>4</td>
 <td><code>ci-review-automation/pr-retest.yml</code></td>
-<td>parameter, lagging</td>
-<td>Workflow to dispatch from <code>vars.RETEST_WORKFLOW</code> with a default and neutral wording; re-sync all four (kerbside and ryll also lack the bot guard)</td>
+<td>parameter</td>
+<td>Dispatch <code>${{ vars.RETEST_WORKFLOW \|\| 'functional-tests.yml' }}</code> with neutral wording; re-sync all four and this repository; actions, development, hunkydory and ryll set <code>RETEST_WORKFLOW=ci.yml</code></td>
 <td>4</td>
 </tr>
 <tr>
 <td>5</td>
-<td><code>codeql/codeql-analysis.yml</code></td>
-<td>local improvement, lagging</td>
-<td><code>branches: [main, develop]</code>, <code>timeout-minutes</code>, PR-only cancelling concurrency, a review-path skip; drop the obsolete <code>HEAD^2</code> checkout in kerbside and ryll. Blocked on the decision below</td>
-<td>2</td>
+<td><code>ci-review-automation/pr-re-review.yml</code></td>
+<td>parameter (comment only)</td>
+<td>Neutral wording for where <code>pr-auto-review.yml</code> lives; re-sync actions</td>
+<td>1</td>
 </tr>
 <tr>
 <td>6</td>
+<td><code>codeql/codeql-analysis.yml</code></td>
+<td>local improvement, lagging</td>
+<td>Job-level review-only skip (decision 2) and the rest of decision 2; re-sync hunkydory and ryll; kerbside and actions stay per-repository</td>
+<td>2</td>
+</tr>
+<tr>
+<td>7</td>
 <td><code>pin-indirect-dependencies/pin-indirect-dependencies.yml</code></td>
-<td>parameter, per-repo</td>
-<td>Replace <code>{{PROJECT_NAME}}</code>; move kerbside's extra apt packages to a tracked file</td>
+<td>parameter, local improvement</td>
+<td><code>{{PROJECT_NAME}}</code> goes: the checkout moves to the workspace root (not <code>${{ github.event.repository.name }}</code>, which is empty on the daily <code>schedule</code> run); extra apt packages move to a tracked file the workflow reads if present; re-sync kerbside</td>
 <td>1</td>
 </tr>
 <tr>
 <td>--</td>
 <td><code>release-automation/*</code>, <code>renovate/renovate.json</code></td>
 <td>per-repo</td>
-<td>Record as per-repo in the READMEs; upstream kerbside's <code>vm</code> sign-tag label; fix renovate.json's "Automatically merge" description, which contradicts <code>automerge: false</code></td>
+<td>Record as per-repo in the READMEs; upstream kerbside's <code>vm</code> sign-tag label; fix the "Automatically merge" description in the hunkydory and ryll copies</td>
 <td>0</td>
 </tr>
 </tbody>
 </table>
-<p>Items 1 to 4 take the identical count from 6 to 21; item 5 to 23.
-<code>export-repo-config.yml</code> is already identical in the three
-repositories that call it, and the file at that path in actions is
-the reusable workflow rather than a copy, which its README should
-say.</p>
-<p><strong>Decision needed before item 5.</strong> hunkydory's <code>develop</code> ruleset
-requires CodeQL's <code>Analyze</code> check, so a trigger-level
-<code>paths-ignore</code> in the template would leave every review-only pull
-request there waiting on a check that never runs -- the hazard
-step 8 of the adoption procedure warns about. Either drop
-<code>Analyze</code> from hunkydory's required checks, or have the template
-skip at job level (a <code>check_paths</code> job and an <code>if:</code>), since a job
-skipped by <code>if:</code> satisfies a required check. Default: the
-job-level skip, which works whatever a repository requires.</p>
-<p>Renovate will keep moving action pins independently in the
-template and in each copy. That drift is transient -- it converges
-once every Renovate pull request has merged -- and is not treated
-as a finding.</p>
+<p>That takes the identical count from 5 to 23 of 29.</p>
+<p><strong>Decisions.</strong></p>
+<ol>
+<li><strong>The denominator is 29.</strong> <code>review-tracking</code> is phase 2's and
+   already converged; <code>release-automation</code> is per-repository.
+   Phase 4 reports both totals.</li>
+<li><strong>CodeQL takes hunkydory's job-level skip.</strong> This settles the
+   earlier "decision needed before item 5". The skip works whatever
+   a repository requires, is proven in hunkydory, and a trigger-level
+   filter cannot be safe in a template some copies have as a
+   required check. Around it:</li>
+<li>the filter also excludes <code>docs/**</code>, as three of four copies do;</li>
+<li>a fork guard;</li>
+<li>actions' pull-request-only <code>cancel-in-progress</code>, which fixes
+     ryll cancelling push and scheduled runs;</li>
+<li><code>timeout-minutes</code>;</li>
+<li><code>branches: [main, develop]</code>, which names branches but stays
+     identical across the fleet, the mermaid-lint precedent;</li>
+<li>the obsolete <code>HEAD^2</code> checkout goes.</li>
+</ol>
+<p>kerbside pins <code>languages</code> because autobuild fails on its C file,
+   and actions runs a language matrix. Both stay documented
+   per-repository copies rather than growing a parameter for two
+   repositories.
+3. <strong>pr-retest reads its target from a repository variable.</strong> The
+   default is <code>functional-tests.yml</code>: it is the fleet majority (nine
+   repositories, against six on <code>ci.yml</code> and one on
+   <code>unit-tests.yml</code>) and what the template dispatched before, so most
+   repositories are unaffected on their next sync. The variable is
+   set to <code>ci.yml</code> in actions, development, hunkydory and ryll; each
+   is a change to that repository's settings made by Michael, and
+   development's must be set before this phase's pull request merges.
+   kerbside needs none. kerbside's caveat -- the dispatched workflow
+   is not what gates a pull request there -- is a design question
+   about the retest bot, recorded as future work rather than solved
+   here.
+4. <strong>This repository's own copies converge with the fleet's</strong>
+   where a template change makes that possible: renovate.yml,
+   pr-retest.yml and codeql-analysis.yml.
+5. <strong>Step 8 and the adoption skill document the job-level skip</strong>
+   as the answer for a required check, and correct the "sits
+   expected forever" wording. actions' CodeQL gains the review paths
+   in its re-sync pull request, closing its step 8 gap.
+6. <strong>Pull requests and review.</strong> The template changes land in this
+   repository first, as one pull request with one commit per
+   template. The copies follow as one pull request per repository
+   after it merges, so that each copy matches what landed here. A
+   copy is only importable once the changed template has been
+   re-reviewed and stamped here, so the re-review is part of the
+   phase, not an afterthought.</p>
+<p>The decision most open to argument is 2's handling of kerbside and
+actions. A <code>languages</code> parameter (<code>${{ vars.CODEQL_LANGUAGES }}</code>,
+empty meaning autodetect) would make kerbside's copy importable
+too, at the cost of every repository's CodeQL depending on an
+unset variable behaving like an absent input. That is not verified,
+and verifying it on a security scanner is the wrong place to learn
+it.</p>
 <table>
 <thead>
 <tr>
@@ -16159,24 +16284,71 @@ as a finding.</p>
 <td>high</td>
 <td>opus</td>
 <td>none</td>
-<td>Fresh clones of actions, hunkydory, kerbside and ryll; for every file under <code>templates/</code> (excluding READMEs and <code>shared-blocks/</code>), find its copies by the destination paths the template's README names, diff each, and classify each hunk into parameter, lagging, local improvement or per-repository. Report as a table with the hunks quoted. No changes.</td>
+<td>Done 2026-09-30; the findings are above.</td>
 </tr>
 <tr>
 <td>3b</td>
-<td>high</td>
-<td>opus</td>
+<td>medium</td>
+<td>sonnet</td>
 <td>none</td>
-<td>For each template the management session decides to converge from 3a's table: change the template (parameterise, upstream improvements), update its README, and check the matching audit criterion under <code>scripts/audit/checks/</code> still passes for every repository (<code>scripts/audit-check.py --repo-path</code>). One commit per template.</td>
+<td>Items 1, 2 (README only), 3, 5 and 7 and the per-repo README notes. Per template, one commit in this repository: change the template as the table says, update its README, and where this repository carries its own copy (<code>.github/workflows/renovate.yml</code>) re-sync it. Keep the <code>CiReviewAutomation</code> properties (<code>rev-parse HEAD^2</code> confirm step, fork gates; see <code>scripts/audit/checks/ci_workflows.py:932</code>). For item 7, the apt list is a tracked <code>tools/pin-indirect-dependencies-apt.txt</code>, read only if present. Run <code>pre-commit run --all-files</code> and <code>python3 scripts/audit-check.py --repo-path . --repo-name development</code>.</td>
 </tr>
 <tr>
 <td>3c</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>Items 4 and 6: pr-retest's <code>vars.RETEST_WORKFLOW</code> and the CodeQL template of decision 2, starting from hunkydory's <code>codeql-analysis.yml</code> (origin/develop, commit cd098f5) and actions' fork guard and concurrency. Walk every event (review-only pull request, code pull request, fork pull request, push, schedule, dispatch) and state each job's outcome in the commit message. Re-sync this repository's copies. Keep <code>test_registry.py</code>'s ci-review-automation tests passing.</td>
+</tr>
+<tr>
+<td>3d</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>Rewrite step 8 of "Adopting a repository" in <code>docs/code-review-tracking.md</code> and steps 2-3 of <code>.claude/skills/review-tracking-adoption/SKILL.md</code> to give the job-level <code>check_paths</code> skip as the answer for a required check, with hunkydory's shape as the worked example.</td>
+</tr>
+<tr>
+<td>3e</td>
 <td>medium</td>
 <td>sonnet</td>
 <td>worktree</td>
-<td>Re-synchronise the converged templates' copies in the adopted repositories, one pull request per repository, verifying byte identity with <code>git hash-object</code>. Do not merge.</td>
+<td>After the 3b-3d pull request merges: one branch and pull request each in actions, hunkydory, kerbside and ryll re-syncing that repository's copies from the table, verified with <code>git hash-object</code> (for kerbside's pin-indirect-dependencies that is the workflow <em>and</em> the new <code>tools/pin-indirect-dependencies-apt.sh</code>, plus a <code>tools/pin-indirect-dependencies-apt.txt</code> carrying its mysqlclient build dependencies), plus the renovate.json description fix (hunkydory, ryll) and the review paths in actions' CodeQL. Do not push or open pull requests until asked. <code>RETEST_WORKFLOW=ci.yml</code> is set by Michael in actions, hunkydory and ryll before each pull request merges (development's is set before the 3b-3d pull request merges); kerbside needs none.</td>
 </tr>
 </tbody>
 </table>
+<p><strong>Risks.</strong></p>
+<ul>
+<li><em>A converged template breaks a copy that relied on its local
+  difference.</em> kerbside's CodeQL and pr-retest are the known cases,
+  and both are handled above. Each 3e pull request runs that
+  repository's own CI, and the management session reads the diff
+  of every copy against its old version before opening it.</li>
+<li><em>The CodeQL skip hides a real change.</em> The filter fails open
+  (<code>|| 'true'</code>, <code>!cancelled()</code>), and step 3c's event walk is the
+  check.</li>
+<li><em>The imports this phase is for do not arrive.</em> A re-synchronised
+  copy imports only after the new template is reviewed here.
+  Michael re-reviews the changed templates before 3e opens its
+  pull requests; phase 4 counts the result.</li>
+</ul>
+<p><strong>Definition of done.</strong></p>
+<ul>
+<li>For every row in the table above, <code>git hash-object</code> of each copy
+  on each repository's default branch equals the template's, or the
+  template's README names that copy as per-repository. A script run
+  by phase 4 checks it; step 3a's survey is its first draft.</li>
+<li><code>grep -n 'sits "expected" forever' docs/code-review-tracking.md
+  .claude/skills/review-tracking-adoption/SKILL.md</code> finds nothing,
+  and both describe <code>check_paths</code>.</li>
+<li>A review-only pull request in hunkydory merges with <code>Analyze</code>
+  reported as skipped.</li>
+<li><code>pre-commit run --all-files</code> passes here, and <code>audit-check.py</code>
+  reports no new failure for any of the five repositories.</li>
+</ul>
+<p><strong>Back brief.</strong> Before 3c edits anything, the management session
+agrees the CodeQL template's event table with Michael. It is the
+one change here that alters a security scanner's coverage in every
+copy.</p>
 <h3 id="phase-4-verification">Phase 4: verification<a class="headerlink" href="#phase-4-verification" title="Permanent link">&para;</a></h3>
 <p>Planning effort: medium.</p>
 <p>Once phases 2 and 3 have merged in every adopted repository, and
@@ -16547,6 +16719,12 @@ intend to do aligns with that plan.</p>
   alone unless phase 4 shows the queue matters; a per-repository
   cron would break byte-identity for that file. Raised by the
   automated review of #186.</li>
+<li><strong>What the retest bot should dispatch.</strong> kerbside's
+  <code>pr-retest.yml</code> notes that dispatching <code>functional-tests.yml</code> runs
+  the merge tier, not the lanes that gate a pull request there.
+  Phase 3 makes the target a repository variable; whether the bot
+  should instead re-run a pull request's own gating lanes is a
+  change to the review automation template, not to convergence.</li>
 </ul>
 <p>Related issues: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/173" title="GitHub Issue: shakenfist/development #173">development#173</a> is this repository's
 own review-coverage issue; import does not affect it, because this

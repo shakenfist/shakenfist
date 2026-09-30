@@ -3882,6 +3882,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#json-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JSON output
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4016,10 +4027,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#a-differencing-vhd-or-vhdx-parent-is-not-walked" class="md-nav__link">
+  <a href="#a-differencing-vhd-or-vhdx-parent-is-walked-only-by-info-chain" class="md-nav__link">
     <span class="md-ellipsis">
       
-        A differencing VHD or VHDX parent is not walked
+        A differencing VHD or VHDX parent is walked only by info --chain
       
     </span>
   </a>
@@ -14948,6 +14959,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#json-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JSON output
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -15082,10 +15104,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#a-differencing-vhd-or-vhdx-parent-is-not-walked" class="md-nav__link">
+  <a href="#a-differencing-vhd-or-vhdx-parent-is-walked-only-by-info-chain" class="md-nav__link">
     <span class="md-ellipsis">
       
-        A differencing VHD or VHDX parent is not walked
+        A differencing VHD or VHDX parent is walked only by info --chain
       
     </span>
   </a>
@@ -15157,6 +15179,49 @@ correct data handling.</p>
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>      disk size: 500 MiB (524288000 bytes)
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>      cluster size: 65536 bytes
 </code></pre></div>
+<h3 id="json-output">JSON output<a class="headerlink" href="#json-output" title="Permanent link">&para;</a></h3>
+<p><code>instar info --chain --output json</code> renders the same chain as a JSON
+array, one object per member, top image first. Key names match the
+non-chain <code>--output json</code> form: <code>filename</code>, <code>format</code>, <code>virtual-size</code>,
+<code>actual-size</code>, <code>cluster-size</code> (omitted when the format has none, as
+for raw) and <code>backing-filename</code> (the unresolved reference from that
+image's own header, present on every member whose header names a
+parent). The resolved path of a followed backing file is the next
+element's <code>filename</code>, not repeated on the referencing element.</p>
+<p><code>backing-filename</code> on the <strong>last</strong> element therefore means the listing
+is truncated: the walk stopped before resolving that reference, and
+the reason is on stderr. A complete chain ends on a member whose
+header names no parent, and that member has no <code>backing-filename</code>
+key. A script that treats the last element as necessarily resolved
+will read a truncated chain as a complete one — check for the key, or
+check the exit path's stderr, rather than assuming.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>$ instar info --chain --output json top.qcow2
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>[
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    {
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>        "filename": "/path/to/top.qcow2",
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>        "format": "qcow2",
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>        "virtual-size": 10737418240,
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        "actual-size": 524288,
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        "cluster-size": 65536,
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>        "backing-filename": "middle.qcow2"
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    },
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    {
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>        "filename": "/path/to/middle.qcow2",
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>        "format": "qcow2",
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>        "virtual-size": 10737418240,
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>        "actual-size": 1048576,
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>        "cluster-size": 65536,
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>        "backing-filename": "base.qcow2"
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>    },
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>    {
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>        "filename": "/path/to/base.qcow2",
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>        "format": "qcow2",
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>        "virtual-size": 10737418240,
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>        "actual-size": 524288000,
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>        "cluster-size": 65536
+<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>    }
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>]
+</code></pre></div>
 <h2 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h2>
 <p>Backing file paths are <strong>untrusted data</strong> embedded in image headers. A
 malicious image could reference sensitive system files (e.g., <code>/etc/shadow</code>)
@@ -15165,25 +15230,25 @@ in an attempt to exfiltrate data during processing.</p>
 <p>The <code>--chain</code> command validates all backing file paths against a security
 allowlist before following them. By default, only files in the same directory
 as the input image are allowed.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># This would fail if base.qcow2 tries to reference /etc/passwd</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>instar<span class="w"> </span>info<span class="w"> </span>--chain<span class="w"> </span>malicious.qcow2
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># Error: Backing file '/etc/passwd' is outside allowed paths: ["/path/to/images"]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># This would fail if base.qcow2 tries to reference /etc/passwd</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>instar<span class="w"> </span>info<span class="w"> </span>--chain<span class="w"> </span>malicious.qcow2
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># Error: Backing file '/etc/passwd' is outside allowed paths: ["/path/to/images"]</span>
 </code></pre></div>
 <h3 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h3>
 <p>The allowlist can be configured via the config file:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># ~/.config/instar/config</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">[security]</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># Directories allowed for backing file resolution</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Special markers:</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1">#   $IMAGE_DIR - directory containing the input image</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1">#   $CWD       - current working directory</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">backing-path-allowlist</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">    </span><span class="s2">"$IMAGE_DIR"</span><span class="p">,</span><span class="w">                    </span><span class="c1"># Default: same directory as image</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">    </span><span class="s2">"/var/lib/libvirt/images"</span><span class="p">,</span><span class="w">       </span><span class="c1"># Add production image directories</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="p">]</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="c1"># Maximum backing chain depth (default: 16)</span>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="n">max-chain-depth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">16</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># ~/.config/instar/config</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">[security]</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># Directories allowed for backing file resolution</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c1"># Special markers:</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="c1">#   $IMAGE_DIR - directory containing the input image</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="c1">#   $CWD       - current working directory</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">backing-path-allowlist</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">    </span><span class="s2">"$IMAGE_DIR"</span><span class="p">,</span><span class="w">                    </span><span class="c1"># Default: same directory as image</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">    </span><span class="s2">"/var/lib/libvirt/images"</span><span class="p">,</span><span class="w">       </span><span class="c1"># Add production image directories</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="p">]</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="c1"># Maximum backing chain depth (default: 16)</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="n">max-chain-depth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">16</span>
 </code></pre></div>
 <h3 id="chain-depth-limit">Chain Depth Limit<a class="headerlink" href="#chain-depth-limit" title="Permanent link">&para;</a></h3>
 <p>To prevent infinite loops from circular references, the chain discovery
@@ -15192,7 +15257,7 @@ enforces a maximum depth (default: 16 levels). This is configurable via
 <h3 id="circular-reference-detection">Circular Reference Detection<a class="headerlink" href="#circular-reference-detection" title="Permanent link">&para;</a></h3>
 <p>If an image chain contains a circular reference (e.g., A → B → A), the
 discovery will detect and report it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>Error discovering backing chain: Circular reference detected: /path/to/A.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Error discovering backing chain: Circular reference detected: /path/to/A.qcow2
 </code></pre></div>
 <h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
 <p>Unlike host-side parsing approaches, instar's chain discovery maintains the
@@ -15212,36 +15277,48 @@ guest, while the host only performs path validation.</p>
 <thead>
 <tr>
 <th>Format</th>
-<th>Backing File Support</th>
+<th>Chain Discovery</th>
+<th>Chain Composition</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>QCOW2</td>
 <td>✓ Yes</td>
+<td>✓ Yes</td>
 </tr>
 <tr>
 <td>QCOW1</td>
+<td>✓ Yes</td>
 <td>✓ Yes</td>
 </tr>
 <tr>
 <td>Raw</td>
 <td>No</td>
+<td>No</td>
 </tr>
 <tr>
 <td>VMDK</td>
 <td>✓ Yes (descriptor parentFileNameHint)</td>
+<td>✓ Yes</td>
 </tr>
 <tr>
 <td>VHD</td>
-<td>No</td>
+<td>✓ Yes, via <code>info --chain</code>'s reporting walk only</td>
+<td>Not yet</td>
 </tr>
 <tr>
 <td>VHDX</td>
-<td>No</td>
+<td>✓ Yes, via <code>info --chain</code>'s reporting walk only</td>
+<td>Not yet</td>
 </tr>
 </tbody>
 </table>
+<p>VHD and VHDX are split across two columns because, uniquely among these
+formats, their two columns now disagree: <code>instar info --chain</code> resolves
+and lists a differencing VHD or VHDX parent, but no operation can yet
+compose one into sector data. See "Known limitations" below for what
+that means for every other caller.</p>
 <h2 id="comparison-with-qemu-img">Comparison with qemu-img<a class="headerlink" href="#comparison-with-qemu-img" title="Permanent link">&para;</a></h2>
 <p><code>qemu-img info --backing-chain</code> provides similar functionality but:</p>
 <ol>
@@ -15312,30 +15389,133 @@ validating paths before following them.</p>
   output image with no backing dependencies.</li>
 </ul>
 <h2 id="known-limitations">Known limitations<a class="headerlink" href="#known-limitations" title="Permanent link">&para;</a></h2>
-<h3 id="a-differencing-vhd-or-vhdx-parent-is-not-walked">A differencing VHD or VHDX parent is not walked<a class="headerlink" href="#a-differencing-vhd-or-vhdx-parent-is-not-walked" title="Permanent link">&para;</a></h3>
-<p><code>discover_backing_chain</code> deliberately stops at a VHD (<code>disk_type == 4</code>) or
-VHDX (<code>HasParent</code> set) parent instead of resolving it, recording the
-parent reference (so <code>instar info</code> can still report it) without following
-it. <code>instar info --chain</code> on such an image therefore reports a one-image
-chain even though the image has a parent:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>$ instar info --chain vhd-diff-child-aligned.vhd
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>Chain: 1 image(s)
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>  [0] /path/to/vhd-diff-child-aligned.vhd (vpc) -&gt; vhd-diff-parent.vhd
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>      ...
+<h3 id="a-differencing-vhd-or-vhdx-parent-is-walked-only-by-info-chain">A differencing VHD or VHDX parent is walked only by <code>info --chain</code><a class="headerlink" href="#a-differencing-vhd-or-vhdx-parent-is-walked-only-by-info-chain" title="Permanent link">&para;</a></h3>
+<p><code>discover_backing_chain</code> takes a policy. A <em>composing</em> caller —
+<code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code>, <code>check</code>, <code>commit</code> and <code>rebase</code> —
+stops at a VHD (<code>disk_type == 4</code>) or VHDX (<code>HasParent</code> set) parent
+exactly as before, recording the parent reference (so <code>instar info</code> can
+still report it) without resolving or opening it. Only the <em>reporting</em>
+walk behind <code>instar info --chain</code> resolves the parent — through the same
+allowlist and depth-limit checks described above for a qcow2 backing
+file — and continues the listing into it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>$ instar info --chain vhd-diff-child-aligned.vhd
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>Chain: 2 image(s)
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>  [0] /abs/path/vhd-diff-child-aligned.vhd (vpc) -&gt; vhd-diff-parent.vhd
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>      virtual size: 16 MiB (16777216 bytes)
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>      disk size: 4 MiB (4198912 bytes)
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>      cluster size: 2097152 bytes
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>  [1] /abs/path/vhd-diff-parent.vhd (vpc)
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>      ...
 </code></pre></div>
-<p>This is not an oversight: nothing in instar can compose a VHD or VHDX
-parent yet, so walking it would only change <em>which</em> failure a caller sees
-(a resolved-but-uncomposable parent) rather than whether reading succeeds,
-and for VHDX it would actively make things worse — the parent locator is a
-Windows-shaped path (<code>.\parent.vhdx</code>) that does not resolve on POSIX, so
-walking it turned a clear refusal into a "backing file not found" error.
-The <code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code>, <code>check</code> and <code>measure</code> operations
-refuse a differencing source outright regardless of whether its parent
-exists — see the "VHD/VHDX differencing" section of
-<a href="/components/instar/quirks/">quirks.md</a> — so a refusal must not depend on the parent being
-present. The composition work in
-<a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> lifts this restriction
-per operation as real chain composition lands.</p>
+<p>When the reporting walk cannot resolve a parent, it ends the listing at
+the last image it did resolve — that image's own unresolved reference
+stays in the printed line (<code>-&gt; vhd-diff-parent.vhd</code>) exactly as it
+always has — and <code>instar info --chain</code> still exits 0. A single line
+names the reason on stderr:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar: backing chain stops at &lt;child absolute path&gt;: parent '&lt;reference&gt;' &lt;reason&gt;
+</code></pre></div>
+<p><code>&lt;reason&gt;</code> is one of: the reference is a Windows absolute path and
+cannot be resolved on this host; it is outside the backing file
+allowlist; it was not found; it would exceed the maximum backing chain
+depth; it is already in the chain (circular reference); or it could not
+be resolved, for any other reason. <code>absolute_win32_path</code> and
+<code>volume_path</code> VHDX locator values (<code>C:\images\parent.vhdx</code>,
+<code>\\?\Volume{GUID}\...</code>) are reported verbatim, by design, and are
+deliberately never rewritten into POSIX convention before that check
+runs — inventing a host path out of a drive letter and then testing the
+invention against the allowlist would be a path-traversal primitive, not
+a convenience, so a locator of this kind always ends the walk with the
+Windows-absolute-path reason, never a "not found" one. A relative VHDX
+locator does not have this problem: it arrives already rendered into
+POSIX convention (<code>vhdx-diff-parent.vhdx</code>, not <code>.\vhdx-diff-parent.vhdx</code>)
+before the host ever sees it, and resolves like any other relative name.</p>
+<p>One caveat about the reasons themselves. For an <em>absolute</em> reference,
+resolution probes the filesystem before the allowlist is consulted, so
+"was not found" and "is outside the backing file allowlist" distinguish
+whether an attacker-chosen absolute host path exists. Only existence
+leaks, never content, and the allowlist still rejects — no path outside
+it is ever opened. A qcow2 chain naming an absolute backing file has
+always drawn the same distinction; what is new is that <code>info --chain</code>
+now prints it while exiting 0, so it no longer takes a failing command
+to carry the answer. If you run <code>instar info --chain</code> over untrusted
+images in a service and return its stderr to whoever supplied them,
+that is the line to withhold. Tracked as
+<a href="https://github.com/shakenfist/instar/issues/611">issue #611</a>.</p>
+<p>The fail-soft covers <em>resolving</em> the parent reference, and nothing
+beyond it. Once a parent resolves, it is read like any other chain
+member and the ordinary rules apply, so a malformed cross-format chain
+— a VHD or VHDX child naming a parent that is not itself a VHD or VHDX
+— can still end in a non-zero exit:</p>
+<table>
+<thead>
+<tr>
+<th>Resolved parent</th>
+<th><code>info --chain</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>a VHD or VHDX, as the format requires</td>
+<td>lists it, exits 0</td>
+</tr>
+<tr>
+<td>an unidentifiable file</td>
+<td>lists it as <code>unknown</code>, exits 0</td>
+</tr>
+<tr>
+<td>a self-contained qcow2</td>
+<td>lists it as <code>qcow2</code>, exits 0</td>
+</tr>
+<tr>
+<td>a qcow2 whose own backing file is missing</td>
+<td><strong>exits non-zero</strong></td>
+</tr>
+<tr>
+<td>a detected-but-unsupported format such as qed</td>
+<td><strong>exits non-zero</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The last two are the pre-existing rules for those formats reached at any
+chain position, not a new behaviour: a qcow2 chain is not fail-soft, and
+a detected-but-unsupported format is refused wherever it appears. Note
+also that instar does not check that a resolved parent has the same
+format as its child, though the VHD and VHDX specifications require it —
+so the third row lists a qcow2 as a VHD's parent without complaint.
+Tracked as
+<a href="https://github.com/shakenfist/instar/issues/608">issue #608</a>.</p>
+<p><code>instar info</code> reports and refuses nothing (see <a href="/components/instar/info/">info.md</a>), so
+<code>info --chain</code> exiting non-zero because a parent happened to be absent
+would be a worse regression than the one-image listing it replaces.
+Contrast qcow2 and VMDK: <code>info --chain</code> on either with a missing backing
+file still exits non-zero, deliberately, because those formats compose
+today — a listing that quietly stopped short would disagree with what
+the very next <code>convert</code> of the same image does. VHD and VHDX have no
+such disagreement to protect, because nothing composes them yet.</p>
+<p>This is discovery, not composition: nothing in instar can read the
+<em>data</em> of a VHD or VHDX parent, only the header fields that name it, and
+no composing caller resolves one. A composing operation must never
+resolve a parent it will not go on to read — if it did, the same
+differencing image would give a typed refusal when its parent happened
+to sit beside it and a path error when it did not, and a refusal that
+depends on a file instar is not going to read is not a refusal. That is
+exactly why <code>info --chain</code> walks and nothing else does.</p>
+<p>Two different lists appear in this document and in the changelog, and
+they are not the same set. The <em>composing callers</em> — the operations that
+call <code>discover_backing_chain</code> with the composing policy — are <code>convert</code>,
+<code>dd</code>, <code>compare</code>, <code>bench</code>, <code>check</code>, <code>commit</code> and <code>rebase</code>. The operations
+that <em>refuse a differencing source</em> are <code>convert</code>, <code>dd</code>, <code>compare</code>,
+<code>bench</code>, <code>check</code>, <code>measure</code> and <code>map</code>. The overlap is not total in either
+direction: <code>measure</code> and <code>map</code> refuse without walking a chain, and
+<code>commit</code> and <code>rebase</code> reject a VHD or VHDX source before any parent is
+considered, because neither operation supports those formats at all
+(<code>commit</code> and <code>rebase</code> are qcow2 and VMDK only) — so their refusal is not
+a differencing refusal and would stand even for a VHD with no parent. See
+the "VHD/VHDX differencing" section of <a href="/components/instar/quirks/">quirks.md</a> for the
+full per-op record. The composition work
+in <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> lifts each
+operation's restriction as real chain composition lands, one operation
+at a time.</p>
 
 
 

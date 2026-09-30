@@ -14924,9 +14924,12 @@
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>.github/workflows/renovate.yml</code> exists -- runs renovate hourly on a
-  self-hosted runner.</li>
-<li><code>renovate.json</code> exists, with package grouping rules and scheduling.</li>
-<li>Only the <code>RENOVATE_AUTODISCOVER_FILTER</code> value changes per repo.</li>
+  self-hosted runner. <code>RENOVATE_AUTODISCOVER_FILTER</code> is
+  <code>${{ github.repository }}</code>, supplied by the runtime, so the file is
+  copied verbatim rather than edited per repository.</li>
+<li><code>renovate.json</code> exists, with package grouping rules and scheduling.
+  It is a per-repository adaptation, not expected to be
+  byte-identical to the template's copy.</li>
 <li><code>renovate.json</code> enables the <code>pre-commit</code> manager, where the
   repository has remote pre-commit hooks to manage.</li>
 </ul>

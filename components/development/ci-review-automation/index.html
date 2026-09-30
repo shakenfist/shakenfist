@@ -15091,7 +15091,7 @@ commands by commenting on a PR:</p>
 <tr>
 <td><code>@shakenfist-bot please retest</code></td>
 <td><code>pr-retest.yml</code></td>
-<td>Re-run functional tests</td>
+<td>Re-run the test workflow</td>
 </tr>
 <tr>
 <td><code>@shakenfist-bot please re-review</code></td>
@@ -15199,12 +15199,15 @@ for background on <code>issue_comment</code> trigger security.</p>
 </tr>
 <tr>
 <td><code>pr-retest.yml</code></td>
-<td>None</td>
+<td><code>RETEST_WORKFLOW</code> repository variable, if the test workflow is not <code>functional-tests.yml</code></td>
 <td>Manual test re-run</td>
 </tr>
 </tbody>
 </table>
-<p>Both files are project-agnostic and can be copied directly.</p>
+<p>Both files are project-agnostic and can be copied directly.
+<code>pr-retest.yml</code> dispatches <code>functional-tests.yml</code> unless the <code>RETEST_WORKFLOW</code>
+repository variable names another workflow; see the
+<a href="https://github.com/shakenfist/development/tree/main/templates/ci-review-automation/README.md#choosing-what-a-retest-dispatches">template README</a>.</p>
 <p>For projects with large test suites that would benefit from
 automatic test fixing, see the separate
 <a href="https://github.com/shakenfist/development/tree/main/templates/test-drift-fix"><code>templates/test-drift-fix/</code></a>

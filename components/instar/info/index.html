@@ -14902,14 +14902,19 @@ not the <code>qcow2</code> that field defaults to when no backing format is
 recorded. A differencing image records no backing-format field of its
 own, but SPEC(VHD) and SPEC(VHDX) both require a parent to be the same
 format as its child, so the format is known without one.</p>
-<p><strong>A reported parent is not a resolved parent.</strong> <code>info</code> decodes the
-parent name and the parent locator entries from the image's own header
-and prints what it finds; it does not open the result, and <code>--chain</code>
-stops at the one image (see <a href="/components/instar/chain-discovery/">chain-discovery.md</a>).
-A parent locator is attacker-controlled data — it can name an absolute
-path, a relative traversal, a UNC share or a URL — so treat
-<code>backing-filename</code> on a differencing image as a string the image
-claims, not a file instar has validated.</p>
+<p><strong>A reported parent is not a resolved parent.</strong> <code>info</code> on its own
+decodes the parent name and the parent locator entries from the image's
+own header and prints what it finds; it does not open the result.
+<code>--chain</code> does resolve a VHD or VHDX parent and walk into it, under the
+same allowlist and depth checks a qcow2 backing file gets — but only
+when it can: whenever a parent cannot be resolved, the walk ends at the
+last image it did resolve, and that image's own unresolved reference is
+reported rather than the command erroring (see
+<a href="/components/instar/chain-discovery/">chain-discovery.md</a> for the reasons and the exact
+stderr line). A parent locator is attacker-controlled
+data — it can name an absolute path, a relative traversal, a UNC share
+or a URL — so treat <code>backing-filename</code> on a differencing image as a
+string the image claims, not a file instar has validated.</p>
 <h2 id="known-limitations">Known limitations<a class="headerlink" href="#known-limitations" title="Permanent link">&para;</a></h2>
 <h3 id="a-windows-convention-parent-makes-actual-path-unresolvable">A Windows-convention parent makes "actual path" unresolvable<a class="headerlink" href="#a-windows-convention-parent-makes-actual-path-unresolvable" title="Permanent link">&para;</a></h3>
 <p><code>info</code>'s "actual path" resolution treats any backing-file string that
