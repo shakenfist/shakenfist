@@ -19,6 +19,7 @@ from shakenfist.exceptions import EnsureMeshFailed
 from shakenfist.exceptions import HashFailed
 from shakenfist.exceptions import MissingNodeLockSocket
 from shakenfist.exceptions import MissingPrivExecSocket
+from shakenfist.exceptions import NodeLockTimeout
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.exceptions import RemoveFloatingIPFailed
 from shakenfist.exceptions import TruncatedNodeLockResponse
@@ -371,8 +372,9 @@ def _node_lock_request(request: Any) -> bool:
 
 
 class NodeLock():
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, timeout: float | None = None) -> None:
         self.name = name
+        self.timeout = timeout
         self.requester = json.dumps({
             'caller': util_callstack.get_caller(offset=-3),
             'lock_id': sf_random.random_id(),
@@ -399,6 +401,10 @@ class NodeLock():
                 self.log.with_fields({
                     'duration': duration
                 }).info('Waiting to acquire lock')
+
+            if self.timeout is not None and duration > self.timeout:
+                raise NodeLockTimeout(
+                    f'Timed out after {duration}s waiting for lock {self.name}')
 
             time.sleep(0.2)
         return self

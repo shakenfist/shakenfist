@@ -529,13 +529,20 @@ class DatabaseBackedObject:
                 })
 
     def get_lock(self, subtype=None, op=None, global_scope=True,
-                 timeout=60):
+                 timeout=60, node_timeout=None):
         # There is no point locking in-memory objects
         if self.in_memory_only:
             return NoopLock()
 
         if not global_scope:
-            return util_concurrency.NodeLock(f'{self.object_type}-{self.uuid}')
+            # timeout is for cluster locks only, and is deliberately not
+            # applied here: sf-queues restore passes timeout=120 with
+            # global_scope=False, and would start timing out, while
+            # every other node scope caller would get today's default
+            # of 60 without asking for it. node_timeout is the node
+            # lock's own, separate, opt-in bound.
+            return util_concurrency.NodeLock(
+                f'{self.object_type}-{self.uuid}', timeout=node_timeout)
 
         return locks.ClusterLock(
             self.object_type, subtype, str(self.uuid), log_ctx=self.log, op=op,
