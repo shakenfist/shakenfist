@@ -27,7 +27,7 @@ commands by commenting on a PR:
 
 | Command | Workflow | Description |
 |---------|----------|-------------|
-| `@shakenfist-bot please retest` | `pr-retest.yml` | Re-run functional tests |
+| `@shakenfist-bot please retest` | `pr-retest.yml` | Re-run the test workflow |
 | `@shakenfist-bot please re-review` | `pr-re-review.yml` | Fresh automated review |
 | `@shakenfist-bot please attempt to fix` | `pr-fix-tests.yml` | Fix failing tests (separate template) |
 
@@ -122,9 +122,12 @@ Templates are in
 | Template | Customisation | Description |
 |----------|---------------|-------------|
 | `pr-re-review.yml` | None | Manual re-review trigger |
-| `pr-retest.yml` | None | Manual test re-run |
+| `pr-retest.yml` | `RETEST_WORKFLOW` repository variable, if the test workflow is not `functional-tests.yml` | Manual test re-run |
 
 Both files are project-agnostic and can be copied directly.
+`pr-retest.yml` dispatches `functional-tests.yml` unless the `RETEST_WORKFLOW`
+repository variable names another workflow; see the
+[template README](https://github.com/shakenfist/development/tree/main/templates/ci-review-automation/README.md#choosing-what-a-retest-dispatches).
 
 For projects with large test suites that would benefit from
 automatic test fixing, see the separate

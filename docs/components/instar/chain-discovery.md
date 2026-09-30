@@ -52,6 +52,54 @@ Chain: 1 image(s)
       cluster size: 65536 bytes
 ```
 
+### JSON output
+
+`instar info --chain --output json` renders the same chain as a JSON
+array, one object per member, top image first. Key names match the
+non-chain `--output json` form: `filename`, `format`, `virtual-size`,
+`actual-size`, `cluster-size` (omitted when the format has none, as
+for raw) and `backing-filename` (the unresolved reference from that
+image's own header, present on every member whose header names a
+parent). The resolved path of a followed backing file is the next
+element's `filename`, not repeated on the referencing element.
+
+`backing-filename` on the **last** element therefore means the listing
+is truncated: the walk stopped before resolving that reference, and
+the reason is on stderr. A complete chain ends on a member whose
+header names no parent, and that member has no `backing-filename`
+key. A script that treats the last element as necessarily resolved
+will read a truncated chain as a complete one — check for the key, or
+check the exit path's stderr, rather than assuming.
+
+```
+$ instar info --chain --output json top.qcow2
+[
+    {
+        "filename": "/path/to/top.qcow2",
+        "format": "qcow2",
+        "virtual-size": 10737418240,
+        "actual-size": 524288,
+        "cluster-size": 65536,
+        "backing-filename": "middle.qcow2"
+    },
+    {
+        "filename": "/path/to/middle.qcow2",
+        "format": "qcow2",
+        "virtual-size": 10737418240,
+        "actual-size": 1048576,
+        "cluster-size": 65536,
+        "backing-filename": "base.qcow2"
+    },
+    {
+        "filename": "/path/to/base.qcow2",
+        "format": "qcow2",
+        "virtual-size": 10737418240,
+        "actual-size": 524288000,
+        "cluster-size": 65536
+    }
+]
+```
+
 ## Security
 
 Backing file paths are **untrusted data** embedded in image headers. A
@@ -123,14 +171,20 @@ guest, while the host only performs path validation.
 
 Chain discovery works with any format that supports backing files:
 
-| Format | Backing File Support |
-|--------|---------------------|
-| QCOW2  | ✓ Yes |
-| QCOW1  | ✓ Yes |
-| Raw    | No |
-| VMDK   | ✓ Yes (descriptor parentFileNameHint) |
-| VHD    | No |
-| VHDX   | No |
+| Format | Chain Discovery | Chain Composition |
+|--------|------------------|--------------------|
+| QCOW2  | ✓ Yes | ✓ Yes |
+| QCOW1  | ✓ Yes | ✓ Yes |
+| Raw    | No | No |
+| VMDK   | ✓ Yes (descriptor parentFileNameHint) | ✓ Yes |
+| VHD    | ✓ Yes, via `info --chain`'s reporting walk only | Not yet |
+| VHDX   | ✓ Yes, via `info --chain`'s reporting walk only | Not yet |
+
+VHD and VHDX are split across two columns because, uniquely among these
+formats, their two columns now disagree: `instar info --chain` resolves
+and lists a differencing VHD or VHDX parent, but no operation can yet
+compose one into sector data. See "Known limitations" below for what
+that means for every other caller.
 
 ## Comparison with qemu-img
 
@@ -179,31 +233,121 @@ The chain discovery infrastructure is used by the following operations:
 
 ## Known limitations
 
-### A differencing VHD or VHDX parent is not walked
+### A differencing VHD or VHDX parent is walked only by `info --chain`
 
-`discover_backing_chain` deliberately stops at a VHD (`disk_type == 4`) or
-VHDX (`HasParent` set) parent instead of resolving it, recording the
-parent reference (so `instar info` can still report it) without following
-it. `instar info --chain` on such an image therefore reports a one-image
-chain even though the image has a parent:
+`discover_backing_chain` takes a policy. A *composing* caller —
+`convert`, `dd`, `compare`, `bench`, `check`, `commit` and `rebase` —
+stops at a VHD (`disk_type == 4`) or VHDX (`HasParent` set) parent
+exactly as before, recording the parent reference (so `instar info` can
+still report it) without resolving or opening it. Only the *reporting*
+walk behind `instar info --chain` resolves the parent — through the same
+allowlist and depth-limit checks described above for a qcow2 backing
+file — and continues the listing into it:
 
 ```
 $ instar info --chain vhd-diff-child-aligned.vhd
-Chain: 1 image(s)
-  [0] /path/to/vhd-diff-child-aligned.vhd (vpc) -> vhd-diff-parent.vhd
+Chain: 2 image(s)
+  [0] /abs/path/vhd-diff-child-aligned.vhd (vpc) -> vhd-diff-parent.vhd
+      virtual size: 16 MiB (16777216 bytes)
+      disk size: 4 MiB (4198912 bytes)
+      cluster size: 2097152 bytes
+  [1] /abs/path/vhd-diff-parent.vhd (vpc)
       ...
 ```
 
-This is not an oversight: nothing in instar can compose a VHD or VHDX
-parent yet, so walking it would only change *which* failure a caller sees
-(a resolved-but-uncomposable parent) rather than whether reading succeeds,
-and for VHDX it would actively make things worse — the parent locator is a
-Windows-shaped path (`.\parent.vhdx`) that does not resolve on POSIX, so
-walking it turned a clear refusal into a "backing file not found" error.
-The `convert`, `dd`, `compare`, `bench`, `check` and `measure` operations
-refuse a differencing source outright regardless of whether its parent
-exists — see the "VHD/VHDX differencing" section of
-[quirks.md](/components/instar/quirks/) — so a refusal must not depend on the parent being
-present. The composition work in
-[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) lifts this restriction
-per operation as real chain composition lands.
+When the reporting walk cannot resolve a parent, it ends the listing at
+the last image it did resolve — that image's own unresolved reference
+stays in the printed line (`-> vhd-diff-parent.vhd`) exactly as it
+always has — and `instar info --chain` still exits 0. A single line
+names the reason on stderr:
+
+```
+instar: backing chain stops at <child absolute path>: parent '<reference>' <reason>
+```
+
+`<reason>` is one of: the reference is a Windows absolute path and
+cannot be resolved on this host; it is outside the backing file
+allowlist; it was not found; it would exceed the maximum backing chain
+depth; it is already in the chain (circular reference); or it could not
+be resolved, for any other reason. `absolute_win32_path` and
+`volume_path` VHDX locator values (`C:\images\parent.vhdx`,
+`\\?\Volume{GUID}\...`) are reported verbatim, by design, and are
+deliberately never rewritten into POSIX convention before that check
+runs — inventing a host path out of a drive letter and then testing the
+invention against the allowlist would be a path-traversal primitive, not
+a convenience, so a locator of this kind always ends the walk with the
+Windows-absolute-path reason, never a "not found" one. A relative VHDX
+locator does not have this problem: it arrives already rendered into
+POSIX convention (`vhdx-diff-parent.vhdx`, not `.\vhdx-diff-parent.vhdx`)
+before the host ever sees it, and resolves like any other relative name.
+
+One caveat about the reasons themselves. For an *absolute* reference,
+resolution probes the filesystem before the allowlist is consulted, so
+"was not found" and "is outside the backing file allowlist" distinguish
+whether an attacker-chosen absolute host path exists. Only existence
+leaks, never content, and the allowlist still rejects — no path outside
+it is ever opened. A qcow2 chain naming an absolute backing file has
+always drawn the same distinction; what is new is that `info --chain`
+now prints it while exiting 0, so it no longer takes a failing command
+to carry the answer. If you run `instar info --chain` over untrusted
+images in a service and return its stderr to whoever supplied them,
+that is the line to withhold. Tracked as
+[issue #611](https://github.com/shakenfist/instar/issues/611).
+
+The fail-soft covers *resolving* the parent reference, and nothing
+beyond it. Once a parent resolves, it is read like any other chain
+member and the ordinary rules apply, so a malformed cross-format chain
+— a VHD or VHDX child naming a parent that is not itself a VHD or VHDX
+— can still end in a non-zero exit:
+
+| Resolved parent | `info --chain` |
+|---|---|
+| a VHD or VHDX, as the format requires | lists it, exits 0 |
+| an unidentifiable file | lists it as `unknown`, exits 0 |
+| a self-contained qcow2 | lists it as `qcow2`, exits 0 |
+| a qcow2 whose own backing file is missing | **exits non-zero** |
+| a detected-but-unsupported format such as qed | **exits non-zero** |
+
+The last two are the pre-existing rules for those formats reached at any
+chain position, not a new behaviour: a qcow2 chain is not fail-soft, and
+a detected-but-unsupported format is refused wherever it appears. Note
+also that instar does not check that a resolved parent has the same
+format as its child, though the VHD and VHDX specifications require it —
+so the third row lists a qcow2 as a VHD's parent without complaint.
+Tracked as
+[issue #608](https://github.com/shakenfist/instar/issues/608).
+
+`instar info` reports and refuses nothing (see [info.md](/components/instar/info/)), so
+`info --chain` exiting non-zero because a parent happened to be absent
+would be a worse regression than the one-image listing it replaces.
+Contrast qcow2 and VMDK: `info --chain` on either with a missing backing
+file still exits non-zero, deliberately, because those formats compose
+today — a listing that quietly stopped short would disagree with what
+the very next `convert` of the same image does. VHD and VHDX have no
+such disagreement to protect, because nothing composes them yet.
+
+This is discovery, not composition: nothing in instar can read the
+*data* of a VHD or VHDX parent, only the header fields that name it, and
+no composing caller resolves one. A composing operation must never
+resolve a parent it will not go on to read — if it did, the same
+differencing image would give a typed refusal when its parent happened
+to sit beside it and a path error when it did not, and a refusal that
+depends on a file instar is not going to read is not a refusal. That is
+exactly why `info --chain` walks and nothing else does.
+
+Two different lists appear in this document and in the changelog, and
+they are not the same set. The *composing callers* — the operations that
+call `discover_backing_chain` with the composing policy — are `convert`,
+`dd`, `compare`, `bench`, `check`, `commit` and `rebase`. The operations
+that *refuse a differencing source* are `convert`, `dd`, `compare`,
+`bench`, `check`, `measure` and `map`. The overlap is not total in either
+direction: `measure` and `map` refuse without walking a chain, and
+`commit` and `rebase` reject a VHD or VHDX source before any parent is
+considered, because neither operation supports those formats at all
+(`commit` and `rebase` are qcow2 and VMDK only) — so their refusal is not
+a differencing refusal and would stand even for a VHD with no parent. See
+the "VHD/VHDX differencing" section of [quirks.md](/components/instar/quirks/) for the
+full per-op record. The composition work
+in [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) lifts each
+operation's restriction as real chain composition lands, one operation
+at a time.

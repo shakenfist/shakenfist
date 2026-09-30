@@ -3,9 +3,12 @@
 ## What we check
 
 * `.github/workflows/renovate.yml` exists -- runs renovate hourly on a
-  self-hosted runner.
+  self-hosted runner. `RENOVATE_AUTODISCOVER_FILTER` is
+  `${{ github.repository }}`, supplied by the runtime, so the file is
+  copied verbatim rather than edited per repository.
 * `renovate.json` exists, with package grouping rules and scheduling.
-* Only the `RENOVATE_AUTODISCOVER_FILTER` value changes per repo.
+  It is a per-repository adaptation, not expected to be
+  byte-identical to the template's copy.
 * `renovate.json` enables the `pre-commit` manager, where the
   repository has remote pre-commit hooks to manage.
 

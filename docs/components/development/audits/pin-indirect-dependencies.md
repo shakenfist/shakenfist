@@ -42,6 +42,11 @@ Projects in scope should have:
   unchanged from the template. It demotes existing pins to pip
   constraints for a fresh resolve; see its header comment for details
   including the `# never-pin: <name>` escape hatch.
+* Every other `tools/*.sh` script the workflow runs, such as
+  `tools/pin-indirect-dependencies-apt.sh` -- the list is read from the
+  deployed workflow (comments ignored), so a repository that re-syncs
+  the workflow but not a helper it now calls is caught before the
+  daily run fails with "No such file or directory".
 * `# START_OF_INDIRECT_DEPS` and `# END_OF_INDIRECT_DEPS` markers in
   `pyproject.toml` delimiting the block the script regenerates (without
   both markers the script refuses to run).
