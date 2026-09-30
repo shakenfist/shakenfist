@@ -19774,11 +19774,13 @@ def _direct_create_instance(data: InstanceData) -> bool:
 
 
 def _direct_get_instance(
-        inst_uuid: UUID) -> Optional[InstanceData]:
+        inst_uuid: UUID, *, strict: bool = False) -> Optional[InstanceData]:
     """Get Instance static values from MariaDB.
 
     Args:
         inst_uuid: The UUID of the Instance.
+        strict: If True, a caught OperationalError is re-raised as
+            DatabaseUnavailable instead of being reported as a miss.
 
     Returns:
         An InstanceData object, or None if not found.
@@ -19840,6 +19842,9 @@ def _direct_get_instance(
         LOG.warning(
             f'MariaDB get failed for '
             f'instance {inst_uuid}: {e}')
+        if strict:
+            raise exceptions.DatabaseUnavailable(
+                f'instance {inst_uuid} could not be read: {e}') from e
         return None
 
 
@@ -20328,8 +20333,14 @@ def _grpc_create_instance(data: InstanceData) -> bool:
 
 
 def _grpc_get_instance(
-        inst_uuid: UUID) -> Optional[InstanceData]:
-    """Get Instance static values via the database microservice."""
+        inst_uuid: UUID, *, strict: bool = False) -> Optional[InstanceData]:
+    """Get Instance static values via the database microservice.
+
+    Args:
+        inst_uuid: The UUID of the Instance.
+        strict: If True, a caught grpc.RpcError is re-raised as
+            DatabaseUnavailable instead of being reported as a miss.
+    """
     try:
         stub = _get_database_stub()
         request = database_pb2.GetInstanceRequest(
@@ -20372,6 +20383,9 @@ def _grpc_get_instance(
         LOG.error(
             f'gRPC GetInstance failed for '
             f'{inst_uuid}: {e}')
+        if strict:
+            raise exceptions.DatabaseUnavailable(
+                f'instance {inst_uuid} could not be read: {e}') from e
         return None
 
 
@@ -20696,22 +20710,34 @@ def create_instance(data: InstanceData) -> bool:
 
 
 def get_instance(
-        inst_uuid: UUID) -> Optional[InstanceData]:
+        inst_uuid: UUID, *, strict: bool = False) -> Optional[InstanceData]:
     """Get Instance static values.
 
     Args:
         inst_uuid: The UUID of the Instance.
+        strict: If True, skip the object cache (which only ever holds
+            hits, so skipping it never masks a real row) and re-raise a
+            caught gRPC or MariaDB error as DatabaseUnavailable rather
+            than reporting it as a miss. This is for callers which
+            delete things when an instance is absent, such as the
+            cleaner (phase 1b D3): today a non-retryable RpcError or
+            OperationalError reads exactly like "no such instance",
+            which is unsafe for a caller about to act on that absence.
+            Issue #3373 may later make this the default and remove the
+            keyword.
 
     Returns:
         An InstanceData object, or None if not found.
     """
-    cached: Optional[InstanceData] = _object_cache_get('instance', inst_uuid)
-    if cached is not None:
-        return cached
+    if not strict:
+        cached: Optional[InstanceData] = _object_cache_get(
+            'instance', inst_uuid)
+        if cached is not None:
+            return cached
     if _use_database_service():
-        row = _grpc_get_instance(inst_uuid)
+        row = _grpc_get_instance(inst_uuid, strict=strict)
     else:
-        row = _direct_get_instance(inst_uuid)
+        row = _direct_get_instance(inst_uuid, strict=strict)
     _object_cache_put('instance', inst_uuid, row, config.OBJECT_CACHE_TTL_IMMUTABLE)
     return row
 

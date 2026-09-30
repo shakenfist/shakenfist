@@ -811,6 +811,111 @@ class ClusterOperationFetchFailureTestCase(base.ShakenFistTestCase):
             mariadb.get_cluster_operation, str(uuid.uuid4()))
 
 
+class StrictInstanceLookupTestCase(base.ShakenFistTestCase):
+    """Phase 1b D3: before the cleaner deletes an unknown domain's disks
+    it must be able to tell a genuine miss apart from a lookup that
+    merely failed. ``get_instance(..., strict=True)`` re-raises what
+    the non-strict path -- kept for every other caller -- quietly turns
+    into None (issue 3373's first half covers the exhausted-outage
+    case already; this covers the non-retryable one)."""
+
+    INST_UUID = uuid.uuid4()
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                side_effect=FakeRpcError(grpc.StatusCode.UNKNOWN))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_grpc_strict_non_retryable_error_raises(
+            self, mock_use, mock_stub, mock_call):
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb.get_instance, self.INST_UUID, strict=True)
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                side_effect=FakeRpcError(grpc.StatusCode.UNKNOWN))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_grpc_non_strict_non_retryable_error_returns_none(
+            self, mock_use, mock_stub, mock_call):
+        # Today's behaviour, kept for every other caller.
+        self.assertIsNone(mariadb.get_instance(self.INST_UUID))
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                return_value=database_pb2.GetInstanceReply(found=False))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_grpc_strict_miss_returns_none(
+            self, mock_use, mock_stub, mock_call):
+        # A genuine miss still reads as no such instance, strict or not.
+        self.assertIsNone(
+            mariadb.get_instance(self.INST_UUID, strict=True))
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                side_effect=exceptions.DatabaseUnavailable('down'))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_grpc_exhausted_outage_raises_strict(
+            self, mock_use, mock_stub, mock_call):
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb.get_instance, self.INST_UUID, strict=True)
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                side_effect=exceptions.DatabaseUnavailable('down'))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_grpc_exhausted_outage_raises_non_strict(
+            self, mock_use, mock_stub, mock_call):
+        # DatabaseUnavailable is not a grpc.RpcError, so it always
+        # escapes the wrapper's except clause, strict or not.
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb.get_instance, self.INST_UUID)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    def test_direct_strict_operational_error_raises(
+            self, mock_use, mock_engine):
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'SELECT', {}, Exception('server has gone away'))
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb.get_instance, self.INST_UUID, strict=True)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    def test_direct_non_strict_operational_error_returns_none(
+            self, mock_use, mock_engine):
+        # Today's behaviour, kept for every other caller.
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'SELECT', {}, Exception('server has gone away'))
+        self.assertIsNone(mariadb.get_instance(self.INST_UUID))
+
+    @mock.patch('shakenfist.mariadb._grpc_get_instance')
+    @mock.patch('shakenfist.mariadb._object_cache_get')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_strict_skips_the_cache_read(
+            self, mock_use, mock_cache_get, mock_grpc_get):
+        # The object cache only ever holds hits (issue 3373's
+        # get_instance docstring), so a strict caller that is about to
+        # act on an absence must not be answered from it.
+        mock_cache_get.return_value = mock.sentinel.cached_hit
+        mock_grpc_get.return_value = None
+
+        result = mariadb.get_instance(self.INST_UUID, strict=True)
+
+        mock_cache_get.assert_not_called()
+        self.assertIsNone(result)
+
+
 class QueuesWorkItemDatabaseUnavailableTestCase(base.ShakenFistTestCase):
     """Issue 3716: a database outage during the queue worker's operation
     lookup must leave the work item claimed for the stuck-row reaper to
