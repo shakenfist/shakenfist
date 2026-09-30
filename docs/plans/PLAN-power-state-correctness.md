@@ -224,7 +224,7 @@ phases 0, 1b and 3 all rely on `create()` failing when power on fails.
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 0. Assert power state in the existing lifecycle tests | [PLAN-power-state-correctness-phase-00-assertions.md](PLAN-power-state-correctness-phase-00-assertions.md) | Complete | `250a40871` |
-| 1a. Honest libvirt domain listing | [PLAN-power-state-correctness-phase-01a-listing.md](PLAN-power-state-correctness-phase-01a-listing.md) | In progress | — |
+| 1a. Honest libvirt domain listing | [PLAN-power-state-correctness-phase-01a-listing.md](PLAN-power-state-correctness-phase-01a-listing.md) | Complete | `8aa69c5e4` |
 | 1b. The cleaner sees powered off domains | PLAN-power-state-correctness-phase-01b-inactive-domains.md | Not started | — |
 | 2. Autostart and instance restore | PLAN-power-state-correctness-phase-02-autostart-restore.md | Not started | — |
 | 3. Power operations answer truthfully | PLAN-power-state-correctness-phase-03-power-api.md | Not started | — |
@@ -274,6 +274,10 @@ honestly named already and stays on `listDomainsID()`. The survey also
 found that only the shutoff expectation fails under an honest fake,
 because a crashed domain is active in libvirt's model; see S4 and S5 in
 the phase plan.
+
+Landed as [#4372](https://github.com/shakenfist/shakenfist/pull/4372).
+The cleaner's second loop still iterates active domains, with a comment
+pointing phase 1b at `get_inactive_sf_domains()`.
 
 ### Phase 1b: the cleaner sees powered off domains
 
