@@ -33,9 +33,10 @@ counter the placement transaction maintains. The node is charged
 whichever is larger, so an instance which is placed but not yet running
 counts against the cloud for the whole time it spends fetching images.
 
-That filter is a pre-filter rather than the decision: since
-scheduler-reservations phase 3 the binding guard is the atomic `UPDATE`
-`Instance.place_instance()` makes against `scheduler_node_capacity`,
+That filter is a pre-filter rather than the decision: the binding
+guard is the atomic `UPDATE` `Instance.place_instance()` makes against
+`scheduler_node_capacity` -- introduced by
+[PLAN-scheduler-reservations](../plans/PLAN-scheduler-reservations.md) --
 whose `limit_cpus` is `floor(cpu_schedulable x CPU_OVERCOMMIT_RATIO)`
 (`_derive_cpu_memory_limits()` in `shakenfist/mariadb.py`). The two therefore test the same
 arithmetic on purpose, and for sizing they can be read as one bound.
@@ -116,10 +117,11 @@ rather than as a scheduling flake somewhere else in the suite. The
 deliberate cost is that a smaller-on-purpose topology cannot be
 deployed without editing that constant in the same change.
 
-27 is not derived on paper either. Phase 2 of the sizing plan read a
-cluster ledger of exactly 27.0 in all 154 `slim-primary` job-runs of
-its baseline window, which is what makes the arithmetic above a
-description of the system rather than a model of it.
+27 is not derived on paper either. The sizing plan's baseline window
+([PLAN-ci-cloud-sizing](../plans/PLAN-ci-cloud-sizing.md)) read a
+cluster ledger of exactly 27.0 in all 154 `slim-primary` job-runs,
+which is what makes the arithmetic above a description of the system
+rather than a model of it.
 
 ### Two things the topology files do not show
 
@@ -137,10 +139,10 @@ network or database role reserves all four threads and is clamped to
 one schedulable thread, which is how `slim-primary`'s `sf1` yields a
 ledger of 3 where its identically-sized siblings yield 6. Widening the
 nodes of a topology therefore buys more ledger than adding nodes of the
-same size does, per vCPU spent on the under-cloud, and that is why
-phase 4 reshaped `slim-tier` by widening rather than by adding a
-fourth node. It is the first thing to check against any proposed new
-topology.
+same size does, per vCPU spent on the under-cloud, and that is why the
+sizing plan reshaped `slim-tier` by widening its nodes rather than by
+adding a fourth. It is the first thing to check against any proposed
+new topology.
 
 ### Re-measuring this from scratch
 
@@ -204,9 +206,11 @@ deployed -- so it correctly never appears in either count.
 
 ### An open question: `slim-primary` reads OVERSIZED
 
-Phase 5's window read `slim-primary` below the band's lower bound in 25
-of 30 job-runs, against `slim-tier`'s 5 of 10. The topology phase 4
-deliberately left alone is the emptier of the two, the lower bound
+The window the gate was armed against
+([PLAN-ci-cloud-sizing](../plans/PLAN-ci-cloud-sizing.md)) read
+`slim-primary` below the band's lower bound in 25 of 30 job-runs,
+against `slim-tier`'s 5 of 10. The topology the sizing plan
+deliberately left unreshaped is the emptier of the two, the lower bound
 exists precisely to detect that, it has detected it, and nobody has
 acted on it.
 
@@ -214,11 +218,12 @@ This is recorded rather than answered. Asking it properly means a
 window and not a run --
 [Asking whether a cloud is oversized](#asking-whether-a-cloud-is-oversized)
 is the command -- and acting on it means shrinking a topology, which is
-a change to the cloud every functional job runs on. Phase 4 set the bar
-for that: a prediction of what the reshape would do to the band and to
-the refusal census, and a falsification criterion stated before the
-window was harvested, so the reshape could be shown to have failed. A
-shrink argued from these readings alone would have neither, and the
+a change to the cloud every functional job runs on. The `slim-tier`
+reshape set the bar for that: a prediction of what the reshape would do
+to the band and to the refusal census, and a falsification criterion
+stated before the window was harvested, so the reshape could be shown
+to have failed. A shrink argued from these readings alone would have
+neither, and the
 `MINIMUM_HYPERVISOR_LEDGER` floor means `slim-tier` cannot be shrunk at
 all without that argument being made in the same change.
 

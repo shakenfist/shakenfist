@@ -130,6 +130,19 @@ repos:
         files: ^(docs/.*\.md|AGENTS\.md|ARCHITECTURE\.md|CLAUDE\.md|README\.md)$
         pass_filenames: false
 
+      - id: check-plan-phase-references
+        name: Check documentation cites no plan phase numbers
+        description: >-
+          Documentation describes the current state of the software, not the
+          history of how it was built, so it must not cite implementation
+          plan phase numbers (the plan-phase-references consistency audit).
+          Describe the current behaviour instead, or link the master plan in
+          docs/plans/.
+        entry: python3 tools/check-plan-phase-references.py
+        language: system
+        files: ^(docs/.*\.md|AGENTS\.md|ARCHITECTURE\.md|README\.md)$
+        pass_filenames: false
+
       - id: check-plan-status
         name: Check plan statuses and index arithmetic agree
         description: >-
