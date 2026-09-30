@@ -713,6 +713,25 @@ class ReservedCapacityAdmissionTestCase(SchedulerTestCase):
             self.assertFalse(per_node['cpu_reservation_clamped'])
             self.assertFalse(per_node['memory_reservation_clamped'])
 
+    def test_summarize_resources_publishes_domains_enumerated_at(self):
+        # The node's own timestamp for the enumeration behind cpu_measured
+        # (issue 4214) is passed through untouched, and a node whose metrics
+        # predate the field reports None rather than a fabricated time.
+        self.mock_mariadb.set_node_metrics_same(self._baseline())
+        self.mock_mariadb.update_node_metrics('node3', {
+            'domains_enumerated_at': 1790581560.25})
+
+        resources = scheduler.Scheduler().summarize_resources()
+
+        self.assertEqual(
+            1790581560.25,
+            resources['per_node'][self._node_uuid('node3')][
+                'domains_enumerated_at'])
+        for n, per_node in resources['per_node'].items():
+            if n == self._node_uuid('node3'):
+                continue
+            self.assertIsNone(per_node['domains_enumerated_at'])
+
 
 class CapacityCounterTestCase(SchedulerTestCase):
     """The pre-filter reads the counters the guard will draw down (P2).
