@@ -433,11 +433,19 @@ def _netdesc_safety_checks(netdesc, namespace):
     return
 
 
-def _netdesc_allocate_address(inst, netdesc, order):
+def _netdesc_allocate_address(inst, netdesc, order, hot_plug=False):
+    # On the create path inst is the half-built instance this request is
+    # assembling, so error-deleting it is the cleanup for a refused
+    # netdesc. On the hot plug path inst existed before the request and
+    # may be running a workload, so a refused plug must leave it exactly
+    # as it found it: an address collision error-deleted the target
+    # instance (issue 4366). Each refusal below therefore cleans up only
+    # what this call itself created when hot_plug is set.
     n = sfnet.Network.from_db(netdesc['network_uuid'])
     if not n:
-        inst.enqueue_delete_due_error(
-            'missing network  during IP allocation phase')
+        if not hot_plug:
+            inst.enqueue_delete_due_error(
+                'missing network  during IP allocation phase')
         return (
             None,
             sf_api.error(404, f'network {netdesc["network_uuid"]} not found')
@@ -475,14 +483,16 @@ def _netdesc_allocate_address(inst, netdesc, order):
                 if not n.ipam.reserve(netdesc['address'], inst.unique_label(),
                                       ReservationType.INSTANCE, '',
                                       evict_halo=True):
-                    inst.enqueue_delete_due_error(
-                        'failed to reserve an IP on network %s'
-                        % netdesc['network_uuid'])
+                    if not hot_plug:
+                        inst.enqueue_delete_due_error(
+                            'failed to reserve an IP on network %s'
+                            % netdesc['network_uuid'])
                     return None, sf_api.error(
                         409, 'address %s in use' % netdesc['address'])
 
     except exceptions.CongestedNetwork as e:
-        inst.enqueue_delete_due_error('cannot allocate address: %s' % e)
+        if not hot_plug:
+            inst.enqueue_delete_due_error('cannot allocate address: %s' % e)
         return None, sf_api.error(507, str(e), suppress_traceback=True)
 
     if 'model' not in netdesc or not netdesc['model']:
@@ -509,12 +519,20 @@ def _netdesc_allocate_address(inst, netdesc, order):
         if validation.declared_boolean(netdesc.get('float')):
             err = api_util.assign_floating_ip(ni)
             if err:
-                inst.enqueue_delete_due_error(
-                    'interface float failed: %s' % err)
+                if hot_plug:
+                    # The interface exists and holds its address; deleting
+                    # it releases both without touching the instance.
+                    ni.delete()
+                else:
+                    inst.enqueue_delete_due_error(
+                        'interface float failed: %s' % err)
                 return None, err
 
     except exceptions.CongestedNetwork as e:
-        inst.enqueue_delete_due_error('cannot allocate address: %s' % e)
+        if hot_plug:
+            ni.delete()
+        else:
+            inst.enqueue_delete_due_error('cannot allocate address: %s' % e)
         return None, sf_api.error(507, str(e), suppress_traceback=True)
 
     # Include the interface uuid in the network description we
@@ -1391,7 +1409,7 @@ class InstanceInterfacesEndpoint(api_base.Resource):
             order = max(ni.order for ni in ifaces) + 1
 
         netdesc, err = _netdesc_allocate_address(
-            instance_from_db, network, order)
+            instance_from_db, network, order, hot_plug=True)
         if err:
             return err
 
