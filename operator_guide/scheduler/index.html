@@ -15873,8 +15873,9 @@ by the same statement, so it counts against the <em>next</em> placement. That
 is what makes this a spreader rather than a bound: what stops a node
 accepting work it has no room for is the <code>cpus</code>, <code>memory_mb</code> and
 <code>disk_gb</code> dimensions of the same guard, not this one.</p>
-<p>It was not always so. Until scheduler-reservations phase 4a the clause
-added the incoming placement's charge to the left-hand side while the
+<p>It was not always so. Until a fix made under
+<a href="../../plans/PLAN-scheduler-reservations/">PLAN-scheduler-reservations</a>
+the clause added the incoming placement's charge to the left-hand side while the
 budget stayed denominated per schedulable thread, and
 <code>SCHEDULER_DEMAND_PER_VCPU</code> was seeded at 2.5 -- a figure transcribed
 from a measurement of allocated vCPUs per thread rather than of load
