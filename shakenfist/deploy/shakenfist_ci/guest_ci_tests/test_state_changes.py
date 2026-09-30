@@ -303,8 +303,12 @@ class TestStateChanges(base.BaseNamespacedTestCase):
 
         # libvirt's qemu driver names the process "-name guest=<domain
         # name>,...", and libvirt.tmpl sets the domain name to "sf:<uuid>".
+        # The bracket keeps the pattern from matching itself: pkill -f reads
+        # whole command lines, and the remote shell ssh starts to run this
+        # command has the pattern in its own, so "guest=sf:<uuid>" made pkill
+        # kill that shell and ssh exit 255.
         self._node_exec(
-            node, ['pkill', '-9', '-f', 'guest=sf:%s' % inst['uuid']],
+            node, ['pkill', '-9', '-f', 'guest=s[f]:%s' % inst['uuid']],
             sudo=True)
 
         self._await_power_off(inst['uuid'], after=after)
