@@ -30,6 +30,21 @@ PAUSED_REASON_STRINGS = {
     'VIR_DOMAIN_PAUSED_API_ERROR': 'api error',
 }
 
+# https://libvirt.org/html/libvirt-libvirt-domain.html#virDomainShutoffReason
+# Looked up by constant name with a getattr() fallback because older python
+# bindings do not define all of these.
+SHUTOFF_REASON_STRINGS = {
+    'VIR_DOMAIN_SHUTOFF_UNKNOWN': 'unknown',
+    'VIR_DOMAIN_SHUTOFF_SHUTDOWN': 'shutdown',
+    'VIR_DOMAIN_SHUTOFF_DESTROYED': 'destroyed',
+    'VIR_DOMAIN_SHUTOFF_CRASHED': 'crashed',
+    'VIR_DOMAIN_SHUTOFF_MIGRATED': 'migrated',
+    'VIR_DOMAIN_SHUTOFF_SAVED': 'saved',
+    'VIR_DOMAIN_SHUTOFF_FAILED': 'failed',
+    'VIR_DOMAIN_SHUTOFF_FROM_SNAPSHOT': 'from snapshot',
+    'VIR_DOMAIN_SHUTOFF_DAEMON': 'daemon',
+}
+
 
 def get_libvirt() -> ModuleType:
     global LIBVIRT
@@ -118,6 +133,23 @@ class LibvirtConnection():
             return None
 
         for const, pretty in PAUSED_REASON_STRINGS.items():
+            if reason == getattr(self.libvirt, const, None):
+                return pretty
+        return f'unrecognised reason {reason}'
+
+    def extract_shutoff_reason(self, domain: Any) -> str | None:
+        """Return a human readable shutoff reason, or None if not shutoff.
+
+        Display only: nothing branches on this value. See phase 1b's D7
+        in docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md
+        for why an inactive domain is always recorded as "off", whatever
+        this reason says.
+        """
+        state, reason = domain.state()
+        if state != self.libvirt.VIR_DOMAIN_SHUTOFF:
+            return None
+
+        for const, pretty in SHUTOFF_REASON_STRINGS.items():
             if reason == getattr(self.libvirt, const, None):
                 return pretty
         return f'unrecognised reason {reason}'
@@ -221,6 +253,17 @@ class LibvirtConnection():
         domains are persistent, so a powered off instance is here."""
         return self._list_sf_domains(
             self.libvirt.VIR_CONNECT_LIST_DOMAINS_INACTIVE)
+
+    def get_all_domain_uuids(self) -> set[str]:
+        """Every defined domain's uuid, active or inactive.
+
+        Deliberately not filtered to "sf:" domains, unlike
+        get_active_sf_domains() and get_inactive_sf_domains() above: the
+        apparmor sweep uses this to decide which profiles are safe to
+        remove, and must not remove the profile of a foreign (non-sf:)
+        domain just because it is not one of ours.
+        """
+        return {d.UUIDString() for d in self.conn.listAllDomains(0)}
 
     def get_cpu_map(self) -> tuple[int, int, list[bool]]:
         return self.conn.getCPUMap()

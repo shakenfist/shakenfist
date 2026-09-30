@@ -37,6 +37,16 @@ class FakeLibvirtModule:
     VIR_DOMAIN_PAUSED_USER = 1
     VIR_DOMAIN_PAUSED_IOERROR = 5
 
+    VIR_DOMAIN_SHUTOFF_UNKNOWN = 0
+    VIR_DOMAIN_SHUTOFF_SHUTDOWN = 1
+    VIR_DOMAIN_SHUTOFF_DESTROYED = 2
+    VIR_DOMAIN_SHUTOFF_CRASHED = 3
+    VIR_DOMAIN_SHUTOFF_MIGRATED = 4
+    VIR_DOMAIN_SHUTOFF_SAVED = 5
+    VIR_DOMAIN_SHUTOFF_FAILED = 6
+    VIR_DOMAIN_SHUTOFF_FROM_SNAPSHOT = 7
+    VIR_DOMAIN_SHUTOFF_DAEMON = 8
+
     VIR_DOMAIN_DISK_ERROR_NONE = 0
     VIR_DOMAIN_DISK_ERROR_UNSPEC = 1
     VIR_DOMAIN_DISK_ERROR_NO_SPACE = 2
@@ -148,6 +158,80 @@ class UtilLibvirtPowerState(base.ShakenFistTestCase):
             'unrecognised reason 999',
             _connection().extract_pause_reason(domain))
 
+    def test_shutoff_reason_not_shutoff(self):
+        domain = FakeStatefulDomain(FakeLibvirtModule.VIR_DOMAIN_RUNNING)
+        self.assertIsNone(_connection().extract_shutoff_reason(domain))
+
+    def test_shutoff_reason_unknown(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_SHUTOFF,
+            reason=FakeLibvirtModule.VIR_DOMAIN_SHUTOFF_UNKNOWN)
+        self.assertEqual(
+            'unknown', _connection().extract_shutoff_reason(domain))
+
+    def test_shutoff_reason_shutdown(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_SHUTOFF,
+            reason=FakeLibvirtModule.VIR_DOMAIN_SHUTOFF_SHUTDOWN)
+        self.assertEqual(
+            'shutdown', _connection().extract_shutoff_reason(domain))
+
+    def test_shutoff_reason_destroyed(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_SHUTOFF,
+            reason=FakeLibvirtModule.VIR_DOMAIN_SHUTOFF_DESTROYED)
+        self.assertEqual(
+            'destroyed', _connection().extract_shutoff_reason(domain))
+
+    def test_shutoff_reason_crashed(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_SHUTOFF,
+            reason=FakeLibvirtModule.VIR_DOMAIN_SHUTOFF_CRASHED)
+        self.assertEqual(
+            'crashed', _connection().extract_shutoff_reason(domain))
+
+    def test_shutoff_reason_migrated(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_SHUTOFF,
+            reason=FakeLibvirtModule.VIR_DOMAIN_SHUTOFF_MIGRATED)
+        self.assertEqual(
+            'migrated', _connection().extract_shutoff_reason(domain))
+
+    def test_shutoff_reason_saved(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_SHUTOFF,
+            reason=FakeLibvirtModule.VIR_DOMAIN_SHUTOFF_SAVED)
+        self.assertEqual(
+            'saved', _connection().extract_shutoff_reason(domain))
+
+    def test_shutoff_reason_failed(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_SHUTOFF,
+            reason=FakeLibvirtModule.VIR_DOMAIN_SHUTOFF_FAILED)
+        self.assertEqual(
+            'failed', _connection().extract_shutoff_reason(domain))
+
+    def test_shutoff_reason_from_snapshot(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_SHUTOFF,
+            reason=FakeLibvirtModule.VIR_DOMAIN_SHUTOFF_FROM_SNAPSHOT)
+        self.assertEqual(
+            'from snapshot', _connection().extract_shutoff_reason(domain))
+
+    def test_shutoff_reason_daemon(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_SHUTOFF,
+            reason=FakeLibvirtModule.VIR_DOMAIN_SHUTOFF_DAEMON)
+        self.assertEqual(
+            'daemon', _connection().extract_shutoff_reason(domain))
+
+    def test_shutoff_reason_unrecognised(self):
+        domain = FakeStatefulDomain(
+            FakeLibvirtModule.VIR_DOMAIN_SHUTOFF, reason=999)
+        self.assertEqual(
+            'unrecognised reason 999',
+            _connection().extract_shutoff_reason(domain))
+
     def test_power_state_pretty_includes_pause_reason(self):
         domain = FakeStatefulDomain(
             FakeLibvirtModule.VIR_DOMAIN_PAUSED,
@@ -210,11 +294,15 @@ class UtilLibvirtActiveDomainIds(base.ShakenFistTestCase):
 
 
 class FakeNamedDomain:
-    def __init__(self, name):
+    def __init__(self, name, uuid=None):
         self._name = name
+        self._uuid = uuid
 
     def name(self):
         return self._name
+
+    def UUIDString(self):
+        return self._uuid
 
 
 class UtilLibvirtSfDomains(base.ShakenFistTestCase):
@@ -281,6 +369,19 @@ class UtilLibvirtSfDomains(base.ShakenFistTestCase):
         lc.conn.listAllDomains.return_value = []
 
         self.assertEqual([], list(lc.get_inactive_sf_domains()))
+
+    def test_get_all_domain_uuids_issues_one_call(self):
+        lc = _connection()
+        lc.conn = mock.Mock()
+        lc.conn.listAllDomains.return_value = [
+            FakeNamedDomain('sf:one', 'uuid-one'),
+            FakeNamedDomain('apache2', 'uuid-apache'),
+        ]
+
+        self.assertEqual(
+            {'uuid-one', 'uuid-apache'}, lc.get_all_domain_uuids())
+
+        lc.conn.listAllDomains.assert_called_once_with(0)
 
 
 class UtilLibvirtStatistics(base.ShakenFistTestCase):
