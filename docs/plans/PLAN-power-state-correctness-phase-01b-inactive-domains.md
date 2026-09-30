@@ -875,7 +875,18 @@ Before merging, the brief 8 inventory is the second gate.
   `strict` keyword.
 * Stray domains of instances whose delete ended in state `error` (D9).
 * Whether libvirt keeps an inactive domain's shutoff reason across a
-  libvirtd restart. Record it if step 6 or later testing shows either
-  way.
+  libvirtd restart. Step 6 confirmed the reason itself on a real
+  hypervisor: a SIGKILLed qemu reads `crashed` and a guest poweroff
+  `shutdown` (functional run
+  [36721352515](https://github.com/shakenfist/shakenfist/actions/runs/36721352515)),
+  but not its persistence.
+* The first loop's `crashed` branch, unreachable while `on_crash` is
+  `restart` (D7), has no re-entry guard. From `created-error` it would
+  write `created-error-error`, which raises and aborts the pass. Found
+  in step 4's review; give it the I/O error branch's `ERROR_STATES`
+  guard if the branch is ever made reachable.
+* `_await_image_event()` in `shakenfist_ci/base.py` matches on an
+  `operation` field that events do not have, the bug step 6 fixed in
+  `_await_instance_event()`. It has no callers.
 * `NodeLock` has no recovery when its holder dies. That is not specific
   to this phase.
