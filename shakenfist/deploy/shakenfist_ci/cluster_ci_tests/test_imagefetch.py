@@ -62,7 +62,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
     def test_disappearing_source_cache(self):
         p = subprocess.run(
             ['sudo /srv/shakenfist/venv/bin/sf-client '
-             'artifact download debian-12 '
+             'artifact download debian '
              '/var/www/html/debian-12-disappearing-cache'],
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(
@@ -111,7 +111,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
     def test_disappearing_source_instance(self):
         p = subprocess.run(
             ['sudo /srv/shakenfist/venv/bin/sf-client '
-             'artifact download debian-12 '
+             'artifact download debian '
              '/var/www/html/debian-12-disappearing-instance'],
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(
@@ -185,7 +185,7 @@ class TestHTTPFetch(base.BaseNamespacedTestCase):
 
         p = subprocess.run(
             ['sudo /srv/shakenfist/venv/bin/sf-client '
-             'artifact download debian-12 '
+             'artifact download debian '
              '/var/www/html/debian-12-vanished-server'],
             shell=True, capture_output=True, timeout=300)
         self.assertEqual(
