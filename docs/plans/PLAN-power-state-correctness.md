@@ -225,7 +225,7 @@ phases 0, 1b and 3 all rely on `create()` failing when power on fails.
 |-------|------|--------|--------|
 | 0. Assert power state in the existing lifecycle tests | [PLAN-power-state-correctness-phase-00-assertions.md](PLAN-power-state-correctness-phase-00-assertions.md) | Complete | `250a40871` |
 | 1a. Honest libvirt domain listing | [PLAN-power-state-correctness-phase-01a-listing.md](PLAN-power-state-correctness-phase-01a-listing.md) | Complete | `8aa69c5e4` |
-| 1b. The cleaner sees powered off domains | PLAN-power-state-correctness-phase-01b-inactive-domains.md | Not started | — |
+| 1b. The cleaner sees powered off domains | [PLAN-power-state-correctness-phase-01b-inactive-domains.md](PLAN-power-state-correctness-phase-01b-inactive-domains.md) | In progress | — |
 | 2. Autostart and instance restore | PLAN-power-state-correctness-phase-02-autostart-restore.md | Not started | — |
 | 3. Power operations answer truthfully | PLAN-power-state-correctness-phase-03-power-api.md | Not started | — |
 | 4. Push audit | PLAN-power-state-correctness-phase-04-push-audit.md | Not started | — |
@@ -329,6 +329,29 @@ the guest dies before replying, so issue a detached delayed power off
 (`systemd-run --on-active=3 systemctl poweroff`). Plan at high effort:
 the cleaner deletes things, and a wrong inactive-domain list is a
 deletion bug.
+
+The phase survey corrected four things in this section. The phase plan
+has the detail as S1 to S14 and D1 to D9.
+* **The lock needs a timeout first.** A node lock has no timeout today,
+  and `get_lock()` ignores `timeout` for node scope. The phase adds an
+  optional bound (S1, D1).
+* **The `delete-wait` branch re-enqueues rather than deleting in
+  place.** `inst.delete()` is not the whole delete path. It skips the
+  interface and network teardown that only the queued delete does, so
+  the branch calls `enqueue_delete()` instead (S3, D5).
+* **The apparmor sweep gets its own listing.** Pointing it at inactive
+  domains would have left it believing no running domain exists. It
+  lists every defined domain itself, foreign ones included, and is
+  skipped when listing fails (S7, D8).
+* **A database error can read as "unknown domain".** This hazard was
+  not listed. [#3373](https://github.com/shakenfist/shakenfist/issues/3373)
+  already makes a full outage abort the pass, but a non-retryable
+  lookup error still returns `None`, so both loops confirm absence with
+  a strict lookup before deleting (S5, D3).
+
+On `CRASHED`: an inactive domain is always `off`, with libvirt's
+shutoff reason recorded in the event and never branched on. The first
+loop's unreachable active `crashed` branch is left and documented (D7).
 
 ### Phase 2: autostart and instance restore
 
@@ -798,6 +821,11 @@ Related issues:
 
 - [#4307](https://github.com/shakenfist/shakenfist/issues/4307) tracks
   this plan and findings F1 to F13.
+- [#3373](https://github.com/shakenfist/shakenfist/issues/3373) (the
+  gRPC client reports "database unavailable" as "not found"). Its
+  first half makes an outage abort the cleaner's pass. Phase 1b adds a
+  strict lookup for the cleaner's deletions to cover the non-retryable
+  remainder.
 - [#2241](https://github.com/shakenfist/shakenfist/issues/2241) (unpause
   should recover from a crashed guest or a qemu monitor EOF, not just
   retry) overlaps F6 and F7; phase 3 resolves or excludes it.
