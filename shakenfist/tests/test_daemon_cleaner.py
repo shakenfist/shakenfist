@@ -1,3 +1,4 @@
+import contextlib
 import datetime
 import os
 import tempfile
@@ -22,6 +23,19 @@ from shakenfist.tests.mock_mariadb import MockMariaDB
 # Module-level storage for test instance UUIDs that the fake libvirt uses
 _test_instance_uuids = {}
 
+# Further domains a test wants the fake libvirt to list, as FakeLibvirtDomain
+# objects. Reset by CleanerBaseTestCase.setUp().
+_test_extra_domains = []
+
+# The libvirt uuid of the fake's one foreign (non-SF) domain.
+FOREIGN_DOMAIN_UUID = '0e8b8d47-5b8c-4b0e-9d0a-6f6c1b6f3b1a'
+
+
+class FakeLibvirtError(Exception):
+    """A class of its own, as libvirt's is. Were it Exception, the cleaner's
+    `except libvirtError` handlers would swallow every error, including the
+    ones these tests exist to see."""
+
 
 class FakeLibvirt:
     VIR_DOMAIN_BLOCKED = 1
@@ -43,7 +57,7 @@ class FakeLibvirt:
     VIR_DOMAIN_DISK_ERROR_UNSPEC = 1
     VIR_DOMAIN_DISK_ERROR_NO_SPACE = 2
 
-    libvirtError = Exception
+    libvirtError = FakeLibvirtError
 
     def open(self, _ignored):
         return FakeLibvirtConnection()
@@ -86,11 +100,16 @@ class FakeLibvirtConnection:
         for name_key, state, reason in domain_map.values():
             if name_key == 'apache2':
                 # Non-SF domain, return as-is
-                domains.append(FakeLibvirtDomain('apache2', state))
+                domains.append(FakeLibvirtDomain(
+                    'apache2', state, uuid=FOREIGN_DOMAIN_UUID))
                 continue
 
-            # SF domain - use the actual instance UUID
-            inst_uuid = _test_instance_uuids.get(name_key, name_key)
+            # SF domain - use the actual instance UUID. A domain exists only
+            # for the instances a test created: a real domain's name is
+            # always "sf:" and a uuid, never "sf:running".
+            if name_key not in _test_instance_uuids:
+                continue
+            inst_uuid = _test_instance_uuids[name_key]
             disk_errors = {}
             if name_key == 'ioerror':
                 disk_errors = {
@@ -101,24 +120,40 @@ class FakeLibvirtConnection:
                 f'sf:{inst_uuid}', state, reason=reason,
                 disk_errors=disk_errors))
 
+        domains.extend(_test_extra_domains)
+
+        # Flags of 0 means every defined domain, as it does for libvirt.
+        if flags == 0:
+            return domains
+
         wants_active = flags == FakeLibvirt.VIR_CONNECT_LIST_DOMAINS_ACTIVE
-        return [d for d in domains
-                if (d.state()[0] != FakeLibvirt.VIR_DOMAIN_SHUTOFF) ==
-                wants_active]
+        return [d for d in domains if d.isActive() == wants_active]
 
     def lookupByName(self, name):
-        return FakeLibvirtDomain(name, FakeLibvirt.VIR_DOMAIN_RUNNING)
+        # The domain listAllDomains() would list under that name, active or
+        # not, and libvirt's error if there is none.
+        for domain in self.listAllDomains(0):
+            if domain.name() == name:
+                return domain
+        raise FakeLibvirtError(f'Domain not found: no domain with name {name}')
 
     def close(self):
         pass
 
 
 class FakeLibvirtDomain:
-    def __init__(self, name, state, reason=1, disk_errors=None):
+    def __init__(self, name, state, reason=1, disk_errors=None, uuid=None):
         self._name = name
         self._state = state
         self._reason = reason
         self._disk_errors = disk_errors or {}
+
+        # libvirt.tmpl sets an SF domain's libvirt uuid to the instance uuid,
+        # so by default the name's suffix is the uuid. A test can pass a
+        # different one.
+        if uuid is None and name.startswith('sf:'):
+            uuid = name[len('sf:'):]
+        self._uuid = uuid
 
     def name(self):
         return self._name
@@ -130,7 +165,40 @@ class FakeLibvirtDomain:
         return self._disk_errors
 
     def UUIDString(self):
-        return 'fake_uuid'
+        return self._uuid
+
+    def isActive(self):
+        # As libvirt, and as FakeLibvirtConnection.listAllDomains() decides.
+        return self._state != FakeLibvirt.VIR_DOMAIN_SHUTOFF
+
+
+class FakeInstanceLocks:
+    """Stands in for Instance.get_lock(), which unit tests have no nodelock
+    socket for. Records each lock taken and released, and can be told to
+    time out the way a bounded NodeLock does."""
+
+    def __init__(self):
+        self.get_lock_calls = []
+        self.events = []
+        self.timeout = False
+
+    def get_lock(self, inst, **kwargs):
+        self.get_lock_calls.append((str(inst.uuid), kwargs))
+        return self._lock(str(inst.uuid))
+
+    @contextlib.contextmanager
+    def _lock(self, inst_uuid):
+        if self.timeout:
+            raise exceptions.NodeLockTimeout(
+                f'Timed out waiting for lock instance-{inst_uuid}')
+        self.events.append(('lock', inst_uuid))
+        try:
+            yield
+        finally:
+            self.events.append(('unlock', inst_uuid))
+
+    def locked_uuids(self):
+        return [u for u, _ in self.get_lock_calls]
 
 
 def fake_exists(path):
@@ -149,9 +217,14 @@ class FakeConfig(BaseSettings):
 fake_config = FakeConfig()
 
 
-class CleanerTestCase(base.ShakenFistTestCase):
+class CleanerBaseTestCase(base.ShakenFistTestCase):
     def setUp(self):
         super().setUp()
+
+        global _test_instance_uuids
+        global _test_extra_domains
+        _test_instance_uuids = {}
+        _test_extra_domains = []
 
         self.libvirt = mock.patch(
             'shakenfist.util.libvirt.get_libvirt',
@@ -167,6 +240,15 @@ class CleanerTestCase(base.ShakenFistTestCase):
         self.mock_mariadb = MockMariaDB(self, node_count=4)
         self.mock_mariadb.setup()
 
+        self.locks = FakeInstanceLocks()
+        self.get_lock = mock.patch.object(
+            instance.Instance, 'get_lock', autospec=True,
+            side_effect=self.locks.get_lock)
+        self.get_lock.start()
+        self.addCleanup(self.get_lock.stop)
+
+
+class CleanerTestCase(CleanerBaseTestCase):
     @mock.patch('os.path.exists', side_effect=fake_exists)
     @mock.patch('time.time', return_value=7)
     @mock.patch('os.listdir', return_value=[])
@@ -337,6 +419,356 @@ class CleanerCrashedInstanceTestCase(CleanerTestCase):
         db_state = self.mock_mariadb.get_mariadb_state(
             ObjectType.INSTANCE, instance_uuids['crashed'])
         self.assertEqual(instance.Instance.STATE_DELETED, db_state['value'])
+
+
+class CleanerGuardsTestCase(CleanerBaseTestCase):
+    """The guards phase 1b adds before the cleaner acts on a domain.
+
+    See D2, D3, D4 and D8 in
+    docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md.
+    Not a CleanerTestCase subclass, so these run once rather than once per
+    subclass.
+    """
+
+    def _create_instances(self, names):
+        global _test_instance_uuids
+
+        instance_uuids = {}
+        for name in names:
+            inst = self.mock_mariadb.create_instance(
+                name, set_state=instance.Instance.STATE_CREATED)
+            instance_uuids[name] = str(inst.uuid)
+        _test_instance_uuids = instance_uuids
+        return instance_uuids
+
+    def _power_state(self, inst_uuid):
+        attrs = self.mock_mariadb.get_mariadb_instance_attributes(inst_uuid)
+        if not attrs or not attrs.power_state:
+            return None
+        return attrs.power_state.get('power_state')
+
+    def _unknown_running_domain(self):
+        """A running SF domain with no instance in the database."""
+        global _test_instance_uuids
+
+        unknown_uuid = str(uuid.uuid4())
+        _test_instance_uuids = {'running': unknown_uuid}
+        return unknown_uuid
+
+    @staticmethod
+    def _virsh_commands(mock_execute, inst_uuid):
+        return [c[0][0] for c in mock_execute.call_args_list
+                if inst_uuid in c[0][0]]
+
+    def test_sf_instance_uuid(self):
+        u = str(uuid.uuid4())
+        self.assertEqual(u, cleaner_st._sf_instance_uuid(
+            FakeLibvirtDomain(f'sf:{u}', FakeLibvirt.VIR_DOMAIN_RUNNING)))
+
+        # The name disagrees with the domain's uuid.
+        self.assertIsNone(cleaner_st._sf_instance_uuid(
+            FakeLibvirtDomain(f'sf:{u}', FakeLibvirt.VIR_DOMAIN_RUNNING,
+                              uuid=str(uuid.uuid4()))))
+
+        # An empty suffix, even one the domain's uuid agrees with.
+        self.assertIsNone(cleaner_st._sf_instance_uuid(
+            FakeLibvirtDomain('sf:', FakeLibvirt.VIR_DOMAIN_RUNNING, uuid='')))
+
+        # Not one of ours.
+        self.assertIsNone(cleaner_st._sf_instance_uuid(
+            FakeLibvirtDomain('apache2', FakeLibvirt.VIR_DOMAIN_RUNNING,
+                              uuid=FOREIGN_DOMAIN_UUID)))
+
+    @mock.patch(
+        'shakenfist.daemons.cleaner.scheduled_tasks._delete_instance_files')
+    @mock.patch(
+        'shakenfist.daemons.cleaner.scheduled_tasks.util_concurrency.execute')
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_mismatched_uuid_domain_is_ignored(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists,
+            mock_execute, mock_delete_files):
+        """A domain whose name disagrees with its uuid is neither looked up
+        nor deleted (D4). Neither uuid has an instance, so without the
+        guard the unknown domain branch would destroy it."""
+        name_uuid = str(uuid.uuid4())
+        domain_uuid = str(uuid.uuid4())
+        _test_extra_domains.append(FakeLibvirtDomain(
+            f'sf:{name_uuid}', FakeLibvirt.VIR_DOMAIN_RUNNING,
+            uuid=domain_uuid))
+
+        with mock.patch.object(
+                instance.Instance, 'from_db',
+                wraps=instance.Instance.from_db) as mock_from_db:
+            cleaner_st.update_power_states()
+
+        looked_up = [str(c[0][0]) for c in mock_from_db.call_args_list]
+        self.assertNotIn(name_uuid, looked_up)
+        self.assertNotIn(domain_uuid, looked_up)
+        self.assertEqual([], mock_execute.call_args_list)
+        self.assertEqual([], mock_delete_files.call_args_list)
+
+    @mock.patch('shakenfist.daemons.cleaner.scheduled_tasks.shutil.rmtree')
+    @mock.patch(
+        'shakenfist.daemons.cleaner.scheduled_tasks._delete_instance_files')
+    @mock.patch(
+        'shakenfist.daemons.cleaner.scheduled_tasks.util_concurrency.execute')
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_empty_name_domain_is_ignored(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists,
+            mock_execute, mock_delete_files, mock_rmtree):
+        """A domain named "sf:" would have the cleaner remove
+        STORAGE_PATH/instances/ itself (S6). The fake's uuid for it is the
+        empty suffix, so only the empty name check stops it."""
+        _test_extra_domains.append(FakeLibvirtDomain(
+            'sf:', FakeLibvirt.VIR_DOMAIN_RUNNING))
+
+        cleaner_st.update_power_states()
+
+        self.assertEqual([], mock_execute.call_args_list)
+        self.assertEqual([], mock_delete_files.call_args_list)
+        self.assertEqual([], mock_rmtree.call_args_list)
+
+    @mock.patch(
+        'shakenfist.daemons.cleaner.scheduled_tasks._delete_with_kill')
+    @mock.patch(
+        'shakenfist.daemons.cleaner.scheduled_tasks.util_concurrency.execute')
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_unknown_domain_not_destroyed_when_database_errors(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists,
+            mock_execute, mock_kill):
+        """A non-retryable database error reads as a miss to from_db()
+        (#3373). The strict lookup raises instead, and the running domain
+        and its disks survive (D3)."""
+        unknown_uuid = self._unknown_running_domain()
+        mock_get_instance = self.mock_mariadb._mariadb_get_instance
+
+        def get_instance(inst_uuid, *, strict=False):
+            if strict:
+                raise exceptions.DatabaseUnavailable('UNKNOWN from sf-database')
+            return mock_get_instance(inst_uuid)
+
+        with mock.patch('shakenfist.mariadb.get_instance',
+                        side_effect=get_instance) as mock_lookup:
+            cleaner_st.update_power_states()
+
+        # The strict lookup was asked, and said no.
+        self.assertIn(
+            mock.call(uuid.UUID(unknown_uuid), strict=True),
+            mock_lookup.call_args_list)
+        self.assertEqual(
+            [], self._virsh_commands(mock_execute, unknown_uuid))
+        self.assertFalse(mock_kill.called)
+
+    @mock.patch(
+        'shakenfist.daemons.cleaner.scheduled_tasks._delete_with_kill')
+    @mock.patch(
+        'shakenfist.daemons.cleaner.scheduled_tasks.util_concurrency.execute')
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_unknown_domain_not_destroyed_when_strict_lookup_finds_it(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists,
+            mock_execute, mock_kill):
+        """If the strict lookup finds the instance the first lookup missed,
+        the first lookup was the error, and nothing is deleted (D3)."""
+        inst_uuid = self._create_instances(['running'])['running']
+
+        with mock.patch.object(instance.Instance, 'from_db',
+                               return_value=None):
+            cleaner_st.update_power_states()
+
+        self.assertEqual([], self._virsh_commands(mock_execute, inst_uuid))
+        self.assertFalse(mock_kill.called)
+
+    @mock.patch(
+        'shakenfist.daemons.cleaner.scheduled_tasks._delete_with_kill')
+    @mock.patch(
+        'shakenfist.daemons.cleaner.scheduled_tasks._delete_instance_files')
+    @mock.patch(
+        'shakenfist.daemons.cleaner.scheduled_tasks.util_concurrency.execute')
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_unknown_domain_destroyed_on_strict_miss(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists,
+            mock_execute, mock_delete_files, mock_kill):
+        """A running SF domain the database really has never heard of is
+        still destroyed, as it is today."""
+        unknown_uuid = self._unknown_running_domain()
+
+        def execute(cmd, *args, **kwargs):
+            # As libvirt would, forget the domain once it is undefined, so
+            # the second loop does not find it again.
+            global _test_instance_uuids
+            if cmd.startswith('virsh undefine'):
+                _test_instance_uuids = {}
+            return '', ''
+
+        mock_execute.side_effect = execute
+        cleaner_st.update_power_states()
+
+        self.assertEqual(
+            [f'virsh destroy "sf:{unknown_uuid}"',
+             f'virsh undefine --nvram "sf:{unknown_uuid}"'],
+            self._virsh_commands(mock_execute, unknown_uuid))
+        mock_delete_files.assert_called_once_with(unknown_uuid)
+
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_power_state_written_under_lock(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists):
+        """A changed power state is written holding the instance's node
+        lock, with a bounded wait (D2)."""
+        inst_uuid = self._create_instances(['running'])['running']
+
+        written = []
+
+        def update_power_state(inst, state):
+            written.append((state, list(self.locks.events)))
+            return True
+
+        with mock.patch.object(instance.Instance, 'update_power_state',
+                               autospec=True,
+                               side_effect=update_power_state):
+            cleaner_st.update_power_states()
+
+        self.assertEqual(
+            [(inst_uuid, {'op': 'Cleaner power state update',
+                          'global_scope': False, 'node_timeout': 2})],
+            self.locks.get_lock_calls)
+        self.assertEqual([('on', [('lock', inst_uuid)])], written)
+        self.assertEqual(
+            [('lock', inst_uuid), ('unlock', inst_uuid)], self.locks.events)
+
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_lock_timeout_leaves_power_state_unwritten(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists):
+        """F13: a busy instance is skipped for this pass, not written
+        without its lock."""
+        inst_uuids = self._create_instances(['running', 'paused'])
+        before = {u: self._power_state(u) for u in inst_uuids.values()}
+        self.locks.timeout = True
+
+        cleaner_st.update_power_states()
+
+        self.assertEqual(
+            sorted(inst_uuids.values()), sorted(self.locks.locked_uuids()))
+        for inst_uuid in inst_uuids.values():
+            self.assertNotIn(self._power_state(inst_uuid), ['on', 'paused'])
+            self.assertEqual(before[inst_uuid], self._power_state(inst_uuid))
+
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_stale_reading_not_written(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists):
+        """F13: a domain listed as paused, but powered off by the time the
+        cleaner holds the lock, is not recorded as paused. The power off
+        held the lock, so the reading from the listing is stale."""
+        inst_uuid = self._create_instances(['paused'])['paused']
+        inst = instance.Instance.from_db(inst_uuid)
+        inst.update_power_state('on')
+
+        powered_off = FakeLibvirtDomain(
+            f'sf:{inst_uuid}', FakeLibvirt.VIR_DOMAIN_SHUTOFF)
+        with mock.patch.object(FakeLibvirtConnection, 'lookupByName',
+                               return_value=powered_off) as mock_lookup:
+            cleaner_st.update_power_states()
+
+        mock_lookup.assert_called_once_with(f'sf:{inst_uuid}')
+        self.assertEqual([inst_uuid], self.locks.locked_uuids())
+        self.assertEqual('on', self._power_state(inst_uuid))
+
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_agreeing_power_state_takes_no_lock(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists):
+        """When the database already agrees with libvirt there is nothing
+        to write, so no lock is taken. S14's database load claim rests on
+        this."""
+        inst_uuids = self._create_instances(['running', 'paused', 'ioerror'])
+        for name, state in [('running', 'on'), ('paused', 'paused'),
+                            ('ioerror', 'paused')]:
+            instance.Instance.from_db(inst_uuids[name]).update_power_state(
+                state)
+        # An I/O error paused instance already marked errored has nothing
+        # left to write either.
+        instance.Instance.from_db(inst_uuids['ioerror']).state = \
+            instance.Instance.STATE_CREATED_ERROR
+
+        with mock.patch.object(
+                instance.Instance, 'update_power_state') as mock_update:
+            cleaner_st.update_power_states()
+
+        self.assertEqual([], self.locks.get_lock_calls)
+        self.assertFalse(mock_update.called)
+
+    def _run_sweep(self, profiles, instance_dirs=()):
+        """Run a pass over apparmor profiles old enough to be swept, and
+        return the paths it removed."""
+        profile_dir = '/etc/apparmor.d/libvirt'
+        existing = {profile_dir}
+        for u in instance_dirs:
+            existing.add(os.path.join(
+                cleaner_st.config.STORAGE_PATH, 'instances', u))
+
+        with mock.patch('os.path.exists', side_effect=existing.__contains__), \
+                mock.patch('os.listdir', return_value=profiles), \
+                mock.patch('os.stat', return_value=mock.Mock(st_mtime=0)), \
+                mock.patch('os.path.isdir', return_value=False), \
+                mock.patch('time.time', return_value=10 ** 9), \
+                mock.patch('os.unlink') as mock_unlink, \
+                mock.patch('shutil.rmtree') as mock_rmtree:
+            cleaner_st.update_power_states()
+
+        self.assertFalse(mock_rmtree.called)
+        return [c[0][0] for c in mock_unlink.call_args_list]
+
+    def test_sweep_keeps_foreign_domain_profile(self):
+        """The apparmor sweep lists every defined domain, including ones
+        which are not ours, and keeps their profiles (D8)."""
+        undefined_uuid = str(uuid.uuid4())
+        removed = self._run_sweep([
+            f'libvirt-{FOREIGN_DOMAIN_UUID}',
+            f'libvirt-{FOREIGN_DOMAIN_UUID}.files',
+            f'libvirt-{undefined_uuid}'])
+
+        # The profile of a domain which is not defined at all is still
+        # swept, which shows the sweep ran.
+        self.assertEqual(
+            [f'/etc/apparmor.d/libvirt/libvirt-{undefined_uuid}'], removed)
+
+    def test_sweep_skipped_when_listing_fails(self):
+        """If listing every domain fails, the sweep deletes nothing, rather
+        than treating every old profile as an undefined domain's (S7)."""
+        undefined_uuid = str(uuid.uuid4())
+        with mock.patch(
+                'shakenfist.util.libvirt.LibvirtConnection.get_all_domain_uuids',
+                side_effect=FakeLibvirtError('listing failed')):
+            removed = self._run_sweep([
+                f'libvirt-{FOREIGN_DOMAIN_UUID}',
+                f'libvirt-{undefined_uuid}'])
+
+        self.assertEqual([], removed)
 
 
 class MaintainBlobsSentinelTestCase(base.ShakenFistTestCase):
