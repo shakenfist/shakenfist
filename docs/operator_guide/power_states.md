@@ -8,7 +8,7 @@ The following power states are implemented:
 * **on**: the instance is running
 * **off**: the instance is not running
 * **paused**: the instance is paused, either by an operator request or by the hypervisor because a disk I/O error occurred (see below)
-* **crashed**: the instance is crashed according to the hypervisor. Instances in this power state will also be in an instance state of "error".
+* **crashed**: the hypervisor reports the domain as crashed while it is still active. Shaken Fist's domain configuration prevents this in practice (see below), so it is not seen.
 
 There are additionally a set of "transition states" which are used to indicate that you have requested a change of state that might not yet have completed. These are:
 
@@ -17,6 +17,37 @@ There are additionally a set of "transition states" which are used to indicate t
 * transition-to-paused
 
 We're hoping to not have to implement a transition-to-crashed state, but you never know.
+
+Detecting power changes made outside the API
+---------------------------------------------
+
+Not every power off goes through the API: a guest can power itself off from inside, or the qemu process backing it can die on its own. Shaken Fist's cleaner notices either of these within one or two of its passes, each about a minute apart (passes are deferred while the cluster is not stable). When it does, it records the instance's power state as `off`, sets the agent state to "not ready (instance powered off)", and adds a "detected poweroff" audit event, whose `extra` carries `reason` (libvirt's shutoff reason for the domain) and `previous_power_state` (the power state recorded just before).
+
+The instance's own state does not change -- it is still `created`. A power on through the API recovers it normally.
+
+The reason strings, and what each means:
+
+* **unknown**: libvirt could not determine why the domain stopped
+* **shutdown**: the guest shut itself down, for example a guest-initiated poweroff
+* **destroyed**: the domain was destroyed, for example by the power off API. The cleaner does not normally emit a "detected poweroff" event for this case, because the API already recorded the instance as `off`
+* **crashed**: the qemu process died unexpectedly, for example killed by the OOM killer or by a signal. See below: this is reported as power state `off`, not as the `crashed` power state
+* **migrated**: the domain stopped here because it migrated elsewhere
+* **saved**: the domain was saved (suspended to disk)
+* **failed**: the domain failed to start
+* **from snapshot**: the domain was started from a snapshot that left it shut off
+* **daemon**: libvirtd shut the domain down
+
+Crashed is not seen in practice
+--------------------------------
+
+The `crashed` power state above is written only for a domain libvirt reports as crashed while it is still running, and Shaken Fist's domain configuration prevents that: `on_crash` is `restart` in the domain template, and there is no panic device configured. So in practice this power state is not seen.
+
+A qemu process which dies is instead recorded as power state `off`, with reason `crashed` (see above). It is not terminal: a power on through the API recovers it.
+
+Instance files missing
+-----------------------
+
+If an instance's files are missing from its hypervisor while its domain is powered off, the cleaner moves it to an error state once, with error message "instance files missing".
 
 Disk I/O errors
 ---------------
