@@ -440,6 +440,15 @@ outcome clauses under both candidate denominators, and what the second
 reading owes before it is taken are in
 [phase 5's Outcome](PLAN-transient-capacity-refusals-phase-05-queue-decision.md).
 
+One thing the second reading owed has since been paid. The rule is
+amended, as **D43**, written before any of the second window was read:
+now that #4337 makes zero expressible, an `empty` trace is an
+observation of zero waits and enters the denominator, while `absent`
+and `unparseable` stay unknown. That is what unpins the two clauses the
+first reading found structurally stuck at 100%, and it gives the rule
+back a path to Abandon that it did not have. Nothing else in the rule
+moves.
+
 What the eight readable waits say, held loosely because they are 7.7%
 of the window: waits from 0.036 s to 270.858 s against the suite's
 420 s deadline, none of which reached it; all eight pinned creates,
@@ -872,7 +881,9 @@ window's instrumented bundles carry no capacity-wait trace, because the
 trace cannot express "nothing was refused"
 ([#4337](https://github.com/shakenfist/shakenfist/issues/4337)). The
 phase therefore extends its window once, remains `In progress`, and has
-decided nothing. See open question 8 above and that plan's Outcome.
+decided nothing. The amendment that extension owed is now written as
+D43, before the second window was read. See open question 8 above and
+that plan's Outcome.
 
 ### Phase 6 -- Documentation and close-out
 
