@@ -15354,6 +15354,14 @@ readable units. The full reading, the arithmetic for all three
 outcome clauses under both candidate denominators, and what the second
 reading owes before it is taken are in
 <a href="../PLAN-transient-capacity-refusals-phase-05-queue-decision/">phase 5's Outcome</a>.</p>
+<p>One thing the second reading owed has since been paid. The rule is
+amended, as <strong>D43</strong>, written before any of the second window was read:
+now that #4337 makes zero expressible, an <code>empty</code> trace is an
+observation of zero waits and enters the denominator, while <code>absent</code>
+and <code>unparseable</code> stay unknown. That is what unpins the two clauses the
+first reading found structurally stuck at 100%, and it gives the rule
+back a path to Abandon that it did not have. Nothing else in the rule
+moves.</p>
 <p>What the eight readable waits say, held loosely because they are 7.7%
 of the window: waits from 0.036 s to 270.858 s against the suite's
 420 s deadline, none of which reached it; all eight pinned creates,
@@ -15789,7 +15797,9 @@ window's instrumented bundles carry no capacity-wait trace, because the
 trace cannot express "nothing was refused"
 (<a href="https://github.com/shakenfist/shakenfist/issues/4337">#4337</a>). The
 phase therefore extends its window once, remains <code>In progress</code>, and has
-decided nothing. See open question 8 above and that plan's Outcome.</p>
+decided nothing. The amendment that extension owed is now written as
+D43, before the second window was read. See open question 8 above and
+that plan's Outcome.</p>
 <h3 id="phase-6-documentation-and-close-out">Phase 6 -- Documentation and close-out<a class="headerlink" href="#phase-6-documentation-and-close-out" title="Permanent link">&para;</a></h3>
 <p>Document the transient-refusal contract in
 <code>docs/operator_guide/scheduler.md</code> and the API reference, the suite

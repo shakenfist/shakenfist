@@ -16124,6 +16124,12 @@ and does not answer it:</p>
 <p>different answers on the second reading. Settle it, in writing,
 <em>before</em> the second window's data is looked at.</p>
 </blockquote>
+<p><strong>Answered by D43</strong>, under <em>Decisions taken after the first reading</em>
+at the end of this plan, written 2026-09-30 before any second-window
+data was read. The answer also corrects the question: post-#4337 it is
+<code>empty</code>, not <code>absent</code>, that carries "nothing was refused", and the two
+states now mean different things. <code>empty</code> is admitted to the
+denominator as a real zero; <code>absent</code> stays unknown.</p>
 <h3 id="the-fairness-input-d37-requires-it-whatever-the-outcome">The fairness input (D37 requires it whatever the outcome)<a class="headerlink" href="#the-fairness-input-d37-requires-it-whatever-the-outcome" title="Permanent link">&para;</a></h3>
 <p>All 8 readable waits were <strong>pinned</strong> creates -- <code>pinned_to</code> set from
 the test's <code>force_placement</code>. <strong>Zero unpinned.</strong> The single wait longer
@@ -16328,8 +16334,11 @@ worse than an item plainly marked unmet.</p>
 ends at 5e. This is what the extension owes, so that the second reading
 is not a rerun of the first.</p>
 <ol>
-<li><strong>Settle the <code>absent</code> question in writing first</strong>, per the open
-   question above. Before the data.</li>
+<li><strong>The <code>absent</code> question is settled</strong> -- D43, written 2026-09-30
+   before any second-window data was read. <code>empty</code> is a real zero and
+   enters the denominator; <code>absent</code> and <code>unparseable</code> stay unknown.
+   Nothing further is owed here; it is listed because the ordering
+   (rule first, data second) is the point.</li>
 <li><strong>#4337 has landed</strong> -- <code>62bb1ddeb</code>, merged 2026-09-27T19:10:31Z,
    which adds <code>ensure_capacity_wait_trace()</code> and calls it from
    <code>BaseTestCase.setUp()</code>. It opens the file <code>'a'</code>, so it creates
@@ -16343,15 +16352,14 @@ is not a rerun of the first.</p>
    on the old instrument would spend it for nothing.</li>
 <li><strong>Count qualifying runs, not enumerated runs</strong>, against D36
    condition 2. See <em>Gate thinness</em>.</li>
-<li><strong>Reconsider A2 and B3.</strong> They are structurally pinned at 100%
-   under the instrument this window was read with, and #4337 landing
-   does not by itself unpin them: D37 discards <code>empty</code> alongside
-   <code>absent</code>, so a zero-wait run that now writes an empty file is still
-   thrown out of the denominator. They stay pinned until <code>empty</code> is
-   admitted to it. Reconsidering them is an
-   amendment to a pre-registered rule and must therefore happen before
-   the second reading, alongside (1), and be recorded as a new decision
-   rather than as a reinterpretation of D37.</li>
+<li><strong>A2 and B3 are unpinned, by D43 rather than by #4337.</strong> They were
+   structurally pinned at 100% under the instrument this window was
+   read with, and #4337 landing did not by itself unpin them: D37
+   discards <code>empty</code> alongside <code>absent</code>, so a zero-wait run that now
+   writes an empty file would still have been thrown out of the
+   denominator. D43 admits <code>empty</code> to it, which is what unpins them.
+   Report A2 and B3 over a denominator of <code>read</code> + <code>empty</code>, and show
+   the census that denominator was drawn from.</li>
 </ol>
 <h3 id="what-phase-6-inherits">What phase 6 inherits<a class="headerlink" href="#what-phase-6-inherits" title="Permanent link">&para;</a></h3>
 <ul>
@@ -16368,6 +16376,101 @@ is not a rerun of the first.</p>
   neither: it is a candidate for phase 6's sweep or for the issue-fix
   workflow, but it is not this phase's work.</li>
 </ul>
+<h2 id="decisions-taken-after-the-first-reading">Decisions taken after the first reading<a class="headerlink" href="#decisions-taken-after-the-first-reading" title="Permanent link">&para;</a></h2>
+<p>The Decisions above were all fixed before the first window was read.
+This section is not, and says so in its own heading so that no later
+reader has to work out which side of the data a decision falls on.</p>
+<h3 id="d43-empty-is-a-real-zero-absent-and-unparseable-stay-unknown">D43 -- <code>empty</code> is a real zero; <code>absent</code> and <code>unparseable</code> stay unknown<a class="headerlink" href="#d43-empty-is-a-real-zero-absent-and-unparseable-stay-unknown" title="Permanent link">&para;</a></h3>
+<p><strong>Written 2026-09-30, before any second-window trace data was read.</strong>
+This amends a pre-registered rule, which is worth doing carefully or
+not at all, so the record of what was and was not known when it was
+written comes first.</p>
+<p><strong>What had been looked at when this was written.</strong> The gate
+conditions, and nothing else. That <code>62bb1ddeb</code> is on <code>develop</code>; that
+<code>ensure_capacity_wait_trace()</code> exists at
+<code>shakenfist/deploy/shakenfist_ci/base.py:180</code>, opens the file <code>'a'</code>
+and is called from <code>BaseTestCase.setUp()</code> at <code>:214</code>; and a count of
+<code>merge_group</code> runs of <code>Functional tests</code> whose base contains that
+commit -- 26 enumerated, of which 18 ran a topology, against D36
+condition 2's threshold of 20. No capacity-wait trace from any of
+those runs has been opened, no bundle from the second window has been
+downloaded, and no wait figure from the second window appears anywhere
+in this plan. The first window's data is of course already read and
+written up above, which is precisely why this paragraph is needed.</p>
+<p><strong>The question</strong>, as the Outcome's blockquote leaves it: is a run that
+records no wait an observation, or an absence? D37 answers absence for
+all three of its silent states at once -- "A run whose trace is
+absent, empty or unparseable is recorded as <strong>unknown</strong> and excluded
+from both numerator and denominator". #4337 pulls those three states
+apart, and this amendment follows the split rather than the sentence.</p>
+<p><strong>The rule, from the second window onward:</strong></p>
+<ul>
+<li><strong><code>empty</code> is an observation of zero waits.</strong> It enters both
+  numerator and denominator as a qualifying run with a longest single
+  wait of 0 s which recorded no wait. This applies only to units whose
+  run base contains <code>62bb1ddeb</code>. Before that commit an empty file had
+  no defined meaning, and in fact no unit produced one -- the first
+  window's census is 96 <code>absent</code>, 8 <code>read</code>, 0 <code>empty</code>, 0
+  <code>unparseable</code>.</li>
+<li><strong><code>absent</code> remains unknown.</strong> After #4337 an absent file no longer
+  means "nothing was refused". It means no test ever reached <code>setUp()</code>
+  -- a cluster that died before testing -- or a component ref
+  predating the wrapper. Neither is a quiet cluster, and reading
+  either as a zero would be the same error D37's closing paragraph
+  warns against, made in the opposite direction.</li>
+<li><strong><code>unparseable</code> remains unknown</strong>, for the reason it always was: a
+  file that cannot be read says nothing about what it contains.</li>
+<li><strong>A qualifying unit is one whose trace file is present</strong>, empty or
+  not. D37's "a topology that collected a trace" is read that way, and
+  an empty file is a trace that was collected.</li>
+<li><strong>The first window is not re-scored.</strong> Its 104 units were collected
+  under the old instrument and its reading stands as written above.
+  The second reading reads the second window, not both.</li>
+</ul>
+<p><strong>Everything else in D37 is unchanged</strong>: the 420 s denominator, the
+longest-single-wait statistic, the 25% readability ceiling, the three
+outcome clauses exactly as worded, the single bounded extension, and
+the rule that a still-unreadable window is a finding against phase 2's
+plumbing rather than an Abandon.</p>
+<p><strong>What this unpins.</strong> The three objections recorded above are one
+defect wearing three faces, and admitting <code>empty</code> answers all three at
+once. A zero-wait run now lands in the denominator, so A2 ("fewer than
+25% of qualifying runs record any wait") and B3 ("more than 50%") stop
+being pinned at 100%; and a quiet cluster stops being
+indistinguishable from a broken one at the readability gate. D37
+regains a path to Abandon, which it did not have.</p>
+<p><strong>The objection a reviewer should make</strong>, and should weigh rather than
+accept: this amendment makes Abandon reachable, D38 argues the burden
+of proof sits on building rather than abandoning, and so it moves the
+rule toward the outcome the plan already leans toward. That is the
+exact shape of a post-hoc amendment. Three things answer it:</p>
+<ol>
+<li><strong>A rule with an unreachable branch is not a rule.</strong> D37 as written
+   could return only Build or unreadable. That is a pre-registration
+   of a foregone conclusion rather than of a decision, and repairing
+   it is a different act from tuning it.</li>
+<li><strong>It does not only help Abandon.</strong> B3 becomes satisfiable in the
+   Build direction too. Under D37 it fired on every readable window
+   whatever that window contained, which told a reader nothing;
+   admitting <code>empty</code> makes "more than half the qualifying runs waited"
+   a claim about the cloud. The clause becomes informative in both
+   directions, and it is the clause most likely to select Build.</li>
+<li><strong>It is written against no data.</strong> What had been looked at is
+   recorded above, and it is a run count and two source line numbers.
+   The amendment cannot have been fitted to a result nobody has seen.</li>
+</ol>
+<p><strong>What would falsify its premise.</strong> If the second window's units come
+back predominantly <code>absent</code> rather than <code>empty</code>, then
+<code>ensure_capacity_wait_trace()</code> is not reaching the bundles, this
+amendment has changed nothing, and the window is unreadable again --
+which is D37's still-unreadable case and resolves as D37 says, to a
+finding against phase 2's plumbing. The second reading must therefore
+report the <code>read</code>/<code>empty</code>/<code>absent</code>/<code>unparseable</code> census <em>before</em>
+applying any outcome clause, so that this is visible rather than
+inferred after the fact.</p>
+<p><strong>Check.</strong> The second reading honours this decision if its census
+table carries a non-zero <code>empty</code> row and its A2 and B3 arithmetic use
+a denominator equal to <code>read</code> + <code>empty</code>.</p>
 
 
 
