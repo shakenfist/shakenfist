@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-09-30T12:11:40.248254+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-10-01T12:44:43.444137+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -858,7 +858,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 | private-ci | non-compliant | shakenfist/private-ci#64 |
 | ryll | compliant | - |
 | sfui | compliant | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#4386 |
+| shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#8 |
 | visual-digest-rust | compliant | - |
 
@@ -867,8 +867,7 @@ Details for non-compliant projects:
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121
 - **client-python-k3s** (Status): 4 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/library-api.md:100, docs/library-api.md:126, docs/library-api.md:169, docs/library-api.md:260
 - **instar** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/development.md:1017
-- **private-ci** (Status): 15 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/dashboard-freshness.md:77, docs/dashboard-freshness.md:212, docs/dashboard-freshness.md:368, docs/gerrit-reviews.md:17, docs/gerrit-reviews.md:78, docs/gerrit-reviews.md:80, docs/gerrit-reviews.md:85, docs/gerrit-reviews.md:321, docs/gerrit-reviews.md:488 (+5 more)
-- **shakenfist** (Status): 6 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/developer_guide/ci_cloud_sizing.md:37, docs/developer_guide/ci_cloud_sizing.md:119, docs/developer_guide/ci_cloud_sizing.md:141, docs/developer_guide/ci_cloud_sizing.md:207, docs/developer_guide/ci_cloud_sizing.md:208, docs/developer_guide/ci_cloud_sizing.md:217
+- **private-ci** (Status): 17 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/dashboard-freshness.md:84, docs/dashboard-freshness.md:225, docs/dashboard-freshness.md:256, docs/dashboard-freshness.md:283, docs/dashboard-freshness.md:435, docs/gerrit-reviews.md:17, docs/gerrit-reviews.md:78, docs/gerrit-reviews.md:80, docs/gerrit-reviews.md:85 (+7 more)
 - **uncalibrated-sextant** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137, ARCHITECTURE.md:236 (+12 more)
 
 ## plan-source-references
@@ -895,7 +894,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 | private-ci | compliant | - |
 | ryll | compliant | - |
 | sfui | N/A | - |
-| shakenfist | compliant | - |
+| shakenfist | non-compliant | shakenfist/shakenfist#4397 |
 | uncalibrated-sextant | compliant | - |
 | visual-digest-rust | N/A | - |
 
@@ -903,6 +902,7 @@ Details for non-compliant projects:
 
 - **client-python** (Status): 2 of 4 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist_client/apiclient.py:185 -> docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md, shakenfist_client/tests/test_client_apiclient.py:2320 -> docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md
 - **instar** (Status): 2 of 269 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): tools/ci/test-check-doc-phrases.sh:43 -> PLAN-differencingflow.md, tools/ci/test-check-doc-phrases.sh:142 -> /docs/plans/PLAN-example.md
+- **shakenfist** (Status): 2 of 400 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist/tests/test_plan_phase_references.py:86 -> docs/plans/PLAN-thing.md, shakenfist/tests/test_plan_phase_references.py:88 -> docs/other/plans/PLAN-deep.md
 
 ## plan-template
 
@@ -1251,9 +1251,9 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **actions** (Status): 130 of 135 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 5 need review (threshold 5)
-- **development** (Status): 175 of 203 in-scope files reviewed at HEAD; 28 need review (threshold 5)
-- **kerbside** (Status): 129 of 250 in-scope files reviewed at HEAD (4 imported from shakenfist/development); 121 need review (threshold 5)
+- **actions** (Status): 130 of 135 in-scope files reviewed at HEAD (6 imported from shakenfist/development); 5 need review (threshold 5)
+- **development** (Status): 197 of 203 in-scope files reviewed at HEAD; 6 need review (threshold 5)
+- **kerbside** (Status): 135 of 252 in-scope files reviewed at HEAD (10 imported from shakenfist/development); 117 need review (threshold 5)
 - **kerbside-client** (Status): 3 of 15 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 12 need review (threshold 5)
 - **sfui** (Status): 4 of 52 in-scope files reviewed at HEAD (4 imported from shakenfist/development); 48 need review (threshold 5)
 
@@ -1343,12 +1343,11 @@ Criterion: [scheduled-workflow-health.md](/components/development/audits/schedul
 | sfui | compliant | - |
 | shakenfist | non-compliant | shakenfist/shakenfist#4369 |
 | uncalibrated-sextant | compliant | - |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#28 |
+| visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
 - **shakenfist** (Status): 1 workflow(s) that fire unattended have failed on develop at least 3 times and never once succeeded, so whatever they are meant to do has never happened. The usual cause is an installation that was not finished -- a missing secret, or an organisation secret not granted to this repository -- and the reason is in the log of the linked run
-- **visual-digest-rust** (Status): 1 workflow(s) that fire unattended have failed on develop at least 3 times and never once succeeded, so whatever they are meant to do has never happened. The usual cause is an installation that was not finished -- a missing secret, or an organisation secret not granted to this repository -- and the reason is in the log of the linked run
 
 ## scope-coverage
 
