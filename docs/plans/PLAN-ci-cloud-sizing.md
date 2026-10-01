@@ -1705,15 +1705,18 @@ which is what `tools/check-plan-status.py` enforces.
   not done in phase 2, which had already re-measured once and must
   not become a rolling measurement window. **Phase 3 owns it, as its
   D29.**
-- **Instrument the two cluster jobs the probe cannot see.** Phase
+- **Instrument the cluster job the probe cannot see.** Phase
   2's D17 found that only four of the six clouds a merge run builds
-  carry the phase 1 probe, for two different reasons. `Ansible
-  modules` runs through the reusable `smoke-cluster` workflow but
-  with `test_kind: ansible-modules`
-  (`functional-tests.yml:528`), and every probe step is gated `if:
-  inputs.test_kind == 'functional'`; widening that gate is the whole
-  fix, and is what phase 6's 6d prepares (pushing it is
-  [#4377](https://github.com/shakenfist/shakenfist/issues/4377)). `Node lifecycle` never reaches
+  carry the phase 1 probe, for two different reasons. One of the two
+  is now fixed. `Ansible modules` runs through the reusable
+  `smoke-cluster` workflow but with `test_kind: ansible-modules`
+  (`functional-tests.yml:528`), and every probe step was gated `if:
+  inputs.test_kind == 'functional'`; widening three of those seven
+  gates was the whole fix, prepared by phase 6's 6d and merged to
+  `shakenfist/actions` on 2026-10-01
+  ([#4377](https://github.com/shakenfist/shakenfist/issues/4377)).
+  That job has banked a real series since, so five of the six clouds
+  are now measured. `Node lifecycle` never reaches
   that workflow at all -- it calls the `build-smoke-cluster`
   composite action directly (`functional-tests.yml:581`), and the
   probe steps live in the workflow rather than in the action, so
