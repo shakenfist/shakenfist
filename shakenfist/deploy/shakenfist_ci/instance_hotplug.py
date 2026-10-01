@@ -16,6 +16,8 @@ example in ``docs/developer_guide/coding_rules.md``.
 import json
 import time
 
+from shakenfist_client import apiclient
+
 
 class InstanceHotplugTestsMixin:
     """Hot plug an interface, then prove the guest can use it.
@@ -25,6 +27,53 @@ class InstanceHotplugTestsMixin:
     sets its own namespace prefix. The tests use ``self.test_client``,
     ``self.namespace`` and the instance and agent await helpers.
     """
+
+    def test_interface_plug_address_in_use_is_refused_without_harm(self):
+        # Issue 4366: the hot plug route shared its address allocation
+        # failure handling with the create route, and so error-deleted
+        # the pre-existing target instance when the requested address
+        # was already in use. The refusal must answer 409 and leave the
+        # instance untouched and still able to accept a later plug.
+        hotnet = self.test_client.allocate_network(
+            '10.0.0.0/24', True, True, '%s-hotplug-clash' % self.namespace)
+
+        inst = self.create_instance(
+            'test-hotplug-clash', 1, 1024,
+            [
+                {
+                    'network_uuid': hotnet['uuid'],
+                    'address': '10.0.0.5'
+                }
+            ],
+            [
+                {
+                    'size': 8,
+                    'base': 'sf://upload/system/debian',
+                    'type': 'disk'
+                }
+            ], None, None)
+        self._await_instance_create(inst['uuid'])
+
+        self.assertRaises(
+            apiclient.ResourceStateConflictException,
+            self.test_client.add_instance_interface, inst['uuid'],
+            {'network_uuid': hotnet['uuid'], 'address': '10.0.0.5'})
+
+        i = self.test_client.get_instance(inst['uuid'])
+        self.assertEqual(
+            'created', i['state'],
+            'a refused hot plug must not change the state of its '
+            'target instance')
+
+        # The instance still accepts a non-colliding plug.
+        self.test_client.add_instance_interface(
+            inst['uuid'],
+            {'network_uuid': hotnet['uuid'], 'address': '10.0.0.6'})
+        self._await_instance_operations_complete(inst['uuid'])
+        addresses = [
+            ni['ipv4'] for ni in
+            self.test_client.get_instance_interfaces(inst['uuid'])]
+        self.assertIn('10.0.0.6', addresses)
 
     def test_interface_plug_and_exec_dhcp(self):
         # Create a network to hot plug to
