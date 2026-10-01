@@ -28,18 +28,21 @@ was checked against a real artifact rather than reasoned about:
   *that*, at ``bundle/traces/``. Reading the outer zip's namelist for
   ``traces/headroom.jsonl`` finds nothing and would have looked exactly like
   a run whose probe never started.
-* **Only four of the six cluster bundles carry the probe today** (D17).
-  Five are classified for harvest: phase 6's D3 moved 'Ansible modules'
-  into ``BUNDLE_TOPOLOGIES`` ahead of the shakenfist/actions change that
-  instruments it (#4377), so until that is pushed its records carry
-  ``series_present`` false -- an expected absence, not a probe failure. The
-  sixth, 'Node lifecycle', is skipped by name rather than recorded as
-  missing data. See ``UNINSTRUMENTED_BUNDLES`` below.
+* **Five of the six cluster bundles carry the probe** (D17). Phase 6's D3
+  moved 'Ansible modules' into ``BUNDLE_TOPOLOGIES`` ahead of the
+  shakenfist/actions change that instruments it (#4377); that change merged
+  on 2026-10-01 and the bundle has carried a real series since. A harvest
+  over the window before it reads ``series_present`` false there -- an
+  expected absence, not a probe failure. The sixth, 'Node lifecycle', is
+  skipped by name rather than recorded as missing data. See
+  ``UNINSTRUMENTED_BUNDLES`` below.
 * **The topology is not in the series.** It is passed to the report at run
   time and never written down, so a bundle on disk does not say which shape
-  produced it. D20 fixes that prospectively by having the collect script
-  write ``traces/headroom-label``; until those runs exist the mapping comes
-  from the explicit table in ``BUNDLE_TOPOLOGIES``, which fails loudly on a
+  produced it. D20 fixed that prospectively by having the collect script
+  write ``traces/headroom-label``, and runs carrying it now exist: those
+  records report ``topology_source`` 'headroom-label' and the table becomes
+  a cross-check rather than the only answer. Older runs still map through
+  the explicit table in ``BUNDLE_TOPOLOGIES``, which fails loudly on a
   bundle name it does not cover rather than guessing.
 * **A bundle with no series is a record, not a gap.** A run predating phase
   1, or one whose probe never started, is written out with ``summary`` null
@@ -122,8 +125,8 @@ BundleKind = collections.namedtuple(
 # D17's table, sourced from the merge matrix at
 # .github/workflows/functional-tests.yml:440-495, plus the Ansible modules
 # entry phase 6 of PLAN-ci-cloud-sizing-phase-06-docs.md added in its 6d
-# (D3 there), ahead of the shakenfist/actions change which widens the probe
-# gate onto that job (tracked as #4377). Four of the five jobs run
+# (D3 there), which the shakenfist/actions change widening the probe gate
+# onto that job has since made live (#4377). Four of the five jobs run
 # the *same* topology, which is the point: if slim-primary's four jobs
 # differ from each other in peak demand then the difference is the suite and
 # not the shape, and phase 4 must not respond to it by resizing the cloud.
@@ -143,18 +146,17 @@ BundleKind = collections.namedtuple(
 # 36316642104, where it reported just 'Ansible modules (collection)'), not
 # derived from the matrix's job name.
 #
-# 'Ansible modules' depends on a change in shakenfist/actions
-# (.github/workflows/smoke-cluster.yml) which may not be pushed yet -- see
-# the Prepared changes section of
-# docs/plans/PLAN-ci-cloud-sizing-phase-06-docs.md, tracked as #4377. Until
-# it lands, a harvest still
-# finds the 'bundle-shakenfist-full-ansible-modules' artifact (the job
-# already uploads a bundle; only its contents change), classifies it here
-# rather than skipping it, and records it with series_present False and
-# absent_reason set, because its bundle carries no traces/headroom.jsonl
-# yet. That is bundle_record()'s designed handling of a probe that has not
-# run, not a bug -- see 'A bundle with no series is a record, not a gap'
-# above.
+# 'Ansible modules' was classified here before the shakenfist/actions change
+# that instruments it existed -- the diff was written out under Prepared
+# changes in docs/plans/PLAN-ci-cloud-sizing-phase-06-docs.md for the
+# operator to push, tracked as #4377, and merged on 2026-10-01. A harvest
+# over the window before that merge still finds the
+# 'bundle-shakenfist-full-ansible-modules' artifact (the job uploaded a
+# bundle all along; only its contents changed), classifies it here rather
+# than skipping it, and records it with series_present False and
+# absent_reason set, because those bundles carry no traces/headroom.jsonl.
+# That is bundle_record()'s designed handling of a probe that has not run,
+# not a bug -- see 'A bundle with no series is a record, not a gap' above.
 BUNDLE_TOPOLOGIES = {
     'bundle-shakenfist-full-debian-13-slim-primary': BundleKind(
         'Debian 13 cluster', 'slim-primary', 'Debian 13 cluster (collection)'),
@@ -176,9 +178,8 @@ BUNDLE_TOPOLOGIES = {
 # PLAN-ci-cloud-sizing.md and D3 of PLAN-ci-cloud-sizing-phase-06-docs.md.
 # Phase 6's 6d moved the 'Ansible modules' bundle into BUNDLE_TOPOLOGIES
 # above, and prepared the widening of smoke-cluster.yml's probe-step gate
-# that instruments it (the Prepared changes section of that plan, for the
-# operator to push to shakenfist/actions, tracked as #4377). What remains
-# here is the composite-action seam:
+# that instruments it; that landed in shakenfist/actions on 2026-10-01
+# (#4377). What remains here is the composite-action seam:
 #
 # * 'Node lifecycle' never reaches the reusable smoke-cluster workflow at
 #   all. It calls the build-smoke-cluster composite action directly

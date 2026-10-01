@@ -530,8 +530,14 @@ jobs:
     with:
       component: shakenfist
       component_ref: ${{ github.sha }}
-      # Not gated: the collect step only runs for test_kind functional, so
-      # this job has never been measured. See the smoke tier job above.
+      # Not gated, although this job is now measured. shakenfist/actions#120
+      # widened the probe steps to admit ansible-modules, so the collect step
+      # runs here and banks a series. The band it would be gated against was
+      # fitted to the shapes the warn window read, and this suite was not one
+      # of them -- so the reusable workflow resolves CI_HEADROOM_GATE to false
+      # for any test_kind but functional whatever a caller passes, and passing
+      # false here is that policy stated where review sees it. See the smoke
+      # tier job above.
       headroom_gate: false
       tier: full
       topology: slim-primary
