@@ -27,7 +27,7 @@ class TestVDIConsoleFile(base.BaseNamespacedTestCase):
         super().__init__(*args, **kwargs)
 
     def _fetch_vv(self, video=None):
-        """Create a minimal instance and return its parsed direct .vv.
+        """Create a minimal instance and return it and its parsed .vv.
 
         A minimal diskless instance: nothing boots to an OS, but the VM
         reaches the created state with its console ports allocated,
@@ -47,7 +47,7 @@ class TestVDIConsoleFile(base.BaseNamespacedTestCase):
         cp = configparser.ConfigParser(delimiters=('=',), interpolation=None)
         cp.read_string(vv_text)
         self.assertIn('virt-viewer', cp.sections())
-        return cp['virt-viewer']
+        return inst, cp['virt-viewer']
 
     def _assert_tls_port_is_pinned(self, vv):
         """A TLS console port must carry a host-subject.
@@ -67,7 +67,7 @@ class TestVDIConsoleFile(base.BaseNamespacedTestCase):
     def test_direct_vv_file_is_valid(self):
         # video is left unset so the server applies its default SPICE
         # console.
-        vv = self._fetch_vv()
+        inst, vv = self._fetch_vv()
 
         # virt-viewer accepts exactly these types; anything else (like the
         # internal spiceconcurrent enum) is "Unsupported graphic type".
@@ -80,8 +80,8 @@ class TestVDIConsoleFile(base.BaseNamespacedTestCase):
         # actually exercises the collapse.
         self.assertIn(vv['type'], ('spice', 'vnc'))
 
-        # The host must be a connectable address for a cluster node, not
-        # the placement node's UUID.
+        # The host must be a connectable address, not the placement
+        # node's UUID.
         nodes = self._get_cluster_nodes()
         self.addDetail(
             'nodes',
@@ -89,11 +89,20 @@ class TestVDIConsoleFile(base.BaseNamespacedTestCase):
         self.assertIsNone(
             UUID_RE.match(vv['host']),
             'the .vv host is a UUID, which resolves nowhere: %s' % vv['host'])
-        known_addresses = set()
-        for n in nodes:
-            known_addresses.add(n['ip'])
-            known_addresses.add(n['name'])
-        self.assertIn(vv['host'], known_addresses)
+
+        # And it must be an address of the node hosting the instance. That
+        # is the node's egress IP where one is configured, which the nodes
+        # API does not report (it has only the mesh IP), so ask the node.
+        refreshed = self.test_client.get_instance(inst['uuid'])
+        node = self._node_by_identifier(nodes, refreshed.get('node'))
+        self.assertIsNotNone(
+            node, 'instance placement %s matches no node' % refreshed.get('node'))
+        self._require_node_exec(node)
+        addresses = self._node_addresses(node)
+        self.addDetail(
+            'placement_node_addresses',
+            content.text_content(json.dumps(sorted(addresses), indent=4)))
+        self.assertIn(vv['host'], addresses)
 
         # At least one connection port, and every port numeric.
         self.assertTrue(
@@ -128,7 +137,7 @@ class TestVDIConsoleFile(base.BaseNamespacedTestCase):
         default is already 'spice', so only a request which asks for a
         variant reaches that code at all.
         """
-        vv = self._fetch_vv(
+        _, vv = self._fetch_vv(
             video={'model': 'cirrus', 'memory': 16384,
                    'vdi': 'spiceconcurrent'})
         self.assertEqual('spice', vv['type'])

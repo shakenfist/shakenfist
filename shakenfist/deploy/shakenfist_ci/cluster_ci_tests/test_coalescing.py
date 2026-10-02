@@ -279,23 +279,6 @@ class TestCoalescing(base.BaseNamespacedTestCase):
 
         return folds, dedups
 
-    def _node_by_identifier(self, nodes, identifier):
-        """The node dict for a placement identifier, or None.
-
-        ``Instance.placement['node']`` is written by the placement RPC
-        and read back through ``Node.from_db()``, which accepts either
-        a node uuid or a node name -- and both forms have been in that
-        field. Match on both rather than picking one and being subtly
-        wrong on a cluster which uses the other.
-        """
-        if not identifier:
-            return None
-        for node in nodes:
-            if identifier in (node.get('uuid'), node.get('name'),
-                              node.get('fqdn')):
-                return node
-        return None
-
     def _mesh_flood_ips(self, node, vxid):
         """The flood FDB destinations for a vxid on one node.
 

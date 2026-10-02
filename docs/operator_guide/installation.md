@@ -173,6 +173,13 @@ all:
         sf-3:
 ```
 
+The mesh network carries east/west traffic between nodes, so it need not be
+routable from anywhere else. `node_egress_ip` is the north/south address, and
+it is the hypervisor address that users are given in `virt-viewer` files from
+the `vdiconsolehelper` API call. Set it to an address that console clients can
+reach. If it is left unset, or set to a loopback address such as the deployer's
+default of `127.0.0.1`, those files fall back to the node's mesh IP.
+
 For a single machine, put `localhost` in every group — see
 `examples/single-node/inventory.yaml` for exactly that.
 

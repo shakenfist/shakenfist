@@ -6,6 +6,7 @@
 #        - and link to OpenAPI docs: yes
 #        - and include examples: yes
 #   - Has complete CI coverage:
+import ipaddress
 import os
 import uuid
 from functools import partial
@@ -1994,6 +1995,32 @@ delete-this-file=1
 ca=-----BEGIN CERTIFICATE-----\nMIIEF...16br/Fw==\n-----END CERTIFICATE-----\n"""
 
 
+def _vdi_console_address(node):
+    """Return the address a viewer outside the cluster should dial.
+
+    This runs on the hypervisor hosting the instance, because the endpoint
+    is behind redirect_instance_request. That makes the local
+    NODE_EGRESS_IP the hosting node's north/south address. node.ip is the
+    mesh (east/west) address the node registered with, which is often on
+    a network that clients cannot route to. SPICE and VNC listen on every
+    interface (see libvirt.tmpl), so either address reaches the console
+    when it is routable. Fall back to the mesh address when no usable
+    egress address is configured: NODE_EGRESS_IP defaults to empty, and
+    the deployer's default is 127.0.0.1, which would point the viewer at
+    its own host.
+    """
+    egress = config.NODE_EGRESS_IP.strip()
+    if egress:
+        try:
+            if not ipaddress.ip_address(egress).is_loopback:
+                return egress
+        except ValueError:
+            # A hostname rather than an IP literal. It is still the
+            # operator's chosen north/south address.
+            return egress
+    return node.ip
+
+
 class InstanceVDIConsoleHelperEndpoint(api_base.Resource):
     # A .vv file carries the SPICE connection credentials for the
     # guest, so this hands out interactive keyboard and mouse control
@@ -2029,9 +2056,10 @@ class InstanceVDIConsoleHelperEndpoint(api_base.Resource):
         p = instance_from_db.ports
 
         # placement['node'] holds a node UUID, which is not a connectable
-        # address. Emit the node's IP: a node name is not resolvable from
-        # outside the cluster either, and the TLS identity check travels in
-        # host-subject below rather than in the hostname.
+        # address. Emit the node's egress IP (see _vdi_console_address): a
+        # node name is not resolvable from outside the cluster either, and
+        # the TLS identity check travels in host-subject below rather than
+        # in the hostname.
         n = Node.from_db(instance_from_db.placement.get('node'))
         if not n:
             return sf_api.error(404, 'placement node not found')
@@ -2062,7 +2090,7 @@ class InstanceVDIConsoleHelperEndpoint(api_base.Resource):
 
         vvconfig = VIRTVIEWER_TEMPLATE % {
             'vdi_type': vdi_type,
-            'node': n.ip,
+            'node': _vdi_console_address(n),
             'vdi_port': p.get('vdi_port'),
             'vdi_tls_port': tls_port,
             'host_subject': host_subject,

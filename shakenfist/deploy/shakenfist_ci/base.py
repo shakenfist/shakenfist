@@ -635,6 +635,23 @@ class BaseTestCase(testtools.TestCase):
         """Return the cluster's nodes as reported by the API."""
         return self.system_client.get_nodes()
 
+    def _node_by_identifier(self, nodes, identifier):
+        """The node dict for a placement identifier, or None.
+
+        ``Instance.placement['node']`` is written by the placement RPC
+        and read back through ``Node.from_db()``, which accepts either
+        a node uuid or a node name -- and both forms have been in that
+        field. Match on both rather than picking one and being subtly
+        wrong on a cluster which uses the other.
+        """
+        if not identifier:
+            return None
+        for node in nodes:
+            if identifier in (node.get('uuid'), node.get('name'),
+                              node.get('fqdn')):
+                return node
+        return None
+
     def _placement_roster_key(self, force_placement):
         """Which /admin/resources per_node key this pin refers to.
 
@@ -727,6 +744,20 @@ class BaseTestCase(testtools.TestCase):
         for link in json.loads(out):
             for addr in link.get('addr_info', []):
                 if addr.get('family') == 'inet' and addr.get('local'):
+                    addresses.add(addr['local'])
+        return addresses
+
+    def _node_addresses(self, node):
+        """The set of IP addresses configured on a cluster node.
+
+        The nodes API reports only a node's mesh IP; this asks the node
+        itself, so it also sees its egress address.
+        """
+        out, _ = self._node_exec(node, ['ip', '-json', 'addr', 'show'])
+        addresses = set()
+        for link in json.loads(out):
+            for addr in link.get('addr_info', []):
+                if addr.get('local'):
                     addresses.add(addr['local'])
         return addresses
 
