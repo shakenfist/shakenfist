@@ -77,6 +77,7 @@ execution.
 | 2026-04-23 | [Macbook bug-report fixes](/components/ryll/plans/PLAN-macbook-bugreport-fixes/) | MOUSE_MODE wire format, client-mode re-request after guest reboot, and MULTI_MEDIA_TIME handler |
 | 2026-06-01 | [Open questions watch-list](/components/ryll/plans/OPEN-QUESTIONS/) | Single review surface for symptoms seen in bug reports that we can't yet characterise. Entries link out to the phase plans that would action them. Reviewed at the start of each session closeout. |
 | 2026-07-14 | [Self-hosted runner migration](/components/ryll/plans/PLAN-self-hosted-runners/) | Move Linux x86_64 CI jobs onto self-hosted runners inside the devcontainer and mark the no-hardware platforms (macOS, Windows, aarch64 Linux) as audit-ok exceptions, resolving the workflow-standards consistency audit (issue #155). |
+| 2026-10-02 | [Main-channel event drops](/components/ryll/plans/PLAN-main-event-drops/) | Count main-channel event drops and move mouse mode and agent state from the event queue onto a `watch`, so a stalled UI can no longer leave the client in the wrong mouse mode (issue #428) |
 
 ## Consolidation plans
 

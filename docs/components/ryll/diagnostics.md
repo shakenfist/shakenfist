@@ -121,6 +121,20 @@ cannot be grown from the wire. See the
 [channel diagnostics audit](/components/ryll/channel-diagnostics-audit/) for the full
 audit matrix and minimum-baseline rationale.
 
+`MainSnapshot` also records four fields for diagnosing a stalled UI:
+`events_dropped_count`, `events_dropped_by_kind` and
+`last_event_drop_ts_secs` count the `ChannelEvent`s the main channel
+discarded because the renderer's event queue stayed full for longer than
+`MAIN_EVENT_SEND_TIMEOUT` (per `ChannelEvent` variant name, with the
+session-relative time of the latest drop); a non-zero count means the UI
+stopped draining events. Mouse mode and vdagent state are not events, so
+they are never counted here: the main channel publishes them through the
+renderer's `SessionState` watch channels, which hold the latest value and
+cannot drop it. `server_mouse_mode` is the mouse mode the server
+last announced in `MAIN_INIT` or `MOUSE_MODE` (1 = server/relative,
+2 = client/absolute); compare it with `mouse_mode` in the app snapshot, as a
+mismatch means the client is sending the wrong kind of pointer message.
+
 The `ChannelSnapshots` struct in `ryll/src/bugreport.rs` holds the four
 channel snapshot `Arc<Mutex<T>>` values and is created alongside
 `TrafficBuffers` in `run_connection()`. The `AppSnapshot` is

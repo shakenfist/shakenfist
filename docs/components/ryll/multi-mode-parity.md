@@ -77,7 +77,7 @@ poller), media socket binding added 2026-08-21.
 | Password authentication | available | available | available |
 | **Control socket** | | | |
 | Control socket (`--control-socket`) | n/a — intrinsic (the window owns input and the surface; combining with the GUI is a CLI error) | available | available |
-| Session state query (`status` verb) | n/a — intrinsic | available | available (`run_web` builds a `SessionStatus` from the same `spice_connected` / `agent_connected` flags and surface mirror headless uses) |
+| Session state query (`status` verb) | n/a — intrinsic | available | available (`run_web` builds a `SessionStatus` from the same `spice_connected` flag, `SessionState` agent watch and surface mirror headless uses) |
 | Event subscription (`latency`, `agent_connected`, `paste_*`, `surface_drawn`, `digest_updated`) | n/a — intrinsic | available (`digest_updated` needs the `digest-decode` build feature) | available (same `event_broadcast_tx`; `digest_updated` needs the `digest-decode` build feature, and the poller is spawned only when `--control-socket` is given so an ordinary browser session does not pay to decode QR) |
 | **Display** | | | |
 | Display framebuffer (render SPICE draw ops) | available | partial (`ryll/src/app.rs:3513-3516` — headless counts frames but never paints continuously; with `--control-socket`, a `SurfaceMirror` renders draw ops on demand for the `screenshot` verb, instantiated on first use) | available (single monitor, MVP) |
@@ -110,7 +110,7 @@ poller), media socket binding added 2026-08-21.
 | Paste-as-keystrokes (runtime trigger via Ctrl+Alt+V) | available | available (via the control socket `paste` verb; Ctrl+Alt+V itself is GUI-only) | missing (out of MVP scope) |
 | Paste-as-keystrokes (headless `--paste-text`) | n/a — intrinsic (GUI reads clipboard; `--paste-text` is headless-only per README) | available | missing (out of MVP scope) |
 | Paste-as-keystrokes (inter-character delay `--paste-char-delay-ms`) | available | available (also settable per-request via the control socket `paste` verb's `char_delay_ms`) | missing (out of MVP scope) |
-| Paste-as-keystrokes (vdagent auto-disable) | available (`ryll/src/app.rs:1077-1078`) | available (AgentConnected event logged; `enable_paste` flag passed through) | missing (out of MVP scope) |
+| Paste-as-keystrokes (vdagent auto-disable) | available (`ryll/src/app.rs:1077-1078`) | available (vdagent state logged from the session's `SessionState` watch; `enable_paste` flag passed through) | missing (out of MVP scope) |
 | Paste character validation / error dialog | available | partial (`ryll/src/app.rs:3553-3556` — PasteFailed logged and causes non-zero exit; control-socket clients get a `paste_failed` event; no interactive dialog) | missing (out of MVP scope) |
 | **USB Redirection** | | | |
 | USB redirection channel (protocol layer) | available | available (`--usb-disk`, `--usb-disk-ro` CLI flags work in headless) | missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope) |
@@ -175,7 +175,7 @@ poller), media socket binding added 2026-08-21.
 | File logging to `/tmp/ryll.log` (`-v`) | available | available | available |
 | Intimate logging (`--intimate`, keystrokes/mouse) | available | available | missing (no interactive input to log in web MVP that wouldn't also appear in the browser console) |
 | **Connection Source** | | | |
-| VDAgent connection status (agent_connected flag) | available | available (AgentConnected event handled and logged; also a control-socket event and `status` field) | available (wired through same channel path) |
+| VDAgent connection status (agent_connected flag) | available | available (read from the session's `SessionState` watch and logged; also a control-socket event and `status` field) | available (wired through same channel path) |
 | TCP keepalive on all channel sockets | available | available | available (inherited from SpiceClient) |
 | **Authentication / Session Token** | | | |
 | Per-launch URL token (web mode only) | n/a — intrinsic (no HTTP server) | n/a — intrinsic (no HTTP server) | available (MVP; random 32-byte token printed to stdout) |

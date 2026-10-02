@@ -505,7 +505,10 @@ surface.
 Which pointer message the relay sends depends on the negotiated
 mouse mode, and a SPICE server discards the form it did not
 negotiate without saying anything — so getting it wrong presents
-as a dead pointer rather than as an error:
+as a dead pointer rather than as an error. The relay reads the
+mode on every pointer event from `WebState::mouse_mode`, a clone of
+the session's `SessionState` watch receiver, so a mid-session
+change takes effect on the next move:
 
 - **Client mode** (guest has vdagent, so an absolute pointing
   device): absolute `InputEvent::MouseMove`.
@@ -519,24 +522,29 @@ as a dead pointer rather than as an error:
 `dc.onopen`, and the relay answers it with the current mouse mode.
 This is the only correct moment to deliver it: the SPICE server
 announces the mode at session-init, seconds before any browser
-exists, and the tracker below only re-broadcasts on a change that
-a healthy session never has. The browser is the only party that
-knows its channel is open, so it asks.
+exists, and the tracker below only pushes a change that a healthy
+session never has. The browser is the only party that knows its
+channel is open, so it asks.
 
 ### Mouse-mode tracker
 
 `run_mouse_mode_tracker`, also in `inputs.rs` — a task with the
-lifetime of the *process*, not of a bridge. It subscribes to the
-`ChannelEvent` broadcast bus and stores each `MouseMode` into the
-shared `AtomicU32` the relay reads.
+lifetime of the session, not of a bridge. It waits on the mouse-mode
+receiver of the session's `SessionState` and pushes each new mode to
+the browser as a `mouse-mode` control message. It exits when the
+session ends and the main channel drops the sender.
 
-Its subscription lifetime is load-bearing. A `broadcast::Receiver`
-only sees what is sent after it was created, and the mouse mode is
-announced during session-init, so a per-bridge subscription would
-always start out not knowing the mode. For the same reason
-`run_web` takes this subscription (and the cursor relay's, and the
-surface mirror's) *before* spawning the SPICE session, rather than
-relying on session-init being slower than the code that follows it.
+Mouse mode is not on the `ChannelEvent` broadcast bus. A bus
+receiver skips whatever it lags past, so a burst of display events
+could carry a mode change away with it and leave the relay sending
+the pointer messages the server ignores for the rest of the session.
+A `watch` holds only the latest value: a reader that falls behind
+sees the newest mode rather than missing one, and a receiver created
+at any time already holds the current value, so there is no
+subscribe-before-spawn ordering to get right either. `run_web` still
+subscribes the cursor relay and the surface mirror to the bus
+*before* spawning the SPICE session, because those two do need the
+session-init events.
 
 ### Cursor relay
 

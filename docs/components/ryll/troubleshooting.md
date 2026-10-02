@@ -237,6 +237,31 @@ are sent but the display never updates in response.
 4. The `tools/test_click.py` script can test click delivery
    independently of ryll
 
+### "event dropped: send timed out after 5s" in the log
+
+**Symptom:** `/tmp/ryll.log` contains
+`channels: <Kind> event dropped: send timed out after 5s; renderer event
+consumer is wedged or starved`, and the notification panel shows a Warn
+"The display stalled and missed some updates from the server".
+
+**Meaning:** The UI thread stopped draining the event queue for more than
+5 seconds, so the main channel gave up on one event rather than stop
+answering server PINGs. A related warning, `still waiting, as this event ends
+the session`, means the terminal `Disconnected(Main)` event is being held
+until the UI drains again; it is never dropped.
+
+**What is and is not lost:** Latency samples, notifications and
+monitors-config events are dropped. Mouse mode, agent state and session end
+are not: they travel on `watch` channels or a non-dropping send.
+
+**Where to look:** In `channel-state.json`, the main channel's
+`events_dropped_count`, `events_dropped_by_kind` and `last_event_drop_ts_secs`
+say what was dropped and when. To rule out a stale mouse mode, compare the
+app's `mouse_mode` with main's `server_mouse_mode`.
+
+**Cause:** The stall itself, usually during a guest reboot, is tracked as
+issue #430.
+
 ### Session becomes unresponsive after idle period
 
 **Symptom:** After leaving the session idle for a few minutes, all

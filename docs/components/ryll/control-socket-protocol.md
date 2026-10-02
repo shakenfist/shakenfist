@@ -718,6 +718,14 @@ fires on **transitions only** — once when the agent connects and once
 when it disconnects. It does not fire periodically as a heartbeat. The
 initial state after `hello` can be queried via `status`.
 
+Ryll reports the agent's latest state rather than every change, so a
+disconnect and reconnect close enough together that this client's
+connection never observed the intermediate state produce no event. The
+state is read from the session directly rather than from the event bus,
+so falling behind the bus cannot skip a transition; only a full
+per-client outbound queue can, and that is reported by `dropped` like
+any other loss.
+
 Callers that depend on agent-required verbs (`paste`) should subscribe
 to this event and watch for `"connected": true` before issuing the
 first paste request.
