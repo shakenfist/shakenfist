@@ -422,40 +422,52 @@ say so.
 
 ### 8. Should the server queue a create that does not fit?
 
-**Not answered yet.** Phase 5 took its first reading, over 26
-qualifying `merge_group` runs on the reshaped `slim-tier`, and the
-window was **not readable**: 96 of its 104 instrumented bundles carry
-no capacity-wait trace at all, an unknown fraction of **92.3%**
-against the 25% ceiling phase 5's pre-registered rule sets for
-calling a window readable. The cause is not lost plumbing -- every
-absent bundle carries a fully populated `bundle/traces/` -- but that
-the trace file is created on first write and so cannot express
-"nothing was refused"
-([#4337](https://github.com/shakenfist/shakenfist/issues/4337)). That
-is the rule's *unreadable* case, which is deliberately not one of its
-three outcomes and deliberately does not resolve to Abandon, so the
-phase **extends its window once** rather than deciding on the eight
-readable units. The full reading, the arithmetic for all three
-outcome clauses under both candidate denominators, and what the second
-reading owes before it is taken are in
-[phase 5's Outcome](PLAN-transient-capacity-refusals-phase-05-queue-decision.md).
+**No.** Phase 5 has taken both of its readings and decided: the
+server should not queue a create that does not fit. Two
+qualifications belong beside that answer rather than after it.
 
-One thing the second reading owed has since been paid. The rule is
-amended, as **D43**, written before any of the second window was read:
-now that #4337 makes zero expressible, an `empty` trace is an
-observation of zero waits and enters the denominator, while `absent`
-and `unparseable` stay unknown. That is what unpins the two clauses the
-first reading found structurally stuck at 100%, and it gives the rule
-back a path to Abandon that it did not have. Nothing else in the rule
-moves.
+**It was selected by the rule's default, not by its evidence.**
+Phase 5's pre-registered rule resolves its middle ground to Abandon
+on a second reading, and that is what fired. Abandon's own clauses
+did **not** hold -- two waits in the second window exceed its 210 s
+line -- and no Build clause fired either. Three capacity waits were
+recorded over 95 instrumented bundles, at 41%, 55% and 69% of the
+suite's 420 s deadline, produced by the same three tests that
+produced the first window's long waits, and two of the three got
+*longer* after the reshape rather than shorter. The finding is **rare
+but substantial**, not absent, and "no queue" must not be read later
+as "CI does not wait".
 
-What the eight readable waits say, held loosely because they are 7.7%
-of the window: waits from 0.036 s to 270.858 s against the suite's
-420 s deadline, none of which reached it; all eight pinned creates,
-which means the fairness assertion below is still unevidenced rather
-than confirmed; seven bound on `cpus`. On the reshaped `slim-tier`
-alone the longest was 180.490 s, below the 210 s line the rule draws.
-None of that decides anything.
+**The fairness argument below is untestable on this evidence rather
+than confirmed.** All 11 waits across the two windows were pinned
+creates and none was unpinned -- but every create in the functional
+suite that is refused is pinned, so the instrument cannot produce the
+comparison arm. Citing "all the long waits were pinned" as support
+for "a pinned create starves worst" would be reading a harness
+artefact as a scheduler finding.
+
+The first reading was **unreadable**: 92.3% of its instrumented
+bundles carried no trace at all, because the file was created on
+first write and so could not express "nothing was refused"
+([#4337](https://github.com/shakenfist/shakenfist/issues/4337)). The
+phase therefore spent its single extension there. #4337's fix worked
+-- the second window's census is 92 `empty` against 2 `absent`, an
+unknown fraction of 2.1% -- which is what made a reading possible at
+all. The full reading, the arithmetic for every clause under all
+three candidate scopings, how close the loosest of those sits to
+Build, the four objections to the rule, and the three limits of the
+evidence are in
+[phase 5's Outcome -- second reading](PLAN-transient-capacity-refusals-phase-05-queue-decision.md).
+
+The rule was amended once between the readings, as **D43**, written
+before any of the second window was read: now that #4337 makes zero
+expressible, an `empty` trace is an observation of zero waits and
+enters the denominator, while `absent` and `unparseable` stay
+unknown. That is what unpinned the two clauses the first reading
+found structurally stuck at 100%. A second decision, **D44**,
+excludes from the denominator the bundles that cannot run the Python
+harness at all, and says plainly that it was implemented in the
+gather script before it was written up.
 
 **The arguments, which the reading did not disturb.** The machinery
 exists -- `BaseClusterOperation.defer_with_backoff()` already
@@ -467,12 +479,12 @@ passes looks like a contained change. Against it: it is exactly the
 queue-state surface the project does not want; it has no fairness
 model (a waiting 4-vCPU create starves behind a stream of 1-vCPU
 ones, and a pinned create starves worst -- an assertion no data
-supports yet, because every refusal phase 5 could read was pinned and
-there was no comparison arm); waiting instances hold IPAM
+can support from CI, because every refusal the suite produces is
+pinned and there is no comparison arm); waiting instances hold IPAM
 allocations, so a CPU shortage can become an address shortage; and
 the client's create-and-await path has a ceiling that bounds any
-useful deadline. Which way those arguments fall is decided by phase
-5's numeric rule on the second reading, not by "short and few" versus
+useful deadline. Which way those arguments fell was decided by phase
+5's numeric rule on its second reading, not by "short and few" versus
 "long or many" -- that informal test is what the phase plan replaced
 with thresholds fixed before the data existed.
 
@@ -574,7 +586,7 @@ spelling above is the one to write.
 | 2. The suite waits, and says so: an informed `create_instance` wrapper and a per-run wait summary | [PLAN-transient-capacity-refusals-phase-02-suite-wait.md](PLAN-transient-capacity-refusals-phase-02-suite-wait.md) | Complete | `5ad9651ee` (#4166), `2c6206941` (#4187) |
 | 3. Publish metrics when the running-domain set changes | [PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md](PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md) | Complete | `03cd7be3a` (#4200) |
 | 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | [PLAN-transient-capacity-refusals-phase-04-retry-after.md](PLAN-transient-capacity-refusals-phase-04-retry-after.md) | Complete | `565e36e6e` (#4241), client-python `74d6e129b` (client-python#399) |
-| 5. Decide on server-side queued placement from the phase 2 data | [PLAN-transient-capacity-refusals-phase-05-queue-decision.md](PLAN-transient-capacity-refusals-phase-05-queue-decision.md) | In progress | — |
+| 5. Decide on server-side queued placement from the phase 2 data | [PLAN-transient-capacity-refusals-phase-05-queue-decision.md](PLAN-transient-capacity-refusals-phase-05-queue-decision.md) | Complete | — |
 | 6. Documentation and close-out | PLAN-transient-capacity-refusals-phase-06-docs.md | Not started | — |
 | 7. Push audit | PLAN-transient-capacity-refusals-phase-07-push-audit.md | Not started | — |
 
@@ -682,7 +694,7 @@ fails on any raw call outside an explicit allowlist marker, the way
 calls. The 115 it quoted was a count over the whole of
 `shakenfist/deploy/shakenfist_ci/`, which today is 117 across 41
 files. The difference is `smoke_ci_tests/` (27 calls in 7 files),
-`base.py:1227` and `database_tier.py:275`. The smoke tier belongs in
+`base.py:1794` and `database_tier.py:283`. The smoke tier belongs in
 scope: it runs on the smallest cloud, where one sibling instance is
 the largest fraction of the cluster.*
 
@@ -830,7 +842,7 @@ D32 records as a filed gap rather than fixing here.
 
 The contract this changes already has an owner:
 `BaseTestCase.assertRefusedAtStage()`
-(`shakenfist/deploy/shakenfist_ci/base.py:1464`), landed by the
+(`shakenfist/deploy/shakenfist_ci/base.py:1552`), landed by the
 sizing plan's phase 3a and used by four assertions in
 `cluster_ci_tests/test_saturation.py`. Its docstring names this
 phase as the single place to change when the contract moves.
@@ -875,15 +887,29 @@ phase which reads twenty runs and then decides what those words meant
 is narrating a decision rather than taking one.
 
 The gate has since opened -- the sizing plan's reshape landed as
-`shakenfist/actions#88` (`f78576e`) and its step 4d reported -- and the
-first reading has been taken. It was **unreadable**: 92.3% of the
-window's instrumented bundles carry no capacity-wait trace, because the
-trace cannot express "nothing was refused"
+`shakenfist/actions#88` (`f78576e`) and its step 4d reported -- and
+both readings have been taken. The first was **unreadable**: 92.3%
+of the window's instrumented bundles carried no capacity-wait trace,
+because the trace could not express "nothing was refused"
 ([#4337](https://github.com/shakenfist/shakenfist/issues/4337)). The
-phase therefore extends its window once, remains `In progress`, and has
-decided nothing. The amendment that extension owed is now written as
-D43, before the second window was read. See open question 8 above and
-that plan's Outcome.
+phase spent its single extension there, and amended the rule as D43
+before any of the second window was read.
+
+The second reading, over 39 ancestry-qualifying `merge_group` runs
+from 2026-09-27 to 2026-10-02, is **Abandon** -- unanimously across
+all three candidate scopings, but selected by the rule's
+middle-ground default rather than by Abandon's own clauses, which did
+not hold. #4337's fix worked: the census went from 0 `empty` and 96
+`absent` to 92 `empty` and 2 `absent`, an unknown fraction of 2.1%
+against the 25% ceiling. Three waits were recorded, at 41%, 55% and
+69% of the 420 s deadline, from the same three tests as the first
+window, two of which got longer after the reshape; all three were
+pinned creates, which leaves the fairness assertion untestable on CI
+data rather than confirmed. The phase is `Complete` -- it made the
+decision it existed to make; what is abandoned is the queue, which is
+recorded as open question 8's answer rather than as a phase status.
+Nothing was designed and no code changed. See open question 8 above
+and that plan's *Outcome -- second reading*.
 
 ### Phase 6 -- Documentation and close-out
 
