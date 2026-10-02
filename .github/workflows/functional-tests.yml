@@ -374,7 +374,6 @@ jobs:
           || github.event.pull_request.head.repo.full_name == github.repository)
     needs: [check_paths]
     uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
-    secrets: inherit
     with:
       component: shakenfist
       component_ref: ${{ github.sha }}
@@ -493,7 +492,6 @@ jobs:
           }
         ]
     uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
-    secrets: inherit
     with:
       component: shakenfist
       component_ref: ${{ github.sha }}
@@ -526,7 +524,6 @@ jobs:
       && needs.check_paths.outputs.code_changed != 'false'
     needs: [check_paths]
     uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
-    secrets: inherit
     with:
       component: shakenfist
       component_ref: ${{ github.sha }}
