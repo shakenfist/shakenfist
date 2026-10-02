@@ -147,9 +147,9 @@ can rely on them.
    Autostart (F10) already restarts domains on a hypervisor reboot, and
    a restart of sf-queues or libvirtd leaves running domains running, so
    restore has had no job since `Instance` lost `create_on_hypervisor()`.
-   Still to establish in phase 2, on a real hypervisor: the
-   `libvirt-guests` default on Debian 13 and Ubuntu 24.04, since that
-   decides whether guests are shut down or suspended across a reboot.
+   Phase 2 established the `libvirt-guests` default from the Debian 13
+   and Ubuntu 24.04 packages: guests are shut down at host shutdown and
+   nothing is started at boot, so autostart alone decides (phase 2 S2).
 2. **What does a failed power on return?** Answered: 507 for port or
    memory exhaustion, 500 for anything else. client-python maps 409, 500
    and 507 to distinct exceptions and does not retry in `_request_url`,
@@ -225,8 +225,8 @@ phases 0, 1b and 3 all rely on `create()` failing when power on fails.
 |-------|------|--------|--------|
 | 0. Assert power state in the existing lifecycle tests | [PLAN-power-state-correctness-phase-00-assertions.md](PLAN-power-state-correctness-phase-00-assertions.md) | Complete | `250a40871` |
 | 1a. Honest libvirt domain listing | [PLAN-power-state-correctness-phase-01a-listing.md](PLAN-power-state-correctness-phase-01a-listing.md) | Complete | `8aa69c5e4` |
-| 1b. The cleaner sees powered off domains | [PLAN-power-state-correctness-phase-01b-inactive-domains.md](PLAN-power-state-correctness-phase-01b-inactive-domains.md) | In progress | — |
-| 2. Autostart and instance restore | PLAN-power-state-correctness-phase-02-autostart-restore.md | Not started | — |
+| 1b. The cleaner sees powered off domains | [PLAN-power-state-correctness-phase-01b-inactive-domains.md](PLAN-power-state-correctness-phase-01b-inactive-domains.md) | Complete | `447ed75ae` |
+| 2. Autostart and instance restore | [PLAN-power-state-correctness-phase-02-autostart-restore.md](PLAN-power-state-correctness-phase-02-autostart-restore.md) | In progress | — |
 | 3. Power operations answer truthfully | PLAN-power-state-correctness-phase-03-power-api.md | Not started | — |
 | 4. Push audit | PLAN-power-state-correctness-phase-04-push-audit.md | Not started | — |
 
@@ -353,6 +353,13 @@ On `CRASHED`: an inactive domain is always `off`, with libvirt's
 shutoff reason recorded in the event and never branched on. The first
 loop's unreachable active `crashed` branch is left and documented (D7).
 
+Landed as [#4395](https://github.com/shakenfist/shakenfist/pull/4395).
+Functional run
+[36721352515](https://github.com/shakenfist/shakenfist/actions/runs/36721352515)
+confirmed on a real hypervisor that a guest poweroff reads `shutdown`
+and a SIGKILLed qemu reads `crashed`. It merged before brief 8's sfcbr
+inventory was taken.
+
 ### Phase 2: autostart and instance restore
 
 Fix F10 by calling `setAutostart(0)` in `power_off()`, after first
@@ -362,6 +369,26 @@ the same change, and with it
 `test_failed_restore_enqueues_delete_and_continues` and `FakeInstance`'s
 string `power_state`. Delete F3's `_health_check_kvm_process`. Plan at
 high effort: this is behaviour on every node at startup and reboot.
+
+The phase survey corrected three things in this section. The phase plan
+has the detail as S1 to S9 and D1 to D8.
+
+* **Open question 1 is answered from the packages.** On both Debian 13
+  and Ubuntu 24.04, libvirt-guests is enabled, shuts guests down at
+  host shutdown and starts nothing at boot, and the deployer changes
+  none of it. Autostart alone decides what comes back (S2).
+* **`setAutostart(0)` in `power_off()` is not enough.** It leaves the
+  flag set on every domain powered off before this phase, and on a
+  guest which powered itself off. The cleaner also clears it when it
+  finds an inactive domain `off`, under the instance lock (D2, D6).
+* **That needs an explicit shutdown ordering.** If the cleaner ran
+  while libvirt-guests shuts guests down, a reboot would power off
+  every instance. Nothing orders the daemons after libvirt-guests on a
+  node without `sf-database`, so the phase adds
+  `After=libvirt-guests.service` to every SF unit (S3, D3).
+
+The restore test is rewritten rather than deleted, because it is the
+only cover the placement reconciliation has in its file (S5).
 
 ### Phase 3: power operations answer truthfully
 
