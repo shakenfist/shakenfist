@@ -687,6 +687,21 @@ class BaseTestCase(testtools.TestCase):
                 return n
         return None
 
+    def _node_by_uuid(self, node_uuid):
+        """Return the node dict matching node_uuid, or None.
+
+        Unlike _network_node(), which finds the one node flagged as the
+        network node, this resolves an arbitrary node identity to the node
+        dict _node_exec() wants. An instance's 'node' field is exactly this
+        uuid: place_instance() (instance.py) writes the placement
+        attribute's 'node' key from config.NODE_UUID, and external_view()
+        passes it straight through.
+        """
+        for n in self._get_cluster_nodes():
+            if n.get('uuid') == node_uuid:
+                return n
+        return None
+
     def _hypervisor_nodes(self, exclude_network_node=False):
         """Return node dicts for hypervisors.
 
@@ -810,10 +825,6 @@ class BaseTestCase(testtools.TestCase):
         message = (
             f'Instance {instance_uuid} reports power_state {observed!r} {after}, '
             f'expected {expected!r}.')
-        if observed == 'on' and expected in ('off', 'paused'):
-            message += (
-                ' This matches the cleaner stale-write race recorded as F13 in '
-                'docs/plans/PLAN-power-state-correctness.md.')
         self.fail(message)
 
     def _cloud_init_health_check_json(self, instance_uuid):
@@ -1189,13 +1200,22 @@ class BaseTestCase(testtools.TestCase):
         self._await_instance_create(instance_uuid)
 
         # Once created, we shouldn't need more than another 5 minutes for boot.
+        #
+        # An event's human-readable label -- what add_event()'s callers pass
+        # as "message", e.g. "detected poweroff" -- is carried in the events
+        # API response's 'message' field. There is no 'operation' field
+        # (shakenfist.schema.event.EventReadRow has none), so matching on it
+        # raised KeyError on the first event seen after "after" -- this
+        # method had no caller until phase 1b's test_lifecycle_guest_poweroff
+        # (see docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md,
+        # S13), so nothing had exercised it against the real schema before.
         start_time = time.time()
         while time.time() - start_time < 5 * 60:
             for event in self.system_client.get_instance_events(instance_uuid):
                 if after and event['timestamp'] <= after:
                     continue
 
-                if (event['operation'] == operation and
+                if (event['message'] == operation and
                         (not message or event['message'] == message)):
                     return event['timestamp']
 

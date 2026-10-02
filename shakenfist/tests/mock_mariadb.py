@@ -2626,8 +2626,12 @@ class MockMariaDB():
         return True
 
     def _mariadb_get_instance(
-            self, inst_uuid) -> Optional[InstanceData]:
-        """Mock implementation of mariadb.get_instance()"""
+            self, inst_uuid, *, strict=False) -> Optional[InstanceData]:
+        """Mock implementation of mariadb.get_instance().
+
+        strict only changes how the real function reports a database
+        error, and the mock has none, so it is accepted and ignored.
+        """
         key = str(inst_uuid)
         data = self.instance_objects.get(key)
         self._trace(f'MockMariaDB.get_instance({key}): {data}')

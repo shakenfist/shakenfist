@@ -216,6 +216,14 @@ class LockNotHeld(LockException):
     ...
 
 
+class NodeLockTimeout(LockException):
+    """Raised only when a caller asked for a bounded wait on a node
+    lock (NodeLock(..., timeout=...), or get_lock(node_timeout=...))
+    and the lock was not granted before that timeout elapsed. The
+    default, unbounded wait, never raises this."""
+    ...
+
+
 class WriteException(DatabaseException):
     ...
 

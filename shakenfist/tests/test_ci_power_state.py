@@ -159,14 +159,17 @@ class AssertPowerStateTestCase(test_base.ShakenFistTestCase):
         self.assertIn('after unpause', message)
         self.harness._log_instance_events.assert_called_once_with('uuid1')
 
-    def test_stale_on_when_off_expected_mentions_f13(self):
+    def test_stale_on_when_off_expected_does_not_mention_f13(self):
+        # F13 (the cleaner stale-write race) was fixed in phase 1b step 4,
+        # which made this failure message's F13 hint stale; it was removed
+        # in phase 1b step 6.
         self.system_client.get_instance.return_value = {'power_state': 'on'}
 
         exc = self.assertRaises(
             AssertionError, self.harness._assert_power_state,
             'uuid1', 'off', 'after power off')
 
-        self.assertIn('F13', str(exc))
+        self.assertNotIn('F13', str(exc))
 
     def test_off_when_on_expected_does_not_mention_f13(self):
         self.system_client.get_instance.return_value = {'power_state': 'off'}

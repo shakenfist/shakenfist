@@ -402,6 +402,20 @@ files staged.
       `git diff develop... -- shakenfist/daemons` is one of the four
       calls or part of the second loop's comment.
 
+## Outcome
+
+Landed as [#4372](https://github.com/shakenfist/shakenfist/pull/4372),
+merge commit `8aa69c5e4`. The dispatched functional run
+([36392599796](https://github.com/shakenfist/shakenfist/actions/runs/36392599796))
+passed its Guests job and every Smoke job, and Guests exercises the
+sidechannel's domain discovery through the renamed helper. The
+Definition of done holds on `develop`: the old helpers are gone, the
+cleaner fake no longer mentions `listDomainsID` or `lookupByID`, and the
+only mention of `get_inactive_sf_domains()` outside the helper and its
+tests is the comment in the cleaner's second loop that points phase 1b
+at it. The one expected failure is the shutoff test, which phase 1b
+turns on.
+
 ## Back brief
 
 Before starting step 1, back brief Mikal on what will change: two new
