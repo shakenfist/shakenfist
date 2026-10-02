@@ -8,6 +8,7 @@
     path: /etc/pki/CA
     state: directory
     mode: '0755'
+  tags: [system-dirs]
 
 - name: Create the certificate destination directory
   ansible.builtin.file:

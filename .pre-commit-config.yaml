@@ -49,6 +49,15 @@ repos:
         files: ^shakenfist/deploy/collection/
         pass_filenames: false
 
+      # Requires: ansible-core, gnutls-bin (certtool) and openssl
+      - id: test-internal-ca
+        name: Test the internal_ca role
+        description: Issue and renew certificates with the internal_ca role, rootless, and check them with openssl
+        entry: tools/ci-test-internal-ca.sh
+        language: system
+        files: ^(shakenfist/deploy/collection/roles/internal_ca/|tools/ci-test-internal-ca\.sh$)
+        pass_filenames: false
+
   # Flake8 style checking via tox
   # Requires: pip install tox flake8
   - repo: local
