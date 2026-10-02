@@ -3032,6 +3032,13 @@ message NamespaceClaim {
   string state = 9;
   double expires_at = 10;
   double updated_at = 11;
+  // The high-water mark on used_*: the largest drawdown this claim has
+  // ever held. Raised by the admission drawdown and by the reconciler,
+  // never lowered by anything, so it answers what a namespace actually
+  // consumed even when it is asked after the instances were deleted.
+  int64 peak_used_cpus = 12;
+  int64 peak_used_memory_mb = 13;
+  int64 peak_used_disk_gb = 14;
 }
 
 // The expiry rides in as a duration rather than an absolute time, and is

@@ -53,13 +53,27 @@ def _operational_error(errno):
 
 def _claim_row(uuid=CLAIM1, namespace='ci-1', limit_cpus=16,
                limit_memory_mb=16384, limit_disk_gb=100, used_cpus=4,
-               used_memory_mb=4096, used_disk_gb=40, state='active'):
-    """A row in the shape _claim_select() projects."""
+               used_memory_mb=4096, used_disk_gb=40, state='active',
+               peak_used_cpus=None, peak_used_memory_mb=None,
+               peak_used_disk_gb=None):
+    """A row in the shape _claim_select() projects.
+
+    The high-water mark defaults to the matching ``used_*``, which is
+    what a claim that has only ever grown holds. A test about the mark
+    itself says otherwise.
+    """
     return SimpleNamespace(
         uuid=uuid, namespace=namespace, limit_cpus=limit_cpus,
         limit_memory_mb=limit_memory_mb, limit_disk_gb=limit_disk_gb,
         used_cpus=used_cpus, used_memory_mb=used_memory_mb,
-        used_disk_gb=used_disk_gb, state=state,
+        used_disk_gb=used_disk_gb,
+        peak_used_cpus=(used_cpus if peak_used_cpus is None
+                        else peak_used_cpus),
+        peak_used_memory_mb=(used_memory_mb if peak_used_memory_mb is None
+                             else peak_used_memory_mb),
+        peak_used_disk_gb=(used_disk_gb if peak_used_disk_gb is None
+                           else peak_used_disk_gb),
+        state=state,
         expires_at=1800000000.0, updated_at=1799990000.0)
 
 
@@ -210,6 +224,35 @@ class SharedAggregationTestCase(base.ShakenFistTestCase):
 
 class CreateNamespaceClaimTestCase(_ClaimMixin, base.ShakenFistTestCase):
     """The guarded create transaction (D3, D14)."""
+
+    def test_the_insert_seeds_the_mark_from_the_drawdown(self):
+        # A claim created over a namespace which already holds instances
+        # has already reached that figure, so the mark starts there --
+        # in the same INSERT, from the same migrated drawdown as used_*,
+        # because the next reconcile pass would raise it from zero
+        # anyway and make the seeding look like a defect (D3).
+        router = _ClaimRouter(drawdown=(6, 6144, 60))
+        result = self._run(router)
+
+        self.assertTrue(result['created'], result['error'])
+        [insert] = [stmt for text, stmt in router.executed
+                    if text.startswith('INSERT INTO namespace_claims')]
+        params = insert.compile(dialect=MYSQL_DIALECT).params
+        self.assertEqual(6, params['used_cpus'])
+        self.assertEqual(6, params['peak_used_cpus'])
+        self.assertEqual(6144, params['peak_used_memory_mb'])
+        self.assertEqual(60, params['peak_used_disk_gb'])
+
+    def test_a_claim_over_an_empty_namespace_starts_at_zero(self):
+        # And nothing invents a peak where there was no drawdown.
+        router = _ClaimRouter(drawdown=None)
+        self.assertTrue(self._run(router)['created'])
+        [insert] = [stmt for text, stmt in router.executed
+                    if text.startswith('INSERT INTO namespace_claims')]
+        params = insert.compile(dialect=MYSQL_DIALECT).params
+        self.assertEqual(0, params['peak_used_cpus'])
+        self.assertEqual(0, params['peak_used_memory_mb'])
+        self.assertEqual(0, params['peak_used_disk_gb'])
 
     def _call(self, **kwargs):
         args = {
@@ -844,8 +887,10 @@ class ClaimGrpcWrapperTestCase(base.ShakenFistTestCase):
         return database_pb2.NamespaceClaim(
             uuid=str(CLAIM1), namespace='ci-1', limit_cpus=16,
             limit_memory_mb=16384, limit_disk_gb=100, used_cpus=4,
-            used_memory_mb=4096, used_disk_gb=40, state='active',
-            expires_at=1800000000.0, updated_at=1799990000.0)
+            used_memory_mb=4096, used_disk_gb=40, peak_used_cpus=12,
+            peak_used_memory_mb=12288, peak_used_disk_gb=120,
+            state='active', expires_at=1800000000.0,
+            updated_at=1799990000.0)
 
     def test_claim_calls_use_the_default_budget(self):
         # Claim CRUD is operator driven: it is not on the instance
@@ -876,6 +921,11 @@ class ClaimGrpcWrapperTestCase(base.ShakenFistTestCase):
         self.assertTrue(result['created'])
         self.assertEqual(str(CLAIM1), result['claim']['uuid'])
         self.assertEqual(4, result['claim']['used_cpus'])
+        # The mark rides the same message, and is not the counter: a
+        # claim reports a peak above what it currently holds.
+        self.assertEqual(12, result['claim']['peak_used_cpus'])
+        self.assertEqual(12288, result['claim']['peak_used_memory_mb'])
+        self.assertEqual(120, result['claim']['peak_used_disk_gb'])
         self.assertTrue(result['dimensions'][0]['exceeded'])
 
     def test_a_refusal_carries_no_claim(self):
@@ -963,6 +1013,8 @@ class ClaimServicerTestCase(base.ShakenFistTestCase):
             'uuid': str(CLAIM1), 'namespace': 'ci-1', 'limit_cpus': 16,
             'limit_memory_mb': 16384, 'limit_disk_gb': 100,
             'used_cpus': 4, 'used_memory_mb': 4096, 'used_disk_gb': 40,
+            'peak_used_cpus': 12, 'peak_used_memory_mb': 12288,
+            'peak_used_disk_gb': 120,
             'state': 'active', 'expires_at': 1800000000.0,
             'updated_at': 1799990000.0}
 
@@ -982,6 +1034,13 @@ class ClaimServicerTestCase(base.ShakenFistTestCase):
         self.assertTrue(reply.created)
         self.assertEqual(str(CLAIM1), reply.claim.uuid)
         self.assertEqual(4, reply.claim.used_cpus)
+        # Every field of the row reaches the wire, the mark included --
+        # the servicer builds the message by keyword expansion, so a
+        # proto field the row has and the message does not would be a
+        # TypeError here rather than a silently dropped number.
+        self.assertEqual(12, reply.claim.peak_used_cpus)
+        self.assertEqual(12288, reply.claim.peak_used_memory_mb)
+        self.assertEqual(120, reply.claim.peak_used_disk_gb)
 
     def test_a_refusal_carries_its_dimensions(self):
         with mock.patch(

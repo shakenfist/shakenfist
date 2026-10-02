@@ -464,8 +464,11 @@ EVENT_OBJECTS_VERSION = 1
 # Scheduler-reservations capacity tables (see docs/plans/
 # PLAN-scheduler-reservations-phase-02-capacity-tables.md). v1: schema
 # creation.
+#
+# namespace_claims v2 adds the used_* high-water mark (see docs/plans/
+# PLAN-claim-coverage-and-sizing-phase-02b-peak-measurement.md, D2).
 SCHEDULER_NODE_CAPACITY_VERSION = 1
-NAMESPACE_CLAIMS_VERSION = 1
+NAMESPACE_CLAIMS_VERSION = 2
 CLUSTER_CAPACITY_VERSION = 1
 
 
@@ -3615,6 +3618,13 @@ def _get_scheduler_node_capacity_table() -> sa.Table:
     return _scheduler_node_capacity_table
 
 
+# The high-water mark columns namespace_claims v2 adds. Named once so
+# the v1-to-2 migration and the schema drift guard agree with the table
+# definition rather than each restating it.
+NAMESPACE_CLAIMS_PEAK_COLUMNS = (
+    'peak_used_cpus', 'peak_used_memory_mb', 'peak_used_disk_gb')
+
+
 def _get_namespace_claims_table() -> sa.Table:
     """Get or create the namespace_claims table definition.
 
@@ -3623,10 +3633,19 @@ def _get_namespace_claims_table() -> sa.Table:
     One row per capacity claim: the claiming namespace (indexed, because
     phase 3 admission looks claims up by namespace; the column matches
     the namespaces table's name primary key), the claimed limits, the
-    materialised usage counters, the claim's coverage state, and its
-    expiry. Written by the reconciler (phase 2), by the guarded-UPDATE
-    admission path (phase 3) and by the claim CRUD RPCs (phase 4), and
-    it doubles as the static values table for the NamespaceClaim object.
+    materialised usage counters, their high-water mark, the claim's
+    coverage state, and its expiry. Written by the reconciler (phase 2),
+    by the guarded-UPDATE admission path (phase 3) and by the claim CRUD
+    RPCs (phase 4), and it doubles as the static values table for the
+    NamespaceClaim object.
+
+    ``peak_used_*`` is the largest drawdown this claim has ever held,
+    and it only ever goes up: the admission drawdown raises it, the
+    reconciler raises it, and the release path deliberately does not
+    touch it. That is what makes it answer a question ``used_*`` cannot
+    -- what a namespace actually consumed, asked after it has deleted
+    the instances. See docs/plans/
+    PLAN-claim-coverage-and-sizing-phase-02b-peak-measurement.md, D2.
 
     ``expires_at`` and ``updated_at`` follow the cluster_locks TIMESTAMP
     idiom: server-side timestamps so the expiry sweep compares against
@@ -3658,6 +3677,16 @@ def _get_namespace_claims_table() -> sa.Table:
                           server_default='0'),
                 sa.Column('used_disk_gb', sa.BigInteger(), nullable=False,
                           server_default='0'),
+                # The high-water mark on the three counters above, in
+                # the same units and with the same BIGINT width. Zero
+                # on an upgraded database until the next admission or
+                # reconcile pass raises it; never lowered by anything.
+                sa.Column('peak_used_cpus', sa.BigInteger(),
+                          nullable=False, server_default='0'),
+                sa.Column('peak_used_memory_mb', sa.BigInteger(),
+                          nullable=False, server_default='0'),
+                sa.Column('peak_used_disk_gb', sa.BigInteger(),
+                          nullable=False, server_default='0'),
                 sa.Column('state', sa.String(32), nullable=False),
                 sa.Column('expires_at', sa.DateTime(), nullable=False),
                 sa.Column('updated_at', sa.DateTime(), nullable=False),
@@ -3751,6 +3780,35 @@ def _ensure_scheduler_node_capacity_schema(
     }
 
 
+def _add_missing_namespace_claims_columns(
+        engine: sa.Engine, table: sa.Table, table_name: str) -> None:
+    """Add any NAMESPACE_CLAIMS_PEAK_COLUMNS column the table is missing.
+
+    The same idiom as _add_missing_node_metrics_columns(): the column
+    type is taken from the table definition so the DDL cannot drift from
+    it, and each ADD COLUMN is guarded by an existence check so a re-run
+    -- or a run from an older schema version -- is a no-op.
+
+    The mark is *not* backfilled from ``used_*``. A high-water mark is a
+    measurement, and seeding one from a counter read at upgrade time
+    would publish a peak nothing observed. Existing claims therefore
+    start at zero and are raised by the next admission or the next
+    reconcile pass, neither of which can lower one -- so the mark
+    converges on the truth from below rather than starting above it.
+    """
+    mysql_dialect = sa.dialects.mysql.dialect()
+    with engine.begin() as conn:
+        cols = get_table_columns(engine, table_name)
+        for column_name in NAMESPACE_CLAIMS_PEAK_COLUMNS:
+            if column_name in cols:
+                continue
+            column_type = table.c[column_name].type.compile(
+                dialect=mysql_dialect)
+            conn.execute(sa.text(
+                f'ALTER TABLE {table_name} ADD COLUMN '
+                f'{column_name} {column_type} NOT NULL DEFAULT 0'))
+
+
 def _ensure_namespace_claims_schema(engine: sa.Engine) -> dict[str, Any]:
     """Ensure the namespace_claims table schema is up to date."""
     table_name = 'namespace_claims'
@@ -3768,6 +3826,17 @@ def _ensure_namespace_claims_schema(engine: sa.Engine) -> dict[str, Any]:
                  f'(version {NAMESPACE_CLAIMS_VERSION})')
         table.metadata.create_all(engine, tables=[table], checkfirst=True)
         current_ver = NAMESPACE_CLAIMS_VERSION
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 2:
+        # v2 adds the used_* high-water mark (claim coverage and sizing
+        # phase 2b, D2). Spec-driven, existence-guarded ADD COLUMNs, so
+        # a re-run is a no-op and the end state does not depend on which
+        # step introduced a column.
+        LOG.info(f'Adding high water mark columns to {table_name} table '
+                 f'(version 2)')
+        _add_missing_namespace_claims_columns(engine, table, table_name)
+        current_ver = 2
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -25194,6 +25263,20 @@ _NAMESPACE_USAGE_AGGREGATION = '''
                 GROUP BY i.namespace'''
 
 
+# The high-water mark is *raised* here and never written flat, and
+# that GREATEST is the most dangerous line in this statement. Spelt
+# ``c.peak_used_cpus = COALESCE(u.used_cpus, 0)`` it would be correct
+# on every test with one instance and one pass, and would discard the
+# peak of every real workload within five minutes of it being reached
+# -- this pass runs every five minutes, and a CI job deletes its
+# instances before anybody asks what it used. A mark that can go down
+# is not a mark (D3).
+#
+# Unlike the admission drawdown, the SET order here is not load
+# bearing: the peak assignment reads ``c.peak_used_cpus``, which this
+# statement does not otherwise write, and ``u.used_cpus``, which
+# belongs to the derived table. MariaDB's left-to-right assignment
+# evaluation therefore cannot change the result.
 _RECONCILE_CLAIM_USAGE_SQL = sa.text(f'''
     UPDATE namespace_claims c
       LEFT JOIN ({_NAMESPACE_USAGE_AGGREGATION}) u
@@ -25201,6 +25284,12 @@ _RECONCILE_CLAIM_USAGE_SQL = sa.text(f'''
        SET c.used_cpus = COALESCE(u.used_cpus, 0),
            c.used_memory_mb = COALESCE(u.used_memory_mb, 0),
            c.used_disk_gb = COALESCE(u.used_disk_gb, 0),
+           c.peak_used_cpus = GREATEST(
+               c.peak_used_cpus, COALESCE(u.used_cpus, 0)),
+           c.peak_used_memory_mb = GREATEST(
+               c.peak_used_memory_mb, COALESCE(u.used_memory_mb, 0)),
+           c.peak_used_disk_gb = GREATEST(
+               c.peak_used_disk_gb, COALESCE(u.used_disk_gb, 0)),
            c.updated_at = NOW()
      WHERE c.state = 'active'
 ''')
@@ -26436,6 +26525,10 @@ def _floored_namespace_decrement(
     ``GREATEST(0, ...)`` on a miss. Returns the clamp detail -- which of
     the two counters this was, and the per-dimension drift -- when it
     had to clamp, or None on a clean decrement (issue 4050).
+
+    Deliberately does not touch ``peak_used_*``: a high-water mark does
+    not come down, and a release is exactly the event it exists to
+    survive (D2).
     """
     if claim_uuid is not None:
         table: sa.Table = _get_namespace_claims_table()
@@ -27003,13 +27096,43 @@ def _direct_admit_instance_placement(
                         (claims.c.used_disk_gb + disk_gb
                          <= claims.c.limit_disk_gb),
                     ]
+                # ordered_values(), and the peak assignments first,
+                # because MariaDB evaluates an UPDATE's assignments
+                # left to right and a later one sees the *updated*
+                # value of an earlier column. With used_cpus assigned
+                # first, GREATEST(peak_used_cpus, used_cpus + cpus)
+                # reads the already-incremented counter and records a
+                # peak one whole allocation too high, on every
+                # admission, silently. values() cannot express the
+                # ordering: it renders the SET clause in table column
+                # order whatever order the keywords are written in, and
+                # the peak columns are defined after the counters they
+                # mark. Verified against a real server by the live
+                # suite's one-admission arithmetic, and the compiled
+                # order is asserted in
+                # test_mariadb_capacity_admission.py.
+                #
+                # A move never reaches this branch, which is right: a
+                # move changes no namespace's usage, so there is no new
+                # peak for it to set.
                 if conn.execute(sa.update(claims).where(
-                        sa.and_(*where)).values(
-                            used_cpus=claims.c.used_cpus + cpus,
-                            used_memory_mb=(claims.c.used_memory_mb
-                                            + memory_mb),
-                            used_disk_gb=claims.c.used_disk_gb + disk_gb,
-                            updated_at=sa.func.now())).rowcount == 0:
+                        sa.and_(*where)).ordered_values(
+                            (claims.c.peak_used_cpus, sa.func.greatest(
+                                claims.c.peak_used_cpus,
+                                claims.c.used_cpus + cpus)),
+                            (claims.c.peak_used_memory_mb, sa.func.greatest(
+                                claims.c.peak_used_memory_mb,
+                                claims.c.used_memory_mb + memory_mb)),
+                            (claims.c.peak_used_disk_gb, sa.func.greatest(
+                                claims.c.peak_used_disk_gb,
+                                claims.c.used_disk_gb + disk_gb)),
+                            (claims.c.used_cpus, claims.c.used_cpus + cpus),
+                            (claims.c.used_memory_mb,
+                             claims.c.used_memory_mb + memory_mb),
+                            (claims.c.used_disk_gb,
+                             claims.c.used_disk_gb + disk_gb),
+                            (claims.c.updated_at,
+                             sa.func.now()))).rowcount == 0:
                     raise _AdmissionDenied('claim')
             elif probe.cluster_present:
                 where = [cluster.c.id == 1]
@@ -27765,6 +27888,9 @@ class NamespaceClaimRow(TypedDict):
     used_cpus: int
     used_memory_mb: int
     used_disk_gb: int
+    peak_used_cpus: int
+    peak_used_memory_mb: int
+    peak_used_disk_gb: int
     state: str
     expires_at: float
     updated_at: float
@@ -27955,6 +28081,8 @@ def _claim_select() -> sa.Select[Any]:
         claims.c.uuid, claims.c.namespace, claims.c.limit_cpus,
         claims.c.limit_memory_mb, claims.c.limit_disk_gb,
         claims.c.used_cpus, claims.c.used_memory_mb, claims.c.used_disk_gb,
+        claims.c.peak_used_cpus, claims.c.peak_used_memory_mb,
+        claims.c.peak_used_disk_gb,
         claims.c.state,
         sa.func.unix_timestamp(claims.c.expires_at).label('expires_at'),
         sa.func.unix_timestamp(claims.c.updated_at).label('updated_at'))
@@ -27971,6 +28099,9 @@ def _claim_row_to_dict(row: sa.Row[Any]) -> NamespaceClaimRow:
         'used_cpus': int(row.used_cpus),
         'used_memory_mb': int(row.used_memory_mb),
         'used_disk_gb': int(row.used_disk_gb),
+        'peak_used_cpus': int(row.peak_used_cpus),
+        'peak_used_memory_mb': int(row.peak_used_memory_mb),
+        'peak_used_disk_gb': int(row.peak_used_disk_gb),
         'state': str(row.state),
         'expires_at': float(row.expires_at or 0),
         'updated_at': float(row.updated_at or 0),
@@ -28239,6 +28370,13 @@ def _direct_create_namespace_claim(
                     'capacity', requested=limits, migrated=migrated)
 
             # (3) namespace_claims, second in the canonical order.
+            # The high-water mark is seeded from the same migrated
+            # drawdown as used_*, and in the same statement. A claim
+            # created over a namespace which already holds instances has
+            # already reached that figure, so a mark of zero would be
+            # wrong and the next reconcile pass would raise it anyway --
+            # which would make the seeding look like a defect rather
+            # than the fix (D3).
             conn.execute(sa.insert(claims).values(
                 uuid=claim_key,
                 namespace=namespace,
@@ -28248,6 +28386,9 @@ def _direct_create_namespace_claim(
                 used_cpus=migrated['cpus'],
                 used_memory_mb=migrated['memory_mb'],
                 used_disk_gb=migrated['disk_gb'],
+                peak_used_cpus=migrated['cpus'],
+                peak_used_memory_mb=migrated['memory_mb'],
+                peak_used_disk_gb=migrated['disk_gb'],
                 state=CLAIM_STATE_ACTIVE,
                 expires_at=_claim_expiry_expression(expires_in_seconds),
                 updated_at=sa.func.now()))
@@ -28773,6 +28914,9 @@ def _claim_from_proto(claim: Any) -> NamespaceClaimRow:
         'used_cpus': int(claim.used_cpus),
         'used_memory_mb': int(claim.used_memory_mb),
         'used_disk_gb': int(claim.used_disk_gb),
+        'peak_used_cpus': int(claim.peak_used_cpus),
+        'peak_used_memory_mb': int(claim.peak_used_memory_mb),
+        'peak_used_disk_gb': int(claim.peak_used_disk_gb),
         'state': claim.state,
         'expires_at': float(claim.expires_at),
         'updated_at': float(claim.updated_at),
