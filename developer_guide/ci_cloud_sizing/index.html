@@ -15244,13 +15244,14 @@ an unbounded harvest downloads the whole ninety day retention window;
 bundles are cached by artifact id under <code>~/.cache/shakenfist-ci-headroom</code>
 by default, outside any checkout, and an already-cached bundle is never
 re-fetched. Two things about it are deliberate and worth knowing before
-changing it. A merge run builds six cluster bundles and five are
-classified for harvest, but only four carry the probe today: <code>Ansible
-modules</code> is classified ahead of the <code>shakenfist/actions</code> change that
-instruments it
-(<a href="https://github.com/shakenfist/shakenfist/issues/4377">#4377</a>), so until
-that lands its records carry <code>series_present: false</code>, which is an
-expected absence rather than a probe failure. The sixth, <code>Node
+changing it. A merge run builds six cluster bundles, five are
+classified for harvest, and all five carry the probe. <code>Ansible modules</code>
+was classified ahead of the <code>shakenfist/actions</code> change that instruments
+it (<a href="https://github.com/shakenfist/shakenfist/issues/4377">#4377</a>); that
+change merged on 2026-10-01, and the bundle has recorded a real series
+since. Harvests over the window before it read <code>series_present: false</code>
+for that bundle, which is an expected absence rather than a probe
+failure. The sixth, <code>Node
 lifecycle</code>, is skipped <em>by name</em> with the reason recorded in the source,
 so it never appears as missing data; and a
 bundle whose artifact name the tool has no entry for raises
@@ -15432,9 +15433,11 @@ the warn window read. That call site passes
 being unset leaves the gate on. The other three call sites of
 <code>smoke-cluster.yml</code> pass <code>headroom_gate: false</code>: the smoke tier job (pull
 requests only, a single node, never harvested because the harvest reads
-<code>merge_group</code> runs), the Ansible modules job (its collect step does not
-run at all until <a href="https://github.com/shakenfist/shakenfist/issues/4377">#4377</a>
-lands), and the dispatch-only matrix in <code>scheduled-tests.yml</code> (whose
+<code>merge_group</code> runs), the Ansible modules job (measured since
+<a href="https://github.com/shakenfist/shakenfist/issues/4377">#4377</a>, but never
+fitted to the band, and the reusable workflow resolves the gate to false
+for any <code>test_kind</code> but <code>functional</code> whatever the caller passes), and the
+dispatch-only matrix in <code>scheduled-tests.yml</code> (whose
 single machine entry has never been harvested). Every call site has to
 pass one of those two values explicitly. The reusable workflow leaves
 the gate off when nothing is passed (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/102" title="GitHub Issue: shakenfist/actions #102">actions#102</a>; before it,

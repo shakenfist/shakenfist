@@ -15334,12 +15334,10 @@ than against real CPU, because the ledger is what the scheduler
 actually admits onto. Of the bounds checked against it, only the
 cluster-wide upper bound can fail a job -- nothing else does. A probe
 samples every cluster job that runs through the reusable smoke-cluster
-workflow with <code>test_kind: functional</code> and publishes a series recording
-what the cluster actually carried. The Ansible modules job reaches that
-workflow too but is not probed until
-<a href="https://github.com/shakenfist/shakenfist/issues/4377">#4377</a> lands, and
-the jobs that deploy through the composite action instead are not probed
-yet (<a href="https://github.com/shakenfist/shakenfist/issues/4367">#4367</a>). See
+workflow with <code>test_kind: functional</code> or <code>test_kind: ansible-modules</code>,
+and publishes a series recording what the cluster actually carried. The
+jobs that deploy through the composite action instead are not probed yet
+(<a href="https://github.com/shakenfist/shakenfist/issues/4367">#4367</a>). See
 <a href="../ci_cloud_sizing/">CI cloud sizing and headroom</a> for the sizing
 model, the instrumentation and how to re-measure it.</p>
 <h2 id="coverage-the-functional-suite-does-not-have">Coverage the functional suite does not have<a class="headerlink" href="#coverage-the-functional-suite-does-not-have" title="Permanent link">&para;</a></h2>
