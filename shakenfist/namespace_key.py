@@ -30,6 +30,7 @@ from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
 from shakenfist.schema.namespace_key_data import NamespaceKeyData
@@ -218,11 +219,16 @@ class NamespaceKey(dbo):
         which need it must read that rather than the nonce property,
         which re-reads from the database and so can legitimately come
         back empty.
+
+        A rotation also repairs a key which has no state row (issue
+        3836): a create whose state write failed leaves exactly that,
+        and the caller's retry arrives here as a rotation.
         """
         existing = cls.from_db_by_name(namespace, name)
         if existing:
             existing.rotate(plaintext_secret, expiry=expiry, scopes=scopes,
                             provenance=provenance)
+            existing._heal_missing_state()
             return existing
 
         key_uuid = str(uuid4())
@@ -257,12 +263,28 @@ class NamespaceKey(dbo):
                     f'namespace key {namespace}:{name} was not persisted')
             existing.rotate(plaintext_secret, expiry=expiry, scopes=scopes,
                             provenance=provenance)
+            existing._heal_missing_state()
             return existing
 
         k.minted_nonce = nonce
         k.state = cls.STATE_INITIAL
         k.state = cls.STATE_CREATED
         return k
+
+    def _heal_missing_state(self) -> None:
+        """Give a key which has no state row the states a create writes.
+
+        Issue 3836: a create which failed between the row inserts and
+        the state writes leaves a live key with no state row, and the
+        retry reaches new() as a rotation, which writes no state. Does
+        nothing if the key has a state.
+        """
+        if self.state.value is not None:
+            return
+        self.state = self.STATE_INITIAL
+        self.state = self.STATE_CREATED
+        self.add_event(EVENT_TYPE_AUDIT,
+                       'rotation repaired a key which had no state row')
 
     def rotate(self, plaintext_secret: str, expiry: Optional[float] = None,
                scopes: Optional[list[str]] = None,
