@@ -2003,21 +2003,36 @@ def _vdi_console_address(node):
     NODE_EGRESS_IP the hosting node's north/south address. node.ip is the
     mesh (east/west) address the node registered with, which is often on
     a network that clients cannot route to. SPICE and VNC listen on every
-    interface (see libvirt.tmpl), so either address reaches the console
-    when it is routable. Fall back to the mesh address when no usable
-    egress address is configured: NODE_EGRESS_IP defaults to empty, and
-    the deployer's default is 127.0.0.1, which would point the viewer at
-    its own host.
+    IPv4 interface (listen='0.0.0.0' in libvirt.tmpl), so either address
+    reaches the console when it is routable.
+
+    Fall back to the mesh address when no usable egress address is
+    configured. NODE_EGRESS_IP defaults to empty, and the deployer's
+    default is 127.0.0.1, which would point the viewer at its own host.
+    An IPv6 address has nothing listening on it; an unspecified,
+    link-local or multicast address cannot be dialled from a client; and
+    a value which is not an IP literal at all is a typo in a field
+    documented as an IP. Those are operator mistakes rather than the
+    default, so they are logged.
     """
     egress = config.NODE_EGRESS_IP.strip()
-    if egress:
-        try:
-            if not ipaddress.ip_address(egress).is_loopback:
-                return egress
-        except ValueError:
-            # A hostname rather than an IP literal. It is still the
-            # operator's chosen north/south address.
-            return egress
+    if not egress:
+        return node.ip
+
+    try:
+        addr = ipaddress.ip_address(egress)
+    except ValueError:
+        addr = None
+
+    if addr is not None and addr.version == 4 and not (
+            addr.is_loopback or addr.is_unspecified or addr.is_link_local
+            or addr.is_multicast):
+        return egress
+
+    if addr is None or not addr.is_loopback:
+        LOG.with_fields({'node_egress_ip': egress, 'fallback': node.ip}).warning(
+            'NODE_EGRESS_IP is not a usable IPv4 address for console clients, '
+            'falling back to the mesh IP')
     return node.ip
 
 

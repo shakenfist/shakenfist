@@ -737,29 +737,29 @@ class BaseTestCase(testtools.TestCase):
             nodes.append(n)
         return nodes
 
-    def _local_ipv4_addresses(self):
-        """The set of IPv4 addresses configured on the local host."""
-        out, _ = process.execute('ip', '-json', 'addr', 'show')
+    @staticmethod
+    def _parse_ipv4_addresses(ip_json):
+        """The set of IPv4 addresses in `ip -json addr show` output."""
         addresses = set()
-        for link in json.loads(out):
+        for link in json.loads(ip_json):
             for addr in link.get('addr_info', []):
                 if addr.get('family') == 'inet' and addr.get('local'):
                     addresses.add(addr['local'])
         return addresses
 
-    def _node_addresses(self, node):
-        """The set of IP addresses configured on a cluster node.
+    def _local_ipv4_addresses(self):
+        """The set of IPv4 addresses configured on the local host."""
+        out, _ = process.execute('ip', '-json', 'addr', 'show')
+        return self._parse_ipv4_addresses(out)
+
+    def _node_ipv4_addresses(self, node):
+        """The set of IPv4 addresses configured on a cluster node.
 
         The nodes API reports only a node's mesh IP; this asks the node
         itself, so it also sees its egress address.
         """
         out, _ = self._node_exec(node, ['ip', '-json', 'addr', 'show'])
-        addresses = set()
-        for link in json.loads(out):
-            for addr in link.get('addr_info', []):
-                if addr.get('local'):
-                    addresses.add(addr['local'])
-        return addresses
+        return self._parse_ipv4_addresses(out)
 
     def _node_is_local(self, node):
         """Whether node is the host the suite is running on.

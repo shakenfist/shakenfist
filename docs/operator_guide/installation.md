@@ -176,9 +176,16 @@ all:
 The mesh network carries east/west traffic between nodes, so it need not be
 routable from anywhere else. `node_egress_ip` is the north/south address, and
 it is the hypervisor address that users are given in `virt-viewer` files from
-the `vdiconsolehelper` API call. Set it to an address that console clients can
-reach. If it is left unset, or set to a loopback address such as the deployer's
-default of `127.0.0.1`, those files fall back to the node's mesh IP.
+the `vdiconsolehelper` API call. Set it to an IPv4 address that console clients
+can reach, and make sure the hypervisor's VDI port range (the `vdi` and
+`vdi_tls` ports) is open on that address from wherever those clients run.
+Firewall rules written when console clients reached hypervisors over the mesh
+may cover only that network. SPICE and VNC listen on IPv4 only, so an IPv6 address is not
+used. If it is left unset, set to a loopback address such as the deployer's
+default of `127.0.0.1`, or set to anything else a client cannot dial (an
+unspecified, link-local or multicast address, or a value that is not an IP
+address), those files fall back to the node's mesh IP. Values other than unset
+and loopback are logged as a warning when that happens.
 
 For a single machine, put `localhost` in every group — see
 `examples/single-node/inventory.yaml` for exactly that.

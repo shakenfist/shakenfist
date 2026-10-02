@@ -90,20 +90,6 @@ class TestVDIConsoleFile(base.BaseNamespacedTestCase):
             UUID_RE.match(vv['host']),
             'the .vv host is a UUID, which resolves nowhere: %s' % vv['host'])
 
-        # And it must be an address of the node hosting the instance. That
-        # is the node's egress IP where one is configured, which the nodes
-        # API does not report (it has only the mesh IP), so ask the node.
-        refreshed = self.test_client.get_instance(inst['uuid'])
-        node = self._node_by_identifier(nodes, refreshed.get('node'))
-        self.assertIsNotNone(
-            node, 'instance placement %s matches no node' % refreshed.get('node'))
-        self._require_node_exec(node)
-        addresses = self._node_addresses(node)
-        self.addDetail(
-            'placement_node_addresses',
-            content.text_content(json.dumps(sorted(addresses), indent=4)))
-        self.assertIn(vv['host'], addresses)
-
         # At least one connection port, and every port numeric.
         self.assertTrue(
             'port' in vv or 'tls-port' in vv,
@@ -124,6 +110,22 @@ class TestVDIConsoleFile(base.BaseNamespacedTestCase):
         self.assertIn('-----END CERTIFICATE-----', pem)
 
         self._assert_tls_port_is_pinned(vv)
+
+        # Last, because it needs exec on the node and skips without it:
+        # the host must be an address of the node hosting the instance.
+        # That is the node's egress IP where one is configured, which the
+        # nodes API does not report (it has only the mesh IP), so ask the
+        # node.
+        refreshed = self.test_client.get_instance(inst['uuid'])
+        node = self._node_by_identifier(nodes, refreshed.get('node'))
+        self.assertIsNotNone(
+            node, 'instance placement %s matches no node' % refreshed.get('node'))
+        self._require_node_exec(node)
+        addresses = self._node_ipv4_addresses(node)
+        self.addDetail(
+            'placement_node_addresses',
+            content.text_content(json.dumps(sorted(addresses), indent=4)))
+        self.assertIn(vv['host'], addresses)
 
     def test_spiceconcurrent_vv_type_is_collapsed(self):
         """The internal VDI enum must never reach the viewer.

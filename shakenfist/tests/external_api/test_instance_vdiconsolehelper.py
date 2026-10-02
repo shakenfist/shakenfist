@@ -157,6 +157,47 @@ class InstanceVDIConsoleHelperEndpointTestCase(base.ShakenFistTestCase):
 
             self.assertEqual('10.0.0.1', vv['host'])
 
+    def test_egress_ip_is_stripped(self):
+        config.NODE_EGRESS_IP = '  192.168.1.53\n'
+        instance_uuid = self._make_instance(
+            'spice', {'vdi_port': 31002, 'vdi_tls_port': 31003})
+
+        vv = self._get_vv(instance_uuid)
+
+        self.assertEqual('192.168.1.53', vv['host'])
+
+    def test_unusable_egress_ip_falls_back_to_mesh_ip(self):
+        # SPICE and VNC listen on 0.0.0.0 only, so an IPv6 egress address
+        # has nothing behind it. The others cannot be dialled from a
+        # client, and a non-IP value is a typo in a field documented as
+        # an IP.
+        for egress in ('2001:db8::53', '0.0.0.0', '169.254.1.53',
+                       '224.0.0.53', '192.168.1.5x', 'sf-3.example.com'):
+            config.NODE_EGRESS_IP = egress
+            instance_uuid = self._make_instance(
+                'spice', {'vdi_port': 31002, 'vdi_tls_port': 31003})
+
+            vv = self._get_vv(instance_uuid)
+
+            self.assertEqual('10.0.0.1', vv['host'], egress)
+
+    def test_only_operator_mistakes_are_logged(self):
+        # The deployer's loopback default is the expected case and must
+        # not log on every console fetch; a value an operator set which
+        # is then ignored must say so.
+        for egress, expect_warning in (('127.0.0.1', False),
+                                       ('2001:db8::53', True),
+                                       ('192.168.1.5x', True)):
+            config.NODE_EGRESS_IP = egress
+            instance_uuid = self._make_instance(
+                'spice', {'vdi_port': 31002, 'vdi_tls_port': 31003})
+
+            with mock.patch('shakenfist.external_api.instance.LOG') as log:
+                self._get_vv(instance_uuid)
+
+            warned = log.with_fields.return_value.warning.called
+            self.assertEqual(expect_warning, warned, egress)
+
     def test_plain_spice_and_vnc_pass_through(self):
         for vdi_type in ('spice', 'vnc'):
             instance_uuid = self._make_instance(
