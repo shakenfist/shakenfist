@@ -1023,7 +1023,7 @@ those are corrected here as well.
 | 4. Re-shape the topologies against the phase 2 data | [PLAN-ci-cloud-sizing-phase-04-topologies.md](PLAN-ci-cloud-sizing-phase-04-topologies.md) | Complete | `870a5fbec` (#4202), `6856aad74` (#4289) |
 | 5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger | [PLAN-ci-cloud-sizing-phase-05-guardrails.md](PLAN-ci-cloud-sizing-phase-05-guardrails.md) | Complete | `de87bcde2` (#4308), `633c56b31` (shakenfist/actions#94), `704416829` (#4328), `e2243a554` (shakenfist/actions#102) |
 | 6. Documentation, and the instrument seam the propagation half turned out to be | [PLAN-ci-cloud-sizing-phase-06-docs.md](PLAN-ci-cloud-sizing-phase-06-docs.md) | Complete | `174c0b819` (#4373), `cd9a89242` (#4396), `a742c99b0` (shakenfist/actions#120) |
-| 7. Push audit | PLAN-ci-cloud-sizing-phase-07-push-audit.md | Not started | — |
+| 7. Push audit | [PLAN-ci-cloud-sizing-phase-07-push-audit.md](PLAN-ci-cloud-sizing-phase-07-push-audit.md) | In progress | — |
 
 The `Merged` column records what put each phase on `develop`. These
 entries were reconstructed after the fact, because the plan did not
@@ -1358,16 +1358,20 @@ If the audit finds nothing, that is recorded in one sentence.
 Two things make this plan's audit unusual and are worth planning
 for rather than discovering. The work is split across
 repositories -- the probe and its tooling live here, the
-invocation lives in `shakenfist/actions` -- so the audit of the
-half that landed elsewhere runs against that repository's default
-branch, as part of the pull request that lands it, and this phase
-cites that audit rather than re-running it. And most of the
-change is CI configuration and measurement tooling rather than
-product code, so the wave 2 code-quality and security lenses have
-less to read than usual while the documentation lens has more:
-the sizing model, the ledger arithmetic and the band all have to
-say the same thing in `docs/developer_guide/ci.md` as the
-topology files do.
+invocation lives in `shakenfist/actions`. That repository has no
+`PUSH-AUDIT.md`, so there is no audit of the other half to cite
+and the phase 7 plan's D2 audits those three merges from here,
+read-only, filing rather than fixing. And the balance between the
+wave 2 lenses is not what it looks like: most of the change is CI
+configuration and measurement tooling, but `shakenfist/scheduler.py`
+is in three of the ranges and `shakenfist/config.py` in one, and
+two of those added fields to the `/admin/resources` response, so
+the code-quality and security lenses have real product code to
+read. The documentation lens has the most: the sizing model, the
+ledger arithmetic and the band all have to say the same thing on
+`docs/developer_guide/ci_cloud_sizing.md` -- which phase 6
+created as the canonical page, with `docs/developer_guide/ci.md`
+carrying a summary and a link -- as the topology files do.
 
 ## Agent guidance
 
