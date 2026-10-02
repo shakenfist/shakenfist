@@ -225,7 +225,7 @@ phases 0, 1b and 3 all rely on `create()` failing when power on fails.
 |-------|------|--------|--------|
 | 0. Assert power state in the existing lifecycle tests | [PLAN-power-state-correctness-phase-00-assertions.md](PLAN-power-state-correctness-phase-00-assertions.md) | Complete | `250a40871` |
 | 1a. Honest libvirt domain listing | [PLAN-power-state-correctness-phase-01a-listing.md](PLAN-power-state-correctness-phase-01a-listing.md) | Complete | `8aa69c5e4` |
-| 1b. The cleaner sees powered off domains | [PLAN-power-state-correctness-phase-01b-inactive-domains.md](PLAN-power-state-correctness-phase-01b-inactive-domains.md) | In progress | — |
+| 1b. The cleaner sees powered off domains | [PLAN-power-state-correctness-phase-01b-inactive-domains.md](PLAN-power-state-correctness-phase-01b-inactive-domains.md) | Complete | `447ed75ae` |
 | 2. Autostart and instance restore | PLAN-power-state-correctness-phase-02-autostart-restore.md | Not started | — |
 | 3. Power operations answer truthfully | PLAN-power-state-correctness-phase-03-power-api.md | Not started | — |
 | 4. Push audit | PLAN-power-state-correctness-phase-04-push-audit.md | Not started | — |
@@ -352,6 +352,13 @@ has the detail as S1 to S14 and D1 to D9.
 On `CRASHED`: an inactive domain is always `off`, with libvirt's
 shutoff reason recorded in the event and never branched on. The first
 loop's unreachable active `crashed` branch is left and documented (D7).
+
+Landed as [#4395](https://github.com/shakenfist/shakenfist/pull/4395).
+Functional run
+[36721352515](https://github.com/shakenfist/shakenfist/actions/runs/36721352515)
+confirmed on a real hypervisor that a guest poweroff reads `shutdown`
+and a SIGKILLed qemu reads `crashed`. It merged before brief 8's sfcbr
+inventory was taken.
 
 ### Phase 2: autostart and instance restore
 

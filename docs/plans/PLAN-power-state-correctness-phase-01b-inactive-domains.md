@@ -852,6 +852,23 @@ in the pull request description.
 * [ ] Brief 8's inventory counts are in the pull request description,
       and Mikal has looked at every line in a deleting branch.
 
+## Outcome
+
+Landed as [#4395](https://github.com/shakenfist/shakenfist/pull/4395),
+merge commit `447ed75ae`. The second functional run
+([36721352515](https://github.com/shakenfist/shakenfist/actions/runs/36721352515))
+passed every job, and both new tests ran rather than skipping: a guest
+poweroff reads `shutdown` and a SIGKILLed qemu reads `crashed`, so D7
+stands. The first run
+([36705724407](https://github.com/shakenfist/shakenfist/actions/runs/36705724407))
+failed only because `pkill -f` killed its own ssh shell. The Definition
+of done holds on `develop`: no `expectedFailure` remains in the cleaner
+tests, the second loop iterates `get_inactive_sf_domains()` and the
+apparmor sweep `get_all_domain_uuids()`. The one item not met is the
+last: the pull request merged before brief 8's sfcbr inventory was
+taken, so the deleting branches met sfcbr's inactive domains without
+that review.
+
 ## Back brief
 
 Before starting step 1, back brief Mikal on the three places this plan
