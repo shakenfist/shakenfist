@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-power-state-correctness-phase-01a-listing/">
+        <link rel="canonical" href="https://shakenfist.com/plans/PLAN-power-state-correctness-phase-01b-inactive-domains/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Phase 1a -- Honest libvirt domain listing - Shaken Fist</title>
+        <title>Phase 1b -- The cleaner sees powered off domains - Shaken Fist</title>
       
     
     
@@ -97,7 +97,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#phase-1a-honest-libvirt-domain-listing" class="md-skip">
+        <a href="#phase-1b-the-cleaner-sees-powered-off-domains" class="md-skip">
           Skip to content
         </a>
       
@@ -133,7 +133,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Phase 1a -- Honest libvirt domain listing
+              Phase 1b -- The cleaner sees powered off domains
             
           </span>
         </div>
@@ -14700,10 +14700,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#s1-the-two-old-helpers-are-one-filter-applied-twice" class="md-nav__link">
+  <a href="#s1-a-node-lock-cannot-time-out" class="md-nav__link">
     <span class="md-ellipsis">
       
-        S1 -- the two old helpers are one filter applied twice
+        S1 -- a node lock cannot time out
       
     </span>
   </a>
@@ -14711,10 +14711,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#s2-a-third-helper-exists-and-stays" class="md-nav__link">
+  <a href="#s2-the-instance-lock-is-a-complete-guard" class="md-nav__link">
     <span class="md-ellipsis">
       
-        S2 -- a third helper exists, and stays
+        S2 -- the instance lock is a complete guard
       
     </span>
   </a>
@@ -14722,10 +14722,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#s3-four-callers-all-wanting-active-sf-domains" class="md-nav__link">
+  <a href="#s3-instdelete-is-not-the-delete-path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        S3 -- four callers, all wanting active SF domains
+        S3 -- inst.delete() is not the delete path
       
     </span>
   </a>
@@ -14733,10 +14733,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#s4-a-crashed-domain-is-never-active-in-production" class="md-nav__link">
+  <a href="#s4-for-deleted-the-by-hand-teardown-is-correct" class="md-nav__link">
     <span class="md-ellipsis">
       
-        S4 -- a crashed domain is never active in production
+        S4 -- for deleted, the by-hand teardown is correct
       
     </span>
   </a>
@@ -14744,10 +14744,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#s5-which-fake-expectations-an-honest-listing-breaks" class="md-nav__link">
+  <a href="#s5-a-database-error-can-still-read-as-unknown-domain-delete-it" class="md-nav__link">
     <span class="md-ellipsis">
       
-        S5 -- which fake expectations an honest listing breaks
+        S5 -- a database error can still read as "unknown domain, delete it"
       
     </span>
   </a>
@@ -14755,10 +14755,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#s6-the-test-runner-honours-unittestexpectedfailure" class="md-nav__link">
+  <a href="#s6-the-domain-name-is-trusted" class="md-nav__link">
     <span class="md-ellipsis">
       
-        S6 -- the test runner honours unittest.expectedFailure
+        S6 -- the domain name is trusted
       
     </span>
   </a>
@@ -14766,10 +14766,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#s7-another-plan-already-asked-for-this" class="md-nav__link">
+  <a href="#s7-the-apparmor-sweep-reads-the-second-loops-list" class="md-nav__link">
     <span class="md-ellipsis">
       
-        S7 -- another plan already asked for this
+        S7 -- the apparmor sweep reads the second loop's list
       
     </span>
   </a>
@@ -14777,10 +14777,76 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#s8-mypy-is-strict-on-this-file" class="md-nav__link">
+  <a href="#s8-error-states-re-enter" class="md-nav__link">
     <span class="md-ellipsis">
       
-        S8 -- mypy is strict on this file
+        S8 -- error states re-enter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#s9-the-shutoff-reason-is-available-and-unused" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S9 -- the shutoff reason is available and unused
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#s10-crashed-is-documented-as-terminal-and-is-never-produced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S10 -- crashed is documented as terminal and is never produced
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#s11-nothing-writes-agent_state-when-a-guest-powers-itself-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S11 -- nothing writes agent_state when a guest powers itself off
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#s12-the-unit-test-fakes-need-three-honest-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S12 -- the unit test fakes need three honest details
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#s13-the-functional-helpers-fit-and-one-message-goes-stale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S13 -- the functional helpers fit, and one message goes stale
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#s14-database-load" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        S14 -- database load
       
     </span>
   </a>
@@ -14805,10 +14871,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#d1-two-helpers-each-one-listalldomains-call" class="md-nav__link">
+  <a href="#d1-node-locks-get-an-optional-timeout" class="md-nav__link">
     <span class="md-ellipsis">
       
-        D1 -- two helpers, each one listAllDomains() call
+        D1 -- node locks get an optional timeout
       
     </span>
   </a>
@@ -14816,10 +14882,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#d2-move-every-caller-to-the-active-helper-and-delete-the-old-ones" class="md-nav__link">
+  <a href="#d2-every-cleaner-write-happens-under-the-lock-after-a-re-read" class="md-nav__link">
     <span class="md-ellipsis">
       
-        D2 -- move every caller to the active helper, and delete the old ones
+        D2 -- every cleaner write happens under the lock, after a re-read
       
     </span>
   </a>
@@ -14827,10 +14893,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#d3-get_active_domain_ids-is-left-on-listdomainsid" class="md-nav__link">
+  <a href="#d3-confirm-absence-before-deleting-an-unknown-domain" class="md-nav__link">
     <span class="md-ellipsis">
       
-        D3 -- get_active_domain_ids() is left on listDomainsID()
+        D3 -- confirm absence before deleting an unknown domain
       
     </span>
   </a>
@@ -14838,10 +14904,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#d4-the-honest-fake-lists-by-state-and-keeps-crashed-active" class="md-nav__link">
+  <a href="#d4-a-domains-name-must-agree-with-its-uuid" class="md-nav__link">
     <span class="md-ellipsis">
       
-        D4 -- the honest fake lists by state, and keeps crashed active
+        D4 -- a domain's name must agree with its uuid
       
     </span>
   </a>
@@ -14849,10 +14915,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#d5-the-shutoff-expectation-becomes-its-own-expected-failure" class="md-nav__link">
+  <a href="#d5-a-stale-delete-wait-instance-is-re-enqueued-not-deleted-in-place" class="md-nav__link">
     <span class="md-ellipsis">
       
-        D5 -- the shutoff expectation becomes its own expected failure
+        D5 -- a stale delete-wait instance is re-enqueued, not deleted in place
       
     </span>
   </a>
@@ -14860,10 +14926,43 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#d6-no-new-tests-for-the-resources-or-sidechannel-callers" class="md-nav__link">
+  <a href="#d6-files-missing-is-recorded-once" class="md-nav__link">
     <span class="md-ellipsis">
       
-        D6 -- no new tests for the resources or sidechannel callers
+        D6 -- files missing is recorded once
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d7-a-powered-off-domain-is-off-the-reason-is-recorded-never-branched-on" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D7 -- a powered off domain is off; the reason is recorded, never branched on
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d8-the-apparmor-sweep-lists-every-defined-domain-itself" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D8 -- the apparmor sweep lists every defined domain itself
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d9-stray-domains-of-instances-in-state-error-are-left-alone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D9 -- stray domains of instances in state error are left alone
       
     </span>
   </a>
@@ -14888,10 +14987,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#brief-1-the-helpers-and-their-unit-tests" class="md-nav__link">
+  <a href="#brief-1-a-bounded-node-lock" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Brief 1 -- the helpers and their unit tests
+        Brief 1 -- a bounded node lock
       
     </span>
   </a>
@@ -14899,10 +14998,76 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#brief-2-the-callers-the-fake-the-expected-failure" class="md-nav__link">
+  <a href="#brief-2-shutoff-reasons-and-every-domains-uuid" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Brief 2 -- the callers, the fake, the expected failure
+        Brief 2 -- shutoff reasons and every domain's uuid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brief-3-a-strict-instance-lookup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Brief 3 -- a strict instance lookup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brief-4-the-guards-before-anything-is-switched-on" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Brief 4 -- the guards, before anything is switched on
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brief-5-the-switch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Brief 5 -- the switch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brief-6-functional-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Brief 6 -- functional tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brief-7-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Brief 7 -- documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brief-8-inventory-before-merge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Brief 8 -- inventory before merge
       
     </span>
   </a>
@@ -14937,10 +15102,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#outcome" class="md-nav__link">
+  <a href="#back-brief" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Outcome
+        Back brief
       
     </span>
   </a>
@@ -14948,10 +15113,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
+  <a href="#future-work" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Back brief
+        Future work
       
     </span>
   </a>
@@ -14979,228 +15144,362 @@
   
 
 
-<h1 id="phase-1a-honest-libvirt-domain-listing">Phase 1a -- Honest libvirt domain listing<a class="headerlink" href="#phase-1a-honest-libvirt-domain-listing" title="Permanent link">&para;</a></h1>
+<h1 id="phase-1b-the-cleaner-sees-powered-off-domains">Phase 1b -- The cleaner sees powered off domains<a class="headerlink" href="#phase-1b-the-cleaner-sees-powered-off-domains" title="Permanent link">&para;</a></h1>
 <p>Part of <a href="../PLAN-power-state-correctness/">PLAN-power-state-correctness.md</a>.
-Phase 0 landed as <a href="https://github.com/shakenfist/shakenfist/pull/4327">#4327</a>
-(<code>250a40871</code>), so <code>power_state</code> is now asserted throughout the lifecycle
-tests before anything in this phase or phase 1b touches the cleaner.</p>
-<p><strong>Planning effort:</strong> medium, as the master plan asks. This phase changes
-names and test fakes, not behaviour. The judgement calls are the helpers'
-shape (D1), what an honest fake says about a crashed domain (D4), and
-how the tests phase 1b will need are held ready (D5).</p>
+Phase 1a landed as <a href="https://github.com/shakenfist/shakenfist/pull/4372">#4372</a>
+(<code>8aa69c5e4</code>). It gave the cleaner <code>get_inactive_sf_domains()</code>, made the
+cleaner test's libvirt fake list domains the way libvirt does, and left
+<code>test_update_power_states_detects_shutoff</code> as an expected failure for
+this phase to turn on.</p>
+<p><strong>Planning effort:</strong> high, as the master plan asks. This phase makes
+live the cleaner code which deletes disks and undefines domains, and
+that code has not run against a powered off domain since 2022. A wrong
+answer here is data loss, not a wrong status field. <strong>Review effort:</strong>
+high for steps 4 and 5, which change what the cleaner deletes.</p>
 <h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
 <p><strong>In scope:</strong></p>
 <ul>
-<li>Two helpers on <code>LibvirtConnection</code> in <code>shakenfist/util/libvirt.py</code>,
-  <code>get_active_sf_domains()</code> and <code>get_inactive_sf_domains()</code>, each one
-  <code>listAllDomains()</code> call. Unit tests for both.</li>
-<li>Moving the four callers of <code>get_all_domains()</code> and <code>get_sf_domains()</code>
-  to <code>get_active_sf_domains()</code>, which keeps their current behaviour, and
-  deleting the two old helpers.</li>
-<li>Rewriting <code>test_daemon_cleaner.py</code>'s libvirt fake so it lists domains
-  the way libvirt does, and turning the one expectation that fails as a
-  result into an expected failure for phase 1b.</li>
-<li>Correcting the stale claims the survey found. These are fixed at their
-  source in the planning commit, so later steps should not redo them.</li>
+<li>Pointing the cleaner's second loop at <code>get_inactive_sf_domains()</code>, so
+  a guest which powers itself off is recorded as <code>off</code>, with its
+  <code>agent_state</code> and libvirt's shutoff reason.</li>
+<li>The guards that the second loop's deleting branches never needed
+  while they were dead: an instance lock with a bounded wait, a re-read
+  of the domain inside it, a validated uuid, a confirmed absence before
+  deleting an unknown domain, a re-entry guard on "instance files
+  missing", and a delete path which does not leak.</li>
+<li>Applying the same lock, re-read, uuid validation and confirmed
+  absence to the first loop. The lock and re-read fix F13.</li>
+<li>Giving the apparmor sweep its own listing of every defined domain.</li>
+<li>Unit tests for every guard, each shown to fail when its guard is
+  removed, and a functional test of a guest powering itself off.</li>
+<li>Correcting the master plan's phase 1b section where the survey found
+  it wrong. That is done in this phase's planning commit, so later steps
+  should not redo it.</li>
 </ul>
 <p><strong>Out of scope:</strong></p>
 <ul>
-<li>Any behaviour change. In particular, the cleaner's second loop and the
-  apparmor sweep keep iterating active domains, and <code>instances_total</code>
-  keeps counting only active domains. Pointing the cleaner at inactive
-  domains is phase 1b. That phase needs the guards listed in the master
-  plan first.</li>
-<li><code>get_active_domain_ids()</code>. It stays on <code>listDomainsID()</code> (D3).</li>
-<li>A helper listing foreign (non-<code>sf:</code>) domains for the apparmor sweep.
-  Phase 1b decides what that sweep reads, because changing its input
-  changes what it deletes.</li>
-<li>Unit tests for the resources daemon's domain counting and the
-  sidechannel's monitor discovery. Neither has one today, and this phase
-  changes only which method each calls (D6).</li>
+<li>The rest of <a href="https://github.com/shakenfist/shakenfist/issues/3373">#3373</a>:
+  the gRPC wrappers in <code>mariadb.py</code> still report a non-retryable
+  <code>RpcError</code> as "not found". This phase adds a strict lookup for the
+  cleaner alone (D3), shaped so #3373 can later make it the default.</li>
+<li>Autostart, instance restore and F3's <code>_health_check_kvm_process</code>,
+  which are phase 2.</li>
+<li>What power operations return (F4 to F8, F12), which is phase 3.</li>
+<li>Mapping libvirt's rarer states (F9), and the first loop's unreachable
+  <code>crashed</code> branch beyond documenting it (D7).</li>
+<li>Stray domains belonging to instances whose delete ended in state
+  <code>error</code> (D9).</li>
+<li>Changing <code>instances_total</code> in the resources daemon.</li>
 </ul>
 <h2 id="what-the-survey-found">What the survey found<a class="headerlink" href="#what-the-survey-found" title="Permanent link">&para;</a></h2>
-<p>The master plan's phase 1a section is right in substance. The survey
-found one helper it does not mention, a fake detail it does not decide,
-and an overlapping future-work item in another plan. The master plan and
-<code>docs/plans/index.md</code> are corrected in this phase's planning commit.</p>
-<h3 id="s1-the-two-old-helpers-are-one-filter-applied-twice">S1 -- the two old helpers are one filter applied twice<a class="headerlink" href="#s1-the-two-old-helpers-are-one-filter-applied-twice" title="Permanent link">&para;</a></h3>
-<p><code>get_all_domains()</code> (<code>util/libvirt.py:217-229</code>) iterates
-<code>listDomainsID()</code>, calls <code>lookupByID()</code> for each id, and already skips
-any domain whose name does not start with <code>sf:</code>. <code>get_sf_domains()</code>
-(<code>:182-190</code>) wraps it and applies the same filter again. Despite their
-names, both return exactly the active SF domains. This matches F1.</p>
-<h3 id="s2-a-third-helper-exists-and-stays">S2 -- a third helper exists, and stays<a class="headerlink" href="#s2-a-third-helper-exists-and-stays" title="Permanent link">&para;</a></h3>
-<p><code>get_active_domain_ids()</code> (<code>util/libvirt.py:192-215</code>) was added by
-<code>9ffb387b8</code> on 2026-09-13, after the master plan's audit, for the
-resources daemon's 5 second poll (<code>resources/main.py:824</code>). It returns
-<code>set(self.conn.listDomainsID())</code>, unfiltered, and its docstring explains
-why. It is honestly named already. Its docstring refers to
-<code>get_all_domains()</code>, so that reference needs updating when the old
-helper goes.</p>
-<h3 id="s3-four-callers-all-wanting-active-sf-domains">S3 -- four callers, all wanting active SF domains<a class="headerlink" href="#s3-four-callers-all-wanting-active-sf-domains" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Caller</th>
-<th>Current call</th>
-<th>What it does with the result</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>daemons/cleaner/scheduled_tasks.py:108</code></td>
-<td><code>get_sf_domains()</code></td>
-<td>First loop: records power state and fills <code>seen</code>.</td>
-</tr>
-<tr>
-<td><code>daemons/cleaner/scheduled_tasks.py:222</code></td>
-<td><code>get_all_domains()</code></td>
-<td>Second loop: acts on domains absent from <code>seen</code>, which is none of them in practice (F1). Its <code>startswith('sf:')</code> check at <code>:227</code> is dead, and its comment says "Inactive VMs just have a name", which is false.</td>
-</tr>
-<tr>
-<td><code>daemons/resources/main.py:497</code></td>
-<td><code>get_all_domains()</code></td>
-<td>Sums <code>info()</code> over domains where <code>isActive() == 1</code>, and counts <code>instances_total</code> and <code>instances_active</code> from the same set, so the two are always equal.</td>
-</tr>
-<tr>
-<td><code>daemons/sidechannel/main.py:2011</code></td>
-<td><code>get_sf_domains()</code></td>
-<td>Starts monitors for SF domains not <code>off</code>, <code>crashed</code> or <code>paused</code>.</td>
-</tr>
-</tbody>
-</table>
-<p><code>grep -rn 'get_all_domains\|get_sf_domains'</code> over <code>shakenfist/</code> finds
-nothing else. No test patches either method by name.</p>
-<h3 id="s4-a-crashed-domain-is-never-active-in-production">S4 -- a crashed domain is never active in production<a class="headerlink" href="#s4-a-crashed-domain-is-never-active-in-production" title="Permanent link">&para;</a></h3>
-<p>Our domain XML sets <code>&lt;on_crash&gt;restart&lt;/on_crash&gt;</code>
-(<code>deploy/collection/roles/hypervisor/files/libvirt.tmpl:40</code>) and
-declares no panic device. qemu therefore never reports a guest crash to
-libvirt, and a guest that panics simply reboots or hangs. libvirt
-reports <code>VIR_DOMAIN_CRASHED</code> for an <em>active</em> domain only under
-<code>on_crash</code> <code>preserve</code>, so the cleaner's first-loop <code>crashed</code> branch
-(<code>scheduled_tasks.py:155-161</code>) is unreachable on a Shaken Fist
-hypervisor. Libvirt's API still permits it, though. This bears on D4, and
-on phase 1b's open question about mapping a <code>CRASHED</code> shutoff reason, so
-the master plan's phase 1b section now says so.</p>
-<h3 id="s5-which-fake-expectations-an-honest-listing-breaks">S5 -- which fake expectations an honest listing breaks<a class="headerlink" href="#s5-which-fake-expectations-an-honest-listing-breaks" title="Permanent link">&para;</a></h3>
-<p><code>FakeLibvirtConnection</code> (<code>tests/test_daemon_cleaner.py:48-97</code>) serves
-seven domains from <code>listDomainsID()</code>: running, a foreign <code>apache2</code>,
-shutoff, crashed, paused, PM-suspended and I/O-error paused. In libvirt
-only the shutoff one is inactive. When the fake lists only active
-domains:</p>
-<ul>
-<li><code>test_update_power_states</code> loses its <code>('shutoff', 'off')</code> expectation:
-  no loop sees that domain, so its instance keeps <code>power_state</code> unset.
-  This expectation is phase 1b's to meet.</li>
-<li><code>test_update_power_states_does_not_enforce_capacity</code> still passes,
-  because the running domain is still placed.</li>
-<li><code>test_update_power_states_pets_watchdog</code> still passes.</li>
-<li><code>test_crashed_delete_wait_instance_is_marked_deleted</code> passes only if
-  the crashed domain stays active (D4).</li>
-</ul>
-<h3 id="s6-the-test-runner-honours-unittestexpectedfailure">S6 -- the test runner honours <code>unittest.expectedFailure</code><a class="headerlink" href="#s6-the-test-runner-honours-unittestexpectedfailure" title="Permanent link">&para;</a></h3>
-<p>The repository has no expected-failure test yet. A check against the
-pinned <code>testtools</code> 2.9.1 in <code>.tox/py3</code> confirmed that
-<code>@unittest.expectedFailure</code> on a <code>testtools.TestCase</code> method is reported
-as an expected failure when it fails. An unexpected success fails the
-run. So phase 1b cannot make the test pass and forget to remove the
-decorator.</p>
-<h3 id="s7-another-plan-already-asked-for-this">S7 -- another plan already asked for this<a class="headerlink" href="#s7-another-plan-already-asked-for-this" title="Permanent link">&para;</a></h3>
-<p><code>PLAN-transient-capacity-refusals.md</code>'s Future work has an item, "Make
-<code>get_all_domains()</code> one libvirt call" (<code>:1199-1209</code>). This phase
-resolves it. Its line references are stale: it cites the resources
-caller at <code>:401</code>, which is now <code>:497</code>. Step 2 updates the entry to point
-here.</p>
-<h3 id="s8-mypy-is-strict-on-this-file">S8 -- mypy is strict on this file<a class="headerlink" href="#s8-mypy-is-strict-on-this-file" title="Permanent link">&para;</a></h3>
-<p><code>tox -emypy</code> runs <code>util/libvirt.py</code> with <code>--disallow-untyped-defs</code>
-(<code>tox.ini:107</code>), so the new helpers need full annotations. They follow
-the existing <code>Iterator[Any]</code> return type.</p>
+<p>The master plan's phase 1b section has the right list of hazards, but
+three of its prescriptions would not work as written, and the survey
+found one hazard it does not list. The master plan's phase 1b section
+is corrected in this phase's planning commit.</p>
+<h3 id="s1-a-node-lock-cannot-time-out">S1 -- a node lock cannot time out<a class="headerlink" href="#s1-a-node-lock-cannot-time-out" title="Permanent link">&para;</a></h3>
+<p><code>NodeLock.__enter__</code> (<code>util/concurrency.py:386-404</code>) retries every 0.2
+seconds until it gets the lock, forever. <code>get_lock()</code> drops its
+<code>timeout</code> argument for node scope (<code>baseobject.py:537-538</code>), so sf-queues
+restore's <code>get_lock(timeout=120, ..., global_scope=False)</code>
+(<code>daemons/queues/startup_tasks.py:154</code>) has never timed out. The master
+plan's "instance lock with a short timeout, skip if busy" therefore
+needs a timeout added first. That is cheap: a single lock request is
+already non-blocking, because <code>_node_lock_request()</code> returns whether the
+lock was granted (<code>util/concurrency.py:326-364</code>).</p>
+<h3 id="s2-the-instance-lock-is-a-complete-guard">S2 -- the instance lock is a complete guard<a class="headerlink" href="#s2-the-instance-lock-is-a-complete-guard" title="Permanent link">&para;</a></h3>
+<p>Every call that defines, starts, destroys or undefines one of our domains
+is in <code>instance.py</code>:
+* <code>_power_on_inner()</code>
+* <code>_power_on_retry_prep()</code>
+* <code>power_off()</code>
+* <code>_delete_on_hypervisor()</code></p>
+<p>Every caller of those holds the instance's node lock:
+* the power endpoints (<code>external_api/instance.py:1529-1660</code>);
+* instance create and start (<code>operations/node_inst_netdesc_op.py:469</code>
+  and <code>:368</code>);
+* the queued delete (<code>operations/node_inst_op.py:188</code>).</p>
+<p>The cleaner is the only thing that changes an instance's power state
+without the lock. A cleaner which takes the lock and re-reads the
+domain inside it cannot observe a domain mid-way through a power on,
+power off or delete. The master plan's skip of <code>initial</code>, <code>preflight</code>
+and <code>creating</code> becomes belt and braces, and costs nothing, so it stays.</p>
+<h3 id="s3-instdelete-is-not-the-delete-path">S3 -- <code>inst.delete()</code> is not the delete path<a class="headerlink" href="#s3-instdelete-is-not-the-delete-path" title="Permanent link">&para;</a></h3>
+<p>For the <code>delete-wait</code> branch the master plan proposes <code>inst.delete()</code>,
+"as the first loop does" (F11). <code>delete()</code> runs
+<code>_delete_on_hypervisor()</code> and <code>_delete_globally()</code>
+(<code>instance.py:1616-1627</code>). The queued delete also does two things
+<code>delete()</code> does not (<code>operations/node_inst_op.py:201-240</code>):
+* It deletes the instance's network interfaces.
+* It cleans up networks no longer used on the node.</p>
+<p><code>_delete_globally()</code> sets the state to <code>deleted</code>. Any queued delete
+behind it then returns early (<code>node_inst_op.py:193</code>), so the interfaces
+would never be deleted. The delete path is <code>enqueue_delete()</code>
+(<code>instance.py:2515</code>) (D5).</p>
+<p>The first loop's <code>inst.delete()</code> does not have this problem. It only
+runs for instances already in <code>deleted</code>, whose global teardown has run.</p>
+<h3 id="s4-for-deleted-the-by-hand-teardown-is-correct">S4 -- for <code>deleted</code>, the by-hand teardown is correct<a class="headerlink" href="#s4-for-deleted-the-by-hand-teardown-is-correct" title="Permanent link">&para;</a></h3>
+<p>When the instance is already <code>deleted</code>, the second loop's local rmtree
+and undefine are the right action: the global half ran, and a queued
+delete would return early. Only its <code>state = deleted</code> write is redundant,
+and it is a no-op anyway (<code>baseobject.py:586-587</code>).</p>
+<h3 id="s5-a-database-error-can-still-read-as-unknown-domain-delete-it">S5 -- a database error can still read as "unknown domain, delete it"<a class="headerlink" href="#s5-a-database-error-can-still-read-as-unknown-domain-delete-it" title="Permanent link">&para;</a></h3>
+<p>Both of the cleaner's <code>not inst</code> branches treat <code>Instance.from_db()</code>
+returning <code>None</code> as "a Shaken Fist domain the database has never heard
+of", and delete it:
+* <strong>The first loop, live today.</strong> It runs <code>virsh destroy</code>, <code>virsh
+  undefine</code> and rmtree on the instance's directory
+  (<code>scheduled_tasks.py:115-119</code>, <code>:38-58</code>). That is a running instance
+  and its disks.
+* <strong>The second loop, once this phase makes it live.</strong> It would do the
+  same to a powered off instance.</p>
+<p><strong>What #3373's first half already covers.</strong> It landed as <code>19f2d5354</code>,
+although the issue is still open. An outage which exhausts
+<code>_grpc_call()</code>'s retries on <code>UNAVAILABLE</code>, <code>DEADLINE_EXCEEDED</code> or
+<code>CANCELLED</code> now raises <code>DatabaseUnavailable</code> (<code>mariadb.py:741</code>, <code>:900</code>).
+That exception is not a <code>grpc.RpcError</code>, so it gets past
+<code>_grpc_get_instance()</code>'s handler. It is not a <code>libvirtError</code> either, so
+it aborts the cleaner's pass rather than deleting anything, and
+<code>_resilient_job</code> retries the pass a minute later. The broad outage
+case is safe today.</p>
+<p><strong>What is still open.</strong> Any <em>non-retryable</em> <code>RpcError</code> is raised on
+the first attempt. <code>_grpc_get_instance()</code> still maps it to <code>None</code>
+(<code>mariadb.py:20371-20375</code>). The likely source is <code>UNKNOWN</code> or
+<code>INTERNAL</code>, which is what sf-database answers when its handler raises,
+for example on the InnoDB trouble recorded against sf-database. #3373
+lists that as its follow-on work. <code>_direct_get_instance()</code> does the same
+with <code>OperationalError</code>, but only sf-database and sf-ctl use the direct
+path (<code>DIRECT_MARIADB_CALLERS</code>, <code>mariadb.py:566</code>), and the cleaner never
+does.</p>
+<p>So a narrower hazard remains live in the first loop and would become
+live in the second: one server-side error on one lookup deletes one
+instance's disks.</p>
+<h3 id="s6-the-domain-name-is-trusted">S6 -- the domain name is trusted<a class="headerlink" href="#s6-the-domain-name-is-trusted" title="Permanent link">&para;</a></h3>
+<p>The instance uuid is <code>domain.name().split(':')[1]</code>, unvalidated.
+* <strong>A domain named <code>sf:</code>.</strong> <code>from_db('')</code> returns <code>None</code> early
+  (<code>baseobject.py:373-374</code>), so <code>_delete_instance_files('')</code> removes
+  <code>STORAGE_PATH/instances/</code> itself.
+* <strong>A domain named <code>sf:garbage</code>.</strong> It raises <code>ValueError</code> from <code>UUID()</code>
+  in <code>Instance._db_get()</code> (<code>instance.py:487</code>). That is not a
+  <code>libvirtError</code>, so it escapes the loop's handler and aborts the rest
+  of the pass, apparmor sweep included, every minute.</p>
+<p>The first loop also interpolates the suffix into a shell command
+(<code>scheduled_tasks.py:43-45</code>).</p>
+<p><code>libvirt.tmpl</code> sets the domain's <code>&lt;uuid&gt;</code> to the instance uuid, so
+<code>domain.UUIDString()</code> is an independent check.</p>
+<h3 id="s7-the-apparmor-sweep-reads-the-second-loops-list">S7 -- the apparmor sweep reads the second loop's list<a class="headerlink" href="#s7-the-apparmor-sweep-reads-the-second-loops-list" title="Permanent link">&para;</a></h3>
+<p><code>all_libvirt_uuids</code> is filled by the second loop (<code>scheduled_tasks.py:223-227</code>).</p>
+<p><strong>If that loop reads inactive domains.</strong> The sweep would believe no
+running domain exists. Running Shaken Fist instances would survive only
+because their instance directory also exists.</p>
+<p><strong>What the list has held since before 1a.</strong> Only <code>sf:</code> domains (F1).
+So the profiles of a foreign VM on the hypervisor are already eligible
+for deletion once they are old enough.</p>
+<p><strong>If listing fails.</strong> The list stays empty, and every old profile
+without an instance directory becomes eligible.</p>
+<h3 id="s8-error-states-re-enter">S8 -- error states re-enter<a class="headerlink" href="#s8-error-states-re-enter" title="Permanent link">&para;</a></h3>
+<p>The "instance files missing" branch writes <code>&lt;state&gt;-error</code>:
+* From an error state, that is invalid, and raises.
+* From <code>error</code>, it writes <code>error-error</code>, which is equally invalid.</p>
+<p><code>error</code> matters because <code>_delete_globally()</code> leaves an errored
+instance's delete in state <code>error</code>, not <code>deleted</code> (<code>instance.py:1611-1614</code>).
+None of the branches' skip lists include <code>error</code>.</p>
+<h3 id="s9-the-shutoff-reason-is-available-and-unused">S9 -- the shutoff reason is available and unused<a class="headerlink" href="#s9-the-shutoff-reason-is-available-and-unused" title="Permanent link">&para;</a></h3>
+<p><code>extract_power_state()</code> discards the reason <code>domain.state()</code> returns
+(<code>util/libvirt.py:72-86</code>). The pause reason already has a
+display-string table and a raw-enum predicate (<code>util/libvirt.py:12-31</code>,
+<code>:88-123</code>), which is the precedent here.</p>
+<p>libvirt's shutoff reasons are <code>UNKNOWN</code>, <code>SHUTDOWN</code>, <code>DESTROYED</code>,
+<code>CRASHED</code>, <code>MIGRATED</code>, <code>SAVED</code>, <code>FAILED</code>, <code>FROM_SNAPSHOT</code> and <code>DAEMON</code>.
+The expected mappings are:
+* a guest <code>poweroff</code> gives <code>SHUTDOWN</code>;
+* our <code>power_off()</code> (<code>destroy()</code>) gives <code>DESTROYED</code>;
+* a qemu killed by a signal gives <code>CRASHED</code>, according to libvirt's qemu
+  driver.</p>
+<p>The last is unverified here, and step 6 checks it where the suite can
+run commands on the hypervisor.</p>
+<h3 id="s10-crashed-is-documented-as-terminal-and-is-never-produced">S10 -- <code>crashed</code> is documented as terminal and is never produced<a class="headerlink" href="#s10-crashed-is-documented-as-terminal-and-is-never-produced" title="Permanent link">&para;</a></h3>
+<p><code>docs/operator_guide/power_states.md:11</code> says a <code>crashed</code> instance is
+also in state <code>error</code>. Only the first loop writes <code>crashed</code>, for an
+<em>active</em> crashed domain. Phase 1a found that branch unreachable, because
+<code>on_crash</code> is <code>restart</code> in <code>libvirt.tmpl</code> and there is no panic device.</p>
+<h3 id="s11-nothing-writes-agent_state-when-a-guest-powers-itself-off">S11 -- nothing writes <code>agent_state</code> when a guest powers itself off<a class="headerlink" href="#s11-nothing-writes-agent_state-when-a-guest-powers-itself-off" title="Permanent link">&para;</a></h3>
+<p>The sidechannel drops its monitor within a second of the domain going
+inactive (<code>daemons/sidechannel/main.py:2033-2053</code>). It writes nothing on
+the way out, so <code>agent_state</code> keeps its last value, usually ready. Only
+<code>power_off()</code> writes <code>AGENT_INSTANCE_OFF</code> (<code>instance.py:2409</code>).</p>
+<h3 id="s12-the-unit-test-fakes-need-three-honest-details">S12 -- the unit test fakes need three honest details<a class="headerlink" href="#s12-the-unit-test-fakes-need-three-honest-details" title="Permanent link">&para;</a></h3>
+<p>In <code>test_daemon_cleaner.py</code>:
+* <code>FakeLibvirtDomain.UUIDString()</code> returns <code>'fake_uuid'</code>.
+* It has no <code>isActive()</code>.
+* The connection's <code>lookupByName()</code> returns a <em>running</em> domain whatever
+  it is asked for.</p>
+<p>Nothing fakes the node lock, which has no socket in unit tests. The
+cleaner does not take one today.</p>
+<h3 id="s13-the-functional-helpers-fit-and-one-message-goes-stale">S13 -- the functional helpers fit, and one message goes stale<a class="headerlink" href="#s13-the-functional-helpers-fit-and-one-message-goes-stale" title="Permanent link">&para;</a></h3>
+<p><code>_await_power_off()</code> (<code>deploy/shakenfist_ci/base.py:787</code>) waits for the
+"detected poweroff" event, and nothing calls it yet.
+<code>_await_instance_event()</code> allows five minutes after create, which covers
+one or two cleaner passes (open question 5).</p>
+<p><code>_assert_power_state()</code> reads once, by phase 0's D1. It appends an F13
+hint to its failure message (<code>base.py:815-817</code>), which this phase makes
+stale.</p>
+<h3 id="s14-database-load">S14 -- database load<a class="headerlink" href="#s14-database-load" title="Permanent link">&para;</a></h3>
+<p><strong>Steady state.</strong> A powered off instance whose database row already says
+<code>off</code> costs the cleaner, per pass:
+* its static values (cached for 300 seconds);
+* its state;
+* <code>place_instance()</code>, which takes and releases the placement attribute
+  lock, reads the placement and returns early;
+* its power state.</p>
+<p>That is four or five requests a minute, 0.07 to 0.08 requests a second.
+It is the same as the cleaner already spends on each running instance,
+and the node lock (D1) is a local socket that costs the database
+nothing.</p>
+<p><strong>The budget.</strong> <code>shakenfist/data/database_load_budget.yaml</code> charges the
+cleaner per standing instance, meaning per instance in state <code>created</code>.
+Powered off instances are already counted in that. So the model's form
+does not change. Its fitted slope was measured on clusters where few
+instances were off, so it rises by at most the fraction of instances
+powered off, and on CI that is close to zero.</p>
+<p><strong>Where the new cost goes.</strong> A lock and a re-read are taken only when
+the cleaner is about to write, which is once per power change, not once
+per pass.</p>
+<p>No budget change is proposed.</p>
 <h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
-<h3 id="d1-two-helpers-each-one-listalldomains-call">D1 -- two helpers, each one <code>listAllDomains()</code> call<a class="headerlink" href="#d1-two-helpers-each-one-listalldomains-call" title="Permanent link">&para;</a></h3>
-<p>Add <code>get_active_sf_domains()</code> and <code>get_inactive_sf_domains()</code>, both
-returning <code>Iterator[Any]</code>. They share a private
-<code>_list_sf_domains(flags)</code>, which calls
-<code>self.conn.listAllDomains(flags)</code> once and yields the domains whose
-<code>name()</code> starts with <code>sf:</code>. The flags are
-<code>self.libvirt.VIR_CONNECT_LIST_DOMAINS_ACTIVE</code> and
-<code>VIR_CONNECT_LIST_DOMAINS_INACTIVE</code>. Read them from the module
-<code>get_libvirt()</code> returned, as <code>extract_power_state()</code> does, so the test
-fakes can supply them.</p>
-<p>The <code>sf</code> in the names stays. Every caller wants SF domains only, and a
-name that hides a filter is how <code>get_all_domains()</code> misled the apparmor
-sweep (F1).</p>
-<p><code>get_inactive_sf_domains()</code> has no caller until phase 1b. It is added
-here anyway so that phase 1b is a change to callers and guards against a
-helper this phase has already unit-tested, and so the pair's names make
-the choice visible at every call site. This is the decision most open
-to argument: it adds a method with no caller. The alternative is to
-leave it to phase 1b, and the cost of that is small either way.</p>
-<p><code>listAllDomains()</code> returns domain objects, so the per-domain
-<code>lookupByID()</code> and the race between listing and looking up both go
-away. A domain that disappears between <code>listDomainsID()</code> and
-<code>lookupByID()</code> used to be skipped silently. Now it is either in the
-listing or not. <code>name()</code> reads a field the python binding already holds,
-so it adds no round trip.</p>
-<h3 id="d2-move-every-caller-to-the-active-helper-and-delete-the-old-ones">D2 -- move every caller to the active helper, and delete the old ones<a class="headerlink" href="#d2-move-every-caller-to-the-active-helper-and-delete-the-old-ones" title="Permanent link">&para;</a></h3>
-<p>All four callers in S3 call <code>get_active_sf_domains()</code>. <code>get_all_domains()</code>
-and <code>get_sf_domains()</code> are deleted, with no aliases: an alias would keep
-the misleading name callable.</p>
-<p>The second cleaner loop gets the same call, which makes its uselessness
-visible. Its comment is replaced with one saying that it deliberately
-still iterates active domains, so it acts only when the first loop left
-<code>seen</code> incomplete, and that phase 1b points it at inactive domains (F1).
-The dead <code>startswith('sf:')</code> check at <code>:227</code> stays. Phase 1b rewrites
-this loop, and leaving it keeps this diff to the call and its comment.</p>
-<p>The resources daemon keeps its <code>isActive()</code> check. It is redundant
-against an active listing, but it guards a domain that stops between the
-listing and <code>info()</code>, and removing it is not this phase's business.</p>
-<h3 id="d3-get_active_domain_ids-is-left-on-listdomainsid">D3 -- <code>get_active_domain_ids()</code> is left on <code>listDomainsID()</code><a class="headerlink" href="#d3-get_active_domain_ids-is-left-on-listdomainsid" title="Permanent link">&para;</a></h3>
-<p>It is a change detector for a 5 second poll. It deliberately does not
-filter by name, because filtering needs a per-domain call, and its
-docstring gives the reasons. <code>listAllDomains()</code> would also be a single
-call, but it would return objects the poll does not need, and the
-function is honestly named already. Only its docstring changes: it drops
-the comparison with <code>get_all_domains()</code> and describes the cost
-difference against <code>get_active_sf_domains()</code> instead.</p>
-<h3 id="d4-the-honest-fake-lists-by-state-and-keeps-crashed-active">D4 -- the honest fake lists by state, and keeps crashed active<a class="headerlink" href="#d4-the-honest-fake-lists-by-state-and-keeps-crashed-active" title="Permanent link">&para;</a></h3>
-<p>The cleaner test's <code>FakeLibvirtConnection</code> gets
-<code>listAllDomains(flags)</code> in place of <code>listDomainsID()</code> and <code>lookupByID()</code>.
-It builds the same seven domains and returns those whose state matches
-the flags. <code>VIR_DOMAIN_SHUTOFF</code> is inactive and every other state is
-active. <code>FakeLibvirt</code> gains the two flag constants, with libvirt's values
-1 and 2.</p>
-<p>The fake <strong>drops</strong> <code>listDomainsID()</code> and <code>lookupByID()</code> rather than
-keeping them. Code that goes back to the old path then fails with an
-<code>AttributeError</code> instead of quietly passing against a fake which still
-serves it.</p>
-<p>The crashed domain stays in the active set. S4 says our hypervisors
-never produce an active crashed domain. But the fake's job is to behave
-like libvirt, not like our template, and libvirt does return one under
-<code>on_crash</code> <code>preserve</code>. Keeping it active also keeps
-<code>test_crashed_delete_wait_instance_is_marked_deleted</code> covering a branch
-of production code which still exists. Whether that branch should exist
-is phase 1b's CRASHED question.</p>
-<h3 id="d5-the-shutoff-expectation-becomes-its-own-expected-failure">D5 -- the shutoff expectation becomes its own expected failure<a class="headerlink" href="#d5-the-shutoff-expectation-becomes-its-own-expected-failure" title="Permanent link">&para;</a></h3>
-<p><code>test_update_power_states</code> drops <code>('shutoff', 'off')</code> from its
-expectation list and keeps the other four. A new test,
-<code>test_update_power_states_detects_shutoff</code>, sets up the same instances,
-runs <code>update_power_states()</code>, and asserts the shutoff instance's
-<code>power_state</code> is <code>off</code>. It is decorated with <code>@unittest.expectedFailure</code>
-and has a docstring naming F1 and phase 1b.</p>
-<p>A separate test, not a decorator on the existing one: an expected
-failure hides every other assertion in the same test. The four
-expectations that do hold must keep failing loudly if they break.</p>
-<p>By S6, phase 1b has to remove the decorator in the same change that
-makes the test pass.</p>
-<h3 id="d6-no-new-tests-for-the-resources-or-sidechannel-callers">D6 -- no new tests for the resources or sidechannel callers<a class="headerlink" href="#d6-no-new-tests-for-the-resources-or-sidechannel-callers" title="Permanent link">&para;</a></h3>
-<p>Each caller changes one method name for another with the same contract.
-That contract is unit-tested in <code>test_util_libvirt.py</code> by step 1. Testing
-<code>_get_stats()</code> or the monitor discovery loop would mean mocking large
-functions for a rename. The functional suite exercises both:
-<code>instances_active</code> feeds the metrics the node tests read, and every
-guest test that waits for agent ready needs a sidechannel monitor. The
-PR's smoke job covers them, and step 3 dispatches the guest suite
-because the sidechannel path matters to every guest test.</p>
+<h3 id="d1-node-locks-get-an-optional-timeout">D1 -- node locks get an optional timeout<a class="headerlink" href="#d1-node-locks-get-an-optional-timeout" title="Permanent link">&para;</a></h3>
+<p><code>NodeLock(name, timeout=None)</code>. <code>None</code> keeps today's wait-forever
+behaviour. A number raises a new <code>exceptions.NodeLockTimeout</code> (a
+<code>LockException</code>) once that many seconds have passed without the lock.
+<code>get_lock()</code> gains a keyword <code>node_timeout=None</code>, passed only to
+<code>NodeLock</code>.</p>
+<p><code>get_lock()</code>'s existing <code>timeout</code> is not reused for node scope:
+* sf-queues restore passes <code>timeout=120</code> with <code>global_scope=False</code>, and
+  would start timing out;
+* every other node-scope caller gets the default of 60 without asking
+  for it.</p>
+<p>Neither change belongs in this phase.</p>
+<h3 id="d2-every-cleaner-write-happens-under-the-lock-after-a-re-read">D2 -- every cleaner write happens under the lock, after a re-read<a class="headerlink" href="#d2-every-cleaner-write-happens-under-the-lock-after-a-re-read" title="Permanent link">&para;</a></h3>
+<p>Before the cleaner writes an instance's <code>power_state</code>, <code>agent_state</code> or
+<code>state</code>, or enqueues or performs a delete, it:
+1. takes <code>inst.get_lock(op=..., global_scope=False, node_timeout=2)</code>;
+2. inside the lock, looks the domain up again with
+   <code>lc.get_domain_from_sf_uuid()</code> and re-derives what it was about to
+   write from that fresh domain and a fresh read of the instance;
+3. writes only if the fresh reading still calls for it.</p>
+<p><strong>When the lock is unavailable.</strong> On <code>NodeLockTimeout</code> or
+<code>MissingNodeLockSocket</code> the domain is skipped for this pass at debug
+level. The next pass retries.</p>
+<p><strong>The steady state takes no lock.</strong> When the database already agrees
+with libvirt there is nothing to write. This applies to both loops, and
+in the first loop it is the fix for F13.</p>
+<p><strong>Why two seconds.</strong> Holders of the instance lock are power operations,
+creates and deletes, which take seconds to minutes. Waiting on them
+would hold up the whole pass, and a minute later the cleaner gets
+another chance.</p>
+<h3 id="d3-confirm-absence-before-deleting-an-unknown-domain">D3 -- confirm absence before deleting an unknown domain<a class="headerlink" href="#d3-confirm-absence-before-deleting-an-unknown-domain" title="Permanent link">&para;</a></h3>
+<p><code>exceptions.DatabaseUnavailable</code> already exists (S5). Add a keyword-only
+<code>strict=False</code> to <code>mariadb.get_instance()</code>. When it is true, the
+wrapper re-raises <em>any</em> <code>grpc.RpcError</code> it would have mapped to <code>None</code>
+as <code>DatabaseUnavailable</code>, chained from the original error, and the
+direct path does the same for <code>OperationalError</code>. A genuine miss still
+returns <code>None</code>.</p>
+<p>In both loops, when <code>Instance.from_db()</code> returns <code>None</code>, the cleaner
+calls <code>mariadb.get_instance(uuid, strict=True)</code>:
+* <strong>It raises.</strong> The domain is skipped for this pass, and the cleaner
+  logs a warning naming #3373.
+* <strong>It returns a row.</strong> The first lookup was the error. The domain is
+  skipped for this pass, and the next pass handles it normally.
+* <strong>It returns <code>None</code> without raising.</strong> The domain really is unknown,
+  and the existing deletion proceeds.</p>
+<p><code>DatabaseUnavailable</code> raised by <code>from_db()</code> itself keeps aborting the
+pass, as it does today. The whole database is unreachable, so nothing
+else in the pass would succeed either.</p>
+<p><strong>Why not finish #3373.</strong> Mapping non-retryable errors to an exception
+in all of the wrappers changes every caller behind them, which is a
+change of its own.</p>
+<p><strong>Why in this phase.</strong> This phase turns the second loop's deleting
+branch on, and the first loop's branch is the same code shape, so it
+uses the same helper.</p>
+<p>The strict path is written so #3373 can make it the default and delete
+the keyword.</p>
+<h3 id="d4-a-domains-name-must-agree-with-its-uuid">D4 -- a domain's name must agree with its uuid<a class="headerlink" href="#d4-a-domains-name-must-agree-with-its-uuid" title="Permanent link">&para;</a></h3>
+<p>One helper, <code>_sf_instance_uuid(domain) -&gt; str | None</code>, returns the name's
+suffix only when it equals <code>domain.UUIDString()</code>. Otherwise it logs a
+warning naming both, and the cleaner skips that domain entirely: no
+lookup, no delete, and no <code>virsh</code> command. Both loops call it before
+anything else.</p>
+<p>This is stronger than <code>util_general.valid_uuid4()</code>, which accepts any
+32 hex digits because <code>uuid.UUID(..., version=4)</code> overwrites the version
+bits rather than checking them. It also fails safe. A legacy domain
+whose uuid does not match is left alone rather than deleted.</p>
+<h3 id="d5-a-stale-delete-wait-instance-is-re-enqueued-not-deleted-in-place">D5 -- a stale <code>delete-wait</code> instance is re-enqueued, not deleted in place<a class="headerlink" href="#d5-a-stale-delete-wait-instance-is-re-enqueued-not-deleted-in-place" title="Permanent link">&para;</a></h3>
+<p>This deliberately differs from the master plan's F11 prescription, for
+the reason in S3.</p>
+<p><strong>For <code>delete-wait</code>.</strong> After the existing five minute grace, and under
+D2's lock, the cleaner calls <code>inst.enforced_deletes_increment()</code>. It then
+acts on the count:
+* On counts 1, 6 and 11, roughly five minutes apart, it calls
+  <code>inst.enqueue_delete()</code> and adds the audit event "stray powered off
+  instance delete enqueued" with <code>{'attempt': n}</code>.
+* On count 16 it adds "stray powered off instance delete abandoned" at
+  error level.
+* On other counts it does nothing.</p>
+<p>The counter is the one the first loop's escalation uses. An instance
+cannot be in both loops' deleting branches at once.</p>
+<p><strong>For <code>deleted</code>.</strong> The by-hand local teardown stays (S4). It moves
+inside the lock, and loses its redundant state write.</p>
+<h3 id="d6-files-missing-is-recorded-once">D6 -- files missing is recorded once<a class="headerlink" href="#d6-files-missing-is-recorded-once" title="Permanent link">&para;</a></h3>
+<p>The "instance files missing" branch changes state only when the instance
+is not in <code>Instance.ERROR_STATES</code>, a set which includes <code>error</code>. When it
+does, it moves to <code>&lt;state&gt;-error</code> and then sets
+<code>inst.error = 'instance files missing'</code>, in the same order as the I/O
+error branch, because the error setter rejects a message on a
+non-error state. From an error state it does nothing, logging at debug
+level.</p>
+<h3 id="d7-a-powered-off-domain-is-off-the-reason-is-recorded-never-branched-on">D7 -- a powered off domain is <code>off</code>; the reason is recorded, never branched on<a class="headerlink" href="#d7-a-powered-off-domain-is-off-the-reason-is-recorded-never-branched-on" title="Permanent link">&para;</a></h3>
+<p>The cleaner writes <code>power_state = 'off'</code> for every inactive domain,
+whatever the shutoff reason. The reason is display only, like the pause
+reason:
+* <code>SHUTOFF_REASON_STRINGS</code> and <code>extract_shutoff_reason()</code> are added to
+  <code>util/libvirt.py</code>, next to their pause equivalents.
+* The reason goes in the "detected poweroff" event's <code>extra</code>, as
+  <code>{'reason': ..., 'previous_power_state': ...}</code>.</p>
+<p>An inactive domain never produces <code>crashed</code>, and the instance's state
+does not change.</p>
+<p><strong>The write order is load-bearing:</strong> <code>power_state</code>, then
+<code>agent_state = AGENT_INSTANCE_OFF</code>, then the event. The functional test
+waits for the event and then reads <code>power_state</code> once (phase 0's D1).</p>
+<p><strong>The first loop's active <code>crashed</code> branch is left as it is.</strong> It is
+unreachable with <code>on_crash=restart</code>, and <code>power_states.md</code> will say so.</p>
+<p>This is the decision most likely to be argued with. The master plan
+framed a crash as the case F3 was trying to catch, and mapping
+<code>CRASHED</code> to <code>crashed</code> would match the documented meaning. It is not
+done here, for three reasons:
+* <strong>It is recoverable.</strong> A qemu killed by the OOM killer comes back with
+  a power on. Documented <code>crashed</code> means state <code>error</code>, which is
+  terminal and allows only deletion.
+* <strong>The reason may not persist.</strong> libvirt may not keep an inactive
+  domain's shutoff reason across a libvirtd restart. This is
+  unverified, and step 6 records what it sees. Branching on a value
+  that may read <code>unknown</code> after a restart would make the same guest
+  <code>off</code> or <code>crashed</code> depending on when libvirtd last restarted.
+* <strong>Operators still see the difference.</strong> The event records the reason,
+  which is what the mission asks for: distinguishing an OOM kill from a
+  guest <code>poweroff</code>.</p>
+<h3 id="d8-the-apparmor-sweep-lists-every-defined-domain-itself">D8 -- the apparmor sweep lists every defined domain itself<a class="headerlink" href="#d8-the-apparmor-sweep-lists-every-defined-domain-itself" title="Permanent link">&para;</a></h3>
+<p><code>LibvirtConnection.get_all_domain_uuids()</code> returns
+<code>{d.UUIDString() for d in self.conn.listAllDomains(0)}</code>. Flags <code>0</code> means
+every defined domain, active or inactive, including foreign ones. The
+sweep calls it directly rather than reading a list built by the second
+loop. If it raises <code>libvirtError</code>, the sweep is skipped for this pass.
+The comment's claim about foreign domains then becomes true (F1).</p>
+<h3 id="d9-stray-domains-of-instances-in-state-error-are-left-alone">D9 -- stray domains of instances in state <code>error</code> are left alone<a class="headerlink" href="#d9-stray-domains-of-instances-in-state-error-are-left-alone" title="Permanent link">&para;</a></h3>
+<p>When an errored instance is deleted, it ends in state <code>error</code> (S8). If
+its undefine failed, its domain lingers. This phase records the domain
+as <code>off</code> and does not delete it. <code>error</code> is not a deleted state:
+state_targets allows deleting it again. Deciding when such a domain is
+a stray needs the state machine work this plan declared out of scope.
+It is recorded as future work.</p>
 <h2 id="step-plan">Step plan<a class="headerlink" href="#step-plan" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -15218,190 +15517,450 @@ because the sidechannel path matters to every guest test.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>See brief 1. Commit: "libvirt: list domains by active or inactive."</td>
+<td>See brief 1. Commit: "Give node locks an optional timeout."</td>
 </tr>
 <tr>
 <td>2</td>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>See brief 2. Commit: "Move domain listing callers to named helpers."</td>
+<td>See brief 2. Commit: "libvirt: shutoff reasons and all domain uuids."</td>
 </tr>
 <tr>
 <td>3</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>See brief 3. Commit: "Add a strict instance lookup for deletions."</td>
+</tr>
+<tr>
+<td>4</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>See brief 4. Commit: "cleaner: guard deletes and power state writes."</td>
+</tr>
+<tr>
+<td>5</td>
+<td>high</td>
+<td>opus</td>
+<td>none</td>
+<td>See brief 5. Commit: "cleaner: detect powered off instances."</td>
+</tr>
+<tr>
+<td>6</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td>See brief 6. Commit: "Test a guest powering itself off."</td>
+</tr>
+<tr>
+<td>7</td>
 <td>low</td>
+<td>sonnet</td>
+<td>none</td>
+<td>See brief 7. Commit: "Document detected power off."</td>
+</tr>
+<tr>
+<td>8</td>
+<td>medium</td>
 <td>management session</td>
 <td>none</td>
-<td>Run <code>tox -epy3</code>, <code>tox -emypy</code> and <code>pre-commit run --all-files</code>. Then dispatch <code>functional-tests.yml</code> on the branch (<code>gh workflow run functional-tests.yml --ref power-state-correctness-phase-01a-listing</code>). Confirm that the <code>Guests (collection)</code> job and the pull request's smoke job pass, and that <code>test_state_changes.py</code>'s power state assertions ran. Record both run URLs in the pull request description.</td>
+<td>Run <code>tox -epy3</code>, <code>tox -emypy</code> and <code>pre-commit run --all-files</code>. Dispatch <code>functional-tests.yml</code> on the branch (<code>gh workflow run functional-tests.yml --ref power-state-correctness-phase-01b-inactive-domains</code>). Confirm that the Guests job passes, that <code>test_lifecycle_guest_poweroff</code> passed rather than skipped, and what <code>test_lifecycle_qemu_killed</code> did. Then run the inventory in brief 8. Record the run URLs and the inventory counts in the pull request description.</td>
 </tr>
 </tbody>
 </table>
-<p>The steps run in order. Step 1 is additive and passes on its own. Step 2
-changes the callers and the fake together, because the fake has to serve
-<code>listAllDomains()</code> from the moment the cleaner calls it.</p>
-<h3 id="brief-1-the-helpers-and-their-unit-tests">Brief 1 -- the helpers and their unit tests<a class="headerlink" href="#brief-1-the-helpers-and-their-unit-tests" title="Permanent link">&para;</a></h3>
-<p>In <code>shakenfist/util/libvirt.py</code>, add to <code>LibvirtConnection</code>, next to
-<code>get_active_domain_ids()</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">_list_sf_domains</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">flags</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="sd">"""One listAllDomains() call, filtered to Shaken Fist domains."""</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="k">for</span> <span class="n">domain</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">conn</span><span class="o">.</span><span class="n">listAllDomains</span><span class="p">(</span><span class="n">flags</span><span class="p">):</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>        <span class="k">if</span> <span class="n">domain</span><span class="o">.</span><span class="n">name</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">'sf:'</span><span class="p">):</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>            <span class="k">yield</span> <span class="n">domain</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_active_sf_domains</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="sd">"""Shaken Fist domains libvirt considers active: running, paused or</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="sd">    PM suspended. A powered off domain is not in this list."""</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_list_sf_domains</span><span class="p">(</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">libvirt</span><span class="o">.</span><span class="n">VIR_CONNECT_LIST_DOMAINS_ACTIVE</span><span class="p">)</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_inactive_sf_domains</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">    </span><span class="sd">"""Shaken Fist domains which are defined but not running. Our</span>
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="sd">    domains are persistent, so a powered off instance is here."""</span>
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_list_sf_domains</span><span class="p">(</span>
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">libvirt</span><span class="o">.</span><span class="n">VIR_CONNECT_LIST_DOMAINS_INACTIVE</span><span class="p">)</span>
-</code></pre></div>
-<p>Do not touch <code>get_all_domains()</code>, <code>get_sf_domains()</code> or any caller in
-this step.</p>
-<p>In <code>shakenfist/tests/test_util_libvirt.py</code>, next to the
-<code>get_active_domain_ids()</code> tests (<code>:180-206</code>), add tests which use the
-same setup: <code>_connection()</code> with <code>lc.conn = mock.Mock()</code>. Add
-<code>VIR_CONNECT_LIST_DOMAINS_ACTIVE = 1</code> and
-<code>VIR_CONNECT_LIST_DOMAINS_INACTIVE = 2</code> to <code>FakeLibvirtModule</code> first,
-since <code>_connection()</code> installs it as <code>lc.libvirt</code>. The tests are:</p>
-<ul>
-<li>Each helper calls <code>listAllDomains</code> exactly once, with the matching
-  flag, and never calls <code>listDomainsID</code> or <code>lookupByID</code>.</li>
-<li>Each yields only the <code>sf:</code> domains from a list which mixes <code>sf:</code> and
-  foreign names, in listing order.</li>
-<li>An empty listing yields nothing.</li>
-</ul>
-<p>Before committing, mutate the code and check the tests fail. Swap the
-two flags, then remove the <code>sf:</code> filter, and each mutation must fail at
-least one test. Say in the step report that you did this. Run
-<code>stestr run shakenfist.tests.test_util_libvirt</code>, <code>tox -emypy</code> and
-<code>pre-commit run --all-files</code> with the files staged. Style: single
-quotes, double-quoted docstrings, 120 columns.</p>
-<h3 id="brief-2-the-callers-the-fake-the-expected-failure">Brief 2 -- the callers, the fake, the expected failure<a class="headerlink" href="#brief-2-the-callers-the-fake-the-expected-failure" title="Permanent link">&para;</a></h3>
+<p>The steps run in order, in one worktree, never in parallel, because
+pre-commit's stash is repository-wide. Steps 1 to 3 are additive and
+pass on their own. Step 4 changes no behaviour a user can see, except
+for skipping unsafe deletes. Step 5 is the switch. Everything it relies
+on has landed and been tested by then, so a reviewer can read step 5 as
+the behaviour change alone.</p>
+<p>Every sub-agent report must list each guard it added, and for each one
+the test that failed when that guard was removed. That is the check the
+management session reviews: the plan-checks memory records that an
+unmutated test is not evidence.</p>
+<h3 id="brief-1-a-bounded-node-lock">Brief 1 -- a bounded node lock<a class="headerlink" href="#brief-1-a-bounded-node-lock" title="Permanent link">&para;</a></h3>
+<p>In <code>shakenfist/util/concurrency.py</code>, give <code>NodeLock.__init__</code> a
+<code>timeout: float | None = None</code>. In <code>__enter__</code>, raise
+<code>exceptions.NodeLockTimeout</code> once <code>time.time() - start_time</code> exceeds a
+non-<code>None</code> timeout, after a failed request. Keep the existing slow-wait
+log.</p>
+<p>Add <code>NodeLockTimeout(LockException)</code> to <code>shakenfist/exceptions.py</code>, with
+a docstring saying it is raised only when a caller asked for a bounded
+wait.</p>
+<p>In <code>shakenfist/baseobject.py</code>, give <code>get_lock()</code> a keyword
+<code>node_timeout: float | None = None</code>, passed to <code>NodeLock</code> and ignored
+for cluster scope. Add a comment that <code>timeout</code> is for cluster locks and
+is not applied to node locks, and why: restore passes 120 and would
+start timing out. Do not change <code>get_lock_attr()</code>.</p>
+<p>Unit tests in a new <code>shakenfist/tests/test_util_concurrency_nodelock.py</code>,
+patching <code>_node_lock_request</code>:
+* No timeout keeps retrying. Grant on the fifth request.
+* A timeout raises <code>NodeLockTimeout</code> when never granted. Patch
+  <code>time.time</code> and <code>time.sleep</code> rather than sleeping for real.
+* A lock granted on the first request with a timeout does not raise.
+* <code>get_lock(global_scope=False, node_timeout=...)</code> passes the timeout
+  through, and <code>get_lock(global_scope=False, timeout=120)</code> does not.</p>
+<p>Mutation check: removing the raise must fail the second test.</p>
+<h3 id="brief-2-shutoff-reasons-and-every-domains-uuid">Brief 2 -- shutoff reasons and every domain's uuid<a class="headerlink" href="#brief-2-shutoff-reasons-and-every-domains-uuid" title="Permanent link">&para;</a></h3>
+<p>In <code>shakenfist/util/libvirt.py</code>:
+* Add <code>SHUTOFF_REASON_STRINGS</code> next to <code>PAUSED_REASON_STRINGS</code>, in the
+  same <code>getattr</code> style. The keys and values are:
+  * <code>VIR_DOMAIN_SHUTOFF_UNKNOWN</code> 'unknown'
+  * <code>_SHUTDOWN</code> 'shutdown'
+  * <code>_DESTROYED</code> 'destroyed'
+  * <code>_CRASHED</code> 'crashed'
+  * <code>_MIGRATED</code> 'migrated'
+  * <code>_SAVED</code> 'saved'
+  * <code>_FAILED</code> 'failed'
+  * <code>_FROM_SNAPSHOT</code> 'from snapshot'
+  * <code>_DAEMON</code> 'daemon'
+* Add <code>extract_shutoff_reason(domain) -&gt; str | None</code>, mirroring
+  <code>extract_pause_reason()</code>: <code>None</code> unless the state is <code>SHUTOFF</code>, and
+  <code>'unrecognised reason N'</code> for an unknown code. Its docstring says it
+  is display only, and that phase 1b's D7 is why nothing branches on
+  it.
+* Add <code>get_all_domain_uuids() -&gt; set[str]</code> next to the listing helpers:
+  one <code>self.conn.listAllDomains(0)</code> call, with no name filter. Its
+  docstring says it includes foreign domains on purpose, for the
+  apparmor sweep, and contrasts it with the <code>sf</code> helpers.</p>
+<p>In <code>shakenfist/tests/test_util_libvirt.py</code>, extend the existing fake
+module with the shutoff reason constants, and test:
+* each mapping;
+* a non-shutoff domain giving <code>None</code>;
+* an unknown code;
+* <code>get_all_domain_uuids()</code> making exactly one call with flags <code>0</code> and
+  keeping a non-<code>sf:</code> domain.</p>
+<p><code>tox -emypy</code> is strict on this file (phase 1a S8).</p>
+<h3 id="brief-3-a-strict-instance-lookup">Brief 3 -- a strict instance lookup<a class="headerlink" href="#brief-3-a-strict-instance-lookup" title="Permanent link">&para;</a></h3>
+<p><code>exceptions.DatabaseUnavailable</code> already exists (<code>exceptions.py:198</code>),
+and <code>_grpc_call()</code> already raises it for an exhausted outage. Do not
+add another exception, and do not change <code>_grpc_call()</code>.</p>
+<p>In <code>shakenfist/mariadb.py</code>:
+* <code>get_instance(inst_uuid, *, strict=False)</code>. When <code>strict</code> is true,
+  skip the cache read, since the cache only ever holds hits. Pass
+  <code>strict</code> to <code>_grpc_get_instance()</code> and <code>_direct_get_instance()</code>.
+* In each of those, when <code>strict</code> is true, re-raise the caught
+  <code>grpc.RpcError</code> or <code>OperationalError</code> as
+  <code>exceptions.DatabaseUnavailable(...) from e</code>.
+* A genuine miss (<code>not reply.found</code>, or no row) still returns <code>None</code>.
+* Leave the error log in place.
+* Extend <code>get_instance()</code>'s docstring with what <code>strict</code> is for, and a
+  pointer to #3373.</p>
+<p>Unit tests go in <code>shakenfist/tests/test_database_unavailable.py</code>, which
+already fakes <code>grpc.RpcError</code> for #3373. For the gRPC path:
+* strict and a non-retryable error such as <code>StatusCode.UNKNOWN</code> raises
+  <code>DatabaseUnavailable</code>;
+* strict and a miss returns <code>None</code>;
+* non-strict and the same error still returns <code>None</code>, which is today's
+  behaviour and is kept for every other caller;
+* an exhausted retryable error raises <code>DatabaseUnavailable</code> either way,
+  as it does today.</p>
+<p>Add the matching strict and non-strict pair for the direct path with
+<code>OperationalError</code>.</p>
+<p>Mutation check: dropping the strict re-raise must fail a test.</p>
+<h3 id="brief-4-the-guards-before-anything-is-switched-on">Brief 4 -- the guards, before anything is switched on<a class="headerlink" href="#brief-4-the-guards-before-anything-is-switched-on" title="Permanent link">&para;</a></h3>
+<p>All in <code>shakenfist/daemons/cleaner/scheduled_tasks.py</code>. The second loop
+still reads active domains after this step, so the only behaviour change
+is deletes and writes that no longer happen.</p>
 <ol>
-<li><strong>Callers.</strong> Replace <code>lc.get_sf_domains()</code> at
-   <code>daemons/cleaner/scheduled_tasks.py:108</code> and
-   <code>daemons/sidechannel/main.py:2011</code>, and <code>lc.get_all_domains()</code> at
-   <code>daemons/cleaner/scheduled_tasks.py:222</code> and
-   <code>daemons/resources/main.py:497</code>, with <code>lc.get_active_sf_domains()</code>.
-   Change nothing else in those loops, except the cleaner's second loop
-   comment. At <code>:219-220</code> it reads "Inactive VMs just have a name, and
-   are powered off in our state system", which is false. Replace it with
-   a comment saying the loop deliberately still iterates active domains,
-   so it only acts on domains the first loop failed to add to <code>seen</code>, and
-   that phase 1b of <code>docs/plans/PLAN-power-state-correctness.md</code> points
-   it at <code>get_inactive_sf_domains()</code> (F1). Leave the dead
-   <code>startswith('sf:')</code> check and the resources <code>isActive()</code> check alone
-   (D2).</li>
-<li><strong>Delete</strong> <code>get_all_domains()</code> and <code>get_sf_domains()</code> from
-   <code>util/libvirt.py</code>. Update <code>get_active_domain_ids()</code>'s docstring so it
-   compares itself to <code>get_active_sf_domains()</code>: that is one
-   <code>listAllDomains()</code> call returning domain objects to filter by name,
-   and this method needs neither the objects nor the filter (D3).
-   <code>grep -rn 'get_all_domains\|get_sf_domains' shakenfist tools</code> must
-   then find nothing.</li>
-<li><strong>The fake</strong> (<code>tests/test_daemon_cleaner.py:25-97</code>). Add
-   <code>VIR_CONNECT_LIST_DOMAINS_ACTIVE = 1</code> and
-   <code>VIR_CONNECT_LIST_DOMAINS_INACTIVE = 2</code> to <code>FakeLibvirt</code>. In
-   <code>FakeLibvirtConnection</code>, replace <code>listDomainsID()</code> and <code>lookupByID()</code>
-   with <code>listAllDomains(self, flags)</code>. It builds the same domains from
-   the same map, keeping <code>id7</code> conditional on <code>'ioerror'</code> as today, and
-   returns those whose state matches the flags: <code>VIR_DOMAIN_SHUTOFF</code> is
-   inactive and every other state is active. Keep <code>lookupByName()</code>. Add
-   a comment saying the fake mirrors libvirt's listing, not our domain
-   template, which is why the crashed domain is active (D4, S4). Do not
-   keep <code>listDomainsID()</code> or <code>lookupByID()</code>.</li>
-<li><strong>The expected failure.</strong> In <code>test_update_power_states</code>, remove
-   <code>('shutoff', 'off')</code> from the expectations. Add
-   <code>test_update_power_states_detects_shutoff</code> with the same decorators
-   and setup, asserting that the shutoff instance's
-   <code>power_state['power_state']</code> is <code>'off'</code>. Decorate it with
-   <code>@unittest.expectedFailure</code>, and give it a docstring saying that the
-   cleaner cannot see inactive domains (F1) and that phase 1b removes
-   the decorator in the change which makes this pass. Add
-   <code>import unittest</code> in the stdlib import group.</li>
-<li><strong>The other plan.</strong> In <code>docs/plans/PLAN-transient-capacity-refusals.md</code>,
-   rewrite the Future work entry "Make <code>get_all_domains()</code> one libvirt
-   call" (<code>:1199-1209</code>) to say that phase 1a of
-   <code>PLAN-power-state-correctness.md</code> resolved it: <code>get_all_domains()</code> is
-   gone, and its callers use the single-call <code>get_active_sf_domains()</code>.
-   Keep the entry rather than deleting it, so the link from that plan's
-   phase 3 D22 still leads somewhere.</li>
+<li><strong><code>_sf_instance_uuid(domain)</code>, D4.</strong> Use it at the top of both loops
+   in place of <code>split(':')[1]</code>, skipping the domain on <code>None</code>.</li>
+<li><strong><code>_instance_confirmed_absent(instance_uuid)</code>, D3.</strong> It returns True
+   only when <code>mariadb.get_instance(UUID(instance_uuid), strict=True)</code>
+   returns <code>None</code>. On <code>DatabaseUnavailable</code> it logs a warning citing
+   #3373 and returns False. Do not catch <code>DatabaseUnavailable</code> from
+   <code>Instance.from_db()</code> itself: that should keep aborting the pass. If it returns a row, it returns False. Both
+   loops' <code>not inst</code> branches call it, and skip the domain unless it
+   returns True.</li>
+<li><strong><code>_locked(inst)</code>, D2.</strong> A small context manager, or an inline
+   try/except, wrapping <code>inst.get_lock(op='Cleaner power state
+   update', global_scope=False, node_timeout=2)</code>. It turns
+   <code>NodeLockTimeout</code> and <code>MissingNodeLockSocket</code> into a skip.</li>
 </ol>
-<p>Run <code>stestr run shakenfist.tests.test_daemon_cleaner</code> and confirm the
-output reports one expected failure and no other failure. Then run the
-full <code>tox -epy3</code>, <code>tox -emypy</code> and <code>pre-commit run --all-files</code> with the
-files staged.</p>
+<p>In the first loop, the reading goes before <code>update_power_state()</code>:
+   * Compare <code>lc.extract_power_state(domain)</code> with
+     <code>inst.power_state.get('power_state')</code>.
+   * <strong>They agree:</strong> take no lock, and fall through to the <code>crashed</code> and
+     <code>paused</code> branches as today. Those write only on a change of state,
+     and have their own guards.
+   * <strong>They differ:</strong> take the lock. Inside it, re-look-up the domain
+     with <code>lc.get_domain_from_sf_uuid()</code>. If it is gone or inactive,
+     skip, because the second loop's next pass owns it. Otherwise call
+     <code>update_power_state()</code> with the re-extracted state.</p>
+<p>Also run the <code>crashed</code> and I/O error branches' state writes under the
+   lock, after the re-look-up. The <code>deleted</code> escalation is left alone.
+   It acts on instances whose global delete already ran, and the
+   <code>virsh</code>/SIGKILL path is its own lock-free last resort.
+4. <strong>The apparmor sweep, D8.</strong> Build <code>all_libvirt_uuids</code> from
+   <code>lc.get_all_domain_uuids()</code>, called just before the sweep. On
+   <code>libvirtError</code>, log and skip the sweep. Delete the second loop's
+   <code>all_libvirt_uuids</code> accumulation.</p>
+<p>Unit tests in <code>shakenfist/tests/test_daemon_cleaner.py</code>.</p>
+<p>First make the fakes honest:
+* <code>FakeLibvirtDomain.UUIDString()</code> returns the name's suffix for <code>sf:</code>
+  domains, and a fixed foreign uuid for <code>apache2</code>.
+* Add <code>isActive()</code>.
+* Make <code>lookupByName()</code> return the domain <code>listAllDomains()</code> would,
+  rather than a running one.
+* Add a <code>get_lock</code> fake which records calls and can be told to raise
+  <code>NodeLockTimeout</code>, patched at <code>shakenfist.instance.Instance.get_lock</code>
+  or at <code>util_concurrency.NodeLock</code>, whichever the existing test
+  setup makes simpler.</p>
+<p>Then add tests:
+* A mismatched uuid domain causes no delete and no lookup.
+* A domain named <code>sf:</code> causes no rmtree.
+* An unknown active domain with <code>DatabaseUnavailable</code> on the strict
+  lookup is not destroyed. Make the strict lookup raise for this, so
+  that <code>from_db()</code> returns <code>None</code> the way a non-retryable error makes
+  it.
+* An unknown active domain with a strict miss is destroyed, which is
+  today's behaviour.
+* F13: a lock timeout leaves <code>power_state</code> unwritten.
+* F13: a domain which reads <code>paused</code> in the pass, but <code>off</code> inside the
+  lock, is not written as <code>paused</code>.
+* The sweep keeps a foreign domain's profile.
+* The sweep deletes nothing when listing raises.
+* Agreeing states take no lock, since that is the database load claim
+  in S14.</p>
+<p>Mutate each guard in turn and report which test failed.</p>
+<h3 id="brief-5-the-switch">Brief 5 -- the switch<a class="headerlink" href="#brief-5-the-switch" title="Permanent link">&para;</a></h3>
+<p>In the second loop of <code>update_power_states()</code>:
+* Iterate <code>lc.get_inactive_sf_domains()</code>, and delete the "deliberately
+  still iterates active domains" comment.
+* Keep the <code>seen</code> check. It covers a domain that went inactive between
+  the loops.</p>
+<p>For each domain, after brief 4's uuid and absence handling:</p>
+<ol>
+<li><strong>Unknown domain</strong> (confirmed absent). This is today's rmtree and
+   undefine, unchanged.</li>
+<li><strong><code>initial</code>, <code>preflight</code> or <code>creating</code>.</strong> Skip, logging at debug
+   level (S2).</li>
+<li><strong><code>deleted</code>, older than five minutes.</strong> Under the lock, and after
+   re-reading the state, do the local teardown, with no state write
+   (S4, D5).</li>
+<li><strong><code>delete-wait</code>, older than five minutes.</strong> Under the lock, after
+   re-reading the state, apply D5's enqueue schedule. Do not call
+   <code>inst.delete()</code>.</li>
+<li><strong>Everything else.</strong> <code>place_instance(config.NODE_UUID,
+   enforce=False)</code> as today, then:</li>
+<li><strong>Files missing:</strong> apply D6.</li>
+<li>
+<p><strong>Otherwise, if <code>power_state</code> is not <code>off</code>:</strong> take the lock and
+     re-look-up the domain. If it is now active or gone, skip. Then, in
+     this order:</p>
+<ol>
+<li><code>update_power_state('off')</code>;</li>
+<li><code>inst.agent_state = constants.AGENT_INSTANCE_OFF</code>;</li>
+<li><code>inst.add_event(EVENT_TYPE_AUDIT, 'detected poweroff',
+    extra={'reason': lc.extract_shutoff_reason(domain),
+    'previous_power_state': ...})</code>.</li>
+</ol>
+<p>The order is load-bearing (D7).</p>
+</li>
+</ol>
+<p>Remove <code>@unittest.expectedFailure</code> from
+<code>test_update_power_states_detects_shutoff</code>, and its docstring's "phase
+1b" text. It must now pass in all three test classes that run it (phase
+1a S6).</p>
+<p>New tests, each with a mutation check:
+* The shutoff instance gets <code>agent_state</code> <code>AGENT_INSTANCE_OFF</code>.
+* The event carries the reason.
+* The writes happen in order. Record the calls on a mock.
+* An instance already <code>off</code> gets no lock, no write and no event.
+* <code>creating</code> is skipped.
+* A lock timeout is skipped.
+* A domain active again inside the lock is skipped.
+* <code>delete-wait</code> calls <code>enqueue_delete()</code> on counts 1, 6 and 11 only,
+  adds the abandon event at 16, and never calls <code>delete()</code>.
+* <code>deleted</code> does the teardown without a state write.
+* Files missing from <code>created</code> goes to <code>created-error</code> with the error
+  message.
+* Files missing from <code>error</code> and from <code>created-error</code> does nothing and
+  raises nothing.
+* An unknown inactive domain behind <code>DatabaseUnavailable</code> is not
+  removed.</p>
+<p>Run <code>stestr run shakenfist.tests.test_daemon_cleaner</code> from <code>.tox/py3</code>
+and report that no expected failures remain.</p>
+<h3 id="brief-6-functional-tests">Brief 6 -- functional tests<a class="headerlink" href="#brief-6-functional-tests" title="Permanent link">&para;</a></h3>
+<p>In <code>shakenfist/deploy/shakenfist_ci/guest_ci_tests/test_state_changes.py</code>,
+add <code>test_lifecycle_guest_poweroff</code> to <code>TestStateChanges</code>, modelled on
+<code>test_lifecycle_power_cycle</code>:
+1. <code>inst = self._start_target('guestpoweroff')</code>, then record <code>after =
+   time.time()</code>.
+2. <code>self._await_command(inst['uuid'], 'systemd-run --on-active=3
+   systemctl poweroff')</code>. This returns at once, because <code>systemd-run</code>
+   only schedules the power off. A bare <code>poweroff</code> would never reply.
+3. <code>self._await_power_off(inst['uuid'], after=after)</code>, then
+   <code>self._assert_power_state(inst['uuid'], 'off', 'after guest power
+   off')</code>. A single read is valid because the cleaner writes the state
+   before the event.
+4. Assert that <code>agent_state</code> is <code>'not ready (instance powered off)'</code>, and
+   that the event's <code>extra['reason']</code> is <code>'shutdown'</code>.
+5. Power on through the API, <code>_await_instance_ready()</code>, and assert
+   <code>on</code>. Then assert that <code>agent_system_boot_time</code> changed, as the power
+   cycle test does.</p>
+<p>Add <code>test_lifecycle_qemu_killed</code>:
+1. Resolve the instance's node to the node dict <code>_node_exec()</code> wants.
+   The only existing user is <code>cluster_ci_tests/test_stray_vxlan.py</code>,
+   which calls <code>self._network_node()</code>. Find or write the equivalent for
+   an instance's node. Node exec is unproven in the Guests suite, which
+   is why the skip below matters.
+2. Call <code>_require_node_exec(node)</code>.
+3. <code>pkill -9 -f 'guest=sf:&lt;uuid&gt;'</code> with sudo.
+4. Await "detected poweroff", then assert <code>off</code>, the instance state still
+   <code>created</code>, and the reason. Assert <code>'crashed'</code>. If it reads otherwise,
+   do not weaken the assertion. Stop and report what libvirt said,
+   because D7 and power_states.md depend on it.</p>
+<p>In <code>base.py</code>, delete the F13 hint from <code>_assert_power_state()</code>
+(<code>base.py:815-817</code>), since step 4 fixed F13.</p>
+<h3 id="brief-7-documentation">Brief 7 -- documentation<a class="headerlink" href="#brief-7-documentation" title="Permanent link">&para;</a></h3>
+<p><code>docs/operator_guide/power_states.md</code>:
+* Say that the cleaner detects a guest which powers itself off, or
+  whose qemu dies, within one or two passes of about a minute each.
+  Say that it records <code>off</code>, sets the agent state, and adds a "detected
+  poweroff" event whose <code>reason</code> is libvirt's.
+* List the reason strings and what each means.
+* Rewrite the <code>crashed</code> bullet: it is written only for a domain libvirt
+  reports as crashed while still active, which Shaken Fist's domain
+  configuration prevents (<code>on_crash</code> is <code>restart</code>). A qemu which dies
+  is <code>off</code> with reason <code>crashed</code>, and a power on recovers it.</p>
+<p><code>docs/developer_guide/subsystem_internals.md</code> (around line 425): one
+sentence that <code>update_power_states</code> takes the instance's node lock with
+a two second bound before writing, and skips the instance if busy.</p>
+<p>No AGENTS.md or ARCHITECTURE.md change: no convention or component
+changes.</p>
+<h3 id="brief-8-inventory-before-merge">Brief 8 -- inventory before merge<a class="headerlink" href="#brief-8-inventory-before-merge" title="Permanent link">&para;</a></h3>
+<p>The switch makes live the deletion branches that have been dead since
+2022, on every hypervisor at once. Before merging, the management
+session asks Mikal to run, on each sfcbr hypervisor, the only
+long-lived cluster:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>virsh list --inactive --name | grep '^sf:' | while read d; do
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  u=${d#sf:}; printf '%s %s\n' "$u" \
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    "$(sf-client --json instance show "$u" 2&gt;/dev/null |
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>       jq -r '"\(.state) \(.power_state)"' || echo MISSING)"
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>done
+</code></pre></div>
+<p>The session then classifies each line into brief 5's branches, and
+counts each. Any line in the unknown branch (the lookup found no
+instance) is a gate: every such instance is looked at before merge. So
+is any line in <code>delete-wait</code>, <code>deleted</code>, or files missing. The counts go
+in the pull request description.</p>
 <h2 id="risks-and-mitigations">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong><code>listAllDomains()</code> behaves differently from the pair it replaces on
-  a real hypervisor.</strong> The unit tests use fakes, and the fakes are what
-  this plan is correcting. Mitigation: step 3's guest suite run. Every
-  guest test depends on the sidechannel finding its domain through the
-  new call, and phase 0's <code>power_state</code> assertions depend on the cleaner
-  not writing a wrong value. The management session reads both jobs,
-  not just the overall result.</li>
-<li><strong>A caller silently widens to inactive domains.</strong> This is only
-  possible if someone picks the wrong helper. Mitigation: brief 2 names
-  the one helper every caller uses, and the Definition of done greps for
-  <code>get_inactive_sf_domains</code> outside <code>util/libvirt.py</code> and its test.</li>
-<li><strong>The expected failure outlives phase 1b.</strong> Mitigation: by S6, an
-  unexpected success fails the run, so phase 1b cannot pass its unit
-  tests without removing the decorator.</li>
-<li><strong>Worktree pre-commit stash races.</strong> Steps run one after another, in
-  one worktree, and never in parallel.</li>
+<li><strong>The first deploy acts on every inactive domain at once.</strong> Four
+  years of powered off guests, strays and half-deleted instances become
+  visible together. Mitigation: brief 8's inventory before merge. D3's
+  confirmation and D4's validation make the deleting branches fail
+  safe. D5 enqueues deletes through the normal path at most three times.</li>
+<li><strong>A database error deletes disks (S5).</strong> An exhausted outage is
+  already fail-safe, because it aborts the pass. A non-retryable error
+  is not, and D3 closes that for the cleaner, tested with the strict
+  lookup raising. The general fix stays with #3373, which gets a
+  comment linking this phase.</li>
+<li><strong>The cleaner holds an instance lock when systemd's watchdog kills
+  it.</strong> A node lock held by a dead process stays held until sf-nodelock
+  restarts. Any holder has this problem. Mitigation: the cleaner holds
+  the lock only for a re-look-up and at most four writes, it pets the
+  watchdog before taking it, and <code>place_instance()</code> stays outside it.</li>
+<li><strong>The unit fakes lie again.</strong> Phase 1a's lesson. Mitigation: brief 4
+  makes the fakes' uuid, <code>isActive()</code> and lookup honest, and every guard
+  carries a mutation check the management session reads.</li>
+<li><strong>The <code>CRASHED</code> claim is wrong.</strong> Mitigation: the reason is display
+  only (D7), and <code>test_lifecycle_qemu_killed</code> checks it on a real
+  hypervisor. A different answer changes one doc line and one
+  assertion, and nothing the cleaner does.</li>
+<li><strong>#3373 lands first and changes <code>get_instance()</code>.</strong> Mitigation: resolve
+  the conflict by keeping whichever raises. D3's keyword exists to be
+  deleted by #3373.</li>
+<li><strong>Database load.</strong> S14 estimates none that the budget does not already
+  charge. Mitigation: brief 4's no-lock-in-steady-state test, and the
+  load budget check in CI.</li>
+<li><strong>Worktree pre-commit stash races.</strong> Steps run one after another and
+  never in parallel.</li>
 </ul>
 <h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -rn 'get_all_domains\|get_sf_domains' shakenfist tools</code>
-      prints nothing.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -rn 'get_inactive_sf_domains' shakenfist</code> prints only
-      <code>util/libvirt.py</code> and <code>tests/test_util_libvirt.py</code>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -n 'listDomainsID\|lookupByID' shakenfist/tests/test_daemon_cleaner.py</code>
-      prints nothing.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>stestr run shakenfist.tests.test_daemon_cleaner</code> reports no
-      failure, and its only expected failures are
-      <code>test_update_power_states_detects_shutoff</code>. It is reported three
-      times, because <code>CleanerCrashedInstanceTestCase</code> and
-      <code>CleanerIOErrorPausedInstanceTestCase</code> subclass <code>CleanerTestCase</code>
-      and so rerun every test it defines.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>stestr run shakenfist.tests.test_util_libvirt</code> passes, and the
-      step 1 report says that both mutations in brief 1 failed a test.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>tox -emypy</code> and <code>pre-commit run --all-files</code> pass.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A <code>workflow_dispatch</code> run of <code>functional-tests.yml</code> on the branch
-      has a passing <code>Guests (collection)</code> job, and the pull request's
-      smoke job passes. Both run URLs are in the pull request
-      description.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No behaviour change outside the test fake.
-      <code>git diff --stat develop... -- shakenfist/daemons</code> lists only
-      <code>cleaner/scheduled_tasks.py</code>, <code>resources/main.py</code> and
-      <code>sidechannel/main.py</code>, and every changed line in
-      <code>git diff develop... -- shakenfist/daemons</code> is one of the four
-      calls or part of the second loop's comment.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -n expectedFailure shakenfist/tests/test_daemon_cleaner.py</code>
+      prints nothing, and <code>stestr run shakenfist.tests.test_daemon_cleaner</code>
+      reports no failures and no expected failures.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> In <code>shakenfist/daemons/cleaner/scheduled_tasks.py</code>,
+      <code>grep -n "get_active_sf_domains\|get_inactive_sf_domains\|get_all_domain_uuids"</code>
+      prints exactly three calls, one of each. The first loop calls the
+      active helper, the second loop the inactive one, and the sweep the
+      all-uuids one.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -n "inst.delete()" shakenfist/daemons/cleaner/scheduled_tasks.py</code>
+      prints only the first loop's <code>deleted</code> escalation.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -n "name().split(':')\|domain_name.split(':')" shakenfist/daemons/cleaner/scheduled_tasks.py</code>
+      prints nothing: every uuid in <code>update_power_states()</code> comes from
+      <code>_sf_instance_uuid()</code>. It prints two lines on <code>develop</code> today.
+      <code>clear_old_libvirt_logs()</code> parses log file names, not domains, and
+      is not matched.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The step 4 and step 5 reports name, for each guard, the test that
+      failed when the guard was removed. The guards are:<ul>
+<li>uuid mismatch;</li>
+<li>the empty name;</li>
+<li>the strict lookup;</li>
+<li>the lock timeout;</li>
+<li>the re-look-up inside the lock;</li>
+<li>the error-state re-entry guard;</li>
+<li>the sweep skipping on a listing failure;</li>
+<li>the sweep keeping foreign domains;</li>
+<li>the write order;</li>
+<li>the <code>delete-wait</code> enqueue schedule.</li>
 </ul>
-<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
-<p>Landed as <a href="https://github.com/shakenfist/shakenfist/pull/4372">#4372</a>,
-merge commit <code>8aa69c5e4</code>. The dispatched functional run
-(<a href="https://github.com/shakenfist/shakenfist/actions/runs/36392599796">36392599796</a>)
-passed its Guests job and every Smoke job, and Guests exercises the
-sidechannel's domain discovery through the renamed helper. The
-Definition of done holds on <code>develop</code>: the old helpers are gone, the
-cleaner fake no longer mentions <code>listDomainsID</code> or <code>lookupByID</code>, and the
-only mention of <code>get_inactive_sf_domains()</code> outside the helper and its
-tests is the comment in the cleaner's second loop that points phase 1b
-at it. The one expected failure is the shutoff test, which phase 1b
-turns on.</p>
+</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>tox -epy3</code>, <code>tox -emypy</code> and <code>pre-commit run --all-files</code> pass.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A <code>workflow_dispatch</code> run of <code>functional-tests.yml</code> on the branch
+      passes its Guests job, in which <code>test_lifecycle_guest_poweroff</code>
+      <em>passed</em>. The run's output says whether <code>test_lifecycle_qemu_killed</code>
+      passed or skipped. If it failed on the reason, D7 and
+      power_states.md are revisited before merge.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -n "F13" shakenfist/deploy/shakenfist_ci/base.py</code> prints
+      nothing.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>docs/operator_guide/power_states.md</code> no longer says a <code>crashed</code>
+      instance is always in state <code>error</code> without saying when <code>crashed</code>
+      occurs. It names the "detected poweroff" event and its <code>reason</code>.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Brief 8's inventory counts are in the pull request description,
+      and Mikal has looked at every line in a deleting branch.</li>
+</ul>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
-<p>Before starting step 1, back brief Mikal on what will change: two new
-helpers, four callers moved, two helpers deleted, the cleaner fake made
-honest, and one expected failure left for phase 1b. State D1's choice to
-add <code>get_inactive_sf_domains()</code> before it has a caller, and D4's choice
-to keep the crashed domain active in the fake. Either is cheap to change
-now, and changing it after step 2 means rewriting tests.</p>
+<p>Before starting step 1, back brief Mikal on the three places this plan
+departs from, or adds to, the master plan's phase 1b section. Each is
+cheap to change now, and expensive after steps 4 and 5 have built tests
+around it:
+* <strong>D3.</strong> A strict lookup before any delete of an unknown domain.
+  #3373's first half made a full outage abort the pass, but a single
+  non-retryable error still reads as "not found", and the first loop
+  destroys a running instance on that today.
+* <strong>D5.</strong> Re-enqueueing <code>delete-wait</code> deletes rather than calling
+  <code>inst.delete()</code>, which would leak interfaces.
+* <strong>D7.</strong> <code>off</code> plus a recorded reason, rather than <code>crashed</code>.</p>
+<p>Before merging, the brief 8 inventory is the second gate.</p>
+<h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="https://github.com/shakenfist/shakenfist/issues/3373">#3373</a>: make
+  non-retryable errors raise for every lookup, then delete D3's
+  <code>strict</code> keyword.</li>
+<li>Stray domains of instances whose delete ended in state <code>error</code> (D9).</li>
+<li>Whether libvirt keeps an inactive domain's shutoff reason across a
+  libvirtd restart. Step 6 confirmed the reason itself on a real
+  hypervisor: a SIGKILLed qemu reads <code>crashed</code> and a guest poweroff
+  <code>shutdown</code> (functional run
+  <a href="https://github.com/shakenfist/shakenfist/actions/runs/36721352515">36721352515</a>),
+  but not its persistence.</li>
+<li>The first loop's <code>crashed</code> branch, unreachable while <code>on_crash</code> is
+  <code>restart</code> (D7), has no re-entry guard. From <code>created-error</code> it would
+  write <code>created-error-error</code>, which raises and aborts the pass. Found
+  in step 4's review; give it the I/O error branch's <code>ERROR_STATES</code>
+  guard if the branch is ever made reachable.</li>
+<li><code>_await_image_event()</code> in <code>shakenfist_ci/base.py</code> matches on an
+  <code>operation</code> field that events do not have, the bug step 6 fixed in
+  <code>_await_instance_event()</code>. It has no callers.</li>
+<li><code>NodeLock</code> has no recovery when its holder dies. That is not specific
+  to this phase.</li>
+</ul>
 
 
 
@@ -15422,7 +15981,7 @@ now, and changing it after step 2 means rewriting tests.</p>
 
 
 <p class="md-content__report-issue">
-  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-power-state-correctness-phase-01a-listing.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-power-state-correctness-phase-01a-listing.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-power-state-correctness-phase-01a-listing/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
+  <a href="https://github.com/shakenfist/shakenfist/issues/new?title=Docs%20issue%3A%20plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md&body=%2A%2ASource%20file%3A%2A%2A%20%60plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md%60%0A%2A%2APage%20URL%3A%2A%2A%20https%3A//shakenfist.com/plans/PLAN-power-state-correctness-phase-01b-inactive-domains/%0A%0A%2A%2ADescribe%20the%20issue%3A%2A%2A%0A&labels=documentation" target="_blank" rel="noopener">
     📝 Report an issue with this page
   </a>
 </p>

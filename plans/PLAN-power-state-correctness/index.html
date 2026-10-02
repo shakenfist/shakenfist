@@ -15287,13 +15287,13 @@ phases 0, 1b and 3 all rely on <code>create()</code> failing when power on fails
 <tr>
 <td>1a. Honest libvirt domain listing</td>
 <td><a href="../PLAN-power-state-correctness-phase-01a-listing/">PLAN-power-state-correctness-phase-01a-listing.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>8aa69c5e4</code></td>
 </tr>
 <tr>
 <td>1b. The cleaner sees powered off domains</td>
-<td>PLAN-power-state-correctness-phase-01b-inactive-domains.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-power-state-correctness-phase-01b-inactive-domains/">PLAN-power-state-correctness-phase-01b-inactive-domains.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -15354,6 +15354,9 @@ honestly named already and stays on <code>listDomainsID()</code>. The survey als
 found that only the shutoff expectation fails under an honest fake,
 because a crashed domain is active in libvirt's model; see S4 and S5 in
 the phase plan.</p>
+<p>Landed as <a href="https://github.com/shakenfist/shakenfist/pull/4372">#4372</a>.
+The cleaner's second loop still iterates active domains, with a comment
+pointing phase 1b at <code>get_inactive_sf_domains()</code>.</p>
 <h3 id="phase-1b-the-cleaner-sees-powered-off-domains">Phase 1b: the cleaner sees powered off domains<a class="headerlink" href="#phase-1b-the-cleaner-sees-powered-off-domains" title="Permanent link">&para;</a></h3>
 <p>Point the cleaner's second loop and its apparmor sweep at the inactive
 listing. This makes live code that deletes things, so this phase is
@@ -15403,6 +15406,27 @@ the guest dies before replying, so issue a detached delayed power off
 (<code>systemd-run --on-active=3 systemctl poweroff</code>). Plan at high effort:
 the cleaner deletes things, and a wrong inactive-domain list is a
 deletion bug.</p>
+<p>The phase survey corrected four things in this section. The phase plan
+has the detail as S1 to S14 and D1 to D9.
+* <strong>The lock needs a timeout first.</strong> A node lock has no timeout today,
+  and <code>get_lock()</code> ignores <code>timeout</code> for node scope. The phase adds an
+  optional bound (S1, D1).
+* <strong>The <code>delete-wait</code> branch re-enqueues rather than deleting in
+  place.</strong> <code>inst.delete()</code> is not the whole delete path. It skips the
+  interface and network teardown that only the queued delete does, so
+  the branch calls <code>enqueue_delete()</code> instead (S3, D5).
+* <strong>The apparmor sweep gets its own listing.</strong> Pointing it at inactive
+  domains would have left it believing no running domain exists. It
+  lists every defined domain itself, foreign ones included, and is
+  skipped when listing fails (S7, D8).
+* <strong>A database error can read as "unknown domain".</strong> This hazard was
+  not listed. <a href="https://github.com/shakenfist/shakenfist/issues/3373">#3373</a>
+  already makes a full outage abort the pass, but a non-retryable
+  lookup error still returns <code>None</code>, so both loops confirm absence with
+  a strict lookup before deleting (S5, D3).</p>
+<p>On <code>CRASHED</code>: an inactive domain is always <code>off</code>, with libvirt's
+shutoff reason recorded in the event and never branched on. The first
+loop's unreachable active <code>crashed</code> branch is left and documented (D7).</p>
 <h3 id="phase-2-autostart-and-instance-restore">Phase 2: autostart and instance restore<a class="headerlink" href="#phase-2-autostart-and-instance-restore" title="Permanent link">&para;</a></h3>
 <p>Fix F10 by calling <code>setAutostart(0)</code> in <code>power_off()</code>, after first
 establishing the <code>libvirt-guests</code> default on Debian 13 and Ubuntu 24.04
@@ -15858,6 +15882,11 @@ while planning it.</p>
 <ul>
 <li><a href="https://github.com/shakenfist/shakenfist/issues/4307">#4307</a> tracks
   this plan and findings F1 to F13.</li>
+<li><a href="https://github.com/shakenfist/shakenfist/issues/3373">#3373</a> (the
+  gRPC client reports "database unavailable" as "not found"). Its
+  first half makes an outage abort the cleaner's pass. Phase 1b adds a
+  strict lookup for the cleaner's deletions to cover the non-retryable
+  remainder.</li>
 <li><a href="https://github.com/shakenfist/shakenfist/issues/2241">#2241</a> (unpause
   should recover from a crashed guest or a qemu monitor EOF, not just
   retry) overlaps F6 and F7; phase 3 resolves or excludes it.</li>

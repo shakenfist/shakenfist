@@ -15219,7 +15219,12 @@ daemon is working normally. The existing explicit callers are:</p>
   <code>update_power_states</code>, <code>_maintain_blobs</code> and <code>_find_missing_blobs</code>,
   which pet around inner-loop iterations that may each take several
   seconds. <code>update_power_states</code> runs as a scheduled task outside the
-  cleaner's <code>idle()</code> loop, so it is petted per libvirt domain.</li>
+  cleaner's <code>idle()</code> loop, so it is petted per libvirt domain. Before
+  writing an instance's power state or state, or deleting it, it takes
+  that instance's node lock with a two second bound, and re-reads the
+  domain inside the lock; it skips the instance for that pass if the
+  lock is busy. When libvirt and the database already agree on an
+  instance's power state, no lock is taken at all.</li>
 </ul>
 <p>If you add a new long-running maintenance pass to any of the eight
 armed daemons — <code>sf-database</code>, <code>sf-net</code>, <code>sf-cleaner</code>, <code>sf-cluster</code>,
