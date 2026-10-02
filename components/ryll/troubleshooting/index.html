@@ -11633,6 +11633,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#event-dropped-send-timed-out-after-5s-in-the-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "event dropped: send timed out after 5s" in the log
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#session-becomes-unresponsive-after-idle-period" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13395,6 +13406,34 @@
     
   
     Two-stage CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-main-event-drops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Main-channel event drops
   
 
     
@@ -15504,6 +15543,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#event-dropped-send-timed-out-after-5s-in-the-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "event dropped: send timed out after 5s" in the log
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#session-becomes-unresponsive-after-idle-period" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16197,6 +16247,25 @@ are sent but the display never updates in response.</p>
    reaching the wire
 4. The <code>tools/test_click.py</code> script can test click delivery
    independently of ryll</p>
+<h3 id="event-dropped-send-timed-out-after-5s-in-the-log">"event dropped: send timed out after 5s" in the log<a class="headerlink" href="#event-dropped-send-timed-out-after-5s-in-the-log" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom:</strong> <code>/tmp/ryll.log</code> contains
+<code>channels: &lt;Kind&gt; event dropped: send timed out after 5s; renderer event
+consumer is wedged or starved</code>, and the notification panel shows a Warn
+"The display stalled and missed some updates from the server".</p>
+<p><strong>Meaning:</strong> The UI thread stopped draining the event queue for more than
+5 seconds, so the main channel gave up on one event rather than stop
+answering server PINGs. A related warning, <code>still waiting, as this event ends
+the session</code>, means the terminal <code>Disconnected(Main)</code> event is being held
+until the UI drains again; it is never dropped.</p>
+<p><strong>What is and is not lost:</strong> Latency samples, notifications and
+monitors-config events are dropped. Mouse mode, agent state and session end
+are not: they travel on <code>watch</code> channels or a non-dropping send.</p>
+<p><strong>Where to look:</strong> In <code>channel-state.json</code>, the main channel's
+<code>events_dropped_count</code>, <code>events_dropped_by_kind</code> and <code>last_event_drop_ts_secs</code>
+say what was dropped and when. To rule out a stale mouse mode, compare the
+app's <code>mouse_mode</code> with main's <code>server_mouse_mode</code>.</p>
+<p><strong>Cause:</strong> The stall itself, usually during a guest reboot, is tracked as
+issue #430.</p>
 <h3 id="session-becomes-unresponsive-after-idle-period">Session becomes unresponsive after idle period<a class="headerlink" href="#session-becomes-unresponsive-after-idle-period" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong> After leaving the session idle for a few minutes, all
 input (keyboard and mouse) stops working. The display may also

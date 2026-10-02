@@ -12836,6 +12836,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-main-event-drops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Main-channel event drops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15008,7 +15036,7 @@ poller), media socket binding added 2026-08-21.</p>
 <td>Session state query (<code>status</code> verb)</td>
 <td>n/a — intrinsic</td>
 <td>available</td>
-<td>available (<code>run_web</code> builds a <code>SessionStatus</code> from the same <code>spice_connected</code> / <code>agent_connected</code> flags and surface mirror headless uses)</td>
+<td>available (<code>run_web</code> builds a <code>SessionStatus</code> from the same <code>spice_connected</code> flag, <code>SessionState</code> agent watch and surface mirror headless uses)</td>
 </tr>
 <tr>
 <td>Event subscription (<code>latency</code>, <code>agent_connected</code>, <code>paste_*</code>, <code>surface_drawn</code>, <code>digest_updated</code>)</td>
@@ -15205,7 +15233,7 @@ poller), media socket binding added 2026-08-21.</p>
 <tr>
 <td>Paste-as-keystrokes (vdagent auto-disable)</td>
 <td>available (<code>ryll/src/app.rs:1077-1078</code>)</td>
-<td>available (AgentConnected event logged; <code>enable_paste</code> flag passed through)</td>
+<td>available (vdagent state logged from the session's <code>SessionState</code> watch; <code>enable_paste</code> flag passed through)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
@@ -15595,7 +15623,7 @@ poller), media socket binding added 2026-08-21.</p>
 <tr>
 <td>VDAgent connection status (agent_connected flag)</td>
 <td>available</td>
-<td>available (AgentConnected event handled and logged; also a control-socket event and <code>status</code> field)</td>
+<td>available (read from the session's <code>SessionState</code> watch and logged; also a control-socket event and <code>status</code> field)</td>
 <td>available (wired through same channel path)</td>
 </tr>
 <tr>

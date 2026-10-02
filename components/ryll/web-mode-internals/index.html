@@ -13230,6 +13230,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-main-event-drops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Main-channel event drops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16070,7 +16098,10 @@ surface.</p>
 <p>Which pointer message the relay sends depends on the negotiated
 mouse mode, and a SPICE server discards the form it did not
 negotiate without saying anything — so getting it wrong presents
-as a dead pointer rather than as an error:</p>
+as a dead pointer rather than as an error. The relay reads the
+mode on every pointer event from <code>WebState::mouse_mode</code>, a clone of
+the session's <code>SessionState</code> watch receiver, so a mid-session
+change takes effect on the next move:</p>
 <ul>
 <li><strong>Client mode</strong> (guest has vdagent, so an absolute pointing
   device): absolute <code>InputEvent::MouseMove</code>.</li>
@@ -16084,21 +16115,26 @@ as a dead pointer rather than as an error:</p>
 <code>dc.onopen</code>, and the relay answers it with the current mouse mode.
 This is the only correct moment to deliver it: the SPICE server
 announces the mode at session-init, seconds before any browser
-exists, and the tracker below only re-broadcasts on a change that
-a healthy session never has. The browser is the only party that
-knows its channel is open, so it asks.</p>
+exists, and the tracker below only pushes a change that a healthy
+session never has. The browser is the only party that knows its
+channel is open, so it asks.</p>
 <h3 id="mouse-mode-tracker">Mouse-mode tracker<a class="headerlink" href="#mouse-mode-tracker" title="Permanent link">&para;</a></h3>
 <p><code>run_mouse_mode_tracker</code>, also in <code>inputs.rs</code> — a task with the
-lifetime of the <em>process</em>, not of a bridge. It subscribes to the
-<code>ChannelEvent</code> broadcast bus and stores each <code>MouseMode</code> into the
-shared <code>AtomicU32</code> the relay reads.</p>
-<p>Its subscription lifetime is load-bearing. A <code>broadcast::Receiver</code>
-only sees what is sent after it was created, and the mouse mode is
-announced during session-init, so a per-bridge subscription would
-always start out not knowing the mode. For the same reason
-<code>run_web</code> takes this subscription (and the cursor relay's, and the
-surface mirror's) <em>before</em> spawning the SPICE session, rather than
-relying on session-init being slower than the code that follows it.</p>
+lifetime of the session, not of a bridge. It waits on the mouse-mode
+receiver of the session's <code>SessionState</code> and pushes each new mode to
+the browser as a <code>mouse-mode</code> control message. It exits when the
+session ends and the main channel drops the sender.</p>
+<p>Mouse mode is not on the <code>ChannelEvent</code> broadcast bus. A bus
+receiver skips whatever it lags past, so a burst of display events
+could carry a mode change away with it and leave the relay sending
+the pointer messages the server ignores for the rest of the session.
+A <code>watch</code> holds only the latest value: a reader that falls behind
+sees the newest mode rather than missing one, and a receiver created
+at any time already holds the current value, so there is no
+subscribe-before-spawn ordering to get right either. <code>run_web</code> still
+subscribes the cursor relay and the surface mirror to the bus
+<em>before</em> spawning the SPICE session, because those two do need the
+session-init events.</p>
 <h3 id="cursor-relay">Cursor relay<a class="headerlink" href="#cursor-relay" title="Permanent link">&para;</a></h3>
 <p><code>ryll/src/web/cursor.rs</code> — subscribes to the renderer's
 broadcast <code>ChannelEvent</code> stream and watches for <code>CursorImage</code>

@@ -13240,6 +13240,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-main-event-drops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Main-channel event drops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16574,6 +16602,13 @@ this event and accumulate samples client-side rather than polling with
 fires on <strong>transitions only</strong> — once when the agent connects and once
 when it disconnects. It does not fire periodically as a heartbeat. The
 initial state after <code>hello</code> can be queried via <code>status</code>.</p>
+<p>Ryll reports the agent's latest state rather than every change, so a
+disconnect and reconnect close enough together that this client's
+connection never observed the intermediate state produce no event. The
+state is read from the session directly rather than from the event bus,
+so falling behind the bus cannot skip a transition; only a full
+per-client outbound queue can, and that is reported by <code>dropped</code> like
+any other loss.</p>
 <p>Callers that depend on agent-required verbs (<code>paste</code>) should subscribe
 to this event and watch for <code>"connected": true</code> before issuing the
 first paste request.</p>

@@ -12969,6 +12969,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-main-event-drops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Main-channel event drops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15296,6 +15324,19 @@ does not recognise is folded into <code>unknown_opcode_count</code> so the map
 cannot be grown from the wire. See the
 <a href="/components/ryll/channel-diagnostics-audit/">channel diagnostics audit</a> for the full
 audit matrix and minimum-baseline rationale.</p>
+<p><code>MainSnapshot</code> also records four fields for diagnosing a stalled UI:
+<code>events_dropped_count</code>, <code>events_dropped_by_kind</code> and
+<code>last_event_drop_ts_secs</code> count the <code>ChannelEvent</code>s the main channel
+discarded because the renderer's event queue stayed full for longer than
+<code>MAIN_EVENT_SEND_TIMEOUT</code> (per <code>ChannelEvent</code> variant name, with the
+session-relative time of the latest drop); a non-zero count means the UI
+stopped draining events. Mouse mode and vdagent state are not events, so
+they are never counted here: the main channel publishes them through the
+renderer's <code>SessionState</code> watch channels, which hold the latest value and
+cannot drop it. <code>server_mouse_mode</code> is the mouse mode the server
+last announced in <code>MAIN_INIT</code> or <code>MOUSE_MODE</code> (1 = server/relative,
+2 = client/absolute); compare it with <code>mouse_mode</code> in the app snapshot, as a
+mismatch means the client is sending the wrong kind of pointer message.</p>
 <p>The <code>ChannelSnapshots</code> struct in <code>ryll/src/bugreport.rs</code> holds the four
 channel snapshot <code>Arc&lt;Mutex&lt;T&gt;&gt;</code> values and is created alongside
 <code>TrafficBuffers</code> in <code>run_connection()</code>. The <code>AppSnapshot</code> is
