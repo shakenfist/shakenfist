@@ -448,8 +448,11 @@ def keys_with_attributes(
     Note that this deliberately does not filter on object state. The
     only thing which soft deletes a key is the expiry sweep, and such
     a key is by construction already excluded by the expiry filter;
-    user requested removal is a hard delete. Any future soft delete
-    path must revisit that, here and in Namespace.lookup_key().
+    user requested removal is a hard delete. That claim also relies on
+    the orphan reconciler repairing a live stateless key forward to
+    created via zombie_repair_state() rather than deleting it (issue
+    3836). Any future soft delete path must revisit that, here and in
+    Namespace.lookup_key().
     """
     return [
         (NamespaceKey.from_static_data(static_data), attrs)

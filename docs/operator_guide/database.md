@@ -1027,12 +1027,19 @@ iterators cannot see:
 - **Zombies** — static-values rows with no `object_states` row
   (for example after a crash between static-row creation and the first
   state write). Once a zombie has been observed on two consecutive
-  sweeps it is repaired by writing a `deleted` state row, after which
-  the regular deleted-object sweep hard deletes it. Node and namespace
-  objects are never auto-repaired.
+  sweeps it is repaired by writing a state row. By default that row is
+  `deleted`, after which the regular deleted-object sweep hard deletes
+  it. A namespace key, trusted issuer or mapping rule whose attributes
+  row is present is instead repaired to `created`, because its
+  authentication read path honours it without a state row and deleting
+  it would silently revoke a working credential (issue 3836). If the
+  liveness read fails because the database is unavailable, nothing is
+  written, the pass stops, and the zombie is retried on the next pass.
+  Node and namespace objects are never auto-repaired.
 
 Both sweeps log what they remove, and zombie repairs also emit an audit
-event against the repaired object.
+event against the repaired object, which says which state it was
+repaired to.
 
 Cluster operation targets are stored separately because:
 
