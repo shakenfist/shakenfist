@@ -47,3 +47,4 @@
 - PLAN-ci-cloud-sizing.md: Right-size the CI test clouds
 - PLAN-transient-capacity-refusals.md: A capacity refusal is transient
 - PLAN-power-state-correctness.md: Truthful instance power state
+- PLAN-zombie-repair-live-credentials.md: Zombie repair must not delete a live credential
