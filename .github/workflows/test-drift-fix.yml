@@ -153,7 +153,7 @@ jobs:
       - name: Exit early if nothing to do
         if: steps.initial_test.outputs.tests_passed == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           echo "All tests pass. Nothing to do."
           if [ "${IS_PR_RUN}" == "true" ]; then
@@ -372,7 +372,7 @@ jobs:
           env.IS_PR_RUN == 'true' &&
           steps.verify.outputs.fix_succeeded == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           git push origin ${PR_REF}
 
@@ -388,7 +388,7 @@ jobs:
           steps.verify.outputs.fix_succeeded == 'true' &&
           inputs.dry_run != true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           git push -f origin test-drift-fix-${DATESTAMP}
           sleep 5
@@ -435,7 +435,7 @@ jobs:
           (steps.claude_fix.outputs.claude_available != 'true' ||
            steps.verify.outputs.fix_succeeded == 'false')
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           TEST_OUTPUT=$(tail -c 2000 \
             ${{ runner.temp }}/test-output.txt \
