@@ -183,7 +183,7 @@ BUNDLE_TOPOLOGIES = {
 #
 # * 'Node lifecycle' never reaches the reusable smoke-cluster workflow at
 #   all. It calls the build-smoke-cluster composite action directly
-#   (functional-tests.yml:581), and the probe steps live in the workflow
+#   (functional-tests.yml:587), and the probe steps live in the workflow
 #   rather than in the action, so they are not in its job. Fixing this means
 #   moving or duplicating the probe steps into the composite action, which
 #   changes how *every* caller deploys -- shakenfist's five call sites,
