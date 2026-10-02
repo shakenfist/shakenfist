@@ -15102,6 +15102,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#outcome" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outcome
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#back-brief" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15925,6 +15936,21 @@ in the pull request description.</p>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Brief 8's inventory counts are in the pull request description,
       and Mikal has looked at every line in a deleting branch.</li>
 </ul>
+<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
+<p>Landed as <a href="https://github.com/shakenfist/shakenfist/pull/4395">#4395</a>,
+merge commit <code>447ed75ae</code>. The second functional run
+(<a href="https://github.com/shakenfist/shakenfist/actions/runs/36721352515">36721352515</a>)
+passed every job, and both new tests ran rather than skipping: a guest
+poweroff reads <code>shutdown</code> and a SIGKILLed qemu reads <code>crashed</code>, so D7
+stands. The first run
+(<a href="https://github.com/shakenfist/shakenfist/actions/runs/36705724407">36705724407</a>)
+failed only because <code>pkill -f</code> killed its own ssh shell. The Definition
+of done holds on <code>develop</code>: no <code>expectedFailure</code> remains in the cleaner
+tests, the second loop iterates <code>get_inactive_sf_domains()</code> and the
+apparmor sweep <code>get_all_domain_uuids()</code>. The one item not met is the
+last: the pull request merged before brief 8's sfcbr inventory was
+taken, so the deleting branches met sfcbr's inactive domains without
+that review.</p>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before starting step 1, back brief Mikal on the three places this plan
 departs from, or adds to, the master plan's phase 1b section. Each is

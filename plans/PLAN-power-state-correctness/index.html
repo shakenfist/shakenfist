@@ -15198,9 +15198,9 @@ can rely on them.</p>
    Autostart (F10) already restarts domains on a hypervisor reboot, and
    a restart of sf-queues or libvirtd leaves running domains running, so
    restore has had no job since <code>Instance</code> lost <code>create_on_hypervisor()</code>.
-   Still to establish in phase 2, on a real hypervisor: the
-   <code>libvirt-guests</code> default on Debian 13 and Ubuntu 24.04, since that
-   decides whether guests are shut down or suspended across a reboot.</li>
+   Phase 2 established the <code>libvirt-guests</code> default from the Debian 13
+   and Ubuntu 24.04 packages: guests are shut down at host shutdown and
+   nothing is started at boot, so autostart alone decides (phase 2 S2).</li>
 <li><strong>What does a failed power on return?</strong> Answered: 507 for port or
    memory exhaustion, 500 for anything else. client-python maps 409, 500
    and 507 to distinct exceptions and does not retry in <code>_request_url</code>,
@@ -15293,13 +15293,13 @@ phases 0, 1b and 3 all rely on <code>create()</code> failing when power on fails
 <tr>
 <td>1b. The cleaner sees powered off domains</td>
 <td><a href="../PLAN-power-state-correctness-phase-01b-inactive-domains/">PLAN-power-state-correctness-phase-01b-inactive-domains.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>447ed75ae</code></td>
 </tr>
 <tr>
 <td>2. Autostart and instance restore</td>
-<td>PLAN-power-state-correctness-phase-02-autostart-restore.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-power-state-correctness-phase-02-autostart-restore/">PLAN-power-state-correctness-phase-02-autostart-restore.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -15427,6 +15427,12 @@ has the detail as S1 to S14 and D1 to D9.
 <p>On <code>CRASHED</code>: an inactive domain is always <code>off</code>, with libvirt's
 shutoff reason recorded in the event and never branched on. The first
 loop's unreachable active <code>crashed</code> branch is left and documented (D7).</p>
+<p>Landed as <a href="https://github.com/shakenfist/shakenfist/pull/4395">#4395</a>.
+Functional run
+<a href="https://github.com/shakenfist/shakenfist/actions/runs/36721352515">36721352515</a>
+confirmed on a real hypervisor that a guest poweroff reads <code>shutdown</code>
+and a SIGKILLed qemu reads <code>crashed</code>. It merged before brief 8's sfcbr
+inventory was taken.</p>
 <h3 id="phase-2-autostart-and-instance-restore">Phase 2: autostart and instance restore<a class="headerlink" href="#phase-2-autostart-and-instance-restore" title="Permanent link">&para;</a></h3>
 <p>Fix F10 by calling <code>setAutostart(0)</code> in <code>power_off()</code>, after first
 establishing the <code>libvirt-guests</code> default on Debian 13 and Ubuntu 24.04
@@ -15435,6 +15441,25 @@ the same change, and with it
 <code>test_failed_restore_enqueues_delete_and_continues</code> and <code>FakeInstance</code>'s
 string <code>power_state</code>. Delete F3's <code>_health_check_kvm_process</code>. Plan at
 high effort: this is behaviour on every node at startup and reboot.</p>
+<p>The phase survey corrected three things in this section. The phase plan
+has the detail as S1 to S9 and D1 to D8.</p>
+<ul>
+<li><strong>Open question 1 is answered from the packages.</strong> On both Debian 13
+  and Ubuntu 24.04, libvirt-guests is enabled, shuts guests down at
+  host shutdown and starts nothing at boot, and the deployer changes
+  none of it. Autostart alone decides what comes back (S2).</li>
+<li><strong><code>setAutostart(0)</code> in <code>power_off()</code> is not enough.</strong> It leaves the
+  flag set on every domain powered off before this phase, and on a
+  guest which powered itself off. The cleaner also clears it when it
+  finds an inactive domain <code>off</code>, under the instance lock (D2, D6).</li>
+<li><strong>That needs an explicit shutdown ordering.</strong> If the cleaner ran
+  while libvirt-guests shuts guests down, a reboot would power off
+  every instance. Nothing orders the daemons after libvirt-guests on a
+  node without <code>sf-database</code>, so the phase adds
+  <code>After=libvirt-guests.service</code> to every SF unit (S3, D3).</li>
+</ul>
+<p>The restore test is rewritten rather than deleted, because it is the
+only cover the placement reconciliation has in its file (S5).</p>
 <h3 id="phase-3-power-operations-answer-truthfully">Phase 3: power operations answer truthfully<a class="headerlink" href="#phase-3-power-operations-answer-truthfully" title="Permanent link">&para;</a></h3>
 <p>F4 to F8 and F12, with their functional tests. <code>power_on()</code> reports
 failure and the endpoint answers 507 or 500 (open question 2);
