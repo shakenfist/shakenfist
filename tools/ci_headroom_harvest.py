@@ -837,7 +837,11 @@ def build_parser(default_census_limit):
 
 
 def harvest(github, args, report):
-    """Enumerate, download, summarise and write. Returns the record count.
+    """Enumerate, download, summarise and write.
+
+    Returns the number of records written and, of those, how many carry a
+    usable series. The second number is what an analysis can actually be
+    computed over, so it is reported rather than left for a reader to derive.
 
     An empty result is an error at both of the points it can arise. The
     ordering defect this tool was fixed for presented as a harvest which
@@ -870,6 +874,7 @@ def harvest(github, args, report):
                  args.workflow), file=sys.stderr)
 
     written = 0
+    usable = 0
     # Written incrementally rather than accumulated and dumped at the end.
     # A harvest of the full window is an hour of downloads, and an
     # interruption two thirds of the way through should leave two thirds of
@@ -885,6 +890,10 @@ def harvest(github, args, report):
                 records = harvest_run(
                     github, run, args.cache_dir, report, args.census_limit,
                     workdir)
+            usable += sum(
+                1 for record in records
+                if ((record.get('summary') or {}).get('series')
+                    or {}).get('samples_usable'))
             written += write_records(records, handle)
             handle.flush()
 
@@ -895,7 +904,28 @@ def harvest(github, args, report):
             'bundle naming change this tool has not been told about.'
             % (len(runs), 'run was' if len(runs) == 1 else 'runs were',
                args.output))
-    return written
+    # The third way an empty result arises, and the one which does not look
+    # empty. Records are written, each honestly saying it carries no usable
+    # series, and the file parses -- but pooled they are a population of
+    # zero, and an analysis over them reports on nothing while reading like
+    # it reported on the window. A probe which stopped starting looks like
+    # this, and so does a window predating the instrument.
+    #
+    # Not an error, because a bundle with no series is a record and not a gap
+    # -- that is this tool's design, stated in the module docstring and
+    # relied on by a one-run harvest of an expired artifact, which is a
+    # legitimate thing to ask for and whose answer is the reason in the
+    # record. So the count is reported either way and its absence is called
+    # out, rather than refused. What would make this an assertion rather than
+    # a line of prose is a consumer which reads the dataset on a schedule;
+    # there is none, which is its own issue.
+    if not args.quiet and written and not usable:
+        print('WARNING: not one of the %d %s written carries a usable series, '
+              'so this window measured nothing. Narrow it to runs the probe '
+              'was running in, or find out why it was not.'
+              % (written, 'record' if written == 1 else 'records'),
+              file=sys.stderr)
+    return written, usable
 
 
 def main(argv=None):
@@ -921,11 +951,11 @@ def main(argv=None):
                      'retention window')
 
     github = GitHubCLI(repo=args.repo, verbose=not args.quiet)
-    written = harvest(github, args, report)
+    written, usable = harvest(github, args, report)
     if not args.quiet:
-        print('Wrote %d %s to %s in %d API calls'
+        print('Wrote %d %s to %s (%d with a usable series) in %d API calls'
               % (written, 'record' if written == 1 else 'records',
-                 args.output, github.calls), file=sys.stderr)
+                 args.output, usable, github.calls), file=sys.stderr)
     return 0
 
 

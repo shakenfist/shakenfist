@@ -1583,9 +1583,10 @@ class BaseTestCase(testtools.TestCase):
     def assertRefusedAtStage(self, response, stage):
         """Assert a create was refused at a scheduler stage, per D27.
 
-        The contract asserted here, as of 2026-09 (``scheduler.py:540``
-        and the create path's ``except exceptions.LowResourceException``
-        clause, ``external_api/instance.py:901-906``):
+        The contract asserted here, as of 2026-09 (the scheduler's
+        ``LowResourceException`` raise, and the create path's ``except
+        exceptions.LowResourceException`` clause in
+        ``external_api/instance.py``):
 
         * HTTP status 507.
         * A body whose ``error`` field is ``No nodes remaining at

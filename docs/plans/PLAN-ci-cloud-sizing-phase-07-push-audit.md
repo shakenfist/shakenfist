@@ -453,4 +453,443 @@ Two gates in particular, both cheap to propose and expensive to redo:
 
 ## Findings
 
-*(Written by 7i. Empty until the audit runs.)*
+Seven agents ran: wave 1 (7b), the four `PUSH-AUDIT.md` judgment headings
+(7c-7f), the D3 instrument lens (7g), and the `shakenfist/actions` pass
+(7h). Every heading below names what it examined, per D8.
+
+**The headline: no finding invalidates the plan's conclusions.** The band
+is not fitted to under-measured data, and that is shown from the committed
+dataset rather than argued. There were no critical or high security
+findings. Wave 1 passed.
+
+What the audit found instead has one shape, which three lenses reached
+independently: **the instrument records its own failures honestly, reports
+them silently, and nothing reads the records.**
+
+### Wave 1 (7b) -- passed
+
+`pre-commit run --all-files` green, all twelve hooks. `tox` green: 5,501
+tests, 5,380 passed, 121 skipped, 0 failed, 351s. The four style greps run
+against each of the fourteen ranges individually: **zero** lines over 120
+characters, zero `etcd` references, zero `mariadb.get_all_*(` without a
+`# nopushdown:` tag. 92 `print(` hits, every one in `ci_headroom_probe.py`,
+`ci_headroom_report.py` or `ci_headroom_harvest.py` -- the three CLI tools
+whose printed output is their product, none of which may import
+`shakenfist_utilities.logs`. Correct use, not stray debug output.
+
+**Proto freshness is not applicable, with evidence**: `git diff
+--name-only` pooled over all fourteen ranges touches 37 files and none is
+under `protos/` or `shakenfist/protos/`, so `tox -e genprotos` was
+correctly not run. `tools/mermaid-lint.sh` ran with docker available, exit
+status checked directly: 0. Only two files in the repository carry mermaid
+diagrams (`ARCHITECTURE.md`, `docs/developer_guide/state_machine.md`) and
+both parse.
+
+The named flake, `test_nested_sweep.NestedSweepOffTestCase.test_the_sweep`,
+passed under parallel stestr in both the `py3` and `cover` passes. Recorded
+per D4 rather than omitted, because a wave 1 report that lists it without
+re-running it in isolation has misgraded it.
+
+### A premise of this plan was wrong, and did not reach the tree
+
+The plan, and two of the briefs written from it, said
+`ci_headroom_report.py` and `ci_headroom_probe.py` are standard-library-only
+by constraint. `probe.py` imports `shakenfist_client.apiclient` and is right
+to: it runs on the cluster primary inside the test environment, not on a
+bare runner. The stdlib-only pair is `report.py` and `harvest.py`, and each
+says so in its own docstring, `harvest.py` explicitly contrasting itself
+with `report.py`.
+
+7c checked whether the wrong version had propagated: five statements of the
+constraint exist across `ci_cloud_sizing.md`, `ci.md`, `AGENTS.md` and the
+three tools, and all five are correct. The error was confined to the plan
+documents, which this section is the correction of.
+
+### Blocking findings, all fixed in this phase
+
+**F-B1. `tools/ci_headroom_report.py`'s module docstring stated the opposite
+of the code.** It said the per-node maximum committed fraction "is recorded
+rather than printed ... the phase which sets them is the phase which should
+print it". Phase 5 (`de87bcde2`) then added the printing: it is printed
+beside the cluster-wide verdict, raised as a GitHub annotation, and carried
+in the step summary, judged against `PER_NODE_BAND_UPPER`. A false claim in
+the first 140 lines of the instrument's central file. Fixed.
+
+**F-B2. `GitHubCLI.paginate()`'s page walk had no test.**
+`FakeGitHub.paginate()` yields one page and returns, for every path shape,
+so every existing test exercised what callers do with a listing and none
+exercised how the listing is gathered. `GitHubCLI` appeared nowhere in
+`shakenfist/tests/`.
+
+That is half of the 2026-09-08 fix left unheld. The other half -- the
+client-side sort -- is covered in three orderings by `RunListingTestCase`.
+GitHub's `?event=merge_group` listing genuinely does omit the newest runs
+from page one, checked against the live API during this phase, so a run
+reachable only on a later page is the ordinary case. Fixed: a new
+`PaginationTestCase` with five tests, including one that drives
+`list_runs()` end to end with the newest run on page two. The fake now
+raises on a refetched page, so a walk that never advances fails instead of
+hanging.
+
+**F-B3. A window in which every record is absent reported success
+unqualified.** The harvest raises on zero runs and on zero records, but a
+window where every bundle lacked a series wrote N records and printed
+"Wrote N records".
+
+**The first fix for this was wrong and is worth recording.** Raising on an
+all-absent window broke three existing tests, one of them named
+`test_a_harvest_which_produced_a_record_is_not_an_error`, and contradicted
+the module's own documented principle that a bundle with no series is a
+record and not a gap -- a one-run harvest of an expired artifact is a
+legitimate question whose answer is the reason in the record. So
+`harvest()` now returns the written count *and* the usable count, `main()`
+prints both, and an all-absent window gets an explicit warning rather than
+a refusal. Two tests pin the accounting. What would make this an assertion
+rather than a line of prose is a consumer reading the dataset on a
+schedule, which is #4409.
+
+**F-B4. A broken log shipper read as a cluster with no refusals.** With the
+census file read successfully but matching no log lines,
+`capacity_shortage_drops` is 0 and `refusal_warning` was `False` --
+identical to a genuinely clean run. Every job this runs in deploys a
+cluster and schedules instances, so the scheduler cannot have been silent:
+an empty result means the shipping path stopped or the message forms were
+renamed.
+
+`refusal_warning` was already deliberately tri-state for the census that
+could not be read; this is the second way it cannot say, and it now reads
+null too. Both prose sites that explained the null as "no census was read"
+now distinguish the two reasons. Two tests, one for the empty census and
+one for the converse -- a census that read real lines and found no refusal
+must keep saying so.
+
+### Mechanical fixes, taken because they leave the repository
+
+**F-M1. 25 sites in `tools/ci_headroom_report.py` printed decision letters
+into CI output**, including two in `$GITHUB_STEP_SUMMARY` and three in
+GitHub annotations: D3, D4, D5, D7, D8, D9, D10, D11, D13, D15, D18, "phase
+2", "phase 4". A contributor reading a job log or a PR annotation has no
+access to the plan that assigns those letters. Each sentence already stated
+its reason, so the citations were removed and the reasons kept. Five test
+assertions pinning the old strings were updated with them.
+
+**F-M2. 20 runtime `skipTest`/`fail` messages in `test_saturation.py` ended
+in `(D26)`.** These are what an engineer reads in a cluster CI result. Each
+message already stated its own reason in full. Removed; the 26 remaining
+mentions are in docstrings and comments and are filed as #4411.
+
+**F-M3. Nine rotted line-number citations repaired.** The survey found one
+(`functional-tests.yml:581`, invalidated by `#4396` six hours after phase 6
+verified it). 7e found six more. Checking 7e's own list found two further
+ones it had not examined. Every repair was verified against the target
+rather than taking the reported number:
+
+| Citation | Claimed | Actual |
+|---|---|---|
+| `sizing.py` `ram_max` | `scheduler.py:1109-1111` | `:1142` |
+| `sizing.py` `ram_available` | `scheduler.py:1114-1120` | `:1152` |
+| `sizing.py`, `test_nodes.py` affinity tests | `(:128)`, `(:291)` | `:124`, `:282` |
+| `test_saturation.py` cap stage | `scheduler.py:643-655` | `:661-670` |
+| `test_saturation.py` cap published | `scheduler.py:1058` | `:1073-1074` |
+| `test_saturation.py` list prefilter | `external_api/instance.py:485` | `:589`, with `Instance.ACTIVE_STATES` in `shakenfist/instance.py:303` |
+| `base.py` 507 contract | `scheduler.py:540`, `instance.py:901-906` | `:527`, `:1146` |
+| `test_nodes.py` `_database_nodes()` | `database_tier.py:130-142` | `:137` |
+| `test_saturation.py` skip idiom | `test_nodes.py:111`, `:116-122`, `:125` | none of the three |
+
+Since these have now rotted twice in one week, the repair names the symbol
+and drops the number wherever a symbol exists, which is durable. One
+citation 7e reported as rotted was not: `sizing.py:202`'s
+`scheduler.py:1052-1057` for the `is_hypervisor` and
+`UNREASONABLE_QUEUE_LENGTH` filter is correct. And one of its sub-claims
+was a misreading: `test_saturation.py`'s comment says the
+`cpu_max_per_instance` stage is *earlier than* `sufficient_idle_cpu`, not
+that it is it. Only the line number was wrong.
+
+**F-M4. `sizing.py` cited a file this repository does not contain.**
+`ansible/ci-topology-slim-tier.yml:65` lives only in `shakenfist/actions`.
+Every other cross-repository citation in this plan's code names the
+repository and flags the unpinned `@main`; this one did neither, so a
+reader searches for a file that is not here. Brought into line.
+
+### The two blocking rules, vacuous with evidence (7c)
+
+`git diff <range> -- '*.py' | grep -E '^\+[^+].*get_all_[a-z_]+\('` returns
+zero in all fourteen ranges. No range adds a MariaDB call site at all --
+every added line matching `mariadb\.` is a `self.mock_mariadb.*` in a unit
+test or one docstring sentence -- so the judgment-level pushdown case has
+no new caller to reach through. No range touches
+`shakenfist/schema/*_attributes.py` or adds an `add_*`/`remove_*` mutator
+pair, so the cached-FK-list rule is vacuous. Zero new MariaDB functions and
+zero proto changes, so the three-layer pattern raises no question.
+
+The TODO/FIXME/HACK/XXX sweep and the `# noqa` / `# type: ignore` /
+`pragma: no cover` sweep are both **empty across all fourteen ranges**, so
+there was no triage list to grade.
+
+### The product code, read as product code (7c, 7f)
+
+The plan's phase 7 section claimed this change was not product code.
+`shakenfist/scheduler.py` is in three ranges and `shakenfist/config.py` in
+one, and two of those added fields to the `/admin/resources` response body.
+
+**`cpu_limit`, published deliberately as `None` rather than falling back:
+every consumer handles it, and none collapses the distinction.** Both
+lenses enumerated them independently and agreed -- `sizing.py`'s
+`effective_cpu_ceiling()` and `hypervisor_ledger()` (whose docstring names
+`cpu_limit or 0` as the defect it avoids, because that would read a healthy
+cluster as a zero ledger for its first three minutes), `retries.py`'s
+`node_available_cpus()`, `ci_headroom_report.py`'s `NodeSample` (which
+keeps the fallback *and* counts it), `test_saturation.py` (which skips
+rather than guesses), and the scheduler's own pre-filter, which does not
+read the API field at all. `ci_headroom_report.py`'s `numeric()` also
+rejects `bool`, so a field arriving as `True` reads as absent rather than
+as 1.0.
+
+**`capacity_degraded`** preserves its tri-state correctly in
+`ci_headroom_report.py` -- absent key is not `False`, and the two are
+counted apart. The two cluster-CI consumers collapse absent to false, which
+is harmless because the suite ships with the server it tests, but neither
+says so. Advisory, not filed separately; it is one comment.
+
+**`config.py`'s help text is accurate, verified against the template.**
+`NODE_CPU_RESERVATION_THREADS`'s new "doubling it on network and database
+nodes" matches `examples/_shared/site.yml`'s `(1 + ternary(1,0)) * 2`, and
+`NODE_RAM_RESERVATION_GB`'s "adding a bump" matches `max(2.0, 10%) + 4.0`.
+
+**The swagger drift phase 1 anticipated did not happen**, and could not:
+`admin_resources_get_example` is a literal `{...}`, so there is nothing to
+drift. Recorded because it looks like a finding.
+
+### Security (7f) -- no critical, no high
+
+`git diff <range> -- shakenfist/external_api/` is **empty for all fourteen
+ranges**, as is `shakenfist/db*/` and `protos/`. The endpoint's
+`@api_base.caller_is_admin` decorator is untouched and requires both
+`request_namespace() == 'system'` and `ADMIN` scope, so namespace
+membership alone does not reach it. Neither new field is a new category of
+information: `cpu_hard_max`, `cpu_measured`, `cpu_committed` and
+`cpu_committed_row_present` were already published from the same inputs.
+
+**The probe's `sudo chown -R /srv/ci/traces` cannot be redirected.** The
+path is a literal; no matrix value, input or repository variable reaches
+it. `/srv/ci` is a root-owned mount point over `/dev/vdc`, so nothing
+unprivileged can pre-create `traces` there, and GNU `chown -R` defaults to
+`-P` and will not follow a symlink it meets. `inputs.base_image_user` is a
+YAML literal at all four call sites and the matrix jobs are unreachable
+from a fork pull request.
+
+**Nothing sensitive reaches the ninety-day artifact.** The probe writes
+four keys and never reads `os.environ` beyond constructing the client;
+`SHAKENFIST_KEY` never enters a record. Its `error` key renders
+`APIException.args`, which carries the server's error body and not the
+`Authorization` header. `summarize_resources()` is keyed by node name and
+publishes only scalars -- no namespace, instance or tenant field. The probe
+deliberately reduces each roster entry to five keys rather than banking the
+full `external_view()`, which would have carried `ip` and
+`spice_server_cert_subject`; that instinct is worth recording.
+
+**The Loki census discloses nothing new**, which was not the expected
+answer. Its lines do carry namespace names and instance UUIDs, but
+`ansible/ci-gather-logs-loki.yml` already puts an *unfiltered*
+`{job="shakenfist"}` dump of up to 200,000 entries in the same bundle, so
+the census is a strict subset of a stream the bundle already carries, from
+a cloud destroyed at end of job.
+
+**The nested-zip extraction is correct, and for a better reason than
+validation.** `extract_traces()` never uses an archive-supplied name to
+build a path: it iterates three module constants, uses the namelist only
+for a membership test, and joins `os.path.basename(constant)`. The classic
+traversal has no entry point.
+
+**No SQL of any kind in any range** -- grepped for `text(`, `SELECT`,
+`INSERT`, `UPDATE`, `DELETE FROM` and `execute(` across every added line;
+the only hits are prose in comments. Two `subprocess` calls, both argv
+lists, no `shell=True` anywhere, no `os.system`.
+
+Four low findings filed as #4412.
+
+### Test coverage (7d)
+
+Beyond F-B2, two questions came back clean with their evidence.
+`test_headroom_gate_workflow_seams.py` genuinely derives each call site's
+shape from the workflow YAML, following `${{ matrix.X.Y }}` into the real
+matrix entries and failing loudly on anything it cannot resolve to a
+concrete value, rather than pinning literals; its hardcoded
+`MEASURED_SHAPES` is correct by design, being the warn window's ground
+truth rather than a derived value. `test_saturation.py` asserts the refusal
+contract through structured `stage` and `transient` fields and real ledger
+arithmetic against a node it actually fills and releases; the two plain
+substring matches are the only paths carrying no structured fields to
+assert on, and their docstrings say so.
+
+Remaining gaps filed as #4413.
+
+### Documentation (7e)
+
+**The 12-versus-24 trap is clean.** D7's annotation is present at
+`PLAN-ci-cloud-sizing.md:128-135`, saying in terms that the baseline table
+is a measurement record and not the current state, and pointing at
+`ci_cloud_sizing.md` for the live figures. No present-tense "12" survives
+outside `docs/plans/`: the two hits in the swept paths are an unrelated
+incident report about a 12 vCPU *instance*, and `sizing.py`'s own
+explicitly-historical framing immediately above `MINIMUM_HYPERVISOR_LEDGER
+= 24`.
+
+`README.md` and `ARCHITECTURE.md` are untouched by every range. `AGENTS.md`
+gained exactly one table row, a curated link to the new page, which is the
+pattern the shared block wants rather than growth to flag. No range adds an
+ASCII box-and-arrow diagram; every fenced block added is a shell command,
+an equation or a figures listing. No `phase <number>` reference in any
+non-plans markdown file. No schema change in any range, so migration
+guidance does not apply -- confirmed by `git diff --name-only` against
+`shakenfist/schema/*`, `migrations/` and `protos/database.proto`, not
+assumed.
+
+D5's two plan-document-only merges introduced no false claim. `9eaf4af34`'s
+"12 to 18 under-cloud vCPU" is a different figure from the 12-to-24
+*ledger*, and both are accurately stated in their own homes.
+
+### The instrument's failure surface (7g, D3) -- the lens that earned its place
+
+**The band is not fitted to under-measured data.** Across all 236
+summarised records in `docs/plans/data/ci-cloud-sizing-baseline/`:
+`samples_failed` is 0; no record has fewer than 20 usable samples (minimum
+51); `capacity_degraded_samples` is 0; `census.truncated` is never true;
+and **every record's mean sample spacing is 15.000s to within 10µs**. That
+last figure is the load-bearing one: it proves no line was dropped
+mid-series and no sample ever overran its slot, which are the two modes
+that would bias the p90 low. The management session reproduced this
+independently from the committed files.
+
+So the modes the instrument's counters can see did not occur in the fit
+window. **But nothing would have told anybody if they had**, and the lens
+produced the full list of modes graded sound, undocumented or defect. The
+four defects became F-B3, F-B4, #4410 and the probe docstring in #4413. The
+"undocumented" rows share one cause and are #4409: a deliberate swallow,
+honestly recorded, with no consumer.
+
+Three things the counters cannot see, recorded because they bound what the
+clean result above means:
+
+* **The ledger itself.** The fraction is `max(cpu_measured, cpu_committed)
+  / cpu_limit` and trusts the reconciler's row. A ledger that
+  systematically under-counts makes every cluster look emptier and leaves
+  no trace in the durable dataset. Server-side fidelity, outside this
+  plan.
+* **The warm-up exclusion.** 10.6% of samples -- the first 135-210s -- are
+  excluded. That prefix almost certainly overlaps venv and pip setup rather
+  than test execution, but `sampled_at` is not aligned to the test step's
+  start anywhere in the record, so that is inferred from step order rather
+  than measured.
+* **Coverage.** No record carries the test step's duration, so a series
+  covering part of a job is indistinguishable from one covering all of it.
+  The banked windows (750-2,565s) are consistent with full coverage and
+  nothing asserts it.
+
+**A correction to this plan's own D3 text**, found by the lens: a typo in
+the `CI_HEADROOM_GATE` repository variable **arms** the gate, it does not
+disarm it. `functional-tests.yml` passes `${{ vars.CI_HEADROOM_GATE !=
+'false' }}`, so only the literal `false` turns it off and `off` or `0`
+leave it armed; `ci_headroom_verdict.sh` meanwhile accepts
+`0|false|no|off|...` as off, so its header over-promises a flexibility the
+caller layer does not honour. Both expressions were verified directly. The
+hazard is the reverse of what this plan assumed, and it is the safer
+direction.
+
+### The `shakenfist/actions` half (7h, D2)
+
+D2's premise held exactly: no `PUSH-AUDIT.md` in that repository, confirmed
+by `gh api` (404) and `git ls-tree origin/main`. Audited read-only over the
+three ranges; four issues filed there, nothing fixed from here.
+
+**shakenfist/actions#127 is the finding worth the step.** `test_kind` is an
+unvalidated `type: string` and all seven dependent steps are equality tests
+with no catch-all arm, so `test_kind: ansible_modules` -- an underscore
+instead of a hyphen -- skips the traces directory, the probe, the mesh
+authorisation, both test steps, the slowest-tests listing and the collect
+step. The job deploys a full topology, runs no tests at all, and passes.
+`Log input details` echoes seven inputs but not `test_kind`, so the only
+evidence is the skip pattern. Same bug class as the traces-directory gate
+one level up: there a green run measured nothing, here it tests nothing.
+`test_kind` predates the three audited merges, but #120 is what made the
+input multi-valued, which is how it surfaced.
+
+Also filed: #128 (a withheld verdict and a probe that produced nothing are
+invisible outside the step log -- the other half of #4409), #129 (the Loki
+census discards `curl`'s error and never checks the HTTP status), #130 (the
+absent `PUSH-AUDIT.md`, with a proposed repository-specific wave 1 and the
+two wave-2 headings this audit had to invent: unpinned-`@main` fan-out, and
+gate exhaustiveness -- the second produced #127).
+
+**That repository's CI does run its shell tests**, which was a yes/no worth
+asking: `python3 -m unittest discover -s tests -t . --verbose` in
+`ci.yml`'s `unit-tests` job, with `python3-yaml` installed first because the
+test imports it at module scope, plus a `.pre-commit-config.yaml` local
+hook. Its 16 cases assert on *resolved* workflow expressions rather than
+literals, which is unusually good for shell tests.
+
+Three premises in that step's brief did not hold, and are recorded because
+this plan wrote them: `ci_headroom_verdict.sh` contains no ratio arithmetic
+at all (no `bc`, no `awk`, no float comparison -- the band maths is all in
+the Python half); neither shell script uses `set -e`, so "a `|| true` leaves
+no failure path" does not apply, and failures are handled explicitly with
+`if ! scp` and `status=$?`; and quoting is clean throughout, with
+`ssh_opts` and `report_args` as arrays and the headroom label base64'd
+before it crosses `ssh`.
+
+### Mutation testing
+
+Every property claimed above was mutated and the mutation confirmed caught,
+naming the right test. Seven mutations, all caught:
+
+| Mutation | Caught by |
+|---|---|
+| `paginate` stops after page one | `test_a_run_reachable_only_on_a_later_page_is_in_the_window` |
+| `paginate` never advances the page | `test_a_short_page_ends_the_walk` |
+| `paginate` spends a call past the short page | `test_every_page_is_walked` |
+| the usable count counts every record | `test_the_usable_count_counts_only_records_with_samples` |
+| the usable count is never incremented | same |
+| the empty-census tri-state is removed | `test_a_census_which_read_no_log_lines_cannot_say_there_were_none` |
+| the tri-state fires for every census | `test_a_capacity_refusal_is_a_warning_of_its_own` (pre-existing) |
+
+The last is the one worth noting: it confirms the fix did not make every
+run's refusal warning unknown, and it was caught by tests that already
+existed.
+
+### Spot-checks (D8, two per agent)
+
+| Agent | Checked | Result |
+|---|---|---|
+| 7b | `ci_headroom_report.py` really is 3,108 lines; `probe.py`'s imports | both confirmed; the line count coincidentally equals a range's insertion count, and the management session's suspicion of conflation was wrong |
+| 7c | the docstring-versus-code contradiction; the `(D26)` count | confirmed; 32 occurrences, 23 in `skipTest`/`fail` calls |
+| 7d | `FakeGitHub.paginate()` yields one page; `GitHubCLI` absent from tests | both confirmed |
+| 7e | `sizing.py`'s `ram_max` citation; the printed decision letters | both confirmed; 16 `print`-embedded citations found by the check, 25 sites in total once annotations and the step summary were included |
+| 7f | the zip-extraction allowlist; the untyped `artifact['id']` | both confirmed |
+| 7g | the cadence and failed-sample figures over all 236 records; the gate expressions in both layers | both confirmed; its record count of 204 + 32 was right and the management session's 249 was the raw line count |
+| 7h | the unvalidated `test_kind` and all seven gates; whether CI runs the tests | both confirmed |
+
+### Dispositions
+
+| Finding | Grade | Disposition |
+|---|---|---|
+| F-B1 docstring states the opposite of the code | blocking | fixed here |
+| F-B2 `paginate()` page walk untested | blocking | fixed here, 5 tests |
+| F-B3 all-absent window reports success unqualified | blocking | fixed here, 2 tests |
+| F-B4 empty census reads as no refusals | blocking | fixed here, 2 tests |
+| F-M1 25 printed decision citations | mechanical | fixed here |
+| F-M2 20 runtime `(D26)` messages | mechanical | fixed here |
+| F-M3 nine rotted line citations | mechanical | fixed here |
+| F-M4 cross-repository citation unmarked | mechanical | fixed here |
+| no consumer for the instrument's records | advisory | [#4409](https://github.com/shakenfist/shakenfist/issues/4409) |
+| warn window not committed, expires December | advisory, deadline | [#4410](https://github.com/shakenfist/shakenfist/issues/4410) |
+| ~390 plan citations in comments | advisory | [#4411](https://github.com/shakenfist/shakenfist/issues/4411) |
+| harvest hardening, four low security findings | advisory | [#4412](https://github.com/shakenfist/shakenfist/issues/4412) |
+| four test gaps, incl. the probe docstring | advisory | [#4413](https://github.com/shakenfist/shakenfist/issues/4413) |
+| `report.py` 3,108 lines, no stated reason | advisory | [#4414](https://github.com/shakenfist/shakenfist/issues/4414) |
+| unrecognised `test_kind` passes a test-free job | medium | shakenfist/actions#127 |
+| withheld verdict invisible outside the step log | medium-low | shakenfist/actions#128 |
+| census discards `curl`'s error | low | shakenfist/actions#129 |
+| no `PUSH-AUDIT.md` in `shakenfist/actions` | low | shakenfist/actions#130 |
+
+No blocking finding remains open. #4367 and #4320 were out of scope by this
+plan's own Scope section and are not re-reported.
