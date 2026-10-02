@@ -175,6 +175,30 @@ class NamespaceKey(dbo):
         return cls.from_static_data(static_data)
 
     @classmethod
+    def zombie_repair_state(cls, object_uuid: str) -> str:
+        """Repair a stateless key forward if it can still authenticate.
+
+        Neither Namespace.lookup_key() nor keys_with_attributes() looks
+        at object state: each joins the static row to its attributes row
+        and checks expiry. So a key with no state row but with its
+        attributes authenticates, and marking it deleted would lock out
+        whoever holds it (issue 3836). Such a key is repaired to
+        created, after which the expiry sweep governs it normally.
+
+        A key with no attributes row has no secret to compare against,
+        so nothing can authenticate with it and it is garbage. Expiry
+        is deliberately not consulted here: an expired key repaired to
+        created is soft deleted by the expiry sweep, which is the path
+        that is meant to do that.
+
+        A failed attributes read raises DatabaseUnavailable rather than
+        reading as "absent", so the reconciler leaves the key alone.
+        """
+        if mariadb.get_namespace_key_attributes(_as_uuid(object_uuid)):
+            return cls.STATE_CREATED
+        return cls.STATE_DELETED
+
+    @classmethod
     def new(cls, namespace: str, name: str, plaintext_secret: str,
             expiry: Optional[float] = None,
             scopes: Optional[list[str]] = None,

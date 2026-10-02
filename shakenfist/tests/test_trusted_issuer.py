@@ -7,7 +7,9 @@ a set, and deletion follows the standard object lifecycle.
 """
 
 from functools import partial
+from unittest import mock
 
+from shakenfist import exceptions
 from shakenfist.baseobject import state_filter
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
@@ -130,3 +132,27 @@ class TrustedIssuerTestCase(base.ShakenFistTestCase):
     def test_name_is_reusable_after_a_hard_delete(self):
         self._new().hard_delete()
         self.assertIsNotNone(self._new())
+
+    # What the orphan reconciler writes for an issuer with no state row.
+    # from_db_by_name() and the exchange's issuer listing trust an
+    # issuer that is not deleted, so a stateless issuer with its
+    # attributes is live and must be repaired forward (issue 3836).
+    def test_zombie_issuer_with_attributes_is_repaired_to_created(self):
+        issuer = self._new()
+        self.assertEqual(TrustedIssuer.STATE_CREATED,
+                         TrustedIssuer.zombie_repair_state(str(issuer.uuid)))
+
+    def test_zombie_issuer_without_attributes_is_repaired_to_deleted(self):
+        issuer = self._new()
+        del self.mock_mariadb.trusted_issuer_attributes[str(issuer.uuid)]
+        self.assertEqual(TrustedIssuer.STATE_DELETED,
+                         TrustedIssuer.zombie_repair_state(str(issuer.uuid)))
+
+    def test_unreadable_zombie_issuer_raises_rather_than_guessing(self):
+        issuer = self._new()
+        with mock.patch(
+                'shakenfist.mariadb.get_trusted_issuer_attributes',
+                side_effect=exceptions.DatabaseUnavailable('tier blip')):
+            self.assertRaises(
+                exceptions.DatabaseUnavailable,
+                TrustedIssuer.zombie_repair_state, str(issuer.uuid))

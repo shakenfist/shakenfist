@@ -128,6 +128,27 @@ class TrustedIssuer(dbo):
         return issuer
 
     @classmethod
+    def zombie_repair_state(cls, object_uuid: str) -> str:
+        """Repair a stateless issuer forward if the exchange would trust it.
+
+        from_db_by_name() and the federated exchange's issuer listing
+        (federation.issuer_claiming_url()) reject only an issuer whose
+        state is deleted, so one with no state row is still trusted.
+        Marking it deleted would silently revoke trust an operator
+        configured (issue 3836), so an issuer with its attributes row is
+        repaired to created instead.
+
+        An issuer with no attributes row has no issuer URL or JWKS URI,
+        so the exchange can never match a token to it and it is garbage.
+
+        A failed attributes read raises DatabaseUnavailable rather than
+        reading as "absent", so the reconciler leaves the issuer alone.
+        """
+        if mariadb.get_trusted_issuer_attributes(_as_uuid(object_uuid)):
+            return cls.STATE_CREATED
+        return cls.STATE_DELETED
+
+    @classmethod
     def new(cls, name: str, issuer_url: str, jwks_uri: str,
             audience: str) -> Optional['TrustedIssuer']:
         """Configure a new trusted issuer.

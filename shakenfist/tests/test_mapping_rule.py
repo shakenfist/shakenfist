@@ -10,6 +10,7 @@ the (namespace, name) pair is unambiguous.
 from functools import partial
 from unittest import mock
 
+from shakenfist import exceptions
 from shakenfist import mapping_rule
 from shakenfist.baseobject import state_filter
 from shakenfist.mapping_rule import MappingRule
@@ -98,6 +99,43 @@ class MappingRuleTestCase(base.ShakenFistTestCase):
         found = list(MappingRules([], namespace='ci'))
         self.assertEqual(1, len(found))
         self.assertEqual('ci', found[0].namespace)
+
+    # What the orphan reconciler writes for a rule with no state row.
+    # from_db_by_name() honours a rule that is not deleted, so a
+    # stateless rule with its attributes is live and must be repaired
+    # forward (issue 3836).
+    def test_zombie_rule_with_attributes_is_repaired_to_created(self):
+        rule = self._new()
+        self.assertEqual(MappingRule.STATE_CREATED,
+                         MappingRule.zombie_repair_state(str(rule.uuid)))
+
+    def test_zombie_rule_without_attributes_is_repaired_to_deleted(self):
+        rule = self._new()
+        del self.mock_mariadb.mapping_rule_attributes[str(rule.uuid)]
+        self.assertEqual(MappingRule.STATE_DELETED,
+                         MappingRule.zombie_repair_state(str(rule.uuid)))
+
+    def test_damaged_zombie_rule_is_repaired_to_created(self):
+        # An attributes row which will not decode still exists: the
+        # exchange refuses the rule as unusable and its listing marks it
+        # so, which is how the owner finds out. Deleting it would hide
+        # that, so it is kept exactly as visible as it was.
+        rule = self._new()
+        with mock.patch(
+                'shakenfist.mariadb.get_mapping_rule_attributes',
+                side_effect=exceptions.CorruptMappingRule('bad claims')):
+            self.assertEqual(
+                MappingRule.STATE_CREATED,
+                MappingRule.zombie_repair_state(str(rule.uuid)))
+
+    def test_unreadable_zombie_rule_raises_rather_than_guessing(self):
+        rule = self._new()
+        with mock.patch(
+                'shakenfist.mariadb.get_mapping_rule_attributes',
+                side_effect=exceptions.DatabaseUnavailable('tier blip')):
+            self.assertRaises(
+                exceptions.DatabaseUnavailable,
+                MappingRule.zombie_repair_state, str(rule.uuid))
 
 
 class MappingRuleValidationTestCase(base.ShakenFistTestCase):

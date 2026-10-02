@@ -429,6 +429,29 @@ class DatabaseBackedObject:
         return found_obj
 
     @classmethod
+    def zombie_repair_state(cls, object_uuid: str) -> str:
+        """The state the orphan reconciler writes for a zombie of this type.
+
+        A zombie is a static-values row with no object_states row. The
+        orphan reconciler calls this for one which has been seen on two
+        consecutive passes, and writes whatever state it returns.
+
+        The default, deleted, is right for any type whose read paths
+        cannot see a stateless object: nothing can observe it, so it is
+        garbage, and the deleted-object sweep then collects it through
+        the normal path. A type with a read path which honours a
+        stateless object must override this and return a live state
+        whenever that object would be honoured, so that reconciliation
+        never changes what a reader observes (issue 3836).
+
+        An override may raise DatabaseUnavailable when it cannot tell.
+        The reconciler then writes nothing for that object on this pass
+        and asks again on the next one; guessing either way would risk
+        destroying a working object.
+        """
+        return cls.STATE_DELETED
+
+    @classmethod
     def filter(cls, filters):
         raise NotImplementedError(
             f'{cls.__name__} must override filter() with a MariaDB '

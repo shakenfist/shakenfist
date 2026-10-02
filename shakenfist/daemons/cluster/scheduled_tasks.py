@@ -935,16 +935,88 @@ ORPHAN_MINIMUM_AGE = 3600
 _ZOMBIE_CANDIDATES: dict[str, set[str]] = {}
 
 
+def _repair_zombies(objtype: str, cls: type[dbo], confirmed: set[str]) -> bool:
+    """Repair one object type's confirmed zombies.
+
+    Returns False if a liveness read found the database tier
+    unavailable, in which case the caller must end the pass. Nothing is
+    written for that zombie or any after it; they are all still in
+    _ZOMBIE_CANDIDATES, so the next pass confirms and retries them.
+    Guessing instead would risk destroying a live object (issue 3836),
+    and a tier-wide failure must not spend another _grpc_call retry
+    budget per remaining object inside a job whose watchdog is only
+    petted between jobs.
+
+    Any other failure costs only that one object.
+    """
+    for obj_uuid in sorted(confirmed):
+        try:
+            repaired_state = cls.zombie_repair_state(obj_uuid)
+        except DatabaseUnavailable as e:
+            LOG.with_fields({
+                'object_type': objtype,
+                'object_uuid': obj_uuid,
+                'error': str(e)
+            }).warning('Orphan reconciliation could not tell whether a '
+                       'zombie is live, stopping this pass')
+            return False
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                f'zombie repair of {objtype} {obj_uuid}', e)
+            continue
+
+        try:
+            if not mariadb.set_state(
+                    ObjectType(objtype), obj_uuid,
+                    State(value=repaired_state,
+                          update_time=time.time(),
+                          message=('reconciled object with no state '
+                                   f'row to {repaired_state}'))):
+                continue
+
+            if repaired_state in cls.ACTIVE_STATES:
+                audit = ('the orphan reconciliation sweep found this '
+                         'object live with no state row and marked it '
+                         f'{repaired_state}')
+                log_message = ('Orphan reconciliation repaired live '
+                               f'zombie object to {repaired_state}')
+            else:
+                audit = ('the orphan reconciliation sweep marked this '
+                         f'object {repaired_state} because it had no '
+                         'state row')
+                log_message = ('Orphan reconciliation marked zombie '
+                               f'object {repaired_state}')
+            eventlog.add_event(EVENT_TYPE_AUDIT, objtype, obj_uuid, audit)
+            LOG.with_fields({
+                'object_type': objtype,
+                'object_uuid': obj_uuid,
+                'repaired_state': repaired_state
+            }).info(log_message)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                f'zombie repair of {objtype} {obj_uuid}', e)
+    return True
+
+
 @util_general.recorded_method
 def reconcile_orphaned_objects():
     """Remove phantom state rows and repair zombie static rows.
 
     Phantoms (an object_states row whose static-values row is gone) are
     deleted server-side. Zombies (a static-values row with no
-    object_states row) are repaired by writing a deleted state row, which
-    makes them visible to the regular deleted-object sweep; that sweep
-    then hard deletes them through the normal path. Both kinds of orphan
-    are otherwise invisible to every state-driven iterator, forever.
+    object_states row) are invisible to every state-driven iterator,
+    forever, so once one has been seen on two consecutive passes it is
+    given the state its class's zombie_repair_state() returns.
+
+    For most types that is deleted, which makes the zombie visible to
+    the regular deleted-object sweep; that sweep then hard deletes it
+    through the normal path. A type whose read path honours a stateless
+    object (a namespace key, trusted issuer or mapping rule with its
+    attributes row present) is instead repaired forward to created, so
+    that reconciliation never destroys something a reader would still
+    honour (issue 3836). If that liveness read finds the database tier
+    unavailable, nothing is written, the pass stops and the zombie is
+    retried on the next pass.
 
     Runs only on the elected cluster node.
     """
@@ -983,26 +1055,26 @@ def reconcile_orphaned_objects():
         current = set(work.uuids)
         confirmed = current & _ZOMBIE_CANDIDATES.get(objtype, set())
         _ZOMBIE_CANDIDATES[objtype] = current
+        if not confirmed:
+            continue
 
-        for obj_uuid in sorted(confirmed):
-            try:
-                if not mariadb.set_state(
-                        ObjectType(objtype), obj_uuid,
-                        State(value=dbo.STATE_DELETED,
-                              update_time=time.time(),
-                              message='reconciled object with no state row')):
-                    continue
-                eventlog.add_event(
-                    EVENT_TYPE_AUDIT, objtype, obj_uuid,
-                    'the orphan reconciliation sweep marked this object '
-                    'deleted because it had no state row')
-                LOG.with_fields({
-                    'object_type': objtype,
-                    'object_uuid': obj_uuid
-                }).info('Orphan reconciliation repaired zombie object')
-            except Exception as e:
-                util_exceptions.ignore_exception(
-                    f'zombie repair of {objtype} {obj_uuid}', e)
+        # Which state a zombie is repaired to is the class's decision,
+        # not ours (issue 3836). Without the class there is no way to
+        # ask, and falling back to deleted is the one answer that can
+        # destroy a live object, so this type's zombies are left alone.
+        # They stay candidates, so they are confirmed again next pass.
+        try:
+            cls = get_object_class(objtype)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                f'zombie repair class lookup for {objtype}', e)
+            continue
+
+        if not _repair_zombies(objtype, cls, confirmed):
+            # The tier went away mid-pass. Same treatment as a
+            # tier-wide work-list failure above, for the same reason.
+            _record_sweep_stopped('reconcile_orphans', zombie_types, objtype)
+            break
     else:
         _record_sweep_completed('reconcile_orphans')
 

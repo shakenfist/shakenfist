@@ -15,6 +15,8 @@ import sqlalchemy as sa
 
 from shakenfist import constants
 from shakenfist import mariadb
+from shakenfist.baseobject import DatabaseBackedObject
+from shakenfist.daemons.cluster import scheduled_tasks
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 from shakenfist.tests import dbfixture
@@ -251,3 +253,32 @@ class OrphanQueryTestCase(
             'every object type with a class needs a static table getter, '
             'or the orphan reconciler silently skips it in both directions '
             '(issues 3588, 3788)')
+
+    def test_zombie_repair_state_overrides_are_pinned(self):
+        # Registering a type above makes the reconciler repair its
+        # zombies, which by default means marking them deleted. That is
+        # only safe if nothing can observe a stateless object of that
+        # type. namespace_key, trusted_issuer and mapping_rule each have
+        # a read path which honours one, and repairing them to deleted
+        # destroyed live credentials (issue 3836). Pin the set, so that
+        # adding a type -- or an override -- is a decision someone made.
+        default = DatabaseBackedObject.zombie_repair_state.__func__
+        overriding = set()
+        for objtype in mariadb.ORPHAN_RECONCILABLE_OBJECT_TYPES:
+            if objtype in scheduled_tasks.ZOMBIE_REPAIR_EXCLUDED_TYPES:
+                continue
+            cls = constants.get_object_class(objtype)
+            if cls.zombie_repair_state.__func__ is not default:
+                overriding.add(objtype)
+
+        self.assertEqual(
+            {'namespace_key', 'trusted_issuer', 'mapping_rule'},
+            overriding,
+            'the set of object types which override zombie_repair_state() '
+            'changed. If you added an object type, decide whether any of '
+            'its read paths honour an object with no state row (a by-name '
+            'lookup or listing which does not check state, or which rejects '
+            'only deleted). If one does, the orphan reconciler would '
+            'destroy live objects of that type: override '
+            'zombie_repair_state() to return a live state when the object '
+            'would be honoured, and add the type here (issue 3836)')
