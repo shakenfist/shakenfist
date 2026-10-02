@@ -265,6 +265,16 @@ defence, and make the template's meaning depend on whether a value
 happened to equal its default. The release note says plainly that the
 first deploy reissues.
 
+*Step 2 finding.* The template-change trigger is the registered
+`changed` flag of the same run. A run interrupted between writing the
+template and setting the certificate aside (two adjacent local tasks)
+leaves the next run seeing an unchanged template, so that reissue
+waits for the expiry window. Comparing the template's mtime with the
+certificate's would close the gap, but mtimes are not trustworthy
+state here. sfcbr keeps its CA tree in a deploy-mirror checkout, where
+mtimes reflect checkout order, so an mtime trigger would reissue or
+skip arbitrarily. The gap is accepted.
+
 ### D5 -- renewal reuses the key
 
 The key is generated only when absent, as today, and renewal reissues
@@ -275,10 +285,19 @@ make. Future work.
 
 ### D6 -- a 90-day renewal window, and a documented limitation
 
-QEMU's SPICE server loads its certificate when the instance starts. As
-far as I can tell from QEMU's `spice-core.c`, it does not reload them;
-step 2's sub-agent confirms this against the QEMU source and records the
-answer in the README text.
+QEMU's SPICE server loads its certificate when the instance starts, and
+never reloads it. Step 2 confirmed this against upstream source:
+
+* `qemu_spice_init()` (`ui/spice-core.c`) passes the x509 paths once to
+  `spice_server_set_tls()`;
+* spice-server's `reds_init_ssl()` reads the files into a single
+  `SSL_CTX` that every later connection reuses;
+* spice-server exports no reload call;
+* QMP's `display-reload` covers VNC only.
+
+A live migration starts a fresh QEMU on the destination, which loads the
+current files, so migrating is a way to refresh an instance without
+restarting it.
 
 An instance started before a renewal therefore keeps presenting the old
 certificate until it is restarted. It fails TLS verification if it is
@@ -304,6 +323,10 @@ the role's entry points with `ansible-playbook` against `localhost`,
 * `-e ansible_become=false`;
 * `--skip-tags packages`. The apt task in `bootstrap.yml` gains that tag,
   and nothing else changes;
+* a way past `distribute_certificates.yml`'s "Create /etc/pki/CA" task,
+  which needs root and which step 2's rootless smoke run hit. Step 3
+  tags it (D8's brief names the tag), and the test skips that tag as
+  well;
 * `ca_path`, `cert_dest_dir` and `cert_owner`/`cert_group` set to the
   temporary directory and the invoking user.
 
@@ -488,7 +511,7 @@ shellcheck-clean.
 |------|----------------------------|
 | The first deploy after upgrade reissues every node's certificate (D4), and something pinned more than the CA and subject. | Brief 3 case 4 asserts the public key is unchanged. The management session checks that nothing in `shakenfist/` or Kerbside pins a certificate fingerprint: `grep -rn fingerprint` over both before merge. The release note says it happens. |
 | The static runners lack `certtool`, so the new sanity step fails on every PR. | Brief 3 checks the runner image before wiring CI. The script's first assertion names the package. If the image needs a change, the operator makes it in 33fl before this PR merges. |
-| `-e ansible_become=false` does not override the task-level `become: true`, so the rootless test cannot reach the slurp. | Precedence says it does (connection variables outrank keywords, the same fact sfcbr's deploy relies on). Case 1 fails loudly if it does not. The fallback is a `cert_slurp_become` parameter, defaulting to true. |
+| `-e ansible_become=false` does not override the task-level `become: true`, so the rootless test cannot reach the slurp. | Settled by step 2's smoke run: the `-vvv` log shows no become, and the slurp succeeded. No fallback parameter is needed. |
 | A rootless control node (sfcbr) cannot write the template over an existing `u=r` file. | `copy` replaces atomically by rename into a directory the user owns, which needs no write permission on the old file. Brief 3 runs entirely rootless, so it proves it. |
 | D6 is wrong, and QEMU does reload. | Brief 2 checks the source. Brief 4 states whatever it found, not what this plan assumed. |
 | The renewal window passes with no deploy, and certificates still expire. | Documented in the README. A metric or event for certificate expiry belongs to Embrace TLS ("cert expiry within some window emits an event log warning and a prometheus metric"). This phase does not pre-empt it. |
@@ -499,8 +522,9 @@ shellcheck-clean.
   step 1's commit (case 4), and the sanity-checks job runs it.
 * `grep -rn 'server_cert.pem\|\.meta\.stdout'
   shakenfist/deploy/collection/` prints nothing.
-* `grep -rn '/etc/pki/libvirt-spice' shakenfist/deploy/collection/roles/`
-  matches only `defaults/main.yml` and README or argument_specs prose.
+* `grep -rn '/etc/pki/libvirt-spice' shakenfist/deploy/collection/roles/internal_ca/tasks/`
+  matches only comments. Elsewhere in `roles/`, the hypervisor role's
+  libvirt `spice_tls_x509_cert_dir` setting rightly keeps the literal.
 * With only `hostname` set, the role's derived control-node paths equal
   today's, as brief 1's check shows.
 * The PR's `localhost` smoke cluster passes. That is the real deploy of
