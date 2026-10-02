@@ -1,8 +1,12 @@
 ---
-# Issue (or renew) a SPICE TLS certificate for {{ hostname }}. The certificate
-# material is generated on the control node (delegated to localhost) against
-# the CA created by bootstrap.yml.
+# Issue (or renew) a TLS certificate for {{ hostname }} (SPICE by default). The
+# certificate material is generated on the control node (delegated to
+# localhost) against the CA created by bootstrap.yml.
 
+# This stats server_cert.pem, which nothing installs, so the renewal
+# tasks below never run (issue 4415). That is deliberate until they are
+# rewritten: pointing them at the real file would reach a `when:` which
+# raises on every host with a certificate.
 - name: Check if the host certificate is already installed
   ansible.builtin.stat:
     path: /etc/pki/libvirt-spice/server_cert.pem
@@ -46,7 +50,13 @@
   ansible.builtin.copy:
     content: |
       organization = Shaken Fist CA for {{ deploy_name }}
-      cn = {{ hostname }}
+      cn = {{ cert_cn }}
+      {% for name in cert_san_dns %}
+      dns_name = {{ name }}
+      {% endfor %}
+      {% for addr in cert_san_ip %}
+      ip_address = {{ addr }}
+      {% endfor %}
       tls_www_server
       encryption_key
       signing_key
