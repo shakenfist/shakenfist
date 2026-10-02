@@ -115,9 +115,10 @@ it could not find, rather than raising an `AttributeError`. Every other
 module in the collection works with the released client.
 
 The `internal_ca` role generates certificates on the control node with
-`certtool` from the `gnutls-bin` package (Debian/Ubuntu). The role installs it
+`certtool` from the `gnutls-bin` package (Debian/Ubuntu), and checks their
+expiry there with `openssl` from the `openssl` package. The role installs both
 via apt when its control-node tasks run with root; rootless deploys must
-install it beforehand.
+install them beforehand.
 
 ## Consuming the collection
 

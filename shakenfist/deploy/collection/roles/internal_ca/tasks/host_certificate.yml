@@ -2,35 +2,84 @@
 # Issue (or renew) a TLS certificate for {{ hostname }} (SPICE by default). The
 # certificate material is generated on the control node (delegated to
 # localhost) against the CA created by bootstrap.yml.
+#
+# The control node's copy is authoritative; distribute_certificates.yml copies
+# it out. It is reissued when it expires within cert_renew_days, or when the
+# rendered certtool template changes (CN, SANs or lifetime). A reissue reuses
+# the existing key, and keeps the old certificate beside the new one as
+# {{ host_cert_path }}.<UTC timestamp>.
 
-# This stats server_cert.pem, which nothing installs, so the renewal
-# tasks below never run (issue 4415). That is deliberate until they are
-# rewritten: pointing them at the real file would reach a `when:` which
-# raises on every host with a certificate.
-- name: Check if the host certificate is already installed
+- name: Check if the host certificate exists on the control node
   ansible.builtin.stat:
-    path: /etc/pki/libvirt-spice/server_cert.pem
-  register: host_cert
-
-- name: Check certificate lifetime
-  ansible.builtin.shell: >-
-    openssl x509 -checkend $(( 3600 * 24 * 30 )) -noout
-      -in /etc/pki/libvirt-spice/server_cert.pem || true
-  register: host_cert_expires
-  changed_when: false
-  when: host_cert.stat.exists
-
-- name: Log certificate expiry result
-  ansible.builtin.debug:
-    msg: "{{ host_cert_expires }}"
-  when: host_cert.stat.exists
-
-- name: Move aside old certificate
-  ansible.builtin.command: mv "{{ host_cert_path }}" "{{ host_key_path }}".$(date +%Y%m%d)".pem"
-  changed_when: true
+    path: "{{ host_cert_path }}"
   delegate_to: localhost
   delegate_facts: true
-  when: host_cert.stat.exists and not host_cert_expires.meta.stdout == "Certificate will expire"
+  register: host_cert
+
+# -checkend exits 0 when the certificate is still valid at the end of the
+# window and 1 when it is not. Anything else (openssl missing, for example)
+# fails rather than silently skipping renewal.
+- name: Check if the host certificate expires within the renewal window
+  ansible.builtin.command:
+    argv:
+      - openssl
+      - x509
+      - -checkend
+      - "{{ (cert_renew_days | int) * 86400 }}"
+      - -noout
+      - -in
+      - "{{ host_cert_path }}"
+  register: host_cert_expiry
+  changed_when: false
+  failed_when: host_cert_expiry.rc not in [0, 1]
+  delegate_to: localhost
+  delegate_facts: true
+  when: host_cert.stat.exists
+
+- name: Write host certificate template
+  ansible.builtin.copy:
+    content: |
+      organization = Shaken Fist CA for {{ deploy_name }}
+      cn = {{ cert_cn }}
+      {% for name in cert_san_dns %}
+      dns_name = {{ name }}
+      {% endfor %}
+      {% for addr in cert_san_ip %}
+      ip_address = {{ addr }}
+      {% endfor %}
+      expiration_days = {{ cert_expiration_days }}
+      tls_www_server
+      encryption_key
+      signing_key
+    dest: "{{ host_template_path }}"
+    # No owner: see bootstrap.yml -- rootless control nodes cannot
+    # chown, and a root-run creates root-owned files anyway.
+    mode: u=r
+  delegate_to: localhost
+  delegate_facts: true
+  register: host_cert_template
+
+- name: Set aside the host certificate for reissue
+  vars:
+    host_cert_renew_reasons: >-
+      {{ (['it expires within ' ~ cert_renew_days ~ ' days']
+          if (host_cert_expiry.rc | default(0)) == 1 else [])
+         + (['its template changed'] if host_cert_template is changed else []) }}
+  when: host_cert.stat.exists and host_cert_renew_reasons | length > 0
+  delegate_to: localhost
+  delegate_facts: true
+  block:
+    - name: Explain why the host certificate is being reissued
+      ansible.builtin.debug:
+        msg: "Reissuing {{ host_cert_path }}: {{ host_cert_renew_reasons | join(' and ') }}"
+
+    - name: Move the old host certificate aside
+      ansible.builtin.command:
+        argv:
+          - mv
+          - "{{ host_cert_path }}"
+          - "{{ host_cert_path }}.{{ now(utc=true, fmt='%Y%m%d%H%M%S') }}"
+      changed_when: true
 
 - name: Check if the host certificate still exists
   ansible.builtin.stat:
@@ -45,28 +94,6 @@
   delegate_to: localhost
   delegate_facts: true
   register: host_key
-
-- name: Write host certificate template
-  ansible.builtin.copy:
-    content: |
-      organization = Shaken Fist CA for {{ deploy_name }}
-      cn = {{ cert_cn }}
-      {% for name in cert_san_dns %}
-      dns_name = {{ name }}
-      {% endfor %}
-      {% for addr in cert_san_ip %}
-      ip_address = {{ addr }}
-      {% endfor %}
-      tls_www_server
-      encryption_key
-      signing_key
-    dest: "{{ host_template_path }}"
-    # No owner: see bootstrap.yml -- rootless control nodes cannot
-    # chown, and a root-run creates root-owned files anyway.
-    mode: u=r
-  delegate_to: localhost
-  delegate_facts: true
-  when: not host_cert.stat.exists
 
 - name: Create host key
   ansible.builtin.shell: umask 277 && certtool --generate-privkey > "{{ host_key_path }}"
