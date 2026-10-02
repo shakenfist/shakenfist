@@ -523,6 +523,30 @@ its whole claim a second time until the next reconcile pass -- five
 minutes, starting from the moment an operator does the thing claims exist
 for.
 
+### The peak a claim ever held
+
+Alongside `used_cpus`, `used_memory_mb` and `used_disk_gb` -- what the
+claim's namespace holds *right now* -- every claim also publishes
+`peak_used_cpus`, `peak_used_memory_mb` and `peak_used_disk_gb`: the
+largest each counter has ever reached while the claim has existed.
+The admission path raises the mark inside the same transaction that
+draws the claim down, the five-minute reconciler raises it towards
+whatever ground truth it recomputes `used_*` to, and nothing ever
+lowers it -- releasing an instance drops `used_*` but leaves the mark
+exactly where it was. A claim created over a namespace that already
+holds instances (above) starts its mark at the same migrated drawdown
+that seeds `used_*`, for the same reason: a namespace already holding
+ten vCPU has already reached a peak of ten, and seeding the mark at
+zero would make the next reconcile pass look like it had found a bug
+rather than finished the seeding.
+
+This is what lets a caller answer "what did this namespace actually
+hold" after the instances that held it are gone. `used_*` cannot: it
+is drawn down to zero by the same deletes that would otherwise prove
+the point. A namespace's own capacity planning -- sizing the *next*
+claim from what the last one actually needed -- is exactly that
+question, asked after the fact.
+
 The same migration is why a claim is granted or refused against
 
     claimed + limit + GREATEST(0, unclaimed_used - migrated) <= total
