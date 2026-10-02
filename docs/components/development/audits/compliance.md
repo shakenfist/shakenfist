@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-10-01T12:44:43.444137+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-10-02T12:08:50.859602+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -49,7 +49,7 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 | sfui | non-compliant | shakenfist/sfui#26 |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#16 |
-| visual-digest-rust | non-compliant | shakenfist/visual-digest-rust#27 |
+| visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
@@ -65,7 +65,6 @@ Details for non-compliant projects:
 - **occystrap** (Status): pr-re-review.yml: the confirm step is conditional (if: steps.ref.outputs.merged == 'true'), so at least one checkout path goes unconfirmed; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
 - **sfui** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py); it is unused, and its workflow holds contents: write on the pull request branch
 - **uncalibrated-sextant** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
-- **visual-digest-rust** (Status): pr-re-review.yml: the confirm step is conditional (if: steps.ref.outputs.merged == 'true'), so at least one checkout path goes unconfirmed; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
 
 ## console-logging
 
@@ -319,40 +318,32 @@ Criterion: [export-repo-config.md](/components/development/audits/export-repo-co
 | Project | Status | Issue |
 |---------|--------|--------|
 | actions | compliant | - |
-| agent-python | non-compliant | shakenfist/agent-python#146 |
-| client-python | non-compliant | shakenfist/client-python#409 |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#79 |
-| clingwrap | non-compliant | shakenfist/clingwrap#138 |
+| agent-python | compliant | - |
+| client-python | compliant | - |
+| client-python-k3s | compliant | - |
+| clingwrap | compliant | - |
 | cloudgood | non-compliant | shakenfist/cloudgood#3 |
 | development | compliant | - |
-| divergulent | non-compliant | shakenfist/divergulent#121 |
+| divergulent | compliant | - |
 | hunkydory | compliant | - |
 | instar | non-compliant | shakenfist/instar#600 |
 | kerbside | compliant | - |
 | kerbside-client | non-compliant | shakenfist/kerbside-client#7 |
 | kerbside-patches | compliant | - |
-| library-utilities | non-compliant | shakenfist/library-utilities#63 |
-| occystrap | non-compliant | shakenfist/occystrap#148 |
+| library-utilities | compliant | - |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
-| sfui | non-compliant | shakenfist/sfui#38 |
+| sfui | compliant | - |
 | shakenfist | compliant | - |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#19 |
 | visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
-- **agent-python** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
-- **client-python** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
-- **client-python-k3s** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
-- **clingwrap** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
 - **cloudgood** (Status): Missing .github/workflows/export-repo-config.yml
-- **divergulent** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
 - **instar** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
 - **kerbside-client** (Status): Missing .github/workflows/export-repo-config.yml
-- **library-utilities** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
-- **occystrap** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
-- **sfui** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
 - **uncalibrated-sextant** (Status): Missing .github/workflows/export-repo-config.yml
 
 ## fuzz-nightly-reporting
@@ -867,7 +858,7 @@ Details for non-compliant projects:
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121
 - **client-python-k3s** (Status): 4 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/library-api.md:100, docs/library-api.md:126, docs/library-api.md:169, docs/library-api.md:260
 - **instar** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/development.md:1017
-- **private-ci** (Status): 17 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/dashboard-freshness.md:84, docs/dashboard-freshness.md:225, docs/dashboard-freshness.md:256, docs/dashboard-freshness.md:283, docs/dashboard-freshness.md:435, docs/gerrit-reviews.md:17, docs/gerrit-reviews.md:78, docs/gerrit-reviews.md:80, docs/gerrit-reviews.md:85 (+7 more)
+- **private-ci** (Status): 29 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/dashboard-freshness.md:84, docs/dashboard-freshness.md:132, docs/dashboard-freshness.md:133, docs/dashboard-freshness.md:227, docs/dashboard-freshness.md:258, docs/dashboard-freshness.md:285, docs/dashboard-freshness.md:297, docs/dashboard-freshness.md:300, docs/dashboard-freshness.md:301 (+19 more)
 - **uncalibrated-sextant** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137, ARCHITECTURE.md:236 (+12 more)
 
 ## plan-source-references
@@ -902,7 +893,7 @@ Details for non-compliant projects:
 
 - **client-python** (Status): 2 of 4 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist_client/apiclient.py:185 -> docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md, shakenfist_client/tests/test_client_apiclient.py:2320 -> docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md
 - **instar** (Status): 2 of 269 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): tools/ci/test-check-doc-phrases.sh:43 -> PLAN-differencingflow.md, tools/ci/test-check-doc-phrases.sh:142 -> /docs/plans/PLAN-example.md
-- **shakenfist** (Status): 2 of 400 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist/tests/test_plan_phase_references.py:86 -> docs/plans/PLAN-thing.md, shakenfist/tests/test_plan_phase_references.py:88 -> docs/other/plans/PLAN-deep.md
+- **shakenfist** (Status): 2 of 410 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist/tests/test_plan_phase_references.py:86 -> docs/plans/PLAN-thing.md, shakenfist/tests/test_plan_phase_references.py:88 -> docs/other/plans/PLAN-deep.md
 
 ## plan-template
 
@@ -1194,7 +1185,7 @@ Criterion: [reusable-workflow-secrets.md](/components/development/audits/reusabl
 |---------|--------|--------|
 | actions | compliant | - |
 | agent-python | compliant | - |
-| client-python | non-compliant | shakenfist/client-python#410 |
+| client-python | compliant | - |
 | client-python-k3s | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | N/A | - |
@@ -1206,7 +1197,7 @@ Criterion: [reusable-workflow-secrets.md](/components/development/audits/reusabl
 | kerbside-client | compliant | - |
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
-| occystrap | non-compliant | shakenfist/occystrap#150 |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | compliant | - |
@@ -1216,9 +1207,7 @@ Criterion: [reusable-workflow-secrets.md](/components/development/audits/reusabl
 
 Details for non-compliant projects:
 
-- **client-python** (Status): 1 job(s) pass "secrets: inherit" to a reusable workflow, handing it every secret this repository holds. Declare the secrets the called workflow reads under on.workflow_call.secrets and pass those by name; if it reads none, delete the line
 - **instar** (Status): 1 job(s) pass "secrets: inherit" to a reusable workflow, handing it every secret this repository holds. Declare the secrets the called workflow reads under on.workflow_call.secrets and pass those by name; if it reads none, delete the line
-- **occystrap** (Status): 1 job(s) pass "secrets: inherit" to a reusable workflow, handing it every secret this repository holds. Declare the secrets the called workflow reads under on.workflow_call.secrets and pass those by name; if it reads none, delete the line
 - **shakenfist** (Status): 5 job(s) pass "secrets: inherit" to a reusable workflow, handing it every secret this repository holds. Declare the secrets the called workflow reads under on.workflow_call.secrets and pass those by name; if it reads none, delete the line
 
 ## review-coverage
@@ -1233,7 +1222,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 | client-python-k3s | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
-| development | non-compliant | shakenfist/development#195 |
+| development | compliant | - |
 | divergulent | N/A | - |
 | hunkydory | compliant | - |
 | instar | N/A | - |
@@ -1251,11 +1240,10 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **actions** (Status): 130 of 135 in-scope files reviewed at HEAD (6 imported from shakenfist/development); 5 need review (threshold 5)
-- **development** (Status): 197 of 203 in-scope files reviewed at HEAD; 6 need review (threshold 5)
+- **actions** (Status): 128 of 135 in-scope files reviewed at HEAD (6 imported from shakenfist/development); 7 need review (threshold 5)
 - **kerbside** (Status): 135 of 252 in-scope files reviewed at HEAD (10 imported from shakenfist/development); 117 need review (threshold 5)
 - **kerbside-client** (Status): 3 of 15 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 12 need review (threshold 5)
-- **sfui** (Status): 4 of 52 in-scope files reviewed at HEAD (4 imported from shakenfist/development); 48 need review (threshold 5)
+- **sfui** (Status): 3 of 52 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 49 need review (threshold 5)
 
 ## review-scope-completeness
 
@@ -1455,13 +1443,13 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 | divergulent | N/A | - |
 | hunkydory | N/A | - |
 | instar | N/A | - |
-| kerbside | non-compliant | shakenfist/kerbside#507 |
+| kerbside | non-compliant | shakenfist/kerbside#516 |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
 | private-ci | non-compliant | shakenfist/private-ci#58 |
-| ryll | compliant | - |
+| ryll | non-compliant | shakenfist/ryll#438 |
 | sfui | N/A | - |
 | shakenfist | N/A | - |
 | uncalibrated-sextant | N/A | - |
@@ -1469,8 +1457,9 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 
 Details for non-compliant projects:
 
-- **kerbside** (Status): kerbside/api/static/sfui: 11 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
-- **private-ci** (Status): conductor/static/sfui: 7 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **kerbside** (Status): kerbside/api/static/sfui: 3 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **private-ci** (Status): conductor/static/sfui: 10 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **ryll** (Status): ryll/src/web/assets/sfui: 3 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 
 ## undeclared-direct-dependency
 
@@ -1531,7 +1520,7 @@ Criterion: [unused-declared-dependency.md](/components/development/audits/unused
 Details for non-compliant projects:
 
 - **client-python** (Status): Declared but never imported: chardet (pyproject.toml:23), pyyaml (pyproject.toml:27), requests_toolbelt (pyproject.toml:22). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
-- **client-python-k3s** (Status): Declared but never imported: prettytable (pyproject.toml:33). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
+- **client-python-k3s** (Status): Declared but never imported: prettytable (pyproject.toml:57). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
 
 ## version-file-gitignore
 
@@ -1542,7 +1531,7 @@ Criterion: [version-file-gitignore.md](/components/development/audits/version-fi
 | actions | N/A | - |
 | agent-python | compliant | - |
 | client-python | compliant | - |
-| client-python-k3s | compliant | - |
+| client-python-k3s | N/A | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#106 |
 | cloudgood | N/A | - |
 | development | N/A | - |
