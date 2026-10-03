@@ -348,8 +348,12 @@ A new object type has to join more registries than is obvious. Both
 are load bearing for the orphan reconciler: zombie repair marks the
 static row deleted and then hydrates it through `get_object_class()` to
 collect it, so registering only the first trades one leak for another.
-`NAMESPACE_KEY` missing from the first is issue 3588, and the same
-defect is still live for `TRUSTED_ISSUER` and `MAPPING_RULE`.
+`NAMESPACE_KEY` missing from the first is issue 3588. A new type must
+also decide its `zombie_repair_state()`: the default repairs a stateless
+row to `deleted`, which is wrong for anything that works without a
+state row. `test_zombie_repair_state_overrides_are_pinned` in
+`test_mariadb_orphans.py` names the overriding types, so adding one
+means updating it deliberately.
 
 ## Node resource health
 

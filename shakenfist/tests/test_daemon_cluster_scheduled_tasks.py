@@ -3,6 +3,7 @@ import time
 from unittest import mock
 
 from prometheus_client import REGISTRY
+from sqlalchemy.exc import OperationalError
 
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
@@ -1082,8 +1083,9 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
 
 class ReconcileOrphanedObjectsTestCase(base.ShakenFistTestCase):
     """Orphan reconciliation: phantoms removed server-side, zombies
-    repaired by writing a deleted state row after two consecutive
-    observations (issue 3534)."""
+    repaired after two consecutive observations (issue 3534) -- to
+    deleted, or to created for a credential its read path would still
+    honour (issue 3836)."""
 
     def setUp(self):
         super().setUp()
@@ -1141,6 +1143,296 @@ class ReconcileOrphanedObjectsTestCase(base.ShakenFistTestCase):
         self.assertEqual(BLOB_UUID_1, obj_uuid)
         self.assertEqual('deleted', state.value)
         mock_add_event.assert_called_once()
+        self.assertIn('marked this object deleted',
+                      mock_add_event.call_args.args[3])
+
+    # The object types whose read paths honour an object with no state
+    # row, and the attributes reader each one's zombie_repair_state()
+    # consults (issue 3836).
+    LIVE_READ_TYPES = (
+        (ObjectType.NAMESPACE_KEY,
+         'shakenfist.mariadb.get_namespace_key_attributes'),
+        (ObjectType.TRUSTED_ISSUER,
+         'shakenfist.mariadb.get_trusted_issuer_attributes'),
+        (ObjectType.MAPPING_RULE,
+         'shakenfist.mariadb.get_mapping_rule_attributes'),
+    )
+
+    def _one_zombie_of(self, zombie_type):
+        def stateless(objtype):
+            if objtype == zombie_type:
+                return [BLOB_UUID_1]
+            return []
+        return stateless
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids')
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_live_zombie_credentials_are_repaired_forward(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        # A key, issuer or rule with its attributes row is honoured by
+        # its read path with no state row at all. Marking it deleted
+        # would destroy a working credential (issue 3836), so it is
+        # repaired to created instead.
+        for zombie_type, reader in self.LIVE_READ_TYPES:
+            with self.subTest(object_type=zombie_type):
+                st._ZOMBIE_CANDIDATES.clear()
+                mock_set_state.reset_mock()
+                mock_add_event.reset_mock()
+                mock_stateless.side_effect = self._one_zombie_of(zombie_type)
+
+                with mock.patch(reader,
+                                return_value=mock.sentinel.attributes) as rd, \
+                        mock.patch.object(st.LOG, 'with_fields') as log:
+                    st.reconcile_orphaned_objects()
+                    mock_set_state.assert_not_called()
+
+                    st.reconcile_orphaned_objects()
+
+                rd.assert_called_once()
+                mock_set_state.assert_called_once()
+                objtype, obj_uuid, state = mock_set_state.call_args.args
+                self.assertEqual(zombie_type, objtype)
+                self.assertEqual(BLOB_UUID_1, obj_uuid)
+                self.assertEqual('created', state.value)
+
+                mock_add_event.assert_called_once()
+                self.assertIn('found this object live',
+                              mock_add_event.call_args.args[3])
+                self.assertIn('marked it created',
+                              mock_add_event.call_args.args[3])
+
+                fields = [c.args[0] for c in log.call_args_list
+                          if 'repaired_state' in c.args[0]]
+                self.assertEqual(1, len(fields))
+                self.assertEqual('created', fields[0]['repaired_state'])
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids')
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_zombie_credentials_without_attributes_are_deleted(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        # With no attributes row there is nothing to authenticate
+        # against or evaluate, so the zombie is garbage, exactly as for
+        # any other type.
+        for zombie_type, reader in self.LIVE_READ_TYPES:
+            with self.subTest(object_type=zombie_type):
+                st._ZOMBIE_CANDIDATES.clear()
+                mock_set_state.reset_mock()
+                mock_add_event.reset_mock()
+                mock_stateless.side_effect = self._one_zombie_of(zombie_type)
+
+                with mock.patch(reader, return_value=None) as rd:
+                    st.reconcile_orphaned_objects()
+                    st.reconcile_orphaned_objects()
+
+                rd.assert_called_once()
+                mock_set_state.assert_called_once()
+                objtype, obj_uuid, state = mock_set_state.call_args.args
+                self.assertEqual(zombie_type, objtype)
+                self.assertEqual('deleted', state.value)
+                mock_add_event.assert_called_once()
+                self.assertIn('marked this object deleted',
+                              mock_add_event.call_args.args[3])
+
+    def _two_zombies_of(self, zombie_type):
+        def stateless(objtype):
+            if objtype == zombie_type:
+                return [BLOB_UUID_1, BLOB_UUID_2]
+            return []
+        return stateless
+
+    def _assert_pass_stopped_on(self, zombie_type, mock_stateless):
+        """The pass read types up to zombie_type and then stopped.
+
+        The stop is recorded the same way as a tier-wide work-list
+        failure: the next pass resumes after the type that stopped this
+        one, and no type after it was read on this pass.
+        """
+        zombie_types = [t for t in mariadb.ORPHAN_RECONCILABLE_OBJECT_TYPES
+                        if t not in st.ZOMBIE_REPAIR_EXCLUDED_TYPES]
+        idx = zombie_types.index(str(zombie_type))
+        read = [str(c.args[0]) for c in mock_stateless.call_args_list]
+        self.assertEqual(zombie_types[:idx + 1], read)
+        self.assertEqual(
+            zombie_types[(idx + 1) % len(zombie_types)],
+            st._SWEEP_RESUME_AFTER['reconcile_orphans'])
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids')
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_unreadable_liveness_writes_nothing_and_retries(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        # If the reconciler cannot tell whether a zombie is live, it
+        # must not guess: deleted would destroy a working credential,
+        # created would resurrect garbage. It writes nothing, and since
+        # the tier is gone it ends the pass rather than spending another
+        # retry budget per remaining object and type. The zombies stay
+        # candidates, and the next pass repairs them.
+        for zombie_type, reader in self.LIVE_READ_TYPES:
+            with self.subTest(object_type=zombie_type):
+                st._ZOMBIE_CANDIDATES.clear()
+                _reset_sweep_failure_state()
+                mock_set_state.reset_mock()
+                mock_add_event.reset_mock()
+                mock_stateless.side_effect = self._two_zombies_of(
+                    zombie_type)
+
+                with mock.patch(
+                        reader,
+                        side_effect=DatabaseUnavailable('tier blip')) as rd:
+                    st.reconcile_orphaned_objects()
+                    self.assertNotIn('reconcile_orphans',
+                                     st._SWEEP_RESUME_AFTER)
+
+                    mock_stateless.reset_mock()
+                    st.reconcile_orphaned_objects()
+
+                # Only the first zombie was asked about; the second was
+                # not attempted, and neither were the later types.
+                rd.assert_called_once()
+                mock_set_state.assert_not_called()
+                mock_add_event.assert_not_called()
+                self._assert_pass_stopped_on(zombie_type, mock_stateless)
+                self.assertEqual(
+                    {BLOB_UUID_1, BLOB_UUID_2},
+                    st._ZOMBIE_CANDIDATES[str(zombie_type)])
+
+                # The read recovers: the next pass repairs both and
+                # completes.
+                with mock.patch(reader,
+                                return_value=mock.sentinel.attributes):
+                    st.reconcile_orphaned_objects()
+
+                self.assertEqual(2, mock_set_state.call_count)
+                self.assertEqual(
+                    {BLOB_UUID_1, BLOB_UUID_2},
+                    {c.args[1] for c in mock_set_state.call_args_list})
+                for c in mock_set_state.call_args_list:
+                    self.assertEqual('created', c.args[2].value)
+                self.assertEqual(2, mock_add_event.call_count)
+                self.assertNotIn('reconcile_orphans', st._SWEEP_RESUME_AFTER)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids')
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_mariadb_error_on_key_liveness_read_writes_nothing(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event, mock_use, mock_engine):
+        # The same fail-closed property, but driven through the real
+        # attributes reader rather than a mock of it. The reader used to
+        # return None on an OperationalError, which reads as "no
+        # attributes" and would have marked a live key deleted on any
+        # MariaDB blip (issue 3836).
+        mock_stateless.side_effect = self._two_zombies_of(
+            ObjectType.NAMESPACE_KEY)
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'SELECT', {}, Exception('server has gone away'))
+
+        st.reconcile_orphaned_objects()
+        mock_stateless.reset_mock()
+        st.reconcile_orphaned_objects()
+
+        mock_engine.return_value.connect.assert_called_once()
+        mock_set_state.assert_not_called()
+        mock_add_event.assert_not_called()
+        self._assert_pass_stopped_on(ObjectType.NAMESPACE_KEY, mock_stateless)
+        self.assertEqual({BLOB_UUID_1, BLOB_UUID_2},
+                         st._ZOMBIE_CANDIDATES['namespace_key'])
+
+        with mock.patch('shakenfist.mariadb.get_namespace_key_attributes',
+                        return_value=mock.sentinel.attributes):
+            st.reconcile_orphaned_objects()
+
+        self.assertEqual(2, mock_set_state.call_count)
+        for c in mock_set_state.call_args_list:
+            self.assertEqual('created', c.args[2].value)
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids')
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_other_liveness_failures_cost_only_that_object(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        # Only a tier-wide failure ends the pass. Anything else is about
+        # one object, so that object is skipped (and stays a candidate)
+        # while the rest of its type and the pass carry on.
+        mock_stateless.side_effect = self._two_zombies_of(
+            ObjectType.NAMESPACE_KEY)
+
+        with mock.patch('shakenfist.mariadb.get_namespace_key_attributes',
+                        side_effect=[RuntimeError('odd row'),
+                                     mock.sentinel.attributes]):
+            st.reconcile_orphaned_objects()
+            st.reconcile_orphaned_objects()
+
+        mock_set_state.assert_called_once()
+        self.assertEqual(BLOB_UUID_2, mock_set_state.call_args.args[1])
+        self.assertEqual('created', mock_set_state.call_args.args[2].value)
+        self.assertIn(BLOB_UUID_1, st._ZOMBIE_CANDIDATES['namespace_key'])
+        self.assertNotIn('reconcile_orphans', st._SWEEP_RESUME_AFTER)
+
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.set_state', return_value=True)
+    @mock.patch('shakenfist.mariadb.get_stateless_object_uuids')
+    @mock.patch('shakenfist.mariadb.delete_orphaned_artifact_attributes',
+                return_value=0)
+    @mock.patch('shakenfist.mariadb.delete_orphaned_object_states',
+                return_value=0)
+    def test_unresolvable_class_skips_only_that_type(
+            self, mock_delete_orphans, mock_delete_attrs, mock_stateless,
+            mock_set_state, mock_add_event):
+        # Without the class there is no way to ask whether a zombie is
+        # live, and defaulting to deleted is the answer that can destroy
+        # one. That type's zombies are left as candidates, and the sweep
+        # still finishes every other type.
+        def stateless(objtype):
+            if objtype in (ObjectType.NETWORK, ObjectType.NAMESPACE_KEY):
+                return [BLOB_UUID_1]
+            return []
+        mock_stateless.side_effect = stateless
+
+        with mock.patch.object(st, 'get_object_class') as get_class:
+            def resolve(objtype):
+                if objtype == 'namespace_key':
+                    raise ImportError('no such module')
+                return dbo
+            get_class.side_effect = resolve
+
+            st.reconcile_orphaned_objects()
+            st.reconcile_orphaned_objects()
+
+        mock_set_state.assert_called_once()
+        objtype, _, state = mock_set_state.call_args.args
+        self.assertEqual(ObjectType.NETWORK, objtype)
+        self.assertEqual('deleted', state.value)
+        self.assertIn(BLOB_UUID_1, st._ZOMBIE_CANDIDATES['namespace_key'])
 
     @mock.patch('shakenfist.eventlog.add_event')
     @mock.patch('shakenfist.mariadb.set_state', return_value=True)

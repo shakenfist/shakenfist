@@ -13404,7 +13404,11 @@ def _direct_get_namespace_key_attributes(
         LOG.warning(
             f'MariaDB get failed for '
             f'namespace_key_attributes {key_uuid}: {e}')
-        return None
+        # None means "no such row" to callers, so a database failure
+        # must raise instead of reading as an absent key (issue 3836).
+        raise exceptions.DatabaseUnavailable(
+            f'namespace key attributes {key_uuid} could not be read: '
+            f'{e}') from e
 
 
 def _direct_update_namespace_key_attributes(
@@ -13666,7 +13670,11 @@ def _grpc_get_namespace_key_attributes(
         LOG.error(
             f'gRPC GetNamespaceKeyAttributes failed for '
             f'{key_uuid}: {e}')
-        return None
+        # None means "no such row" to callers, so a transport or server
+        # failure must raise instead (issue 3836).
+        raise exceptions.DatabaseUnavailable(
+            f'namespace key attributes {key_uuid} could not be read: '
+            f'{e}') from e
 
 
 def _grpc_update_namespace_key_attributes(
@@ -13829,6 +13837,10 @@ def get_namespace_key_attributes(
 
     Returns:
         A NamespaceKeyAttributesData object, or None if not found.
+
+    Raises:
+        DatabaseUnavailable: If the database cannot be read. This is
+            distinct from None, which means the row does not exist.
     """
     if _use_database_service():
         return _grpc_get_namespace_key_attributes(key_uuid)
@@ -14118,7 +14130,12 @@ def _direct_get_trusted_issuer_attributes(
         LOG.warning(
             'MariaDB get failed for trusted_issuer_attributes '
             f'{issuer_uuid}: {e}')
-        return None
+        # None means "no such row" to callers, so a database failure
+        # must raise instead of reading as an absent issuer (issue
+        # 3836).
+        raise exceptions.DatabaseUnavailable(
+            f'trusted issuer attributes {issuer_uuid} could not be read: '
+            f'{e}') from e
 
 
 def _trusted_issuer_attributes_column_values(
@@ -14432,7 +14449,11 @@ def create_trusted_issuer_attributes(
 
 def get_trusted_issuer_attributes(
         issuer_uuid: UUID) -> Optional[TrustedIssuerAttributesData]:
-    """Get a TrustedIssuer's mutable attributes."""
+    """Get a TrustedIssuer's mutable attributes.
+
+    Returns None if the row does not exist. Raises DatabaseUnavailable
+    when the database cannot be read.
+    """
     if _use_database_service():
         return _grpc_get_trusted_issuer_attributes(issuer_uuid)
     return _direct_get_trusted_issuer_attributes(issuer_uuid)
@@ -14793,7 +14814,11 @@ def _direct_get_mapping_rule_attributes(
     except OperationalError as e:
         LOG.warning(
             f'MariaDB get failed for mapping_rule_attributes {rule_uuid}: {e}')
-        return None
+        # None means "no such row" to callers, so a database failure
+        # must raise instead of reading as an absent rule (issue 3836).
+        raise exceptions.DatabaseUnavailable(
+            f'mapping rule attributes {rule_uuid} could not be read: '
+            f'{e}') from e
 
 
 def _mapping_rule_attributes_column_values(
@@ -15156,7 +15181,11 @@ def create_mapping_rule_attributes(data: MappingRuleAttributesData) -> bool:
 
 def get_mapping_rule_attributes(
         rule_uuid: UUID) -> Optional[MappingRuleAttributesData]:
-    """Get a MappingRule's mutable attributes."""
+    """Get a MappingRule's mutable attributes.
+
+    Returns None if the row does not exist. Raises DatabaseUnavailable
+    when the database cannot be read.
+    """
     if _use_database_service():
         return _grpc_get_mapping_rule_attributes(rule_uuid)
     return _direct_get_mapping_rule_attributes(rule_uuid)

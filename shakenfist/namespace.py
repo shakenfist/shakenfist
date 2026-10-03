@@ -232,6 +232,12 @@ class Namespace(dbo):
         the point read deliberately returns expired keys so that other
         callers can tell the two cases apart. It uses this module's
         clock so that it agrees with the `keys` accessor.
+
+        This does not filter on object state, which is safe only
+        because nothing but the expiry sweep soft deletes a key and
+        the orphan reconciler repairs a live stateless key forward
+        rather than deleting it (issue 3836). Any new soft delete
+        path must revisit that.
         """
         row = mariadb.get_namespace_key_by_name(self.uuid, name)
         if not row:

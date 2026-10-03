@@ -389,6 +389,62 @@ class NamespaceKeyFetchFailureTestCase(base.ShakenFistTestCase):
             mariadb.get_namespace_key_by_name, 'banana', 'key1')
 
 
+class AttributeReadFailureTestCase(base.ShakenFistTestCase):
+    """Issue 3836: the attribute readers return None for "no such row",
+    so a failed read must raise instead of reading as an absent row.
+    Callers such as the zombie repair path treat None as authoritative."""
+
+    KEY_UUID = uuid.UUID('11111111-1111-1111-1111-111111111111')
+
+    # (public reader, direct reader, gRPC reader)
+    READERS = [
+        ('get_namespace_key_attributes',
+         '_direct_get_namespace_key_attributes',
+         '_grpc_get_namespace_key_attributes'),
+        ('get_trusted_issuer_attributes',
+         '_direct_get_trusted_issuer_attributes',
+         '_grpc_get_trusted_issuer_attributes'),
+        ('get_mapping_rule_attributes',
+         '_direct_get_mapping_rule_attributes',
+         '_grpc_get_mapping_rule_attributes'),
+    ]
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_direct_operational_error_raises_database_unavailable(
+            self, mock_engine):
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'SELECT', {}, Exception('server has gone away'))
+        for _, direct, _ in self.READERS:
+            with self.subTest(reader=direct):
+                self.assertRaises(
+                    exceptions.DatabaseUnavailable,
+                    getattr(mariadb, direct), self.KEY_UUID)
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                side_effect=FakeRpcError(grpc.StatusCode.RESOURCE_EXHAUSTED))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_grpc_error_raises_database_unavailable(
+            self, mock_stub, mock_call):
+        for _, _, grpc_reader in self.READERS:
+            with self.subTest(reader=grpc_reader):
+                self.assertRaises(
+                    exceptions.DatabaseUnavailable,
+                    getattr(mariadb, grpc_reader), self.KEY_UUID)
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    def test_public_wrappers_raise_on_direct_failure(
+            self, mock_use, mock_engine):
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'SELECT', {}, Exception('server has gone away'))
+        for public, _, _ in self.READERS:
+            with self.subTest(reader=public):
+                self.assertRaises(
+                    exceptions.DatabaseUnavailable,
+                    getattr(mariadb, public), self.KEY_UUID)
+
+
 class GrpcCallMethodNameTestCase(base.ShakenFistTestCase):
     # The wire method name is read from the private ``_method`` attribute of
     # grpcio's multicallable so the retry path can re-resolve a fresh bound

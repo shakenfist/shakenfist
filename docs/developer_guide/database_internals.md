@@ -355,9 +355,14 @@ at a time at processing time inside a per-item exception guard.
 `reconcile_orphaned_objects()` (hourly) removes "phantom"
 `object_states` rows whose static-values row is gone (with an age
 guard so mid-creation objects are never raced) and repairs "zombie"
-static rows that have no state row by writing a `deleted` state row
-once the zombie has been seen on two consecutive sweeps; node and
-namespace objects are excluded from zombie repair. Both kinds of
+static rows that have no state row by writing a state row once the
+zombie has been seen on two consecutive sweeps; node and namespace
+objects are excluded from zombie repair. The state written comes from
+`zombie_repair_state()`, which defaults to `deleted`; `NamespaceKey`,
+`TrustedIssuer` and `MappingRule` override it to return `created` when
+their attributes row exists, since their authentication read path
+honours them without a state row. A failed liveness read
+(`DatabaseUnavailable`) writes nothing and ends the pass. Both kinds of
 orphan are otherwise invisible to every state-driven iterator.
 
 The elected cluster node also runs

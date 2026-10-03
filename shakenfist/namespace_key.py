@@ -30,6 +30,7 @@ from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.baseobject import DatabaseBackedObjectIterator as dbo_iter
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
 from shakenfist.schema.namespace_key_data import NamespaceKeyData
@@ -175,6 +176,30 @@ class NamespaceKey(dbo):
         return cls.from_static_data(static_data)
 
     @classmethod
+    def zombie_repair_state(cls, object_uuid: str) -> str:
+        """Repair a stateless key forward if it can still authenticate.
+
+        Neither Namespace.lookup_key() nor keys_with_attributes() looks
+        at object state: each joins the static row to its attributes row
+        and checks expiry. So a key with no state row but with its
+        attributes authenticates, and marking it deleted would lock out
+        whoever holds it (issue 3836). Such a key is repaired to
+        created, after which the expiry sweep governs it normally.
+
+        A key with no attributes row has no secret to compare against,
+        so nothing can authenticate with it and it is garbage. Expiry
+        is deliberately not consulted here: an expired key repaired to
+        created is soft deleted by the expiry sweep, which is the path
+        that is meant to do that.
+
+        A failed attributes read raises DatabaseUnavailable rather than
+        reading as "absent", so the reconciler leaves the key alone.
+        """
+        if mariadb.get_namespace_key_attributes(_as_uuid(object_uuid)):
+            return cls.STATE_CREATED
+        return cls.STATE_DELETED
+
+    @classmethod
     def new(cls, namespace: str, name: str, plaintext_secret: str,
             expiry: Optional[float] = None,
             scopes: Optional[list[str]] = None,
@@ -194,11 +219,16 @@ class NamespaceKey(dbo):
         which need it must read that rather than the nonce property,
         which re-reads from the database and so can legitimately come
         back empty.
+
+        A rotation also repairs a key which has no state row (issue
+        3836): a create whose state write failed leaves exactly that,
+        and the caller's retry arrives here as a rotation.
         """
         existing = cls.from_db_by_name(namespace, name)
         if existing:
             existing.rotate(plaintext_secret, expiry=expiry, scopes=scopes,
                             provenance=provenance)
+            existing._heal_missing_state()
             return existing
 
         key_uuid = str(uuid4())
@@ -233,12 +263,28 @@ class NamespaceKey(dbo):
                     f'namespace key {namespace}:{name} was not persisted')
             existing.rotate(plaintext_secret, expiry=expiry, scopes=scopes,
                             provenance=provenance)
+            existing._heal_missing_state()
             return existing
 
         k.minted_nonce = nonce
         k.state = cls.STATE_INITIAL
         k.state = cls.STATE_CREATED
         return k
+
+    def _heal_missing_state(self) -> None:
+        """Give a key which has no state row the states a create writes.
+
+        Issue 3836: a create which failed between the row inserts and
+        the state writes leaves a live key with no state row, and the
+        retry reaches new() as a rotation, which writes no state. Does
+        nothing if the key has a state.
+        """
+        if self.state.value is not None:
+            return
+        self.state = self.STATE_INITIAL
+        self.state = self.STATE_CREATED
+        self.add_event(EVENT_TYPE_AUDIT,
+                       'rotation repaired a key which had no state row')
 
     def rotate(self, plaintext_secret: str, expiry: Optional[float] = None,
                scopes: Optional[list[str]] = None,
@@ -402,8 +448,11 @@ def keys_with_attributes(
     Note that this deliberately does not filter on object state. The
     only thing which soft deletes a key is the expiry sweep, and such
     a key is by construction already excluded by the expiry filter;
-    user requested removal is a hard delete. Any future soft delete
-    path must revisit that, here and in Namespace.lookup_key().
+    user requested removal is a hard delete. That claim also relies on
+    the orphan reconciler repairing a live stateless key forward to
+    created via zombie_repair_state() rather than deleting it (issue
+    3836). Any future soft delete path must revisit that, here and in
+    Namespace.lookup_key().
     """
     return [
         (NamespaceKey.from_static_data(static_data), attrs)

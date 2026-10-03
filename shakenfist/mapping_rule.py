@@ -333,6 +333,38 @@ class MappingRule(dbo):
         return rule
 
     @classmethod
+    def zombie_repair_state(cls, object_uuid: str) -> str:
+        """Repair a stateless rule forward if the exchange would honour it.
+
+        from_db_by_name() rejects only a rule whose state is deleted, so
+        one with no state row is still evaluated by the federated
+        exchange and listed by the CRUD routes. Marking it deleted would
+        silently withdraw a rule an operator configured (issue 3836), so
+        a rule with its attributes row is repaired to created instead.
+
+        A rule with no attributes row has no policy to evaluate, so the
+        exchange can never mint against it and it is garbage.
+
+        A failed attributes read raises DatabaseUnavailable rather than
+        reading as "absent", so the reconciler leaves the rule alone.
+        """
+        try:
+            attrs = mariadb.get_mapping_rule_attributes(_as_uuid(object_uuid))
+        except exceptions.CorruptMappingRule:
+            # The attributes row exists but will not decode. Readers see
+            # that rule as present and damaged, not absent: the exchange
+            # refuses it as unusable and external_view() reports it as
+            # such, so its owner can find and fix or delete it. Marking
+            # it deleted would hide the damage, free its name and
+            # collect the row without anyone being told, which changes
+            # what a reader observes (issue 3836). It is repaired to
+            # created, and stays exactly as visible as it was.
+            return cls.STATE_CREATED
+        if attrs:
+            return cls.STATE_CREATED
+        return cls.STATE_DELETED
+
+    @classmethod
     def new(cls, namespace: str, name: str, issuer: str,
             bound_claims: dict[str, Any], scopes: list[str],
             key_ttl: int, key_name_prefix: str) -> Optional['MappingRule']:

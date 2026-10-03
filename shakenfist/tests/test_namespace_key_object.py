@@ -10,8 +10,10 @@ from unittest import mock
 
 import bcrypt
 from pydantic import SecretStr
+from sqlalchemy.exc import OperationalError
 
 from shakenfist import exceptions
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.namespace_key import NamespaceKey
@@ -169,6 +171,52 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
             'different'.encode('utf-8'),
             base64.b64decode(
                 self._attributes(loser).key.get_secret_value())))
+
+    def _drop_state(self, key):
+        self.mock_mariadb.mariadb_states.pop(
+            f'{key.object_type}/{key.uuid}', None)
+
+    def test_rotating_a_stateless_key_heals_it(self):
+        # Issue 3836: a create whose state write failed leaves a key with
+        # no state row, and the retry is a rotation.
+        first = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        self._drop_state(first)
+        self.assertIsNone(first.state.value)
+
+        with mock.patch.object(NamespaceKey, 'add_event') as mock_add_event, \
+                mock.patch('shakenfist.mariadb.set_state',
+                           wraps=self.mock_mariadb._mariadb_set_state) as spy:
+            second = NamespaceKey.new('banana', 'deploy', 'different')
+
+        self.assertEqual(
+            [NamespaceKey.STATE_INITIAL, NamespaceKey.STATE_CREATED],
+            [c.args[2].value for c in spy.call_args_list])
+        self.assertEqual(NamespaceKey.STATE_CREATED, second.state.value)
+        audits = [c for c in mock_add_event.call_args_list
+                  if c.args[0] == EVENT_TYPE_AUDIT]
+        self.assertEqual(1, len(audits))
+        self.assertIn('no state row', audits[0].args[1])
+
+    def test_rotating_a_created_key_writes_no_state(self):
+        NamespaceKey.new('banana', 'deploy', 'sekrit')
+        with mock.patch.object(NamespaceKey, 'add_event') as mock_add_event, \
+                mock.patch('shakenfist.mariadb.set_state') as spy:
+            NamespaceKey.new('banana', 'deploy', 'different')
+
+        spy.assert_not_called()
+        self.assertEqual(
+            [], [c for c in mock_add_event.call_args_list
+                 if c.args[0] == EVENT_TYPE_AUDIT])
+
+    def test_the_race_fallback_heals_a_stateless_key(self):
+        winner = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        self._drop_state(winner)
+
+        with mock.patch.object(NamespaceKey, 'from_db_by_name',
+                               side_effect=[None, winner]):
+            loser = NamespaceKey.new('banana', 'deploy', 'different')
+
+        self.assertEqual(NamespaceKey.STATE_CREATED, loser.state.value)
 
     def test_new_records_the_nonce_it_minted(self):
         """All three paths out of new() must set minted_nonce.
@@ -452,6 +500,64 @@ class NamespaceKeyStateTestCase(NamespaceKeyTestCase):
         self.assertIsNone(
             self.mock_mariadb.mariadb_states.get(
                 f'{ObjectType.NAMESPACE_KEY}/{k.uuid}'))
+
+
+class NamespaceKeyZombieRepairTestCase(NamespaceKeyTestCase):
+    """What the orphan reconciler writes for a key with no state row.
+
+    Namespace.lookup_key() and keys_with_attributes() authenticate a
+    key without looking at its state, so a stateless key with its
+    attributes is live and must be repaired forward (issue 3836).
+    """
+
+    def test_a_key_with_attributes_is_repaired_to_created(self):
+        k = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        self.assertEqual(NamespaceKey.STATE_CREATED,
+                         NamespaceKey.zombie_repair_state(str(k.uuid)))
+
+    def test_an_expired_key_with_attributes_is_still_created(self):
+        # Expiry is the expiry sweep's job, not the reconciler's: a key
+        # repaired to created is soft deleted by that sweep as normal.
+        k = NamespaceKey.new('banana', 'deploy', 'sekrit', expiry=1.0)
+        self.assertEqual(NamespaceKey.STATE_CREATED,
+                         NamespaceKey.zombie_repair_state(str(k.uuid)))
+
+    def test_a_key_without_attributes_is_repaired_to_deleted(self):
+        k = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        del self.mock_mariadb.namespace_key_attributes[str(k.uuid)]
+        self.assertEqual(NamespaceKey.STATE_DELETED,
+                         NamespaceKey.zombie_repair_state(str(k.uuid)))
+
+    def test_an_unreadable_key_raises_rather_than_guessing(self):
+        k = NamespaceKey.new('banana', 'deploy', 'sekrit')
+        with mock.patch(
+                'shakenfist.mariadb.get_namespace_key_attributes',
+                side_effect=exceptions.DatabaseUnavailable('tier blip')):
+            self.assertRaises(
+                exceptions.DatabaseUnavailable,
+                NamespaceKey.zombie_repair_state, str(k.uuid))
+
+
+class NamespaceKeyZombieRepairDirectReadTestCase(base.ShakenFistTestCase):
+    """The same decision, through the real direct attributes reader.
+
+    The reader used to return None on an OperationalError, which reads
+    as "no attributes" and so would have repaired a live key to deleted
+    on any MariaDB blip (issue 3836). A test that mocks the public
+    reader cannot see that, so this one goes through the engine.
+    """
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    def test_a_mariadb_error_raises_rather_than_reading_as_absent(
+            self, mock_use, mock_engine):
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'SELECT', {}, Exception('server has gone away'))
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            NamespaceKey.zombie_repair_state,
+            'dddd4444-dddd-4ddd-8ddd-dddddddddddd')
 
 
 class NamespaceKeysIteratorTestCase(NamespaceKeyTestCase):
