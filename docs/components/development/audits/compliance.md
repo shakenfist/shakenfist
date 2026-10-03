@@ -21,7 +21,7 @@ verdict, and see
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-10-02T12:08:50.859602+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-10-03T11:21:04.118845+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -893,7 +893,7 @@ Details for non-compliant projects:
 
 - **client-python** (Status): 2 of 4 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist_client/apiclient.py:185 -> docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md, shakenfist_client/tests/test_client_apiclient.py:2320 -> docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md
 - **instar** (Status): 2 of 269 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): tools/ci/test-check-doc-phrases.sh:43 -> PLAN-differencingflow.md, tools/ci/test-check-doc-phrases.sh:142 -> /docs/plans/PLAN-example.md
-- **shakenfist** (Status): 2 of 410 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist/tests/test_plan_phase_references.py:86 -> docs/plans/PLAN-thing.md, shakenfist/tests/test_plan_phase_references.py:88 -> docs/other/plans/PLAN-deep.md
+- **shakenfist** (Status): 2 of 412 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist/tests/test_plan_phase_references.py:86 -> docs/plans/PLAN-thing.md, shakenfist/tests/test_plan_phase_references.py:88 -> docs/other/plans/PLAN-deep.md
 
 ## plan-template
 
@@ -1201,14 +1201,13 @@ Criterion: [reusable-workflow-secrets.md](/components/development/audits/reusabl
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | compliant | - |
-| shakenfist | non-compliant | shakenfist/shakenfist#4380 |
+| shakenfist | compliant | - |
 | uncalibrated-sextant | compliant | - |
 | visual-digest-rust | compliant | - |
 
 Details for non-compliant projects:
 
 - **instar** (Status): 1 job(s) pass "secrets: inherit" to a reusable workflow, handing it every secret this repository holds. Declare the secrets the called workflow reads under on.workflow_call.secrets and pass those by name; if it reads none, delete the line
-- **shakenfist** (Status): 5 job(s) pass "secrets: inherit" to a reusable workflow, handing it every secret this repository holds. Declare the secrets the called workflow reads under on.workflow_call.secrets and pass those by name; if it reads none, delete the line
 
 ## review-coverage
 
@@ -1216,13 +1215,13 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | non-compliant | shakenfist/actions#108 |
+| actions | compliant | - |
 | agent-python | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
-| development | compliant | - |
+| development | non-compliant | shakenfist/development#216 |
 | divergulent | N/A | - |
 | hunkydory | compliant | - |
 | instar | N/A | - |
@@ -1232,7 +1231,7 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 | library-utilities | N/A | - |
 | occystrap | N/A | - |
 | private-ci | N/A | - |
-| ryll | compliant | - |
+| ryll | non-compliant | shakenfist/ryll#456 |
 | sfui | non-compliant | shakenfist/sfui#42 |
 | shakenfist | N/A | - |
 | uncalibrated-sextant | N/A | - |
@@ -1240,9 +1239,10 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **actions** (Status): 128 of 135 in-scope files reviewed at HEAD (6 imported from shakenfist/development); 7 need review (threshold 5)
-- **kerbside** (Status): 135 of 252 in-scope files reviewed at HEAD (10 imported from shakenfist/development); 117 need review (threshold 5)
+- **development** (Status): 196 of 203 in-scope files reviewed at HEAD; 7 need review (threshold 5)
+- **kerbside** (Status): 134 of 252 in-scope files reviewed at HEAD (9 imported from shakenfist/development); 118 need review (threshold 5)
 - **kerbside-client** (Status): 3 of 15 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 12 need review (threshold 5)
+- **ryll** (Status): 188 of 222 in-scope files reviewed at HEAD (10 imported from shakenfist/development); 34 need review (threshold 5)
 - **sfui** (Status): 3 of 52 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 49 need review (threshold 5)
 
 ## review-scope-completeness
@@ -1457,9 +1457,9 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 
 Details for non-compliant projects:
 
-- **kerbside** (Status): kerbside/api/static/sfui: 3 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
-- **private-ci** (Status): conductor/static/sfui: 10 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
-- **ryll** (Status): ryll/src/web/assets/sfui: 3 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **kerbside** (Status): kerbside/api/static/sfui: 5 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **private-ci** (Status): conductor/static/sfui: 12 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
+- **ryll** (Status): ryll/src/web/assets/sfui: 5 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout
 
 ## undeclared-direct-dependency
 

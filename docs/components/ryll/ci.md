@@ -636,7 +636,13 @@ whitelist in `.gitignore` and with `codeql-analysis.yml`.
 ## Retesting
 
 Commenting `@shakenfist-bot please retest` on a pull request
-runs `gh workflow run ci.yml` against the branch. Because
+dispatches `ci.yml` against the branch. `pr-retest.yml` is the
+shared template verbatim and names no workflow itself: it
+dispatches whatever the `RETEST_WORKFLOW` repository variable
+names, and ryll sets that to `ci.yml`. Unset, it falls back to
+the fleet default `functional-tests.yml`, which ryll does not
+have, so every retest would fail with a comment saying why.
+Because
 `workflow_dispatch` runs both tiers, this exercises the merge
 tier on the branch — useful for confirming a Windows or macOS
 fix before queueing, rather than discovering it by ejection.
@@ -714,7 +720,7 @@ consistency audit.
 | `ci.yml` | Smoke tier and merge tier, the three gates, and the automated PR review |
 | `manual-build.yml` | On-demand binary builds of arbitrary branches |
 | `release.yml` | Build and publish release artifacts |
-| `codeql-analysis.yml` | CodeQL security scanning |
+| `codeql-analysis.yml` | CodeQL security scanning; skipped on review-only pull requests and on pull requests from forks, which are scanned only by the post-merge push run, so a green `Analyze` on a fork pull request means skipped, not clean |
 | `supply-chain.yml` | Weekly advisory drift against develop (cargo-audit, cargo-deny); the PR-time scanners live in `ci.yml` |
 | `fuzz.yml` | Nightly `cargo-fuzz` build and smoke run against develop; failures filed as issues |
 | `mermaid-lint.yml` | Renders every mermaid diagram in the repository's markdown; advisory, not a gate |
