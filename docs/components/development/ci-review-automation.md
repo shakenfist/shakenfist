@@ -98,7 +98,7 @@ elevated permissions. Security is enforced through multiple layers:
    in this repository, but the repositories that copied
    `pr-re-review.yml` before it existed do not have it, and
    `check_ci_review_automation` does not yet look for it, so the
-   daily audit will not tell you which ones
+   weekly audit will not tell you which ones
 5. **No pre-commit** -- pre-commit hooks execute repository code and
    are skipped in privileged workflows. `test-drift-fix.yml` is the
    deliberate exception: fixing test drift means running the pull
@@ -217,7 +217,7 @@ repository:
 
 ## Projects Using This Automation
 
-Which projects have which of these is measured every morning rather
+Which projects have which of these is measured weekly rather
 than listed here, because a hand-maintained table of fleet state goes
 stale silently: see the `ci-review-automation` section of
 [the compliance page](/components/development/audits/compliance/#ci-review-automation).

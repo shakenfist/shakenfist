@@ -68,7 +68,7 @@ The roster is its own block because it changes on a different cadence
 -- models ship and retire while the effort ladder sits still. That is
 also how models are *managed* fleet-wide: edit
 `templates/shared-blocks/subagent-model-roster.md`, bump its version,
-commit, and the next daily run files an issue against every lagging
+commit, and the next audit run files an issue against every lagging
 repository.
 
 ### What stays project-specific
@@ -132,5 +132,5 @@ matching section of the repository's `PLAN-TEMPLATE.md`.
 ## Projects
 
 Per-project compliance for this criterion is regenerated
-every morning by the consistency audit: see
+on every run of the consistency audit: see
 [the compliance page](/components/development/audits/compliance/#plan-template).

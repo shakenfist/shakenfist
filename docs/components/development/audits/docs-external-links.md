@@ -63,5 +63,5 @@ For links to other files in the same repository, use
 ## Projects
 
 Per-project compliance for this criterion is regenerated
-every morning by the consistency audit: see
+on every run of the consistency audit: see
 [the compliance page](/components/development/audits/compliance/#docs-external-links).

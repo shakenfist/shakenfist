@@ -138,5 +138,5 @@ so a package that needs an annotation is one that is genuinely invisible
 ## Projects
 
 Per-project compliance for this criterion is regenerated
-every morning by the consistency audit: see
+on every run of the consistency audit: see
 [the compliance page](/components/development/audits/compliance/#npm-unused-declared-dependency).

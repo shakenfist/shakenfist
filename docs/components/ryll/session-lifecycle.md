@@ -13,10 +13,11 @@ Ryll installs a SIGINT handler (via `libc::signal`) in `main.rs` that sets a
 global `AtomicBool` flag (`SHUTDOWN_REQUESTED`). This allows Ctrl+C to trigger
 a clean shutdown instead of killing the process immediately.
 
-- **GUI mode**: The `eframe::App::update()` loop in `app.rs` checks the flag
-  each frame and calls `ctx.send_viewport_cmd(ViewportCommand::Close)` when
-  set, which lets eframe run its normal teardown path and finalize the capture
-  session.
+- **GUI mode**: `RyllApp::logic` in `app.rs` checks the flag on every pass
+  and calls `ctx.send_viewport_cmd(ViewportCommand::Close)` when set, which
+  lets eframe run its normal teardown path and finalize the capture session.
+  eframe calls `logic` even while the window is hidden, so Ctrl+C works on a
+  minimised window too.
 - **Headless mode**: The tokio `select!` loop polls the flag alongside channel
   events and breaks out cleanly when shutdown is requested. However the loop
   ends, `run_headless` then winds the connection task down and joins it

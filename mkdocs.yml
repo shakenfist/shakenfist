@@ -173,6 +173,7 @@ nav:
                 - "Review import": components/development/plans/PLAN-review-import.md
                 - "Shaken Fist Project Consistency Plan": components/development/plans/PLAN-consistency.md
                 - "Systematic whole-codebase review tracking": components/development/plans/PLAN-code-review-tracking.md
+                - "Workflow ref trust": components/development/plans/PLAN-workflow-ref-trust.md
         - Instar:
             - "Introduction": components/instar/index.md
             - "`instar amend` — change qcow2 image options in place": components/instar/amend.md

@@ -100,5 +100,5 @@ repository's `PUSH-AUDIT.md` and checked by the `push-audit` audit.
 ## Projects
 
 Per-project compliance for this criterion is regenerated
-every morning by the consistency audit: see
+on every run of the consistency audit: see
 [the compliance page](/components/development/audits/compliance/#diagram-format).

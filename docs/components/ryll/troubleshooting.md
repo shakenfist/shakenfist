@@ -86,6 +86,23 @@ Error: invalid peer certificate: UnknownIssuer
    and the certificate's name must match the host connected to,
    because the name is then all that identifies the backend.
 
+### Session drops when pasting large text into the guest
+
+**Symptom:** Every channel disconnects at once, without a TLS
+`close_notify`, just after a paste in the guest. The log's last main-channel
+line is `clipboard to guest (N bytes)` with N above about 14,000. The
+hypervisor's QEMU log shows `invalid agent message: data exceeds size from
+header`.
+
+**Cause:** Builds without the fix for issue #447 stop sending a large
+clipboard message when the server's agent tokens run out, and never finish
+it. spice-server then reads the next agent message as the rest of the old
+one and disconnects the client. Neither the guest nor ryll has crashed.
+
+**Solution:** Upgrade. ryll now holds the unsent chunks until the server
+returns tokens. On an affected build, copy something short on the host
+before pasting into the guest.
+
 ## Display Issues
 
 ### "Waiting for display..." stays forever
@@ -259,8 +276,17 @@ are not: they travel on `watch` channels or a non-dropping send.
 say what was dropped and when. To rule out a stale mouse mode, compare the
 app's `mouse_mode` with main's `server_mouse_mode`.
 
-**Cause:** The stall itself, usually during a guest reboot, is tracked as
-issue #430.
+**Causes:**
+- The window was hidden: minimised, behind other windows, on another
+  Space, or under the macOS lock screen. eframe does not draw a hidden
+  window, and builds without the fix for issue #444 only drained the queue
+  while drawing, so the queue filled within seconds and stayed full until
+  the window was shown again. In a bug report this shows as hours of drops
+  (mostly `Latency`) with healthy PING/PONG counts throughout. ryll now
+  drains the queue from `App::logic`, which eframe keeps calling for hidden
+  windows.
+- A UI-thread stall while the window is visible, usually during a guest
+  reboot, tracked as issue #430.
 
 ### Session becomes unresponsive after idle period
 
@@ -680,7 +706,9 @@ first send happens on session bring-up once display geometry is known, or on
 any window resize. In a freshly-connected session with no resize activity (or
 in headless mode where geometry is fixed), `agent_request_count` may stay at
 zero for a while before the probe starts firing — that does not indicate an
-unhealthy agent.
+unhealthy agent. The probe is also skipped while earlier agent messages, such
+as a large clipboard transfer, are still waiting for the server to return
+tokens.
 
 **Agent reply-lag fields in `MainSnapshot` (visible in Connection bug reports):**
 

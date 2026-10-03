@@ -3,7 +3,7 @@
 Every Shaken Fist project is expected to be packaged, tested and
 automated the same way. The consistency audit is what makes that an
 observable property rather than an intention: it measures each
-repository against a set of criteria every morning, files an issue on
+repository against a set of criteria once a week, files an issue on
 the repository for each criterion it fails, closes the issue when the
 criterion passes again, and publishes the result as a table in this
 repository.
@@ -45,11 +45,37 @@ decomposes into several -- runner tags, permissions, linting, and more
 -- which all render into its one section of the compliance page as
 separate columns.
 
-## What a daily run does
+## What a run does
 
-`.github/workflows/consistency-audit.yml` runs at 06:00 UTC, after
-`export-repo-config` at 00:30, and can be started by hand with
-`workflow_dispatch`. It has four jobs.
+`.github/workflows/consistency-audit.yml` runs weekly at 18:00 UTC on
+Sunday -- early on Monday morning in Canberra -- and can be started by
+hand with `workflow_dispatch`. `export-repo-config`, whose output some
+checks read, still runs daily at 00:30 UTC.
+
+The audit used to run daily. It filed and closed issues faster than the
+fleet could absorb them: in September 2026 consistency fixes were the
+largest single category of PR in kerbside and ryll, and crowded out the
+work those repositories exist for. Weekly turns that into a small
+backlog to start the working week on.
+
+One consequence is that an issue fixed mid-week stays open until the
+next run unless the fixing PR closes it with `Fixes #N` in the PR body,
+which the `standards-alignment` skill in `.claude/skills/` asks for. A
+closed issue is not a passing criterion, though: the issue manager only
+searches open issues, so if the check still fails after the merge -- a
+partial fix, or a second finding under the same criterion -- the next
+run files a new issue rather than reopening the old one, and the
+discussion on it is left behind. After merging such a fix, dispatch the
+workflow by hand to confirm the criterion passes, which also brings the
+compliance page up to date.
+
+`Fixes #N` only closes an issue when the PR merges into the repository
+the issue was filed in. A fix that lands in this repository instead --
+an override, a corrected check, a new matrix entry -- closes nothing
+elsewhere, so dispatch the workflow after merging it and let the run
+close the issues the fix resolved.
+
+The audit workflow has four jobs.
 
 **1. `audit`** -- a matrix job per repository. Each leg shallow-clones
 the target with `gh repo clone`, installs a pinned `skillsaw` into a
@@ -83,7 +109,7 @@ another push landed while the audit ran.
 It writes that page and nothing else. The criterion specifications are
 hand-written, and are in scope for whole-file human review because of
 it; a generated block in one would carry a timestamp that changes
-daily and no review mark could survive it.
+every run and no review mark could survive it.
 
 The tables are therefore always a rendering of the most recent run.
 Never edit one by hand: the next run overwrites it.
@@ -93,10 +119,12 @@ files or updates an issue labelled `audit-failure` on this repository.
 
 That last job exists because this pipeline's worst failure mode is a
 quiet one. A scheduled workflow that fails emails whoever pushed last,
-which is nobody's inbox in particular at 06:00 UTC -- and while the
-audit is down the tables keep displaying the previous morning's
+which is nobody's inbox in particular before anyone is up -- and while
+the audit is down the tables keep displaying the previous run's
 verdicts, so the audit looks healthy from the outside. In August 2026
-that ran for a full day.
+that ran for a full day; on a weekly cadence the same failure would
+last a week. Nothing retries a failed run, so the issue says how to
+start one by hand once the cause is fixed.
 
 ## Issues are the work tracking
 
@@ -132,8 +160,8 @@ for it and files a fresh set, so treat `ISSUE_TITLES` in
 **Repository renames are handled, but noisily on purpose.** Repo names
 are resolved to their canonical form before searching, because GitHub's
 issue search does not follow renames while issue creation does -- so a
-stale matrix entry would otherwise file a duplicate every single
-morning. A rename still fails the job, so the matrix actually gets
+stale matrix entry would otherwise file a duplicate on every single
+run. A rename still fails the job, so the matrix actually gets
 updated. If duplicates exist anyway, the oldest is kept and the rest are
 closed.
 
@@ -234,8 +262,9 @@ criterion with no test module entry fails the contract tests in
 `scripts/tests/test_metadata.py`.
 
 A new criterion does not require a re-audit of anything else, and does
-not require touching any project repository. The next morning's run
-measures it everywhere and files the issues.
+not require touching any project repository. The next run measures it
+everywhere and files the issues; dispatch the workflow by hand if you
+want to see that before Monday.
 
 ## Bringing a repository into scope
 
