@@ -15103,6 +15103,19 @@ is unreachable.</p>
 <a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a><span class="w">        </span><span class="nt">sf-2</span><span class="p">:</span>
 <a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a><span class="w">        </span><span class="nt">sf-3</span><span class="p">:</span>
 </code></pre></div>
+<p>The mesh network carries east/west traffic between nodes, so it need not be
+routable from anywhere else. <code>node_egress_ip</code> is the north/south address, and
+it is the hypervisor address that users are given in <code>virt-viewer</code> files from
+the <code>vdiconsolehelper</code> API call. Set it to an IPv4 address that console clients
+can reach, and make sure the hypervisor's VDI port range (the <code>vdi</code> and
+<code>vdi_tls</code> ports) is open on that address from wherever those clients run.
+Firewall rules written when console clients reached hypervisors over the mesh
+may cover only that network. SPICE and VNC listen on IPv4 only, so an IPv6 address is not
+used. If it is left unset, set to a loopback address such as the deployer's
+default of <code>127.0.0.1</code>, or set to anything else a client cannot dial (an
+unspecified, link-local or multicast address, or a value that is not an IP
+address), those files fall back to the node's mesh IP. Values other than unset
+and loopback are logged as a warning when that happens.</p>
 <p>For a single machine, put <code>localhost</code> in every group — see
 <code>examples/single-node/inventory.yaml</code> for exactly that.</p>
 <h2 id="set-the-deployment-variables">Set the deployment variables<a class="headerlink" href="#set-the-deployment-variables" title="Permanent link">&para;</a></h2>
