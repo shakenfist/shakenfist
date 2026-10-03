@@ -15365,38 +15365,48 @@ of 6 each and <code>sf2</code> 12, which is the smallest shape in its table
 that changes the number that binds. The sizing plan is updated to
 say so.</p>
 <h3 id="8-should-the-server-queue-a-create-that-does-not-fit">8. Should the server queue a create that does not fit?<a class="headerlink" href="#8-should-the-server-queue-a-create-that-does-not-fit" title="Permanent link">&para;</a></h3>
-<p><strong>Not answered yet.</strong> Phase 5 took its first reading, over 26
-qualifying <code>merge_group</code> runs on the reshaped <code>slim-tier</code>, and the
-window was <strong>not readable</strong>: 96 of its 104 instrumented bundles carry
-no capacity-wait trace at all, an unknown fraction of <strong>92.3%</strong>
-against the 25% ceiling phase 5's pre-registered rule sets for
-calling a window readable. The cause is not lost plumbing -- every
-absent bundle carries a fully populated <code>bundle/traces/</code> -- but that
-the trace file is created on first write and so cannot express
-"nothing was refused"
-(<a href="https://github.com/shakenfist/shakenfist/issues/4337">#4337</a>). That
-is the rule's <em>unreadable</em> case, which is deliberately not one of its
-three outcomes and deliberately does not resolve to Abandon, so the
-phase <strong>extends its window once</strong> rather than deciding on the eight
-readable units. The full reading, the arithmetic for all three
-outcome clauses under both candidate denominators, and what the second
-reading owes before it is taken are in
-<a href="../PLAN-transient-capacity-refusals-phase-05-queue-decision/">phase 5's Outcome</a>.</p>
-<p>One thing the second reading owed has since been paid. The rule is
-amended, as <strong>D43</strong>, written before any of the second window was read:
-now that #4337 makes zero expressible, an <code>empty</code> trace is an
-observation of zero waits and enters the denominator, while <code>absent</code>
-and <code>unparseable</code> stay unknown. That is what unpins the two clauses the
-first reading found structurally stuck at 100%, and it gives the rule
-back a path to Abandon that it did not have. Nothing else in the rule
-moves.</p>
-<p>What the eight readable waits say, held loosely because they are 7.7%
-of the window: waits from 0.036 s to 270.858 s against the suite's
-420 s deadline, none of which reached it; all eight pinned creates,
-which means the fairness assertion below is still unevidenced rather
-than confirmed; seven bound on <code>cpus</code>. On the reshaped <code>slim-tier</code>
-alone the longest was 180.490 s, below the 210 s line the rule draws.
-None of that decides anything.</p>
+<p><strong>No.</strong> Phase 5 has taken both of its readings and decided: the
+server should not queue a create that does not fit. Two
+qualifications belong beside that answer rather than after it.</p>
+<p><strong>It was selected by the rule's default, not by its evidence.</strong>
+Phase 5's pre-registered rule resolves its middle ground to Abandon
+on a second reading, and that is what fired. Abandon's own clauses
+did <strong>not</strong> hold -- two waits in the second window exceed its 210 s
+line -- and no Build clause fired either. Three capacity waits were
+recorded over 95 instrumented bundles, at 41%, 55% and 69% of the
+suite's 420 s deadline, produced by the same three tests that
+produced the first window's long waits, and two of the three got
+<em>longer</em> after the reshape rather than shorter. The finding is <strong>rare
+but substantial</strong>, not absent, and "no queue" must not be read later
+as "CI does not wait".</p>
+<p><strong>The fairness argument below is untestable on this evidence rather
+than confirmed.</strong> All 11 waits across the two windows were pinned
+creates and none was unpinned -- but every create in the functional
+suite that is refused is pinned, so the instrument cannot produce the
+comparison arm. Citing "all the long waits were pinned" as support
+for "a pinned create starves worst" would be reading a harness
+artefact as a scheduler finding.</p>
+<p>The first reading was <strong>unreadable</strong>: 92.3% of its instrumented
+bundles carried no trace at all, because the file was created on
+first write and so could not express "nothing was refused"
+(<a href="https://github.com/shakenfist/shakenfist/issues/4337">#4337</a>). The
+phase therefore spent its single extension there. #4337's fix worked
+-- the second window's census is 92 <code>empty</code> against 2 <code>absent</code>, an
+unknown fraction of 2.1% -- which is what made a reading possible at
+all. The full reading, the arithmetic for every clause under all
+three candidate scopings, how close the loosest of those sits to
+Build, the four objections to the rule, and the three limits of the
+evidence are in
+<a href="../PLAN-transient-capacity-refusals-phase-05-queue-decision/">phase 5's Outcome -- second reading</a>.</p>
+<p>The rule was amended once between the readings, as <strong>D43</strong>, written
+before any of the second window was read: now that #4337 makes zero
+expressible, an <code>empty</code> trace is an observation of zero waits and
+enters the denominator, while <code>absent</code> and <code>unparseable</code> stay
+unknown. That is what unpinned the two clauses the first reading
+found structurally stuck at 100%. A second decision, <strong>D44</strong>,
+excludes from the denominator the bundles that cannot run the Python
+harness at all, and says plainly that it was implemented in the
+gather script before it was written up.</p>
 <p><strong>The arguments, which the reading did not disturb.</strong> The machinery
 exists -- <code>BaseClusterOperation.defer_with_backoff()</code> already
 re-enqueues with a delay for artifact fetches and network
@@ -15407,12 +15417,12 @@ passes looks like a contained change. Against it: it is exactly the
 queue-state surface the project does not want; it has no fairness
 model (a waiting 4-vCPU create starves behind a stream of 1-vCPU
 ones, and a pinned create starves worst -- an assertion no data
-supports yet, because every refusal phase 5 could read was pinned and
-there was no comparison arm); waiting instances hold IPAM
+can support from CI, because every refusal the suite produces is
+pinned and there is no comparison arm); waiting instances hold IPAM
 allocations, so a CPU shortage can become an address shortage; and
 the client's create-and-await path has a ceiling that bounds any
-useful deadline. Which way those arguments fall is decided by phase
-5's numeric rule on the second reading, not by "short and few" versus
+useful deadline. Which way those arguments fell was decided by phase
+5's numeric rule on its second reading, not by "short and few" versus
 "long or many" -- that informal test is what the phase plan replaced
 with thresholds fixed before the data existed.</p>
 <p>Phase 5's survey corrected four of the sentences above, and the
@@ -15539,7 +15549,7 @@ every phase has been completed, abandoned or superseded.</p>
 <tr>
 <td>5. Decide on server-side queued placement from the phase 2 data</td>
 <td><a href="../PLAN-transient-capacity-refusals-phase-05-queue-decision/">PLAN-transient-capacity-refusals-phase-05-queue-decision.md</a></td>
-<td>In progress</td>
+<td>Complete</td>
 <td>—</td>
 </tr>
 <tr>
@@ -15649,7 +15659,7 @@ fails on any raw call outside an explicit allowlist marker, the way
 calls. The 115 it quoted was a count over the whole of
 <code>shakenfist/deploy/shakenfist_ci/</code>, which today is 117 across 41
 files. The difference is <code>smoke_ci_tests/</code> (27 calls in 7 files),
-<code>base.py:1227</code> and <code>database_tier.py:275</code>. The smoke tier belongs in
+<code>base.py:1794</code> and <code>database_tier.py:283</code>. The smoke tier belongs in
 scope: it runs on the smallest cloud, where one sibling instance is
 the largest fraction of the cluster.</em></p>
 <p>The wrapper: on <code>InsufficientResourcesException</code>, if the deadline
@@ -15781,7 +15791,7 @@ express -- it cannot declare a response header, which phase 4's
 D32 records as a filed gap rather than fixing here.</p>
 <p>The contract this changes already has an owner:
 <code>BaseTestCase.assertRefusedAtStage()</code>
-(<code>shakenfist/deploy/shakenfist_ci/base.py:1464</code>), landed by the
+(<code>shakenfist/deploy/shakenfist_ci/base.py:1552</code>), landed by the
 sizing plan's phase 3a and used by four assertions in
 <code>cluster_ci_tests/test_saturation.py</code>. Its docstring names this
 phase as the single place to change when the contract moves.</p>
@@ -15819,15 +15829,28 @@ because "small" and "near its deadline" above are not numbers and a
 phase which reads twenty runs and then decides what those words meant
 is narrating a decision rather than taking one.</p>
 <p>The gate has since opened -- the sizing plan's reshape landed as
-<code>shakenfist/actions#88</code> (<code>f78576e</code>) and its step 4d reported -- and the
-first reading has been taken. It was <strong>unreadable</strong>: 92.3% of the
-window's instrumented bundles carry no capacity-wait trace, because the
-trace cannot express "nothing was refused"
+<code>shakenfist/actions#88</code> (<code>f78576e</code>) and its step 4d reported -- and
+both readings have been taken. The first was <strong>unreadable</strong>: 92.3%
+of the window's instrumented bundles carried no capacity-wait trace,
+because the trace could not express "nothing was refused"
 (<a href="https://github.com/shakenfist/shakenfist/issues/4337">#4337</a>). The
-phase therefore extends its window once, remains <code>In progress</code>, and has
-decided nothing. The amendment that extension owed is now written as
-D43, before the second window was read. See open question 8 above and
-that plan's Outcome.</p>
+phase spent its single extension there, and amended the rule as D43
+before any of the second window was read.</p>
+<p>The second reading, over 39 ancestry-qualifying <code>merge_group</code> runs
+from 2026-09-27 to 2026-10-02, is <strong>Abandon</strong> -- unanimously across
+all three candidate scopings, but selected by the rule's
+middle-ground default rather than by Abandon's own clauses, which did
+not hold. #4337's fix worked: the census went from 0 <code>empty</code> and 96
+<code>absent</code> to 92 <code>empty</code> and 2 <code>absent</code>, an unknown fraction of 2.1%
+against the 25% ceiling. Three waits were recorded, at 41%, 55% and
+69% of the 420 s deadline, from the same three tests as the first
+window, two of which got longer after the reshape; all three were
+pinned creates, which leaves the fairness assertion untestable on CI
+data rather than confirmed. The phase is <code>Complete</code> -- it made the
+decision it existed to make; what is abandoned is the queue, which is
+recorded as open question 8's answer rather than as a phase status.
+Nothing was designed and no code changed. See open question 8 above
+and that plan's <em>Outcome -- second reading</em>.</p>
 <h3 id="phase-6-documentation-and-close-out">Phase 6 -- Documentation and close-out<a class="headerlink" href="#phase-6-documentation-and-close-out" title="Permanent link">&para;</a></h3>
 <p>Document the transient-refusal contract in
 <code>docs/operator_guide/scheduler.md</code> and the API reference, the suite
