@@ -1,7 +1,7 @@
 # Consistency audit compliance
 
 Which project currently meets which criterion. This page is
-regenerated every morning by the consistency audit workflow and
+regenerated weekly by the consistency audit workflow and
 committed by it, and it is the only generated file in `docs/audits/`
 -- every criterion specification beside it is hand-written and
 changes only when a person changes it.
@@ -16,7 +16,10 @@ indexes them all.
 The generation timestamp below is load-bearing. When a run fails it
 leaves the previous run's verdicts in place, so this page goes on
 looking healthy while being stale -- check the date before trusting a
-verdict, and see
+verdict. The audit runs at 18:00 UTC every Sunday and can be
+dispatched by hand in between, so a timestamp older than the most
+recent Sunday 18:00 UTC means the last scheduled run failed, however
+many manual runs came before it. See
 [../consistency-audits.md](/components/development/consistency-audits/) for what a run
 does.
 

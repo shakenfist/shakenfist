@@ -59,7 +59,7 @@ of its own and gets the ordinary advice.
 
 The file list comes from `git ls-files`. An untracked `CLAUDE.md` is
 somebody's scratch file in their own clone, not a property of the
-repository, and the daily audit runs against a fresh clone and would
+repository, and the scheduled audit runs against a fresh clone and would
 never see one. `CLAUDE.local.md` is in the matched set for the same
 reason from the other side: it is meant to be gitignored, so an
 untracked one is invisible here and a tracked one is a personal
@@ -84,7 +84,7 @@ exits cleanly anywhere inside a work tree, listing whatever the
 enclosing index holds below the directory it was pointed at -- usually
 nothing -- so a tree copied into a subdirectory of an unrelated
 repository would otherwise be reported compliant without having been
-read. The daily audit clones and so always points at a root; this is
+read. The scheduled audit clones and so always points at a root; this is
 for the audit run by hand.
 
 The matched set is a constant so that it can grow. GitHub Copilot's
@@ -102,5 +102,5 @@ survives in `AGENTS.md` or under `docs/` before deleting the original.
 ## Projects
 
 Per-project compliance for this criterion is regenerated
-every morning by the consistency audit: see
+on every run of the consistency audit: see
 [the compliance page](/components/development/audits/compliance/#llm-doc-naming).

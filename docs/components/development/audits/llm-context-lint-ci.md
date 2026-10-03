@@ -2,10 +2,10 @@
 
 ## What we check
 
-The daily consistency audit is a backstop, not a feedback loop. A
+The weekly consistency audit is a backstop, not a feedback loop. A
 malformed skill, a smuggled unicode character or a secret pasted into
 `CLAUDE.md` should be caught by the commit that introduces it, not up
-to twenty-four hours later by a report nobody is watching.
+to a week later by a report nobody is watching.
 
 Every repository with agent context must therefore run
 [skillsaw](https://skillsaw.org/) itself, in both places the other
@@ -73,5 +73,5 @@ pre-commit manager will have the `rev` kept current automatically.
 ## Projects
 
 Per-project compliance for this criterion is regenerated
-every morning by the consistency audit: see
+on every run of the consistency audit: see
 [the compliance page](/components/development/audits/compliance/#llm-context-lint-ci).

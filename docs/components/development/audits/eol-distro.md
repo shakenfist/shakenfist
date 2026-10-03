@@ -11,7 +11,7 @@ date.
 
 This criterion is that memory written down. A retired release is
 listed once, in `EOL_RELEASES` in
-`scripts/audit/checks/distros.py`, and from the next morning's run
+`scripts/audit/checks/distros.py`, and from the next audit run
 every repository still building on it fails until it moves.
 
 ### The retired list
@@ -183,5 +183,5 @@ container build files, not a file to install.
 
 ## Projects
 
-Per-project compliance is regenerated every morning by the consistency
+Per-project compliance is regenerated on every run of the consistency
 audit: see [the compliance page](/components/development/audits/compliance/#eol-distro).

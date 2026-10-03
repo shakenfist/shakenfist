@@ -36,6 +36,12 @@ default branch. A workflow is a finding when both of these hold:
   `merge_group` failure fails in front of whoever opened the pull
   request.
 
+Three failures is a pattern reached quickly by a workflow that runs
+often, but the finding appears only when the audit next runs, which is
+weekly. A daily workflow broken just after an audit is reported up to
+about ten days later, and a weekly workflow only after its third
+failed run, three weeks or more.
+
 The finding names each workflow, how many of its runs failed, and a
 link to the most recent failed run. It does not diagnose the cause.
 The reason is in that run's log, and the usual one is an unfinished
@@ -82,5 +88,5 @@ until it can.
 ## Projects
 
 Per-project compliance for this criterion is regenerated
-every morning by the consistency audit: see
+on every run of the consistency audit: see
 [the compliance page](/components/development/audits/compliance/#scheduled-workflow-health).
