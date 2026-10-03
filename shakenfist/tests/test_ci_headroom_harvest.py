@@ -269,7 +269,7 @@ class HarvestTestCase(base.ShakenFistTestCase):
 
     def _harvest(self, github, **kwargs):
         args = Args(self.output, self.cache, **kwargs)
-        count = harvest.harvest(github, args, report)
+        count, _ = harvest.harvest(github, args, report)
         with open(self.output) as f:
             lines = [line for line in f.read().split('\n') if line]
         return count, lines
@@ -558,6 +558,129 @@ class RecordTestCase(HarvestTestCase):
         self.assertTrue(by_name[PRIMARY_BUNDLE]['series_present'])
         self.assertFalse(by_name[TIER_BUNDLE]['series_present'])
         self.assertIsNone(by_name[TIER_BUNDLE]['summary'])
+
+
+class PagedGitHub(harvest.GitHubCLI):
+    """GitHubCLI with gh replaced by canned pages.
+
+    ``paginate()`` is the one part of that class reachable without a
+    subprocess, and it is also where the window is actually assembled, so
+    the fake replaces ``json()`` and leaves the walk under test.
+    """
+
+    def __init__(self, pages, key='workflow_runs'):
+        super().__init__()
+        self.pages = pages
+        self.key = key
+        self.asked = []
+
+    def json(self, path):
+        # Refetching a page is the one way this loop can go wrong that a
+        # canned-pages fake would otherwise hang on rather than fail: a walk
+        # which never advances asks for page one until the heat death of the
+        # test suite. Raising turns that into a failure.
+        if path in self.asked:
+            raise AssertionError('page refetched, so the walk is not advancing: %s' % path)
+        self.asked.append(path)
+        page = int(path.split('&page=')[1])
+        items = self.pages[page - 1] if page <= len(self.pages) else []
+        return {self.key: items}
+
+
+class PaginationTestCase(base.ShakenFistTestCase):
+    """The page walk itself, which the rest of this module cannot reach.
+
+    Every other test here fakes ``paginate()`` wholesale and so exercises
+    what callers do with a listing rather than how the listing is gathered.
+    That left the walk untested, and the walk is half of the 2026-09-08 fix:
+    the other half is the client-side sort, which ``RunListingTestCase``
+    covers in both orderings. GitHub does not surface the newest
+    ``merge_group`` runs on page one -- that was checked against the live
+    API -- so a run reachable only on a later page is the ordinary case, not
+    an edge one, and an early ``return`` reintroduced into this loop would
+    silently shorten every window.
+    """
+
+    def _runs(self, count, first_id=1):
+        return [{'id': first_id + n,
+                 'created_at': '2026-09-%02dT00:00:00Z' % ((n % 28) + 1)}
+                for n in range(count)]
+
+    def test_every_page_is_walked(self):
+        pages = [self._runs(100, 1), self._runs(100, 101), self._runs(7, 201)]
+        github = PagedGitHub(pages)
+        got = [item for page in github.paginate('p', 'workflow_runs')
+               for item in page]
+        self.assertEqual(207, len(got))
+        self.assertEqual([1, 207], [got[0]['id'], got[-1]['id']])
+        self.assertEqual(3, len(github.asked))
+
+    def test_a_short_page_ends_the_walk(self):
+        # A page holding fewer than per_page items is the last one, so the
+        # walk stops without spending a call to be told the next is empty.
+        github = PagedGitHub([self._runs(100, 1), self._runs(3, 101)])
+        list(github.paginate('p', 'workflow_runs'))
+        self.assertEqual(2, len(github.asked))
+
+    def test_an_empty_first_page_yields_nothing_rather_than_hanging(self):
+        github = PagedGitHub([[]])
+        self.assertEqual([], list(github.paginate('p', 'workflow_runs')))
+        self.assertEqual(1, len(github.asked))
+
+    def test_the_page_number_advances(self):
+        # The defect this guards is a loop which refetches page one forever,
+        # which looks like a working walk until the window never ends.
+        github = PagedGitHub([self._runs(100, 1), self._runs(100, 101),
+                              self._runs(1, 201)])
+        list(github.paginate('p', 'workflow_runs', per_page=100))
+        self.assertEqual(['p?per_page=100&page=1', 'p?per_page=100&page=2',
+                          'p?per_page=100&page=3'], github.asked)
+
+    def test_a_run_reachable_only_on_a_later_page_is_in_the_window(self):
+        # The shape of the 2026-09-08 incident, end to end through list_runs:
+        # the newest run is not on page one, and nothing may stop before it.
+        newest = {'id': 9999, 'created_at': '2026-09-30T00:00:00Z'}
+        github = PagedGitHub([self._runs(100, 1), [newest]])
+        runs = harvest.list_runs(github, workflow='functional-tests.yml')
+        self.assertEqual(101, len(runs))
+        self.assertEqual(9999, runs[0]['id'])
+
+
+class UsableSeriesAccountingTestCase(RecordTestCase):
+    """How many records carry a series anyone can compute over.
+
+    An all-absent window is not an error -- a bundle with no series is a
+    record and not a gap, and a one-run harvest of an expired artifact is a
+    legitimate question whose answer is the reason in the record. But the
+    count written is not the count measured, and reporting only the first
+    lets a window in which the probe never started read as a window of N
+    records. So the harvest returns both.
+    """
+
+    def test_the_usable_count_counts_only_records_with_samples(self):
+        github = self._github({
+            PRIMARY_BUNDLE: instrumented_members(),
+            TIER_BUNDLE: {'bundle/logs/syslog': 'x\n'},
+        })
+        args = Args(self.output, self.cache)
+        written, usable = harvest.harvest(github, args, report)
+        self.assertEqual(2, written)
+        self.assertEqual(
+            1, usable,
+            'Two records were written and only one carries a series, so a '
+            'caller told "2" has been told the size of the file rather than '
+            'the size of the population it can measure.')
+
+    def test_a_window_which_measured_nothing_reports_zero_usable(self):
+        github = self._github({TIER_BUNDLE: {'bundle/logs/syslog': 'x\n'}})
+        args = Args(self.output, self.cache)
+        written, usable = harvest.harvest(github, args, report)
+        self.assertEqual(1, written)
+        self.assertEqual(
+            0, usable,
+            'A window in which no bundle carried a series reported a '
+            'non-zero usable count, which is the shape that lets a dead '
+            'probe read as a measured window.')
 
 
 class LoudFailureTestCase(HarvestTestCase):

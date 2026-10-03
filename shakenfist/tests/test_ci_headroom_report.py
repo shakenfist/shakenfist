@@ -979,6 +979,50 @@ class CensusTestCase(HeadroomReportTestCase):
             'makes a refusal in an otherwise-idle-looking run a warning '
             'independent of the ratio, and this run is both at once.')
 
+    def test_a_census_which_read_no_log_lines_cannot_say_there_were_none(self):
+        """A healthy Loki and a broken shipper must not read as a clean run.
+
+        The warning is tri-state so that a census which could not speak says
+        so. Being unreadable is the obvious way that happens; reading
+        successfully and matching nothing is the other, and it is the
+        dangerous one, because zero capacity-stage drops out of zero log
+        lines is arithmetically the same as zero out of thousands. Every job
+        this runs in deploys a cluster and schedules instances, so the
+        scheduler cannot have been silent: an empty result means the shipping
+        path stopped or the message forms were renamed.
+        """
+        census = self._census([])
+        path = self._series([
+            sample({NODE_ONE: node_payload(cpu_measured=1, cpu_committed=1)}),
+        ])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'Refusal warning: UNKNOWN', output,
+            'A census which matched not one log line reported no refusals '
+            'rather than reporting that it could not tell. That is the same '
+            'output a genuinely clean run produces, so a log shipper which '
+            'stopped is indistinguishable from a cluster which refused '
+            'nothing.')
+        self.assertIn('did not observe', output)
+
+    def test_a_census_which_read_lines_but_no_refusals_still_says_none(self):
+        """The converse, so the fix above cannot have made every run unknown.
+
+        A census that read real log lines and found no capacity-stage drop
+        has observed the absence, and must keep saying so.
+        """
+        census = self._census([
+            census_event('schedule have highest affinity', {}),
+        ])
+        path = self._series([
+            sample({NODE_ONE: node_payload(cpu_measured=1, cpu_committed=1)}),
+        ])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn('no capacity-stage drops in the census window', output)
+        self.assertNotIn('Refusal warning: UNKNOWN', output)
+
     def test_the_refusal_warning_is_framed_as_calibration_not_undersizing(self):
         """D5: the job-log prose, not just the annotation, carries the frame.
 
@@ -1117,12 +1161,12 @@ class BandVerdictTestCase(HeadroomReportTestCase):
         code, output = self._run('--series', path)
         self.assertEqual(0, code)
         self.assertIn(
-            'Per-node maximum p90, D4 bound 0.85: 1.000', output,
-            'The per-node maximum and the D4 bound it is judged against '
+            'Per-node maximum p90, bound 0.85: 1.000', output,
+            'The per-node maximum and the bound it is judged against '
             'were not both printed.')
         self.assertIn(
             'ABOVE BAND', output,
-            'A per-node maximum of 1.000 is above the D4 bound of 0.85 and '
+            'A per-node maximum of 1.000 is above the bound of 0.85 and '
             'must read as such.')
         self.assertIn(
             'saturated', output,
@@ -1144,7 +1188,7 @@ class BandVerdictTestCase(HeadroomReportTestCase):
         code, output = self._run('--series', path)
         self.assertEqual(0, code)
         self.assertIn(
-            'Per-node maximum p90, D4 bound 0.85: 0.100', output)
+            'Per-node maximum p90, bound 0.85: 0.100', output)
         self.assertIn('WITHIN BAND', output)
         self.assertNotIn('ABOVE BAND', output)
 
@@ -1622,7 +1666,7 @@ class ReviewFixesTestCase(HeadroomReportTestCase):
         self.assertIn('Fallbacks inside ledger-unreadable samples:       2',
                       output)
         self.assertIn(
-            'D7 should read the second line alone', output,
+            'a ledger comparison should read the', output,
             'The two causes of a fallback were reported as one number, '
             'so a reader reconciling the ledgers cannot tell a real '
             'fallback from a failed capacity read.')
@@ -1884,7 +1928,7 @@ class GuardCensusTestCase(HeadroomReportTestCase):
             '    1  measured CPU load alone was already over the limit',
             output)
         self.assertIn(
-            '    1  the D13 feedforward estimate is what carried it over',
+            '    1  the feedforward demand estimate carried it over',
             output,
             'The demand split counted `requested` into the comparison, which '
             'the guard does not since phase 4a, so an estimator defect reads '
