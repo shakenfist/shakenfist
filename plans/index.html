@@ -15228,6 +15228,13 @@ checker's blind spot, and the only numbers here it cannot recompute.</p>
 <td>3 of 6</td>
 </tr>
 <tr>
+<td>2026-10-02</td>
+<td><a href="PLAN-kerbside-deployer/">Deploy Kerbside from the ansible collection</a></td>
+<td>The deployer phase the Kerbside VDI console tokens plan deferred: a <code>kerbside</code> inventory group, a <code>kerbside</code> role, the signing key and a dedicated scrape credential minted at deploy time, and a merge-queue lane with the feature on. #4004 closed after only its <code>kerbside_url</code> increment, so until this lands no collection-deployed cluster (sfcbr included) can route consoles through Kerbside</td>
+<td>Proposed</td>
+<td>0 of 7</td>
+</tr>
+<tr>
 <td>2026-10-03</td>
 <td><a href="PLAN-zombie-repair-live-credentials/">Zombie repair must not delete a live credential</a></td>
 <td>Orphan reconciliation repairs a stateless namespace key, trusted issuer or mapping rule forward to <code>created</code> when its read path would honour it, failing closed on an unreadable database; closes <a href="https://github.com/shakenfist/shakenfist/issues/3836">#3836</a></td>
