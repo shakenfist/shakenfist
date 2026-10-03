@@ -1,7 +1,6 @@
 import os
 from typing import Any
 
-import psutil
 from shakenfist_utilities import logs  # noreorder
 
 from shakenfist.config import config
@@ -172,17 +171,6 @@ class NodeInstOp(BaseClusterOperation):
 
             except lc.libvirt.libvirtError as e:
                 self.log.warning('Ignoring libvirt error: %s' % e)
-
-    def _health_check_kvm_process(self, inst):
-        pid = inst.kvm_pid
-        if pid:
-            try:
-                psutil.Process(pid)
-            except (psutil.NoSuchProcess, FileNotFoundError):
-                inst.kvm_pid = None
-
-                if inst.power_state == 'on':
-                    inst.enqueue_delete_due_error('kvm process missing')
 
     def _instance_delete(self, inst):
         with inst.get_lock(op='Instance delete', global_scope=False):

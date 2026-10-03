@@ -30,11 +30,8 @@ class FakeInstance:
     etcd-era ``inst.etcd``) raises AttributeError, just like production.
     """
 
-    def __init__(self, uuid, fail_restore=False):
+    def __init__(self, uuid):
         self.uuid = uuid
-        self.power_state = 'on'
-        self.fail_restore = fail_restore
-        self.restored = False
         self.delete_errors = []
 
         # The placement reconciliation at the end of restore_instances()
@@ -49,11 +46,6 @@ class FakeInstance:
     def get_lock(self, timeout=None, op=None, global_scope=False):
         return contextlib.nullcontext()
 
-    def create_on_hypervisor(self):
-        if self.fail_restore:
-            raise RuntimeError('hypervisor exploded')
-        self.restored = True
-
     def enqueue_delete_due_error(self, error_msg):
         self.delete_errors.append(error_msg)
 
@@ -61,27 +53,28 @@ class FakeInstance:
         return 'instance(%s)' % self.uuid
 
 
-class RestoreInstancesErrorPathTestCase(base.ShakenFistTestCase):
-    """Regression test for issue #3552.
+class RestoreDoesNotTouchTheHypervisorTestCase(base.ShakenFistTestCase):
+    """Guards against the instance restore loop (F2) coming back.
 
-    The instance-restore error path used to call
-    ``inst.etcd.enqueue_delete_due_error(...)``, an etcd-era leftover.
-    Instance objects no longer have an ``etcd`` attribute, so a failed
-    restore raised AttributeError instead of enqueuing the delete, and
-    the exception aborted the loop so later instances were never
-    restored.
+    That loop was a no-op: ``inst.power_state`` is a dict, so ``not in
+    started`` was always true, and ``Instance.create_on_hypervisor()`` does
+    not exist. Fixing only the comparison would have raised AttributeError
+    for every instance, and the error path would then have enqueued a
+    delete for each, so every instance on the node would be deleted on the
+    next sf-queues restart. ``FakeInstance`` has neither attribute, so a
+    resurrected loop fails here the same way. Restore now only restores
+    networks and reconciles placement.
     """
 
-    def test_failed_restore_enqueues_delete_and_continues(self):
-        failing = FakeInstance('uuid-failing', fail_restore=True)
-        healthy = FakeInstance('uuid-healthy')
+    def test_restore_does_not_delete_or_touch_the_hypervisor(self):
+        first = FakeInstance('uuid-first')
+        second = FakeInstance('uuid-second')
 
         fake_config = mock.MagicMock()
         fake_config.NODE_NAME = 'fake-node'
 
         fake_instance_module = mock.MagicMock()
-        fake_instance_module.Instances.return_value = [failing, healthy]
-        fake_instance_module.Instance.STATE_INITIAL = 'initial'
+        fake_instance_module.Instances.return_value = [first, second]
 
         fake_node = mock.MagicMock()
         fake_node.instances = []
@@ -111,15 +104,14 @@ class RestoreInstancesErrorPathTestCase(base.ShakenFistTestCase):
 
             startup_tasks.restore_instances()
 
-        # The failing instance was enqueued for deletion due to error...
-        self.assertEqual(
-            ['exception while restoring instance on daemon restart'],
-            failing.delete_errors)
-        mock_ignore.assert_called_once()
+        # Neither instance was enqueued for deletion...
+        self.assertEqual([], first.delete_errors)
+        self.assertEqual([], second.delete_errors)
 
-        # ...and the failure did not stop later instances being restored.
-        self.assertTrue(healthy.restored)
-        self.assertEqual([], healthy.delete_errors)
+        # ...and nothing was swallowed by ignore_exception, which is what
+        # a resurrected restore loop would hit the moment it called a
+        # nonexistent create_on_hypervisor() on either instance.
+        mock_ignore.assert_not_called()
 
         # Both instances had their placement reference rows repaired
         # through the admission RPC, without enforcing the capacity
