@@ -367,8 +367,8 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 | 8. Rust unit tests and Python integration tests | [PLAN-differencing-phase-08-tests.md](/components/instar/plans/PLAN-differencing-phase-08-tests/) | Complete | `c416abd` (#588) |
 | 9. Coverage fuzzing of the locator parsers | [PLAN-differencing-phase-09-fuzz.md](/components/instar/plans/PLAN-differencing-phase-09-fuzz/) | Complete | `044ad77` (#594) |
 | 10. Documentation | [PLAN-differencing-phase-10-docs.md](/components/instar/plans/PLAN-differencing-phase-10-docs/) | Complete | `036252f` (#598) |
-| 11. Composition: host chain discovery and `info --chain` | [PLAN-differencing-phase-11-chain-host.md](/components/instar/plans/PLAN-differencing-phase-11-chain-host/) | Planned | |
-| 12. Composition: guest VHD sector-bitmap read path | PLAN-differencing-phase-12-vhd-compose.md | Not started | |
+| 11. Composition: host chain discovery and `info --chain` | [PLAN-differencing-phase-11-chain-host.md](/components/instar/plans/PLAN-differencing-phase-11-chain-host/) | Complete | `c66f8b2` (#603) |
+| 12. Composition: guest VHD sector-bitmap read path | [PLAN-differencing-phase-12-vhd-compose.md](/components/instar/plans/PLAN-differencing-phase-12-vhd-compose/) | In progress | |
 | 13. Composition: guest VHDX sector-bitmap read path | PLAN-differencing-phase-13-vhdx-compose.md | Not started | |
 | 14. Composition: per-op rollout, replacing phase 4's refusals | PLAN-differencing-phase-14-op-rollout.md | Not started | |
 | 15. Composition: integration tests and fuzz | PLAN-differencing-phase-15-compose-tests.md | Not started | |
@@ -496,12 +496,40 @@ rather than left as one phase to be split later, the way
   same problem and each is a self-contained read-path change, so
   they are separate phases that can be planned, reviewed and
   reverted independently. VHD first, for the same reason its
-  emitter goes first.
+  emitter goes first. **Narrowed by phase 12's survey on
+  2026-09-30**, which found the guest chain walker already built
+  and already carrying a VHD arm: `read_chain_virtual_cluster`
+  (`src/crates/qcow2/src/lib.rs:7930`) dispatches per format at
+  `:8486`, `ChainStates` already holds `vhd_states` (`:9385`),
+  and an unallocated BAT entry already descends to the next
+  device -- which is the correct reading for a differencing
+  child's wholly-parent-owned block. What is missing is the
+  allocated-block case, and the same function's extended-L2
+  subcluster path (`:8106-8130`) already demonstrates the shape:
+  coalesce runs from a bitmap and recurse into the backing chain
+  for the sub-ranges this device does not own. The phase 4
+  refusal these phases were expected to relax is a single `if` in
+  `init_chain_states` (`:9528` for VHD, `:9556` for VHDX), not a
+  guard inside either parser crate. **Falsified by phase 12's
+  execution**: the planned condition -- lift the refusal when
+  another device follows the child -- is unsafe, because
+  `init_chain_states`'s `device_count` counts a flat, possibly
+  multi-chain device array (`compare` packs two chains into one),
+  not the length of the child's own chain. Phase 12 built the
+  composing arm but left the refusal unconditional; the guard
+  moved into the reader, which already knows its own chain's
+  bounds. What relaxing the refusal per operation actually needs
+  is filed as issue #614, and it is a phase 14 precondition, not
+  solved by phases 12 or 13 alone.
 * **Phase 14, rollout.** Turning the refusals into composition
   across `convert`, `compare`, `dd`, `bench`, `map`, `measure`
   and `check`. Mechanical once 11 to 13 land, but it is the
   phase that changes what users see, and it wants its own review
-  rather than being tacked onto a guest phase.
+  rather than being tacked onto a guest phase. Needs issue #614
+  settled first: per-operation composition means lifting
+  `init_chain_states`'s refusal, and phase 12 found that doing so
+  safely requires knowing a device's own chain boundary, which
+  `device_count` alone does not give it.
 * **Phase 15, tests and fuzz.** Cross-validation against the
   phase 1 oracle for chains instar wrote and chains it did not,
   plus coverage fuzzing of the compose path. Its harness drives
@@ -534,9 +562,12 @@ visible in the crates:
   granularity, not block granularity: the per-block sector bitmap
   says which sectors of an allocated block are the child's.
   `VhdState` today computes the bitmap's size only to skip past
-  it (`src/crates/vhd/src/lib.rs:1432-1441`, `:1534`) and never
-  reads a bit, which is right for a dynamic disk and wrong for a
-  differencing one.
+  it (`src/crates/vhd/src/lib.rs:1513-1516`, stored as
+  `block_data_offset` at `:1522` and applied at `:1615-1616`) and
+  never reads a bit, which is right for a dynamic disk and wrong
+  for a differencing one. **Line references corrected by phase
+  12's survey on 2026-09-30**; the claim itself still holds, and
+  the vhd crate contains no sector-bitmap reader of any kind.
 * VHDX carries the equivalent in its sector-bitmap BAT entries,
   which the current walker deliberately skips
   (`src/crates/vhdx/src/lib.rs:1820`), and it treats
