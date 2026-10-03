@@ -23,6 +23,7 @@ for how each subsystem works internally see
 ## Input and interaction
 
 - **Multi-channel support** - Handles main, display, cursor, inputs, playback, usbredir, and webdav channels.
+- **Keyboard forwarding** - Keys are sent to the guest as PC scancodes for their physical position, so the guest's keyboard layout decides which character is typed. ryll tracks which keys it has sent as pressed: host auto-repeats of a held key are not forwarded, and held keys are released in the guest when ryll's window loses focus or a ryll dialog takes over input, so no key is left stuck down.
 - **Paste-as-keystrokes** - Type arbitrary text into guests without vdagent by translating characters into US-QWERTY scancode sequences. Cooperative timer-driven state machine keeps the inputs channel responsive during long pastes. Triggered via Ctrl+Alt+V shortcut or Menu → Paste in the GUI (when enabled). Automatically disabled when vdagent is connected. Characters are mapped to US-QWERTY scancodes; guests with a different keyboard layout will see different characters. Maximum paste length is 4096 characters. CLI flags: `--enable-paste-as-keystrokes`, `--paste-text TEXT`, `--paste-char-delay-ms N`.
 - **Screenshot capture** - Press F8 or use Menu → Screenshot to save the current display as a PNG via a native file dialog. With multiple monitors, one PNG per surface is saved with `-1`, `-2` suffixes.
 
