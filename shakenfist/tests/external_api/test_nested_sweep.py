@@ -93,6 +93,8 @@ from collections import namedtuple
 from unittest import mock
 
 from shakenfist.instance import Instance
+from shakenfist.schema.ipam_reservation import ReservationType
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests.external_api.test_required_sweep import (
     SweepFixtureTestCase)
 
@@ -102,6 +104,16 @@ HOTPLUG = 'hotplug'
 
 #: Substituted for the fixture network's uuid when a row is sent.
 NETWORK = '{network}'
+
+#: Substituted, when a row is sent, for an address on the fixture
+#: network which is free at that moment. Every row which omits
+#: ``address`` is given a *random* one from the same /24 (the setUp
+#: interface, each 507'd create, each accepted hotplug), and a create
+#: which dies at placement leaves its address behind, so any literal
+#: static address in the table is a percent-level collision per run
+#: which answers 409 ``address ... in use`` instead of the value under
+#: test (issue #4288).
+FREE_ADDRESS = '{free_address}'
 
 #: What a request answered: the status, whether an exception record was
 #: written (which is how this codebase records a server fault), and the
@@ -499,9 +511,10 @@ CASES = [
          'as an omission does. This table cannot see that; '
          'test_null_absent_sweep.py is what pins it'),
     Case('net.address.in_range', CREATE, 'networkspec', 'address',
-         {'network': [{'network_uuid': NETWORK, 'address': '10.9.8.55'}]},
+         {'network': [{'network_uuid': NETWORK, 'address': FREE_ADDRESS}]},
          ACCEPTED, ACCEPTED,
-         'width: an ordinary static address'),
+         'width: an ordinary static address, chosen when the row is sent '
+         'because a literal one collided with a random allocation (#4288)'),
     Case('net.address.out_of_range', CREATE, 'networkspec', 'address',
          {'network': [{'network_uuid': NETWORK, 'address': '192.168.1.1'}]},
          refused('network specification requests an address outside the '
@@ -873,8 +886,23 @@ class _NestedSweepMixin:
         return (ACCEPTED_ON_CREATE if case.route == CREATE
                 else ACCEPTED_ON_HOTPLUG)
 
+    def _free_address(self):
+        """An address on the fixture network nothing holds right now.
+
+        Skips the network address, the first host (the router) and the
+        broadcast address, which the network reserves for itself.
+        """
+        ipam = self.network.ipam
+        for idx in range(2, ipam.num_addresses - 1):
+            address = ipam.get_address_at_index(idx)
+            if ipam.is_free(address):
+                return address
+        self.fail('the fixture network has no free address left')
+
     def _resolve(self, value):
-        """Substitute the fixture network's uuid into a row's body."""
+        """Substitute the fixture's values into a row's body."""
+        if value == FREE_ADDRESS:
+            return self._free_address()
         if isinstance(value, str):
             return value.replace(NETWORK, str(self.network.uuid))
         if isinstance(value, dict):
@@ -978,6 +1006,28 @@ class _NestedSweepMixin:
             'as findings F5 and F6 of '
             'docs/plans/PLAN-api-input-validation-phase-07-structured.md:\n'
             + '\n'.join(mismatches))
+
+    def test_a_static_address_row_survives_a_crowded_network(self):
+        """The static address row cannot collide with a random allocation.
+
+        Issue #4288: ``net.address.in_range`` used to send a literal
+        address, and the random allocations earlier rows make on the
+        same /24 occasionally landed on it, answering 409 rather than
+        the pinned 507. Every candidate but the last is reserved here,
+        including the old literal, so the row only passes if its
+        address is chosen when it is sent.
+        """
+        ipam = self.network.ipam
+        last = ipam.num_addresses - 2
+        for idx in range(2, last):
+            address = ipam.get_address_at_index(idx)
+            if ipam.is_free(address):
+                ipam.reserve(address, (ObjectType.NETWORK, str(self.network.uuid)),
+                             ReservationType.INSTANCE, 'crowding the fixture')
+
+        case = [c for c in CASES if c.case_id == 'net.address.in_range'][0]
+        answer, _ = self._send(case, 0)
+        self.assertEqual(ACCEPTED_ON_CREATE, answer)
 
     def test_a_null_video_key_is_never_stored(self):
         """What a status code cannot see about the videospec.
