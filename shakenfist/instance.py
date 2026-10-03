@@ -2436,6 +2436,18 @@ class Instance(dbowo):
                                          'domain is not running'):
                     self.log.error('Failed to delete domain: %s', e)
 
+            # Autostart is the only thing which restarts this domain after a
+            # hypervisor reboot (S2 in docs/plans/PLAN-power-state-correctness-
+            # phase-02-autostart-restore.md), so clear it to keep a powered
+            # off instance off. A failure is recorded rather than raised (D5):
+            # the domain is off either way, and the cleaner retries the clear.
+            try:
+                inst.setAutostart(0)
+            except lc.libvirt.libvirtError as e:
+                self.add_event(
+                    EVENT_TYPE_AUDIT, 'instance autostart configuration error',
+                    extra={'message': str(e)})
+
             self.agent_state = constants.AGENT_INSTANCE_OFF
             self.update_power_state('off')
             self.add_event(EVENT_TYPE_AUDIT, 'poweroff', extra=extra)
