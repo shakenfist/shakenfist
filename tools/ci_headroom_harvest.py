@@ -110,6 +110,15 @@ LABEL_MEMBER = TRACES_PREFIX + 'headroom-label'
 # ['bundle.zip'] and the 1399 real entries are inside it.
 INNER_BUNDLE_MEMBER = 'bundle.zip'
 
+# The decompression ceiling for any single member read out of an archive.
+# A real artifact zip is about 5 MB, so this is two orders of magnitude
+# above the largest bundle ever harvested: a member declaring more is a zip
+# bomb from the harvested repository, not a measurement. The declared
+# ZipInfo.file_size is an honest ceiling to check, because CPython's
+# ZipExtFile stops returning bytes at the declared size even when the
+# compressed stream holds more.
+MAX_MEMBER_BYTES = 256 * 1024 * 1024
+
 # Every artifact this tool will even look at starts with this. A run also
 # uploads 'coverage', which is not a bundle and is not a missing bundle
 # either, so it is passed over without comment -- whereas an unrecognised
@@ -243,6 +252,13 @@ class GitHubCLI:
     rather than writing a short dataset.
     """
 
+    # How long one gh invocation may take. Without these a gh hung on a
+    # network stall hangs the harvest indefinitely with no diagnostic. A
+    # json() call returns one page of metadata; download() streams a bundle
+    # of about 5 MB, so its ceiling is minutes rather than seconds.
+    JSON_TIMEOUT = 120
+    DOWNLOAD_TIMEOUT = 1800
+
     def __init__(self, repo=DEFAULT_REPO, gh='gh', verbose=False):
         self.repo = repo
         self.gh = gh
@@ -261,7 +277,11 @@ class GitHubCLI:
         try:
             completed = subprocess.run(
                 [self.gh, 'api', full], stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE)
+                stderr=subprocess.PIPE, timeout=self.JSON_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            raise GitHubCLIError(
+                'gh api %s did not complete within %d seconds'
+                % (full, self.JSON_TIMEOUT))
         except OSError as e:
             raise GitHubCLIError(
                 'could not run %s: %s. This tool shells out to the GitHub '
@@ -292,7 +312,14 @@ class GitHubCLI:
         try:
             with open(partial, 'wb') as f:
                 completed = subprocess.run(
-                    [self.gh, 'api', full], stdout=f, stderr=subprocess.PIPE)
+                    [self.gh, 'api', full], stdout=f, stderr=subprocess.PIPE,
+                    timeout=self.DOWNLOAD_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            if os.path.exists(partial):
+                os.unlink(partial)
+            raise GitHubCLIError(
+                'gh api %s did not complete within %d seconds'
+                % (full, self.DOWNLOAD_TIMEOUT))
         except OSError as e:
             raise GitHubCLIError('could not run %s: %s' % (self.gh, e))
         if completed.returncode != 0:
@@ -334,6 +361,11 @@ def load_report(path):
     The tools/ directory is not a package and this file deliberately imports
     nothing from shakenfist, so there is no import path to reach it by. The
     report's own tests load it exactly this way.
+
+    Executing a module named by --report is code execution from a CLI
+    argument on the operator's own machine, which is what running a Python
+    script already is. Issue #4412 records it as not a finding; do not
+    re-file it.
     """
     spec = importlib.util.spec_from_file_location('ci_headroom_report', path)
     if spec is None or spec.loader is None:
@@ -545,6 +577,13 @@ def open_bundle(path):
     outer = zipfile.ZipFile(path)
     if INNER_BUNDLE_MEMBER not in outer.namelist():
         return outer
+    info = outer.getinfo(INNER_BUNDLE_MEMBER)
+    if info.file_size > MAX_MEMBER_BYTES:
+        outer.close()
+        raise HarvestError(
+            'bundle %s declares a %d byte %s, over the %d byte ceiling; '
+            'refusing to decompress it into memory'
+            % (path, info.file_size, INNER_BUNDLE_MEMBER, MAX_MEMBER_BYTES))
     inner_bytes = outer.read(INNER_BUNDLE_MEMBER)
     outer.close()
     return zipfile.ZipFile(io.BytesIO(inner_bytes))
@@ -558,12 +597,23 @@ def extract_traces(path, dest_dir):
     outcome -- a run predating phase 1, or one whose probe never started --
     and is reported by the caller, not raised here.
     """
+    # No archive-supplied name ever reaches a path here: the members
+    # iterated are module constants, the namelist is used only for a
+    # membership test, and the join is over os.path.basename() of a
+    # constant. A hostile namelist therefore has no way to traverse out
+    # of dest_dir, which is why there is no sanitisation to see.
     found = {}
     with open_bundle(path) as bundle:
         names = set(bundle.namelist())
         for member in (SERIES_MEMBER, CENSUS_MEMBER, LABEL_MEMBER):
             if member not in names:
                 continue
+            info = bundle.getinfo(member)
+            if info.file_size > MAX_MEMBER_BYTES:
+                raise HarvestError(
+                    'bundle %s declares a %d byte %s, over the %d byte '
+                    'ceiling; refusing to decompress it'
+                    % (path, info.file_size, member, MAX_MEMBER_BYTES))
             basename = os.path.basename(member)
             target = os.path.join(dest_dir, basename)
             with open(target, 'wb') as f:
@@ -688,6 +738,24 @@ def bundle_record(github, run, artifact, kind, jobs, cache_dir, report,
     return record
 
 
+def checked_artifact_id(artifact):
+    """The artifact's id as an int, refusing anything that is not one.
+
+    The id comes out of an API response body and is interpolated into a
+    cache filename and an API path, so it is outside data used to build
+    both: anything but an integer is refused before either string exists,
+    rather than embedded in a path and discovered later.
+    """
+    raw = artifact.get('id')
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        raise HarvestError(
+            'artifact %r has a non-integer id %r; refusing to build a '
+            'cache path or an API path from it'
+            % (artifact.get('name'), raw))
+
+
 def cached_artifact(github, artifact, cache_dir):
     """Return a local path to the artifact zip, downloading it if need be.
 
@@ -697,7 +765,7 @@ def cached_artifact(github, artifact, cache_dir):
     runs times four bundles at roughly 5 MB, so about 1.3 GB, and step 2d
     will not get the harvest right on the first try.
     """
-    artifact_id = artifact.get('id')
+    artifact_id = checked_artifact_id(artifact)
     os.makedirs(cache_dir, exist_ok=True)
     path = os.path.join(cache_dir, '%s.zip' % artifact_id)
     if os.path.exists(path) and zipfile.is_zipfile(path):
@@ -741,7 +809,7 @@ def harvest_run(github, run, cache_dir, report, census_limit, workdir):
         # directory would leave the second reading the first's leftovers
         # whenever it is missing a file -- which is precisely the case this
         # tool has to report accurately.
-        unpacked = os.path.join(workdir, str(artifact.get('id')))
+        unpacked = os.path.join(workdir, str(checked_artifact_id(artifact)))
         os.makedirs(unpacked, exist_ok=True)
         records.append(bundle_record(
             github, run, artifact, kind, jobs, cache_dir, report,
