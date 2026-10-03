@@ -15923,7 +15923,7 @@ verdict, and see
 <a href="/components/development/consistency-audits/">../consistency-audits.md</a> for what a run
 does.</p>
 <!-- consistency-audit:begin -->
-<p><em>Generated 2026-10-02T12:08:50.859602+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
+<p><em>Generated 2026-10-03T11:21:04.118845+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <h2 id="ci-review-automation">ci-review-automation<a class="headerlink" href="#ci-review-automation" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/ci-review-automation/">ci-review-automation.md</a></p>
 <table>
@@ -19314,7 +19314,7 @@ does.</p>
 <ul>
 <li><strong>client-python</strong> (Status): 2 of 4 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository): shakenfist_client/apiclient.py:185 -&gt; docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md, shakenfist_client/tests/test_client_apiclient.py:2320 -&gt; docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md</li>
 <li><strong>instar</strong> (Status): 2 of 269 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository): tools/ci/test-check-doc-phrases.sh:43 -&gt; PLAN-differencingflow.md, tools/ci/test-check-doc-phrases.sh:142 -&gt; /docs/plans/PLAN-example.md</li>
-<li><strong>shakenfist</strong> (Status): 2 of 410 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository): shakenfist/tests/test_plan_phase_references.py:86 -&gt; docs/plans/PLAN-thing.md, shakenfist/tests/test_plan_phase_references.py:88 -&gt; docs/other/plans/PLAN-deep.md</li>
+<li><strong>shakenfist</strong> (Status): 2 of 412 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository): shakenfist/tests/test_plan_phase_references.py:86 -&gt; docs/plans/PLAN-thing.md, shakenfist/tests/test_plan_phase_references.py:88 -&gt; docs/other/plans/PLAN-deep.md</li>
 </ul>
 <h2 id="plan-template">plan-template<a class="headerlink" href="#plan-template" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/plan-template/">plan-template.md</a></p>
@@ -20511,8 +20511,8 @@ does.</p>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4380" title="GitHub Issue: shakenfist/shakenfist #4380">shakenfist#4380</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>uncalibrated-sextant</td>
@@ -20529,7 +20529,6 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>instar</strong> (Status): 1 job(s) pass "secrets: inherit" to a reusable workflow, handing it every secret this repository holds. Declare the secrets the called workflow reads under on.workflow_call.secrets and pass those by name; if it reads none, delete the line</li>
-<li><strong>shakenfist</strong> (Status): 5 job(s) pass "secrets: inherit" to a reusable workflow, handing it every secret this repository holds. Declare the secrets the called workflow reads under on.workflow_call.secrets and pass those by name; if it reads none, delete the line</li>
 </ul>
 <h2 id="review-coverage">review-coverage<a class="headerlink" href="#review-coverage" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/review-coverage/">review-coverage.md</a></p>
@@ -20544,8 +20543,8 @@ does.</p>
 <tbody>
 <tr>
 <td>actions</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/108" title="GitHub Issue: shakenfist/actions #108">actions#108</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>agent-python</td>
@@ -20574,8 +20573,8 @@ does.</p>
 </tr>
 <tr>
 <td>development</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/216" title="GitHub Issue: shakenfist/development #216">development#216</a></td>
 </tr>
 <tr>
 <td>divergulent</td>
@@ -20624,8 +20623,8 @@ does.</p>
 </tr>
 <tr>
 <td>ryll</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/456" title="GitHub Issue: shakenfist/ryll #456">ryll#456</a></td>
 </tr>
 <tr>
 <td>sfui</td>
@@ -20651,9 +20650,10 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>actions</strong> (Status): 128 of 135 in-scope files reviewed at HEAD (6 imported from shakenfist/development); 7 need review (threshold 5)</li>
-<li><strong>kerbside</strong> (Status): 135 of 252 in-scope files reviewed at HEAD (10 imported from shakenfist/development); 117 need review (threshold 5)</li>
+<li><strong>development</strong> (Status): 196 of 203 in-scope files reviewed at HEAD; 7 need review (threshold 5)</li>
+<li><strong>kerbside</strong> (Status): 134 of 252 in-scope files reviewed at HEAD (9 imported from shakenfist/development); 118 need review (threshold 5)</li>
 <li><strong>kerbside-client</strong> (Status): 3 of 15 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 12 need review (threshold 5)</li>
+<li><strong>ryll</strong> (Status): 188 of 222 in-scope files reviewed at HEAD (10 imported from shakenfist/development); 34 need review (threshold 5)</li>
 <li><strong>sfui</strong> (Status): 3 of 52 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 49 need review (threshold 5)</li>
 </ul>
 <h2 id="review-scope-completeness">review-scope-completeness<a class="headerlink" href="#review-scope-completeness" title="Permanent link">&para;</a></h2>
@@ -21498,9 +21498,9 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>kerbside</strong> (Status): kerbside/api/static/sfui: 3 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
-<li><strong>private-ci</strong> (Status): conductor/static/sfui: 10 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
-<li><strong>ryll</strong> (Status): ryll/src/web/assets/sfui: 3 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
+<li><strong>kerbside</strong> (Status): kerbside/api/static/sfui: 5 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
+<li><strong>private-ci</strong> (Status): conductor/static/sfui: 12 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
+<li><strong>ryll</strong> (Status): ryll/src/web/assets/sfui: 5 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
 </ul>
 <h2 id="undeclared-direct-dependency">undeclared-direct-dependency<a class="headerlink" href="#undeclared-direct-dependency" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/undeclared-direct-dependency/">undeclared-direct-dependency.md</a></p>

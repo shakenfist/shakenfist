@@ -15905,7 +15905,13 @@ exclusions. Keep its skip list in sync with the <code>.vscode</code>
 whitelist in <code>.gitignore</code> and with <code>codeql-analysis.yml</code>.</p>
 <h2 id="retesting">Retesting<a class="headerlink" href="#retesting" title="Permanent link">&para;</a></h2>
 <p>Commenting <code>@shakenfist-bot please retest</code> on a pull request
-runs <code>gh workflow run ci.yml</code> against the branch. Because
+dispatches <code>ci.yml</code> against the branch. <code>pr-retest.yml</code> is the
+shared template verbatim and names no workflow itself: it
+dispatches whatever the <code>RETEST_WORKFLOW</code> repository variable
+names, and ryll sets that to <code>ci.yml</code>. Unset, it falls back to
+the fleet default <code>functional-tests.yml</code>, which ryll does not
+have, so every retest would fail with a comment saying why.
+Because
 <code>workflow_dispatch</code> runs both tiers, this exercises the merge
 tier on the branch — useful for confirming a Windows or macOS
 fix before queueing, rather than discovering it by ejection.</p>
@@ -16003,7 +16009,7 @@ consistency audit.</p>
 </tr>
 <tr>
 <td><code>codeql-analysis.yml</code></td>
-<td>CodeQL security scanning</td>
+<td>CodeQL security scanning; skipped on review-only pull requests and on pull requests from forks, which are scanned only by the post-merge push run, so a green <code>Analyze</code> on a fork pull request means skipped, not clean</td>
 </tr>
 <tr>
 <td><code>supply-chain.yml</code></td>
