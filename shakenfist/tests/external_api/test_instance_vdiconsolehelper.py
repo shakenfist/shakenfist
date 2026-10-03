@@ -60,6 +60,12 @@ class InstanceVDIConsoleHelperEndpointTestCase(base.ShakenFistTestCase):
         config.NODE_UUID = self.mock_mariadb.node_uuids['node1_net']
         self.addCleanup(self._restore_node_uuid)
 
+        # Unset by default so the tests that do not care see the mesh
+        # address fallback, whatever the environment carries.
+        self.saved_egress_ip = config.NODE_EGRESS_IP
+        config.NODE_EGRESS_IP = ''
+        self.addCleanup(self._restore_egress_ip)
+
         self.client = external_api.app.test_client()
 
         resp = self.client.post(
@@ -69,6 +75,9 @@ class InstanceVDIConsoleHelperEndpointTestCase(base.ShakenFistTestCase):
 
     def _restore_node_uuid(self):
         config.NODE_UUID = self.saved_node_uuid
+
+    def _restore_egress_ip(self):
+        config.NODE_EGRESS_IP = self.saved_egress_ip
 
     def _make_instance(self, vdi_type, ports):
         instance_uuid = str(uuid4())
@@ -110,7 +119,8 @@ class InstanceVDIConsoleHelperEndpointTestCase(base.ShakenFistTestCase):
         # accepts only 'spice' and 'vnc' as the type.
         self.assertEqual('spice', vv['type'])
 
-        # The host must be the node's connectable IP, not its UUID.
+        # The host must be a connectable IP, not the node's UUID. With no
+        # egress address configured that is the node's mesh IP.
         self.assertEqual('10.0.0.1', vv['host'])
         self.assertNotEqual(config.NODE_UUID, vv['host'])
 
@@ -122,6 +132,71 @@ class InstanceVDIConsoleHelperEndpointTestCase(base.ShakenFistTestCase):
         # same cluster CA.
         self.assertEqual('CN=node1_net', vv['host-subject'])
         self.assertEqual('1', vv['delete-this-file'])
+
+    def test_host_is_the_egress_ip_when_configured(self):
+        # The mesh network is east/west and often unroutable from where
+        # a viewer runs; the egress address is the one a client outside
+        # the cluster can reach.
+        config.NODE_EGRESS_IP = '192.168.1.53'
+        instance_uuid = self._make_instance(
+            'spice', {'vdi_port': 31002, 'vdi_tls_port': 31003})
+
+        vv = self._get_vv(instance_uuid)
+
+        self.assertEqual('192.168.1.53', vv['host'])
+
+    def test_loopback_egress_ip_falls_back_to_mesh_ip(self):
+        # 127.0.0.1 is the deployer's default for node_egress_ip, and in
+        # a .vv it would point the viewer at its own machine.
+        for egress in ('127.0.0.1', '::1'):
+            config.NODE_EGRESS_IP = egress
+            instance_uuid = self._make_instance(
+                'spice', {'vdi_port': 31002, 'vdi_tls_port': 31003})
+
+            vv = self._get_vv(instance_uuid)
+
+            self.assertEqual('10.0.0.1', vv['host'])
+
+    def test_egress_ip_is_stripped(self):
+        config.NODE_EGRESS_IP = '  192.168.1.53\n'
+        instance_uuid = self._make_instance(
+            'spice', {'vdi_port': 31002, 'vdi_tls_port': 31003})
+
+        vv = self._get_vv(instance_uuid)
+
+        self.assertEqual('192.168.1.53', vv['host'])
+
+    def test_unusable_egress_ip_falls_back_to_mesh_ip(self):
+        # SPICE and VNC listen on 0.0.0.0 only, so an IPv6 egress address
+        # has nothing behind it. The others cannot be dialled from a
+        # client, and a non-IP value is a typo in a field documented as
+        # an IP.
+        for egress in ('2001:db8::53', '0.0.0.0', '169.254.1.53',
+                       '224.0.0.53', '192.168.1.5x', 'sf-3.example.com'):
+            config.NODE_EGRESS_IP = egress
+            instance_uuid = self._make_instance(
+                'spice', {'vdi_port': 31002, 'vdi_tls_port': 31003})
+
+            vv = self._get_vv(instance_uuid)
+
+            self.assertEqual('10.0.0.1', vv['host'], egress)
+
+    def test_only_operator_mistakes_are_logged(self):
+        # The deployer's loopback default is the expected case and must
+        # not log on every console fetch; a value an operator set which
+        # is then ignored must say so.
+        for egress, expect_warning in (('127.0.0.1', False),
+                                       ('2001:db8::53', True),
+                                       ('192.168.1.5x', True)):
+            config.NODE_EGRESS_IP = egress
+            instance_uuid = self._make_instance(
+                'spice', {'vdi_port': 31002, 'vdi_tls_port': 31003})
+
+            with mock.patch('shakenfist.external_api.instance.LOG') as log:
+                self._get_vv(instance_uuid)
+
+            warned = log.with_fields.return_value.warning.called
+            self.assertEqual(expect_warning, warned, egress)
 
     def test_plain_spice_and_vnc_pass_through(self):
         for vdi_type in ('spice', 'vnc'):

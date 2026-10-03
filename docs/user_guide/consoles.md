@@ -78,6 +78,13 @@ direct network access to the hypervisor node, and is accessed at the "vdi port"
 TCP port. By default this console is SPICE since v0.7, although VNC is also
 available.
 
+The `virt-viewer` file from the `vdiconsolehelper` API call names the
+hypervisor by its egress (north/south) address, the one your cluster operator
+configured for clients outside the cluster to reach. Only if the operator has
+not configured a usable one does it fall back to the node's internal mesh
+address, which is often unreachable from outside the cluster; if your viewer
+sits at "Connecting", ask your operator to set `node_egress_ip`.
+
 You can select from 'vnc' or 'spice' (the default) by setting the `vdi` argument
 in your video specification for the instance. If you set `vdi=spiceconcurrent`, then
 experimental support for multiple users accessing the same SPICE console at the
