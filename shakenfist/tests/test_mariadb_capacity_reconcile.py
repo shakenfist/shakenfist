@@ -325,7 +325,7 @@ class ClaimUsageStatementTestCase(base.ShakenFistTestCase):
 
     def test_the_peak_is_raised_and_never_written_flat(self):
         text = str(mariadb._RECONCILE_CLAIM_USAGE_SQL)
-        # D3's one dangerous line. Written as
+        # Claim sizing phase 2b D3's one dangerous line. Written as
         # ``c.peak_used_cpus = COALESCE(u.used_cpus, 0)`` this statement
         # would pass every single-pass test and discard the peak of
         # every real workload within five minutes of it being reached,

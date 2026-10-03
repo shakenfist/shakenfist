@@ -354,8 +354,9 @@ defect is still live for `TRUSTED_ISSUER` and `MAPPING_RULE`.
 ### The peak high-water mark
 
 `namespace_claims` also carries `peak_used_cpus`, `peak_used_memory_mb`
-and `peak_used_disk_gb` (schema version 2,
-`PLAN-claim-coverage-and-sizing-phase-02b-peak-measurement.md` `D2`):
+and `peak_used_disk_gb` (schema version 2; designed in decision `D2`
+of `PLAN-claim-coverage-and-sizing-phase-02b-peak-measurement.md` in
+the `shakenfist/private-ci` repository, and described in full here):
 the largest `used_*` has ever been while the claim existed. It is
 maintained in exactly three places, and nowhere else is allowed to
 touch it:

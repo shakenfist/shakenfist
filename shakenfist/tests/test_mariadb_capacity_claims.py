@@ -230,7 +230,8 @@ class CreateNamespaceClaimTestCase(_ClaimMixin, base.ShakenFistTestCase):
         # has already reached that figure, so the mark starts there --
         # in the same INSERT, from the same migrated drawdown as used_*,
         # because the next reconcile pass would raise it from zero
-        # anyway and make the seeding look like a defect (D3).
+        # anyway and make the seeding look like a defect (claim sizing
+        # phase 2b, D3).
         router = _ClaimRouter(drawdown=(6, 6144, 60))
         result = self._run(router)
 

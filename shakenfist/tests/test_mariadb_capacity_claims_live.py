@@ -808,7 +808,7 @@ class NamespaceClaimCrudLiveTestCase(_LiveClaimFixture):
         # already holds instances starts at that drawdown in both the
         # counter and the mark, because the next reconcile pass would
         # raise the mark from zero anyway and make a zero seed look like
-        # a defect (D3).
+        # a defect (claim sizing phase 2b, D3).
         node = self._add_node()
         self._add_instance(node, cpus=4, memory_mb=4096, disk_gb=40)
         self._add_instance(node, cpus=2, memory_mb=2048, disk_gb=20)

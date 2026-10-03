@@ -465,8 +465,10 @@ EVENT_OBJECTS_VERSION = 1
 # PLAN-scheduler-reservations-phase-02-capacity-tables.md). v1: schema
 # creation.
 #
-# namespace_claims v2 adds the used_* high-water mark (see docs/plans/
-# PLAN-claim-coverage-and-sizing-phase-02b-peak-measurement.md, D2).
+# namespace_claims v2 adds the used_* high-water mark (see
+# docs/developer_guide/subsystem_internals.md, "The peak high-water
+# mark"; designed in PLAN-claim-coverage-and-sizing-phase-02b-peak-
+# measurement.md, D2, in the shakenfist/private-ci repository).
 SCHEDULER_NODE_CAPACITY_VERSION = 1
 NAMESPACE_CLAIMS_VERSION = 2
 CLUSTER_CAPACITY_VERSION = 1
@@ -3619,8 +3621,13 @@ def _get_scheduler_node_capacity_table() -> sa.Table:
 
 
 # The high-water mark columns namespace_claims v2 adds. Named once so
-# the v1-to-2 migration and the schema drift guard agree with the table
-# definition rather than each restating it.
+# the v1-to-2 migration (_add_missing_namespace_claims_columns(), which
+# takes each column's DDL from the table definition) walks exactly the
+# columns the table defines. test_namespace_claims_types in
+# test_mariadb_capacity_schema.py is the guard: it checks every name here
+# is a BigInteger NOT NULL column with a server default, and that the
+# table has no peak_* column this tuple omits, which the migration would
+# otherwise silently skip on an upgraded database.
 NAMESPACE_CLAIMS_PEAK_COLUMNS = (
     'peak_used_cpus', 'peak_used_memory_mb', 'peak_used_disk_gb')
 
@@ -3644,8 +3651,10 @@ def _get_namespace_claims_table() -> sa.Table:
     reconciler raises it, and the release path deliberately does not
     touch it. That is what makes it answer a question ``used_*`` cannot
     -- what a namespace actually consumed, asked after it has deleted
-    the instances. See docs/plans/
-    PLAN-claim-coverage-and-sizing-phase-02b-peak-measurement.md, D2.
+    the instances. See docs/developer_guide/subsystem_internals.md,
+    "The peak high-water mark"; the design is decision D2 of
+    PLAN-claim-coverage-and-sizing-phase-02b-peak-measurement.md in the
+    shakenfist/private-ci repository.
 
     ``expires_at`` and ``updated_at`` follow the cluster_locks TIMESTAMP
     idiom: server-side timestamps so the expiry sweep compares against
@@ -25270,7 +25279,7 @@ _NAMESPACE_USAGE_AGGREGATION = '''
 # peak of every real workload within five minutes of it being reached
 # -- this pass runs every five minutes, and a CI job deletes its
 # instances before anybody asks what it used. A mark that can go down
-# is not a mark (D3).
+# is not a mark (claim sizing phase 2b, D3).
 #
 # Unlike the admission drawdown, the SET order here is not load
 # bearing: the peak assignment reads ``c.peak_used_cpus``, which this
@@ -26528,7 +26537,7 @@ def _floored_namespace_decrement(
 
     Deliberately does not touch ``peak_used_*``: a high-water mark does
     not come down, and a release is exactly the event it exists to
-    survive (D2).
+    survive (claim sizing phase 2b, D2).
     """
     if claim_uuid is not None:
         table: sa.Table = _get_namespace_claims_table()
@@ -28376,7 +28385,7 @@ def _direct_create_namespace_claim(
             # already reached that figure, so a mark of zero would be
             # wrong and the next reconcile pass would raise it anyway --
             # which would make the seeding look like a defect rather
-            # than the fix (D3).
+            # than the fix (claim sizing phase 2b, D3).
             conn.execute(sa.insert(claims).values(
                 uuid=claim_key,
                 namespace=namespace,

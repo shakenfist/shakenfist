@@ -157,6 +157,12 @@ class CapacityTableDefinitionTestCase(base.ShakenFistTestCase):
             self.assertFalse(table.c[name].nullable, name)
             self.assertIsNotNone(table.c[name].server_default,
                                  f'{name} should default to zero')
+        # And the converse: a peak_* column added to the table but not
+        # to the tuple would never be added to an upgraded database,
+        # because the migration only walks the tuple.
+        self.assertEqual(
+            set(mariadb.NAMESPACE_CLAIMS_PEAK_COLUMNS),
+            {c.name for c in table.c if c.name.startswith('peak_')})
 
         self.assertIsInstance(table.c['state'].type, sa.String)
         self.assertEqual(32, table.c['state'].type.length)
@@ -269,7 +275,7 @@ class EnsureCapacitySchemaTestCase(base.ShakenFistTestCase):
 
 
 class NamespaceClaimsPeakMigrationTestCase(base.ShakenFistTestCase):
-    """The v1-to-2 high-water mark migration (phase 2b, D2).
+    """The v1-to-2 high-water mark migration (claim sizing phase 2b, D2).
 
     The DDL itself runs against a real server in
     test_mariadb_capacity_claims_live.py, which is also where the

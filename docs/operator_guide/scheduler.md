@@ -523,6 +523,16 @@ its whole claim a second time until the next reconcile pass -- five
 minutes, starting from the moment an operator does the thing claims exist
 for.
 
+The same migration is why a claim is granted or refused against
+
+    claimed + limit + GREATEST(0, unclaimed_used - migrated) <= total
+
+per dimension, where `migrated` is the drawdown being moved onto the
+claim. Reading it without that term -- "is there `total - claimed -
+unclaimed_used` left?" -- makes claims look harder to get than they are:
+a namespace is not counted against its own claim on the unclaimed side,
+because the same statement is taking it off there.
+
 ### The peak a claim ever held
 
 Alongside `used_cpus`, `used_memory_mb` and `used_disk_gb` -- what the
@@ -547,15 +557,12 @@ the point. A namespace's own capacity planning -- sizing the *next*
 claim from what the last one actually needed -- is exactly that
 question, asked after the fact.
 
-The same migration is why a claim is granted or refused against
-
-    claimed + limit + GREATEST(0, unclaimed_used - migrated) <= total
-
-per dimension, where `migrated` is the drawdown being moved onto the
-claim. Reading it without that term -- "is there `total - claimed -
-unclaimed_used` left?" -- makes claims look harder to get than they are:
-a namespace is not counted against its own claim on the unclaimed side,
-because the same statement is taking it off there.
+A database upgraded to this version adds the three columns at zero and
+does not backfill them, so a claim that already holds instances
+briefly reports a mark *below* its `used_*`. The next reconcile pass
+raises the mark to that ground truth, so it converges within one
+five-minute interval of the upgrade; a client that cannot wait can
+read `max(peak, used)` as a floor.
 
 ### Growing, shrinking, expiring and deleting
 
