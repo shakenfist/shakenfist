@@ -57,11 +57,18 @@ def _operational_error(errno):
 def _claim_row(uuid=CLAIM1, limit_cpus=16, limit_memory_mb=16384,
                limit_disk_gb=100, used_cpus=0, used_memory_mb=0,
                used_disk_gb=0):
+    # The high-water mark mirrors used_* here, which is what a claim
+    # that has only ever grown holds. It is on the row because the
+    # release path's clamp detail reads whichever columns it decrements,
+    # so a release that wrongly reached for the mark must fail on the
+    # number rather than on a missing attribute.
     return SimpleNamespace(
         uuid=uuid, namespace='ci-1', limit_cpus=limit_cpus,
         limit_memory_mb=limit_memory_mb, limit_disk_gb=limit_disk_gb,
         used_cpus=used_cpus, used_memory_mb=used_memory_mb,
-        used_disk_gb=used_disk_gb, state='active')
+        used_disk_gb=used_disk_gb, peak_used_cpus=used_cpus,
+        peak_used_memory_mb=used_memory_mb, peak_used_disk_gb=used_disk_gb,
+        state='active')
 
 
 def _capacity_row(node_uuid=NODE1, limit_cpus=48, limit_memory_mb=196608,
@@ -165,11 +172,19 @@ class _PlacementRouter:
             return self._result()
 
         if 'UPDATE namespace_claims' in text:
-            key = ('namespace_clamp' if 'greatest' in text.lower()
-                   else ('claim_update' if 'used_cpus + ' in text
-                         or '+ %s' in text and 'used_cpus=' in text
-                         and ' - %s' not in text
-                         else 'namespace_decrement'))
+            # Three writers compile against this table and the
+            # classification is on the arithmetic, not on GREATEST:
+            # since the admission drawdown raises the used_* high-water
+            # mark with GREATEST(column, column + %s), 'greatest' alone
+            # no longer tells a drawdown from the release path's
+            # GREATEST(%s, column - %s) floor. Only the release
+            # subtracts, and only its clamp leads GREATEST with a bind.
+            if ' - %s' not in text:
+                key = 'claim_update'
+            elif 'greatest(%s,' in text.lower():
+                key = 'namespace_clamp'
+            else:
+                key = 'namespace_decrement'
             return self._result(rowcount=self.rowcounts[key])
         if 'UPDATE cluster_capacity' in text:
             key = ('namespace_clamp' if 'greatest' in text.lower()
@@ -258,6 +273,44 @@ class AdmitBranchSelectionTestCase(_PlacementMixin, base.ShakenFistTestCase):
         # was created, so drawing it down again here would double count.
         self.assertFalse(any('UPDATE cluster_capacity' in u
                              for u in updates))
+
+    def test_the_drawdown_raises_the_high_water_mark(self):
+        # The claim's used_* counters carry a high-water mark, raised in
+        # the same statement that draws them down so it needs no extra
+        # round trip and no lock this transaction does not already hold.
+        router = _PlacementRouter(claim=_claim_row())
+        self._run(router)
+        [update] = [text for text in router.statements('UPDATE')
+                    if 'UPDATE namespace_claims' in text]
+        for dimension in ('cpus', 'memory_mb', 'disk_gb'):
+            self.assertIn(
+                f'peak_used_{dimension}=greatest('
+                f'namespace_claims.peak_used_{dimension}, '
+                f'namespace_claims.used_{dimension} + %s)', update)
+
+    def test_the_mark_is_assigned_before_the_counter_it_marks(self):
+        # Load bearing, and invisible in a review that reads the
+        # expression without the statement around it: MariaDB evaluates
+        # an UPDATE's assignments left to right and a later one sees the
+        # *updated* value of an earlier column, so
+        # GREATEST(peak_used_cpus, used_cpus + cpus) rendered after
+        # used_cpus=used_cpus+cpus records a peak one whole allocation
+        # too high on every admission. values() cannot express this --
+        # it renders the SET clause in table column order whatever order
+        # the keywords are written in, and the peak columns are defined
+        # after the counters they mark -- hence ordered_values(). The
+        # arithmetic itself is proven against a real server by
+        # test_mariadb_capacity_admission_live.py.
+        router = _PlacementRouter(claim=_claim_row())
+        self._run(router)
+        [update] = [text for text in router.statements('UPDATE')
+                    if 'UPDATE namespace_claims' in text]
+        sets = update.split('SET', 1)[1].split('WHERE', 1)[0]
+        for dimension in ('cpus', 'memory_mb', 'disk_gb'):
+            self.assertLess(
+                sets.index(f'peak_used_{dimension}='),
+                sets.index(f' used_{dimension}='),
+                f'peak_used_{dimension} must be assigned first: {sets}')
 
     def test_the_claim_increment_is_advisory_this_phase(self):
         # D4/D16: claim ceilings are advisory for one release, so the
@@ -1036,6 +1089,24 @@ class ReleaseTestCase(_PlacementMixin, base.ShakenFistTestCase):
                             for u in updates))
         self.assertEqual(1, len([text for text, _ in router.executed
                                  if text.startswith('DELETE')]))
+
+    def test_a_release_leaves_the_high_water_mark_alone(self):
+        # A high-water mark does not come down, and a release is exactly
+        # the event it exists to survive: the whole defect it answers is
+        # a namespace that deleted its instances before anybody asked
+        # what it used. Neither the guarded decrement nor its clamp may
+        # name the mark.
+        router = _PlacementRouter(claim=_claim_row(used_cpus=8),
+                                  reference_nodes=[NODE1],
+                                  rowcounts={'namespace_decrement': 0})
+        self._run(router)
+        claim_updates = [text for text in router.statements('UPDATE')
+                         if 'UPDATE namespace_claims' in text]
+        # Both the guarded decrement and the clamp behind it ran.
+        self.assertEqual(2, len(claim_updates), claim_updates)
+        for update in claim_updates:
+            self.assertIn('used_cpus=', update)
+            self.assertNotIn('peak_used', update)
 
     def test_release_runs_in_canonical_order(self):
         # The same order admission uses (cluster or claim, then node), so

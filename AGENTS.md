@@ -88,6 +88,19 @@ metrics. The headlines:
   on the pull request — see
   [docs/developer_guide/standards.md](docs/developer_guide/standards.md#a-guarded-update-must-be-the-transactions-first-statement).
 
+- **SQLAlchemy's `values()` renders an `UPDATE`'s `SET` clause in table
+  column order, not call order.** MariaDB evaluates that `SET`
+  left to right, so when one assignment's expression reads a column
+  another assignment also sets — a running peak read against the
+  counter it tracks, for example — `values()` silently uses the
+  *column order*, not the order you wrote the keyword arguments in, to
+  decide which one sees the pre- or post-update value. Use
+  `ordered_values()` and list the one that must read the old value
+  first. See
+  [docs/developer_guide/subsystem_internals.md](docs/developer_guide/subsystem_internals.md#the-peak-high-water-mark),
+  where getting this wrong recorded a peak one whole allocation too
+  high on every admission.
+
 - **Protobuf enums are generated, not hand-written.**
   `shakenfist/schema/` is the source of truth. Add a member with the next
   available `proto_id`, run `tox -e genprotos`, and never change or reuse
