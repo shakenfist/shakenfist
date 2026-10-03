@@ -162,8 +162,13 @@ In `_update_inactive_domain()` (`daemons/cleaner/scheduled_tasks.py:334`):
   off before now left autostart set.
 * `:429-456`: the locked branch which records a detected power off.
 
-The caller (`:558-568`) catches `libvirtError` per domain, logs it and
-moves on, so a `setAutostart()` failure skips that domain for one pass.
+The plan first said the caller (`:558-568`) catches `libvirtError` per
+domain. It does not: the `try` wraps the whole loop, so one failed
+`setAutostart()` would have ended the pass for every domain listed after
+it. Step 2 found this and gave the call to `_update_inactive_domain()`
+its own `try`, which logs the error and moves to the next domain; the
+next pass retries.
+
 `domain.autostart()` and `setAutostart()` are local libvirt calls, so
 the already-off branch costs no database load. It takes the node lock
 once for each domain that still has the flag set.
@@ -384,8 +389,9 @@ In `_update_inactive_domain()`:
   * Put that in a small helper if it reads better, but keep the
     unlocked `autostart()` check outside the lock.
 * Do not catch `libvirtError` here. The caller (around line 566)
-  already logs it and moves to the next domain, and the next pass
-  retries.
+  logs it and moves to the next domain, and the next pass retries.
+  (As planned, this said the caller already did that. It did not, and
+  step 2 added the per-domain catch; see S7.)
 
 In `shakenfist/tests/test_daemon_cleaner.py`:
 
