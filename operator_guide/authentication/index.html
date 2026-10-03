@@ -15205,8 +15205,10 @@ than <code>NAMESPACE_KEY_REAP_GRACE</code> seconds ago; the standard object reap
 hard-deletes them once they have been soft-deleted for <code>CLEANER_DELAY</code>. A key
 whose static row has no state row at all (a "zombie", see the orphan
 reconciliation section of the <a href="../database/">database guide</a>) is skipped by
-this sweep — the hourly orphan reconciliation repairs it, after which the
-normal reap path removes it.</p>
+this sweep — the hourly orphan reconciliation repairs it. A zombie key which
+is still live is repaired to <code>created</code>, never deleted, after which the expiry
+sweep governs it normally. Re-running <code>sf-ctl bootstrap-system-key</code> for an
+existing key also heals a missing state row.</p>
 <table>
 <thead>
 <tr>

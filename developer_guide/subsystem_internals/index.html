@@ -15179,8 +15179,12 @@ cluster capacity nothing can release.</p>
 are load bearing for the orphan reconciler: zombie repair marks the
 static row deleted and then hydrates it through <code>get_object_class()</code> to
 collect it, so registering only the first trades one leak for another.
-<code>NAMESPACE_KEY</code> missing from the first is issue 3588, and the same
-defect is still live for <code>TRUSTED_ISSUER</code> and <code>MAPPING_RULE</code>.</p>
+<code>NAMESPACE_KEY</code> missing from the first is issue 3588. A new type must
+also decide its <code>zombie_repair_state()</code>: the default repairs a stateless
+row to <code>deleted</code>, which is wrong for anything that works without a
+state row. <code>test_zombie_repair_state_overrides_are_pinned</code> in
+<code>test_mariadb_orphans.py</code> names the overriding types, so adding one
+means updating it deliberately.</p>
 <h2 id="node-resource-health">Node resource health<a class="headerlink" href="#node-resource-health" title="Permanent link">&para;</a></h2>
 <p>Node storage health drives <code>node.state</code>, on a different axis from the
 daemon-liveness watchdog below. <code>shakenfist/resource_health.py</code> is the
