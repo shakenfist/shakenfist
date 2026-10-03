@@ -40,6 +40,17 @@ After=sf-nodelock.service
 After=sf-database.service
 Before=sf-sentinel-last.service
 {% endif%}
+# Every daemon also orders after libvirt-guests.service, regardless of the
+# chain above. systemd stops units in the reverse of their start order, so
+# this guarantees that every SF daemon stops before libvirt-guests shuts
+# guests down at host shutdown. The cleaner must not see that shutdown, or
+# it would record every guest as powered off and clear its autostart flag,
+# and the reboot would leave them all powered off. The chain above through
+# sf-database does not guarantee this on a node which runs no sf-database,
+# because ordering against a unit which is not loaded does nothing. See
+# docs/plans/PLAN-power-state-correctness-phase-02-autostart-restore.md,
+# sections S3 and D3.
+After=libvirt-guests.service
 PartOf=sf.target
 
 [Service]
