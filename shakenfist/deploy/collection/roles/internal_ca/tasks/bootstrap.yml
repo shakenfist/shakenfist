@@ -5,12 +5,26 @@
 - name: Validate the role's parameters
   ansible.builtin.include_tasks: validate.yml
 
+# The control node may be unprivileged (sfcbr deploys with become disabled
+# for localhost), so only touch apt when a tool is actually missing. Even
+# with both installed, an apt task is not a no-op: it runs apt-mark manual
+# on a package installed as a dependency (openssl usually is), and with
+# state: latest it upgrades whatever has a newer candidate. Both need root.
+- name: Check whether the CA setup tools are already installed
+  ansible.builtin.shell: command -v certtool && command -v openssl
+  register: ca_tools
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags: [packages]
+
 - name: Install CA setup tools
   ansible.builtin.apt:
     name:
       - gnutls-bin
       - openssl
-    state: latest
+    state: present
+  when: ca_tools.rc != 0
   register: apt_action
   retries: 100
   until: >-
