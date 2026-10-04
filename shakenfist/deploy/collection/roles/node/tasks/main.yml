@@ -15,6 +15,12 @@
 # Invoke each via include_role with tasks_from set to the entry point name. The
 # default main entry point runs all three in order, which is correct for a
 # single-host deployment.
+#
+# Two further entry points run once per cluster rather than per host, from the
+# consuming playbook's cluster config play, and are not part of main:
+# kerbside_preflight (before any cluster_config write) and kerbside_credentials
+# (before any daemon restarts). Both do nothing unless the Kerbside variables
+# are set.
 - name: Bootstrap the node
   ansible.builtin.include_tasks: bootstrap.yml
 

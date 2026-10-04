@@ -58,11 +58,33 @@ loki_tenant: ""
 loki_auth_header: ""
 
 # Kerbside VDI console proxy base URL. Empty leaves the proxied-console
-# integration off. The value is also the minted token's audience claim, so it
-# must equal the Kerbside deployment's SF_CONSOLE_TOKEN_AUDIENCE exactly.
-# Deploying Kerbside itself, and provisioning the signing key with
-# sf-ctl ensure-kerbside-signing-key, remain the operator's job.
+# integration off, and the kerbside_preflight and kerbside_credentials entry
+# points do nothing at all. The value is also the minted token's audience
+# claim, so it must equal the Kerbside deployment's SF_CONSOLE_TOKEN_AUDIENCE
+# exactly. When it is set, the deploy ensures the console token signing key
+# exists (sf-ctl ensure-kerbside-signing-key) before any daemon restarts, and
+# refuses to run while a KERBSIDE_URL or KERBSIDE_TOKEN_DURATION cluster_config
+# row differs from these variables, because such a row would silently override
+# them. Deploying Kerbside itself is still a separate job.
 kerbside_url: ""
+
+# Lifetime in seconds of a minted console token. Rendered beside
+# SHAKENFIST_KERBSIDE_URL, and only with it: a duration without a URL means
+# nothing. Matches the server default.
+kerbside_token_duration: 300
+
+# The key Kerbside authenticates to Shaken Fist with, minted as the "kerbside"
+# key in the system namespace. A secret. Empty mints nothing. When set (which
+# requires kerbside_url) it is minted on every deploy, as system_key is minted
+# as the "deploy" key, so changing it rotates it. Removing it does not delete
+# the key -- a secrets file which failed to decrypt looks just like a removed
+# variable -- so revoke it with sf-client namespace delete-key system kerbside.
+kerbside_system_key: ""
+
+# The sf-ctl which the kerbside_preflight and kerbside_credentials entry points
+# run. A variable only so a test can substitute a stub; the rest of the role
+# uses the literal path.
+sf_ctl_path: /srv/shakenfist/venv/bin/sf-ctl
 
 # Extra certificate authorities to trust when fetching a federated identity
 # provider's JWKS. Empty means the system trust store alone. Set this to a

@@ -1,0 +1,113 @@
+---
+# Refuse a Kerbside configuration which a cluster_config row would shadow.
+#
+# A cluster_config row overrides /etc/sf/config at process start, so a
+# KERBSIDE_URL or KERBSIDE_TOKEN_DURATION row which differs from kerbside_url
+# or kerbside_token_duration means this deploy renders one value and every
+# daemon silently runs with another. Operators reach such rows two documented
+# ways: sf-ctl set-config by hand, and extra_config, which the cluster config
+# play itself writes on every deploy. So this runs once per cluster, before
+# that play's first set-config, and checks both sources for both names.
+#
+# With kerbside_url empty it does nothing at all -- not even the show-config
+# -- so a cluster which never turned the feature on, or which configures it
+# purely through sf-ctl set-config, is not touched.
+#
+# Every command is delegated to cluster_db_host, which the consuming playbook
+# passes (the first database-tier host, which has direct database access), so
+# the entry point reads no inventory groups. The sf-ctl path is a variable so a
+# test can drive this against a stub without root or a cluster.
+- name: Check the Kerbside configuration against cluster_config
+  when: kerbside_url | length > 0
+  vars:
+    # The settings guarded, each with the variable which should be its only
+    # source. Values are compared as strings: set-config stores 300 as an
+    # integer, and a -e on the command line passes the variable as a string.
+    kerbside_preflight_settings:
+      - name: KERBSIDE_URL
+        variable: kerbside_url
+        value: "{{ kerbside_url | string }}"
+      - name: KERBSIDE_TOKEN_DURATION
+        variable: kerbside_token_duration
+        value: "{{ kerbside_token_duration | string }}"
+  block:
+    - name: Require a positive Kerbside token duration
+      ansible.builtin.assert:
+        that: kerbside_token_duration | int > 0
+        fail_msg: >-
+          kerbside_token_duration is {{ kerbside_token_duration }}, but must be
+          a positive number of seconds.
+        quiet: true
+
+    # The cluster config play applies extra_config with set-config later in
+    # this same run, so a guard which only read existing rows would pass on
+    # the first deploy and then find the shadow the play had written itself.
+    - name: Refuse Kerbside settings in extra_config
+      ansible.builtin.fail:
+        msg: >-
+          extra_config sets {{ item.name }}, which the deploy would write as a
+          cluster_config row overriding {{ item.variable }} on every node.
+          Remove the {{ item.name }} entry from extra_config and set
+          {{ item.variable }} instead.
+      loop: "{{ kerbside_preflight_settings }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.name in (extra_config | from_json | map(attribute='name') | list)
+
+    # Never --show-secrets: that would put every cluster secret into a
+    # registered variable to read two values which are not secret. Numbers
+    # are shown since sf-ctl stopped redacting them; an older sf-ctl still
+    # shows the duration as <redacted>, which then fails as different below.
+    # A read, so it also runs in check mode, where the guard is still wanted.
+    - name: Read the cluster configuration rows
+      ansible.builtin.command: "{{ sf_ctl_path }} show-config"
+      delegate_to: "{{ cluster_db_host }}"
+      changed_when: false
+      check_mode: false
+      register: kerbside_preflight_show_config
+
+    - name: Warn about cluster_config rows which repeat a Kerbside variable
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: the cluster_config row {{ item.name }} repeats
+          {{ item.variable }} ({{ item.value }}), so it is left alone. It is
+          redundant, and it would stop a later deploy which changes
+          {{ item.variable }}. Remove it with:
+          sf-ctl unset-config {{ item.name }}
+      loop: "{{ kerbside_preflight_settings }}"
+      loop_control:
+        label: "{{ item.name }}"
+      vars:
+        kerbside_preflight_rows: "{{ kerbside_preflight_show_config.stdout | from_json }}"
+      when:
+        - item.name in kerbside_preflight_rows
+        - (kerbside_preflight_rows[item.name] | string) == item.value
+
+    # Fails every differing row in one run rather than stopping at the first,
+    # so an operator with both rows sees both fixes.
+    - name: Refuse cluster_config rows which differ from a Kerbside variable
+      ansible.builtin.fail:
+        msg: >-
+          {% if (kerbside_preflight_rows[item.name] | string) == '<redacted>' -%}
+          The cluster_config row {{ item.name }} exists, but this sf-ctl
+          redacts its value, so the deploy cannot tell whether it matches
+          {{ item.variable }} ({{ item.value }}). The installed sf-ctl is older
+          than this collection.
+          {%- else -%}
+          The cluster_config row {{ item.name }} is
+          '{{ kerbside_preflight_rows[item.name] }}', but {{ item.variable }} is
+          '{{ item.value }}'.
+          {%- endif %}
+          The row overrides /etc/sf/config at process start, so every daemon
+          would ignore {{ item.variable }}. If {{ item.variable }} is right,
+          remove the row on {{ cluster_db_host }} with:
+          sf-ctl unset-config {{ item.name }}
+          and run the deploy again; nothing has been written yet.
+      loop: "{{ kerbside_preflight_settings }}"
+      loop_control:
+        label: "{{ item.name }}"
+      vars:
+        kerbside_preflight_rows: "{{ kerbside_preflight_show_config.stdout | from_json }}"
+      when:
+        - item.name in kerbside_preflight_rows
+        - (kerbside_preflight_rows[item.name] | string) != item.value

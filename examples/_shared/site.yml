@@ -22,8 +22,10 @@
 # Operator-supplied cluster variables (set in group_vars/all or on the command
 # line) include: auth_secret, system_key, deploy_name, dns_server, http_proxy,
 # extra_config, floating_network_ipblock, mariadb_* (for the database tier),
-# and the optional sf_build_local_wheels / repo_path / client_repo_path for a
-# git-checkout deploy.
+# the optional Kerbside integration's kerbside_url, kerbside_token_duration and
+# kerbside_system_key (a secret, minted as the system namespace's "kerbside"
+# key), and the optional sf_build_local_wheels / repo_path / client_repo_path
+# for a git-checkout deploy.
 
 
 # ---------------------------------------------------------------------------
@@ -524,6 +526,17 @@
     extra_config: "[]"
     cluster_db_host: "{{ database_tier_hosts[0] }}"
   tasks:
+    # First, before any set-config: refuse to deploy a kerbside_url or
+    # kerbside_token_duration which a cluster_config row (existing, or about to
+    # be written from extra_config below) would silently override. Does nothing
+    # unless kerbside_url is set. cluster_db_host and extra_config reach the
+    # role as this play's vars; passing them again as include vars would be a
+    # recursive template.
+    - name: Check the Kerbside configuration against cluster_config
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.node
+        tasks_from: kerbside_preflight
+
     # The seed is passed on stdin rather than as an argument so it never
     # appears in the process table on the database host.
     - name: Set the auth secret seed
@@ -603,6 +616,19 @@
       delegate_to: "{{ cluster_db_host }}"
       changed_when: true
       no_log: true
+
+    # The Kerbside console token signing key (when kerbside_url is set) and
+    # the system namespace's "kerbside" key (when kerbside_system_key is
+    # set). Here, before plays 6b and 6c restart any daemon, so an sf-api
+    # restarted with KERBSIDE_URL set always finds a signing key. node_mesh_ip
+    # is passed because the role would otherwise see the run_once host's own,
+    # which need not be cluster_db_host's.
+    - name: Mint the Kerbside signing key and system namespace credential
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.node
+        tasks_from: kerbside_credentials
+      vars:
+        node_mesh_ip: "{{ hostvars[cluster_db_host]['node_mesh_ip'] }}"
 
 
 # ---------------------------------------------------------------------------
