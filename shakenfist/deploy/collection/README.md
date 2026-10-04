@@ -18,7 +18,7 @@ another host's facts, so the roles compose cleanly with any inventory layout.
 | `shakenfist.shakenfist.node` | Core per-node setup: OS packages, `/etc/sf/config`, `sfrc`, the global auth file, all `sf-*` systemd units, and registration of the node and its daemons. Folds in the database capability: when `node_is_database_node` is true it also writes, registers and starts `sf-database`. Has `bootstrap`, `config` and `register` entry points (run them as separate plays to order database-tier hosts first). The `bootstrap` entry point creates the `/srv/shakenfist` virtualenv and installs the `shakenfist` server and client packages (override `server_package`/`client_package`/`pip_extra` to install local wheels for local/CI). Re-running the role is **restart-on-change**: it only restarts a node's daemons when the installed code, `/etc/sf/config`, or a systemd unit actually changed (see [Idempotence and restart-on-change](#idempotence-and-restart-on-change)). |
 | `shakenfist.shakenfist.hypervisor` | Hypervisor host preparation: nested KVM detection/enable, KSM, `vhost_vsock`, SPICE TLS, and the libvirt AppArmor/config tweaks. Apply only to hosts where `node_is_hypervisor` is true. |
 | `shakenfist.shakenfist.network` | Network node preparation: removes the distro `dnsmasq` unit, installs the DHCP/DNS templates, enables IPv4 forwarding, and validates the mesh interface MTU. Apply only to hosts where `node_is_network_node` is true. |
-| `shakenfist.shakenfist.internal_ca` | Internal certificate authority: generates a CA on the control node, issues a per-host SPICE TLS certificate, and distributes the certificates to each host. |
+| `shakenfist.shakenfist.internal_ca` | Internal certificate authority: generates a CA on the control node, then issues a certificate for any host, SPICE TLS by default, and distributes the certificates to it (see [Certificates](#certificates)). |
 
 ## Idempotence and restart-on-change
 
@@ -115,9 +115,80 @@ it could not find, rather than raising an `AttributeError`. Every other
 module in the collection works with the released client.
 
 The `internal_ca` role generates certificates on the control node with
-`certtool` from the `gnutls-bin` package (Debian/Ubuntu). The role installs it
+`certtool` from the `gnutls-bin` package (Debian/Ubuntu), and checks their
+expiry there with `openssl` from the `openssl` package. The role installs both
 via apt when its control-node tasks run with root; rootless deploys must
-install it beforehand.
+install them beforehand.
+
+## Certificates
+
+The `internal_ca` role generates a certificate authority on the control node
+and signs a host certificate with it. By default it issues the SPICE TLS
+certificate for a hypervisor and installs the CA certificate, host certificate
+and host key into `/etc/pki/libvirt-spice/` as `ca-cert.pem`, `server-cert.pem`
+and `server-key.pem`. The role can issue a certificate for any host: the
+parameters below choose the name, subject names, lifetime and install location.
+Certificates are issued with an explicit lifetime of `cert_expiration_days`,
+365 days by default. The SPICE private key is still installed mode `0444` by
+default (issue 4416 tracks changing that).
+
+Renewal happens during a deploy (a `site.yml` run), and only then. A
+certificate is reissued when the control node's copy expires within
+`cert_renew_days` (default 90) days, or when the rendered certtool template
+changes (the common name, the subject alternative names or the lifetime). The
+existing key is reused, and the old certificate is kept beside the new one on
+the control node as `<host_cert_path>.<UTC timestamp>`, where the timestamp is
+formatted `YYYYmmddHHMMSS`. The role never deletes these set-aside copies, so
+one accumulates per host per reissue; prune them yourself if you need to, and
+expect them to appear as new files if `ca_path` is under version control. The
+template is only rewritten after the old certificate has been set aside, so a
+deploy interrupted part way through a reissue repeats it next time rather than
+forgetting it. A cluster therefore needs a deploy at least once inside each
+renewal window: with the defaults, at least once in the last 90 days before a
+certificate expires.
+
+Until this release, renewal never worked (issue 4415), and certtool's default
+lifetime of 365 days applied silently, so every SPICE certificate the
+collection issued expired one year after the first deploy. The first deploy
+after upgrading reissues every host's certificate, with the same key and
+subject, because the template gained an explicit lifetime. Pinning by CA and
+host subject is unaffected, and running instances are not disturbed.
+
+QEMU loads SPICE TLS certificates once, when the instance starts, and never
+reloads them. An instance started before a renewal therefore keeps presenting
+its old certificate until its QEMU process restarts, and fails TLS verification
+if it is still running when that certificate expires. A live migration starts a
+new QEMU process on the destination, which loads the current files, so it
+refreshes the certificate without a restart. To check the certificate a host
+will hand to new instances:
+
+```bash
+openssl x509 -in /etc/pki/libvirt-spice/server-cert.pem -noout -enddate
+```
+
+| Parameter | Default | Purpose |
+|-----------|---------|---------|
+| `cert_name` | `hostname` | Name used for the host's file names on the control node. |
+| `cert_cn` | `hostname` | Subject common name of the certificate. |
+| `cert_san_dns` | `[]` | Extra DNS subject alternative names. |
+| `cert_san_ip` | `[]` | Extra IP subject alternative names. |
+| `cert_expiration_days` | `365` | Lifetime in days of an issued certificate. |
+| `cert_renew_days` | `90` | Reissue when fewer than this many days remain. |
+| `cert_dest_dir` | `/etc/pki/libvirt-spice` | Directory on the host the files are installed into. |
+| `cert_dest_ca_name` | `ca-cert.pem` | File name of the CA certificate. |
+| `cert_dest_cert_name` | `server-cert.pem` | File name of the host certificate. |
+| `cert_dest_key_name` | `server-key.pem` | File name of the host private key. |
+| `cert_owner` | `root` | Owner of the installed files. |
+| `cert_group` | `root` | Group of the installed files. |
+| `cert_mode` | `'0444'` | Mode of the installed CA and host certificates. |
+| `cert_key_mode` | `'0444'` | Mode of the installed host private key. |
+
+The modes must be quoted four digit octal strings, as the defaults are: YAML
+reads an unquoted `0400` as the integer 256, which can end up installed as mode
+`0256`, so the role refuses it. The role also refuses a `deploy_name`,
+`cert_cn` or subject alternative name containing a newline, since each is
+written into a certtool template as a line of its own, and a `cert_name` or
+`cert_dest_*_name` that is not a plain file name.
 
 ## Consuming the collection
 

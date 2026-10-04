@@ -1,27 +1,31 @@
 ---
 # Copy the CA certificate and this host's key/certificate (generated on the
-# control node by host_certificate.yml) onto {{ hostname }} for libvirt's SPICE
-# TLS to use.
+# control node by host_certificate.yml) onto {{ hostname }}. By default these
+# land in /etc/pki/libvirt-spice for libvirt's SPICE TLS to use.
+
+- name: Validate the role's parameters
+  ansible.builtin.include_tasks: validate.yml
 
 - name: Create /etc/pki/CA
   ansible.builtin.file:
     path: /etc/pki/CA
     state: directory
     mode: '0755'
+  tags: [system-dirs]
 
-- name: Create /etc/pki/libvirt-spice
+- name: Create the certificate destination directory
   ansible.builtin.file:
-    path: /etc/pki/libvirt-spice
+    path: "{{ cert_dest_dir }}"
     state: directory
     mode: '0755'
 
 - name: Copy CA certificate to host
   ansible.builtin.copy:
     src: "{{ ca_cert_path }}"
-    dest: /etc/pki/libvirt-spice/ca-cert.pem
-    owner: root
-    group: root
-    mode: '0444'
+    dest: "{{ cert_dest_dir }}/{{ cert_dest_ca_name }}"
+    owner: "{{ cert_owner }}"
+    group: "{{ cert_group }}"
+    mode: "{{ cert_mode }}"
 
 # The host key is generated on the control node as root, mode 0400 (umask 277
 # in host_certificate.yml), so a controller-side `copy: src:` read fails when
@@ -40,16 +44,16 @@
 - name: Install host key on host
   ansible.builtin.copy:
     content: "{{ host_key_material.content | b64decode }}"
-    dest: /etc/pki/libvirt-spice/server-key.pem
-    owner: root
-    group: root
-    mode: '0444'
+    dest: "{{ cert_dest_dir }}/{{ cert_dest_key_name }}"
+    owner: "{{ cert_owner }}"
+    group: "{{ cert_group }}"
+    mode: "{{ cert_key_mode }}"
   no_log: true
 
 - name: Copy host certificate to host
   ansible.builtin.copy:
     src: "{{ host_cert_path }}"
-    dest: /etc/pki/libvirt-spice/server-cert.pem
-    owner: root
-    group: root
-    mode: '0444'
+    dest: "{{ cert_dest_dir }}/{{ cert_dest_cert_name }}"
+    owner: "{{ cert_owner }}"
+    group: "{{ cert_group }}"
+    mode: "{{ cert_mode }}"

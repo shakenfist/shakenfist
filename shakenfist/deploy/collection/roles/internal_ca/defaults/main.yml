@@ -13,6 +13,35 @@ ca_cert_path: "{{ ca_path }}/{{ deploy_name }}-ca-cert.pem"
 ca_key_path: "{{ ca_path }}/{{ deploy_name }}-ca-key.pem"
 ca_template_path: "{{ ca_path }}/{{ deploy_name }}-ca-template.info"
 
-host_cert_path: "{{ ca_path }}/{{ hostname }}-server-cert.pem"
-host_key_path: "{{ ca_path }}/{{ hostname }}-server-key.pem"
-host_template_path: "{{ ca_path }}/{{ hostname }}-server-template.pem"
+host_cert_path: "{{ ca_path }}/{{ cert_name }}-server-cert.pem"
+host_key_path: "{{ ca_path }}/{{ cert_name }}-server-key.pem"
+host_template_path: "{{ ca_path }}/{{ cert_name }}-server-template.pem"
+
+# Name used for the per-host file names on the control node.
+cert_name: "{{ hostname }}"
+# Subject common name of the issued certificate.
+cert_cn: "{{ hostname }}"
+# Extra DNS subject alternative names, one dns_name line each.
+cert_san_dns: []
+# Extra IP subject alternative names, one ip_address line each.
+cert_san_ip: []
+# Lifetime in days of an issued certificate.
+cert_expiration_days: 365
+# Reissue the certificate when fewer than this many days remain.
+cert_renew_days: 90
+# Directory on the target host the CA, certificate and key are installed into.
+cert_dest_dir: "/etc/pki/libvirt-spice"
+# File name of the CA certificate within cert_dest_dir.
+cert_dest_ca_name: "ca-cert.pem"
+# File name of the host certificate within cert_dest_dir.
+cert_dest_cert_name: "server-cert.pem"
+# File name of the host private key within cert_dest_dir.
+cert_dest_key_name: "server-key.pem"
+# Owner of the installed files.
+cert_owner: "root"
+# Group of the installed files.
+cert_group: "root"
+# Mode of the installed CA and host certificates.
+cert_mode: "0444"
+# Mode of the installed host private key.
+cert_key_mode: "0444"
