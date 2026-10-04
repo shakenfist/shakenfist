@@ -31,6 +31,7 @@ from shakenfist import mariadb
 
 class FakeConfig(BaseSettings):
     STORAGE_PATH: str = '/srv/shakenfist'
+    NODE_NAME: str = 'sf-1'
 
 
 class BlobDataTestCase(base.ShakenFistTestCase):
@@ -362,8 +363,9 @@ class ObserveLocalBlobsTestCase(base.ShakenFistTestCase):
     (github issue 3490).
     """
 
+    @mock.patch('shakenfist.mariadb.get_node_blob_uuids', return_value=[])
     @mock.patch('shakenfist.blob.Blob.from_db', return_value=None)
-    def test_non_uuid_names_are_skipped(self, mock_from_db):
+    def test_non_uuid_names_are_skipped(self, mock_from_db, mock_node_blobs):
         tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(tempdir.cleanup)
 
@@ -385,6 +387,106 @@ class ObserveLocalBlobsTestCase(base.ShakenFistTestCase):
 
         mock_from_db.assert_called_once_with(
             blob_uuid, suppress_failure_audit=True)
+
+
+class ObserveLocalBlobsUsageTestCase(base.ShakenFistTestCase):
+    """Presence on disk is not use (github issue 4440).
+
+    observe_local_blobs() runs every five minutes on every node. If it
+    refreshes last_used for every local blob, a blob with N copies is
+    refreshed about every 300/N seconds and an unreferenced replicated
+    blob never ages past the reaper's grace period.
+    """
+
+    RECORDED = '12345678-1234-4321-8234-123456789012'
+    NEW = '87654321-4321-4123-8321-210987654321'
+
+    def setUp(self):
+        super().setUp()
+        tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(tempdir.cleanup)
+        self.storage_path = tempdir.name
+
+        for blob_uuid in [self.RECORDED, self.NEW]:
+            shard = os.path.join(self.storage_path, 'blobs', blob_uuid[:2])
+            os.makedirs(shard)
+            with open(os.path.join(shard, blob_uuid), 'w') as f:
+                f.write('...')
+
+        self.blobs = {}
+        for blob_uuid in [self.RECORDED, self.NEW]:
+            b = mock.MagicMock()
+            b.state.value = blob.Blob.STATE_CREATED
+            self.blobs[blob_uuid] = b
+
+        patcher = mock.patch(
+            'shakenfist.blob.Blob.from_db',
+            side_effect=lambda u, **kwargs: self.blobs[u])
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _observe(self):
+        with mock.patch('shakenfist.blob.config',
+                        FakeConfig(STORAGE_PATH=self.storage_path,
+                                   NODE_NAME='sf-1')):
+            self.assertEqual(2, blob.observe_local_blobs())
+
+    @mock.patch('shakenfist.mariadb.get_node_blob_uuids')
+    def test_only_new_locations_count_as_usage(self, mock_node_blobs):
+        mock_node_blobs.return_value = [self.RECORDED]
+        self._observe()
+
+        mock_node_blobs.assert_called_once_with('sf-1')
+        self.blobs[self.RECORDED].observe.assert_called_once_with(
+            already_recorded=True)
+        self.blobs[self.NEW].observe.assert_called_once_with(
+            already_recorded=False)
+
+    @mock.patch('shakenfist.mariadb.get_node_blob_uuids',
+                side_effect=exceptions.DatabaseUnavailable('nope'))
+    def test_unreadable_locations_count_as_usage(self, mock_node_blobs):
+        """A failed read must only ever make blobs look newer."""
+        self._observe()
+
+        for b in self.blobs.values():
+            b.observe.assert_called_once_with(already_recorded=False)
+
+
+class BlobAddLocationTestCase(base.ShakenFistTestCase):
+    """add_location() stamps last_used only for a new location (issue 4440)."""
+
+    @mock.patch('shakenfist.baseobject.get_minimum_object_version',
+                return_value=blob.Blob.current_version)
+    @mock.patch('shakenfist.mariadb.get_state',
+                return_value=State(value='created', update_time=1234567890.0))
+    def setUp(self, mock_get_state, mock_get_min):
+        super().setUp()
+        self.blob = blob.Blob(BlobData(
+            uuid='12345678-1234-4321-8234-123456789012',
+            modified=1234567890.0,
+            fetched_at=1234567891.0,
+            version=blob.Blob.current_version
+        ))
+
+    @mock.patch('shakenfist.mariadb.record_relationship')
+    @mock.patch('shakenfist.blob.Blob.record_usage')
+    def test_new_location_counts_as_usage(self, mock_usage, mock_record):
+        self.blob.add_location('sf-1')
+
+        mock_usage.assert_called_once_with()
+        mock_record.assert_called_once_with(
+            ObjectType.NODE, 'sf-1', RelationshipType.BLOB_LOCATION, None,
+            ObjectType.BLOB, self.blob.uuid)
+
+    @mock.patch('shakenfist.mariadb.record_relationship')
+    @mock.patch('shakenfist.blob.Blob.record_usage')
+    def test_recorded_location_is_not_usage(self, mock_usage, mock_record):
+        self.blob.add_location('sf-1', already_recorded=True)
+
+        mock_usage.assert_not_called()
+        mock_record.assert_called_once_with(
+            ObjectType.NODE, 'sf-1', RelationshipType.BLOB_LOCATION, None,
+            ObjectType.BLOB, self.blob.uuid)
 
 
 class BlobFromDbMalformedUuidTestCase(base.ShakenFistTestCase):

@@ -48,6 +48,7 @@ from shakenfist.exceptions import BlobDependencyMissing
 from shakenfist.exceptions import BlobFetchFailed
 from shakenfist.exceptions import BlobMissing
 from shakenfist.exceptions import BlobsMustHaveContent
+from shakenfist.exceptions import DatabaseUnavailable
 from shakenfist.exceptions import BlobSizeCannotChange
 from shakenfist.exceptions import BlobTransferSetupFailed
 from shakenfist.exceptions import HashFailed
@@ -377,9 +378,24 @@ class Blob(dbo):
             ObjectType.BLOB, self.uuid, RelationshipType.BLOB_LOCATION)
         return [str(ref.source_uuid) for ref in refs]
 
-    def add_location(self, location: str) -> None:
-        """Record that this blob is present on the given node."""
-        self.record_usage()
+    def add_location(self, location: str, already_recorded: bool = False) -> None:
+        """Record that this blob is present on the given node.
+
+        A location that is new counts as usage, so that a copy which has just
+        arrived gets the reaper's grace period before anything references it.
+        Re-asserting a location that is already recorded does not: being on
+        disk is not being used. observe_local_blobs() re-observes every local
+        blob every five minutes on every node, so a blob with N copies was
+        refreshed about every 300/N seconds and an unreferenced replicated
+        blob never aged out (issue 4440).
+
+        Args:
+            location: The node name the blob is present on.
+            already_recorded: True when the caller knows this location is
+                already recorded, in which case last_used is left alone.
+        """
+        if not already_recorded:
+            self.record_usage()
         mariadb.record_relationship(
             ObjectType.NODE, location,
             RelationshipType.BLOB_LOCATION, None,
@@ -599,14 +615,14 @@ class Blob(dbo):
         self.__attributes = new_attrs
 
     # Operations
-    def add_node_location(self) -> None:
-        self.add_location(config.NODE_NAME)
+    def add_node_location(self, already_recorded: bool = False) -> None:
+        self.add_location(config.NODE_NAME, already_recorded=already_recorded)
 
     def drop_node_location(self, node: str = config.NODE_NAME) -> None:
         self.remove_location(node)
 
-    def observe(self) -> None:
-        self.add_node_location()
+    def observe(self, already_recorded: bool = False) -> None:
+        self.add_node_location(already_recorded=already_recorded)
 
         # Observing a blob can move it from initial to created, but it should not
         # move it from deleted to created.
@@ -1272,6 +1288,11 @@ def observe_local_blobs() -> int:
     This replaces the cluster daemon's periodic cache rebuild, making each
     node authoritative for its own blob locations.
 
+    Only a blob whose location on this node was not already recorded has
+    its last_used refreshed. This pass is presence, not use, and stamping
+    every local blob kept unreferenced replicated blobs from ever reaching
+    the reaper's grace period (issue 4440).
+
     Returns:
         int: The number of blobs observed.
     """
@@ -1279,6 +1300,18 @@ def observe_local_blobs() -> int:
     blob_path = os.path.join(config.STORAGE_PATH, 'blobs')
     if not os.path.exists(blob_path):
         return 0
+
+    # One read per pass rather than one per blob. If it fails, every local
+    # blob is treated as newly located, which refreshes last_used for all of
+    # them: that delays reaping by a pass, where the opposite assumption
+    # could only ever make a blob look older than it is.
+    try:
+        recorded = set(mariadb.get_node_blob_uuids(config.NODE_NAME))
+    except DatabaseUnavailable as e:
+        LOG.with_fields({'error': str(e)}).warning(
+            'Could not read the recorded blob locations for this node, '
+            'treating every local blob as newly located this pass')
+        recorded = set()
 
     observed_count = 0
     try:
@@ -1300,7 +1333,7 @@ def observe_local_blobs() -> int:
             if b and b.state.value == Blob.STATE_CREATED:
                 # Calling observe() updates the BLOB_LOCATION reference
                 # in MariaDB (with last_active timestamp)
-                b.observe()
+                b.observe(already_recorded=(blob_uuid in recorded))
                 observed_count += 1
 
     except FileNotFoundError:
