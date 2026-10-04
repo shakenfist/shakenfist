@@ -3381,6 +3381,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-workflow-ref-trust/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow ref trust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -11532,6 +11560,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#session-drops-when-pasting-large-text-into-the-guest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session drops when pasting large text into the guest
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -15442,6 +15481,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#session-drops-when-pasting-large-text-into-the-guest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Session drops when pasting large text into the guest
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -16096,6 +16146,19 @@ insecure port.</p>
    a backend reached by IP). With neither, the public roots apply
    and the certificate's name must match the host connected to,
    because the name is then all that identifies the backend.</p>
+<h3 id="session-drops-when-pasting-large-text-into-the-guest">Session drops when pasting large text into the guest<a class="headerlink" href="#session-drops-when-pasting-large-text-into-the-guest" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom:</strong> Every channel disconnects at once, without a TLS
+<code>close_notify</code>, just after a paste in the guest. The log's last main-channel
+line is <code>clipboard to guest (N bytes)</code> with N above about 14,000. The
+hypervisor's QEMU log shows <code>invalid agent message: data exceeds size from
+header</code>.</p>
+<p><strong>Cause:</strong> Builds without the fix for issue #447 stop sending a large
+clipboard message when the server's agent tokens run out, and never finish
+it. spice-server then reads the next agent message as the rest of the old
+one and disconnects the client. Neither the guest nor ryll has crashed.</p>
+<p><strong>Solution:</strong> Upgrade. ryll now holds the unsent chunks until the server
+returns tokens. On an affected build, copy something short on the host
+before pasting into the guest.</p>
 <h2 id="display-issues">Display Issues<a class="headerlink" href="#display-issues" title="Permanent link">&para;</a></h2>
 <h3 id="waiting-for-display-stays-forever">"Waiting for display..." stays forever<a class="headerlink" href="#waiting-for-display-stays-forever" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong> GUI shows "Waiting for display..." but never shows content.</p>
@@ -16264,8 +16327,17 @@ are not: they travel on <code>watch</code> channels or a non-dropping send.</p>
 <code>events_dropped_count</code>, <code>events_dropped_by_kind</code> and <code>last_event_drop_ts_secs</code>
 say what was dropped and when. To rule out a stale mouse mode, compare the
 app's <code>mouse_mode</code> with main's <code>server_mouse_mode</code>.</p>
-<p><strong>Cause:</strong> The stall itself, usually during a guest reboot, is tracked as
-issue #430.</p>
+<p><strong>Causes:</strong>
+- The window was hidden: minimised, behind other windows, on another
+  Space, or under the macOS lock screen. eframe does not draw a hidden
+  window, and builds without the fix for issue #444 only drained the queue
+  while drawing, so the queue filled within seconds and stayed full until
+  the window was shown again. In a bug report this shows as hours of drops
+  (mostly <code>Latency</code>) with healthy PING/PONG counts throughout. ryll now
+  drains the queue from <code>App::logic</code>, which eframe keeps calling for hidden
+  windows.
+- A UI-thread stall while the window is visible, usually during a guest
+  reboot, tracked as issue #430.</p>
 <h3 id="session-becomes-unresponsive-after-idle-period">Session becomes unresponsive after idle period<a class="headerlink" href="#session-becomes-unresponsive-after-idle-period" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong> After leaving the session idle for a few minutes, all
 input (keyboard and mouse) stops working. The display may also
@@ -16616,7 +16688,9 @@ first send happens on session bring-up once display geometry is known, or on
 any window resize. In a freshly-connected session with no resize activity (or
 in headless mode where geometry is fixed), <code>agent_request_count</code> may stay at
 zero for a while before the probe starts firing — that does not indicate an
-unhealthy agent.</p>
+unhealthy agent. The probe is also skipped while earlier agent messages, such
+as a large clipboard transfer, are still waiting for the server to return
+tokens.</p>
 <p><strong>Agent reply-lag fields in <code>MainSnapshot</code> (visible in Connection bug reports):</strong></p>
 <table>
 <thead>

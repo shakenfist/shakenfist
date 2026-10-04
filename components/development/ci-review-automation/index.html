@@ -3585,6 +3585,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-workflow-ref-trust/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow ref trust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15194,7 +15222,7 @@ elevated permissions. Security is enforced through multiple layers:</p>
    in this repository, but the repositories that copied
    <code>pr-re-review.yml</code> before it existed do not have it, and
    <code>check_ci_review_automation</code> does not yet look for it, so the
-   daily audit will not tell you which ones
+   weekly audit will not tell you which ones
 5. <strong>No pre-commit</strong> -- pre-commit hooks execute repository code and
    are skipped in privileged workflows. <code>test-drift-fix.yml</code> is the
    deliberate exception: fixing test drift means running the pull
@@ -15306,7 +15334,7 @@ repository:</p>
   structured JSON output and embedded review data</li>
 </ul>
 <h2 id="projects-using-this-automation">Projects Using This Automation<a class="headerlink" href="#projects-using-this-automation" title="Permanent link">&para;</a></h2>
-<p>Which projects have which of these is measured every morning rather
+<p>Which projects have which of these is measured weekly rather
 than listed here, because a hand-maintained table of fleet state goes
 stale silently: see the <code>ci-review-automation</code> section of
 <a href="/components/development/audits/compliance/#ci-review-automation">the compliance page</a>.</p>

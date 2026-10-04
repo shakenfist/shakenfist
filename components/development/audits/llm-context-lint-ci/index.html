@@ -3465,6 +3465,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-workflow-ref-trust/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow ref trust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -14850,10 +14878,10 @@
 
 <h1 id="audit-llm-context-linting-in-pre-commit-and-ci">Audit: LLM context linting in pre-commit and CI<a class="headerlink" href="#audit-llm-context-linting-in-pre-commit-and-ci" title="Permanent link">&para;</a></h1>
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
-<p>The daily consistency audit is a backstop, not a feedback loop. A
+<p>The weekly consistency audit is a backstop, not a feedback loop. A
 malformed skill, a smuggled unicode character or a secret pasted into
 <code>CLAUDE.md</code> should be caught by the commit that introduces it, not up
-to twenty-four hours later by a report nobody is watching.</p>
+to a week later by a report nobody is watching.</p>
 <p>Every repository with agent context must therefore run
 <a href="https://skillsaw.org/">skillsaw</a> itself, in both places the other
 linters run:</p>
@@ -14905,7 +14933,7 @@ other third-party actions that way. Repositories that enable renovate's
 pre-commit manager will have the <code>rev</code> kept current automatically.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <p>Per-project compliance for this criterion is regenerated
-every morning by the consistency audit: see
+on every run of the consistency audit: see
 <a href="/components/development/audits/compliance/#llm-context-lint-ci">the compliance page</a>.</p>
 
 

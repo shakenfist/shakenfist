@@ -3504,6 +3504,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-workflow-ref-trust/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow ref trust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -14985,11 +15013,27 @@ use, and makes a callee starting to read a new secret a visible change
 in two places: its declaration, and every caller that has to start
 passing it. A callee that reads a secret it was not passed gets an
 empty string, so the failure is loud rather than a quiet widening.</p>
-<p>When this criterion was added on 2026-09-29, no reusable workflow in
-the fleet read a secret. Every inherit it found -- <code>smoke-cluster.yml</code>
-callers in shakenfist and client-python, and the <code>test-drift-fix.yml</code>
-callers that <code>templates/test-drift-fix/</code> had put in shakenfist, instar
-and occystrap -- is fixed by deleting the line.</p>
+<p>When this criterion was added on 2026-09-29 it was believed that no
+reusable workflow in the fleet read a secret. A survey on 2026-10-02
+found one exception. The shared callees in shakenfist/actions and the
+<code>test-drift-fix.yml</code> template read none, but instar's local copy of
+<code>test-drift-fix.yml</code> reads <code>GITLAB_TESTDATA_TOKEN</code> in its "Prepare
+instar-testdata" step. The fix proposed for that copy, in
+<a href="https://github.com/shakenfist/instar/pull/617">shakenfist/instar#617</a>,
+uses the named form described under "Required, but confirmed by a
+reviewer" above: the callee declares the secret under
+<code>on.workflow_call.secrets</code> with <code>required: false</code>, and
+<code>pr-fix-tests.yml</code> passes it by name. The same pull request deletes
+instar's <code>export-repo-config.yml</code> inherit. Every other inherit the
+criterion found -- <code>export-repo-config.yml</code> callers in eight more
+repositories, <code>smoke-cluster.yml</code> callers in shakenfist and
+client-python, and the <code>test-drift-fix.yml</code> callers that
+<code>templates/test-drift-fix/</code> had put in shakenfist and occystrap --
+was fixed by deleting the line. Those fixes also moved the shakenfist
+and occystrap copies of <code>test-drift-fix.yml</code> from
+<code>secrets.GITHUB_TOKEN</code> to <code>github.token</code>, as the template already
+has, so that they do not depend on the secrets context of a called
+workflow at all; <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/617" title="GitHub Issue: shakenfist/instar #617">instar#617</a> does the same for instar's copy.</p>
 <p>Local callees are measured even though the moving-ref half of the
 argument does not apply to them: the declared list is still what makes
 a secret being read visible in review, and one rule with no exceptions
@@ -15001,7 +15045,7 @@ separate decision: it trades the moving ref for a bump in every calling
 repository on every change to <code>actions</code>.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <p>Per-project compliance for this criterion is regenerated
-every morning by the consistency audit: see
+on every run of the consistency audit: see
 <a href="/components/development/audits/compliance/#reusable-workflow-secrets">the compliance page</a>.</p>
 
 

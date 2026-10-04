@@ -3487,6 +3487,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-workflow-ref-trust/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow ref trust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -14924,6 +14952,11 @@ default branch. A workflow is a finding when both of these hold:</p>
   <code>merge_group</code> failure fails in front of whoever opened the pull
   request.</li>
 </ul>
+<p>Three failures is a pattern reached quickly by a workflow that runs
+often, but the finding appears only when the audit next runs, which is
+weekly. A daily workflow broken just after an audit is reported up to
+about ten days later, and a weekly workflow only after its third
+failed run, three weeks or more.</p>
 <p>The finding names each workflow, how many of its runs failed, and a
 link to the most recent failed run. It does not diagnose the cause.
 The reason is in that run's log, and the usual one is an unfinished
@@ -14964,7 +14997,7 @@ should not run on a schedule yet, remove the <code>schedule</code> trigger
 until it can.</p>
 <h2 id="projects">Projects<a class="headerlink" href="#projects" title="Permanent link">&para;</a></h2>
 <p>Per-project compliance for this criterion is regenerated
-every morning by the consistency audit: see
+on every run of the consistency audit: see
 <a href="/components/development/audits/compliance/#scheduled-workflow-health">the compliance page</a>.</p>
 
 

@@ -3381,6 +3381,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-workflow-ref-trust/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow ref trust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -14992,10 +15020,11 @@ rather than through a modal.</p>
 global <code>AtomicBool</code> flag (<code>SHUTDOWN_REQUESTED</code>). This allows Ctrl+C to trigger
 a clean shutdown instead of killing the process immediately.</p>
 <ul>
-<li><strong>GUI mode</strong>: The <code>eframe::App::update()</code> loop in <code>app.rs</code> checks the flag
-  each frame and calls <code>ctx.send_viewport_cmd(ViewportCommand::Close)</code> when
-  set, which lets eframe run its normal teardown path and finalize the capture
-  session.</li>
+<li><strong>GUI mode</strong>: <code>RyllApp::logic</code> in <code>app.rs</code> checks the flag on every pass
+  and calls <code>ctx.send_viewport_cmd(ViewportCommand::Close)</code> when set, which
+  lets eframe run its normal teardown path and finalize the capture session.
+  eframe calls <code>logic</code> even while the window is hidden, so Ctrl+C works on a
+  minimised window too.</li>
 <li><strong>Headless mode</strong>: The tokio <code>select!</code> loop polls the flag alongside channel
   events and breaks out cleanly when shutdown is requested. However the loop
   ends, <code>run_headless</code> then winds the connection task down and joins it
