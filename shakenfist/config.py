@@ -1053,8 +1053,11 @@ class SFConfig(BaseSettings):
             'audience.'
         )
     )
+    # gt=0 because a token which has already expired when it is minted
+    # cannot open a console, and nothing about the symptom points here.
     KERBSIDE_TOKEN_DURATION: int = Field(
         300,
+        gt=0,
         description=(
             'Lifetime in seconds of a minted Kerbside VDI console token.'
         )

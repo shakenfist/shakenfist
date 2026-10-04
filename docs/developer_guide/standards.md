@@ -280,7 +280,8 @@ Current hooks:
   the role's config template, without root, by running
   `tools/ci-test-kerbside-cluster-config.sh`. It needs only `ansible-core`,
   and only runs when those entry points, the role's `argument_specs`,
-  defaults or config template, or the script change. The sanity-checks
+  defaults or config template, `examples/_shared/site.yml` (whose wiring of
+  those entry points it checks structurally), or the script change. The sanity-checks
   workflow runs the same script
 - `flake8` - Style check via tox, on changed files
 - `py3` - Unit tests via tox

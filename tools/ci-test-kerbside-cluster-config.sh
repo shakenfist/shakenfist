@@ -17,7 +17,9 @@
 # a URL is refused before it is minted; and that the node role's config
 # template renders the token duration only beside the URL. No CI lane can
 # turn the feature on yet, so this is the only thing which runs the "on"
-# path.
+# path. It also refuses a non-positive duration, and a show-config which is not
+# a JSON object, before anything is read or written, and checks structurally
+# that examples/_shared/site.yml calls the two entry points in the right places.
 #
 # The stub sf-ctl appends each call's argv, its SHAKENFIST_NODE_MESH_IP and
 # any stdin to a log, and answers show-config from a JSON file each case
@@ -447,6 +449,104 @@ SHAKENFIST_KERBSIDE_TOKEN_DURATION=\"600\"" ] || fail "the Kerbside lines are wr
         || fail "the default duration is not rendered: $(grep KERBSIDE "${WORK}/config")"
 }
 
+case_12_non_positive_duration() {
+    CURRENT_CASE='case 12: a non-positive kerbside_token_duration'
+    write_rows '{}'
+    local duration
+    for duration in 0 -5; do
+        run_play_fails 'must be a positive number of seconds' "$(write_vars "duration-${duration}" "{
+          \"kerbside_url\": \"${URL}\",
+          \"kerbside_token_duration\": ${duration}
+        }")"
+        # Refused before show-config, so before anything could be read.
+        if stub_log | grep -q '^ARGV'; then
+            fail "sf-ctl was called for a duration of ${duration}"
+        fi
+    done
+
+    # A string is refused earlier still, by the entry point's argument_specs,
+    # which says so in its own words (the assert's "| int" never sees it).
+    run_play_fails 'kerbside_token_duration. is of type str and we were unable to convert to int' \
+        "$(write_vars duration-abc "{
+      \"kerbside_url\": \"${URL}\",
+      \"kerbside_token_duration\": \"abc\"
+    }")"
+    if stub_log | grep -q '^ARGV'; then
+        fail 'sf-ctl was called for a duration of abc'
+    fi
+}
+
+case_13_show_config_not_json() {
+    CURRENT_CASE='case 13: show-config prints something other than a JSON object'
+    local vars
+    vars="$(write_vars both "{
+      \"kerbside_url\": \"${URL}\",
+      \"kerbside_system_key\": \"${KERBSIDE_KEY}\"
+    }")"
+    local rows
+    for rows in 'WARNING: something' '{oops' '[1, 2]'; do
+        write_rows "${rows}"
+        run_play_fails 'sf-ctl show-config did not print a JSON object' "${vars}"
+        assert_output_has "${rows}"
+        assert_stopped_in_preflight
+    done
+}
+
+# The real site.yml's cluster config play must call the two entry points in
+# the right places: the preflight first, before any set-config, and the
+# credentials after the system namespace key, with node_mesh_ip passed.
+case_14_site_yml_wiring() {
+    CURRENT_CASE='case 14: examples/_shared/site.yml wires the entry points correctly'
+    local out
+    out="$(python3 - "${REPO_ROOT}/examples/_shared/site.yml" << 'PYEOF' 2>&1
+import sys
+
+try:
+    import yaml
+except ImportError:
+    print('PyYAML is not importable by python3, so site.yml cannot be checked')
+    sys.exit(1)
+
+PLAY = 'Write the cluster configuration (once, before register)'
+with open(sys.argv[1]) as f:
+    plays = yaml.safe_load(f)
+matches = [p for p in plays if p.get('name') == PLAY]
+if len(matches) != 1:
+    print(f'expected exactly one play named {PLAY!r}, found {len(matches)}')
+    sys.exit(1)
+tasks = matches[0]['tasks']
+
+
+def includes(task, tasks_from):
+    inc = task.get('ansible.builtin.include_role')
+    return (isinstance(inc, dict) and inc.get('name') == 'shakenfist.shakenfist.node'
+            and inc.get('tasks_from') == tasks_from)
+
+
+if not includes(tasks[0], 'kerbside_preflight'):
+    print('the first task is not an ansible.builtin.include_role of '
+          'shakenfist.shakenfist.node with tasks_from: kerbside_preflight')
+    sys.exit(1)
+
+creds = [i for i, t in enumerate(tasks) if includes(t, 'kerbside_credentials')]
+if len(creds) != 1:
+    print(f'expected exactly one kerbside_credentials include, found {len(creds)}')
+    sys.exit(1)
+names = [t.get('name') for t in tasks]
+KEY = 'Bootstrap the system namespace key'
+if names.count(KEY) != 1:
+    print(f'expected exactly one task named {KEY!r}')
+    sys.exit(1)
+if creds[0] < names.index(KEY):
+    print(f'the kerbside_credentials include comes before {KEY!r}')
+    sys.exit(1)
+if 'node_mesh_ip' not in (tasks[creds[0]].get('vars') or {}):
+    print('the kerbside_credentials include does not pass node_mesh_ip in its vars')
+    sys.exit(1)
+PYEOF
+)" || fail "${out}"
+}
+
 case_1_feature_off
 case_2_url_only
 case_3_both_set
@@ -458,5 +558,8 @@ case_8_redacted_duration
 case_9_extra_config
 case_10_refused_credentials
 case_11_template
+case_12_non_positive_duration
+case_13_show_config_not_json
+case_14_site_yml_wiring
 
-echo "kerbside cluster config: all eleven cases passed (${RUNS} ansible runs)"
+echo "kerbside cluster config: all fourteen cases passed (${RUNS} ansible runs)"

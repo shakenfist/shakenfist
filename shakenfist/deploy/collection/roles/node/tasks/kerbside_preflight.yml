@@ -66,6 +66,33 @@
       check_mode: false
       register: kerbside_preflight_show_config
 
+    # Parsed once, here. from_json raises a template error on anything which
+    # is not JSON (an sf-ctl which printed a warning first, say), before any
+    # assert could run, so the parse sits in a block whose rescue leaves the
+    # rows as none and the assert below reports it in words.
+    - name: Parse the cluster configuration rows
+      block:
+        - name: Parse the show-config output
+          ansible.builtin.set_fact:
+            kerbside_preflight_rows: >-
+              {{ (kerbside_preflight_show_config.stdout | from_json)
+              if (kerbside_preflight_show_config.stdout | trim | regex_search('^[{]'))
+              else none }}
+      rescue:
+        - name: Treat unparseable show-config output as no rows
+          ansible.builtin.set_fact:
+            kerbside_preflight_rows: null
+
+    - name: Require show-config to have printed a JSON object
+      ansible.builtin.assert:
+        that: kerbside_preflight_rows is mapping
+        fail_msg: >-
+          sf-ctl show-config did not print a JSON object, so the deploy cannot
+          check the cluster_config rows. Its output began:
+          {{ (kerbside_preflight_show_config.stdout | trim).splitlines()
+          | first | default('(nothing)', true) | truncate(200) }}
+        quiet: true
+
     - name: Warn about cluster_config rows which repeat a Kerbside variable
       ansible.builtin.debug:
         msg: >-
@@ -77,8 +104,6 @@
       loop: "{{ kerbside_preflight_settings }}"
       loop_control:
         label: "{{ item.name }}"
-      vars:
-        kerbside_preflight_rows: "{{ kerbside_preflight_show_config.stdout | from_json }}"
       when:
         - item.name in kerbside_preflight_rows
         - (kerbside_preflight_rows[item.name] | string) == item.value
@@ -106,8 +131,6 @@
       loop: "{{ kerbside_preflight_settings }}"
       loop_control:
         label: "{{ item.name }}"
-      vars:
-        kerbside_preflight_rows: "{{ kerbside_preflight_show_config.stdout | from_json }}"
       when:
         - item.name in kerbside_preflight_rows
         - (kerbside_preflight_rows[item.name] | string) != item.value
