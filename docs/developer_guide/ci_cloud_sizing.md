@@ -367,14 +367,24 @@ wrote the trace -- the evidence does not wait for
 `ci_headroom_collect.sh` to grow its own `--waits` plumbing and print
 it into the job log, which is a separate, later change.
 
-An absent or empty file reports as unknown, never as zero waits, for
-the same reason an absent or empty census reports as unknown rather
-than as zero refusals (see
-[One bound gates, and everything else is information](#one-bound-gates-and-everything-else-is-information)
-below): "no
-one collected this" and "the wrapper never had to wait" are different
-findings, and the reading that looks reassuring -- zero -- is exactly
-the wrong one to print when the file was never written or never read.
+Since [#4337](https://github.com/shakenfist/shakenfist/issues/4337)
+landed as `62bb1ddeb`, a trace file that exists and is empty is a
+real zero for any run whose base contains that commit:
+`BaseTestCase.setUp()` (`shakenfist/deploy/shakenfist_ci/base.py:214`)
+calls `ensure_capacity_wait_trace()` (`:180`), which touches the file
+into existence at suite start-up and swallows every failure exactly
+as the append path does. `absent` and `unparseable` remain unknown,
+and an absent file still cannot be read as zero, because the same
+on-disk signature covers both a component ref predating the wrapper
+and a run whose every write failed. `tools/ci_headroom_report.py`
+still nulls an empty trace's counts, and that is correct: the report
+runs over a downloaded bundle and cannot see the run's base, so the
+four states it emits (`read`, `empty`, `unreadable`, `unparseable`)
+are the raw reading, and applying the ancestry condition is the
+caller's job.
+[PLAN-transient-capacity-refusals-phase-05-queue-decision.md](../plans/PLAN-transient-capacity-refusals-phase-05-queue-decision.md)'s
+D43 -- "`empty` is a real zero; `absent` and `unparseable` stay
+unknown" -- is the decision this unlocked.
 A file that was read but whose every line was malformed is reported
 the same way, for the same reason, and carries its own `state` of
 `unparseable` in the machine-readable record rather than an
