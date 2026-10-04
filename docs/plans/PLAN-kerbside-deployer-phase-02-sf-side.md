@@ -516,6 +516,12 @@ change now and awkward after a release.
   keys, so a redeploy stops rotating nonces.
 * **Make #4093 true.** It was closed by #4420's merge, not fixed (S7).
   Phase 4 is still what runs the mint test.
+* **Kerbside's own Shaken Fist use-case page is now out of date.**
+  `docs/use-cases/shakenfist.md` in the Kerbside repository says
+  creating the signing key "is an explicit operator step", and does not
+  mention `kerbside_system_key`. It is synced into
+  `docs/components/kerbside/` here, so the fix is made in the Kerbside
+  repository, alongside the master plan's documentation phase.
 * **The rest of play 6a is untested without a cluster.** D1 moves only
   the Kerbside steps into the role. Moving the others would let the
   same harness cover them.

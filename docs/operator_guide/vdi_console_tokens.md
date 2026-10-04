@@ -54,28 +54,45 @@ adds the proxied path.
 
 !!! note
 
-    Kerbside deployment itself is not yet automated by the Shaken Fist
-    ansible collection, so enabling the integration is a **manual** step
-    today. You deploy and configure a Kerbside proxy out of band (see the
-    [Kerbside component documentation](/components/kerbside/)), then point
-    Shaken Fist at it as below.
+    The Shaken Fist ansible collection does not deploy Kerbside itself. You
+    deploy and configure a Kerbside proxy out of band (see the
+    [Kerbside component documentation](/components/kerbside/)). The collection
+    does handle the Shaken Fist side: the URL, the token duration, the
+    signing key and the Kerbside credential, as below.
 
 To enable it, set `KERBSIDE_URL` to your Kerbside deployment's public base
-URL. You can do this at deploy time by setting the collection's
-`kerbside_url` variable in your `group_vars/all.yml` (see
-[Installation](installation.md)), which renders it into every node's
-`/etc/sf/config`:
+URL. For a cluster deployed with the collection, set the `kerbside_url`
+variable in your `group_vars/all.yml` (see [Installation](installation.md)),
+which renders it into every node's `/etc/sf/config`:
 
 ```yaml
 kerbside_url: https://kerbside.example.com
 ```
 
-or on a running cluster with `sf-ctl` (a `cluster_config` value overrides
-the rendered file at process start):
+Setting it also makes the deploy ensure the console token signing key exists
+(see [Signing key custody](#signing-key-custody)). The optional
+`kerbside_system_key` variable mints the credential Kerbside uses to talk to
+Shaken Fist (see [The Kerbside credential](#the-kerbside-credential)).
+
+For a cluster not deployed with the collection, use `sf-ctl` instead (a
+`cluster_config` value overrides the rendered file at process start):
 
 ```bash
 sf-ctl set-config KERBSIDE_URL https://kerbside.example.com
 ```
+
+!!! warning "Do not set these in both places"
+
+    A `cluster_config` row overrides `/etc/sf/config`, so a `KERBSIDE_URL` or
+    `KERBSIDE_TOKEN_DURATION` row which differs from the variable would make
+    every daemon ignore it. When `kerbside_url` is set, the collection deploy
+    therefore stops, before it writes anything, if either row exists with a
+    different value, or if `extra_config` sets either name. The message names
+    the fix: remove the row with `sf-ctl unset-config KERBSIDE_URL` (or
+    `KERBSIDE_TOKEN_DURATION`) and deploy again, relying on the variable. A row
+    equal to its variable does not stop the deploy; it is reported as a warning
+    and can be removed the same way. An `sf-ctl` older than the collection
+    shows the row as `<redacted>`, which the deploy treats as different.
 
 `KERBSIDE_URL` is both the base for the returned console URL and the token
 **audience** (`aud`) claim. Kerbside's expected audience — its own
@@ -84,7 +101,9 @@ that is unset — must equal this string exactly, or verification fails.
 
 Optionally set `KERBSIDE_TOKEN_DURATION`, the lifetime in seconds of a
 minted token. It defaults to 300 seconds (five minutes), which is ample for
-a viewer to redeem the URL:
+a viewer to redeem the URL. With the collection, set the
+`kerbside_token_duration` variable, which must be positive and is rendered
+only alongside `kerbside_url`. Otherwise:
 
 ```bash
 sf-ctl set-config KERBSIDE_TOKEN_DURATION 300
@@ -123,11 +142,17 @@ An attacker who can read a daemon's memory is therefore not shut out by this
 change; one who can read its environment, or the environment of a command
 privexec ran, now is.
 
-The key is **not** created automatically: it must be provisioned explicitly
-before the first console is opened. Until it exists, the `vdiconsoleproxy`
-endpoint returns HTTP 500 naming the command to run below — minting never
-self-bootstraps a key. Create it — for example so you can publish the public
-key to Kerbside before anyone opens a console — with the idempotent:
+Shaken Fist never creates the key lazily while minting: until it exists, the
+`vdiconsoleproxy` endpoint returns HTTP 500 naming the command to run below.
+A deploy with the collection ensures the key whenever `kerbside_url` is set.
+It does so in the cluster configuration play, which runs before the plays that
+restart daemons, so an `sf-api` restarted with `KERBSIDE_URL` set always finds
+a key behind it. It creates the key if it is absent and otherwise changes
+nothing.
+
+For a cluster not deployed with the collection, provision it explicitly before
+the first console is opened — for example so you can publish the public key to
+Kerbside before anyone opens a console — with the idempotent:
 
 ```bash
 sf-ctl ensure-kerbside-signing-key
@@ -139,7 +164,9 @@ prints private material and does nothing if a key already exists.
 !!! warning "Provision the key before upgrading a cluster Kerbside already scrapes"
 
     Do this *before* you roll the daemons, if Kerbside is already
-    configured with this cluster as a console source.
+    configured with this cluster as a console source. A collection deploy
+    with `kerbside_url` set already does, in that order; otherwise run the
+    command above yourself.
 
     Until the key exists, `GET /admin/vditokenpubkey` returns HTTP 404.
     **Kerbside v0.5.0 and earlier** treat that failure as making the whole
@@ -165,6 +192,40 @@ prints private material and does nothing if a key already exists.
     scrape — an unreachable cluster, an error fetching the cluster CA —
     deleted that source's consoles, whether or not tokens were involved.
     On v0.5.0 and earlier, provision the key before you upgrade.
+
+## The Kerbside credential
+
+Kerbside's Shaken Fist source authenticates to the cluster with a key in the
+system namespace, using the username `system`. This is separate from the
+signing key: the signing key lets Shaken Fist mint tokens, the credential lets
+Kerbside read the cluster's consoles and fetch the public keys below. Enter
+the same value as the password when you configure the source in Kerbside (see
+the [Kerbside console sources page](/components/kerbside/console-sources/)).
+
+With the collection, set `kerbside_system_key` (a secret; at least 16
+characters, different from `system_key`, and only valid with `kerbside_url`).
+The deploy mints it as the `kerbside` key in the system namespace on every
+run, the same way `system_key` is minted as the `deploy` key. Each mint issues
+a new nonce, which Kerbside's client absorbs with one re-authentication, so
+Kerbside is not disturbed.
+
+* **Rotate** it by changing the variable and deploying, then update the
+  value in Kerbside's source configuration.
+* **Removing** the variable does not delete the key, because a secrets file
+  which failed to decrypt looks the same as a removed variable. Revoke the
+  credential explicitly:
+
+  ```bash
+  sf-client namespace delete-key system kerbside
+  ```
+
+Clusters not deployed with the collection create the key by hand, on a
+database node, the same way the deploy does -- on stdin, so the key never
+appears in the process table or shell history:
+
+```bash
+sf-ctl bootstrap-system-key --key-from-stdin kerbside < kerbside-key-file
+```
 
 ## Publishing the public keys
 

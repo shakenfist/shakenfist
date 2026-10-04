@@ -190,6 +190,28 @@ reads an unquoted `0400` as the integer 256, which can end up installed as mode
 written into a certtool template as a line of its own, and a `cert_name` or
 `cert_dest_*_name` that is not a plain file name.
 
+## Kerbside
+
+The `node` role handles the Shaken Fist side of a
+[Kerbside](https://github.com/shakenfist/kerbside) VDI console proxy; it does
+not deploy Kerbside itself. Nothing below does anything unless `kerbside_url`
+is set.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `kerbside_url` | `""` | Kerbside's base URL, rendered into `/etc/sf/config` and used as the token audience. When set, the deploy ensures the console token signing key exists before any daemon restarts. |
+| `kerbside_token_duration` | `300` | Lifetime in seconds of a minted console token. Must be positive. |
+| `kerbside_system_key` | `""` | The key Kerbside authenticates with, minted as the `kerbside` key in the system namespace on every deploy. A secret; requires `kerbside_url`, at least 16 characters, different from `system_key`. |
+
+Changing `kerbside_system_key` rotates the key. Removing it does not delete
+the key; revoke it with `sf-client namespace delete-key system kerbside`.
+
+The deploy stops, before writing anything, if a `KERBSIDE_URL` or
+`KERBSIDE_TOKEN_DURATION` `cluster_config` row differs from its variable or
+`extra_config` sets either, since the row would override the variable. Run
+`sf-ctl unset-config <NAME>` and deploy again. See the
+[VDI console tokens operator guide](https://github.com/shakenfist/shakenfist/blob/develop/docs/operator_guide/vdi_console_tokens.md).
+
 ## Consuming the collection
 
 Install the published collection on your Ansible control node:
