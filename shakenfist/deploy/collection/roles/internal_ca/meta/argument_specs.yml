@@ -50,6 +50,76 @@ argument_specs:
         type: str
         description:
           - Path to the host certtool template. Defaults to a value derived from ca_path and hostname.
+      cert_name:
+        type: str
+        description:
+          - Name used for the per-host file names on the control node. Defaults to hostname.
+      cert_cn:
+        type: str
+        description:
+          - Subject common name of the issued certificate. Defaults to hostname.
+      cert_san_dns:
+        type: list
+        elements: str
+        default: []
+        description:
+          - Extra DNS subject alternative names, one dns_name entry each.
+      cert_san_ip:
+        type: list
+        elements: str
+        default: []
+        description:
+          - Extra IP subject alternative names, one ip_address entry each.
+      cert_expiration_days:
+        type: int
+        default: 365
+        description:
+          - Lifetime in days of an issued certificate.
+      cert_renew_days:
+        type: int
+        default: 90
+        description:
+          - Reissue the certificate when fewer than this many days remain.
+      cert_dest_dir:
+        type: str
+        default: "/etc/pki/libvirt-spice"
+        description:
+          - Directory on the target host the CA, certificate and key are installed into.
+      cert_dest_ca_name:
+        type: str
+        default: "ca-cert.pem"
+        description:
+          - File name of the CA certificate within cert_dest_dir.
+      cert_dest_cert_name:
+        type: str
+        default: "server-cert.pem"
+        description:
+          - File name of the host certificate within cert_dest_dir.
+      cert_dest_key_name:
+        type: str
+        default: "server-key.pem"
+        description:
+          - File name of the host private key within cert_dest_dir.
+      cert_owner:
+        type: str
+        default: "root"
+        description:
+          - Owner of the installed files.
+      cert_group:
+        type: str
+        default: "root"
+        description:
+          - Group of the installed files.
+      cert_mode:
+        type: str
+        default: "0444"
+        description:
+          - Mode of the installed CA and host certificates, as a quoted four digit octal string.
+      cert_key_mode:
+        type: str
+        default: "0444"
+        description:
+          - Mode of the installed host private key, as a quoted four digit octal string.
   bootstrap:
     short_description: Create the deployment's internal certificate authority.
     description:
@@ -59,11 +129,13 @@ argument_specs:
         tasks_from set to bootstrap.
     options: *ca_options
   host_certificate:
-    short_description: Issue or renew a host's SPICE TLS certificate.
+    short_description: Issue or renew a host TLS certificate (SPICE by default).
     description:
       - >-
         Generates the per-host key and certificate on the control node against
-        the CA. Invoke per host via include_role with tasks_from set to
+        the CA. By default this is a SPICE TLS certificate, but the subject,
+        alternative names and file names are controlled by the cert_*
+        parameters. Invoke per host via include_role with tasks_from set to
         host_certificate.
     options: *ca_options
   distribute_certificates:
@@ -71,6 +143,7 @@ argument_specs:
     description:
       - >-
         Copies the CA certificate and the host's key/certificate from the
-        control node into /etc/pki/libvirt-spice on the host. Invoke per host
-        via include_role with tasks_from set to distribute_certificates.
+        control node into cert_dest_dir on the host (by default
+        /etc/pki/libvirt-spice, for libvirt SPICE TLS). Invoke per host via
+        include_role with tasks_from set to distribute_certificates.
     options: *ca_options

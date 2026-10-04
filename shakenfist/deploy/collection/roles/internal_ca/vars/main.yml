@@ -1,0 +1,18 @@
+---
+# The certtool template a host certificate is issued from. It lives here
+# rather than inline in host_certificate.yml because it is used twice: hashed
+# to decide whether the certificate must be reissued, and written to
+# host_template_path once the old certificate has been set aside.
+host_cert_template_content: |
+  organization = Shaken Fist CA for {{ deploy_name }}
+  cn = {{ cert_cn }}
+  {% for name in cert_san_dns %}
+  dns_name = {{ name }}
+  {% endfor %}
+  {% for addr in cert_san_ip %}
+  ip_address = {{ addr }}
+  {% endfor %}
+  expiration_days = {{ cert_expiration_days }}
+  tls_www_server
+  encryption_key
+  signing_key

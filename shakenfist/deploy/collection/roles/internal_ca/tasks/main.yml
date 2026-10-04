@@ -3,8 +3,8 @@
 # consuming playbook:
 #
 #   * bootstrap               (run once, on the control node) creates the CA.
-#   * host_certificate        (per host) issues a SPICE TLS certificate on the
-#                             control node for that host.
+#   * host_certificate        (per host) issues a TLS certificate (SPICE by
+#                             default) on the control node for that host.
 #   * distribute_certificates (per host) copies the CA cert and the host's
 #                             key/cert onto the host.
 #

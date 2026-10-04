@@ -2,10 +2,14 @@
 # Create the deployment's internal certificate authority on the control node.
 # Idempotent: if the CA certificate already exists, nothing is regenerated.
 
+- name: Validate the role's parameters
+  ansible.builtin.include_tasks: validate.yml
+
 - name: Install CA setup tools
   ansible.builtin.apt:
     name:
       - gnutls-bin
+      - openssl
     state: latest
   register: apt_action
   retries: 100
@@ -13,6 +17,7 @@
     apt_action is success or
     ('Failed to lock apt for exclusive operation' not in apt_action.msg and
      '/var/lib/dpkg/lock' not in apt_action.msg)
+  tags: [packages]
 
 - name: Create the CA directory
   ansible.builtin.file:

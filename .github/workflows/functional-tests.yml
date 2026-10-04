@@ -218,6 +218,15 @@ jobs:
           ansible-lint --config-file shakenfist/deploy/collection/.ansible-lint \
               shakenfist/deploy/collection/
 
+      # Rootless issue and renewal test of the internal_ca role. Uses the
+      # ansible-core which ansible-lint brought in above, and needs certtool
+      # (gnutls-bin) on the runner image.
+      - name: Test the internal_ca role
+        timeout-minutes: 5
+        run: |
+          . /tmp/venv-test/bin/activate
+          tools/ci-test-internal-ca.sh
+
       - name: Attempt to install requirements
         timeout-minutes: 5
         run: |
