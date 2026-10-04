@@ -578,6 +578,39 @@ The one exception is `mermaid-lint.yml`, which runs on
 ships `docker.io`, so it needs no install step -- but the label has to be
 listed in `.github/actionlint.yaml` or actionlint rejects the workflow.
 
+### apt and its locks
+
+A runner can still be running its own apt job (`apt-daily`, or an
+unattended upgrade) when a job's first step arrives, and by default
+`apt-get` does not wait for a held lock -- it fails at once. That failed
+`integration-convert-vhd` on a PR that never touched it, with `Could
+not get lock /var/lib/dpkg/lock-frontend`.
+
+So every host-side `apt-get` in CI goes through `tools/ci/apt-get.sh`,
+and so should any new one -- in a workflow step and in an installer
+script alike:
+
+```yaml
+      - name: Install gitleaks
+        run: |
+          tools/ci/apt-get.sh update
+          tools/ci/apt-get.sh install -y gitleaks
+```
+
+Passing `-o DPkg::Lock::Timeout=300` yourself is not the same thing.
+Measured against apt 3.0.3, the version on the `debian-13` runners, that
+option makes apt wait for the dpkg frontend lock and nothing else: the
+lists lock that `update` takes and the archives lock that `install`
+takes to download both still fail at once, and those are the two locks
+`apt-daily` itself holds. The wrapper passes the option and also retries
+any command that failed on a held lock, inside one five-minute deadline
+-- far longer than the competing job takes, and short enough that a
+genuinely wedged apt still fails the step. `tools/ci/test-apt-get.sh`
+checks the retry logic against a fake `apt-get`.
+
+`apt-get` run inside a fresh container needs none of this, since nothing
+else in the container is running apt, and calls it directly.
+
 ### Self-hosted runners and the GitHub CLI
 
 The same applies to `gh`: the `[self-hosted, debian-13, ...]` runners do
@@ -1005,6 +1038,8 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 
 - `scripts/differential-fuzz.py` - Differential fuzzing script (instar vs qemu-img + libyal)
 - `scripts/extract-fuzz-corpus.py` - Seeds + restores the coverage-fuzz corpus from instar-testdata
+- `tools/ci/apt-get.sh` - Runs `sudo apt-get`, waiting for apt's locks rather than failing on them; every host-side `apt-get` in CI goes through it (see "apt and its locks" above)
+- `tools/ci/test-apt-get.sh` - Tests for that wrapper against a fake `apt-get`; the `ci-tooling` CI job runs it
 - `tools/ci/install-docker.sh` - Installs the Docker client and daemon on a self-hosted runner, plus any extra packages passed as arguments (see "Self-hosted runners and Docker" above)
 - `tools/ci/install-gh-cli.sh` - Installs the GitHub CLI on a self-hosted runner if absent (see "Self-hosted runners and the GitHub CLI" above)
 - `tools/ci/fuzz-tier.sh` - Computes tiered nightly per-target fuzz durations

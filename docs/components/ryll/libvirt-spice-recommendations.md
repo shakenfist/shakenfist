@@ -319,10 +319,12 @@ in the guest (`apt install spice-vdagent` on Debian/Ubuntu;
 - Dynamic monitor reconfiguration (e.g. window resize triggers a
   guest-side resolution change) does not work.
 
-Ryll's bug-report `MainSnapshot::agent_request_count` and related
-fields report whether the agent is responding to probes. A `0` agent reply count
-in a bug report usually means `spice-vdagent` is not installed or
-not running.
+Ryll's bug report shows whether an agent is attached (the "Guest agent
+connected" notification) and whether it is reading what ryll sends
+(`MainSnapshot::agent_stall_count` and `agent_starved_since_ts_secs`).
+A zero `agent_reply_count` is not a symptom on its own: with a QXL
+display, spice-server handles monitors config itself and the agent
+never replies to it.
 
 ## USB redirection (optional)
 
