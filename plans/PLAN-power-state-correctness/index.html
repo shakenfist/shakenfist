@@ -15133,8 +15133,8 @@ support that suspicion. Every finding below was checked against
 <tr>
 <td>F3</td>
 <td><code>operations/node_inst_op.py</code> <code>_health_check_kvm_process</code></td>
-<td>Compares the <code>power_state</code> dict to <code>'on'</code>; never called.</td>
-<td>Dead. Wired up correctly it would error-delete every guest which powered itself off, because <code>kvm_pid</code> goes stale, so delete it rather than fix it.</td>
+<td>Compares the <code>power_state</code> dict to <code>'on'</code>. This row first said it was never called; phase 2 found it is dispatched by name, for every created instance, from the <code>health_check_kvm_process</code> task the cluster daemon enqueues.</td>
+<td>Its delete branch is dead. Wired up correctly it would error-delete every guest which powered itself off, because <code>kvm_pid</code> goes stale. Its stale <code>kvm_pid</code> clearing is live, so phase 2 removed only the delete branch.</td>
 </tr>
 <tr>
 <td>F4</td>
@@ -15495,7 +15495,7 @@ establishing the <code>libvirt-guests</code> default on Debian 13 and Ubuntu 24.
 (open question 1). Delete the instance half of sf-queues restore (F2) in
 the same change, and with it
 <code>test_failed_restore_enqueues_delete_and_continues</code> and <code>FakeInstance</code>'s
-string <code>power_state</code>. Delete F3's <code>_health_check_kvm_process</code>. Plan at
+string <code>power_state</code>. Remove F3's dead delete branch. Plan at
 high effort: this is behaviour on every node at startup and reboot.</p>
 <p>The phase survey corrected three things in this section. The phase plan
 has the detail as S1 to S9 and D1 to D8.</p>
@@ -15520,7 +15520,10 @@ only cover the placement reconciliation has in its file (S5).</p>
 <p>F4 to F8 and F12, with their functional tests. <code>power_on()</code> reports
 failure and the endpoint answers 507 or 500 (open question 2);
 <code>power_off()</code> does not record <code>off</code> when <code>destroy()</code> failed and stays
-consistent with phase 2's autostart change; pause and unpause judge
+consistent with phase 2's autostart change (phase 2 already leaves the
+autostart flag set when <code>destroy()</code> failed for any reason other than
+"not running", and nothing ever sets the flag again on a domain which is
+running -- decide whether the cleaner's detected power on should); pause and unpause judge
 success by the domain's state rather than by whether the stored value
 changed, and raise <code>InvalidLifecycleState</code> for an inactive domain the
 way <code>reboot()</code> does after #3630; <code>_power_on_inner()</code> updates

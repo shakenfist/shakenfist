@@ -14675,6 +14675,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#autostart-and-a-hypervisor-reboot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Autostart and a hypervisor reboot
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14873,6 +14884,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#autostart-and-a-hypervisor-reboot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Autostart and a hypervisor reboot
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -14933,6 +14955,13 @@
 <h2 id="disk-io-errors">Disk I/O errors<a class="headerlink" href="#disk-io-errors" title="Permanent link">&para;</a></h2>
 <p>Instance disks are configured with a "stop" error policy: when the storage backing a disk fails (for example a dying NVMe device or an unreachable NFS mount), qemu pauses the instance instead of passing I/O errors through to the guest. Shaken Fist notices the pause reason and marks the instance as errored, recording per-disk error detail in the instance's error message and event log.</p>
 <p>Note that this is deliberately permanent -- even a transient storage error pauses the guest and errors the instance, because an instance which has taken disk errors is not trustworthy. The errored instance is terminal (it cannot return to the created state), but it can still be snapshotted to salvage data. The paused domain is left in place as forensic state until the operator deletes the instance.</p>
+<h2 id="autostart-and-a-hypervisor-reboot">Autostart and a hypervisor reboot<a class="headerlink" href="#autostart-and-a-hypervisor-reboot" title="Permanent link">&para;</a></h2>
+<p>Shaken Fist uses libvirt's own autostart flag on each domain, not anything of its own, to decide which instances come back when a hypervisor reboots. Power on sets the flag. Power off clears it, whether the power off came through the API or was found by the cleaner (see "Detecting power changes made outside the API" above): an instance the database records as <code>off</code> has its autostart flag cleared either way. If a power off fails to stop the domain, its autostart flag is left set. The cleaner also clears the flag on an inactive domain it finds already recorded as <code>off</code> with the flag still set, which is how a domain that was powered off before this behaviour existed, or whose own clear on power off failed, gets fixed. That clear is logged as an "autostart cleared" audit event, with <code>extra={'reason': 'instance is powered off'}</code>, once per domain.</p>
+<p>If the libvirt call to clear autostart on power off itself fails, the power off still completes and the instance is still recorded as <code>off</code>; the failure is instead recorded as an "instance autostart configuration error" audit event, and the cleaner's own check retries the clear on a later pass.</p>
+<p>This reconciliation only runs one way: the cleaner clears a stale flag on a powered off domain, but it never sets the flag on a running domain which lacks it. The result is that after a hypervisor reboots, none of the instances the database last recorded as off come back, and every instance which was powered on through Shaken Fist and not powered off since does.</p>
+<p>This depends on the distribution's own <code>libvirt-guests</code> service, which Shaken Fist does not configure. On Debian 13 and Ubuntu 24.04 it is enabled by default, with <code>ON_BOOT=ignore</code> and <code>ON_SHUTDOWN=shutdown</code>; Ubuntu additionally sets <code>PARALLEL_SHUTDOWN=10</code> and <code>SHUTDOWN_TIMEOUT=120</code>. With these defaults <code>libvirt-guests</code> asks every running guest to shut down cleanly when the host shuts down, and starts nothing itself at boot -- the autostart flag alone decides what comes back. An operator who changes <code>ON_BOOT</code> to <code>start</code> would have <code>libvirt-guests</code> restart the guests that were running at shutdown itself, which the autostart flag already does. An operator who changes <code>ON_SHUTDOWN</code> to <code>suspend</code> would have guests saved to a managed save image at shutdown instead of shut down, which Shaken Fist does not currently handle.</p>
+<p>Every Shaken Fist daemon's systemd unit also orders itself after <code>libvirt-guests.service</code>. systemd stops units in the reverse of their start order, so this guarantees that every Shaken Fist daemon, including the cleaner, has stopped before <code>libvirt-guests</code> shuts guests down at host shutdown. Without that ordering, the cleaner could see guests going down for the reboot, record each as a detected power off, and clear its autostart flag in response -- turning a reboot into every instance on that hypervisor coming back powered off.</p>
+<p><code>sf-queues</code> does not restart or power on any instance when it starts. A restart of <code>sf-queues</code>, or of <code>libvirtd</code>, leaves running domains running regardless. It is only a hypervisor reboot, which stops every domain, where the autostart flag decides what starts again.</p>
 
 
 

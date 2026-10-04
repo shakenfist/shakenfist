@@ -14811,10 +14811,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#s6-_health_check_kvm_process-is-dead-and-owns-an-import" class="md-nav__link">
+  <a href="#s6-_health_check_kvm_process-is-live-only-its-delete-branch-is-dead" class="md-nav__link">
     <span class="md-ellipsis">
       
-        S6 -- _health_check_kvm_process() is dead, and owns an import
+        S6 -- _health_check_kvm_process() is live; only its delete branch is dead
       
     </span>
   </a>
@@ -15149,7 +15149,8 @@ libvirt.</p>
   shuts guests down (D3).</li>
 <li>F2. Deleting the instance half of sf-queues' startup restore. The
   network restore and the placement reconciliation stay.</li>
-<li>F3. Deleting <code>_health_check_kvm_process()</code>.</li>
+<li>F3. Removing the dead delete branch of <code>_health_check_kvm_process()</code>.
+  As planned this said the whole method; see S6.</li>
 <li>Unit tests for each change, each shown to fail without it, and a
   functional test that reads the autostart flag on the hypervisor.</li>
 <li>Correcting the master plan's phase 2 section where the survey found
@@ -15251,6 +15252,21 @@ chain, because ordering against a unit which is not loaded does
 nothing. <code>sf.target</code> is ordered after <code>multi-user.target</code>, but that
 orders the target, not the daemons it wants. Nothing guarantees the
 order the cleaner rule needs, so this phase adds it (D3).</p>
+<p>The boot half of a reboot needs no ordering, which was checked against
+libvirt's source in review of #4437. A daemon's sockets are created with
+their accept callback disabled
+(<code>src/rpc/virnetserverservice.c</code>, "IO callback is initially disabled"),
+and <code>daemonRunStateInit()</code> (<code>src/remote/remote_daemon.c</code>) enables them
+("Only now accept clients from network") only after
+<code>virStateInitialize()</code> returns. The qemu driver's state initialisation
+starts every autostart domain synchronously before it returns:
+<code>virDomainDriverAutoStart()</code> in 11.3.0 (Debian 13), and
+<code>qemuAutostartDomains()</code> in 10.0.0 (Ubuntu 24.04). So the cleaner's
+first connection to libvirt after boot cannot complete until every
+autostart domain has been started, or has failed to start -- and one
+which failed to start really is off, so recording it off and clearing
+its flag is right. This holds for socket-activated modular daemons and
+for monolithic libvirtd alike.</p>
 <h3 id="s4-instance-restore-is-a-no-op-and-deleting-it-is-safe">S4 -- instance restore is a no-op, and deleting it is safe<a class="headerlink" href="#s4-instance-restore-is-a-no-op-and-deleting-it-is-safe" title="Permanent link">&para;</a></h3>
 <p><code>restore_instances()</code> (<code>daemons/queues/startup_tasks.py:99</code>) runs on a
 background thread at sf-queues start (<code>:284-288</code>, <code>:377</code>). It:</p>
@@ -15281,12 +15297,27 @@ assertions at its end (<code>:120-125</code>) are the only cover the step 4
 reconciliation has in that file, so they are kept in a rewritten test
 rather than deleted with it. <code>StartupRestoreThreadTestCase</code> (<code>:128</code>
 onwards) is about threading and is unaffected.</p>
-<h3 id="s6-_health_check_kvm_process-is-dead-and-owns-an-import">S6 -- <code>_health_check_kvm_process()</code> is dead, and owns an import<a class="headerlink" href="#s6-_health_check_kvm_process-is-dead-and-owns-an-import" title="Permanent link">&para;</a></h3>
-<p><code>operations/node_inst_op.py:176-184</code> has no caller (<code>grep -rn
-_health_check_kvm_process shakenfist</code> finds only the definition), and
-it compares the <code>power_state</code> dict to <code>'on'</code>. It is the only user of
-<code>psutil</code> in that module (<code>:4</code>, <code>:180</code>, <code>:181</code>), so the import goes too,
-or flake8 fails.</p>
+<h3 id="s6-_health_check_kvm_process-is-live-only-its-delete-branch-is-dead">S6 -- <code>_health_check_kvm_process()</code> is live; only its delete branch is dead<a class="headerlink" href="#s6-_health_check_kvm_process-is-live-only-its-delete-branch-is-dead" title="Permanent link">&para;</a></h3>
+<p>As planned, this section said the method had no caller, because <code>grep
+-rn _health_check_kvm_process shakenfist</code> finds only the definition.
+That was wrong, and step 4 deleted it. <code>NodeInstOp.dispatch_task()</code>
+calls <code>self.__getattribute__(f'_{task.name}')</code>, and the cluster
+daemon's instance checks (<code>daemons/cluster/scheduled_tasks.py:480-488</code>)
+enqueue a <code>health_check_kvm_process</code> task for every created instance.
+With the method gone every such dispatch raised <code>AttributeError</code>, and
+the error path moved every created instance to <code>created-error</code>. The
+first functional run on the branch
+(<a href="https://github.com/shakenfist/shakenfist/actions/runs/37162396285">37162396285</a>)
+failed in every cluster job because of it.</p>
+<p>The method is restored without its delete branch, which compares the
+<code>power_state</code> dict to <code>'on'</code> and so never fires. Wired up correctly, it
+would error-delete a guest which powered itself off. Its stale
+<code>kvm_pid</code> clearing is live, and <code>_collect_billing_statistics()</code> reads
+<code>kvm_pid</code>. The task cannot be removed either, because its name is
+persisted in queued operations. Fourteen operation types dispatch by
+name like this. <code>tests/test_operation_task_dispatch.py</code> now checks that
+every task in each of them has a handler, so a grep cannot mislead the
+next deletion.</p>
 <h3 id="s7-the-cleaners-two-off-branches-are-where-autostart-is-cleared">S7 -- the cleaner's two <code>off</code> branches are where autostart is cleared<a class="headerlink" href="#s7-the-cleaners-two-off-branches-are-where-autostart-is-cleared" title="Permanent link">&para;</a></h3>
 <p>In <code>_update_inactive_domain()</code> (<code>daemons/cleaner/scheduled_tasks.py:334</code>):</p>
 <ul>
@@ -15296,9 +15327,13 @@ or flake8 fails.</p>
   off before now left autostart set.</li>
 <li><code>:429-456</code>: the locked branch which records a detected power off.</li>
 </ul>
-<p>The caller (<code>:558-568</code>) catches <code>libvirtError</code> per domain, logs it and
-moves on, so a <code>setAutostart()</code> failure skips that domain for one pass.
-<code>domain.autostart()</code> and <code>setAutostart()</code> are local libvirt calls, so
+<p>The plan first said the caller (<code>:558-568</code>) catches <code>libvirtError</code> per
+domain. It does not: the <code>try</code> wraps the whole loop, so one failed
+<code>setAutostart()</code> would have ended the pass for every domain listed after
+it. Step 2 found this and gave the call to <code>_update_inactive_domain()</code>
+its own <code>try</code>, which logs the error and moves to the next domain; the
+next pass retries.</p>
+<p><code>domain.autostart()</code> and <code>setAutostart()</code> are local libvirt calls, so
 the already-off branch costs no database load. It takes the node lock
 once for each domain that still has the flag set.</p>
 <h3 id="s8-the-power-endpoints-already-hold-the-lock-the-cleaner-takes">S8 -- the power endpoints already hold the lock the cleaner takes<a class="headerlink" href="#s8-the-power-endpoints-already-hold-the-lock-the-cleaner-takes" title="Permanent link">&para;</a></h3>
@@ -15449,7 +15484,7 @@ in parallel in one worktree, because pre-commit's stash is repo-wide.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Delete the instance restore loop and <code>_health_check_kvm_process()</code>. See brief 4. Commit: "Remove the instance restore that never ran."</td>
+<td>Delete the instance restore loop and <code>_health_check_kvm_process()</code>. See brief 4. Commit: "Remove the instance restore that never ran." Deleting the method was wrong (S6); a follow-up commit restores it without its delete branch.</td>
 </tr>
 <tr>
 <td>5</td>
@@ -15536,8 +15571,9 @@ its helpers <code>_instance_lock()</code> and <code>_inactive_domain_inside_lock
 <li>Put that in a small helper if it reads better, but keep the
     unlocked <code>autostart()</code> check outside the lock.</li>
 <li>Do not catch <code>libvirtError</code> here. The caller (around line 566)
-  already logs it and moves to the next domain, and the next pass
-  retries.</li>
+  logs it and moves to the next domain, and the next pass retries.
+  (As planned, this said the caller already did that. It did not, and
+  step 2 added the per-domain catch; see S7.)</li>
 </ul>
 <p>In <code>shakenfist/tests/test_daemon_cleaner.py</code>:</p>
 <ul>
@@ -15724,8 +15760,10 @@ goes in the pull request description.</p>
       prints exactly the <code>power_off()</code> call and the cleaner's calls.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -rn "create_on_hypervisor" shakenfist/daemons/queues/startup_tasks.py</code>
       prints only the network call.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -rn "_health_check_kvm_process\|import psutil" shakenfist/operations/node_inst_op.py</code>
-      prints nothing.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -n "enqueue_delete_due_error" shakenfist/operations/node_inst_op.py</code>
+      does not print a line inside <code>_health_check_kvm_process()</code>, and
+      <code>tests/test_operation_task_dispatch.py</code> passes. (As planned this
+      item checked the method was gone, which was wrong; see S6.)</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -n "libvirt-guests.service" shakenfist/deploy/collection/roles/node/templates/sf.service</code>
       prints the <code>After=</code> line, and it is outside the <code>{% if %}</code> chain.</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -n "power_state = 'on'\|def create_on_hypervisor" shakenfist/tests/test_queues_startup_restore.py</code>
