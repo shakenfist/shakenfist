@@ -586,7 +586,7 @@ spelling above is the one to write.
 | 2. The suite waits, and says so: an informed `create_instance` wrapper and a per-run wait summary | [PLAN-transient-capacity-refusals-phase-02-suite-wait.md](PLAN-transient-capacity-refusals-phase-02-suite-wait.md) | Complete | `5ad9651ee` (#4166), `2c6206941` (#4187) |
 | 3. Publish metrics when the running-domain set changes | [PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md](PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md) | Complete | `03cd7be3a` (#4200) |
 | 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | [PLAN-transient-capacity-refusals-phase-04-retry-after.md](PLAN-transient-capacity-refusals-phase-04-retry-after.md) | Complete | `565e36e6e` (#4241), client-python `74d6e129b` (client-python#399) |
-| 5. Decide on server-side queued placement from the phase 2 data | [PLAN-transient-capacity-refusals-phase-05-queue-decision.md](PLAN-transient-capacity-refusals-phase-05-queue-decision.md) | Complete | — |
+| 5. Decide on server-side queued placement from the phase 2 data | [PLAN-transient-capacity-refusals-phase-05-queue-decision.md](PLAN-transient-capacity-refusals-phase-05-queue-decision.md) | Complete | `b398cb890` (#4362), `a5e4a5e8c` (#4390), `48584e589` (#4406) |
 | 6. Documentation and close-out | PLAN-transient-capacity-refusals-phase-06-docs.md | Not started | — |
 | 7. Push audit | PLAN-transient-capacity-refusals-phase-07-push-audit.md | Not started | — |
 
@@ -596,7 +596,11 @@ range where the phase landed directly. It is filled in as each
 phase lands, so `—` means the phase has not landed yet, even
 where its phase plan is already written and linked above. Phase 1
 took two: the implementation, and the close-out which recorded its
-measurement. Phase 2 took the same two.
+measurement. Phase 2 took the same two. Phase 5 took three and no
+implementation at all: it is a decision phase, so each pull request
+records a reading rather than a change -- the first reading, the
+amendment that made the second reading possible, and the second
+reading, which decided.
 
 Phases 1, 2 and 3 are independent of one another and can run in
 parallel. Phase 4 follows 2, because the client retry should match
