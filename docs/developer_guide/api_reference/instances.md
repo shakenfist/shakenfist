@@ -89,7 +89,10 @@ A `diskspec` consists of the following fields as a JSON dictionary:
 * size (integer): the size of the disk in gigabytes. Must be zero or greater; a
   negative size is refused with a 400, because it corrupts the cluster's capacity
   accounting. Omit this value, or send null, for a disk the size of its base
-  image.
+  image. A request the cluster has no room for is refused later, by the
+  scheduler, with a 507 -- see
+  [capacity refusals](/operator_guide/capacity_refusals/) for that response's
+  format, its `stage` and `transient` fields, and the `Retry-After` header.
 * base (string): the base image for the disk. This can be a variety of URL-like strings,
   as documented on [the artifacts page in the user guide](/user_guide/artifacts/).
   For a blank disk, omit this value, send null, or send the literal string
