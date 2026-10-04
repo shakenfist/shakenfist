@@ -97,7 +97,15 @@ def upgrade_blob_datastore():
 
 
 def restore_instances():
-    # Ensure all instances for this node are defined and have up to date data.
+    # Instances are deliberately not restored here. libvirt keeps a running
+    # domain running across a restart of sf-queues or libvirtd -- there is
+    # nothing to do. After a hypervisor reboot, a domain's libvirt autostart
+    # flag decides whether it starts, not this function. See
+    # docs/plans/PLAN-power-state-correctness.md F2 and F10.
+    #
+    # What this function still does is collect this node's instances so
+    # their networks can be restored, and so their placements can be
+    # reconciled below.
     networks = []
     instances = []
     for inst in instance.Instances([instance.this_node_filter], prefilter='healthy'):
@@ -149,26 +157,9 @@ def restore_instances():
             util_exceptions.ignore_exception(
                 'restore network %s' % network_uuid, e)
 
-    for inst in instances:
-        try:
-            with inst.get_lock(timeout=120, op='Instance restore',
-                               global_scope=False):
-                started = ['on', 'transition-to-on',
-                           instance.Instance.STATE_INITIAL, 'unknown']
-                if inst.power_state not in started:
-                    continue
-
-                LOG.with_fields({'instance': inst}).info('Restoring instance')
-                inst.create_on_hypervisor()
-        except Exception as e:
-            util_exceptions.ignore_exception(
-                'restore instance %s' % inst, e)
-            inst.enqueue_delete_due_error(
-                'exception while restoring instance on daemon restart')
-
     # Reconcile the recorded instance placements for this node: add any
     # missing INSTANCE_LOCATION references, and remove stale ones. The
-    # restore work above can take many minutes, so the instances list
+    # network restore above can take many minutes, so the instances list
     # gathered at its start is a stale snapshot -- before removing a
     # reference, re-check the instance's authoritative placement so a
     # concurrently placed instance is never unrecorded.

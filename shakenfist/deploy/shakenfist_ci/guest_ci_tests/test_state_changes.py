@@ -186,6 +186,53 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         last_boot = this_boot
         self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
 
+    def test_lifecycle_power_off_clears_autostart(self):
+        # F10/D1: libvirt's autostart flag says whether a domain should be
+        # running, and is what starts it again after a hypervisor reboot.
+        # Power on sets it, power off clears it. Node exec is unproven in
+        # the Guests suite, so this skips loudly rather than silently when
+        # it cannot run commands on the instance's hypervisor -- see
+        # _require_node_exec()'s docstring. See
+        # docs/plans/PLAN-power-state-correctness-phase-02-autostart-restore.md,
+        # D1 and D7.
+        inst = self._start_target('autostart')
+        node = self._node_by_uuid(inst['node'])
+        self._require_node_exec(node)
+
+        self.assertTrue(
+            self._domain_autostart(node, inst['uuid']),
+            'Autostart should be enabled after create')
+
+        # D3: every SF daemon, including the cleaner, is ordered after
+        # libvirt-guests.service, so that systemd stops the cleaner before
+        # libvirt-guests shuts guests down at host shutdown. Without that
+        # ordering, a reboot could have the cleaner record every guest as
+        # off and clear its autostart flag, powering off the whole
+        # hypervisor instead of only what was already off.
+        stdout, _ = self._node_exec(
+            node, ['systemctl', 'show', '-p', 'After', 'sf-cleaner.service'])
+        self.assertIn(
+            'libvirt-guests.service', stdout,
+            'sf-cleaner.service should be ordered After libvirt-guests.service '
+            '(D3 in '
+            'docs/plans/PLAN-power-state-correctness-phase-02-autostart-restore.md), '
+            'got: %s' % stdout)
+
+        self.test_client.power_off_instance(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'off', 'after power off')
+        self.assertFalse(
+            self._domain_autostart(node, inst['uuid']),
+            'Autostart should be disabled after power off')
+
+        self.test_client.delete_console_data(inst['uuid'])
+        self.test_client.power_on_instance(inst['uuid'])
+        self._await_instance_not_ready(inst['uuid'])
+        self._await_instance_ready(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'on', 'after power on')
+        self.assertTrue(
+            self._domain_autostart(node, inst['uuid']),
+            'Autostart should be enabled again after power on')
+
     def test_lifecycle_pause_cycle(self):
         inst = self._start_target('pausecycle')
         last_boot = inst['agent_system_boot_time']
@@ -330,6 +377,23 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             'crashed', self._detected_poweroff_reason(inst['uuid'], after),
             "A killed qemu should record libvirt's shutoff reason as "
             "'crashed'")
+
+        # D2: the cleaner clears autostart on an inactive domain it finds
+        # off, in the same locked block as the 'detected poweroff' event it
+        # has already written (D6), so one pass should be enough. Poll
+        # anyway, since _await_power_off() above only waited for the event,
+        # not for the autostart clear that follows it in the same block.
+        # See docs/plans/PLAN-power-state-correctness-phase-02-autostart-restore.md,
+        # D2 and D6.
+        deadline = time.time() + 120
+        autostart = self._domain_autostart(node, inst['uuid'])
+        while autostart and time.time() < deadline:
+            time.sleep(5)
+            autostart = self._domain_autostart(node, inst['uuid'])
+        self.assertFalse(
+            autostart,
+            'Autostart was not cleared within 120s of the cleaner detecting '
+            'the killed qemu as a power off (D2)')
 
 
 class TestDetectReboot(base.BaseNamespacedTestCase):
