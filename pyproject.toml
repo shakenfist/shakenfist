@@ -166,7 +166,7 @@ dependencies = [
     "pbr==7.0.3",
     "pycparser==3.0",
     "pyparsing==3.3.3",
-    "python-dotenv==1.2.3",
+    "python-dotenv==1.2.4",
     "pytz==2026.4",
     "referencing==0.37.0",
     "rfc3986==2.0.0",
