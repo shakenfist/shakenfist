@@ -590,6 +590,11 @@ across clusters.
   needs checking per supported distribution, and against libvirt's
   `spice_tls_x509_cert_dir` expectations. Tracked as #4416.
 * **Rotate the key on renewal** (D5), once the key is no longer exposed.
+* **A certtool failure mid-reissue leaves no certificate.** The old
+  certificate is set aside before certtool runs, so a value certtool
+  rejects (a malformed IP SAN) leaves the control node without one until
+  the value is corrected. Issuing into temporary files and swapping
+  fixes it. Raised in review, tracked as #4435.
 * **Running instances outlive their certificate** (D6). Options are a
   QEMU-side reload, if one exists for SPICE, or an operator-visible list
   of instances started before the current certificate.

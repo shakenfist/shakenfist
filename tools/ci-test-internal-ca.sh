@@ -22,6 +22,9 @@
 # removed on exit; the working tree is used in place via a symlinked
 # collections path, so this tests the role as checked out.
 #
+# It runs the three entry points as site.yml does, not the role's main
+# entry point, which only includes the same three task files in order.
+#
 # Run from anywhere, with ansible-playbook, certtool and openssl on PATH:
 #
 #     tools/ci-test-internal-ca.sh
