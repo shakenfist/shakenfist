@@ -346,11 +346,18 @@ class NamespaceClaim(dbo):
         and a view which collapsed them would be the first step towards
         the code doing the same. An expired claim reads as
         ``state: created, coverage_state: expired``.
+
+        ``peak_used_*`` is the high-water mark on ``used_*``: the
+        largest drawdown this claim has ever held, which is what a
+        caller sizing the next claim wants and what ``used_*`` cannot
+        say once the instances are gone. It only ever goes up, so it
+        can exceed ``used_*`` by any amount and reads as zero on a
+        claim whose cluster has not yet raised it.
         """
         retval = self._external_view()
 
-        # One read rather than six; every field below comes from the
-        # same row.
+        # One read rather than one per field; every field below comes
+        # from the same row.
         row = self._row()
 
         retval.update({
@@ -361,6 +368,10 @@ class NamespaceClaim(dbo):
             'used_cpus': row['used_cpus'] if row else None,
             'used_memory_mb': row['used_memory_mb'] if row else None,
             'used_disk_gb': row['used_disk_gb'] if row else None,
+            'peak_used_cpus': row['peak_used_cpus'] if row else None,
+            'peak_used_memory_mb': (
+                row['peak_used_memory_mb'] if row else None),
+            'peak_used_disk_gb': row['peak_used_disk_gb'] if row else None,
             'coverage_state': row['state'] if row else None,
             'expires_at': row['expires_at'] if row else None,
             'updated_at': row['updated_at'] if row else None

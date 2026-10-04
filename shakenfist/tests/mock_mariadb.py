@@ -2791,7 +2791,9 @@ class MockMariaDB():
     def set_namespace_claim(self, namespace, limit_cpus=0, limit_memory_mb=0,
                             limit_disk_gb=0, used_cpus=0, used_memory_mb=0,
                             used_disk_gb=0, claim_uuid=None, state='active',
-                            expires_in=3600):
+                            expires_in=3600, peak_used_cpus=None,
+                            peak_used_memory_mb=None,
+                            peak_used_disk_gb=None):
         """Seed an active namespace_claims row for a namespace.
 
         No namespace has one by default, which is the unclaimed case:
@@ -2814,6 +2816,13 @@ class MockMariaDB():
         placed produces claim_over_limit and the offending dimensions on
         an admitted placement; with it True the same seed produces
         failing_stage='claim'.
+
+        The ``peak_used_*`` high-water mark defaults to the matching
+        ``used_*``, which is where a claim that has only ever grown
+        stands. Seed it higher to stand in for a namespace that has
+        since released something; it is raised by a drawdown here as it
+        is in the real transaction, and -- the point of it -- never
+        lowered by a release.
         """
         now = time.time()
         claim_uuid = str(claim_uuid) if claim_uuid else str(uuid4())
@@ -2826,6 +2835,13 @@ class MockMariaDB():
             'used_cpus': used_cpus,
             'used_memory_mb': used_memory_mb,
             'used_disk_gb': used_disk_gb,
+            'peak_used_cpus': (used_cpus if peak_used_cpus is None
+                               else peak_used_cpus),
+            'peak_used_memory_mb': (used_memory_mb
+                                    if peak_used_memory_mb is None
+                                    else peak_used_memory_mb),
+            'peak_used_disk_gb': (used_disk_gb if peak_used_disk_gb is None
+                                  else peak_used_disk_gb),
             'state': state,
             'expires_at': now + expires_in,
             'updated_at': now,
@@ -2880,6 +2896,9 @@ class MockMariaDB():
             'used_cpus': row['used_cpus'],
             'used_memory_mb': row['used_memory_mb'],
             'used_disk_gb': row['used_disk_gb'],
+            'peak_used_cpus': row['peak_used_cpus'],
+            'peak_used_memory_mb': row['peak_used_memory_mb'],
+            'peak_used_disk_gb': row['peak_used_disk_gb'],
             'state': row['state'],
             'expires_at': row['expires_at'],
             'updated_at': row['updated_at'],
@@ -3212,6 +3231,8 @@ class MockMariaDB():
                 limit = claim['limit_' + dimension]
                 used = claim['used_' + dimension]
                 claim['used_' + dimension] = used + requested
+                claim['peak_used_' + dimension] = max(
+                    claim['peak_used_' + dimension], used + requested)
                 # used is what the claim held *before* this admission, so
                 # the triple reads exactly as a denial's does, and only
                 # the dimensions actually over are reported.

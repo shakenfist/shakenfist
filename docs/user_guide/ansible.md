@@ -464,6 +464,9 @@ is:
         "used_cpus": 32,
         "used_memory_mb": 65536,
         "used_disk_gb": 1200,
+        "peak_used_cpus": 32,
+        "peak_used_memory_mb": 65536,
+        "peak_used_disk_gb": 1200,
         "expires_at": 1755300000.0,
         "updated_at": 1755213600.0
     }

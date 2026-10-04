@@ -9908,6 +9908,9 @@ class NamespaceClaim(_message.Message):
     STATE_FIELD_NUMBER: _builtins.int
     EXPIRES_AT_FIELD_NUMBER: _builtins.int
     UPDATED_AT_FIELD_NUMBER: _builtins.int
+    PEAK_USED_CPUS_FIELD_NUMBER: _builtins.int
+    PEAK_USED_MEMORY_MB_FIELD_NUMBER: _builtins.int
+    PEAK_USED_DISK_GB_FIELD_NUMBER: _builtins.int
     uuid: _builtins.str
     """Dashed uuid form"""
     namespace: _builtins.str
@@ -9920,6 +9923,14 @@ class NamespaceClaim(_message.Message):
     state: _builtins.str
     expires_at: _builtins.float
     updated_at: _builtins.float
+    peak_used_cpus: _builtins.int
+    """The high-water mark on used_*: the largest drawdown this claim has
+    ever held. Raised by the admission drawdown and by the reconciler,
+    never lowered by anything, so it answers what a namespace actually
+    consumed even when it is asked after the instances were deleted.
+    """
+    peak_used_memory_mb: _builtins.int
+    peak_used_disk_gb: _builtins.int
     def __init__(
         self,
         *,
@@ -9934,10 +9945,13 @@ class NamespaceClaim(_message.Message):
         state: _builtins.str = ...,
         expires_at: _builtins.float = ...,
         updated_at: _builtins.float = ...,
+        peak_used_cpus: _builtins.int = ...,
+        peak_used_memory_mb: _builtins.int = ...,
+        peak_used_disk_gb: _builtins.int = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["expires_at", b"expires_at", "limit_cpus", b"limit_cpus", "limit_disk_gb", b"limit_disk_gb", "limit_memory_mb", b"limit_memory_mb", "namespace", b"namespace", "state", b"state", "updated_at", b"updated_at", "used_cpus", b"used_cpus", "used_disk_gb", b"used_disk_gb", "used_memory_mb", b"used_memory_mb", "uuid", b"uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["expires_at", b"expires_at", "limit_cpus", b"limit_cpus", "limit_disk_gb", b"limit_disk_gb", "limit_memory_mb", b"limit_memory_mb", "namespace", b"namespace", "peak_used_cpus", b"peak_used_cpus", "peak_used_disk_gb", b"peak_used_disk_gb", "peak_used_memory_mb", b"peak_used_memory_mb", "state", b"state", "updated_at", b"updated_at", "used_cpus", b"used_cpus", "used_disk_gb", b"used_disk_gb", "used_memory_mb", b"used_memory_mb", "uuid", b"uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

@@ -213,6 +213,34 @@ class ClaimReadTestCase(ClaimEndpointTestCase):
         self.assertEqual('created', fetched.get_json()['state'])
         self.assertEqual('active', fetched.get_json()['coverage_state'])
 
+    def test_the_high_water_mark_is_published(self):
+        # The mark is what a caller sizing the next claim reads, and it
+        # is the one field used_* cannot stand in for: it stays where
+        # the namespace's busiest moment put it after the instances
+        # that got it there are gone.
+        claim_uuid = self._created()
+        row = self._row(claim_uuid)
+        row['used_cpus'] = 0
+        row['used_memory_mb'] = 0
+        row['used_disk_gb'] = 0
+        row['peak_used_cpus'] = 10
+        row['peak_used_memory_mb'] = 12288
+        row['peak_used_disk_gb'] = 360
+
+        fetched = self.client.get(
+            '/auth/namespaces/ci/claims/%s' % claim_uuid,
+            headers={'Authorization': self.admin}).get_json()
+
+        self.assertEqual(0, fetched['used_cpus'])
+        self.assertEqual(10, fetched['peak_used_cpus'])
+        self.assertEqual(12288, fetched['peak_used_memory_mb'])
+        self.assertEqual(360, fetched['peak_used_disk_gb'])
+
+        listed = self.client.get(
+            '/auth/namespaces/ci/claims',
+            headers={'Authorization': self.admin}).get_json()
+        self.assertEqual([10], [c['peak_used_cpus'] for c in listed])
+
     def test_an_expired_claim_is_still_listed_and_still_created(self):
         # The two states pulling apart is the case the API exists to
         # describe: an expired claim is still a created object, still

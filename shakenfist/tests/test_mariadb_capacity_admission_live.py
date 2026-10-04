@@ -252,6 +252,20 @@ class _LiveCapacityFixture(base.ShakenFistTestCase):
             return conn.execute(sa.select(table).where(
                 table.c.uuid == claim_uuid)).first()
 
+    def _reconcile(self):
+        """One full reconcile pass, for the high-water mark tests.
+
+        The pass recomputes every counter from placement ground truth,
+        which is the only thing that can show whether the mark survives
+        a recompute. This suite's nodes have no ``nodes`` rows, so the
+        pass also sweeps their capacity rows away -- harmless here,
+        because these tests assert on the claim.
+        """
+        result = mariadb._direct_reconcile_scheduler_capacity(
+            DEMAND_PER_VCPU, 600, 1.0)
+        self.assertIsNotNone(result, 'reconcile pass failed')
+        return result
+
 
 @unittest.skipUnless(
     os.environ.get(DSN_ENV),
@@ -818,6 +832,144 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         self.assertTrue(detail['cpus']['exceeded'])
         self.assertFalse(result['claim_over_limit'])
         self.assertEqual(0, self._capacity(self.node_b).used_cpus)
+
+    # ------------------------------------------------------------------
+    # The used_* high-water mark (claim coverage and sizing phase 2b)
+    # ------------------------------------------------------------------
+
+    def test_a_drawdown_raises_the_high_water_mark(self):
+        claim_uuid = self._add_claim(
+            limit_cpus=64, limit_memory_mb=65536, limit_disk_gb=1000,
+            used_cpus=0, used_memory_mb=0, used_disk_gb=0)
+
+        self.assertTrue(self._admit(self.node_b)['admitted'])
+
+        claim = self._claim(claim_uuid)
+        self.assertEqual(4, claim.used_cpus)
+        self.assertEqual(4096, claim.used_memory_mb)
+        self.assertEqual(40, claim.used_disk_gb)
+        # The mark counts this admission *once*. Written into the same
+        # SET after the counter it marks, MariaDB's left-to-right
+        # assignment evaluation would make this 8, 8192 and 80 -- the
+        # peak expression reading the already-incremented counter --
+        # which is the whole reason the drawdown uses ordered_values().
+        self.assertEqual(4, claim.peak_used_cpus)
+        self.assertEqual(4096, claim.peak_used_memory_mb)
+        self.assertEqual(40, claim.peak_used_disk_gb)
+
+    def test_two_drawdowns_mark_the_total_not_the_larger(self):
+        # The mark is on the namespace's aggregate, not on any one
+        # instance: two instances held at once are one peak of both.
+        claim_uuid = self._add_claim(
+            limit_cpus=64, limit_memory_mb=65536, limit_disk_gb=1000,
+            used_cpus=0, used_memory_mb=0, used_disk_gb=0)
+
+        self.assertTrue(self._admit(self.node_b)['admitted'])
+        self.assertTrue(self._admit(
+            self.node_b, instance=self.other_instance)['admitted'])
+
+        claim = self._claim(claim_uuid)
+        self.assertEqual(8, claim.used_cpus)
+        self.assertEqual(8, claim.peak_used_cpus)
+        self.assertEqual(8192, claim.peak_used_memory_mb)
+        self.assertEqual(80, claim.peak_used_disk_gb)
+
+    def test_a_release_lowers_used_and_leaves_the_mark(self):
+        claim_uuid = self._add_claim(
+            limit_cpus=64, limit_memory_mb=65536, limit_disk_gb=1000,
+            used_cpus=0, used_memory_mb=0, used_disk_gb=0)
+        self.assertTrue(self._admit(self.node_b)['admitted'])
+
+        self.assertTrue(self._release()['released'])
+
+        claim = self._claim(claim_uuid)
+        self.assertEqual(0, claim.used_cpus)
+        self.assertEqual(0, claim.used_memory_mb)
+        self.assertEqual(0, claim.used_disk_gb)
+        # Which is the whole point: the namespace held four vCPUs and
+        # the ledger still says so after it gave them back.
+        self.assertEqual(4, claim.peak_used_cpus)
+        self.assertEqual(4096, claim.peak_used_memory_mb)
+        self.assertEqual(40, claim.peak_used_disk_gb)
+
+    def test_a_reconcile_pass_after_a_release_leaves_the_mark(self):
+        """The most valuable assertion about the mark in this module.
+
+        The reconciler rewrites used_* from ground truth every five
+        minutes, so a peak column written flat there -- ``peak_used_cpus
+        = COALESCE(u.used_cpus, 0)`` -- would be correct on every
+        single-pass test and would discard the peak of every real CI job
+        within five minutes of it being reached. The job that provoked
+        this phase deleted its five k3s nodes about five minutes before
+        teardown, so this is the exact sequence that matters: draw down,
+        release, reconcile, and ask afterwards.
+
+        Two passes, because the first could coincidentally agree while
+        the counters were still settling.
+        """
+        claim_uuid = self._add_claim(
+            limit_cpus=64, limit_memory_mb=65536, limit_disk_gb=1000,
+            used_cpus=0, used_memory_mb=0, used_disk_gb=0)
+        self.assertTrue(self._admit(self.node_b)['admitted'])
+        self.assertTrue(self._admit(
+            self.node_b, instance=self.other_instance)['admitted'])
+        self.assertTrue(self._release()['released'])
+        self.assertTrue(self._release(instance=self.other_instance)[
+            'released'])
+
+        self._reconcile()
+        after_one = self._claim(claim_uuid)
+        self._reconcile()
+        after_two = self._claim(claim_uuid)
+
+        # Ground truth says this namespace holds nothing...
+        self.assertEqual(0, after_one.used_cpus)
+        self.assertEqual(0, after_two.used_cpus)
+        # ...and the mark says what it held at its busiest, still.
+        for claim in (after_one, after_two):
+            self.assertEqual(8, claim.peak_used_cpus)
+            self.assertEqual(8192, claim.peak_used_memory_mb)
+            self.assertEqual(80, claim.peak_used_disk_gb)
+
+    def test_a_reconcile_pass_raises_a_mark_it_finds_too_low(self):
+        # The other half of GREATEST: a claim whose mark is behind the
+        # instances the namespace is actually holding -- the shape a
+        # database upgraded from v1 is in, where the columns default to
+        # zero -- is raised to ground truth rather than left there.
+        claim_uuid = self._add_claim(
+            limit_cpus=64, limit_memory_mb=65536, limit_disk_gb=1000,
+            used_cpus=0, used_memory_mb=0, used_disk_gb=0)
+        self._place_reference(self.node_b, self.instance)
+        table = mariadb._get_namespace_claims_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.update(table).where(
+                table.c.uuid == claim_uuid).values(
+                    peak_used_cpus=0, peak_used_memory_mb=0,
+                    peak_used_disk_gb=0))
+            conn.commit()
+
+        self._reconcile()
+
+        claim = self._claim(claim_uuid)
+        self.assertEqual(4, claim.used_cpus)
+        self.assertEqual(4, claim.peak_used_cpus)
+        self.assertEqual(4096, claim.peak_used_memory_mb)
+        self.assertEqual(40, claim.peak_used_disk_gb)
+
+    def test_a_move_sets_no_new_mark(self):
+        # A move changes no namespace's usage, so there is no new peak
+        # for it to record -- and a move that raised the mark would
+        # inflate a namespace by one instance per migration.
+        claim_uuid = self._add_claim(
+            limit_cpus=64, limit_memory_mb=65536, limit_disk_gb=1000,
+            used_cpus=0, used_memory_mb=0, used_disk_gb=0)
+        self.assertTrue(self._admit(self.node_b)['admitted'])
+        self.assertTrue(self._admit(
+            self.node_a, old_node=str(self.node_b))['admitted'])
+
+        claim = self._claim(claim_uuid)
+        self.assertEqual(4, claim.used_cpus)
+        self.assertEqual(4, claim.peak_used_cpus)
 
     def test_an_expired_claim_falls_back_to_the_cluster_branch(self):
         # expires_at is compared server side, so a claim that lapsed

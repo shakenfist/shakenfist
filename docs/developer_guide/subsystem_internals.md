@@ -355,6 +355,60 @@ state row. `test_zombie_repair_state_overrides_are_pinned` in
 `test_mariadb_orphans.py` names the overriding types, so adding one
 means updating it deliberately.
 
+### The peak high-water mark
+
+`namespace_claims` also carries `peak_used_cpus`, `peak_used_memory_mb`
+and `peak_used_disk_gb` (schema version 2; designed in decision `D2`
+of `PLAN-claim-coverage-and-sizing-phase-02b-peak-measurement.md` in
+the `shakenfist/private-ci` repository, and described in full here):
+the largest `used_*` has ever been while the claim existed. It is
+maintained in exactly three places, and nowhere else is allowed to
+touch it:
+
+- **The admission drawdown**, inside
+  `_direct_admit_instance_placement()`'s guarded `UPDATE`, raises the
+  mark to `GREATEST(peak_used_*, used_* + <this placement's share>)`
+  in the same statement that increments `used_*`.
+- **The reconciler**, inside `_RECONCILE_CLAIM_USAGE_SQL`, raises the
+  mark to `GREATEST(peak_used_*, COALESCE(<recomputed used_*>, 0))`
+  every five minutes, alongside rewriting `used_*` from ground truth.
+- **Claim creation**, inside `_direct_create_namespace_claim()`, seeds
+  the mark from the same migrated drawdown that seeds `used_*` -- a
+  namespace that already holds instances when its claim is created has
+  already reached that peak, and seeding the mark at zero would make
+  the next reconcile pass look like it had raised it from nothing.
+
+The release path is deliberately absent from that list: a high-water
+mark does not come down, and a release is exactly the event it exists
+to survive.
+
+Two lines in this are hazards a reviewer has to check by reading the
+`UPDATE`, not by reading a summary of it:
+
+- **The reconciler's `GREATEST` is the only thing stopping it discarding
+  every real peak within five minutes.** Written as
+  `peak_used_* = COALESCE(used_*, 0)` it passes every single-pass test
+  -- a test with one instance and one reconcile pass cannot tell a
+  `GREATEST` from a plain assignment -- and silently resets the mark to
+  current usage on every pass thereafter. The live test that pins this
+  reconciles *after* a drawdown-and-release cycle and asserts the peak
+  survives it, mutation-checked by deleting the `GREATEST` and watching
+  that test fail.
+- **The drawdown's peak assignment must read `used_*` before it is
+  incremented, and `values()` cannot express that.** MariaDB evaluates
+  an `UPDATE`'s `SET` assignments left to right, and SQLAlchemy's
+  `values()` renders the `SET` clause in table column order regardless
+  of the order its keyword arguments are written in -- the peak columns
+  are defined after `used_*` in the table, so a plain `values()` call
+  always has the peak assignment read the *already-incremented*
+  counter, recording a mark one whole allocation too high on every
+  single admission. `ordered_values()`, with the peak assignments
+  listed ahead of the counters they mark, is what makes the statement's
+  evaluation order match the one a reader expects. This is the one
+  genuine gotcha here: nothing about reading the code tells you
+  `values()` reorders by column rather than by call order, so it is
+  recorded in this repository's `AGENTS.md` as well as here.
+
 ## Node resource health
 
 Node storage health drives `node.state`, on a different axis from the
