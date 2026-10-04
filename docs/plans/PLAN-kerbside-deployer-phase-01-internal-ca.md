@@ -164,7 +164,8 @@ separately. Step 3 checks.
 
 *Resolved in review.* The image has it: the sanity job ran the new step
 on a static runner and printed `internal_ca: all six cases passed`
-(run 37158555041, job 111307042604).
+(run 37158555041, job 111307042604) -- the six-case script as first
+pushed; review has since added cases 7 to 9 (brief 3).
 
 ### S8 -- running unprivileged is already a supported shape
 
@@ -282,11 +283,16 @@ skip arbitrarily.
 *Closed in review.* The gap was an ordering problem, not a missing piece
 of state. The template on disk is the record of what the current
 certificate was issued from, so it is now compared without being written
-(`check_mode: true`), and rewritten only after the old certificate has
-been set aside. An interrupted run leaves either the old certificate
-with the old template, which the next run compares again, or no
-certificate, which the next run issues. Case 7 of the test fails the run
-at the set-aside step and proves the rerun reissues.
+-- its sha1 against a hash of the rendered content, which lives in
+`vars/main.yml` so both uses share it -- and rewritten only after the old
+certificate has been set aside. An interrupted run leaves either the old
+certificate with the old template, which the next run compares again, or
+no certificate, which the next run issues. Case 7 of the test fails the
+run at the set-aside step and proves the rerun reissues. The comparison
+is of content alone: a first attempt in review used a check-mode `copy`,
+which also compared the file's mode, so a mirrored CA tree whose
+checkout resets modes would have reissued every certificate on every
+deploy. Case 9 covers both that and the pre-upgrade template.
 
 ### D5 -- renewal reuses the key
 
@@ -482,6 +488,20 @@ shellcheck-clean.
      Assert a new serial and the new SAN.
   6. **No renewal outside the window.** A run with nothing changed after
      case 5 issues nothing.
+
+  Review added three more:
+
+  7. **An interrupted reissue is not forgotten.** Change a SAN and fail
+     the run at the set-aside step (an `mv` which always fails, first on
+     `PATH`). The rerun reissues with the new SAN and the same key.
+  8. **Misread values are refused.** An integer or unpadded mode, a CN
+     or SAN containing a newline, and a `cert_name` or
+     `cert_dest_key_name` containing `../` each fail the run before
+     anything changes.
+  9. **Upgrade and checkout shapes.** A template whose only change is
+     its mode (as a git checkout leaves it) reissues nothing. A template
+     as the role wrote it before this phase, without `expiration_days`,
+     reissues with the same key and subject.
 * Exit non-zero on the first failed assertion, naming the case.
 * Wire it in:
   * `.github/workflows/functional-tests.yml` `sanity_checks`: a step
@@ -573,7 +593,10 @@ across clusters.
 * **Running instances outlive their certificate** (D6). Options are a
   QEMU-side reload, if one exists for SPICE, or an operator-visible list
   of instances started before the current certificate.
-* **Expiry monitoring** belongs to Embrace TLS.
+* **Expiry monitoring** belongs to Embrace TLS. So does the CA itself:
+  it is a 3650-day certificate which nothing checks or renews, so from
+  about a year before it expires, renewals issue host certificates that
+  outlive the CA they chain to.
 * **Check older clusters.** Clusters deployed by the legacy installer
   carried the same template and the same broken renewal. Any such
   cluster more than a year old already has expired SPICE certificates.

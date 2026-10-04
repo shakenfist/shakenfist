@@ -345,7 +345,40 @@ case_8_rejects_bad_values() {
     run_play_fails 'is not a single line' "${WORK}/bad-cn.json"
     echo '{"cert_san_dns": ["console.example.com", "x.example.com\rca"]}' > "${WORK}/bad-san.json"
     run_play_fails 'is not a single line' "${WORK}/bad-san.json"
+    echo '{"cert_name": "../escaped"}' > "${WORK}/bad-name.json"
+    run_play_fails 'cert_name is \\?"\.\./escaped\\?", but must be a plain file name' "${WORK}/bad-name.json"
+    [ ! -e "${WORK}/escaped-server-key.pem" ] || fail 'a rejected cert_name wrote a key outside ca_path'
+    echo '{"cert_dest_key_name": "../server-key.pem"}' > "${WORK}/bad-dest-name.json"
+    run_play_fails 'cert_dest_key_name is \\?"\.\./server-key\.pem\\?", but must be a plain file name' \
+        "${WORK}/bad-dest-name.json"
     [ "$(serial "${HOST_CERT}")" = "${host_serial}" ] || fail 'a rejected run reissued the certificate'
+}
+
+case_9_upgrade_and_checkout() {
+    CURRENT_CASE='case 9: a mode-only template change does not reissue; a pre-upgrade template does'
+    local template="${CA}/testhost-server-template.pem"
+    local host_serial host_pub host_subject
+    host_serial="$(serial "${HOST_CERT}")"
+    host_pub="$(pubkey "${HOST_CERT}")"
+    host_subject="$(openssl x509 -noout -subject -in "${HOST_CERT}")"
+
+    # A git checkout of a mirrored CA tree writes the template 0644, not 0400.
+    chmod 0644 "${template}"
+    run_play
+    [ "$(serial "${HOST_CERT}")" = "${host_serial}" ] || fail 'a mode-only template change reissued the certificate'
+    set_aside "${HOST_CERT}" > /dev/null
+
+    # The template as the role wrote it before it gained an explicit lifetime.
+    chmod u+w "${template}"
+    printf 'organization = Shaken Fist CA for sf\ncn = testhost\ntls_www_server\nencryption_key\nsigning_key\n' \
+        > "${template}"
+    run_play
+    [ "$(serial "${HOST_CERT}")" != "${host_serial}" ] || fail 'a pre-upgrade template did not reissue the certificate'
+    [ "$(pubkey "${HOST_CERT}")" = "${host_pub}" ] || fail 'the reissued certificate has a new key'
+    [ "$(openssl x509 -noout -subject -in "${HOST_CERT}")" = "${host_subject}" ] || fail 'the subject changed'
+    assert_year_lifetime "${HOST_CERT}"
+    local copies=("${HOST_CERT}".*)
+    [ "${#copies[@]}" -eq 2 ] || fail "expected two set-aside copies of ${HOST_CERT}, found ${#copies[@]}"
 }
 
 case_1_fresh_issue
@@ -356,5 +389,6 @@ case_5_renew_on_template_change
 case_6_no_renewal
 case_7_interrupted_reissue
 case_8_rejects_bad_values
+case_9_upgrade_and_checkout
 
-echo "internal_ca: all eight cases passed (${RUNS} ansible runs)"
+echo "internal_ca: all nine cases passed (${RUNS} ansible runs)"

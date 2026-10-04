@@ -138,12 +138,14 @@ certificate is reissued when the control node's copy expires within
 changes (the common name, the subject alternative names or the lifetime). The
 existing key is reused, and the old certificate is kept beside the new one on
 the control node as `<host_cert_path>.<UTC timestamp>`, where the timestamp is
-formatted `YYYYmmddHHMMSS`. The template is only rewritten after the old
-certificate has been set aside, so a deploy interrupted part way through a
-reissue repeats it next time rather than forgetting it. A cluster therefore
-needs a deploy at least once
-inside each renewal window: with the defaults, at least once in the last 90
-days before a certificate expires.
+formatted `YYYYmmddHHMMSS`. The role never deletes these set-aside copies, so
+one accumulates per host per reissue; prune them yourself if you need to, and
+expect them to appear as new files if `ca_path` is under version control. The
+template is only rewritten after the old certificate has been set aside, so a
+deploy interrupted part way through a reissue repeats it next time rather than
+forgetting it. A cluster therefore needs a deploy at least once inside each
+renewal window: with the defaults, at least once in the last 90 days before a
+certificate expires.
 
 Until this release, renewal never worked (issue 4415), and certtool's default
 lifetime of 365 days applied silently, so every SPICE certificate the
@@ -185,7 +187,8 @@ The modes must be quoted four digit octal strings, as the defaults are: YAML
 reads an unquoted `0400` as the integer 256, which can end up installed as mode
 `0256`, so the role refuses it. The role also refuses a `deploy_name`,
 `cert_cn` or subject alternative name containing a newline, since each is
-written into a certtool template as a line of its own.
+written into a certtool template as a line of its own, and a `cert_name` or
+`cert_dest_*_name` that is not a plain file name.
 
 ## Consuming the collection
 

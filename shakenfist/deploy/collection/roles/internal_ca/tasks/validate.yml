@@ -36,3 +36,22 @@
       template, one per line.
     quiet: true
   loop: "{{ [deploy_name, cert_cn] + cert_san_dns + cert_san_ip }}"
+
+# These are file names joined to a directory -- cert_name under ca_path on
+# the control node, the cert_dest_*_name values under cert_dest_dir on the
+# host -- so a / or .. in one would put key material somewhere else.
+- name: Check the certificate file names are plain file names
+  ansible.builtin.assert:
+    that:
+      - item.value is match('^[A-Za-z0-9][A-Za-z0-9._-]*$')
+    fail_msg: >-
+      {{ item.key }} is {{ item.value | to_json }}, but must be a plain file
+      name: letters, digits, dots, hyphens and underscores, not starting
+      with a dot.
+    quiet: true
+  loop: >-
+    {{ {'cert_name': cert_name, 'cert_dest_ca_name': cert_dest_ca_name,
+        'cert_dest_cert_name': cert_dest_cert_name,
+        'cert_dest_key_name': cert_dest_key_name} | dict2items }}
+  loop_control:
+    label: "{{ item.key }}"
