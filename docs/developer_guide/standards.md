@@ -275,6 +275,13 @@ Current hooks:
   It needs `ansible-core`, `certtool` (the `gnutls-bin` package) and
   `openssl`, and only runs when the role or the script changes. The
   sanity-checks workflow runs the same script
+- `test-kerbside-cluster-config` - Drives the node role's `kerbside_preflight`
+  and `kerbside_credentials` entry points against a stub `sf-ctl`, and renders
+  the role's config template, without root, by running
+  `tools/ci-test-kerbside-cluster-config.sh`. It needs only `ansible-core`,
+  and only runs when those entry points, the role's `argument_specs`,
+  defaults or config template, or the script change. The sanity-checks
+  workflow runs the same script
 - `flake8` - Style check via tox, on changed files
 - `py3` - Unit tests via tox
 - `check-from-db-by-ref-namespace` - Every `*_from_db_by_ref` call passes a
