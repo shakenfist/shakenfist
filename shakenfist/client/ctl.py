@@ -196,11 +196,16 @@ def bootstrap_system_key(keyname: str, key: Optional[str],
 @click.option('--show-secrets', is_flag=True, default=False,
               help='Include secret values instead of redacting them.')
 def show_config(show_secrets: bool) -> None:
-    """Show cluster-wide configuration, redacting secrets by default."""
+    """Show cluster-wide configuration, redacting secrets by default.
+
+    Numeric values are never redacted even when the name looks secret
+    (for example KERBSIDE_TOKEN_DURATION), as a number cannot be a
+    credential.
+    """
     config_data = mariadb.get_cluster_config()
     if not show_secrets:
-        for key in config_data:
-            if sf_config.SECRET_CONFIG_KEY_RE.search(key):
+        for key, value in config_data.items():
+            if sf_config.config_value_is_secret(key, value):
                 config_data[key] = '<redacted>'
     click.echo(json.dumps(config_data, indent=4, sort_keys=True))
 
