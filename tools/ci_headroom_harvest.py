@@ -788,7 +788,7 @@ def default_report_path():
 def build_parser(default_census_limit):
     parser = argparse.ArgumentParser(
         description=('Harvest the banked CI headroom bundles from merge runs '
-                     'into one JSONL dataset (phase 2, D16/D17).'))
+                     'into one JSONL dataset.'))
     parser.add_argument(
         '--repo', default=DEFAULT_REPO,
         help='The repository to harvest, as owner/name.')
@@ -797,9 +797,9 @@ def build_parser(default_census_limit):
         help='The workflow file whose merge_group runs carry the bundles.')
     parser.add_argument(
         '--since', type=parse_since, default=None,
-        help=('Only runs created at or after this date (ISO 8601). The phase '
-              '2 window starts at 2026-08-30, the day the census filter fix '
-              'merged.'))
+        help=('Only runs created at or after this date (ISO 8601). The '
+              'committed baseline window starts at 2026-08-30, the day the '
+              'census filter fix merged.'))
     parser.add_argument(
         '--until', type=parse_since, default=None,
         help=('Only runs created at or before this date (ISO 8601). Give it '
@@ -820,8 +820,7 @@ def build_parser(default_census_limit):
               'of zips.'))
     parser.add_argument(
         '--output', '-o', required=True,
-        help=('Where to write the dataset, as one compact JSON object per '
-              'line (D22).'))
+        help='Where to write the dataset, as one compact JSON object per line.')
     parser.add_argument(
         '--report', default=default_report_path(),
         help='Path to tools/ci_headroom_report.py, whose summary_record() this calls.')

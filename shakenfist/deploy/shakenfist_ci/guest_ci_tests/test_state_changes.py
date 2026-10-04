@@ -318,7 +318,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self.assertEqual(
             'created', detected['state'],
             'A killed qemu should leave the instance in state created, '
-            'not change it (D7)')
+            'not change it')
 
         # D7 deliberately does not verify this against a real hypervisor
         # before now: mapping CRASHED to 'crashed' was unverified survey

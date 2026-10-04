@@ -559,19 +559,82 @@ renamed.
 `refusal_warning` was already deliberately tri-state for the census that
 could not be read; this is the second way it cannot say, and it now reads
 null too. Both prose sites that explained the null as "no census was read"
-now distinguish the two reasons. Two tests, one for the empty census and
-one for the converse -- a census that read real lines and found no refusal
+now distinguish the reasons. Two tests, one for the empty census and one
+for the converse -- a census that read real lines and found no refusal
 must keep saying so.
+
+**The first fix for this was keyed on the wrong field, and the automated
+review caught it.** It tested `census['records']`, the count of JSON log
+lines. But `records` is incremented before `stage_of()` runs, so the
+renamed-message case this finding names -- a LogQL filter that stopped
+matching the scheduler's message forms -- leaves whatever else the query
+selects counted in `records` while no stage is tallied, and
+`capacity_shortage_drops` is summed from the stage tallies alone. The
+dangerous half of the defect therefore still read as a clean run. The test
+is now `census['stage_events']`, which subsumes the empty case, and the
+prose is three-way: no census, no lines, or lines without stages.
+
+Two further things fell out of that, neither of them visible from reading
+the first fix:
+
+* **The converse test was passing for the wrong reason.** Its fixture used
+  `schedule have highest affinity`, which `stage_of()` returns None for, so
+  the census it built was itself in the ambiguous state -- it asserted that
+  an observed absence keeps reading as an absence while containing no
+  observation. It now uses a real `STAGE_SURVIVED_PREFIX` event.
+* **The early `return` silenced the guard half.** `print_verdict()` returned
+  as soon as the warning was null, which was harmless while the condition
+  implied an empty census, because an empty census has no guard events
+  either. Widening the condition made it able to suppress a *collected*
+  guard census with real denials -- the reading the comment above that line
+  says it exists to prevent, and the stronger of the two kinds of evidence.
+  It now falls through. A pre-existing test caught this one.
+
+`RECORD_VERSION` is 4 as a result. The file's own convention is that
+additive changes go in place and non-additive ones bump the version, and a
+version 3 record carries `False` where a version 4 record carries `null`
+for the same observation. The committed baseline is unaffected in fact --
+`stage_events` is non-zero on all 204 summarised records in
+`records.jsonl` and all 32 in the addendum, so no banked record is in the
+ambiguous state -- but a window harvested across the boundary would pool
+the two, so the dataset README names it and gives the four lines that
+re-derive the version 4 reading from fields every version carries.
 
 ### Mechanical fixes, taken because they leave the repository
 
-**F-M1. 25 sites in `tools/ci_headroom_report.py` printed decision letters
-into CI output**, including two in `$GITHUB_STEP_SUMMARY` and three in
-GitHub annotations: D3, D4, D5, D7, D8, D9, D10, D11, D13, D15, D18, "phase
-2", "phase 4". A contributor reading a job log or a PR annotation has no
-access to the plan that assigns those letters. Each sentence already stated
-its reason, so the citations were removed and the reasons kept. Five test
-assertions pinning the old strings were updated with them.
+**F-M1. 34 sites printed plan citations into CI output**, including two in
+`$GITHUB_STEP_SUMMARY` and three in GitHub annotations: D3, D4, D5, D7, D8,
+D9, D10, D11, D13, D15, D18, "phase 2", "phase 4". A contributor reading a
+job log or a PR annotation has no access to the plan that assigns those
+letters. Each sentence already stated its reason, so the citations were
+removed and the reasons kept. Seven test assertions pinning the old strings
+were updated with them.
+
+The first pass found 25, all in `tools/ci_headroom_report.py`, by matching
+`D[0-9]` and "phase N". The automated review found four more it had missed
+-- `(5f)`, a *step* identifier rather than a decision letter, three of them
+in `print_verdict()` and one in the step summary. Rather than take the four
+reported, the sweep was redone as an enumeration: every non-docstring
+string literal in the repository, parsed out with `ast` so comments and
+docstrings are excluded by construction, matched against `D[0-9]`,
+`([0-9][a-z])`, `phase [0-9]` and `PLAN-`. That found five more beyond the
+reported four:
+
+| Site | Why it is user-visible |
+|---|---|
+| `ci_headroom_report.py`, the `demand` dimension note | printed in the guard census table |
+| `ci_headroom_harvest.py` ×3 | `argparse` help, so `--help` output |
+| `test_state_changes.py`, a `(D7)` assertion message | read out of a cluster CI failure, which is F-M2's class exactly |
+
+Two sites were left deliberately, and the distinction is what the sweep is
+for. `shakenfist_ci/base.py` and `test_coalescing.py` cite a
+`docs/plans/PLAN-*.md` *path*, which a reader can open -- that is the useful
+form, not the opaque one. And `ci_headroom_harvest.py`'s `absent_reason`
+says "predates phase 1" in a string that is **recorded into every record of
+the committed dataset**: changing it would split the data on a condition
+two spellings now describe, which is the same class of defect as the
+`refusal_warning` boundary above. A citation in banked data is not the same
+problem as a citation in a job log.
 
 **F-M2. 20 runtime `skipTest`/`fail` messages in `test_saturation.py` ended
 in `(D26)`.** These are what an engineer reads in a cluster CI result. Each
@@ -863,7 +926,7 @@ existed.
 | 7b | `ci_headroom_report.py` really is 3,108 lines; `probe.py`'s imports | both confirmed; the line count coincidentally equals a range's insertion count, and the management session's suspicion of conflation was wrong |
 | 7c | the docstring-versus-code contradiction; the `(D26)` count | confirmed; 32 occurrences, 23 in `skipTest`/`fail` calls |
 | 7d | `FakeGitHub.paginate()` yields one page; `GitHubCLI` absent from tests | both confirmed |
-| 7e | `sizing.py`'s `ram_max` citation; the printed decision letters | both confirmed; 16 `print`-embedded citations found by the check, 25 sites in total once annotations and the step summary were included |
+| 7e | `sizing.py`'s `ram_max` citation; the printed decision letters | both confirmed; 16 `print`-embedded citations found by the check, 25 sites in total once annotations and the step summary were included. Nine more were found afterwards by enumerating string literals rather than grepping -- see F-M1 |
 | 7f | the zip-extraction allowlist; the untyped `artifact['id']` | both confirmed |
 | 7g | the cadence and failed-sample figures over all 236 records; the gate expressions in both layers | both confirmed; its record count of 204 + 32 was right and the management session's 249 was the raw line count |
 | 7h | the unvalidated `test_kind` and all seven gates; whether CI runs the tests | both confirmed |
@@ -875,8 +938,8 @@ existed.
 | F-B1 docstring states the opposite of the code | blocking | fixed here |
 | F-B2 `paginate()` page walk untested | blocking | fixed here, 5 tests |
 | F-B3 all-absent window reports success unqualified | blocking | fixed here, 2 tests |
-| F-B4 empty census reads as no refusals | blocking | fixed here, 2 tests |
-| F-M1 25 printed decision citations | mechanical | fixed here |
+| F-B4 empty census reads as no refusals | blocking | fixed here, 4 tests; first fix was wrong, see above |
+| F-M1 34 printed plan citations | mechanical | fixed here |
 | F-M2 20 runtime `(D26)` messages | mechanical | fixed here |
 | F-M3 nine rotted line citations | mechanical | fixed here |
 | F-M4 cross-repository citation unmarked | mechanical | fixed here |

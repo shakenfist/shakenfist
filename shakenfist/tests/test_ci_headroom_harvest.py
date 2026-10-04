@@ -43,6 +43,7 @@ The tool is loaded by path for the same reason its own tests load the report
 that way: ``tools/`` is not a package.
 """
 
+import contextlib
 import importlib.util
 import io
 import json
@@ -681,6 +682,68 @@ class UsableSeriesAccountingTestCase(RecordTestCase):
             'A window in which no bundle carried a series reported a '
             'non-zero usable count, which is the shape that lets a dead '
             'probe read as a measured window.')
+
+    def _stderr(self, members):
+        """Harvest with the warning enabled, and return what it printed.
+
+        The second count is only half the fix. The half an operator actually
+        meets is the line on stderr, so these go through harvest() with
+        quiet off rather than reading the tuple.
+        """
+        github = self._github(members)
+        args = Args(self.output, self.cache, quiet=False)
+        captured = io.StringIO()
+        with contextlib.redirect_stderr(captured):
+            written, usable = harvest.harvest(github, args, report)
+        return written, usable, captured.getvalue()
+
+    def test_a_window_which_measured_nothing_says_so_on_stderr(self):
+        written, usable, printed = self._stderr(
+            {TIER_BUNDLE: {'bundle/logs/syslog': 'x\n'}})
+        self.assertEqual((1, 0), (written, usable))
+        self.assertIn(
+            'WARNING: not one of the 1 record written carries a usable '
+            'series', printed,
+            'The harvest wrote a record, measured nothing, and said nothing '
+            'about it. The returned count is not what an operator reads; '
+            'this line is.')
+        self.assertIn('measured nothing', printed)
+
+    def test_a_window_which_measured_something_prints_no_warning(self):
+        written, usable, printed = self._stderr(
+            {PRIMARY_BUNDLE: instrumented_members(),
+             TIER_BUNDLE: {'bundle/logs/syslog': 'x\n'}})
+        self.assertEqual((2, 1), (written, usable))
+        self.assertNotIn(
+            'WARNING', printed,
+            'One of the two records carries a series, so this window did '
+            'measure something. Warning about it would train an operator to '
+            'ignore the line that matters.')
+
+    def test_main_reports_the_usable_count_beside_the_written_one(self):
+        # main() builds its own client, so the fake is substituted for the
+        # class rather than passed in. This is the only test which goes
+        # through main(): the summary line is printed there and nowhere
+        # else, so nothing below main() can pin it.
+        github = self._github({PRIMARY_BUNDLE: instrumented_members(),
+                               TIER_BUNDLE: {'bundle/logs/syslog': 'x\n'}})
+        original = harvest.GitHubCLI
+        harvest.GitHubCLI = lambda **kwargs: github
+        self.addCleanup(setattr, harvest, 'GitHubCLI', original)
+        captured = io.StringIO()
+        with contextlib.redirect_stderr(captured):
+            code = harvest.main(
+                ['--output', self.output, '--cache-dir', self.cache,
+                 '--since', '2026-08-30'])
+        self.assertEqual(0, code)
+        printed = captured.getvalue()
+        self.assertIn(
+            'Wrote 2 records', printed)
+        self.assertIn(
+            '(1 with a usable series)', printed,
+            'main() printed the file size without the measured size, so a '
+            'window of two records in which one probe ran reads as two '
+            'measurements.')
 
 
 class LoudFailureTestCase(HarvestTestCase):

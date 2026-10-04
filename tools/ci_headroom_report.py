@@ -270,7 +270,19 @@ PER_NODE_BAND_UPPER = 0.85
 # reads them with .get() and treats absence as "written before the gate".
 # n_fraction joined every metric block in place for the same reason: the
 # gate's sample floor is counted from it.
-RECORD_VERSION = 3
+#
+# Version 4 (phase 7) changed what verdict.refusal_warning says about a
+# census which was read and matched no scheduler stage event: False before,
+# null now. See verdict_record(). That is the non-additive kind of change --
+# a version 3 record and a version 4 record carry different values for the
+# same observation, and the earlier one is wrong in the direction that
+# matters, reading an instrument which did not look as a cluster which
+# refused nothing. A consumer pooling across the boundary must re-derive the
+# warning from census.records and census.stage_events, which every version
+# carries, rather than trusting the stored flag; below version 4 a False
+# there means "no capacity-stage drops were tallied", which is not the same
+# claim.
+RECORD_VERSION = 4
 
 # Loki's own max_entries_limit_per_query, and the value
 # tools/ci_headroom_collect.sh in shakenfist/actions issues its query with. A
@@ -348,8 +360,8 @@ GUARD_DIMENSION_NOTES = collections.OrderedDict([
     ('cpus', 'allocated vCPU'),
     ('memory_mb', 'allocated memory'),
     ('disk_gb', 'allocated disk'),
-    ('demand', 'measured CPU load plus the D13 feedforward estimate -- '
-               'NOT an allocation'),
+    ('demand', "measured CPU load plus the scheduler's feedforward "
+               'demand estimate -- NOT an allocation'),
 ])
 
 UNKNOWN_STAGE = '(no failing_stage recorded)'
@@ -1800,12 +1812,27 @@ def verdict_record(record):
     is a warning on its own, independent of the ratio -- but a census which
     could not say there were none reads null rather than False. There are two
     ways it cannot say. The obvious one is a census that was never read. The
-    other is a census read successfully which matched not one log line, which
-    looks like a quiet cluster and is not: every job this runs in deploys a
-    cluster and schedules instances, so the scheduler cannot have been silent.
-    An empty result means the shipping path stopped or the message forms the
-    filter names were renamed, and either way the instrument failed to
-    observe rather than the cluster failing to refuse.
+    other is a census read successfully which found not one scheduler stage
+    event, which looks like a quiet cluster and is not: every job this runs
+    in deploys a cluster and schedules instances, so the scheduler cannot
+    have been silent.
+
+    The test is ``stage_events`` rather than ``records`` because the two
+    instrument failures it catches part company there. A shipping path which
+    stopped leaves no lines at all. Message forms the LogQL filter no longer
+    names leave whatever else the query selects -- the capacity guard's own
+    events, say -- counted in ``records`` while no stage is tallied, and
+    ``capacity_shortage_drops`` is computed from the stage tallies alone, so
+    keying on ``records`` would read that second failure as a clean run.
+    ``print_census`` already calls the same state suspicious, and the two
+    must not disagree.
+
+    Records banked before RECORD_VERSION 4 carry False here for a census
+    which was read and matched no stage event, because this read
+    ``records`` instead. Nothing re-derives those, so an analysis pooling
+    across that boundary must compute the warning from ``census.records``
+    and ``census.stage_events`` -- both present in every version -- rather
+    than from the stored flag.
 
     The per-node maximum (D21) is judged against PER_NODE_BAND_UPPER (D4).
     Phase 2 found 0.85 the cleanest separation in the dataset, but also
@@ -1827,7 +1854,7 @@ def verdict_record(record):
 
     census = record['census']
     shortage = census['capacity_shortage_drops']
-    if census['state'] == 'read' and not census['records']:
+    if census['state'] == 'read' and not census['stage_events']:
         shortage = None
     per_node_max = record['per_node_max_cpu_fraction']
     per_node_p90 = per_node_max['p90']
@@ -2653,18 +2680,18 @@ def print_verdict(record):
         print('  Verdict: %s' % text)
 
     if verdict['gates']:
-        print('  This verdict gates (5f): the report returns exit status %d.'
+        print('  This verdict gates: the report returns exit status %d.'
               % BAND_VIOLATION_EXIT)
         print('  Whether that fails this job is decided by the caller\'s')
         print('  headroom_gate input and the CI_HEADROOM_GATE switch.')
     elif verdict['band'] == 'OVERSUBSCRIBED':
-        print('  This verdict would gate (5f), but the series cannot support')
+        print('  This verdict would gate, but the series cannot support')
         print('  it, so the report returns 0:')
         for reason in verdict['gate_withheld']:
             print('    - %s' % reason)
         print('  An unreadable instrument is not a statement about the cloud.')
     else:
-        print('  Only the cluster-wide upper bound gates (5f). Nothing else')
+        print('  Only the cluster-wide upper bound gates. Nothing else')
         print('  here can fail a job: the lower bound is information rather')
         print('  than an alarm, and the per-node bound never gates.')
 
@@ -2687,16 +2714,28 @@ def print_verdict(record):
     if verdict['refusal_warning'] is None:
         print('  Refusal warning: UNKNOWN. Any capacity-stage refusal is a')
         print('  warning on its own, independent of the ratio above -- but')
-        if census['state'] == 'read':
+        if census['state'] != 'read':
+            print('  no census was read, so that half of the verdict is')
+            print('  missing.')
+        elif not census['records']:
             print('  this census read not one log line, and a run which')
             print('  deployed a cluster cannot have logged nothing, so the')
             print('  census did not observe rather than observing no refusal.')
         else:
-            print('  no census was read, so that half of the verdict is')
-            print('  missing.')
-        return
-    shortage = census['capacity_shortage_drops']
-    if verdict['refusal_warning']:
+            print('  this census read %d %s and found no scheduler stage'
+                  % (census['records'], plural(census['records'], 'line')))
+            print('  event among them. A run which deployed a cluster cannot')
+            print('  have scheduled nothing, and the lines prove the shipping')
+            print('  path is healthy, so the query is what stopped matching:')
+            print('  the census did not observe rather than observing no')
+            print('  refusal.')
+        # Falls through rather than returning. The stage half being
+        # unreadable says nothing about the guard half below, and the guard
+        # half is the stronger evidence of the two -- a collected guard
+        # census with denials in it must not be silenced by a stage filter
+        # which stopped matching.
+    elif verdict['refusal_warning']:
+        shortage = census['capacity_shortage_drops']
         print('  Refusal warning: YES. %d candidate %s at a capacity stage.'
               % (shortage, plural(shortage, 'drop')))
         print('  That is a warning in its own right, whatever the ratio')
@@ -2907,10 +2946,15 @@ def step_summary_lines(record):
             % (fmt_fraction(verdict['per_node_max_p90_fraction']),
                verdict['per_node_band'], verdict['per_node_band_upper']))
     if verdict['refusal_warning'] is None:
-        lines.append(
-            '* Refusal warning: UNKNOWN (%s)'
-            % ('the census read no log lines at all'
-               if record['census']['state'] == 'read' else 'no census read'))
+        census = record['census']
+        if census['state'] != 'read':
+            why = 'no census read'
+        elif not census['records']:
+            why = 'the census read no log lines at all'
+        else:
+            why = ('the census read %d %s and no scheduler stage events'
+                   % (census['records'], plural(census['records'], 'line')))
+        lines.append('* Refusal warning: UNKNOWN (%s)' % why)
     elif verdict['refusal_warning']:
         lines.append(
             '* Refusal warning: YES -- a demand-estimator calibration '
@@ -2925,7 +2969,7 @@ def step_summary_lines(record):
         lines.append(
             '* Gate: this verdict returns exit status %d; whether that '
             'fails this job is decided by the caller\'s headroom_gate input '
-            'and the CI_HEADROOM_GATE switch (5f)'
+            'and the CI_HEADROOM_GATE switch'
             % BAND_VIOLATION_EXIT)
     elif verdict['band'] == 'OVERSUBSCRIBED':
         lines.append(
