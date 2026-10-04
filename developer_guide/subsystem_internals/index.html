@@ -14755,6 +14755,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#the-peak-high-water-mark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The peak high-water mark
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -15213,6 +15224,58 @@ row to <code>deleted</code>, which is wrong for anything that works without a
 state row. <code>test_zombie_repair_state_overrides_are_pinned</code> in
 <code>test_mariadb_orphans.py</code> names the overriding types, so adding one
 means updating it deliberately.</p>
+<h3 id="the-peak-high-water-mark">The peak high-water mark<a class="headerlink" href="#the-peak-high-water-mark" title="Permanent link">&para;</a></h3>
+<p><code>namespace_claims</code> also carries <code>peak_used_cpus</code>, <code>peak_used_memory_mb</code>
+and <code>peak_used_disk_gb</code> (schema version 2; designed in decision <code>D2</code>
+of <code>PLAN-claim-coverage-and-sizing-phase-02b-peak-measurement.md</code> in
+the <code>shakenfist/private-ci</code> repository, and described in full here):
+the largest <code>used_*</code> has ever been while the claim existed. It is
+maintained in exactly three places, and nowhere else is allowed to
+touch it:</p>
+<ul>
+<li><strong>The admission drawdown</strong>, inside
+  <code>_direct_admit_instance_placement()</code>'s guarded <code>UPDATE</code>, raises the
+  mark to <code>GREATEST(peak_used_*, used_* + &lt;this placement's share&gt;)</code>
+  in the same statement that increments <code>used_*</code>.</li>
+<li><strong>The reconciler</strong>, inside <code>_RECONCILE_CLAIM_USAGE_SQL</code>, raises the
+  mark to <code>GREATEST(peak_used_*, COALESCE(&lt;recomputed used_*&gt;, 0))</code>
+  every five minutes, alongside rewriting <code>used_*</code> from ground truth.</li>
+<li><strong>Claim creation</strong>, inside <code>_direct_create_namespace_claim()</code>, seeds
+  the mark from the same migrated drawdown that seeds <code>used_*</code> -- a
+  namespace that already holds instances when its claim is created has
+  already reached that peak, and seeding the mark at zero would make
+  the next reconcile pass look like it had raised it from nothing.</li>
+</ul>
+<p>The release path is deliberately absent from that list: a high-water
+mark does not come down, and a release is exactly the event it exists
+to survive.</p>
+<p>Two lines in this are hazards a reviewer has to check by reading the
+<code>UPDATE</code>, not by reading a summary of it:</p>
+<ul>
+<li><strong>The reconciler's <code>GREATEST</code> is the only thing stopping it discarding
+  every real peak within five minutes.</strong> Written as
+  <code>peak_used_* = COALESCE(used_*, 0)</code> it passes every single-pass test
+  -- a test with one instance and one reconcile pass cannot tell a
+  <code>GREATEST</code> from a plain assignment -- and silently resets the mark to
+  current usage on every pass thereafter. The live test that pins this
+  reconciles <em>after</em> a drawdown-and-release cycle and asserts the peak
+  survives it, mutation-checked by deleting the <code>GREATEST</code> and watching
+  that test fail.</li>
+<li><strong>The drawdown's peak assignment must read <code>used_*</code> before it is
+  incremented, and <code>values()</code> cannot express that.</strong> MariaDB evaluates
+  an <code>UPDATE</code>'s <code>SET</code> assignments left to right, and SQLAlchemy's
+  <code>values()</code> renders the <code>SET</code> clause in table column order regardless
+  of the order its keyword arguments are written in -- the peak columns
+  are defined after <code>used_*</code> in the table, so a plain <code>values()</code> call
+  always has the peak assignment read the <em>already-incremented</em>
+  counter, recording a mark one whole allocation too high on every
+  single admission. <code>ordered_values()</code>, with the peak assignments
+  listed ahead of the counters they mark, is what makes the statement's
+  evaluation order match the one a reader expects. This is the one
+  genuine gotcha here: nothing about reading the code tells you
+  <code>values()</code> reorders by column rather than by call order, so it is
+  recorded in this repository's <code>AGENTS.md</code> as well as here.</li>
+</ul>
 <h2 id="node-resource-health">Node resource health<a class="headerlink" href="#node-resource-health" title="Permanent link">&para;</a></h2>
 <p>Node storage health drives <code>node.state</code>, on a different axis from the
 daemon-liveness watchdog below. <code>shakenfist/resource_health.py</code> is the

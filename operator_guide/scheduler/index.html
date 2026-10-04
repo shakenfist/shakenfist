@@ -14833,6 +14833,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#the-peak-a-claim-ever-held" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The peak a claim ever held
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#growing-shrinking-expiring-and-deleting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15146,6 +15157,17 @@
     <span class="md-ellipsis">
       
         What creating a claim does to existing usage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-peak-a-claim-ever-held" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The peak a claim ever held
       
     </span>
   </a>
@@ -15728,6 +15750,33 @@ claim. Reading it without that term -- "is there <code>total - claimed -
 unclaimed_used</code> left?" -- makes claims look harder to get than they are:
 a namespace is not counted against its own claim on the unclaimed side,
 because the same statement is taking it off there.</p>
+<h3 id="the-peak-a-claim-ever-held">The peak a claim ever held<a class="headerlink" href="#the-peak-a-claim-ever-held" title="Permanent link">&para;</a></h3>
+<p>Alongside <code>used_cpus</code>, <code>used_memory_mb</code> and <code>used_disk_gb</code> -- what the
+claim's namespace holds <em>right now</em> -- every claim also publishes
+<code>peak_used_cpus</code>, <code>peak_used_memory_mb</code> and <code>peak_used_disk_gb</code>: the
+largest each counter has ever reached while the claim has existed.
+The admission path raises the mark inside the same transaction that
+draws the claim down, the five-minute reconciler raises it towards
+whatever ground truth it recomputes <code>used_*</code> to, and nothing ever
+lowers it -- releasing an instance drops <code>used_*</code> but leaves the mark
+exactly where it was. A claim created over a namespace that already
+holds instances (above) starts its mark at the same migrated drawdown
+that seeds <code>used_*</code>, for the same reason: a namespace already holding
+ten vCPU has already reached a peak of ten, and seeding the mark at
+zero would make the next reconcile pass look like it had found a bug
+rather than finished the seeding.</p>
+<p>This is what lets a caller answer "what did this namespace actually
+hold" after the instances that held it are gone. <code>used_*</code> cannot: it
+is drawn down to zero by the same deletes that would otherwise prove
+the point. A namespace's own capacity planning -- sizing the <em>next</em>
+claim from what the last one actually needed -- is exactly that
+question, asked after the fact.</p>
+<p>A database upgraded to this version adds the three columns at zero and
+does not backfill them, so a claim that already holds instances
+briefly reports a mark <em>below</em> its <code>used_*</code>. The next reconcile pass
+raises the mark to that ground truth, so it converges within one
+five-minute interval of the upgrade; a client that cannot wait can
+read <code>max(peak, used)</code> as a floor.</p>
 <h3 id="growing-shrinking-expiring-and-deleting">Growing, shrinking, expiring and deleting<a class="headerlink" href="#growing-shrinking-expiring-and-deleting" title="Permanent link">&para;</a></h3>
 <p>Growing any dimension is a fresh admission decision against the same
 guard, with the migration term at zero (a grow moves nothing -- the
