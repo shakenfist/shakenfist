@@ -99,7 +99,7 @@ def effective_ram_ceiling(per_node_entry):
     """The real per-node memory ceiling, immune to ambient headroom moving.
 
     Unlike ``cpu_available`` or ``disk_available``, ``ram_max``
-    (``scheduler.py:1109-1111``, ``memory_max * config.RAM_OVERCOMMIT_RATIO``)
+    (``summarize_resources()``, ``memory_max * config.RAM_OVERCOMMIT_RATIO``)
     is a published *ceiling*: it is derived from the node's physical memory
     and the overcommit ratio, published unconditionally for every
     hypervisor, and does not move when a sibling stestr worker frees RAM by
@@ -117,7 +117,7 @@ def effective_ram_ceiling(per_node_entry):
     ``ram_max`` by its capacity row's own ``limit_memory_mb`` -- not
     published directly, but recoverable as ``ram_available +
     ram_committed`` for exactly the node where that ledger bound is the
-    one binding ``ram_available`` (``scheduler.py:1114-1120``: when the
+    one binding ``ram_available`` (``summarize_resources()``: when the
     ledger bound wins the ``min()``, ``ram_available == limit_memory_mb -
     ram_committed``, so adding ``ram_committed`` back recovers
     ``limit_memory_mb`` exactly; when the measurement bound wins instead,
@@ -157,8 +157,8 @@ def effective_ram_ceiling(per_node_entry):
 # ``hypervisors``), so ``test_database_tier.py:37`` skips there by
 # design and asserting two would fail both of that topology's jobs.
 
-# What ``test_scheduler.py``'s ``test_affinity`` (:128) and
-# ``test_binary_affinity_prefers_the_tagged_node`` (:291) each skip
+# What ``test_scheduler.py``'s ``test_affinity`` and
+# ``test_binary_affinity_prefers_the_tagged_node`` each skip
 # below. Both count every node ``GET /nodes`` lists, whatever its roles,
 # so this counts the same way.
 MINIMUM_NODES = 3
@@ -249,7 +249,8 @@ def is_single_machine(nodes):
     The role check on top is belt and braces, and it is deliberately not
     justified by the topologies: ``slim-tier``'s primary carries
     ``database_node``, ``network_node`` and ``hypervisors`` all at once
-    (``ansible/ci-topology-slim-tier.yml:65``), so "no cluster node holds
+    (``ansible/ci-topology-slim-tier.yml`` in shakenfist/actions, which
+    this repository consumes at ``@main`` with no pin), so "no cluster node holds
     every role" would be false if anyone said it. What the check buys is
     narrower and still worth having -- a one-node reading which is *not*
     the single-machine shape is something nobody deployed on purpose, and
