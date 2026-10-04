@@ -11578,10 +11578,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#agent-reply-lag-tracking" class="md-nav__link">
+  <a href="#agent-flow-control-and-stall-detection" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Agent reply-lag tracking
+        Agent flow control and stall detection
       
     </span>
   </a>
@@ -11622,10 +11622,32 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#image-cache-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image cache flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#compression-algorithms" class="md-nav__link">
     <span class="md-ellipsis">
       
         Compression algorithms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decode-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decode limits
       
     </span>
   </a>
@@ -13057,6 +13079,34 @@
     
   
     Main-channel event drops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-decoder-hardening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image decoder hardening
   
 
     
@@ -15111,10 +15161,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#agent-reply-lag-tracking" class="md-nav__link">
+  <a href="#agent-flow-control-and-stall-detection" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Agent reply-lag tracking
+        Agent flow control and stall detection
       
     </span>
   </a>
@@ -15155,10 +15205,32 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#image-cache-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image cache flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#compression-algorithms" class="md-nav__link">
     <span class="md-ellipsis">
       
         Compression algorithms
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decode-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decode limits
       
     </span>
   </a>
@@ -15462,14 +15534,24 @@ functions with their own tests — three branches and a
 byte-shape assertion respectively — so a regression in
 either the negotiation logic or the wire format fails
 loudly during <code>cargo test</code>.</p>
-<h4 id="agent-reply-lag-tracking">Agent reply-lag tracking<a class="headerlink" href="#agent-reply-lag-tracking" title="Permanent link">&para;</a></h4>
-<p>The main channel tracks guest agent responsiveness by measuring the round-trip
-time of <code>VD_AGENT_REPLY</code> messages to periodic <code>VD_AGENT_MONITORS_CONFIG</code>
-probes. Reply-lag fields (<code>agent_request_count</code>, <code>agent_reply_count</code>,
-<code>last_agent_reply_lag_us</code>, <code>recent_agent_reply_lag_us</code>, and
-<code>outstanding_agent_request_count</code>) are exposed on <code>MainSnapshot</code> for
-bug reports and diagnostics. See the "Guest agent diagnostics" section
-in <a href="/components/ryll/troubleshooting/">troubleshooting.md</a> for interpretation.</p>
+<h4 id="agent-flow-control-and-stall-detection">Agent flow control and stall detection<a class="headerlink" href="#agent-flow-control-and-stall-detection" title="Permanent link">&para;</a></h4>
+<p>Each <code>AGENT_DATA</code> chunk the client sends costs one agent token. MAIN_INIT
+grants <code>REDS_AGENT_WINDOW_SIZE</code> (10), and spice-server returns them in
+batches of <code>REDS_TOKENS_TO_SEND</code> (5) as the guest consumes the data, or at
+once for data the server consumes itself. ryll queues agent messages
+(<code>channels/agent_queue.rs</code>), sends one chunk per token, and never abandons
+a message part-way: spice-server reassembles messages by byte count and
+disconnects a client whose next message overruns the one it is still
+expecting.</p>
+<p>A client at zero tokens with messages queued has at least six chunks the
+guest has not read, so the main channel treats 5 seconds of that as a
+stalled agent. Replies are not used for this. On QXL guests spice-server
+diverts <code>VD_AGENT_MONITORS_CONFIG</code> to the display device
+(<code>agent-msg-filter.c</code>, <code>reds_on_main_agent_monitors_config</code>), so the agent
+never sees it and never sends <code>VD_AGENT_REPLY</code>. Reply counts and lags are
+still recorded on <code>MainSnapshot</code> as passive diagnostics, next to the token
+and queue fields; the "Guest agent diagnostics" section in
+<a href="/components/ryll/troubleshooting/">troubleshooting.md</a> explains each one.</p>
 <h2 id="image-types-and-compression">Image Types and Compression<a class="headerlink" href="#image-types-and-compression" title="Permanent link">&para;</a></h2>
 <p>SPICE uses several image types for display updates. The type is
 specified in the <code>ImageDescriptor</code> that precedes each image's data.
@@ -15526,7 +15608,7 @@ Values from <code>spice-protocol/spice/enums.h</code>:</p>
 <tr>
 <td style="text-align: right;">106</td>
 <td>FromCacheLossless</td>
-<td>Not implemented</td>
+<td>Supported (image cache lookup)</td>
 </tr>
 <tr>
 <td style="text-align: right;">107</td>
@@ -15587,9 +15669,29 @@ tracked per display channel and included in bug reports for performance analysis
   <code>top_down</code> flag (bit 2 of flags) controls row ordering.</li>
 <li><strong>JPEG</strong>: preceded by a 4-byte <code>data_size</code> (u32 LE), then a standard
   JPEG stream. Decoded via the <code>image</code> crate and converted to RGBA.</li>
-<li><strong>FromCache</strong>: no pixel data, uses <code>image_id</code> from the descriptor
-  to look up a previously cached decompressed image.</li>
+<li><strong>FromCache</strong> and <strong>FromCacheLossless</strong>: no data at all after the
+  descriptor; <code>image_id</code> names a previously cached decompressed image.
+  spice-server marshals a draw's source image after its fixed fields
+  and before any mask, so on a draw without a mask the descriptor ends
+  the message. The server sends FromCacheLossless instead of FromCache
+  when JPEG is enabled and the cached copy is lossless.</li>
 </ul>
+<h3 id="image-cache-flags">Image cache flags<a class="headerlink" href="#image-cache-flags" title="Permanent link">&para;</a></h3>
+<p>The descriptor's <code>flags</code> byte controls the client's image cache, which
+holds decoded non-GLZ images keyed by <code>image_id</code> (GLZ images go to the
+GLZ dictionary instead):</p>
+<ul>
+<li><strong>CACHE_ME</strong> (bit 0): cache this image after decoding it.</li>
+<li><strong>HIGH_BITS_SET</strong> (bit 1): not used by ryll.</li>
+<li><strong>CACHE_REPLACE_ME</strong> (bit 2): overwrite the entry already cached under
+  this id. spice-server sets it, instead of CACHE_ME, when it resends a
+  lossy cached image losslessly so a later FromCacheLossless finds the
+  lossless pixels.</li>
+</ul>
+<p>spice-server only caches images whose guest driver asked for it with
+<code>QXL_IMAGE_CACHE</code>. The Linux KMS qxl driver never does, so Linux guests
+on that driver produce no cache hits; Xorg's <code>xf86-video-qxl</code> and the
+Windows QXL drivers do.</p>
 <h3 id="compression-algorithms">Compression algorithms<a class="headerlink" href="#compression-algorithms" title="Permanent link">&para;</a></h3>
 <p><strong>GLZ</strong> -- Dictionary-based compression that can reference pixels from
 previous images (cross-frame). The GLZ decompressor maintains a cache
@@ -15642,6 +15744,28 @@ on malformed data. QUIC images are preceded by a 4-byte
 dimensions, version (major=0, minor=1), and codec type.</p>
 <p>All decompressors output RGBA pixels (BGRX/BGRA/BGR on the wire
 is converted to RGBA with alpha=255 for opaque formats).</p>
+<h3 id="decode-limits">Decode limits<a class="headerlink" href="#decode-limits" title="Permanent link">&para;</a></h3>
+<p>The image dimensions come from the server, so every image decoder
+(QUIC, LZ, GLZ, zlib-GLZ, LZ4, JPEG, H.264/video, pixmap and
+cursor) refuses an image over the shared per-side and total-pixel
+caps before allocating its RGBA output. For the pure-Rust decoders
+that is everything they allocate. The H.264 decoder and the
+platform JPEG backends (WIC on Windows, ImageIO on macOS) hand the
+compressed data to a codec library first, and it allocates its own
+intermediate buffers before ryll sees the dimensions, so those
+buffers are bounded only by the library's own limits. Of the JPEG
+backends, <code>jpeg-decoder</code> is capped through its
+<code>set_max_decoding_buffer_size</code>, and mozjpeg's dimensions are
+checked after the header is read and before any scanline is
+decoded. The constants (<code>MAX_IMAGE_DIMENSION</code> and
+<code>MAX_IMAGE_PIXELS</code>) and the checked <code>rgba_len</code> size helper live in
+the <a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-compression/src/limits.rs"><code>limits</code>
+module</a>
+of <code>shakenfist-spice-compression</code>. A refused image is dropped and
+not painted, in the same way as a truncated LZ4 image above. The
+zlib layer of <code>ZLIB_GLZ_RGB</code> is inflated against a bound slightly
+above the RGBA size, because a GLZ stream can be a little larger
+than the pixels it decodes to.</p>
 <h2 id="display-channel-capabilities">Display Channel Capabilities<a class="headerlink" href="#display-channel-capabilities" title="Permanent link">&para;</a></h2>
 <p>During the link handshake, ryll advertises per-channel capability flags
 to the server. The display channel capabilities are particularly

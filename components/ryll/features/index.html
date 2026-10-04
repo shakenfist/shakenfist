@@ -13008,6 +13008,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-decoder-hardening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image decoder hardening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15167,7 +15195,7 @@ for how each subsystem works internally see
 <ul>
 <li><strong>TLS support</strong> - Secure connections with inline CA certificates from .vv files.</li>
 <li><strong>Reconnect on disconnect</strong> - When a session ends unexpectedly, the disconnect dialog offers a Reconnect button that drops all per-session state and re-attempts the SPICE handshake against the same target without exiting the application. Preserves the configured virtual disk list, shared folder, paste-as-keystrokes toggle, and notification history; resets statistics, traffic buffers, and per-channel state. See <a href="/components/ryll/session-lifecycle/">session-lifecycle.md</a> "Reconnection" for the full lifecycle.</li>
-<li><strong>Ticket lifecycle handling</strong> - Honours <code>delete-this-file=1</code> (single-use ticket: auto-reconnect suppressed) and the ryll extension key <code>ticket-valid-until</code> (expiry warning and modal) in .vv files. See <a href="/components/ryll/configuration/">configuration.md</a> for the full key reference.</li>
+<li><strong>Ticket lifecycle handling</strong> - Honours <code>delete-this-file=1</code> (the <code>.vv</code> is deleted once read, and the single-use ticket suppresses auto-reconnect) and the ryll extension key <code>ticket-valid-until</code> (expiry warning and modal) in .vv files. See <a href="/components/ryll/configuration/">configuration.md</a> for the full key reference.</li>
 <li><strong>Graceful Ctrl+C shutdown</strong> - Cross-platform signal handling via <code>ctrlc</code> crate; the GUI and headless event loops check a flag and shut down cleanly, ensuring capture files are finalized.</li>
 </ul>
 <h2 id="diagnostics-and-debugging">Diagnostics and debugging<a class="headerlink" href="#diagnostics-and-debugging" title="Permanent link">&para;</a></h2>

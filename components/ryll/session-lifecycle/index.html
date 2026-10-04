@@ -11533,6 +11533,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#connection-attempts-that-fail-before-a-session-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection attempts that fail before a session exists
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#modal-variants-and-consolevv-ticket-keys" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12935,6 +12946,34 @@
     
   
     Main-channel event drops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-decoder-hardening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image decoder hardening
   
 
     
@@ -14972,6 +15011,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#connection-attempts-that-fail-before-a-session-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection attempts that fail before a session exists
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#modal-variants-and-consolevv-ticket-keys" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15175,8 +15225,37 @@ counter) from "another channel in the storm just
 disconnected" (no-op). It is set to <code>true</code> when the
 GUI-tick poll calls <code>reconnect()</code> from a <code>Pending</code> state
 and cleared on the next event (success or failure).</p>
+<h3 id="connection-attempts-that-fail-before-a-session-exists">Connection attempts that fail before a session exists<a class="headerlink" href="#connection-attempts-that-fail-before-a-session-exists" title="Permanent link">&para;</a></h3>
+<p><code>run_connection</code> returns an error only when it could not set a session
+up: the dial, TLS, link or authentication failed or timed out (each
+stage is bounded, see <code>DIAL_TIMEOUT</code> and <code>HANDSHAKE_TIMEOUT</code> in
+<code>shakenfist-spice-protocol/src/client.rs</code>), or a secondary channel
+would not open. Once a session exists, channel failures arrive as
+<code>ChannelEvent::Error</code> instead. The GUI's connection thread sends that
+error to the UI on a per-attempt oneshot, <code>connection_failure_rx</code>,
+which <code>reconnect()</code> replaces just as it replaces <code>event_rx</code>. A
+superseded attempt's failure therefore goes nowhere.</p>
+<p><code>process_events</code> acts on the failure only once <code>event_rx</code> is empty.
+The failure travels on its own channel, so it can arrive before events
+the attempt sent ahead of it, and a <code>SessionInitialized</code> among those
+decides how the failure is handled.
+<code>RyllApp::handle_connection_failed</code> then routes the failure in one of
+two ways:</p>
+<ul>
+<li>If a session was established, or the attempt was an auto-retry, the
+  failure goes to <code>handle_critical_disconnect</code> like any other
+  disconnect. The ticket policy and the retry budget apply.</li>
+<li>Otherwise this was a first attempt or a manual Reconnect that never
+  reached a session, so it lands in <code>Modal(ConnectFailed)</code>. It does not
+  retry in the background. With <code>delete-this-file=1</code> it also does not
+  claim that a session which never existed consumed the ticket. These
+  failures are usually a mistyped port or a server that is down, and
+  there is no traffic to capture. They therefore write a disconnect
+  snapshot only when <code>--bug-report-dir</code> or <code>--capture</code> is set, whereas
+  the first branch always writes one, as any disconnect does.</li>
+</ul>
 <h3 id="modal-variants-and-consolevv-ticket-keys">Modal variants and console.vv ticket keys<a class="headerlink" href="#modal-variants-and-consolevv-ticket-keys" title="Permanent link">&para;</a></h3>
-<p>The <code>Modal</code> variant carries one of three discriminants:</p>
+<p>The <code>Modal</code> variant carries one of four discriminants:</p>
 <ul>
 <li><code>Generic { latest_error }</code> — auto-reconnect budget
   exhausted on a reusable ticket. Buttons: Reconnect, Close.</li>
@@ -15188,6 +15267,10 @@ and cleared on the next event (success or failure).</p>
   <code>ticket-valid-until=&lt;unix-ts&gt;</code> and that wall time has
   passed. Auto-reconnect is suppressed and the modal shows
   the expiry time. Buttons: Close only.</li>
+<li><code>ConnectFailed { error }</code> — a first attempt or a manual
+  Reconnect failed before it reached a session (see above).
+  Buttons: Reconnect, Close, whatever the ticket policy says,
+  since nothing was consumed that ryll knows of.</li>
 </ul>
 <p><code>ReconnectPolicy::forbid_retry(now_wall)</code> consults the two
 ticket-related <code>Config</code> fields and returns the appropriate

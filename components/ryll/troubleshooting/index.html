@@ -11517,6 +11517,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#could-not-connect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Could not connect"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#connection-refused" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13486,6 +13497,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-decoder-hardening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image decoder hardening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15438,6 +15477,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#could-not-connect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Could not connect"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#connection-refused" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16087,9 +16137,33 @@
 <h1 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h1>
 <p>Common issues and how to resolve them.</p>
 <h2 id="connection-issues">Connection Issues<a class="headerlink" href="#connection-issues" title="Permanent link">&para;</a></h2>
+<h3 id="could-not-connect">"Could not connect"<a class="headerlink" href="#could-not-connect" title="Permanent link">&para;</a></h3>
+<p>In GUI mode a connection attempt that fails before a session exists
+opens a "Could not connect" dialog naming the target and the error,
+with Reconnect and Close buttons. Every stage of opening a channel is
+bounded: the TCP dial by 15 seconds, then the TLS handshake, the SPICE
+link exchange and authentication by 15 seconds each. A peer that never
+answers therefore fails in at most about a minute rather than hanging.
+The error names the stage that failed, which tells you where to look:</p>
+<ul>
+<li><code>connecting to &lt;host&gt;:&lt;port&gt;: ...</code> or <code>timed out after 15s connecting
+  to ...</code>: nothing answered on that port. See "Connection refused"
+  below. A timeout rather than a refusal usually means packets are being
+  dropped silently, by a firewall or a missing route.</li>
+<li><code>TLS handshake with ... did not complete within 15s</code>: something
+  accepted the TCP connection but did not answer the TLS handshake. Test
+  the port with
+  <code>openssl s_client -connect &lt;host&gt;:&lt;tls-port&gt; -CAfile ca.pem</code>.</li>
+<li><code>SPICE link handshake ... did not complete</code>: the transport opened but
+  no SPICE server replied on it.</li>
+</ul>
+<p>On macOS 15 and later a process that has not been granted Local Network
+access gets <code>No route to host</code> when it connects to a LAN address. Check
+System Settings &gt; Privacy &amp; Security &gt; Local Network for the terminal
+you launched ryll from.</p>
 <h3 id="connection-refused">"Connection refused"<a class="headerlink" href="#connection-refused" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Error: Connection refused (os error 111)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Error: connecting to &lt;host&gt;:&lt;port&gt;: Connection refused (os error 111)
 </code></pre></div></p>
 <p><strong>Causes:</strong>
 - SPICE server not running
@@ -16128,7 +16202,7 @@ insecure port.</p>
 3. Try quoting the password if it contains special characters</p>
 <h3 id="tls-certificate-errors">TLS Certificate Errors<a class="headerlink" href="#tls-certificate-errors" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>Error: invalid peer certificate: UnknownIssuer
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>Error: TLS handshake with &lt;host&gt;:&lt;port&gt;: invalid peer certificate: UnknownIssuer
 </code></pre></div></p>
 <p><strong>Cause:</strong> Server's TLS certificate isn't trusted.</p>
 <p><strong>Solutions:</strong>
@@ -16675,23 +16749,25 @@ IDs and per-device byte counts) and <code>device_connect_total</code> /
 the <code>webdav</code> section includes <code>http_requests_received</code> (HTTP request count)
 and <code>active_session_count</code> (currently-open connections).</p>
 <h2 id="guest-agent-diagnostics">Guest agent diagnostics<a class="headerlink" href="#guest-agent-diagnostics" title="Permanent link">&para;</a></h2>
-<p>The main channel tracks the responsiveness of the guest agent (vdagent) by
-sending periodic liveness probes and measuring the round-trip time of replies.
-Every 30 seconds, ryll re-sends the guest agent a <code>VD_AGENT_MONITORS_CONFIG</code>
-message (the display layout); the agent acknowledges with <code>VD_AGENT_REPLY</code>.
-The lag between send and reply (in microseconds) measures how quickly the
-agent can respond to requests. If the agent fails to reply for more than
-5 seconds, a Warn notification appears in the status panel. This mechanism
-helps diagnose guest agent freezes without log parsing.</p>
-<p><strong>The probe is dormant until the first <code>VD_AGENT_MONITORS_CONFIG</code> send.</strong> That
-first send happens on session bring-up once display geometry is known, or on
-any window resize. In a freshly-connected session with no resize activity (or
-in headless mode where geometry is fixed), <code>agent_request_count</code> may stay at
-zero for a while before the probe starts firing — that does not indicate an
-unhealthy agent. The probe is also skipped while earlier agent messages, such
-as a large clipboard transfer, are still waiting for the server to return
-tokens.</p>
-<p><strong>Agent reply-lag fields in <code>MainSnapshot</code> (visible in Connection bug reports):</strong></p>
+<p>The guest agent (vdagent) carries clipboard and display-resize messages
+between ryll and the guest. ryll watches whether it is still reading them.</p>
+<p><strong>How a stall is detected.</strong> spice-server limits how much agent data the
+client may have outstanding: each <code>AGENT_DATA</code> chunk costs one token, the
+client starts with 10, and the server hands them back in batches of five
+as the guest consumes the data. If ryll has agent messages waiting, has no
+tokens left, and gets none back for 5 seconds, the guest has stopped
+reading. A Warn notification then appears: "Guest agent is not accepting
+messages (clipboard and display resize are on hold)". While the stall
+lasts it repeats every 20 seconds, folding into the same panel entry and
+raising its count. When tokens come back, the log records <code>guest agent
+accepting messages again after Ns</code> and the episode ends.</p>
+<p>Nothing is checked while ryll has nothing to send: an agent that stalls
+while idle is noticed the next time you copy, paste or resize. ryll used to
+probe the agent every 30 seconds with <code>VD_AGENT_MONITORS_CONFIG</code> and wait
+for a <code>VD_AGENT_REPLY</code>. On QXL guests spice-server passes that message to
+the display device instead of the agent, so the reply never came and the
+probe reported a stall on healthy guests (issue #429).</p>
+<p><strong>Agent fields in <code>MainSnapshot</code> (visible in Connection bug reports):</strong></p>
 <table>
 <thead>
 <tr>
@@ -16701,16 +16777,32 @@ tokens.</p>
 </thead>
 <tbody>
 <tr>
+<td><code>agent_tokens</code></td>
+<td>Agent tokens ryll holds right now: <code>AGENT_DATA</code> chunks it may send before the server returns more.</td>
+</tr>
+<tr>
+<td><code>queued_agent_message_count</code></td>
+<td>Agent messages waiting for tokens, including one partly sent. Usually zero.</td>
+</tr>
+<tr>
+<td><code>agent_starved_since_ts_secs</code></td>
+<td>Session-relative seconds at which ryll ran out of tokens with messages still queued, while that is still the case. Set means the guest is not reading right now.</td>
+</tr>
+<tr>
+<td><code>agent_stall_count</code></td>
+<td>Starvation episodes that lasted long enough to raise the notification. Cumulative.</td>
+</tr>
+<tr>
 <td><code>agent_request_count</code></td>
-<td>Cumulative liveness probes sent (increments every ~30s when connected).</td>
+<td><code>VD_AGENT_MONITORS_CONFIG</code> messages sent (one per window resize or display change).</td>
 </tr>
 <tr>
 <td><code>agent_reply_count</code></td>
-<td>Cumulative <code>VD_AGENT_REPLY</code> messages received. Should equal <code>agent_request_count</code> on a healthy agent (off by at most one in flight).</td>
+<td><code>VD_AGENT_REPLY</code> messages received. Stays at zero on QXL guests, where the agent never sees <code>MONITORS_CONFIG</code>; that is normal.</td>
 </tr>
 <tr>
 <td><code>agent_reply_error_count</code></td>
-<td>Replies with non-zero error code. Should be zero on a healthy agent.</td>
+<td>Replies with a non-zero error code. Should be zero.</td>
 </tr>
 <tr>
 <td><code>last_agent_reply_ts_secs</code></td>
@@ -16718,29 +16810,18 @@ tokens.</p>
 </tr>
 <tr>
 <td><code>last_agent_reply_lag_us</code></td>
-<td>Microseconds between most recent probe send and matched REPLY. Healthy agents reply in well under 100 ms.</td>
+<td>Microseconds between the most recent matched send and its REPLY, where replies arrive at all.</td>
 </tr>
 <tr>
 <td><code>recent_agent_reply_lag_us</code></td>
-<td>Ring of the last 16 reply-lag measurements (in microseconds) for detecting trends. Use min/max/mean to spot when responsiveness degrades.</td>
+<td>Ring of the last 16 reply lags, in microseconds.</td>
 </tr>
 <tr>
 <td><code>outstanding_agent_request_count</code></td>
-<td>Number of probes sent without a matched REPLY yet. Zero on healthy agents; persistently &gt; 0 indicates a stuck or unresponsive agent.</td>
+<td><code>MONITORS_CONFIG</code> sends without a matched REPLY. Grows by one per send on QXL guests and is not a stall signal; saturates at 99.</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Interpreting Warn notifications:</strong></p>
-<p>When <code>outstanding_agent_request_count &gt; 0</code> continuously for more than 5
-seconds after a probe, a Warn notification fires every 60 seconds (to keep
-the notification panel quiet during sustained stalls). The message reads
-like <code>"Guest agent is not replying — last send was 5.3s ago, 1 request
-outstanding"</code> (elapsed time is formatted to one decimal place; <code>request</code>
-vs <code>requests</code> is pluralised by count). The elapsed time is measured against
-the most recent send, not the oldest outstanding request, so the actual
-silence may be longer than the number reports. This indicates the guest
-agent has stopped responding to configuration requests and may require a
-reboot or diagnosis on the server side.</p>
 <h2 id="auto-snapshot-mode-for-intermittent-issues">Auto-snapshot mode for intermittent issues<a class="headerlink" href="#auto-snapshot-mode-for-intermittent-issues" title="Permanent link">&para;</a></h2>
 <p>When you're hunting for an intermittent issue (audio that drops silent for 30
 seconds, streams that flap between encodings, latency that spikes mid-session),

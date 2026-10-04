@@ -13025,6 +13025,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-decoder-hardening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image decoder hardening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15392,8 +15420,11 @@ expect a <code>VD_AGENT_REPLY</code> (today: <code>VD_AGENT_MONITORS_CONFIG</cod
 <code>agent_reply_error_count</code> (replies with a non-zero error field),
 <code>last_agent_reply_ts_secs</code>, <code>last_agent_reply_lag_us</code>, a bounded
 <code>recent_agent_reply_lag_us</code> ring, and
-<code>outstanding_agent_request_count</code> (persistently &gt; 0 means the agent
-is wedged).</p>
+<code>outstanding_agent_request_count</code>. That last one is not a stall
+signal: on QXL guests the agent never sees <code>MONITORS_CONFIG</code>, so no
+reply comes. Stalls are read from agent token starvation instead:
+<code>agent_tokens</code>, <code>queued_agent_message_count</code>,
+<code>agent_starved_since_ts_secs</code> and <code>agent_stall_count</code>.</p>
 <p>Main deliberately has no client-keepalive send counters: the
 spurious-PONG keepalive they once tracked was a band-aid made
 redundant when the underlying main-channel wedge was fixed
@@ -15402,9 +15433,10 @@ for a different mechanism — see the inputs section below.</p>
 <p>One nuance: the per-opcode map is less useful on main than on other
 channels because the agent-related opcodes (<code>VD_AGENT_*</code>) are nested
 under main's payload framing — a flat opcode map at the main-channel
-level won't distinguish agent message subtypes. The agent round-trip
-stats above cover the request/reply cycle; deeper agent traffic
-inspection is the vdagent probe's job.</p>
+level won't distinguish agent message subtypes. The agent stats above
+cover flow control and the request/reply cycle; for deeper agent
+traffic inspection, decode the <code>AGENT_DATA</code> payloads in the bug
+report's <code>traffic.pcap</code>.</p>
 <h3 id="inputs">inputs<a class="headerlink" href="#inputs" title="Permanent link">&para;</a></h3>
 <p>Inputs has <code>motion_count</code>, <code>button_state</code>, <code>secs_since_last_key</code>, a
 <code>recent_events</code> ring that records the last N input events with

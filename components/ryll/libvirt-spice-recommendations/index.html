@@ -13086,6 +13086,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-decoder-hardening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image decoder hardening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15573,10 +15601,12 @@ in the guest (<code>apt install spice-vdagent</code> on Debian/Ubuntu;
 <li>Dynamic monitor reconfiguration (e.g. window resize triggers a
   guest-side resolution change) does not work.</li>
 </ul>
-<p>Ryll's bug-report <code>MainSnapshot::agent_request_count</code> and related
-fields report whether the agent is responding to probes. A <code>0</code> agent reply count
-in a bug report usually means <code>spice-vdagent</code> is not installed or
-not running.</p>
+<p>Ryll's bug report shows whether an agent is attached (the "Guest agent
+connected" notification) and whether it is reading what ryll sends
+(<code>MainSnapshot::agent_stall_count</code> and <code>agent_starved_since_ts_secs</code>).
+A zero <code>agent_reply_count</code> is not a symptom on its own: with a QXL
+display, spice-server handles monitors config itself and the agent
+never replies to it.</p>
 <h2 id="usb-redirection-optional">USB redirection (optional)<a class="headerlink" href="#usb-redirection-optional" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">&lt;redirdev</span><span class="w"> </span><span class="na">bus=</span><span class="s">'usb'</span><span class="w"> </span><span class="na">type=</span><span class="s">'spicevmc'</span><span class="nt">/&gt;</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nt">&lt;redirdev</span><span class="w"> </span><span class="na">bus=</span><span class="s">'usb'</span><span class="w"> </span><span class="na">type=</span><span class="s">'spicevmc'</span><span class="nt">/&gt;</span>

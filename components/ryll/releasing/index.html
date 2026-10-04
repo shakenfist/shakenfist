@@ -11438,6 +11438,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#choosing-the-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing the version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#stage-1-propose-the-release" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13029,6 +13040,34 @@
     
   
     Main-channel event drops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-decoder-hardening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image decoder hardening
   
 
     
@@ -15055,6 +15094,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#choosing-the-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing the version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#stage-1-propose-the-release" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15331,6 +15381,16 @@ else runs on the host and requires:</p>
   tooling.</li>
 </ul>
 <h2 id="release-process">Release process<a class="headerlink" href="#release-process" title="Permanent link">&para;</a></h2>
+<h3 id="choosing-the-version">Choosing the version<a class="headerlink" href="#choosing-the-version" title="Permanent link">&para;</a></h3>
+<p>The crates are at 0.x, where Cargo treats the minor version as the
+breaking-change boundary: a <code>^0.1.7</code> dependency accepts 0.1.8 but
+not 0.2.0. So if any merged PR since the last tag changed a
+published crate's public API incompatibly (a signature, a removed
+item, or a public constant's value), propose the next minor version
+(0.1.x to 0.2.0), not a patch. Such PRs list their breaking changes
+under a "Breaking changes" heading in the PR description. The
+GitHub Release notes are generated from PR titles alone, so copy
+those lists into the release notes by hand.</p>
 <h3 id="stage-1-propose-the-release">Stage 1: propose the release<a class="headerlink" href="#stage-1-propose-the-release" title="Permanent link">&para;</a></h3>
 <p>From a clean checkout of <code>develop</code>, up to date with origin:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>make<span class="w"> </span>propose-release<span class="w"> </span><span class="m">0</span>.2.0

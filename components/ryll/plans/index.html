@@ -12883,6 +12883,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-decoder-hardening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image decoder hardening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15137,6 +15165,13 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 <td>Split CI into a cheap smoke tier on <code>pull_request</code> (lint, Linux build + tests, supply-chain scanners) gating <code>Can enqueue</code>, and an expensive merge tier on <code>merge_group</code> (fuzz ×4, cross-platform builds ×4) gating <code>Can merge</code>, modelled on shakenfist/shakenfist's merge-queue scheme, so a failing <code>cargo deny</code> no longer wastes eight heavy builds.</td>
 <td>Complete</td>
 <td><a href="/components/ryll/plans/PLAN-two-stage-ci-phase-01-workflow-tiers/">1. Two-tier ci.yml</a>, <a href="/components/ryll/plans/PLAN-two-stage-ci-phase-02-windows-check/">2. Windows cross-check</a>, <a href="/components/ryll/plans/PLAN-two-stage-ci-phase-03-merge-queue/">3. Merge queue enablement</a>, <a href="/components/ryll/plans/PLAN-two-stage-ci-phase-04-docs/">4. Docs</a></td>
+</tr>
+<tr>
+<td>2026-10-03</td>
+<td><a href="/components/ryll/plans/PLAN-decoder-hardening/">Image decoder hardening</a></td>
+<td>Give every image decoder one shared size limit and fix the decoder half of the July hardening cluster (#171-#177, #182): QUIC run overruns, unbounded LZ/GLZ/LZ4/zlib/cursor allocations, and pixmap, FromCache and blit bounds panics.</td>
+<td>In progress</td>
+<td>1. Decoder hardening (inline), 2. Push audit (inline)</td>
 </tr>
 </tbody>
 </table>

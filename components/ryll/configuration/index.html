@@ -13191,6 +13191,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-decoder-hardening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image decoder hardening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15835,7 +15863,12 @@ the standard virt-viewer format used by <code>remote-viewer</code> and other SPI
 <p>ryll also reads two ticket-related keys with ryll-specific behaviour:</p>
 <ul>
 <li><strong><code>delete-this-file=1</code></strong> — the standard "remove this file
-  after reading" hint. ryll additionally treats this as a
+  after reading" hint. As remote-viewer does, ryll deletes a
+  <code>--file</code> <code>.vv</code> as soon as it has parsed it, before
+  connecting, so the ticket it carries is not left behind in
+  the downloads directory. A file that fails to parse is kept,
+  and a failed removal is logged as a warning without stopping
+  the connection. ryll additionally treats this as a
   signal that the SPICE ticket is <strong>single-use</strong>: any
   reconnect attempt would be rejected by the server, so
   auto-reconnect is suppressed and a "single-use ticket"
