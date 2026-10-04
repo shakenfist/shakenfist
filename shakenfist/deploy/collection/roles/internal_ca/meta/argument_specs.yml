@@ -114,12 +114,12 @@ argument_specs:
         type: str
         default: "0444"
         description:
-          - Mode of the installed CA and host certificates.
+          - Mode of the installed CA and host certificates, as a quoted four digit octal string.
       cert_key_mode:
         type: str
         default: "0444"
         description:
-          - Mode of the installed host private key.
+          - Mode of the installed host private key, as a quoted four digit octal string.
   bootstrap:
     short_description: Create the deployment's internal certificate authority.
     description:

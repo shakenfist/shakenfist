@@ -1,0 +1,38 @@
+---
+# Reject parameter values which would silently produce the wrong result.
+# Included first by each entry point, so a bad value fails before anything
+# is written.
+
+# A mode must be a quoted octal string. An unquoted 0400 is the YAML
+# integer 256, and anywhere that integer is templated into a string
+# ("{{ ... }}" on ansible-core before 2.19, or an explicit | string) the
+# copy module reads '256' as octal and installs the file 0256 -- group and
+# world writable, which on the key is the opposite of what was asked for.
+# An integer never renders with the leading zero the pattern requires, so
+# the pattern alone rejects one.
+- name: Check the installed file modes are quoted octal strings
+  ansible.builtin.assert:
+    that:
+      - item.value is match('^0[0-7]{3}$')
+    fail_msg: >-
+      {{ item.key }} is {{ item.value | to_json }}, but must be a quoted
+      four digit octal string such as '0400'. Unquoted, YAML reads 0400 as
+      the integer 256.
+    quiet: true
+  loop: "{{ {'cert_mode': cert_mode, 'cert_key_mode': cert_key_mode} | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+# These are written into certtool templates one per line, so a newline in
+# one would add whatever directive followed it -- ca, say -- to a
+# certificate the cluster CA signs.
+- name: Check the certificate names are single lines
+  ansible.builtin.assert:
+    that:
+      - item is not search('[\r\n]')
+    fail_msg: >-
+      {{ item | to_json }} is not a single line. deploy_name, cert_cn and
+      each cert_san_dns and cert_san_ip entry are written into a certtool
+      template, one per line.
+    quiet: true
+  loop: "{{ [deploy_name, cert_cn] + cert_san_dns + cert_san_ip }}"

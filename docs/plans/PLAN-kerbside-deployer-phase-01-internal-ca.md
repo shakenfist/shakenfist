@@ -162,6 +162,10 @@ ansible-core, into `/tmp/venv-test`. Whether the static runner image has
 installs it on managed servers, but the static runners are built
 separately. Step 3 checks.
 
+*Resolved in review.* The image has it: the sanity job ran the new step
+on a static runner and printed `internal_ca: all six cases passed`
+(run 37158555041, job 111307042604).
+
 ### S8 -- running unprivileged is already a supported shape
 
 sfcbr runs the deploy from kasm without root, with `ca_path` pointing at
@@ -273,7 +277,16 @@ waits for the expiry window. Comparing the template's mtime with the
 certificate's would close the gap, but mtimes are not trustworthy
 state here. sfcbr keeps its CA tree in a deploy-mirror checkout, where
 mtimes reflect checkout order, so an mtime trigger would reissue or
-skip arbitrarily. The gap is accepted.
+skip arbitrarily.
+
+*Closed in review.* The gap was an ordering problem, not a missing piece
+of state. The template on disk is the record of what the current
+certificate was issued from, so it is now compared without being written
+(`check_mode: true`), and rewritten only after the old certificate has
+been set aside. An interrupted run leaves either the old certificate
+with the old template, which the next run compares again, or no
+certificate, which the next run issues. Case 7 of the test fails the run
+at the set-aside step and proves the rerun reissues.
 
 ### D5 -- renewal reuses the key
 

@@ -138,7 +138,10 @@ certificate is reissued when the control node's copy expires within
 changes (the common name, the subject alternative names or the lifetime). The
 existing key is reused, and the old certificate is kept beside the new one on
 the control node as `<host_cert_path>.<UTC timestamp>`, where the timestamp is
-formatted `YYYYmmddHHMMSS`. A cluster therefore needs a deploy at least once
+formatted `YYYYmmddHHMMSS`. The template is only rewritten after the old
+certificate has been set aside, so a deploy interrupted part way through a
+reissue repeats it next time rather than forgetting it. A cluster therefore
+needs a deploy at least once
 inside each renewal window: with the defaults, at least once in the last 90
 days before a certificate expires.
 
@@ -175,8 +178,14 @@ openssl x509 -in /etc/pki/libvirt-spice/server-cert.pem -noout -enddate
 | `cert_dest_key_name` | `server-key.pem` | File name of the host private key. |
 | `cert_owner` | `root` | Owner of the installed files. |
 | `cert_group` | `root` | Group of the installed files. |
-| `cert_mode` | `0444` | Mode of the installed CA and host certificates. |
-| `cert_key_mode` | `0444` | Mode of the installed host private key. |
+| `cert_mode` | `'0444'` | Mode of the installed CA and host certificates. |
+| `cert_key_mode` | `'0444'` | Mode of the installed host private key. |
+
+The modes must be quoted four digit octal strings, as the defaults are: YAML
+reads an unquoted `0400` as the integer 256, which can end up installed as mode
+`0256`, so the role refuses it. The role also refuses a `deploy_name`,
+`cert_cn` or subject alternative name containing a newline, since each is
+written into a certtool template as a line of its own.
 
 ## Consuming the collection
 

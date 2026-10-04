@@ -3,6 +3,9 @@
 # control node by host_certificate.yml) onto {{ hostname }}. By default these
 # land in /etc/pki/libvirt-spice for libvirt's SPICE TLS to use.
 
+- name: Validate the role's parameters
+  ansible.builtin.include_tasks: validate.yml
+
 - name: Create /etc/pki/CA
   ansible.builtin.file:
     path: /etc/pki/CA

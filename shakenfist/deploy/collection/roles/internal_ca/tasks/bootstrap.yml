@@ -2,6 +2,9 @@
 # Create the deployment's internal certificate authority on the control node.
 # Idempotent: if the CA certificate already exists, nothing is regenerated.
 
+- name: Validate the role's parameters
+  ansible.builtin.include_tasks: validate.yml
+
 - name: Install CA setup tools
   ansible.builtin.apt:
     name:

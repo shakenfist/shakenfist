@@ -9,7 +9,9 @@
 # lifetime and modes; that a rerun changes nothing; that a second
 # certificate with its own cert_name leaves the first alone; and that a
 # certificate is reissued, with the same key, when it nears expiry or its
-# template changes -- and not otherwise. Before this existed nothing ran
+# template changes -- and not otherwise, even when the run that saw the
+# change is interrupted; and that a mode or certificate name which would be
+# misread is refused. Before this existed nothing ran
 # the role's renewal path at all, and it had never worked.
 #
 # It runs without root, which is a shape the role must support anyway:
@@ -141,6 +143,26 @@ run_play() {
     fi
     CHANGED="$(sed -n 's/^localhost .* changed=\([0-9]*\) .*/\1/p' "${LAST_LOG}")"
     [ -n "${CHANGED}" ] || fail 'no PLAY RECAP in the ansible output'
+}
+
+# run_play_fails PATTERN [extra vars file...]: run the playbook, expecting
+# it to fail with output matching the extended regex PATTERN.
+run_play_fails() {
+    local pattern="$1"
+    shift
+    local args=(-e "@${WORK}/common.json")
+    local f
+    for f in "$@"; do
+        args+=(-e "@${f}")
+    done
+    RUNS=$((RUNS + 1))
+    LAST_LOG="${WORK}/logs/run-${RUNS}.log"
+    if ansible-playbook -i localhost, -c local -e ansible_become=false \
+            --skip-tags packages,system-dirs "${args[@]}" "${WORK}/play.yml" \
+            < /dev/null > "${LAST_LOG}" 2>&1; then
+        fail "ansible-playbook succeeded, expected a failure matching '${pattern}'"
+    fi
+    grep -qE "${pattern}" "${LAST_LOG}" || fail "the failure does not match '${pattern}'"
 }
 
 serial() { openssl x509 -noout -serial -in "$1"; }
@@ -284,11 +306,55 @@ case_6_no_renewal() {
     set_aside "${HOST_CERT}" > /dev/null
 }
 
+case_7_interrupted_reissue() {
+    CURRENT_CASE='case 7: a template change survives an interrupted reissue'
+    # Fail the run at the step which sets the old certificate aside, by
+    # putting an mv which always fails first on PATH. The changed template
+    # must not be recorded on disk until the certificate is gone, or the
+    # rerun sees nothing to do and the new SAN waits for the expiry window.
+    local before_serial before_pub
+    before_serial="$(serial "${KB_CERT}")"
+    before_pub="$(pubkey "${KB_CERT}")"
+    mkdir -p "${WORK}/failing-mv"
+    printf '#!/bin/sh\nexit 1\n' > "${WORK}/failing-mv/mv"
+    chmod +x "${WORK}/failing-mv/mv"
+    write_kerbside_vars '"console.example.com", "kerbside.example.com", "spice.example.com"'
+    PATH="${WORK}/failing-mv:${PATH}" run_play_fails '^fatal: ' "${WORK}/kerbside.json"
+    grep '^TASK \[' "${LAST_LOG}" | tail -n 1 | grep -q 'Move the old host certificate aside' \
+        || fail 'the run did not fail at the set-aside step'
+    [ "$(serial "${KB_CERT}")" = "${before_serial}" ] || fail 'the interrupted run replaced the certificate'
+
+    run_play "${WORK}/kerbside.json"
+    [ "$(serial "${KB_CERT}")" != "${before_serial}" ] || fail 'the rerun did not reissue the certificate'
+    sans "${KB_CERT}" | grep -q 'DNS:spice.example.com' || fail 'the new SAN is missing'
+    [ "$(pubkey "${KB_CERT}")" = "${before_pub}" ] || fail 'the reissued certificate has a new key'
+    local copies=("${KB_CERT}".*)
+    [ "${#copies[@]}" -eq 2 ] || fail "expected two set-aside copies of ${KB_CERT}, found ${#copies[@]}"
+}
+
+case_8_rejects_bad_values() {
+    CURRENT_CASE='case 8: values which would be misread are rejected'
+    local host_serial
+    host_serial="$(serial "${HOST_CERT}")"
+    # The JSON integer 256 is what an unquoted 0400 becomes in YAML.
+    echo '{"cert_key_mode": 256}' > "${WORK}/bad-mode-int.json"
+    run_play_fails 'cert_key_mode is 256, but must be a quoted' "${WORK}/bad-mode-int.json"
+    echo '{"cert_mode": "444"}' > "${WORK}/bad-mode-str.json"
+    run_play_fails 'cert_mode is \\?"444\\?", but must be a quoted' "${WORK}/bad-mode-str.json"
+    echo '{"cert_cn": "console.example.com\nca"}' > "${WORK}/bad-cn.json"
+    run_play_fails 'is not a single line' "${WORK}/bad-cn.json"
+    echo '{"cert_san_dns": ["console.example.com", "x.example.com\rca"]}' > "${WORK}/bad-san.json"
+    run_play_fails 'is not a single line' "${WORK}/bad-san.json"
+    [ "$(serial "${HOST_CERT}")" = "${host_serial}" ] || fail 'a rejected run reissued the certificate'
+}
+
 case_1_fresh_issue
 case_2_idempotent
 case_3_sans_and_stem
 case_4_renew_on_expiry
 case_5_renew_on_template_change
 case_6_no_renewal
+case_7_interrupted_reissue
+case_8_rejects_bad_values
 
-echo "internal_ca: all six cases passed (${RUNS} ansible runs)"
+echo "internal_ca: all eight cases passed (${RUNS} ansible runs)"

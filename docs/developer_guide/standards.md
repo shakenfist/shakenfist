@@ -270,6 +270,11 @@ Current hooks:
   on Linux
 - `ansible-lint` - Validates the `shakenfist.shakenfist` Ansible collection
   (`shakenfist/deploy/collection/`)
+- `test-internal-ca` - Issues and renews certificates with the
+  `internal_ca` role, without root, by running `tools/ci-test-internal-ca.sh`.
+  It needs `ansible-core`, `certtool` (the `gnutls-bin` package) and
+  `openssl`, and only runs when the role or the script changes. The
+  sanity-checks workflow runs the same script
 - `flake8` - Style check via tox, on changed files
 - `py3` - Unit tests via tox
 - `check-from-db-by-ref-namespace` - Every `*_from_db_by_ref` call passes a
