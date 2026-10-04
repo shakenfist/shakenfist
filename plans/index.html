@@ -15258,8 +15258,8 @@ checker's blind spot, and the only numbers here it cannot recompute.</p>
 <tr>
 <td>2026-10-02</td>
 <td><a href="PLAN-kerbside-deployer/">Deploy Kerbside from the ansible collection</a></td>
-<td>The deployer phase the Kerbside VDI console tokens plan deferred: a <code>kerbside</code> inventory group, a <code>kerbside</code> role, the signing key and a dedicated scrape credential minted at deploy time, and a merge-queue lane with the feature on. #4004 closed after only its <code>kerbside_url</code> increment, so until this lands no collection-deployed cluster (sfcbr included) can route consoles through Kerbside</td>
-<td>Proposed</td>
+<td>The deployer phase the Kerbside VDI console tokens plan deferred: a <code>kerbside</code> inventory group, a <code>kerbside</code> role, the signing key and a dedicated scrape credential minted at deploy time, and a merge-queue lane with the feature on. #4004 closed after only its <code>kerbside_url</code> increment, so until this lands no collection-deployed cluster (sfcbr included) can route consoles through Kerbside. Planning phase 1 found that SPICE certificate renewal has never worked and that collection-issued certificates expire after 365 days, so phase 1 fixes that too</td>
+<td>In progress</td>
 <td>0 of 7</td>
 </tr>
 <tr>

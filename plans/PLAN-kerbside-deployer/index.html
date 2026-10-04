@@ -15104,25 +15104,38 @@ a unit restarts that node's daemons. A change made with
 therefore silently shadows whatever the collection later renders.</p>
 <h3 id="defects-found-while-writing-this-plan">Defects found while writing this plan<a class="headerlink" href="#defects-found-while-writing-this-plan" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>SPICE certificates never renew.</strong> <code>host_certificate.yml:6-14</code>
-  stats and expiry-checks <code>/etc/pki/libvirt-spice/server_cert.pem</code>
-  (underscore), but <code>distribute_certificates.yml:52</code> writes
-  <code>server-cert.pem</code> (hyphen). The renewal branch can never fire,
-  so every hypervisor certificate will simply expire. Phase 1
-  rewrites this file anyway; the fix belongs there.</li>
-<li><strong><code>vdi_console_tokens.md:172</code> says</strong> <code>/admin/vditokenpubkey</code> is
+<li><strong>SPICE certificates never renew, and expire after a year.</strong>
+  <code>host_certificate.yml:6-14</code> stats and expiry-checks
+  <code>/etc/pki/libvirt-spice/server_cert.pem</code> (underscore), but
+  <code>distribute_certificates.yml:52</code> writes <code>server-cert.pem</code>
+  (hyphen). The renewal branch therefore never fires. Phase 1's
+  survey found three more faults behind that one:</li>
+<li>the <code>when:</code> reads <code>.meta.stdout</code>, which does not exist, so it
+    would crash;</li>
+<li>its condition is inverted;</li>
+<li>it moves the certificate aside under the key's name.</li>
+</ul>
+<p>Fixing only the filename would have turned a silent no-op into a
+  failure on every deploy. The host template also sets no
+  lifetime, so certtool's 365-day default applies. sfcbr's sf-1
+  certificate expires on 2027-07-11. Every collection-deployed
+  cluster's hypervisor SPICE TLS stops verifying a year after its
+  first deploy, and redeploying does not help. The private key is
+  installed <code>0444</code>. Phase 1 fixes the renewal and the lifetime,
+  and records the key mode as future work; see its "What the
+  survey found" section.
+- <strong><code>vdi_console_tokens.md:172</code> says</strong> <code>/admin/vditokenpubkey</code> is
   served "to admin callers". It carries only <code>@log_token_use</code>
   (<code>admin.py:78-101</code>), so any authenticated caller can read it.
   The key is public, so this is a documentation error rather than
-  a disclosure. Phase 6 fixes the doc.</li>
-<li><strong>Kerbside's <code>installation.md:96-100</code></strong> says the API and the
+  a disclosure. Phase 6 fixes the doc.
+- <strong>Kerbside's <code>installation.md:96-100</code></strong> says the API and the
   daemon must be co-located because they share a unix socket. In
   the code only the daemon and the Rust proxy use
   <code>API_SOCKET_PATH</code>; the API reaches everything else through the
   database. Phase 6 raises it in the Kerbside repository. It
   matters here only because it would otherwise argue against the
-  split units in phase 3.</li>
-</ul>
+  split units in phase 3.</p>
 <h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
 <p>An operator who adds hosts to a <code>kerbside</code> inventory group and
 sets a handful of variables gets a cluster on which
@@ -15206,11 +15219,15 @@ cert paths"; the override is that path, available from the
 start.</p>
 <p><code>PROXY_HOST_SUBJECT</code> is read back from the issued or supplied
 certificate on the Kerbside host, never composed from variables.
-Composing it is how the string drifts from the certificate.
-<strong>Uncertain:</strong> the exact subject string format the <code>.vv</code>
-<code>host-subject</code> needs (virt-viewer's comma-separated <code>C=..,O=..,CN=..</code>
-versus OpenSSL's default one-line form). Phase 1 settles it by
-test, against both ryll and remote-viewer.</p>
+Composing it is how the string drifts from the certificate.</p>
+<p>The format question this section originally left open is
+answered by code already in the tree; phase 1's survey (S5) has
+the detail. <code>shakenfist/node.py</code> <code>_spice_host_subject_from_cert()</code>
+renders a subject in DER order as comma-joined <code>SHORT=value</code>
+pairs, with <code>\</code> and <code>,</code> escaped. That is what Shaken Fist's own
+direct <code>.vv</code> files carry as <code>host-subject</code>, for the same clients,
+and what Kerbside's proxy compares against. Phase 3 renders
+<code>PROXY_HOST_SUBJECT</code> by the same rules. No client test is needed.</p>
 <h3 id="5-what-does-kerbside-authenticate-to-shaken-fist-with">5. What does Kerbside authenticate to Shaken Fist with?<a class="headerlink" href="#5-what-does-kerbside-authenticate-to-shaken-fist-with" title="Permanent link">&para;</a></h3>
 <p><strong>Default:</strong> a dedicated <code>kerbside</code> key in the <code>system</code> namespace,
 from a required secret variable <code>kerbside_system_key</code>. It is
@@ -15296,8 +15313,8 @@ every phase has been completed, abandoned or superseded.</p>
 <tbody>
 <tr>
 <td>1. <code>internal_ca</code> issues certificates to any host at caller-chosen paths, and renews them</td>
-<td>PLAN-kerbside-deployer-phase-01-internal-ca.md</td>
-<td>Proposed</td>
+<td><a href="../PLAN-kerbside-deployer-phase-01-internal-ca/">PLAN-kerbside-deployer-phase-01-internal-ca.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -15357,30 +15374,31 @@ phase has not landed.</p>
   them all.</li>
 </ul>
 <h3 id="phase-1-internal_ca-issues-certificates-to-any-host">Phase 1 -- <code>internal_ca</code> issues certificates to any host<a class="headerlink" href="#phase-1-internal_ca-issues-certificates-to-any-host" title="Permanent link">&para;</a></h3>
+<p>Planned in
+<a href="../PLAN-kerbside-deployer-phase-01-internal-ca/">PLAN-kerbside-deployer-phase-01-internal-ca.md</a>.</p>
 <p><code>host_certificate.yml</code> and <code>distribute_certificates.yml</code> gain
 parameters for:</p>
 <ul>
-<li>the subject CN;</li>
-<li>a SAN list;</li>
-<li>the destination directory;</li>
-<li>the destination file names.</li>
+<li>the file stem on the control node;</li>
+<li>the CN;</li>
+<li>DNS and IP SANs;</li>
+<li>the lifetime and the renewal window;</li>
+<li>the destination directory, file names, owner, group and modes.</li>
 </ul>
 <p>They default to today's <code>/etc/pki/libvirt-spice/</code> layout, so the
-existing <code>allsf</code> plays do not change. <code>site.yml</code> gains a play that
-issues the Kerbside proxy certificate to <code>kerbside</code> hosts that
-supplied no override. It is installed under <code>/etc/kerbside/pki/</code>,
-and its CN and SAN are <code>kerbside_public_fqdn</code>.</p>
-<p>The renewal check is fixed to stat the file it actually installs.
-It gets a unit-level test (template rendering, as
-<code>test_node_config_template.py</code> does for the node config) and a
-note in <code>docs/operator_guide/</code> that renewal had never worked
-before.</p>
-<p>This phase also settles open question 4's subject-format
-uncertainty. It issues a certificate and renders the subject both
-ways. It connects with ryll and with remote-viewer through a
-proxy configured from it, and records which form both accept.</p>
-<p>Planned at high effort: the subject-format question decides
-whether every <code>.vv</code> the cluster hands out is accepted by clients.</p>
+existing <code>allsf</code> plays do not change.</p>
+<p>Renewal is rewritten to work: it checks expiry on the control
+node's copy, branches on the return code, and also reissues when
+the template changes. Lifetime becomes an explicit setting. A
+rootless scripted test, <code>tools/ci-test-internal-ca.sh</code>, runs in
+the sanity-checks job and covers issue, idempotence, SANs and
+both kinds of renewal.</p>
+<p>The <code>site.yml</code> play that issues the Kerbside certificate moved to
+phase 3, which defines the <code>kerbside</code> group and variables it
+needs. The subject-format question needed no test (open
+question 4).</p>
+<p>Planned at high effort: renewal decides when every node's
+certificate on every cluster is reissued.</p>
 <h3 id="phase-2-shaken-fist-side">Phase 2 -- Shaken Fist side<a class="headerlink" href="#phase-2-shaken-fist-side" title="Permanent link">&para;</a></h3>
 <p>All of this lands in the cluster-config play and the node role:</p>
 <ul>
@@ -15432,8 +15450,22 @@ test the tokens plan never had (#4003, #4009, <a class="magiclink magiclink-gith
   same bytes <code>/admin/cacert</code> serves, so the equality check passes
   by construction;</li>
 <li>the two systemd units;</li>
-<li><code>PROXY_HOST_SUBJECT</code>, read back from the installed certificate.</li>
+<li><code>PROXY_HOST_SUBJECT</code>, read back from the installed certificate
+  and rendered by the rules of <code>node.py</code>'s
+  <code>_spice_host_subject_from_cert()</code> (open question 4).</li>
 </ul>
+<p>The proxy certificate comes from the <code>internal_ca</code> role, called
+with phase 1's parameters, for <code>kerbside</code> hosts that supplied no
+override:</p>
+<ul>
+<li><code>cert_name: &lt;host&gt;-kerbside</code>, so it cannot collide with a
+  co-located node's SPICE certificate;</li>
+<li><code>cert_cn</code> and <code>cert_san_dns</code> set to <code>kerbside_public_fqdn</code>;</li>
+<li><code>cert_dest_dir: /etc/kerbside/pki</code>;</li>
+<li>a key mode that is not world-readable.</li>
+</ul>
+<p>The play lives in <code>site.yml</code> beside the existing certificate
+plays.</p>
 <p><code>register</code> runs <code>kerbside db upgrade</code> with <code>run_once</code> on the
 first Kerbside host, then starts or restarts on change. It waits
 until the SF source reports healthy, meaning the signing key has
@@ -15880,9 +15912,12 @@ where one exists, for directly related issues that we should
 either resolve as part of this master plan or at least be aware of
 while planning it.</p>
 <ul>
-<li><strong>SPICE certificate renewal never fires</strong> (found while planning;
-  see Situation). Phase 1 fixes it. File an issue when phase 1
-  starts, so the fix closes something.</li>
+<li><strong>#4415</strong> (open): SPICE certificate renewal never fires, and
+  certificates expire after 365 days (found while planning; see
+  Situation). Phase 1 fixes it and closes the issue.</li>
+<li><strong>#4416</strong> (open): the SPICE private key is installed
+  world-readable. Phase 1 adds the parameters a fix needs, but
+  leaves the default unchanged; see its Future work.</li>
 <li><strong>#4004</strong> (closed by #4024) delivered the first increment
   only. This plan is the remainder; phase 2 comments on #4004
   with a link here.</li>

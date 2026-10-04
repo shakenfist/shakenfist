@@ -16125,8 +16125,23 @@ own is refreshed exactly as it always was.</p>
 <li>The deployer no longer installs an Apache reverse proxy in front of the
   REST API. You bring your own load balancer for the API tier -- see the
   <a href="/operator_guide/load_balancing">load balancing guide</a>.</li>
-<li>TLS certificates on hypervisors which are within 30 days of expiry are now
-  automatically replaced.</li>
+<li>The <code>internal_ca</code> role's certificate renewal now works (issue #4415). It
+  never did: certtool silently applied its default lifetime of 365 days and the
+  role's renewal check never fired, so every SPICE certificate the collection
+  issued expired one year after the first deploy. Certificates issued more than
+  about nine months ago are therefore close to their expiry, and an older
+  cluster may already have expired certificates. Host certificates are now
+  issued with an explicit lifetime (<code>cert_expiration_days</code>, default 365) and are
+  reissued, reusing the existing key, on any deploy where the certificate
+  expires within <code>cert_renew_days</code> (default 90) days. The first deploy after
+  upgrading reissues every host's certificate, with the same key and subject,
+  because the certtool template gained an explicit lifetime. Pinning by CA and
+  host subject is unaffected and running instances are not disturbed. QEMU
+  loads SPICE certificates only when an instance starts, so an instance started
+  before a renewal keeps its old certificate until it is restarted or live
+  migrated. To check a host:
+  <code>openssl x509 -in /etc/pki/libvirt-spice/server-cert.pem -noout -enddate</code>. See
+  the <a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/deploy/collection/README.md#certificates">collection README</a>.</li>
 </ul>
 <h2 id="database">Database<a class="headerlink" href="#database" title="Permanent link">&para;</a></h2>
 <ul>
