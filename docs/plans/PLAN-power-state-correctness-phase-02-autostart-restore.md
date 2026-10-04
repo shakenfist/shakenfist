@@ -110,6 +110,22 @@ nothing. `sf.target` is ordered after `multi-user.target`, but that
 orders the target, not the daemons it wants. Nothing guarantees the
 order the cleaner rule needs, so this phase adds it (D3).
 
+The boot half of a reboot needs no ordering, which was checked against
+libvirt's source in review of #4437. A daemon's sockets are created with
+their accept callback disabled
+(`src/rpc/virnetserverservice.c`, "IO callback is initially disabled"),
+and `daemonRunStateInit()` (`src/remote/remote_daemon.c`) enables them
+("Only now accept clients from network") only after
+`virStateInitialize()` returns. The qemu driver's state initialisation
+starts every autostart domain synchronously before it returns:
+`virDomainDriverAutoStart()` in 11.3.0 (Debian 13), and
+`qemuAutostartDomains()` in 10.0.0 (Ubuntu 24.04). So the cleaner's
+first connection to libvirt after boot cannot complete until every
+autostart domain has been started, or has failed to start -- and one
+which failed to start really is off, so recording it off and clearing
+its flag is right. This holds for socket-activated modular daemons and
+for monolithic libvirtd alike.
+
 ### S4 -- instance restore is a no-op, and deleting it is safe
 
 `restore_instances()` (`daemons/queues/startup_tasks.py:99`) runs on a

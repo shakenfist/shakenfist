@@ -1,4 +1,4 @@
-# Copyright 2019 Michael Still and contributors
+# Copyright 2026 Michael Still and contributors
 """Regression tests for ``NodeInstOp._health_check_kvm_process``.
 
 This method was deleted in commit 216fa31dd on the mistaken belief that
@@ -30,17 +30,9 @@ class FakeInstance:
 
     def __init__(self, pid):
         self.uuid = str(uuid4())
-        self._kvm_pid = pid
+        self.kvm_pid = pid
         self.power_state = {'power_state': 'on'}
         self.enqueue_delete_due_error = mock.Mock()
-
-    @property
-    def kvm_pid(self):
-        return self._kvm_pid
-
-    @kvm_pid.setter
-    def kvm_pid(self, pid):
-        self._kvm_pid = pid
 
 
 class HealthCheckKvmProcessTestCase(base.ShakenFistTestCase):

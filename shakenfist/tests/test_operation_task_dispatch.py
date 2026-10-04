@@ -1,3 +1,4 @@
+# Copyright 2026 Michael Still and contributors
 """Every operation task handler must exist, because it is found by name.
 
 Commit 216fa31dd deleted ``NodeInstOp._health_check_kvm_process()`` on the
@@ -24,9 +25,17 @@ from shakenfist.operations import baseoperation
 from shakenfist.tests import base
 
 
-# The exact source pattern every by-task-name dispatcher uses. See
-# dispatch_task() in any of the operation modules discovered below.
-_DISPATCH_PATTERN = re.compile(r"""self\.__getattribute__\(f'_\{task\.name\}'\)""")
+# The source pattern every by-task-name dispatcher uses (see dispatch_task()
+# in any of the operation modules discovered below), plus the getattr()
+# spelling of the same lookup, so a dispatcher written that way is not
+# silently skipped.
+_DISPATCH_PATTERN = re.compile(
+    r"""(self\.__getattribute__\(|getattr\(\s*self\s*,\s*)f['"]_\{task\.name\}['"]""")
+
+# The number of dispatching modules when this test was written. Discovery
+# finding fewer means the pattern above has drifted from the code, which
+# would silently shrink what this test checks, so that fails too.
+_MINIMUM_DISPATCH_MODULES = 14
 
 
 def _discover_dispatch_modules():
@@ -73,7 +82,9 @@ def _dispatch_classes(module):
 class OperationTaskDispatchTestCase(base.ShakenFistTestCase):
     def test_discovery_is_non_empty_and_includes_node_inst_op(self):
         discovered = _discover_dispatch_modules()
-        self.assertNotEqual([], discovered)
+        self.assertGreaterEqual(
+            len(discovered), _MINIMUM_DISPATCH_MODULES,
+            f'only found {len(discovered)} dispatching modules: {discovered}')
         self.assertIn('shakenfist.operations.node_inst_op', discovered)
 
     def test_every_dispatched_task_has_a_handler(self):

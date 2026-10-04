@@ -938,6 +938,15 @@ class InstancePowerOffAutostartTestCase(InstanceLibvirtTestCase):
         self.inst.power_off()
         self.assertEqual([0], domain.autostart_calls)
 
+    def test_power_off_leaves_autostart_when_destroy_failed(self):
+        # Any other destroy() error may leave the domain running, and a
+        # running domain must keep its autostart flag: nothing sets it again.
+        domain = AutostartDomain(destroy_error=FakeLibvirtError(
+            'internal error: something else entirely'))
+        self._mock_libvirt(domain)
+        self.inst.power_off()
+        self.assertEqual([], domain.autostart_calls)
+
     def test_power_off_autostart_failure_is_recorded_not_raised(self):
         domain = AutostartDomain(autostart_error=FakeLibvirtError(
             'internal error: something else entirely'))

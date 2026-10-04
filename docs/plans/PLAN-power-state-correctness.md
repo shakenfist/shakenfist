@@ -395,7 +395,10 @@ only cover the placement reconciliation has in its file (S5).
 F4 to F8 and F12, with their functional tests. `power_on()` reports
 failure and the endpoint answers 507 or 500 (open question 2);
 `power_off()` does not record `off` when `destroy()` failed and stays
-consistent with phase 2's autostart change; pause and unpause judge
+consistent with phase 2's autostart change (phase 2 already leaves the
+autostart flag set when `destroy()` failed for any reason other than
+"not running", and nothing ever sets the flag again on a domain which is
+running -- decide whether the cleaner's detected power on should); pause and unpause judge
 success by the domain's state rather than by whether the stored value
 changed, and raise `InvalidLifecycleState` for an inactive domain the
 way `reboot()` does after #3630; `_power_on_inner()` updates
