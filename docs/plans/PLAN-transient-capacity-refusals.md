@@ -587,7 +587,7 @@ spelling above is the one to write.
 | 3. Publish metrics when the running-domain set changes | [PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md](PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md) | Complete | `03cd7be3a` (#4200) |
 | 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | [PLAN-transient-capacity-refusals-phase-04-retry-after.md](PLAN-transient-capacity-refusals-phase-04-retry-after.md) | Complete | `565e36e6e` (#4241), client-python `74d6e129b` (client-python#399) |
 | 5. Decide on server-side queued placement from the phase 2 data | [PLAN-transient-capacity-refusals-phase-05-queue-decision.md](PLAN-transient-capacity-refusals-phase-05-queue-decision.md) | Complete | `b398cb890` (#4362), `a5e4a5e8c` (#4390), `48584e589` (#4406) |
-| 6. Documentation and close-out | PLAN-transient-capacity-refusals-phase-06-docs.md | Not started | — |
+| 6. Documentation and close-out | [PLAN-transient-capacity-refusals-phase-06-docs.md](PLAN-transient-capacity-refusals-phase-06-docs.md) | In progress | — |
 | 7. Push audit | PLAN-transient-capacity-refusals-phase-07-push-audit.md | Not started | — |
 
 The `Merged` column records what put each phase on `develop`: the
@@ -917,15 +917,31 @@ and that plan's *Outcome -- second reading*.
 
 ### Phase 6 -- Documentation and close-out
 
-Document the transient-refusal contract in
-`docs/operator_guide/scheduler.md` and the API reference, the suite
-wrapper and its allowlist marker in `docs/developer_guide/ci.md`,
-and the wait summary beside the headroom probe's documentation.
-Update `docs/plans/index.md` and the sibling plans' cross-references
-to their final state. Comment on #3772 with the before-and-after
-pass rate and close it only if the `Debian 12 tier` job's failures
-are no longer `sufficient_idle_cpu`; otherwise leave it open with
-the numbers.
+Document the answer to open question 8 beside the contract a client
+sees, correct the one documentation statement that #4337 overturned,
+and close the plan out. Update `docs/plans/index.md` and the sibling
+plans' cross-references to their final state. Comment on #3772 with
+the before-and-after pass rate and close it only if the
+`Debian 13 tier` job's failures are no longer `sufficient_idle_cpu`;
+otherwise leave it open with the numbers.
+
+This section originally sent the phase to document the
+transient-refusal contract in `docs/operator_guide/scheduler.md`,
+the suite wrapper and its allowlist marker in
+`docs/developer_guide/ci.md`, and the wait summary beside the
+headroom probe's documentation. Phase 6's survey found all three
+already discharged, two of them on pages that did not exist when
+this was written: phase 4 created
+`docs/operator_guide/capacity_refusals.md` and had `scheduler.md`
+link to it rather than restate it, phase 2 documented the wrapper
+and the marker in `ci.md`, and the sizing plan's own phase 6 moved
+the headroom material -- and the wait summary with it -- to
+`docs/developer_guide/ci_cloud_sizing.md`. What that page now says
+about an empty wait trace is what #4337 made false, and correcting
+it is the phase's one real documentation change. The job named here
+was also renamed: `e9e8c86658d` retired the Debian 12 matrix lanes,
+so the close condition is read against `Debian 13 tier`. See
+[phase 6's *What the survey found*](PLAN-transient-capacity-refusals-phase-06-docs.md).
 
 ### Phase 7 -- Push audit
 
