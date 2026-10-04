@@ -15206,6 +15206,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Bugs fixed during this work">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-7s-audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 7's audit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#related-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related issues
+      
+    </span>
+  </a>
+  
 </li>
         
           <li class="md-nav__item">
@@ -16490,13 +16518,13 @@ superseded.</p>
 <td>6. Documentation, and the instrument seam the propagation half turned out to be</td>
 <td><a href="../PLAN-ci-cloud-sizing-phase-06-docs/">PLAN-ci-cloud-sizing-phase-06-docs.md</a></td>
 <td>Complete</td>
-<td>—</td>
+<td><code>174c0b819</code> (#4373), <code>cd9a89242</code> (#4396), <code>a742c99b0</code> (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/120" title="GitHub Issue: shakenfist/actions #120">actions#120</a>)</td>
 </tr>
 <tr>
 <td>7. Push audit</td>
-<td>PLAN-ci-cloud-sizing-phase-07-push-audit.md</td>
-<td>Not started</td>
-<td>—</td>
+<td><a href="../PLAN-ci-cloud-sizing-phase-07-push-audit/">PLAN-ci-cloud-sizing-phase-07-push-audit.md</a></td>
+<td>Complete</td>
+<td>— by design, see below</td>
 </tr>
 </tbody>
 </table>
@@ -16509,6 +16537,17 @@ say which commits arrived inside a pull request. Every SHA is the
 merge commit of the pull request named beside it, so
 <code>&lt;sha&gt;^1..&lt;sha&gt;</code> is the whole of what that pull request put on
 <code>develop</code>. A phase which has not landed reads <code>—</code>.</p>
+<p>Phase 7's cell reads <code>—</code> permanently, and that is the one blank in this
+column which is not a gap. A push audit closes itself out inside its own
+pull request -- there is no later phase to come back and fill the cell in,
+and the merge commit cannot be known from inside the pull request being
+merged. The audit's own first finding is that a blank cell makes a plan
+unauditable, so the distinction has to be stated rather than assumed: the
+other cells are blank when nobody recorded them, and this one is blank
+because nothing could. What the phase put on <code>develop</code> is #4424, named
+here instead of in the cell, and the audit of this plan's own audit is
+therefore the pull request rather than the table. No later plan reads this
+cell, because no phase 8 exists to read it.</p>
 <p>Phase 3 records a fourth merge which did not put it on <code>develop</code> but
 repaired what did. <code>c13d2c6fd</code> (#4186) added the <code># raw-create:</code>
 markers that <code>f3b245304</code> (#4170) landed without, which broke the
@@ -16796,16 +16835,20 @@ If the audit finds nothing, that is recorded in one sentence.</p>
 <p>Two things make this plan's audit unusual and are worth planning
 for rather than discovering. The work is split across
 repositories -- the probe and its tooling live here, the
-invocation lives in <code>shakenfist/actions</code> -- so the audit of the
-half that landed elsewhere runs against that repository's default
-branch, as part of the pull request that lands it, and this phase
-cites that audit rather than re-running it. And most of the
-change is CI configuration and measurement tooling rather than
-product code, so the wave 2 code-quality and security lenses have
-less to read than usual while the documentation lens has more:
-the sizing model, the ledger arithmetic and the band all have to
-say the same thing in <code>docs/developer_guide/ci.md</code> as the
-topology files do.</p>
+invocation lives in <code>shakenfist/actions</code>. That repository has no
+<code>PUSH-AUDIT.md</code>, so there is no audit of the other half to cite
+and the phase 7 plan's D2 audits those three merges from here,
+read-only, filing rather than fixing. And the balance between the
+wave 2 lenses is not what it looks like: most of the change is CI
+configuration and measurement tooling, but <code>shakenfist/scheduler.py</code>
+is in three of the ranges and <code>shakenfist/config.py</code> in one, and
+two of those added fields to the <code>/admin/resources</code> response, so
+the code-quality and security lenses have real product code to
+read. The documentation lens has the most: the sizing model, the
+ledger arithmetic and the band all have to say the same thing on
+<code>docs/developer_guide/ci_cloud_sizing.md</code> -- which phase 6
+created as the canonical page, with <code>docs/developer_guide/ci.md</code>
+carrying a summary and a link -- as the topology files do.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <!-- shared-block: subagent-execution-model v1 -->
@@ -17188,9 +17231,33 @@ which is what <code>tools/check-plan-status.py</code> enforces.</p>
   starts from this list of three changes rather than rediscovering it.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
-<p>Related issues to resolve or be aware of while planning. None of
-these is closed by growing a cloud, and phase 3 exists to make
-sure none of them is closed by accident:</p>
+<h4 id="phase-7s-audit">Phase 7's audit<a class="headerlink" href="#phase-7s-audit" title="Permanent link">&para;</a></h4>
+<p>Phase 7's audit found and fixed four defects in the plan's own output, none
+of which invalidates a conclusion. The instrument's central file opened with
+a docstring stating the opposite of what the code does. The page walk that
+assembles a harvest window had no test, which left half of the 2026-09-08
+unordered-listing fix unheld. A harvest window in which nothing measured
+anything reported success unqualified. And a census read successfully from a
+healthy Loki with a broken log shipper reported no capacity refusals, which
+is what a genuinely idle cluster also reports.</p>
+<p>The last three are one shape, and the audit's own lens is what found it: the
+instrument records its failures honestly, reports them silently, and nothing
+reads the records. That gap is <a href="https://github.com/shakenfist/shakenfist/issues/4409">#4409</a>;
+the band gate's arming evidence expiring with its artifacts is
+<a href="https://github.com/shakenfist/shakenfist/issues/4410">#4410</a>, which has a
+deadline. The audit also reached into <code>shakenfist/actions</code>, which has no
+audit template of its own, and found that an unrecognised <code>test_kind</code> there
+deploys a full topology, runs no tests, and passes (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/127" title="GitHub Issue: shakenfist/actions #127">actions#127</a>).</p>
+<p>What the audit did <em>not</em> find is worth as much: the band is not fitted to
+under-measured data. Across all 236 summarised records the probe recorded
+zero failed samples, no series below 51 usable samples, no degraded capacity
+reads, and a mean sample cadence of 15.000s to within 10µs -- which is the
+figure that proves no sample was ever dropped or delayed.</p>
+<h3 id="related-issues">Related issues<a class="headerlink" href="#related-issues" title="Permanent link">&para;</a></h3>
+<p>Issues to resolve or be aware of, carried from when this plan was
+being written and kept because none of them is closed by growing a
+cloud -- phase 3 exists to make sure none of them is closed by
+accident:</p>
 <ul>
 <li><strong>#3772</strong> (open, umbrella) -- instance creates refused with
   <code>507 sufficient_idle_cpu</code> under suite concurrency. Its own

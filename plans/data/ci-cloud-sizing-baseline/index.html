@@ -14774,6 +14774,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Record schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-fields-whose-meaning-changed-after-this-was-harvested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two fields whose meaning changed after this was harvested
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15101,7 +15118,7 @@ output, minus the two path fields above.</p>
 <tbody>
 <tr>
 <td><code>record_version</code></td>
-<td>Schema version of the report record. <code>records.jsonl</code> is <strong>1</strong>; <code>records-addendum.jsonl</code> is <strong>2</strong>, which adds the four series counters below. A consumer that reads both must expect the older shape.</td>
+<td>Schema version of the report record. <code>records.jsonl</code> is <strong>1</strong>; <code>records-addendum.jsonl</code> is <strong>2</strong>, which adds the four series counters below. A consumer that reads both must expect the older shape. The tool writes <strong>4</strong> today; see <em>Two fields whose meaning changed after this was harvested</em> below.</td>
 </tr>
 <tr>
 <td><code>series</code></td>
@@ -15141,6 +15158,34 @@ output, minus the two path fields above.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="two-fields-whose-meaning-changed-after-this-was-harvested">Two fields whose meaning changed after this was harvested<a class="headerlink" href="#two-fields-whose-meaning-changed-after-this-was-harvested" title="Permanent link">&para;</a></h3>
+<p>Both files here were harvested before the report tool reached
+<code>record_version</code> 4, and two fields inside <code>verdict</code> do not mean today
+what they meant when these records were written. Neither can be
+re-derived by re-harvesting, because the bundles are gone.</p>
+<p><code>verdict.per_node_band</code> is the additive one, and version 3 is where it
+changed: in these records it is the constant <code>null</code>, meaning <em>not
+judged</em>. From version 3 on, <code>null</code> means <em>no sample produced a per-node
+fraction</em>, and a real verdict is published otherwise.</p>
+<p><code>verdict.refusal_warning</code> is the one to be careful with. In these
+records it reads <code>false</code> for a census which was read and matched no
+scheduler stage event at all -- the same value a census which saw the
+scheduler and tallied no capacity-stage drop gets. Version 4 separates
+them and writes <code>null</code> for the first, because a filter which stopped
+matching is the instrument failing to look, not the cluster failing to
+refuse. An analysis pooling these files with records written after that
+change will count the older ones as observed-clean unless it re-derives
+the warning itself:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">census</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="s1">'summary'</span><span class="p">][</span><span class="s1">'census'</span><span class="p">]</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">observed</span> <span class="o">=</span> <span class="n">census</span><span class="p">[</span><span class="s1">'state'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'read'</span> <span class="ow">and</span> <span class="n">census</span><span class="p">[</span><span class="s1">'stage_events'</span><span class="p">]</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">warning</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">census</span><span class="p">[</span><span class="s1">'capacity_shortage_drops'</span><span class="p">])</span> <span class="k">if</span> <span class="n">observed</span> <span class="k">else</span> <span class="kc">None</span>
+</code></pre></div>
+<p>That computes the version 4 reading from fields every version carries.
+In practice it changes nothing about <em>this</em> dataset -- <code>stage_events</code>
+is non-zero on all 204 summarised records in <code>records.jsonl</code> and all 32
+in <code>records-addendum.jsonl</code>, so no record here is actually in the
+ambiguous state. The boundary matters for windows harvested across it,
+which is why it is written down rather than left to be rediscovered.</p>
 <h2 id="what-this-dataset-does-not-know">What this dataset does not know<a class="headerlink" href="#what-this-dataset-does-not-know" title="Permanent link">&para;</a></h2>
 <p><strong>Nothing, now.</strong> Both entries that stood here are answered, one by
 step 2f from the shape of the baseline itself and one by step 2g's
@@ -15249,10 +15294,10 @@ which is the reason the counters were added.</p>
 <p>Both fixes were live throughout: step 2a's <code>capacity_degraded</code> merged
 to <code>develop</code> at 2026-09-06T06:17Z and step 2e's census filter merged to
 <code>shakenfist/actions</code> at 2026-09-06T00:09Z.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python3 tools/ci_headroom_harvest.py \
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    --since 2026-09-07T10:00:00Z --until 2026-09-08T02:00:00Z \
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    --cache-dir /var/tmp/ci-headroom-harvest-cache \
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    --output records-addendum.jsonl
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python3 tools/ci_headroom_harvest.py \
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    --since 2026-09-07T10:00:00Z --until 2026-09-08T02:00:00Z \
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    --cache-dir /var/tmp/ci-headroom-harvest-cache \
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    --output records-addendum.jsonl
 </code></pre></div>
 <p>This window was first harvested as <code>--since 2026-09-07 --limit 10</code>,
 which is not a window at all: <code>--limit</code> takes the newest runs <em>as of
@@ -15341,12 +15386,12 @@ could not have established it alone.</p>
 <p>The dataset is deliberately plain: each line is one JSON object and
 nothing needs to be joined. To recover, say, the per-topology
 distribution of the cluster-wide committed-CPU p90 fraction:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">records</span> <span class="o">=</span> <span class="p">[</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">line</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">open</span><span class="p">(</span><span class="s1">'records.jsonl'</span><span class="p">)]</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">usable</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">records</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>          <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s1">'summary'</span><span class="p">]</span> <span class="ow">and</span> <span class="n">r</span><span class="p">[</span><span class="s1">'summary'</span><span class="p">][</span><span class="s1">'cluster'</span><span class="p">][</span><span class="s1">'committed_cpu'</span><span class="p">][</span><span class="s1">'n'</span><span class="p">]]</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">tier</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span><span class="p">[</span><span class="s1">'summary'</span><span class="p">][</span><span class="s1">'cluster'</span><span class="p">][</span><span class="s1">'committed_cpu'</span><span class="p">][</span><span class="s1">'p90_fraction'</span><span class="p">]</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">usable</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s1">'topology'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'slim-tier'</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">records</span> <span class="o">=</span> <span class="p">[</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">line</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">open</span><span class="p">(</span><span class="s1">'records.jsonl'</span><span class="p">)]</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">usable</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">records</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>          <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s1">'summary'</span><span class="p">]</span> <span class="ow">and</span> <span class="n">r</span><span class="p">[</span><span class="s1">'summary'</span><span class="p">][</span><span class="s1">'cluster'</span><span class="p">][</span><span class="s1">'committed_cpu'</span><span class="p">][</span><span class="s1">'n'</span><span class="p">]]</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">tier</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span><span class="p">[</span><span class="s1">'summary'</span><span class="p">][</span><span class="s1">'cluster'</span><span class="p">][</span><span class="s1">'committed_cpu'</span><span class="p">][</span><span class="s1">'p90_fraction'</span><span class="p">]</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">usable</span> <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="s1">'topology'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'slim-tier'</span><span class="p">]</span>
 </code></pre></div>
 <p>Three figures in the master plan's <em>Situation</em> section are <strong>not</strong>
 recomputable from this directory, and are named as such where they are
