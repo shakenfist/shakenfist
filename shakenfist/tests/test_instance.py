@@ -886,6 +886,76 @@ class InstancePowerEventTimestampsTestCase(InstanceLibvirtTestCase):
         self.assertIsNone(self._event_extra('poweroff'))
 
 
+class AutostartDomain(FakeDomain):
+    """A domain which records each setAutostart() flag, and can be told to
+    raise on destroy() or on setAutostart() itself.
+    """
+
+    def __init__(self, destroy_error=None, autostart_error=None, **kwargs):
+        super().__init__(**kwargs)
+        self._destroy_error = destroy_error
+        self._autostart_error = autostart_error
+        self.autostart_calls = []
+
+    def destroy(self):
+        if self._destroy_error:
+            raise self._destroy_error
+
+    def setAutostart(self, flag):
+        if self._autostart_error:
+            raise self._autostart_error
+        self.autostart_calls.append(flag)
+
+
+class InstancePowerOffAutostartTestCase(InstanceLibvirtTestCase):
+    """power_off() clears libvirt's autostart flag (D1), so a powered off
+    instance stays off across a hypervisor reboot. A failure to clear it is
+    recorded as an event rather than raised, and the power state and
+    'poweroff' event are still written either way (D5).
+    """
+
+    def setUp(self):
+        super().setUp()
+        p = mock.patch.object(instance.Instance, 'add_event')
+        self.mock_add_event = p.start()
+        self.addCleanup(p.stop)
+
+    def _event_messages(self):
+        return [c.args[1] for c in self.mock_add_event.call_args_list]
+
+    def test_power_off_clears_autostart(self):
+        domain = AutostartDomain()
+        self._mock_libvirt(domain)
+        self.inst.power_off()
+        self.assertEqual([0], domain.autostart_calls)
+
+    def test_power_off_of_already_stopped_domain_clears_autostart(self):
+        # destroy() can find the domain already stopped if power_off() is
+        # called more than once, as delete does. The clear still happens.
+        domain = AutostartDomain(destroy_error=FakeLibvirtError(
+            'Requested operation is not valid: domain is not running'))
+        self._mock_libvirt(domain)
+        self.inst.power_off()
+        self.assertEqual([0], domain.autostart_calls)
+
+    def test_power_off_autostart_failure_is_recorded_not_raised(self):
+        domain = AutostartDomain(autostart_error=FakeLibvirtError(
+            'internal error: something else entirely'))
+        self._mock_libvirt(domain)
+
+        self.inst.power_off()
+
+        self.assertEqual('off', self.inst.power_state['power_state'])
+        messages = self._event_messages()
+        self.assertIn('instance autostart configuration error', messages)
+        self.assertIn('poweroff', messages)
+
+    def test_power_off_no_domain_calls_nothing(self):
+        self._mock_libvirt(None)
+        self.inst.power_off()
+        self.mock_add_event.assert_not_called()
+
+
 class InstanceDomainXMLEscapingTestCase(base.ShakenFistTestCase):
     """A caller-supplied model value must stay data in the domain XML.
 

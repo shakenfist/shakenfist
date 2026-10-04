@@ -28,7 +28,8 @@ libvirt.
   shuts guests down (D3).
 * F2. Deleting the instance half of sf-queues' startup restore. The
   network restore and the placement reconciliation stay.
-* F3. Deleting `_health_check_kvm_process()`.
+* F3. Removing the dead delete branch of `_health_check_kvm_process()`.
+  As planned this said the whole method; see S6.
 * Unit tests for each change, each shown to fail without it, and a
   functional test that reads the autostart flag on the hypervisor.
 * Correcting the master plan's phase 2 section where the survey found
@@ -144,13 +145,29 @@ reconciliation has in that file, so they are kept in a rewritten test
 rather than deleted with it. `StartupRestoreThreadTestCase` (`:128`
 onwards) is about threading and is unaffected.
 
-### S6 -- `_health_check_kvm_process()` is dead, and owns an import
+### S6 -- `_health_check_kvm_process()` is live; only its delete branch is dead
 
-`operations/node_inst_op.py:176-184` has no caller (`grep -rn
-_health_check_kvm_process shakenfist` finds only the definition), and
-it compares the `power_state` dict to `'on'`. It is the only user of
-`psutil` in that module (`:4`, `:180`, `:181`), so the import goes too,
-or flake8 fails.
+As planned, this section said the method had no caller, because `grep
+-rn _health_check_kvm_process shakenfist` finds only the definition.
+That was wrong, and step 4 deleted it. `NodeInstOp.dispatch_task()`
+calls `self.__getattribute__(f'_{task.name}')`, and the cluster
+daemon's instance checks (`daemons/cluster/scheduled_tasks.py:480-488`)
+enqueue a `health_check_kvm_process` task for every created instance.
+With the method gone every such dispatch raised `AttributeError`, and
+the error path moved every created instance to `created-error`. The
+first functional run on the branch
+([37162396285](https://github.com/shakenfist/shakenfist/actions/runs/37162396285))
+failed in every cluster job because of it.
+
+The method is restored without its delete branch, which compares the
+`power_state` dict to `'on'` and so never fires. Wired up correctly, it
+would error-delete a guest which powered itself off. Its stale
+`kvm_pid` clearing is live, and `_collect_billing_statistics()` reads
+`kvm_pid`. The task cannot be removed either, because its name is
+persisted in queued operations. Fourteen operation types dispatch by
+name like this. `tests/test_operation_task_dispatch.py` now checks that
+every task in each of them has a handler, so a grep cannot mislead the
+next deletion.
 
 ### S7 -- the cleaner's two `off` branches are where autostart is cleared
 
@@ -162,8 +179,13 @@ In `_update_inactive_domain()` (`daemons/cleaner/scheduled_tasks.py:334`):
   off before now left autostart set.
 * `:429-456`: the locked branch which records a detected power off.
 
-The caller (`:558-568`) catches `libvirtError` per domain, logs it and
-moves on, so a `setAutostart()` failure skips that domain for one pass.
+The plan first said the caller (`:558-568`) catches `libvirtError` per
+domain. It does not: the `try` wraps the whole loop, so one failed
+`setAutostart()` would have ended the pass for every domain listed after
+it. Step 2 found this and gave the call to `_update_inactive_domain()`
+its own `try`, which logs the error and moves to the next domain; the
+next pass retries.
+
 `domain.autostart()` and `setAutostart()` are local libvirt calls, so
 the already-off branch costs no database load. It takes the node lock
 once for each domain that still has the flag set.
@@ -312,7 +334,7 @@ in parallel in one worktree, because pre-commit's stash is repo-wide.
 | 1 | medium | sonnet | none | `power_off()` clears autostart. See brief 1. Commit: "Clear autostart when powering an instance off." |
 | 2 | high | opus | none | The cleaner clears autostart on `off` inactive domains. See brief 2. Commit: "cleaner: clear autostart on powered off domains." |
 | 3 | low | sonnet | none | Order SF daemons after libvirt-guests. See brief 3. Commit: "Stop SF daemons before libvirt-guests." |
-| 4 | medium | sonnet | none | Delete the instance restore loop and `_health_check_kvm_process()`. See brief 4. Commit: "Remove the instance restore that never ran." |
+| 4 | medium | sonnet | none | Delete the instance restore loop and `_health_check_kvm_process()`. See brief 4. Commit: "Remove the instance restore that never ran." Deleting the method was wrong (S6); a follow-up commit restores it without its delete branch. |
 | 5 | medium | sonnet | none | Functional test of the autostart flag. See brief 5. Commit: "Test the autostart flag on the hypervisor." |
 | 6 | medium | sonnet | none | Documentation. See brief 6. Commit: "Document power state across a reboot." |
 | 7 | -- | management | -- | Dispatch the functional tests on the branch and read the result. See brief 7. |
@@ -384,8 +406,9 @@ In `_update_inactive_domain()`:
   * Put that in a small helper if it reads better, but keep the
     unlocked `autostart()` check outside the lock.
 * Do not catch `libvirtError` here. The caller (around line 566)
-  already logs it and moves to the next domain, and the next pass
-  retries.
+  logs it and moves to the next domain, and the next pass retries.
+  (As planned, this said the caller already did that. It did not, and
+  step 2 added the per-domain catch; see S7.)
 
 In `shakenfist/tests/test_daemon_cleaner.py`:
 
@@ -589,8 +612,10 @@ goes in the pull request description.
       prints exactly the `power_off()` call and the cleaner's calls.
 * [ ] `grep -rn "create_on_hypervisor" shakenfist/daemons/queues/startup_tasks.py`
       prints only the network call.
-* [ ] `grep -rn "_health_check_kvm_process\|import psutil" shakenfist/operations/node_inst_op.py`
-      prints nothing.
+* [ ] `grep -n "enqueue_delete_due_error" shakenfist/operations/node_inst_op.py`
+      does not print a line inside `_health_check_kvm_process()`, and
+      `tests/test_operation_task_dispatch.py` passes. (As planned this
+      item checked the method was gone, which was wrong; see S6.)
 * [ ] `grep -n "libvirt-guests.service" shakenfist/deploy/collection/roles/node/templates/sf.service`
       prints the `After=` line, and it is outside the `{% if %}` chain.
 * [ ] `grep -n "power_state = 'on'\|def create_on_hypervisor" shakenfist/tests/test_queues_startup_restore.py`

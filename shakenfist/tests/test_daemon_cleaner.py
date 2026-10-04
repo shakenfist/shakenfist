@@ -32,6 +32,10 @@ _test_extra_domains = []
 # CleanerBaseTestCase.setUp().
 _test_undefined_domains = []
 
+# (name, flag) for each setAutostart() call. Reset by
+# CleanerBaseTestCase.setUp().
+_test_set_autostart_calls = []
+
 # The libvirt uuid of the fake's one foreign (non-SF) domain.
 FOREIGN_DOMAIN_UUID = '0e8b8d47-5b8c-4b0e-9d0a-6f6c1b6f3b1a'
 
@@ -158,11 +162,16 @@ class FakeLibvirtConnection:
 
 
 class FakeLibvirtDomain:
-    def __init__(self, name, state, reason=1, disk_errors=None, uuid=None):
+    def __init__(self, name, state, reason=1, disk_errors=None, uuid=None,
+                 autostart=True):
         self._name = name
         self._state = state
         self._reason = reason
         self._disk_errors = disk_errors or {}
+
+        # power_on() sets autostart on every SF domain, so by default it is
+        # set, as it is in production.
+        self._autostart = autostart
 
         # libvirt.tmpl sets an SF domain's libvirt uuid to the instance uuid,
         # so by default the name's suffix is the uuid. A test can pass a
@@ -189,6 +198,13 @@ class FakeLibvirtDomain:
 
     def undefine(self):
         _test_undefined_domains.append(self._name)
+
+    def autostart(self):
+        return self._autostart
+
+    def setAutostart(self, flag):
+        _test_set_autostart_calls.append((self._name, flag))
+        self._autostart = bool(flag)
 
 
 class FakeInstanceLocks:
@@ -249,9 +265,11 @@ class CleanerBaseTestCase(base.ShakenFistTestCase):
         global _test_instance_uuids
         global _test_extra_domains
         global _test_undefined_domains
+        global _test_set_autostart_calls
         _test_instance_uuids = {}
         _test_extra_domains = []
         _test_undefined_domains = []
+        _test_set_autostart_calls = []
 
         self.libvirt = mock.patch(
             'shakenfist.util.libvirt.get_libvirt',
@@ -834,14 +852,16 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
 
     def _inactive_instance(self, state=instance.Instance.STATE_CREATED,
                            power_state='on',
-                           reason=FakeLibvirt.VIR_DOMAIN_SHUTOFF_SHUTDOWN):
+                           reason=FakeLibvirt.VIR_DOMAIN_SHUTOFF_SHUTDOWN,
+                           autostart=True):
         """An instance whose domain is defined and powered off."""
         inst = self.mock_mariadb.create_instance(
             'inactive', set_state=state)
         if power_state:
             inst.update_power_state(power_state)
         _test_extra_domains.append(FakeLibvirtDomain(
-            f'sf:{inst.uuid}', FakeLibvirt.VIR_DOMAIN_SHUTOFF, reason=reason))
+            f'sf:{inst.uuid}', FakeLibvirt.VIR_DOMAIN_SHUTOFF, reason=reason,
+            autostart=autostart))
         return str(inst.uuid)
 
     def _files_missing(self, inst_uuid):
@@ -931,22 +951,28 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
                 mock.patch.object(instance.Instance, 'agent_state',
                                   new_callable=mock.PropertyMock) as agent, \
                 mock.patch.object(instance.Instance, 'add_event',
-                                  calls.add_event):
+                                  calls.add_event), \
+                mock.patch.object(FakeLibvirtDomain, 'setAutostart',
+                                  calls.setAutostart):
             calls.attach_mock(agent, 'agent_state')
             cleaner_st.update_power_states()
 
+        # The autostart clear comes last, as nothing waits on it (phase 2's
+        # D6).
         self.assertEqual(
             [mock.call.update_power_state('off'),
              mock.call.agent_state(AGENT_INSTANCE_OFF),
              mock.call.add_event(
                  EVENT_TYPE_AUDIT, 'detected poweroff',
-                 extra={'reason': 'shutdown', 'previous_power_state': 'on'})],
+                 extra={'reason': 'shutdown', 'previous_power_state': 'on'}),
+             mock.call.setAutostart(0)],
             calls.mock_calls)
 
     def test_already_off_takes_no_lock(self):
-        """When the database already says off there is nothing to write,
-        so no lock is taken and no event added (S14)."""
-        self._inactive_instance(power_state='off')
+        """When the database already says off and autostart is clear there
+        is nothing to write, so no lock is taken, no event added and no
+        libvirt write made (S14, and phase 2's D6)."""
+        self._inactive_instance(power_state='off', autostart=False)
 
         with mock.patch.object(
                 instance.Instance, 'update_power_state') as mock_update, \
@@ -956,6 +982,156 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
         self.assertEqual([], self.locks.get_lock_calls)
         self.assertFalse(mock_update.called)
         self.assertEqual([], add_event.call_args_list)
+        self.assertEqual([], _test_set_autostart_calls)
+
+    def test_detected_poweroff_clears_autostart(self):
+        """A guest which powered itself off is recorded as off, and loses
+        its autostart flag so a hypervisor reboot does not start it (phase
+        2's D2 and D6)."""
+        inst_uuid = self._inactive_instance()
+
+        add_event = self._run()
+
+        self.assertEqual('off', self._power_state(inst_uuid))
+        self.assertEqual([(f'sf:{inst_uuid}', 0)], _test_set_autostart_calls)
+        self.assertEqual([inst_uuid], self.locks.locked_uuids())
+        self.assertEqual(
+            1, len(self._events(add_event, 'detected poweroff')))
+        # The detected poweroff event is the record; no second event.
+        self.assertEqual([], self._events(add_event, 'autostart cleared'))
+
+    def test_already_off_clears_autostart_once(self):
+        """A domain powered off before power_off() cleared autostart has it
+        cleared under the lock, with an event, once (phase 2's D2 and D6)."""
+        inst_uuid = self._inactive_instance(power_state='off')
+
+        add_event = self._run()
+
+        self.assertEqual([inst_uuid], self.locks.locked_uuids())
+        self.assertEqual([(f'sf:{inst_uuid}', 0)], _test_set_autostart_calls)
+        self.assertEqual(
+            [mock.call(EVENT_TYPE_AUDIT, 'autostart cleared',
+                       extra={'reason': 'instance is powered off'})],
+            self._audit_events(add_event))
+        self.assertEqual('off', self._power_state(inst_uuid))
+
+        # The next pass finds the flag clear, and takes no lock.
+        add_event = self._run()
+
+        self.assertEqual([inst_uuid], self.locks.locked_uuids())
+        self.assertEqual([(f'sf:{inst_uuid}', 0)], _test_set_autostart_calls)
+        self.assertEqual([], self._audit_events(add_event))
+
+    def test_already_off_lock_timeout_does_not_clear_autostart(self):
+        inst_uuid = self._inactive_instance(power_state='off')
+        self.locks.timeout = True
+
+        add_event = self._run()
+
+        self.assertEqual([inst_uuid], self.locks.locked_uuids())
+        self.assertEqual([], _test_set_autostart_calls)
+        self.assertEqual([], add_event.call_args_list)
+
+    def test_already_off_domain_active_inside_lock_keeps_autostart(self):
+        """A power on which held the lock started the domain, and set
+        autostart for it. The cleaner must not clear it (phase 2's S8)."""
+        inst_uuid = self._inactive_instance(power_state='off')
+
+        with mock.patch.object(
+                FakeLibvirtConnection, 'lookupByName',
+                return_value=self._active_domain(inst_uuid)) as mock_lookup:
+            add_event = self._run()
+
+        mock_lookup.assert_called_once_with(f'sf:{inst_uuid}')
+        self.assertEqual([inst_uuid], self.locks.locked_uuids())
+        self.assertEqual([], _test_set_autostart_calls)
+        self.assertEqual([], add_event.call_args_list)
+
+    def test_already_off_domain_gone_inside_lock_keeps_autostart(self):
+        inst_uuid = self._inactive_instance(power_state='off')
+
+        with mock.patch.object(
+                FakeLibvirtConnection, 'lookupByName',
+                side_effect=FakeLibvirtError('Domain not found')):
+            add_event = self._run()
+
+        self.assertEqual([inst_uuid], self.locks.locked_uuids())
+        self.assertEqual([], _test_set_autostart_calls)
+        self.assertEqual([], add_event.call_args_list)
+
+    def test_already_off_powered_on_inside_lock_keeps_autostart(self):
+        """A power on which finished while the cleaner waited for the lock
+        recorded on. The domain the cleaner then reads may still be off, but
+        the flag is the power on's, and stays (phase 2's D6)."""
+        inst_uuid = self._inactive_instance(power_state='off')
+
+        def on_lock(inst_uuid):
+            instance.Instance.from_db(inst_uuid).update_power_state('on')
+
+        self.locks.on_lock = on_lock
+        add_event = self._run()
+
+        self.assertEqual([inst_uuid], self.locks.locked_uuids())
+        self.assertEqual([], _test_set_autostart_calls)
+        self.assertEqual([], self._audit_events(add_event))
+        self.assertEqual('on', self._power_state(inst_uuid))
+
+    def test_skipped_branches_do_not_touch_autostart(self):
+        """Building, deleted and delete-wait instances, and the files
+        missing branch, return before either off branch, so autostart is not
+        read or written (phase 2's S9)."""
+        for state in [instance.Instance.STATE_INITIAL,
+                      instance.Instance.STATE_PREFLIGHT,
+                      instance.Instance.STATE_CREATING,
+                      instance.Instance.STATE_DELETED,
+                      instance.Instance.STATE_DELETE_WAIT]:
+            self._inactive_instance(state=state, power_state='off')
+        for state in [instance.Instance.STATE_CREATED,
+                      instance.Instance.STATE_ERROR]:
+            for power_state in ['on', 'off']:
+                self._files_missing(self._inactive_instance(
+                    state=state, power_state=power_state))
+        self._after_grace()
+
+        with mock.patch.object(
+                FakeLibvirtDomain, 'autostart') as mock_autostart, \
+                mock.patch.object(
+                    FakeLibvirtDomain, 'setAutostart') as mock_set, \
+                mock.patch.object(instance.Instance, 'enqueue_delete'):
+            add_event = self._run()
+
+        self.assertFalse(mock_autostart.called)
+        self.assertFalse(mock_set.called)
+        self.assertEqual([], self._events(add_event, 'autostart cleared'))
+
+    def test_set_autostart_error_skips_only_that_domain(self):
+        """A libvirt error clearing one domain's autostart is logged, and the
+        domains after it are still processed. The next pass retries."""
+        detected = self._inactive_instance()
+        already_off = self._inactive_instance(power_state='off')
+        real_set_autostart = FakeLibvirtDomain.setAutostart
+
+        def set_autostart(domain, flag):
+            if domain.name() == f'sf:{detected}':
+                raise FakeLibvirtError('setAutostart failed')
+            return real_set_autostart(domain, flag)
+
+        with mock.patch.object(FakeLibvirtDomain, 'setAutostart',
+                               autospec=True, side_effect=set_autostart):
+            add_event = self._run()
+
+        # The failing domain's power state was written before the clear.
+        self.assertEqual('off', self._power_state(detected))
+        self.assertEqual([(f'sf:{already_off}', 0)], _test_set_autostart_calls)
+        self.assertEqual(
+            [mock.call(EVENT_TYPE_AUDIT, 'autostart cleared',
+                       extra={'reason': 'instance is powered off'})],
+            self._events(add_event, 'autostart cleared'))
+        # Both locks were released.
+        self.assertEqual(
+            [('lock', detected), ('unlock', detected),
+             ('lock', already_off), ('unlock', already_off)],
+            self.locks.events)
 
     def test_instance_being_created_is_skipped(self):
         """A domain whose instance is still being created is left alone
