@@ -49,7 +49,9 @@ import io
 import json
 import os
 import shutil
+import subprocess
 import tempfile
+from unittest import mock
 import zipfile
 
 from shakenfist.tests import base
@@ -959,6 +961,137 @@ class RunListingTestCase(HarvestTestCase):
         # command the dataset's README quotes.
         parsed = harvest.parse_since('2026-08-30')
         self.assertEqual('UTC', str(parsed.tzinfo))
+
+
+class ArtifactIdTestCase(HarvestTestCase):
+    """The artifact id is outside data used to build a path and an URL.
+
+    It comes out of a GitHub API response body, and is interpolated into a
+    cache filename and an API path (issue #4412). cached_artifact()'s cache
+    key being 'immutable and unique' says nothing about it being an
+    integer, so checked_artifact_id() makes it one before either string is
+    built, or stops the harvest.
+    """
+
+    def test_an_integer_id_passes_through(self):
+        self.assertEqual(9700, harvest.checked_artifact_id({'id': 9700}))
+
+    def test_a_numeric_string_is_read_as_its_integer(self):
+        self.assertEqual(9700, harvest.checked_artifact_id({'id': '9700'}))
+
+    def test_a_traversal_string_is_refused(self):
+        e = self.assertRaises(
+            harvest.HarvestError, harvest.checked_artifact_id,
+            {'id': '../../../etc/cron.d/evil', 'name': PRIMARY_BUNDLE})
+        self.assertIn(PRIMARY_BUNDLE, str(e))
+        self.assertIn('non-integer id', str(e))
+
+    def test_a_missing_id_is_refused(self):
+        self.assertRaises(
+            harvest.HarvestError, harvest.checked_artifact_id,
+            {'name': PRIMARY_BUNDLE})
+
+    def test_a_hostile_id_stops_the_harvest_before_anything_is_fetched(self):
+        # The check has to run before the cache path and the API path
+        # exist, not after: a check that runs after the parse is not a
+        # check, and here the 'parse' is the string interpolation.
+        run = self._run_payload()
+        artifacts = [{'id': '../../escape', 'name': PRIMARY_BUNDLE,
+                      'expired': False}]
+        github = FakeGitHub([run], {run['id']: artifacts}, {run['id']: []}, {})
+        self.assertRaises(harvest.HarvestError, self._harvest, github)
+        self.assertEqual([], github.downloaded)
+
+
+class GitHubCLITimeoutTestCase(HarvestTestCase):
+    """A gh hung on a network stall fails the harvest loudly (issue #4412).
+
+    Without a timeout the harvest hangs indefinitely with no diagnostic.
+    These tests pin both that a timeout is passed to subprocess at all and
+    that its expiry surfaces as GitHubCLIError, the class's existing error
+    style, rather than as a raw TimeoutExpired.
+    """
+
+    def test_a_json_call_passes_its_timeout_to_subprocess(self):
+        cli = harvest.GitHubCLI()
+        completed = mock.Mock(returncode=0, stdout=b'{}')
+        with mock.patch.object(harvest.subprocess, 'run',
+                               return_value=completed) as run:
+            cli.json('actions/runs/1/jobs')
+        self.assertEqual(harvest.GitHubCLI.JSON_TIMEOUT,
+                         run.call_args.kwargs['timeout'])
+
+    def test_a_json_call_which_times_out_raises_in_the_house_style(self):
+        cli = harvest.GitHubCLI()
+        with mock.patch.object(
+                harvest.subprocess, 'run',
+                side_effect=subprocess.TimeoutExpired('gh', 120)):
+            e = self.assertRaises(
+                harvest.GitHubCLIError, cli.json, 'actions/runs/1/jobs')
+        self.assertIn('did not complete', str(e))
+
+    def test_a_download_passes_its_timeout_to_subprocess(self):
+        cli = harvest.GitHubCLI()
+        dest = os.path.join(self.tempdir, 'artifact.zip')
+        completed = mock.Mock(returncode=0)
+        with mock.patch.object(harvest.subprocess, 'run',
+                               return_value=completed) as run:
+            cli.download('actions/artifacts/1/zip', dest)
+        self.assertEqual(harvest.GitHubCLI.DOWNLOAD_TIMEOUT,
+                         run.call_args.kwargs['timeout'])
+
+    def test_a_download_which_times_out_raises_and_leaves_no_partial(self):
+        # The .part discipline exists so an interrupted harvest never
+        # leaves a truncated zip for the next run to treat as complete; a
+        # timeout is one more way to be interrupted.
+        cli = harvest.GitHubCLI()
+        dest = os.path.join(self.tempdir, 'artifact.zip')
+        with mock.patch.object(
+                harvest.subprocess, 'run',
+                side_effect=subprocess.TimeoutExpired('gh', 1800)):
+            self.assertRaises(
+                harvest.GitHubCLIError, cli.download,
+                'actions/artifacts/1/zip', dest)
+        self.assertFalse(os.path.exists(dest))
+        self.assertFalse(os.path.exists(dest + '.part'))
+
+
+class DecompressionCeilingTestCase(HarvestTestCase):
+    """A zip bomb from the harvested repository must not exhaust memory.
+
+    open_bundle() reads the whole inner bundle.zip into a BytesIO and
+    extract_traces() decompresses each trace member in full, so both check
+    the declared ZipInfo.file_size against MAX_MEMBER_BYTES before the
+    read (issue #4412). The ceiling is patched down here because a real
+    256 MB fixture would be its own small bomb.
+    """
+
+    def test_an_oversized_inner_bundle_is_refused(self):
+        path = self._zip('bomb-nested', instrumented_members())
+        with mock.patch.object(harvest, 'MAX_MEMBER_BYTES', 16):
+            e = self.assertRaises(
+                harvest.HarvestError, harvest.open_bundle, path)
+        self.assertIn('bundle.zip', str(e))
+        self.assertIn('refusing to decompress', str(e))
+
+    def test_an_oversized_trace_member_is_refused_before_it_is_read(self):
+        # Flat rather than nested, so the check being exercised is the
+        # per-member one in extract_traces rather than open_bundle's.
+        path = self._zip('bomb-flat', instrumented_members(), nested=False)
+        dest = os.path.join(self.tempdir, 'unpacked-bomb')
+        os.makedirs(dest)
+        with mock.patch.object(harvest, 'MAX_MEMBER_BYTES', 16):
+            e = self.assertRaises(
+                harvest.HarvestError, harvest.extract_traces, path, dest)
+        self.assertIn('refusing to decompress', str(e))
+        self.assertEqual([], os.listdir(dest))
+
+    def test_the_ceiling_clears_a_real_bundle_by_a_wide_margin(self):
+        # A real artifact zip is about 5 MB; the ceiling must never bite a
+        # real harvest. 50x headroom, so bundle growth does not creep up
+        # on it.
+        self.assertGreaterEqual(
+            harvest.MAX_MEMBER_BYTES, 50 * 5 * 1024 * 1024)
 
 
 class BundleTableShapeTestCase(HarvestTestCase):
