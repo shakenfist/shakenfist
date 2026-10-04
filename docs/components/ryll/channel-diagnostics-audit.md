@@ -146,8 +146,11 @@ expect a `VD_AGENT_REPLY` (today: `VD_AGENT_MONITORS_CONFIG`):
 `agent_reply_error_count` (replies with a non-zero error field),
 `last_agent_reply_ts_secs`, `last_agent_reply_lag_us`, a bounded
 `recent_agent_reply_lag_us` ring, and
-`outstanding_agent_request_count` (persistently > 0 means the agent
-is wedged).
+`outstanding_agent_request_count`. That last one is not a stall
+signal: on QXL guests the agent never sees `MONITORS_CONFIG`, so no
+reply comes. Stalls are read from agent token starvation instead:
+`agent_tokens`, `queued_agent_message_count`,
+`agent_starved_since_ts_secs` and `agent_stall_count`.
 
 Main deliberately has no client-keepalive send counters: the
 spurious-PONG keepalive they once tracked was a band-aid made
@@ -158,9 +161,10 @@ for a different mechanism — see the inputs section below.
 One nuance: the per-opcode map is less useful on main than on other
 channels because the agent-related opcodes (`VD_AGENT_*`) are nested
 under main's payload framing — a flat opcode map at the main-channel
-level won't distinguish agent message subtypes. The agent round-trip
-stats above cover the request/reply cycle; deeper agent traffic
-inspection is the vdagent probe's job.
+level won't distinguish agent message subtypes. The agent stats above
+cover flow control and the request/reply cycle; for deeper agent
+traffic inspection, decode the `AGENT_DATA` payloads in the bug
+report's `traffic.pcap`.
 
 ### inputs
 

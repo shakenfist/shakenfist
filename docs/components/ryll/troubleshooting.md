@@ -4,11 +4,37 @@ Common issues and how to resolve them.
 
 ## Connection Issues
 
+### "Could not connect"
+
+In GUI mode a connection attempt that fails before a session exists
+opens a "Could not connect" dialog naming the target and the error,
+with Reconnect and Close buttons. Every stage of opening a channel is
+bounded: the TCP dial by 15 seconds, then the TLS handshake, the SPICE
+link exchange and authentication by 15 seconds each. A peer that never
+answers therefore fails in at most about a minute rather than hanging.
+The error names the stage that failed, which tells you where to look:
+
+- `connecting to <host>:<port>: ...` or `timed out after 15s connecting
+  to ...`: nothing answered on that port. See "Connection refused"
+  below. A timeout rather than a refusal usually means packets are being
+  dropped silently, by a firewall or a missing route.
+- `TLS handshake with ... did not complete within 15s`: something
+  accepted the TCP connection but did not answer the TLS handshake. Test
+  the port with
+  `openssl s_client -connect <host>:<tls-port> -CAfile ca.pem`.
+- `SPICE link handshake ... did not complete`: the transport opened but
+  no SPICE server replied on it.
+
+On macOS 15 and later a process that has not been granted Local Network
+access gets `No route to host` when it connects to a LAN address. Check
+System Settings > Privacy & Security > Local Network for the terminal
+you launched ryll from.
+
 ### "Connection refused"
 
 **Symptom:**
 ```
-Error: Connection refused (os error 111)
+Error: connecting to <host>:<port>: Connection refused (os error 111)
 ```
 
 **Causes:**
@@ -65,7 +91,7 @@ Error: Authentication failed: PermissionDenied
 
 **Symptom:**
 ```
-Error: invalid peer certificate: UnknownIssuer
+Error: TLS handshake with <host>:<port>: invalid peer certificate: UnknownIssuer
 ```
 
 **Cause:** Server's TLS certificate isn't trusted.
@@ -692,48 +718,42 @@ and `active_session_count` (currently-open connections).
 
 ## Guest agent diagnostics
 
-The main channel tracks the responsiveness of the guest agent (vdagent) by
-sending periodic liveness probes and measuring the round-trip time of replies.
-Every 30 seconds, ryll re-sends the guest agent a `VD_AGENT_MONITORS_CONFIG`
-message (the display layout); the agent acknowledges with `VD_AGENT_REPLY`.
-The lag between send and reply (in microseconds) measures how quickly the
-agent can respond to requests. If the agent fails to reply for more than
-5 seconds, a Warn notification appears in the status panel. This mechanism
-helps diagnose guest agent freezes without log parsing.
+The guest agent (vdagent) carries clipboard and display-resize messages
+between ryll and the guest. ryll watches whether it is still reading them.
 
-**The probe is dormant until the first `VD_AGENT_MONITORS_CONFIG` send.** That
-first send happens on session bring-up once display geometry is known, or on
-any window resize. In a freshly-connected session with no resize activity (or
-in headless mode where geometry is fixed), `agent_request_count` may stay at
-zero for a while before the probe starts firing — that does not indicate an
-unhealthy agent. The probe is also skipped while earlier agent messages, such
-as a large clipboard transfer, are still waiting for the server to return
-tokens.
+**How a stall is detected.** spice-server limits how much agent data the
+client may have outstanding: each `AGENT_DATA` chunk costs one token, the
+client starts with 10, and the server hands them back in batches of five
+as the guest consumes the data. If ryll has agent messages waiting, has no
+tokens left, and gets none back for 5 seconds, the guest has stopped
+reading. A Warn notification then appears: "Guest agent is not accepting
+messages (clipboard and display resize are on hold)". While the stall
+lasts it repeats every 20 seconds, folding into the same panel entry and
+raising its count. When tokens come back, the log records `guest agent
+accepting messages again after Ns` and the episode ends.
 
-**Agent reply-lag fields in `MainSnapshot` (visible in Connection bug reports):**
+Nothing is checked while ryll has nothing to send: an agent that stalls
+while idle is noticed the next time you copy, paste or resize. ryll used to
+probe the agent every 30 seconds with `VD_AGENT_MONITORS_CONFIG` and wait
+for a `VD_AGENT_REPLY`. On QXL guests spice-server passes that message to
+the display device instead of the agent, so the reply never came and the
+probe reported a stall on healthy guests (issue #429).
+
+**Agent fields in `MainSnapshot` (visible in Connection bug reports):**
 
 | Field | Meaning |
 |-------|---------|
-| `agent_request_count` | Cumulative liveness probes sent (increments every ~30s when connected). |
-| `agent_reply_count` | Cumulative `VD_AGENT_REPLY` messages received. Should equal `agent_request_count` on a healthy agent (off by at most one in flight). |
-| `agent_reply_error_count` | Replies with non-zero error code. Should be zero on a healthy agent. |
+| `agent_tokens` | Agent tokens ryll holds right now: `AGENT_DATA` chunks it may send before the server returns more. |
+| `queued_agent_message_count` | Agent messages waiting for tokens, including one partly sent. Usually zero. |
+| `agent_starved_since_ts_secs` | Session-relative seconds at which ryll ran out of tokens with messages still queued, while that is still the case. Set means the guest is not reading right now. |
+| `agent_stall_count` | Starvation episodes that lasted long enough to raise the notification. Cumulative. |
+| `agent_request_count` | `VD_AGENT_MONITORS_CONFIG` messages sent (one per window resize or display change). |
+| `agent_reply_count` | `VD_AGENT_REPLY` messages received. Stays at zero on QXL guests, where the agent never sees `MONITORS_CONFIG`; that is normal. |
+| `agent_reply_error_count` | Replies with a non-zero error code. Should be zero. |
 | `last_agent_reply_ts_secs` | Session-relative seconds of the most recent REPLY. |
-| `last_agent_reply_lag_us` | Microseconds between most recent probe send and matched REPLY. Healthy agents reply in well under 100 ms. |
-| `recent_agent_reply_lag_us` | Ring of the last 16 reply-lag measurements (in microseconds) for detecting trends. Use min/max/mean to spot when responsiveness degrades. |
-| `outstanding_agent_request_count` | Number of probes sent without a matched REPLY yet. Zero on healthy agents; persistently > 0 indicates a stuck or unresponsive agent. |
-
-**Interpreting Warn notifications:**
-
-When `outstanding_agent_request_count > 0` continuously for more than 5
-seconds after a probe, a Warn notification fires every 60 seconds (to keep
-the notification panel quiet during sustained stalls). The message reads
-like `"Guest agent is not replying — last send was 5.3s ago, 1 request
-outstanding"` (elapsed time is formatted to one decimal place; `request`
-vs `requests` is pluralised by count). The elapsed time is measured against
-the most recent send, not the oldest outstanding request, so the actual
-silence may be longer than the number reports. This indicates the guest
-agent has stopped responding to configuration requests and may require a
-reboot or diagnosis on the server side.
+| `last_agent_reply_lag_us` | Microseconds between the most recent matched send and its REPLY, where replies arrive at all. |
+| `recent_agent_reply_lag_us` | Ring of the last 16 reply lags, in microseconds. |
+| `outstanding_agent_request_count` | `MONITORS_CONFIG` sends without a matched REPLY. Grows by one per send on QXL guests and is not a stall signal; saturates at 99. |
 
 ## Auto-snapshot mode for intermittent issues
 
