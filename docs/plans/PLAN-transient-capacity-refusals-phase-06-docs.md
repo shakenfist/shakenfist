@@ -426,3 +426,204 @@ a queue is a bad idea. Propose the section's sentences first.
 If any step's brief looks wrong, say so and then follow it, or ask. Do
 not quietly substitute a different approach -- particularly on D47,
 where the tempting move is the one the decision rejects.
+
+## Outcome
+
+Complete. 6a, 6c, 6d and 6e ran independently against this one
+worktree; 6b was gated on its back brief; 6f is this close-out. Every
+step's edit was checked against the tree rather than taken on trust
+before this section was written.
+
+### What each step did
+
+**6a** replaced the stale paragraph in
+`docs/developer_guide/ci_cloud_sizing.md`. It ran `:370-377`, not
+`:370-375` as F4's quote had it -- the quote elided an internal link
+line -- and no other cited line number had drifted:
+`ensure_capacity_wait_trace()` is still `base.py:180`, called from
+`setUp()` at `:214`, and `read_waits()`/`waits_record()` are still
+`ci_headroom_report.py:1069`/`:1712`. The replacement states the
+post-#4337 reading -- an empty trace is a real zero conditioned on the
+run's base carrying `62bb1ddeb` -- cites
+[#4337](https://github.com/shakenfist/shakenfist/issues/4337), links
+phase 5's D43 by name and section rather than by anchor, and documents
+`ensure_capacity_wait_trace()` for the first time anywhere in `docs/`.
+
+**6b** added `## Is the refusal queued server-side?` to
+`docs/operator_guide/capacity_refusals.md` at `:55`, and the one
+cross-link `docs/developer_guide/api_reference/instances.md` was
+missing, beside the capacity text near `:90`. Two things from
+executing it rather than reading the brief: the section's wording was
+reviewed and approved before it was written, then adapted because
+`tools/check-plan-phase-references.py` forbids `\bphase\s+\d+` outside
+`docs/plans/`, so the page names phase 5 by linking the plan file and
+its section rather than saying "phase 5"; and one approved sentence
+was corrected for accuracy after review. It had said no build clause
+"came close to the frequency required", which is only true on the
+narrowest unit counting -- phase 5's own fragility table has B2 at
+8.3% against a 10% threshold under per-run scoping, one long-wait run
+from Build. The page now says no build clause fired, and that how
+close that was depends on how units are counted: wide on the
+narrowest counting, one long-wait run short on the broadest.
+
+**6c** changed `Debian 12 tier` to `Debian 13 tier` at the success
+criteria line only (`:1216`), left `:83`'s historical reading alone,
+changed `#4087`'s bug-list entry to `(closed by phase 1; ...)`, and
+appended bullets for
+[#4337](https://github.com/shakenfist/shakenfist/issues/4337),
+[#4403](https://github.com/shakenfist/shakenfist/issues/4403),
+[#4197](https://github.com/shakenfist/shakenfist/issues/4197) and
+[#4438](https://github.com/shakenfist/shakenfist/issues/4438) to
+*Bugs fixed during this work*, without reordering the existing six.
+The fourth bullet, for #4438, was reassigned to 6c from 6e -- see
+*Deviations*, below.
+
+**6d** rewrote `PLAN-scheduler-reservations.md`'s retry bullet so D8
+reads as confirmed by measurement rather than reversed, naming the
+result (Abandon by the rule's default, three waits in the second
+window, longest 290.83 s against the 420 s deadline) and noting that
+D8's state-surface objection and the measurement reach the same place
+for different reasons. It renamed that file's one present-tense
+`Debian 12 tier` claim to `Debian 13 tier`, and put
+`PLAN-ci-cloud-sizing-phase-05-guardrails.md`'s D5 open check into the
+past tense: the reader D5 named has since read the series and
+decided, so the refusal warning's purpose is discharged rather than
+pending, while the warning itself stays. It confirmed the guardrails
+file's own twelve `Debian 12 tier` occurrences are all historical
+readings and left them alone.
+
+**6e** filed F9 as
+[#4438](https://github.com/shakenfist/shakenfist/issues/4438)
+("ci_headroom_harvest: bundle-shakenfist-full-ansible-modules cannot
+carry a capacity-wait trace", `shakenfist/shakenfist`, OPEN, labelled
+`automated-fix-attempted`), after searching several phrasings and
+reading #4377 and #4403 to confirm it is not a duplicate. It then
+commented on
+[#3772](https://github.com/shakenfist/shakenfist/issues/3772#issuecomment-5977267873)
+and did not close it. Its pass-rate measurement used three windows
+rather than two, splitting at the reshape as well as the rename,
+which is the step's material finding beyond its brief: `Debian 12
+tier` ran 56.8% (25/44) pre-reshape, with 13 of 18 readable failures
+carrying `sufficient_idle_cpu`; 74.0% (37/50) post-reshape/pre-rename,
+with 0 of 7 sampled failures carrying it; and `Debian 13 tier` ran
+88.9% (16/18) post-rename, with 0 of 2. It sampled 9 of 15
+post-reshape failures rather than all 15 and said so in the comment
+rather than claiming zero across the period. It also caught and
+corrected its own mis-dating of the reshape mid-measurement, which
+had shifted the middle figure from 75.0% to 74.0%.
+
+### F9 and #3772, as posted
+
+F9 is [#4438](https://github.com/shakenfist/shakenfist/issues/4438),
+open, labelled `automated-fix-attempted`.
+
+The second window's numbers, as posted to
+[#3772](https://github.com/shakenfist/shakenfist/issues/3772#issuecomment-5977267873):
+39 ancestry-qualifying `merge_group` runs (2026-09-27 -- 2026-10-02),
+95 instrumented bundle-units, census 92 `empty` / 3 `read` / 2
+`absent` -- 2.1% unknown against the first window's 92.3%. Three
+capacity waits, at 41%, 55% and 69% of the 420 s deadline, longest
+290.83 s, two of the three longer after the reshape than in the first
+window. The `Debian 12/13 tier` pass rate across three real windows,
+by job-level conclusion over `merge_group` events: 56.8% (25/44)
+before the reshape, 74.0% (37/50) after the reshape but before the
+rename, 88.9% (16/18) after the rename -- with the `sufficient_idle_cpu`
+signature present in 13 of 18 readable "before" failures and absent
+from all 9 sampled "after" failures. The comment states the two
+confounders (the lane rename `e9e8c86658d` and the sizing plan's
+reshape both land inside the comparison window) and leaves the issue
+open: the master plan's close condition is about failure reasons, and
+the last occurrence comment (2026-09-19) predates both the reshape
+and #4337, so the quiet period is as consistent with nobody triaging
+as with nothing failing.
+
+### Deviations from this plan
+
+1. **Pre-commit was not run by each step.** The step briefs told each
+   step to run its own hooks. Because all six steps shared this one
+   worktree and pre-commit's stash is repo-wide, parallel hook runs
+   would have silently reverted each other's uncommitted work, so
+   hooks were instead run centrally between waves by the orchestrating
+   session. Steps ran the standalone checker scripts
+   (`tools/check-doc-anchors.py`,
+   `tools/check-plan-phase-references.py`) directly where their brief
+   needed one. `pre-commit run --all-files` has since been run once,
+   centrally, over the whole set of changes: all twelve hooks pass.
+
+2. **The step table collided with itself.** Both 6c and 6e were told
+   to edit the master plan's *Bugs fixed during this work*. Recording
+   #4438's number was reassigned from 6e to 6c for that reason, and 6e
+   made no file edits at all -- its work is the issue filing and the
+   #3772 comment, both external to this repository's tree.
+
+### Definition of done, item by item
+
+Every item below was **run**, not read. Item 15 was run by the
+operator rather than by this step, directly, and is cited rather than
+re-run: `pre-commit run --all-files` is unsafe to run twice from two
+sessions against one shared worktree, for the same reason deviation 1
+exists.
+
+| Item | Result | Note |
+|---|---|---|
+| 1 | **Met** | Ran `grep -n 'Debian 12 tier' docs/plans/PLAN-transient-capacity-refusals.md`: one hit, `:83`, unchanged by `git diff`. |
+| 2 | **Met** | Checked `git diff --stat` against each named file: only `PLAN-ci-cloud-sizing-phase-05-guardrails.md` has a diff, and its own `Debian 12 tier` count is 12 before and after. Every other named file is untouched. |
+| 3 | **Met** | `grep -n 'absent or empty file reports as unknown' docs/developer_guide/ci_cloud_sizing.md` returns nothing; `grep -c '4337' docs/developer_guide/ci_cloud_sizing.md` returns `1`. |
+| 4 | **Met** | `grep -rn 'ensure_capacity_wait_trace' docs/ --include='*.md' \| grep -v '^docs/plans/'` returns one hit, `ci_cloud_sizing.md:374`. |
+| 5 | **Met** | `capacity_refusals.md` carries `## Is the refusal queued server-side?`; `CI-only` and `post-reshape` both appear as bullet headings in it, and the client-retry limit appears as `**Client retry off.**`. |
+| 6 | **Met** | `grep -ic 'unnecessary\|not needed\|starv' docs/operator_guide/capacity_refusals.md` returns `0`. |
+| 7 | **Met** | `instances.md` links `/operator_guide/capacity_refusals/`; `python3 tools/check-doc-anchors.py` exits 0. |
+| 8 | **Met** | `gh issue view 3772 --json state` returns `OPEN`; [comment 5977267873](https://github.com/shakenfist/shakenfist/issues/3772#issuecomment-5977267873), posted 2026-10-04, carries the three-wait numbers and both confounders (see above). |
+| 9 | **Met** | `gh issue view 4438 --json labels,state` returns `OPEN` with `automated-fix-attempted`; the number appears in this Outcome and in the master plan's bug list. |
+| 10 | **Met, with a stated discrepancy** | `#4087` reads `(closed by phase 1; ...)`, not `(open`. Within *Bugs fixed during this work*, `#4337` and `#4197` each appear exactly once; `#4403` appears **twice** -- its own bullet, and a cross-reference inside #4438's bullet, which 6e's brief explicitly asked for. The item as written is wrong: it should have said "has its own bullet" rather than "appears exactly once". This is the third consecutive phase to find a wrong definition-of-done item by executing it, after phase 4's three and phase 5's two. |
+| 11 | **Met** | `PLAN-scheduler-reservations.md` now reads "D8 is confirmed by measurement, not reversed"; `grep -c 'would be a reversal of D8' docs/plans/PLAN-scheduler-reservations.md` returns `0`. |
+| 12 | **Met** | `PLAN-ci-cloud-sizing-phase-05-guardrails.md`'s D5 paragraph reads in the past tense ("was named", "was the decision", "has since read the series and decided") and names the result (an Abandon, by the rule's middle-ground default). |
+| 13 | **Met** | `python3 tools/check-plan-status.py` prints "Plan statuses, index arithmetic and phase links agree."; `docs/plans/index.md` reads `6 of 7`. |
+| 14 | **Not met as written** | The figures (3 waits, longest 290.83 s, 95 units) do agree literally between `capacity_refusals.md` and phase 5's Outcome, but `290.83` also appears in two places the item says it should not: `PLAN-scheduler-reservations.md:1243`, because 6d's own brief explicitly required naming "longest 290.83 s against a 420 s deadline" there, and this plan file's own step table and this item's own text, which must state the figure to check for it. The item's "and appear nowhere else" is incompatible with 6d's brief as written for the sibling-plan figure; the self-reference in this file is arguably exempt but was not excluded by the item's wording either. Reported as a second wrong item rather than marked Met on a generous reading. |
+| 15 | **Met, cited rather than re-run** | The operator ran `pre-commit run --all-files` once, centrally, after all five preceding steps' edits; all twelve hooks pass. Running it a second time from this step, against the same shared, unstaged worktree, risks exactly the stash collision deviation 1 exists to avoid. |
+
+Two of fifteen items are wrong as written, both found by running
+rather than reading them: item 10's "appears exactly once" should read
+"has its own bullet", and item 14's "appear nowhere else" collides
+with 6d's own brief. Three consecutive phases -- 4, 5 and 6 -- have
+now found a wrong definition-of-done item by executing it.
+
+### What phase 7 inherits
+
+* **The baseline is the `Merged` column, not `develop...HEAD`.** By
+  the time phase 7 runs, every phase here will have merged, and a diff
+  against `develop` reads as empty -- which would look like a clean
+  audit rather than like the absence of one. The master plan's phase 7
+  section already requires reading the `Merged` column in the
+  Execution table above, phase by phase, rather than the branch tip.
+* **Phase 5 produced no code.** It is a decision phase that closed
+  Abandoned on the queue -- Complete as a phase, nothing built. The
+  master plan's phase 7 section already requires that this be recorded
+  as an audit with no diff to scope over, not as a clean run across an
+  empty range; phase 7 should say so in the same one sentence that
+  section asks for, rather than silently skipping phase 5's row.
+* **Phase 2 is partly audited elsewhere.** Its suite wrapper landed
+  partly in `shakenfist/actions`; that half is audited against that
+  repository's default branch as part of the pull request that landed
+  it there. Phase 7 cites that audit by reference and does not re-run
+  it.
+* **Four open items, two of which must be pre-registered before any
+  third reading of the wait data:**
+    * [#4403](https://github.com/shakenfist/shakenfist/issues/4403) --
+      `ci_headroom_harvest`'s point-in-time bundle tables
+      reinterpreting historical windows.
+    * [#4438](https://github.com/shakenfist/shakenfist/issues/4438) --
+      the Ansible modules bundle cannot carry a capacity-wait trace.
+    * [#4197](https://github.com/shakenfist/shakenfist/issues/4197) --
+      the load-budget re-derivation phase 3 left behind.
+    * **D37's unfixed scoping, and B1's unsoundness.** B1 scores on
+      the longest single wait recorded, so a create that is refused
+      repeatedly, each wait falling short of the 420 s deadline, can
+      exhaust the deadline in aggregate with no single line ever
+      reaching the threshold the rule reads. Neither of these is fixed
+      by anything in this plan, and D51 already declines to harvest a
+      third window from inside phase 6. If a third reading is ever
+      wanted, both must be pre-registered -- as a decision, in writing,
+      before the data is read -- not discovered by re-running the same
+      rule over new numbers and hoping the scoping gap does not matter
+      this time.

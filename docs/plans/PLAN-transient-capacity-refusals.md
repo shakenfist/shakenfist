@@ -587,7 +587,7 @@ spelling above is the one to write.
 | 3. Publish metrics when the running-domain set changes | [PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md](PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md) | Complete | `03cd7be3a` (#4200) |
 | 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | [PLAN-transient-capacity-refusals-phase-04-retry-after.md](PLAN-transient-capacity-refusals-phase-04-retry-after.md) | Complete | `565e36e6e` (#4241), client-python `74d6e129b` (client-python#399) |
 | 5. Decide on server-side queued placement from the phase 2 data | [PLAN-transient-capacity-refusals-phase-05-queue-decision.md](PLAN-transient-capacity-refusals-phase-05-queue-decision.md) | Complete | `b398cb890` (#4362), `a5e4a5e8c` (#4390), `48584e589` (#4406) |
-| 6. Documentation and close-out | [PLAN-transient-capacity-refusals-phase-06-docs.md](PLAN-transient-capacity-refusals-phase-06-docs.md) | In progress | — |
+| 6. Documentation and close-out | [PLAN-transient-capacity-refusals-phase-06-docs.md](PLAN-transient-capacity-refusals-phase-06-docs.md) | Complete | — |
 | 7. Push audit | PLAN-transient-capacity-refusals-phase-07-push-audit.md | Not started | — |
 
 The `Merged` column records what put each phase on `develop`: the
@@ -1213,7 +1213,7 @@ because the following statements will be true:
 * The decision on server-side queued placement is written down in
   the phase 5 file with the data it was made from, whichever way
   it went.
-* The `Debian 12 tier` job's pass rate is comparable to the other
+* The `Debian 13 tier` job's pass rate is comparable to the other
   cluster jobs, and its remaining failures are not
   `sufficient_idle_cpu`.
 * The code passes `pre-commit run --all-files` (flake8, stestr
@@ -1390,9 +1390,9 @@ while planning it.
 
 - **#3772** (open, umbrella) -- the refusal this plan is about.
   Stays open until phase 6 has the before-and-after numbers.
-- **#4087** (open; #4106 attempted it and did not close it) -- the
-  warm-up window. Phase 1 fixes it, comments with what #4106 did and
-  did not cover, and closes it.
+- **#4087** (closed by phase 1; #4106 attempted it and did not close
+  it) -- the warm-up window. Phase 1 fixes it, comments with what
+  #4106 did and did not cover, and closes it.
 - **#3498, #3602, #3670, #3728, #3749, #3767** (closed into #3772)
   -- the per-test victims. Do not file another; the umbrella exists
   because per-test tracking stopped paying for itself.
@@ -1404,6 +1404,21 @@ while planning it.
   phase 3 each carry a budget declaration.
 - **#1364** (open) -- lame-duck and evacuate. Where node-scoped
   reservations would earn their place; see open question 5.
+- **[#4337](https://github.com/shakenfist/shakenfist/issues/4337)**
+  (closed) -- the capacity-wait trace could not express zero, which
+  made 92.3% of phase 5's first window unreadable; its fix is what
+  the second window rests on.
+- **[#4403](https://github.com/shakenfist/shakenfist/issues/4403)**
+  (open) -- `ci_headroom_harvest`'s point-in-time bundle tables
+  reinterpreting historical windows, phase 5's F8. Left for a
+  human, labelled `automated-fix-attempted`.
+- **[#4197](https://github.com/shakenfist/shakenfist/issues/4197)**
+  (open) -- the load-budget re-derivation phase 3 left behind.
+- **[#4438](https://github.com/shakenfist/shakenfist/issues/4438)**
+  (open) -- the Ansible modules bundle can never carry a
+  capacity-wait trace, because that suite is six playbooks with no
+  Python harness; it is the finding this plan's D44 exclusion rests
+  on, left for a human for the same reason #4403 is.
 
 ### Back brief
 
