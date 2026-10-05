@@ -106,7 +106,7 @@ class _CapacityReadingTestCase(base.BaseNamespacedTestCase):
     """
 
     def _cluster_resources_or_skip(self, polled=False):
-        """Read ``/admin/resources``, applying the two whole-response skip rules.
+        """Read ``/admin/resources``, applying two whole-response skip rules.
 
         Skips (rather than fails) when the response cannot support an
         impossible-request calculation at all:

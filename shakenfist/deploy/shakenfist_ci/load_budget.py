@@ -307,9 +307,9 @@ POLL_OVERCOUNT_TOLERANCE = 1.60
 # docstring and in the CI headroom section of
 # docs/developer_guide/ci_cloud_sizing.md.
 #
-# GetNodeMetrics/api gained a second producer with
-# PLAN-transient-capacity-refusals phase 2: create_instance() on
-# BaseTestCase (shakenfist_ci/base.py) calls wait_for_capacity(), which
+# GetNodeMetrics/api has a second producer, the suite's capacity-wait
+# wrapper: create_instance() on BaseTestCase (shakenfist_ci/base.py)
+# calls retries.wait_for_capacity() after a 507, which
 # polls the same GET /admin/resources endpoint the probe above samples,
 # via self.system_client.get_cluster_resources(). It is not the same
 # shape of poll, though, and is named here rather than folded into the
