@@ -454,8 +454,8 @@ class RecordTestCase(HarvestTestCase):
         self.assertEqual(3, record['summary']['series']['samples_usable'])
 
     def test_the_job_conclusion_is_the_jobs_not_the_runs(self):
-        # The master plan's central claim is that utilisation explains the
-        # pass rate spread, and it is per job. A run's conclusion is the
+        # The claim this dataset exists to test is that utilisation explains
+        # the pass rate spread, and it is per job. A run's conclusion is the
         # logical AND of six jobs, so recording only that would make every
         # job of a run in which any job failed look like a failure.
         github = self._github({TIER_BUNDLE: instrumented_members()},
@@ -543,13 +543,12 @@ class RecordTestCase(HarvestTestCase):
     def test_an_ansible_modules_bundle_with_no_traces_yet_is_recorded_absent(self):
         # The bundle-table half of instrumenting a job can land before the
         # matching shakenfist/actions change is pushed. Until then a real
-        # 'Ansible modules' bundle still uploads (the job already produced
-        # one; only its contents change), so a harvest run in that window
-        # must not raise
-        # and must not silently drop it: it is now classified 'harvest', so
-        # it goes through the same no-series path as any other instrumented
-        # bundle whose probe did not run, and is recorded with a reason
-        # rather than dropped.
+        # 'Ansible modules' bundle still uploads (the job already produced one;
+        # only its contents change), so a harvest run in that window must not
+        # raise and must not silently drop it: it is now classified 'harvest',
+        # so it goes through the same no-series path as any other instrumented
+        # bundle whose probe did not run, and is recorded with a reason rather
+        # than dropped.
         github = self._github({
             PRIMARY_BUNDLE: instrumented_members(),
             ANSIBLE_BUNDLE: {'bundle/logs/syslog': 'x\n'},
@@ -1173,13 +1172,13 @@ class BundleTableShapeTestCase(HarvestTestCase):
     harvest the next time it is run.
     """
 
-    # The topologies a BundleKind is allowed to name: every merge_group
-    # cluster job this tool ever harvests deploys one of these two shapes,
-    # read from the merge matrix. 'localhost'
-    # (the single-node smoke topology) is deliberately excluded -- the smoke
-    # job runs on pull_request, not merge_group, so this tool never sees a
-    # bundle from it (list_runs() only reads merge_group runs), and a
-    # BundleKind naming it would be an error, not a new case to allow.
+    # The topologies a BundleKind is allowed to name: every merge_group cluster
+    # job this tool ever harvests deploys one of these two shapes, read from
+    # the merge matrix. 'localhost' (the single-node smoke topology) is
+    # deliberately excluded -- the smoke job runs on pull_request, not
+    # merge_group, so this tool never sees a bundle from it (list_runs() only
+    # reads merge_group runs), and a BundleKind naming it would be an error,
+    # not a new case to allow.
     KNOWN_TOPOLOGIES = frozenset({'slim-primary', 'slim-tier'})
 
     def test_no_bundle_name_is_in_both_tables(self):

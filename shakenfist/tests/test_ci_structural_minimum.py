@@ -3,12 +3,11 @@
 
 ``cluster_ci_tests/test_nodes.py``'s
 ``test_cluster_topology_meets_the_structural_minimum`` asserts, against a
-deployed cluster, that the topology is big enough for the rest of the
-cluster suite to mean anything. Cluster CI only runs in the merge queue,
-so nothing in that file is checkable on a ``pull_request`` -- and an
-assertion which is *itself* wrong is the worst
-kind to discover there, because it fails jobs on clusters which are
-fine.
+deployed cluster, that the topology is big enough for the rest of the cluster
+suite to mean anything. Cluster CI only runs in the merge queue, so nothing in
+that file is checkable on a ``pull_request`` -- and an assertion which is
+*itself* wrong is the worst kind to discover there, because it fails jobs on
+clusters which are fine.
 
 The bounds and the arithmetic therefore live in
 ``shakenfist_ci/sizing.py``, a module deliberately free of suite and

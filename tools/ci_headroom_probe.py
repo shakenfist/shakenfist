@@ -60,7 +60,7 @@ after each one. A sample is not free -- the API call behind
 it is slowest exactly when the cluster is busiest. Sleeping a constant
 interval afterwards would therefore stretch the gap between samples under
 load, so busy periods would be sampled less often than quiet ones and the
-percentiles a later phase reads would be biased toward idle. That bias
+percentiles the report computes would be biased toward idle. That bias
 points the wrong way: it would argue for shrinking a cloud which was in
 fact tight.
 

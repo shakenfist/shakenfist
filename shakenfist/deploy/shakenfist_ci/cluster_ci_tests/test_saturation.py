@@ -51,11 +51,11 @@ keeps itself free of suite imports. Everything below is the part which
 genuinely needs a deployed cluster to exercise.
 
 Every refusal is asserted through ``BaseTestCase.assertRefusedAtStage()``,
-which keeps the stage message in exactly one place in this suite, and none
-of these requests goes anywhere near ``shakenfist_ci.retries``: a refusal
-under test must never be retried away, for the same reason
-``test_namespace_claims.py`` (lines 35-52) gives for
-its own refusal assertions.
+which keeps the stage message in exactly one place in this suite, and none of
+these requests goes anywhere near ``shakenfist_ci.retries``: a refusal under
+test must never be retried away, for the same reason
+``test_namespace_claims.py`` (lines 35-52) gives for its own refusal
+assertions.
 """
 
 import json
@@ -125,13 +125,12 @@ class _CapacityReadingTestCase(base.BaseNamespacedTestCase):
 
         ``polled`` says this is one reading in a sequence rather than the
         single reading a test starts from. testtools' ``addDetail()``
-        overwrites by name, so the fill loop and the ledger-return loop
-        would otherwise leave a failed run holding only their last read --
-        losing the trajectory of how the ledger moved, which is the only
-        evidence a failed run leaves behind about why the ledger did not
-        behave. Polled reads are therefore attached
-        under unique names, and the plain ``resources`` name is left to the
-        one read a test takes before it touches anything.
+        overwrites by name, so the fill loop and the ledger-return loop would
+        otherwise leave a failed run holding only their last read -- losing the
+        trajectory of how the ledger moved, which is the only evidence a failed
+        run leaves behind about why the ledger did not behave. Polled reads are
+        therefore attached under unique names, and the plain ``resources`` name
+        is left to the one read a test takes before it touches anything.
         """
         resources = self.system_client.get_cluster_resources()
         detail = content.text_content(json.dumps(
@@ -941,7 +940,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
 
         **This test expects, and asserts, the first.**
         ``_has_sufficient_cpu()``'s own docstring says it is "a cheap CPU
-        pre-filter (P2) ... not the admission decision", and describes
+        pre-filter ... not the admission decision", and describes
         exactly why it nonetheless sees what the guard sees: it reads the
         capacity row's ``limit_cpus`` and charges the candidate
         ``max(measured_cpus, committed_cpus)``, refusing when that plus the
@@ -963,9 +962,9 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
         report a guard refusal as a malformed stage message rather than as
         the different thing it is.
 
-        The third answer is observed, asserted and
-        recorded. It cannot be reached from a full node by the reasoning
-        above, so if it ever is, the run says so rather than passing.
+        The third answer is observed, asserted and recorded. It cannot be
+        reached from a full node by the reasoning above, so if it ever is, the
+        run says so rather than passing.
 
         Failure modes, and whether each is asserted or skipped:
 

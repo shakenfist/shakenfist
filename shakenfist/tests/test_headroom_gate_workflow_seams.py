@@ -2,10 +2,10 @@
 
 """Every call of smoke-cluster.yml states its headroom gate policy.
 
-A cluster-wide band violation fails the cluster job, in
-`shakenfist/actions`'s smoke-cluster.yml, which this repository reaches
-at `@main` with no pin. Two rules follow, and this is
-what enforces them; docs/developer_guide/ci_cloud_sizing.md states them.
+A cluster-wide band violation fails the cluster job, in `shakenfist/actions`'s
+smoke-cluster.yml, which this repository reaches at `@main` with no pin. Two
+rules follow, and this is what enforces them;
+docs/developer_guide/ci_cloud_sizing.md states them.
 
 A call site which is gated must pass the CI_HEADROOM_GATE repository
 variable through as `headroom_gate`, because the recovery for a spurious

@@ -28,14 +28,13 @@ was checked against a real artifact rather than reasoned about:
   *that*, at ``bundle/traces/``. Reading the outer zip's namelist for
   ``traces/headroom.jsonl`` finds nothing and would have looked exactly like
   a run whose probe never started.
-* **Five of the six cluster bundles carry the probe.** 'Ansible modules'
-  was moved into ``BUNDLE_TOPOLOGIES`` ahead of the shakenfist/actions
-  change that instruments it (#4377); that change merged
-  on 2026-10-01 and the bundle has carried a real series since. A harvest
-  over the window before it reads ``series_present`` false there -- an
-  expected absence, not a probe failure. The sixth, 'Node lifecycle', is
-  skipped by name rather than recorded as missing data. See
-  ``UNINSTRUMENTED_BUNDLES`` below.
+* **Five of the six cluster bundles carry the probe.** 'Ansible modules' was
+  moved into ``BUNDLE_TOPOLOGIES`` ahead of the shakenfist/actions change that
+  instruments it (#4377); that change merged on 2026-10-01 and the bundle has
+  carried a real series since. A harvest over the window before it reads
+  ``series_present`` false there -- an expected absence, not a probe failure.
+  The sixth, 'Node lifecycle', is skipped by name rather than recorded as
+  missing data. See ``UNINSTRUMENTED_BUNDLES`` below.
 * **The topology is not in the series.** It is passed to the report at run
   time and never written down, so a bundle on disk does not say which shape
   produced it. That was fixed prospectively by having the collect script
@@ -233,13 +232,13 @@ class UnknownBundleError(HarvestError):
     """A cluster bundle whose topology this tool has not been told.
 
     Named, and raised rather than skipped, because of what the alternatives
-    cost. Guessing a topology from the artifact name would put a made-up
-    label on a real measurement in a dataset the next three phases argue
-    from. Skipping quietly would drop a whole job out of the window without
-    saying so, and the resulting baseline would be a smaller n than it
-    claimed with no way for a reader to tell. A new bundle name means the
-    merge matrix in .github/workflows/functional-tests.yml gained a row, and
-    a human should decide which topology it is.
+    cost. Guessing a topology from the artifact name would put a made-up label
+    on a real measurement in a dataset the cloud is sized from. Skipping
+    quietly would drop a whole job out of the window without saying so, and the
+    resulting baseline would be a smaller n than it claimed with no way for a
+    reader to tell. A new bundle name means the merge matrix in
+    .github/workflows/functional-tests.yml gained a row, and a human should
+    decide which topology it is.
     """
 
 
@@ -476,16 +475,15 @@ def list_runs(github, workflow=DEFAULT_WORKFLOW, since=None, until=None,
     committed to this repository outlives the week it was harvested in and
     has to name both ends of what it covers.
 
-    **Nothing in here may assume the order the listing arrives in.** The
-    first version of this function did -- it read runs until it met one
-    created before the window and then stopped, documented as "the listing
-    is newest first". On 2026-09-08 the API served this workflow's
-    ``merge_group`` runs *oldest* first, so the very first run was outside
-    any recent window, and a harvest over that window wrote zero records
-    and exited zero: exactly the silently half-completed harvest this
-    tool's module docstring says it must never be. The window is now
-    bounded at the API
-    and the ordering ``limit`` needs is established here by sorting.
+    **Nothing in here may assume the order the listing arrives in.** The first
+    version of this function did -- it read runs until it met one created
+    before the window and then stopped, documented as "the listing is newest
+    first". On 2026-09-08 the API served this workflow's ``merge_group`` runs
+    *oldest* first, so the very first run was outside any recent window, and a
+    harvest over that window wrote zero records and exited zero: exactly the
+    silently half-completed harvest this tool's module docstring says it must
+    never be. The window is now bounded at the API and the ordering ``limit``
+    needs is established here by sorting.
 
     The cost of that is one listing page which a ``--limit`` alone would
     once have skipped: the limit is applied after the sort rather than
@@ -840,11 +838,11 @@ def write_records(records, handle):
 
     Compact, and not pretty printed, because the first size estimate was an
     order of magnitude out: a real record measured against merge run
-    33944911413 is 3,675 bytes compact and 5,381 indented, so the full
-    window is roughly 950 KB rather than the low hundreds of kilobytes
-    first guessed. One object per line so the dataset
-    can be filtered with grep and read a record at a time, and so a harvest
-    interrupted part way through leaves a file which still parses.
+    33944911413 is 3,675 bytes compact and 5,381 indented, so the full window
+    is roughly 950 KB rather than the low hundreds of kilobytes first guessed.
+    One object per line so the dataset can be filtered with grep and read a
+    record at a time, and so a harvest interrupted part way through leaves a
+    file which still parses.
     """
     count = 0
     for record in records:

@@ -75,7 +75,7 @@ def effective_cpu_ceiling(per_node_entry):
 
     ``summarize_resources()`` (``shakenfist/scheduler.py``) publishes
     ``cpu_limit`` as ``None`` for a node the capacity reconciler has not
-    written a ``scheduler_node_capacity`` row for yet, or ever (P7, an
+    written a ``scheduler_node_capacity`` row for yet, or ever (an
     "unguarded" node). The scheduler does not then treat that node as
     limitless: ``_has_sufficient_cpu()`` falls back to the node's own
     live ``cpu_hard_max`` (``limit_cpus = row['limit_cpus'] if row else
@@ -177,10 +177,10 @@ MINIMUM_HYPERVISORS = 3
 MINIMUM_NON_NETWORK_HYPERVISORS = 2
 
 # The total schedulable vCPU ledger, summed across hypervisors. Nothing
-# skips on this; it is the figure PLAN-ci-cloud-sizing cares about and
-# no existing test reads, and node count alone would not have caught
-# ``slim-tier`` at a total of 12 -- that cloud had three nodes and was
-# the one the whole plan was written about.
+# skips on this; it is the figure which decides whether the cloud is
+# big enough and no existing test reads, and node count alone would not
+# have caught ``slim-tier`` at a total of 12 -- that cloud had three
+# nodes and was the undersized cloud which prompted these minimums.
 #
 # 24 is exactly ``slim-tier``'s present total, so the floor sits on the
 # smaller of the two deployed topologies -- which has no slack -- and any
@@ -291,10 +291,10 @@ def structural_minimum_violations(per_node, nodes):
     ``per_node`` is a liveness statement -- fresh metrics, and a queue
     under the unreasonable length -- and a hypervisor which is briefly
     missing from the roster has not stopped being a hypervisor. The
-    flags are also what ``base._hypervisor_nodes()`` and the four tests
-    in this phase's F6 already filter on, so counting them the same way
-    means this assertion and those skips cannot disagree about the same
-    cluster. The ledger is the one figure which must come from
+    flags are also what ``base._hypervisor_nodes()`` filters on, and so
+    what ``test_network_lifecycle.py``'s skip counts, so counting them
+    the same way means this assertion and that skip cannot disagree
+    about the same cluster. The ledger is the one figure which must come from
     ``per_node``, because that is the only place it is published.
     """
     nodes = nodes or []

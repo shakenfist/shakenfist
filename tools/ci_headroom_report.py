@@ -1,8 +1,8 @@
 # Copyright 2019 Michael Still and contributors
 """Summarise a CI headroom series and refusal census for one cluster job.
 
-The CI cloud sizing plan was written from three hand-collected data points,
-because nothing in CI records how close a functional test run gets to the
+Sizing the CI cloud used to rest on three hand-collected data points,
+because nothing in CI recorded how close a functional test run gets to the
 scheduler's admission limits. tools/ci_headroom_probe.py now samples
 /admin/resources and the node roster through the test step of every cluster
 job; this tool turns one of those series -- optionally beside a refusal
@@ -72,7 +72,7 @@ What the numbers mean:
   reconciled -- a discrepancy of 12 against 10 which has never been
   explained -- so the count of node-samples which fell back to cpu_hard_max
   is a deliverable of this report, not a diagnostic aside. A run which is
-  entirely fallback settles that question by itself.
+  entirely fallback says something about that question by itself.
 * **Committed memory** is derived, because the payload publishes no such
   field: ram_available is ram_max minus memory_total_instance_actual, so
   ram_max minus ram_available is what the instances actually hold. A node
@@ -124,8 +124,7 @@ Rendering the prose from the record instead means the number in the job log
 and the number in the dataset cannot disagree, which matters because
 resizing the cloud turns on people trusting these figures. It also means
 this file has exactly one place where each figure is computed, so a reader
-checking the arithmetic
-checks it once.
+checking the arithmetic checks it once.
 
 The record carries a second committed-CPU statistic beside the cluster-wide
 one: the per-node maximum committed fraction. For each sample it is the
@@ -181,8 +180,7 @@ BAND_UPPER = 0.70
 # that bound (max 0.417), so gating on it would have failed nothing that was
 # fine, which is the only test worth arming a gate against. That window is
 # the merge matrix's four jobs, and the gate is armed on those shapes alone;
-# see
-# shakenfist/tests/test_headroom_gate_workflow_seams.py.
+# see shakenfist/tests/test_headroom_gate_workflow_seams.py.
 #
 # The *name* of this constant is load-bearing, not only its value.
 # shakenfist/actions's tools/ci_headroom_verdict.sh believes a status of 3
@@ -195,13 +193,15 @@ BAND_UPPER = 0.70
 # implement it. Renaming this constant switches the gate off rather than
 # breaking it.
 #
-# Only this one direction gates. The per-node bound and the refusal clause
-# are both saturated on runs which are fine, and the lower bound is ruled
-# out too -- which matters more than it reads, because 30 of those same 40
-# job-runs are OVERSIZED, so a lower-bound violation returning a status
-# would redden
-# three quarters of cluster CI on its first run. Everything else this tool can meet --
-# an unreadable series, an absent census, a bug in the report itself -- still
+# Only this one direction gates. The per-node bound saturates on runs which
+# are fine. The refusal count is a calibration signal for the demand
+# estimator rather than a size signal: the guard admits until demand fills
+# whatever bound it is given, so the count is close to invariant under node
+# size. The lower bound is ruled out too -- which matters more than it
+# reads, because 30 of those same 40 job-runs are OVERSIZED, so a
+# lower-bound violation returning a status would redden three quarters of
+# cluster CI on its first run. Everything else this tool can meet -- an
+# unreadable series, an absent census, a bug in the report itself -- still
 # returns 0 and is still only printed. The rule that an instrument may not
 # fail the job it measures holds everywhere except here, and this is not an
 # exception to it: a band violation is a statement about the cloud the suite
@@ -337,10 +337,10 @@ NO_REASON = '(no reason recorded)'
 # the ledger refusing a write, 'placement admitted over namespace capacity
 # claim' is a placement which was ADMITTED, over an advisory claim the
 # operator set, and 'placement recorded despite exceeding capacity guard' is
-# the P5 forced ground-truth write -- a placement recorded even though the
+# the forced ground-truth write -- a placement recorded even though the
 # guard refused it. None of the three is ever added to another. The forced
-# write is the one event which tells the P5 mechanism apart from the
-# never-reconciled window (issue 4087), and the bundles it could be read
+# write is the one event which tells the forced-write mechanism apart from
+# the never-reconciled window (issue 4087), and the bundles it could be read
 # from raw expire, so dropping it here would leave the durable record
 # unable to make that distinction.
 GUARD_DENIED_MESSAGE = 'instance placement denied'
@@ -489,8 +489,8 @@ class Sample:
         # single-hypervisor topology one node which simply has no capacity
         # row yet satisfies "all false" while being an ordinary per-node
         # fact, and reading it as a failed read discards the entire CPU
-        # series -- on slim-primary, the first topology this phase's
-        # definition of done names.
+        # series -- on slim-primary, one of the two topologies cluster CI
+        # runs on.
         flags = [n.row_present for n in self.nodes.values()]
         all_absent = bool(flags) and all(f is False for f in flags)
         self.ledger_unreadable = all_absent and len(flags) > 1
@@ -852,14 +852,13 @@ class GuardCensus:
         """Which term of the demand dimension carried it past the limit.
 
         The demand clause is the one dimension which does not charge the
-        incoming placement: it compares cpu_load_1 plus
-        expected_demand against the limit and leaves `requested` out of
-        the comparison entirely, which is what makes it satisfiable at
-        every node size. So the split is read the same way the guard
-        made it -- measured load alone already exceeds the limit, or the
-        feedforward demand estimate is what carried the sum over it. The
-        second is an estimator finding rather than a cluster which ran
-        out of CPU, and issue 3913 added the two terms to the event for
+        incoming placement: it compares cpu_load_1 plus expected_demand against
+        the limit and leaves `requested` out of the comparison entirely, which
+        is what makes it satisfiable at every node size. So the split is read
+        the same way the guard made it -- measured load alone already exceeds
+        the limit, or the feedforward demand estimate is what carried the sum
+        over it. The second is an estimator finding rather than a cluster which
+        ran out of CPU, and issue 3913 added the two terms to the event for
         exactly this reading. `requested` is deliberately not used here,
         because using it would report a comparison the guard never made.
         """
@@ -946,7 +945,7 @@ class GuardCensus:
             self.claim_exceeded[name] += 1
 
     def observe_forced_write(self, extra):
-        """A ground-truth write recorded past the guard (P5).
+        """A ground-truth write recorded past the guard.
 
         Never added to ``denials``: the write succeeded, recording where
         a libvirt domain already is. Tallied by the stage and dimensions
@@ -1239,12 +1238,12 @@ def read_census(path, limit=None):
 # Two conventions run through all of it, and both exist to stop a reader --
 # human or program -- inferring a fact the measurement does not support.
 #
-# A figure which was not measured is None, never zero. An absent census is
-# the case this matters most for: "we did not look" and "nothing was
-# refused" are different findings and the second is the one the whole plan is
-# hunting for, so a census which was never collected leaves every count under
-# it null. The same applies to a ledger which was never visible and to a
-# percentile over an empty list.
+# A figure which was not measured is None, never zero. An absent census is the
+# case this matters most for: "we did not look" and "nothing was refused" are
+# different findings and the second is the one sizing the cloud turns on, so a
+# census which was never collected leaves every count under it null. The same
+# applies to a ledger which was never visible and to a percentile over an empty
+# list.
 #
 # A ledger is recorded as the range it moved over rather than as an average,
 # because the reconciler rewriting a capacity row mid-run is exactly the kind
@@ -1359,7 +1358,7 @@ def capacity_coverage_record(series):
     which every hypervisor named in that sample's roster carries
     cpu_committed_row_present true -- the measurement of how long the
     capacity table's warm-up window actually lasted in this run. Until that
-    sample, at least one hypervisor was admitting placements unguarded (P7).
+    sample, at least one hypervisor was admitting placements unguarded.
 
     ``achieved`` is recorded explicitly rather than left to be inferred from
     ``seconds`` being None: a series with no usable samples and a series
@@ -1526,10 +1525,10 @@ def cluster_record(series):
 def per_node_record(series):
     """The same figures again, per node, keyed by node uuid.
 
-    This is the block the per-node statistic exists because of, and the one
-    a reader goes to when the cluster-wide fraction looks comfortable. Each
-    node carries its
-    own ledger, so "0.5 of what" is answerable without joining anything.
+    This is the block the per-node statistic exists because of, and the one a
+    reader goes to when the cluster-wide fraction looks comfortable. Each node
+    carries its own ledger, so "0.5 of what" is answerable without joining
+    anything.
     """
     nodes = []
     for sample in series.samples:
@@ -1716,7 +1715,7 @@ def guard_record(census):
     record['claim_shortfalls'] = collections.OrderedDict(
         sorted(guard.claim_shortfalls.items()))
 
-    # A recorded write, never a refusal: the P5 ground-truth writers
+    # A recorded write, never a refusal: the ground-truth writers
     # force a denied placement through because a guard cannot refuse
     # where a domain already is.
     record['forced_writes'] = guard.forced_writes
@@ -1738,14 +1737,13 @@ def waits_record(waits):
     say the wrapper found nothing to wait out, when in fact nothing was
     looked at.
 
-    A file which was read and holds no records because the run genuinely
-    never waited is a real zero and is reported as one. A file whose every
-    line was malformed is not: nothing can be said about whether the suite
-    waited. print_waits() has always said so in prose, but the record is
-    what the headroom gate reads, and 'available: true, count: 0' is
-    indistinguishable from a clean run to a reader which
-    cannot read prose. So that case gets its own state, and its counts are
-    nulled exactly as an unread file's are.
+    A file which was read and holds no records because the run genuinely never
+    waited is a real zero and is reported as one. A file whose every line was
+    malformed is not: nothing can be said about whether the suite waited.
+    print_waits() has always said so in prose, but the record is what the
+    headroom gate reads, and 'available: true, count: 0' is indistinguishable
+    from a clean run to a reader which cannot read prose. So that case gets its
+    own state, and its counts are nulled exactly as an unread file's are.
     """
     record = collections.OrderedDict()
     record['state'] = waits.status
@@ -1909,12 +1907,11 @@ def gate_withheld_reasons(record):
         reasons.append(
             'the capacity read reported failing on %d %s'
             % (degraded, plural(degraded, 'sample')))
-    # Sample.capacity_degraded is tri-state, and None -- a probe built
-    # before the flag existed -- cannot say whether its read was failing.
-    # The only route to one here is a partial rollback of
-    # shakenfist/actions, which
-    # is reached at @main, and a series which cannot say is not one to
-    # fail a job on.
+    # Sample.capacity_degraded is tri-state, and None -- a probe built before
+    # the flag existed -- cannot say whether its read was failing. The only
+    # route to one here is a partial rollback of shakenfist/actions, which is
+    # reached at @main, and a series which cannot say is not one to fail a job
+    # on.
     absent = series['capacity_degraded_absent_samples']
     if absent:
         reasons.append(
@@ -2019,12 +2016,11 @@ def fmt_fraction(value):
 def fmt_ledger_range(low, high):
     """Render a ledger which may have moved during the run.
 
-    A ledger which changed mid-run is worth seeing rather than averaging:
-    the reconciler rewriting a capacity row is exactly the kind of event
-    the unexplained 12-versus-10 ledger discrepancy might turn out to be
-    made of. The record carries the two bounds; this renders them as one
-    figure when they agree
-    and as a range when they do not.
+    A ledger which changed mid-run is worth seeing rather than averaging: the
+    reconciler rewriting a capacity row is exactly the kind of event the
+    unexplained 12-versus-10 ledger discrepancy might turn out to be made of.
+    The record carries the two bounds; this renders them as one figure when
+    they agree and as a range when they do not.
     """
     if low is None:
         return '-'
@@ -2150,7 +2146,7 @@ def print_capacity_coverage(record):
     The offset from the first sample to the first sample in which every
     hypervisor in its roster carries a scheduler_node_capacity row -- the
     window during which at least one hypervisor was admitting placements
-    unguarded (P7). Printed only; nothing in this tool gates on it,
+    unguarded. Printed only; nothing in this tool gates on it,
     because an instrument may not fail the job it measures.
     """
     coverage = record['capacity_coverage']
@@ -2175,7 +2171,7 @@ def print_capacity_coverage(record):
     print('  the roster had a scheduler_node_capacity row by %s.'
           % fmt_time(coverage['covered_at']))
     print('  Until then at least one hypervisor was admitting placements')
-    print('  unguarded (P7): every placement onto it failed open because the')
+    print('  unguarded: every placement onto it failed open because the')
     print('  capacity reconciler had not sized it yet.')
 
 
@@ -2549,13 +2545,13 @@ def print_guard_census(record):
                      ', '.join(unrecognised)))
 
     print()
-    print('  Forced ground-truth writes past the guard (P5): %d'
+    print('  Forced ground-truth writes past the guard: %d'
           % guard['forced_writes'])
     if guard['forced_writes']:
         print('    These placements were RECORDED after the guard refused')
         print('    them: a cleaner or startup-reconciliation write saying')
         print('    where a libvirt domain already is, which a guard cannot')
-        print('    refuse. This is the one event which tells the P5 forced')
+        print('    refuse. This is the one event which tells the forced')
         print('    write apart from the never-reconciled window (issue 4087),')
         print('    and it can push a node past its own ledger.')
         if guard['forced_write_stages']:
@@ -2609,13 +2605,13 @@ def print_guard_census(record):
 def print_waits(waits):
     """The capacity-wait trace, under its own heading.
 
-    The CI suite's create_instance() wrapper waits out a transient 507
-    rather than failing the test on it, and
-    records each wait to /srv/ci/traces/instance-waits.jsonl. This is a
-    summary of that file (``waits_record()``'s output), read the same way
-    the series and census are: an absent or empty file says so and prints
-    no figures, never a zero, because "the wrapper never ran here" and
-    "the wrapper ran and never had to wait" are different findings.
+    The CI suite's create_instance() wrapper waits out a transient 507 rather
+    than failing the test on it, and records each wait to
+    /srv/ci/traces/instance-waits.jsonl. This is a summary of that file
+    (``waits_record()``'s output), read the same way the series and census are:
+    an absent or empty file says so and prints no figures, never a zero,
+    because "the wrapper never ran here" and "the wrapper ran and never had to
+    wait" are different findings.
 
     Deliberately not folded into the main summary record: the
     two files are unrelated inputs on unrelated schedules -- the series and
@@ -2851,14 +2847,13 @@ def band_annotations(record):
 
     The refusal message is worded as an observation about the demand
     estimator's calibration, never as evidence the cloud is undersized:
-    doubling a cluster's ledger left the guard refusing at essentially the
-    same rate, because expected_demand accumulates per
-    admitted placement and the guard admits until whatever bound it is
-    given fills up, which makes the refusal count close to invariant
-    under node size. The per-node message says explicitly that the bound
-    never gates: it is saturated at its ceiling on plenty of runs
-    that otherwise pass, so it cannot discriminate a bad run from a good
-    one at the top of its range.
+    doubling a cluster's ledger left the guard refusing at essentially the same
+    rate, because expected_demand accumulates per admitted placement and the
+    guard admits until whatever bound it is given fills up, which makes the
+    refusal count close to invariant under node size. The per-node message says
+    explicitly that the bound never gates: it is saturated at its ceiling on
+    plenty of runs that otherwise pass, so it cannot discriminate a bad run
+    from a good one at the top of its range.
     """
     verdict = record['verdict']
     label = record['label']
@@ -2910,13 +2905,13 @@ def emit_github_annotations(record):
     """Print a '::warning::' workflow command for each band violation.
 
     GitHub Actions reads annotations from the step's stdout regardless of
-    the step's exit code or continue-on-error (F4), which is why this
-    exists: the report's own exit code is discarded twice between here
-    and a human reading the job. Unconditional and flagless by design:
+    the step's exit code or continue-on-error, which is why this exists:
+    the report's own exit code is discarded twice between here and a human
+    reading the job. Unconditional and flagless by design:
     shakenfist/actions's collect script feature-detects new *flags* by
-    grepping this file's source at a possibly-stale ref, and
-    an annotation this tool always tries to print needs no such
-    detection, so it works the same on every ref.
+    grepping this file's source at a possibly-stale ref, and an annotation
+    this tool always tries to print needs no such detection, so it works
+    the same on every ref.
     """
     # Warnings even for the one verdict which can fail the job. Whether it
     # does is decided downstream -- the caller's headroom_gate input and
@@ -3083,7 +3078,7 @@ def report(args):
     # Additional output, not a replacement: the stdout prose above is
     # unchanged by their presence, and the annotations below are read
     # by GitHub from the same stdout stream regardless of this step's exit
-    # code (F4). No new flag gates either call (F5).
+    # code. No new flag gates either call.
     emit_github_annotations(record)
     write_github_step_summary(record)
 

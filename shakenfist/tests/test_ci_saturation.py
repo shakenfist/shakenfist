@@ -14,12 +14,12 @@ of suite and ``shakenfist_client`` imports so this file can load it by path
 
 Two things are covered here.
 
-First the arithmetic, asserted as the two properties a caller depends on
-rather than as particular return values: a sized request must strictly
-exceed the figure it was sized from, and must stay a request a cluster
-would entertain. An "impossible" request which turns out to be servable is
-the flake the phase exists to remove, and a request of zero or of a
-negative size is not a request at all.
+First the arithmetic, asserted as the two properties a caller depends on rather
+than as particular return values: a sized request must strictly exceed the
+figure it was sized from, and must stay a request a cluster would entertain. An
+"impossible" request which turns out to be servable is exactly the flake this
+arithmetic exists to prevent, and a request of zero or negative size is not a
+request at all.
 
 Second, the client symbols. ``test_saturation.py`` names
 ``apiclient.InsufficientResourcesException``,
@@ -153,7 +153,7 @@ class EffectiveCPUCeilingTestCase(base.ShakenFistTestCase):
             {'cpu_limit': 3, 'cpu_hard_max': 6.0}))
 
     def test_a_null_cpu_limit_falls_back_to_the_live_hard_max(self):
-        """An unguarded node (P7) is not a limitless node.
+        """An unguarded node is not a limitless node.
 
         ``summarize_resources()`` publishes a null ``cpu_limit`` for a
         node the capacity reconciler has written no row for, and

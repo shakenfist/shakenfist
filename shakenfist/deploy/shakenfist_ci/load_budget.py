@@ -220,7 +220,7 @@ POLL_OVERCOUNT_TOLERANCE = 1.60
 # tools/ci_headroom_probe.py samples GET /nodes and GET /admin/resources on
 # an --interval timer for the whole of the functional test step, started by
 # ci_headroom_launch.sh in shakenfist/actions rather than by this suite (see
-# docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md). The producers
+# docs/developer_guide/ci_cloud_sizing.md). The producers
 # are named rather than left as "reading the roster", because the step from
 # two endpoints to exactly these four pairs is the load bearing part:
 # GET /nodes iterates Nodes([]), whose default _find hydrates each uuid
@@ -293,19 +293,19 @@ POLL_OVERCOUNT_TOLERANCE = 1.60
 # ShakenFistUnbudgetedDatabasePolling goes on watching all five at the
 # unbudgeted ceiling on every real cluster.
 #
-# The exemption is load bearing only while the probe is: phase 1
+# The exemption is load bearing only while the probe is: the headroom
 # instrumentation comes out once the sizing question it answers is closed.
-# test_the_suite_still_probes_cluster_headroom watches for part of that --
-# it fails if tools/ci_headroom_probe.py is deleted, stops sampling on a
-# timer, or stops reading one of the two endpoints -- but it cannot watch
-# for all of it, and the comment should not claim otherwise. The launcher
-# and the workflow steps live in shakenfist/actions, so a decommission done
-# there, which is the likely way it happens because that is where the wiring
-# is, stops the probe running while leaving this file, that test and this
-# exemption exactly as they are. The obligation to trim these five is
-# therefore written where whoever retires the tool will actually be reading:
-# in ci_headroom_probe.py's own docstring, in the CI headroom section of
-# docs/developer_guide/ci_cloud_sizing.md, and against #3975 in PLAN-ci-cloud-sizing.md.
+# test_the_suite_still_probes_cluster_headroom watches for part of that -- it
+# fails if tools/ci_headroom_probe.py is deleted, stops sampling on a timer, or
+# stops reading one of the two endpoints -- but it cannot watch for all of it,
+# and the comment should not claim otherwise. The launcher and the workflow
+# steps live in shakenfist/actions, so a decommission done there, which is the
+# likely way it happens because that is where the wiring is, stops the probe
+# running while leaving this file, that test and this exemption exactly as they
+# are. The obligation to trim these five is therefore written where whoever
+# retires the tool will actually be reading: in ci_headroom_probe.py's own
+# docstring and in the CI headroom section of
+# docs/developer_guide/ci_cloud_sizing.md.
 #
 # GetNodeMetrics/api gained a second producer with
 # PLAN-transient-capacity-refusals phase 2: create_instance() on

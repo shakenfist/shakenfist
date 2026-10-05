@@ -645,7 +645,7 @@ class MemoryTestCase(HeadroomReportTestCase):
         code, output = self._run('--series', path)
         self.assertEqual(
             0, code, 'A node publishing ram_max of zero made the report fail, '
-                     'which is a division by zero the plan asked to be '
+                     'which is a division by zero that should have been '
                      'counted instead.')
         self.assertIn(
             'node-samples published no ram_max', output,
@@ -932,7 +932,7 @@ class CensusTestCase(HeadroomReportTestCase):
             'Two drops carrying "no memory_max in node metrics" raised a '
             'capacity shortage warning. That reads a stale metrics row as '
             'evidence the cloud is too small, which is exactly the error '
-            'this plan exists to avoid.')
+            'this report exists to avoid.')
 
     def test_the_three_memory_reasons_are_reported_separately(self):
         census = self._census([
@@ -1130,7 +1130,7 @@ class CensusTestCase(HeadroomReportTestCase):
             'earliest signal that the demand estimator has drifted.')
 
     def test_the_four_capacity_stages_are_named_in_the_output(self):
-        """Including the disk distinction, which the plan itself got wrong.
+        """Including the disk distinction, which is easy to get wrong.
 
         sufficient_idle_disk is disk BANDWIDTH, a rate predicate; the
         stage which means the cluster ran out of disk is
@@ -1582,8 +1582,8 @@ class ReviewFixesTestCase(HeadroomReportTestCase):
         ledger_unreadable was 'every row_present is False', which a
         single-hypervisor topology satisfies whenever its one node has no
         capacity row yet. Every sample was then discarded and the run
-        printed NO VERDICT -- on slim-primary, the first topology this
-        phase's definition of done names.
+        printed NO VERDICT -- on slim-primary, one of the two topologies
+        cluster CI runs on.
         """
         path = self._series([
             sample({NODE_ONE: node_payload(
@@ -1682,9 +1682,8 @@ class ReviewFixesTestCase(HeadroomReportTestCase):
     def test_the_disk_bandwidth_caveat_is_absent_when_disk_did_not_drop(self):
         """Stating it about drops which did not happen dilutes it.
 
-        The distinction is real and the plan itself got it wrong, so the
-        note earns its place -- but only over drops that are actually at
-        sufficient_idle_disk.
+        The distinction is real and easy to get wrong, so the note earns its
+        place -- but only over drops that are actually at sufficient_idle_disk.
         """
         census = self._census([
             census_event('schedule at stage sufficient_idle_cpu',
@@ -1859,12 +1858,12 @@ class GuardCensusTestCase(HeadroomReportTestCase):
             'placement; advisory mode did what the operator asked.')
 
     def test_a_forced_write_is_counted_apart_from_refusals(self):
-        """The P5 forced ground-truth write is a recorded placement.
+        """The forced ground-truth write is a recorded placement.
 
-        The collector ships it -- issue 4087's rule-out of the P5
-        mechanism needed exactly this event -- so a report which dropped
-        it would leave the durable record unable to tell a forced write
-        from the never-reconciled window once the bundles expire.
+        The collector ships it -- issue 4087's rule-out of the forced-write
+        mechanism needed exactly this event -- so a report which dropped it
+        would leave the durable record unable to tell a forced write from the
+        never-reconciled window once the bundles expire.
         """
         census = self._census([
             denial_event(dimensions=[
@@ -1878,7 +1877,7 @@ class GuardCensusTestCase(HeadroomReportTestCase):
                                  '--json', target)
         self.assertEqual(0, code)
         self.assertIn('Placements refused by the guard: 1', output)
-        self.assertIn('Forced ground-truth writes past the guard (P5): 1',
+        self.assertIn('Forced ground-truth writes past the guard: 1',
                       output)
         with open(target) as f:
             record = json.load(f)
@@ -1910,7 +1909,7 @@ class GuardCensusTestCase(HeadroomReportTestCase):
         code, output = self._run('--series', path, '--census', census)
         self.assertEqual(0, code)
         self.assertNotIn('NO CAPACITY GUARD EVENTS IN THIS CENSUS.', output)
-        self.assertIn('Forced ground-truth writes past the guard (P5): 1',
+        self.assertIn('Forced ground-truth writes past the guard: 1',
                       output)
         self.assertIn('Placements refused by the guard: 0', output)
         self.assertIn(
@@ -1975,11 +1974,10 @@ class GuardCensusTestCase(HeadroomReportTestCase):
     def test_the_demand_split_reads_the_comparison_the_guard_made(self):
         """The demand clause does not charge the incoming placement.
 
-        The demand guard compares cpu_load_1 plus
-        expected_demand against the limit and leaves `requested` out, so
-        a split which added `requested` would report a comparison the
-        guard never made -- and would call an estimator defect a busy
-        node.
+        The demand guard compares cpu_load_1 plus expected_demand against the
+        limit and leaves `requested` out, so a split which added `requested`
+        would report a comparison the guard never made -- and would call an
+        estimator defect a busy node.
         """
         census = self._census([
             # Measured load is inside the limit; the feedforward estimate
@@ -2419,7 +2417,7 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
         a cluster-wide p90 comfortably inside the band while one node sat
         pinned at its own ledger for the whole run. A band written only
         cluster-wide calls that run healthy, which is the precise failure
-        this plan exists to stop making, so the per-node maximum is a
+        this report exists to stop making, so the per-node maximum is a
         first-class figure in the record.
         """
         records = []
@@ -2665,11 +2663,10 @@ class CapacityWaitsTestCase(HeadroomReportTestCase):
     def test_an_all_malformed_file_reads_as_unknown_to_a_machine_too(self):
         """The prose said unknown; the record said 'available, zero waits'.
 
-        waits_record() is what the headroom gate reads, and a consumer
-        which cannot read prose saw 'available: true,
-        count: 0' -- indistinguishable from a run which genuinely never
-        waited, which is the exact confusion the printed text spends three
-        paragraphs guarding against.
+        waits_record() is what the headroom gate reads, and a consumer which
+        cannot read prose saw 'available: true, count: 0' -- indistinguishable
+        from a run which genuinely never waited, which is the exact confusion
+        the printed text spends three paragraphs guarding against.
         """
         path = self._write('instance-waits.jsonl', 'garbage\nmore garbage\n')
         record = report.waits_record(report.read_waits(path))
