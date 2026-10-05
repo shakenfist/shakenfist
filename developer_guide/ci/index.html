@@ -15554,12 +15554,39 @@ shakenfist merge groups held the capacity. So the key branches on the event
 and uses <code>github.event.merge_group.base_ref</code> in the queue, with a
 <code>merge_group-</code> prefix so a queue run does not share a group with a
 <code>workflow_dispatch</code> run on <code>develop</code>.</p>
-<p>Cancelling is only safe because the queue is serial: the develop ruleset sets
-<code>max_entries_to_build: 1</code>, so any other in-flight <code>merge_group</code> run is by
-definition superseded and its queue branch already abandoned by GitHub.
-Raising that setting while keeping this key would cancel a live queue entry,
-which reports a failed required check and ejects the pull request — the two
-have to move together. This is audited fleet-wide; see
+<p>The queue is serial — the develop ruleset sets <code>max_entries_to_build: 1</code> — so
+when two <code>merge_group</code> runs share one of these groups, one of them is
+superseded. That alone does not make cancelling safe, because
+<code>cancel-in-progress</code> has no idea which one: it cancels whichever run entered
+the group <em>first</em>. When GitHub rebuilds a queue entry, the old and new runs
+both run <code>Check paths</code>, and the collection jobs of whichever finishes last
+enter the groups last and win. Several times that was the superseded run, so
+the live merge group lost every functional job, <code>Can merge</code> failed on
+<code>cancelled</code> dependencies, and the pull request was ejected with nothing
+tested (issue #3998).</p>
+<p>So a superseded run removes itself first. The last step of <code>Check paths</code> runs
+<code>tools/ci-merge-group-current.sh</code>, which compares the event's
+<code>merge_group.base_sha</code> with the current head of the base branch. With
+<code>max_entries_to_build: 1</code> a live merge group is always built directly on that
+head, so a mismatch means GitHub has already rebuilt the entry — after the
+queue merged the entry ahead of it, or after anything pushed to <code>develop</code>
+outside the queue, such as <code>sfconductor</code> landing a previously ejected pull
+request. The run then cancels itself (which is why <code>Check paths</code> holds
+<code>actions: write</code>) before any queue job enters a concurrency group. A rebuild
+that lands just <em>after</em> the check passed still resolves the right way: the
+replacement run is only created after the push, and its jobs cannot enter the
+groups until its own <code>Check paths</code> has run, so they enter last and cancel the
+superseded run's.</p>
+<p>The check fails in the direction that cannot eject a pull request. If the
+base branch's head cannot be read, the run is treated as current and carries
+on, which is no worse than before the check existed. A run judged superseded
+whose self-cancellation does not land exits non-zero instead, skipping every
+queue job and failing <code>Can merge</code> on a commit the queue has already
+abandoned.</p>
+<p>Raising <code>max_entries_to_build</code> breaks both halves: the key would cancel live
+queue entries building in parallel, and a parallel entry is not built on the
+base branch's head, so the check would cancel it too. They have to move
+together. The key is audited fleet-wide; see
 <a href="https://github.com/shakenfist/development/blob/main/audits/merge-group-cancellation.md">merge-group-cancellation</a>.</p>
 <h2 id="exported-repository-configuration">Exported Repository Configuration<a class="headerlink" href="#exported-repository-configuration" title="Permanent link">&para;</a></h2>
 <p>Repository settings (rulesets, branch protection, merge queue config) are
