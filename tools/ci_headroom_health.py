@@ -43,11 +43,13 @@ Example:
     tools/ci_headroom_health.py /tmp/headroom.jsonl
 
 Exit status is 0 when every check passed, 1 when an invariant was violated,
-and 2 when the dataset could not be read at all.
+and 2 when the dataset, or the report tool the sample floor is read from,
+could not be read at all.
 """
 
 import argparse
 import collections
+import datetime
 import importlib.util
 import json
 import os
@@ -68,14 +70,16 @@ import sys
 # dropped from.
 #
 # What both do establish is that a working instrument banks a series on
-# every bundle it writes: once the probe was running, 32 of 32. The slack
-# below that is for the one gap a healthy instrument still produces -- a job
-# cancelled mid-run, which is one record in the whole baseline -- which at
-# the harvest limit the scheduled job uses is up to four records.
+# every bundle it writes: once the probe was running, 32 of 32, and in the
+# ten newest merge runs on 2026-10-05, 31 of the 31 whose jobs were not
+# cancelled. Cancelled jobs are set aside before this is computed (see
+# set_aside() below), so the slack here is not for them; it is for a gap
+# nobody has characterised yet, which at the harvest limit the scheduled
+# job uses is up to three or four records.
 SERIES_PRESENT_FLOOR = 0.90
 
-# The fewest records a harvest may yield before the window itself is
-# suspect. The modes which produce no record at all -- a run that banked no
+# The fewest records, once cancelled jobs are set aside, a harvest may
+# yield before the window itself is suspect. The modes which produce no record at all -- a run that banked no
 # bundle, a collect which could not reach the primary -- leave nothing for a
 # per-record check to find, so they are only visible as a count.
 #
@@ -105,6 +109,54 @@ MAX_SAMPLES_FAILED = 0
 # this from firing on a rounding change while catching either.
 PROBE_INTERVAL_SECONDS = 15.0
 CADENCE_TOLERANCE_SECONDS = 1.0
+
+# How old the newest harvested run may be, in days, before the window is
+# not the one the harvest was asked for.
+#
+# The scheduled harvest asks for the ten newest merge runs and trusts the
+# answer. On 2026-10-05 the runs listing twice, minutes apart, served a
+# stale window as the newest runs: once a single short page whose newest
+# run was 2026-09-11, so the harvest stopped paginating, and once a full
+# walk whose newest was 2026-09-24. Each read as the current window.
+# Nothing per-record can see that: old records are well-formed records. Merges land several
+# times a day, so a week would do; two weeks keeps a quiet holiday from
+# reading as a broken instrument.
+MAX_WINDOW_AGE_DAYS = 14
+
+# How many records from gated lanes may carry a withheld verdict.
+#
+# The committed datasets predate the field, so this is the one threshold
+# measured only against a fresh harvest: the ten newest merge runs on
+# 2026-10-05, in which none of the 24 records from gated lanes was
+# withheld. That is one window rather than a distribution, so this is the
+# threshold most likely to need its flag; the first few scheduled runs are
+# its real measurement.
+MAX_GATE_WITHHELD = 0
+
+# The lanes the band gate is armed on, as the record labels name them:
+# '<topology> <stestr config>'. These are MEASURED_SHAPES in
+# shakenfist/tests/test_headroom_gate_workflow_seams.py, which is where
+# arming a shape happens, and a test pins this set to that one.
+#
+# The band gate's sample floor and its withheld verdict are only claims
+# about a lane the gate judges. The Ansible modules lane carries the probe
+# but is not armed, and its job probes for about three and a half minutes:
+# in that same window its seven records held 9 to 15 usable samples against
+# a floor of 20, and every one was withheld for it. That is the gate
+# correctly declining to judge a short job, not an instrument failing, and
+# a check which reported it would fail every week until somebody stopped
+# reading it.
+GATED_LABELS = frozenset((
+    'slim-primary cluster-ci.conf',
+    'slim-primary guest-ci.conf',
+    'slim-tier cluster-ci.conf',
+))
+
+# The fewest usable samples a record from a lane the gate is not armed on
+# may carry. Not the band gate's floor, which that lane can never reach; low
+# enough to clear the shortest job in the measured window (9 samples) and
+# high enough that a probe which died in its first minute still fails.
+MIN_SAMPLES_UNGATED = 5
 
 # The report record version which first published whether the band gate was
 # allowed to judge the series. Below it ``verdict.gate_withheld`` is absent,
@@ -143,13 +195,56 @@ def load_report(path):
     if spec is None or spec.loader is None:
         raise HealthError('could not load the report tool from %s' % path)
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as e:
+        # Executing another file can raise anything at all -- a missing
+        # path, a syntax error, an import it cannot satisfy -- and every one
+        # of them is the same answer to the caller: there is no floor to
+        # read, so the exit-two contract applies rather than a traceback.
+        raise HealthError('could not load the report tool from %s: %s: %s'
+                          % (path, type(e).__name__, e))
     return module
+
+
+def band_gate_min_samples(path):
+    """The band gate's sample floor, read out of the report tool at path."""
+    floor = getattr(load_report(path), 'BAND_GATE_MIN_SAMPLES', None)
+    if not isinstance(floor, int) or isinstance(floor, bool):
+        raise HealthError('%s does not define an integer BAND_GATE_MIN_SAMPLES (found %r)'
+                          % (path, floor))
+    return floor
 
 
 def default_report_path():
     return os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         'ci_headroom_report.py')
+
+
+def record_shape_error(record):
+    """Why a parsed line is not shaped like a harvest record, or None.
+
+    Only the containers the checks call into are asserted -- a record is an
+    object, and a summary, where there is one, is an object holding a
+    ``series`` object and, where it has them, ``census`` and ``verdict``
+    objects. Everything below that is read with ``.get()`` and judged by
+    the checks themselves. A line which parses but is the wrong
+    shape is a truncated or foreign file, and must exit two and name the
+    line, not crash a check half way through with a traceback.
+    """
+    if not isinstance(record, dict):
+        return 'is not a JSON object'
+    summary = record.get('summary')
+    if summary is None:
+        return None
+    if not isinstance(summary, dict):
+        return 'has a summary which is not a JSON object'
+    if not isinstance(summary.get('series'), dict):
+        return 'has a summary with no series object'
+    for key in ('census', 'verdict'):
+        if summary.get(key) is not None and not isinstance(summary[key], dict):
+            return 'has a summary whose %s is not a JSON object' % key
+    return None
 
 
 def read_records(path):
@@ -162,9 +257,13 @@ def read_records(path):
                 if not line:
                     continue
                 try:
-                    records.append(json.loads(line))
+                    record = json.loads(line)
                 except ValueError as e:
                     raise HealthError('%s line %d is not JSON: %s' % (path, number, e))
+                problem = record_shape_error(record)
+                if problem:
+                    raise HealthError('%s line %d %s' % (path, number, problem))
+                records.append(record)
     except OSError as e:
         raise HealthError('could not read %s: %s' % (path, e))
     if not records:
@@ -178,6 +277,31 @@ def read_records(path):
 def record_name(record):
     """Enough to find the job again in the Actions UI."""
     return '%s %s' % (record.get('run_id'), record.get('artifact_name') or record.get('job'))
+
+
+def gated(record):
+    """Whether the band gate is armed on the lane this record came from.
+
+    Read from the label the collect script writes, so a record with no label
+    -- one predating it, or a job cancelled before it was written -- is
+    treated as ungated. That cannot hide a broken label file: a window in
+    which no record is gated has no verdict the withheld check can judge,
+    and that check fails it.
+    """
+    return record.get('label') in GATED_LABELS
+
+
+def set_aside(record):
+    """Whether this record says nothing about the instrument at all.
+
+    A job the merge queue cancelled -- because the group it was testing was
+    superseded, which is routine -- uploads whatever it had, often a bundle
+    with no series in it. That is a fact about the queue, not about the
+    probe, and counted as a gap it would push the series-present rate
+    towards its floor on an ordinary busy week: one cancelled run in the
+    window measured on 2026-10-05 took the rate from 1.000 to 0.912.
+    """
+    return record.get('job_conclusion') == 'cancelled'
 
 
 def summarised(records):
@@ -221,6 +345,38 @@ def derived_refusal_warning(census):
     return bool(census.get('capacity_shortage_drops'))
 
 
+def check_window_age(records, args):
+    """The newest run harvested is recent, so the window is the one asked for."""
+    created = [stamp for stamp in (parse_timestamp(record.get('run_created_at'))
+                                   for record in records) if stamp is not None]
+    if not created:
+        return Check('window age', False,
+                     'no record says when its run was created', [])
+    newest = max(created)
+    age = args.now - newest
+    limit = datetime.timedelta(days=args.max_window_age_days)
+    return Check(
+        'window age',
+        age <= limit,
+        'newest run %s, %.1f days old, ceiling %d days'
+        % (newest.strftime('%Y-%m-%dT%H:%M:%SZ'), age.total_seconds() / 86400,
+           args.max_window_age_days),
+        [])
+
+
+def parse_timestamp(value):
+    """A GitHub ISO 8601 timestamp as an aware datetime, or None."""
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=datetime.timezone.utc)
+    return parsed
+
+
 def check_record_count(records, args):
     ok = len(records) >= args.min_records
     return Check(
@@ -231,40 +387,66 @@ def check_record_count(records, args):
 
 
 def check_series_present(records, args):
-    present = [record for record in records if record.get('series_present')]
-    rate = len(present) / len(records)
-    offenders = [
-        '%s: %s' % (record_name(record), record.get('absent_reason') or 'no reason recorded')
-        for record in records if not record.get('series_present')]
+    """Enough of the window carries a series which was summarised.
+
+    A record which says it carries a series and has no summary fails this
+    check outright, whatever the rate. Every per-record check below reads
+    the summary, so such a record would otherwise pass all of them: a
+    report which failed to summarise a series it was handed is the dead
+    instrument this tool exists to catch, one layer further down, and the
+    floor's slack is for cancelled jobs rather than for that. The harvest
+    does not write that shape today, which is an assumption this check
+    states rather than relies on.
+    """
+    present = []
+    unsummarised = []
+    absent = []
+    for record in records:
+        if record.get('series_present') and record.get('summary'):
+            present.append(record)
+        elif record.get('series_present'):
+            unsummarised.append('%s: series present but no summary' % record_name(record))
+        else:
+            absent.append('%s: %s' % (record_name(record),
+                                      record.get('absent_reason') or 'no reason recorded'))
+    rate = len(present) / len(records) if records else 0.0
+    detail = ('%d of %d records carry a summarised series (%.3f), floor %.3f'
+              % (len(present), len(records), rate, args.series_present_floor))
+    if unsummarised:
+        detail += '; %d claim a series and have no summary' % len(unsummarised)
     return Check(
         'series present rate',
-        rate >= args.series_present_floor,
-        '%d of %d records carry a series (%.3f), floor %.3f'
-        % (len(present), len(records), rate, args.series_present_floor),
-        offenders)
+        rate >= args.series_present_floor and not unsummarised,
+        detail,
+        unsummarised + absent)
 
 
 def check_samples_usable(records, args):
     """Every summarised record carries enough samples to say anything.
 
-    The floor is the band gate's own sample floor, which is where the number
-    comes from. Note that clearing it is necessary and not sufficient for the
+    On a lane the gate is armed on, the floor is the band gate's own sample
+    floor, which is where the number comes from; on any other lane it is
+    MIN_SAMPLES_UNGATED, for the reason given beside it. Note that clearing it is necessary and not sufficient for the
     gate: the gate counts the samples which produced a CPU fraction, and the
     first two or three minutes of a cluster's life produce usable samples
     whose capacity table is still empty. The gate says so itself, which is
     what the withheld check below reads.
     """
     offenders = []
-    worst = None
+    worst = {True: None, False: None}
     for record, summary in summarised(records):
         usable = summary['series'].get('samples_usable') or 0
-        worst = usable if worst is None else min(worst, usable)
-        if usable < args.min_samples_usable:
-            offenders.append('%s: %d usable samples' % (record_name(record), usable))
+        lane = gated(record)
+        floor = args.min_samples_usable if lane else args.min_samples_ungated
+        worst[lane] = usable if worst[lane] is None else min(worst[lane], usable)
+        if usable < floor:
+            offenders.append('%s: %d usable samples, floor %d' % (record_name(record), usable, floor))
     return Check(
         'usable samples per record',
         not offenders,
-        'fewest %s, floor %d' % ('n/a' if worst is None else worst, args.min_samples_usable),
+        'fewest %s on gated lanes (floor %d), %s on ungated lanes (floor %d)'
+        % ('n/a' if worst[True] is None else worst[True], args.min_samples_usable,
+           'n/a' if worst[False] is None else worst[False], args.min_samples_ungated),
         offenders)
 
 
@@ -317,10 +499,18 @@ def check_cadence(records, args):
     offenders = []
     cadences = []
     for record, summary in summarised(records):
+        if (summary['series'].get('samples_usable') or 0) < 2:
+            # Fewer than two samples have no spacing to measure, and the
+            # usable-samples check above has already failed on them.
+            # Reporting it twice says nothing new.
+            continue
         cadence = mean_cadence(summary['series'])
         if cadence is None:
-            # Fewer than two samples, which the usable-samples check above
-            # has already failed on. Reporting it twice says nothing new.
+            # Two or more samples and no window to divide: the series is
+            # not saying when it was sampled, which is not the same as
+            # saying it was sampled on time.
+            offenders.append('%s: %d usable samples and no window to measure them over'
+                             % (record_name(record), summary['series'].get('samples_usable')))
             continue
         cadences.append(cadence)
         if abs(cadence - args.probe_interval) > args.cadence_tolerance:
@@ -345,7 +535,11 @@ def check_gate_withheld(records, args):
     offenders = []
     asserted = 0
     unassertable = 0
+    ungated = 0
     for record, summary in summarised(records):
+        if not gated(record):
+            ungated += 1
+            continue
         verdict = summary.get('verdict') or {}
         version = summary.get('record_version') or 0
         withheld = verdict.get('gate_withheld')
@@ -355,15 +549,20 @@ def check_gate_withheld(records, args):
         asserted += 1
         if withheld:
             offenders.append('%s: %s' % (record_name(record), '; '.join(withheld)))
-    detail = '%d records judged, %d too old to say' % (asserted, unassertable)
+    detail = ('%d records judged, %d too old to say, %d on ungated lanes, %d withheld, ceiling %d'
+              % (asserted, unassertable, ungated, len(offenders), args.max_gate_withheld))
     if not asserted and summarised(records):
         return Check(
             'gate withheld', False,
             detail + '. Not one record in this window publishes whether the '
             'gate was allowed to judge it', offenders)
-    return Check('gate withheld', not offenders, detail, offenders)
+    return Check('gate withheld', len(offenders) <= args.max_gate_withheld, detail, offenders)
 
 
+# Each of these reads the records left once set_aside() has removed the
+# ones which say nothing about the instrument. The window's age is the
+# exception, below, because it is a question about the listing the harvest
+# read rather than about any one job.
 CHECKS = (
     check_record_count,
     check_series_present,
@@ -376,7 +575,8 @@ CHECKS = (
 
 
 def evaluate(records, args):
-    return [check(records, args) for check in CHECKS]
+    judged = [record for record in records if not set_aside(record)]
+    return [check_window_age(records, args)] + [check(judged, args) for check in CHECKS]
 
 
 def report_checks(checks, handle):
@@ -406,7 +606,7 @@ def report_checks(checks, handle):
     return not failed
 
 
-def build_parser(min_samples_usable):
+def build_parser():
     parser = argparse.ArgumentParser(
         description=('Assert that a CI headroom harvest shows a working instrument, and '
                      'fail if it does not.'))
@@ -423,8 +623,12 @@ def build_parser(min_samples_usable):
     parser.add_argument(
         '--min-samples-usable', type=int, default=None,
         help=('Fewest usable samples a summarised record may carry. Defaults to the band '
-              "gate's own sample floor, read from the report tool rather than copied "
-              '(currently %d).' % min_samples_usable))
+              "gate's own sample floor, BAND_GATE_MIN_SAMPLES in the report tool, read "
+              'from it rather than copied.'))
+    parser.add_argument(
+        '--min-samples-ungated', type=int, default=MIN_SAMPLES_UNGATED,
+        help=('Fewest usable samples a record from a lane the band gate is not armed on '
+              'may carry (default: %(default)s).'))
     parser.add_argument(
         '--max-samples-failed', type=int, default=MAX_SAMPLES_FAILED,
         help='Most failed samples a record may carry (default: %(default)s).')
@@ -436,6 +640,14 @@ def build_parser(min_samples_usable):
         help=('How far a window\'s mean cadence may sit from the probe interval, in '
               'seconds (default: %(default)s).'))
     parser.add_argument(
+        '--max-gate-withheld', type=int, default=MAX_GATE_WITHHELD,
+        help=('Most records from gated lanes whose verdict may be withheld '
+              '(default: %(default)s).'))
+    parser.add_argument(
+        '--max-window-age-days', type=int, default=MAX_WINDOW_AGE_DAYS,
+        help=('Oldest the newest harvested run may be, in days, before the window is '
+              'treated as not the one asked for (default: %(default)s).'))
+    parser.add_argument(
         '--report', default=default_report_path(),
         help='Path to tools/ci_headroom_report.py, whose sample floor this reads.')
     return parser
@@ -443,16 +655,18 @@ def build_parser(min_samples_usable):
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
-    # The report module is loaded before arguments are parsed so that --help
-    # can print the floor it is about to use. The sample floor itself is
-    # resolved after parsing, so that a --report override still decides it.
-    report = load_report(default_report_path())
-    parser = build_parser(report.BAND_GATE_MIN_SAMPLES)
-    args = parser.parse_args(argv)
-    if os.path.abspath(args.report) != os.path.abspath(default_report_path()):
-        report = load_report(args.report)
+    args = build_parser().parse_args(argv)
+    args.now = datetime.datetime.now(datetime.timezone.utc)
+
+    # Only the report tool which will actually be used is loaded, and only
+    # when its floor is needed, so neither --help nor a --report override
+    # depends on the default one loading.
     if args.min_samples_usable is None:
-        args.min_samples_usable = report.BAND_GATE_MIN_SAMPLES
+        try:
+            args.min_samples_usable = band_gate_min_samples(args.report)
+        except HealthError as e:
+            print('FAIL unreadable report tool: %s' % e, file=sys.stdout)
+            return EXIT_UNREADABLE
 
     try:
         records = read_records(args.dataset)
@@ -460,7 +674,9 @@ def main(argv=None):
         print('FAIL unreadable dataset: %s' % e, file=sys.stdout)
         return EXIT_UNREADABLE
 
-    print('Checking %d records from %s' % (len(records), args.dataset))
+    aside = sum(1 for record in records if set_aside(record))
+    print('Checking %d records from %s, %d set aside because their job was cancelled'
+          % (len(records) - aside, args.dataset, aside))
     if report_checks(evaluate(records, args), sys.stdout):
         return EXIT_OK
     return EXIT_UNHEALTHY

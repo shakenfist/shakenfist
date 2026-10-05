@@ -35,8 +35,10 @@ on:
 jobs:
   headroom-health:
     runs-on: [self-hosted, static]
-    # Forty bundles at roughly five megabytes each, fetched one at a time
-    # through the artifacts API.
+    # Measured on 2026-10-05: ten merge runs were 34 bundles, 227 MB, and
+    # four minutes from a developer machine, fetched one at a time through
+    # the artifacts API. The rest of the timeout is for a slower link or a
+    # slow API day, not for a harvest expected to take it.
     timeout-minutes: 45
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
@@ -49,8 +51,10 @@ jobs:
           path: shakenfist
 
       # Not $GITHUB_WORKSPACE: a dataset written into the checkout would show
-      # up in git status, and the cache is a couple of hundred megabytes of
-      # zips.
+      # up in git status. The cache is per-run scratch space, emptied with
+      # RUNNER_TEMP when the job ends, and that is deliberate: a week apart,
+      # the ten newest merge runs share no bundles with the last ten, so a
+      # persistent cache would only grow.
       - name: Harvest the ten newest merge runs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -64,8 +68,9 @@ jobs:
           python3 ${GITHUB_WORKSPACE}/shakenfist/tools/ci_headroom_health.py \
               ${RUNNER_TEMP}/ci-headroom.jsonl
 
-      # The bundles this was computed from expire in ninety days and the
-      # harvest is two hours of downloads, so the records outlive both.
+      # The bundles this was computed from expire in ninety days, so the
+      # records are kept for as long as the bundles were, and a failing run
+      # can be read again without harvesting it again.
       - name: Keep the harvested records
         if: always()
         uses: actions/upload-artifact@v7
