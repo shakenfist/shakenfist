@@ -52,6 +52,50 @@ fifteen seconds, in an hour, or after every instance on it had been deleted:
 - **No suitable node** (`404`) -- not a capacity fact at all; a node named in
   the request is not in the active node list.
 
+## Is the refusal queued server-side?
+
+No. When the scheduler cannot place an instance, the server refuses the
+request; it does not hold the create until capacity appears. A client that
+wants the create to survive a transient refusal retries it, either itself or
+through the [opt-in client retry](#client-side-retry) described below.
+
+That is a measured position rather than a design preference. It was decided
+over two windows of merge-CI data against a numeric decision rule written down
+before any of the data was read, and is recorded in full in
+[PLAN-transient-capacity-refusals-phase-05-queue-decision.md](../plans/PLAN-transient-capacity-refusals-phase-05-queue-decision.md)
+under *Outcome -- second reading*.
+
+Two things about that result need stating precisely, because the short version
+overstates it. First, the no-queue answer came from the rule's middle-ground
+default rather than from any of its own clauses. That default is Abandon -- the
+answer the rule prescribes when neither the clauses that would have it build a
+queue nor the clauses that would have it abandon the idea outright are
+satisfied -- so the outcome is no queue, not something between the two: two of
+the second window's three capacity waits
+ran past the 210 second line the rule treats as long, which is what stopped it
+abandoning the idea outright, while none of the build clauses fired. How close
+that was depends on the unit the waits are counted over -- per test bundle, per
+run-and-topology, or per run: on the narrowest counting the margin is wide, and
+on the broadest the reading sits one long-wait run short of building a queue
+after all. Three waits were recorded across 95 instrumented units, the longest
+290.83 s against a 420 s deadline.
+
+Second, the evidence has three limits:
+
+- **CI-only.** Every wait came from the functional suite's own creates against
+  CI clusters. No production cloud contributed.
+
+- **Post-reshape.** The window ran after the CI clusters were resized, so it
+  describes the pressure they are under now.
+
+- **Client retry off.** The suite ran with the opt-in retry disabled, so the
+  waits are the server's refusals rather than a client's replays.
+
+One question the evidence cannot answer either way: whether a create pinned to
+a node fares worse than an unpinned one. Every refused create the suite issues
+is pinned, so there is no unpinned comparison arm, and that stays untested
+rather than settled.
+
 ## The response body
 
 A scheduling `507` returns a JSON body with four fields:

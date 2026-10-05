@@ -749,12 +749,14 @@ constant renamed -- returning 3 while no longer naming the contract -- it
 exits 0 and says why, and against `develop`'s report it exits 0. The
 version-skew guard is therefore not a claim about what would happen.
 
-**D5's open check, settled.** D5 required 5f to name a reader for the
-refusal warning or delete it. It is named: `PLAN-transient-capacity-refusals`,
-whose phase 5 is the decision on server-side queued placement and is fed
-by exactly this series -- the guard's refusal behaviour under a ledger
-that changed size. The warning stays, labelled as an observation about
-the demand estimator's calibration.
+**D5's open check, settled.** D5 required 5f to name a reader for the refusal
+warning or delete it. It was named: `PLAN-transient-capacity-refusals`,
+whose phase 5 was the decision on server-side queued placement, fed by
+exactly this series -- the guard's refusal behaviour under a ledger that
+changed size. That reader has since read the series and decided -- an
+Abandon, by the rule's middle-ground default -- so the refusal warning's
+purpose is discharged rather than pending. The warning stays anyway,
+labelled as an observation about the demand estimator's calibration.
 
 **D9's issue, filed.**
 [#4320](https://github.com/shakenfist/shakenfist/issues/4320) records the

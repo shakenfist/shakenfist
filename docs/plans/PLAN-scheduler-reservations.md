@@ -1237,18 +1237,32 @@ because the following statements will be true:
   question is therefore answered and owned by
   [A capacity refusal is transient](PLAN-transient-capacity-refusals.md):
   suite first (informed by `/admin/resources`, and reported),
-  client second, server-side queueing only if the measured waits
-  say so -- which would be a reversal of D8 and is written down as
-  such there.
-- **CI tier topology and sizing as a capacity consumer.** The
-  Debian 12 tier runs three "hypervisors", of which `primary`
-  is also the network *and* database node and `sf1` is also a
-  database node. With `NODE_CPU_RESERVATION_THREADS=4` each
-  has a `cpu_schedulable` of 1-2, so at the default overcommit
-  `limit_cpus` is 3 and three 1-vCPU instances fill a node —
-  while the suite runs at stestr concurrency 5 and several of
-  the tests that fail this way use `force_placement`, which by
-  construction cannot fall back to another node. The per-host
+  client second, server-side queueing third. That plan's phase 5
+  has since measured the waits, over two windows, and the answer
+  is no -- **D8 is confirmed by measurement, not reversed.** The
+  second window found three waits, the longest 290.83 s against
+  the 420 s deadline, and the rule's middle-ground default
+  selected Abandon rather than one of Abandon's own clauses, as
+  [phase 5's *What phase 6 inherits, after the second reading*](PLAN-transient-capacity-refusals-phase-05-queue-decision.md)
+  records. D8 rejected hold-until-fittable on state-surface
+  grounds; the measurement agrees for a different reason -- there
+  was not enough waiting in CI to pay for a queue.
+- **CI tier topology and sizing as a capacity consumer.** On the
+  `Debian 12 tier` -- the shape this reading was taken on -- the
+  lane ran three "hypervisors", of which `primary` was also the
+  network *and* database node and `sf1` also a database node. With
+  `NODE_CPU_RESERVATION_THREADS=4` each had a `cpu_schedulable` of
+  1-2, so at the default overcommit `limit_cpus` was 3 and three
+  1-vCPU instances filled a node — while the suite runs at stestr
+  concurrency 5 and several of the tests that fail this way use
+  `force_placement`, which by construction cannot fall back to
+  another node. That arithmetic no longer describes the live lane:
+  the sizing plan's phase 4 reshaped the tier to three 6 vCPU
+  nodes publishing 24 schedulable vCPU, and it is now named
+  `Debian 13 tier`. See
+  [the CI cloud sizing guide](../developer_guide/ci_cloud_sizing.md)
+  for the current per-node figures rather than a copy of them
+  here. The per-host
   reservations are arithmetically right; they just make an
   already small cluster genuinely small, which is why the
   role-awareness work landed in phase 00a made these failures
