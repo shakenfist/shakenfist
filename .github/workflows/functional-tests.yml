@@ -63,10 +63,19 @@ jobs:
   # Detect docs-only changes so we can skip heavy tests. For
   # workflow_dispatch the filter step is skipped and the output defaults
   # to code_changed=true so all tests run.
+  #
+  # On merge_group it also cancels the run when the queue entry has been
+  # rebuilt onto a newer base; see the last step.
   check_paths:
     name: "Check paths"
     runs-on: [self-hosted, static]
     timeout-minutes: 10
+    # actions: write is for that last step, which cancels its own run.
+    # Naming any scope sets every unnamed one to none, so contents: read
+    # is restated for the checkout.
+    permissions:
+      contents: read
+      actions: write
     outputs:
       code_changed: ${{ steps.filter.outputs.code || 'true' }}
       plans_changed: ${{ steps.filter.outputs.plans || 'true' }}
@@ -109,6 +118,25 @@ jobs:
             # than the runner minutes.
             plans:
               - 'docs/plans/**'
+
+      # A superseded merge group run cancels itself here, before any of its
+      # jobs enter the merge-group-keyed concurrency groups below. Without
+      # this, which of two runs for the same queue entry survives is decided
+      # by whose Check paths finishes last, and it was sometimes the stale
+      # one (issue #3998). It must stay the last step of the job every queue
+      # job needs: the check is only as good as the gap between it and those
+      # jobs entering their groups is short. The script explains why that gap
+      # is safe, and which way it fails when it cannot tell.
+      - name: Cancel this run if the merge group is superseded
+        if: github.event_name == 'merge_group'
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BASE_REF: ${{ github.event.merge_group.base_ref }}
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: tools/ci-merge-group-current.sh
 
   # Scan git history for leaked credentials. Deliberately not gated on
   # check_paths: a credential pasted into documentation is still a
@@ -347,12 +375,14 @@ jobs:
     # superseded merge groups starving a neighbour's, and
     # shakenfist/development audits/merge-group-cancellation.md.
     #
-    # Cancelling is safe because this queue is serial
-    # (max_entries_to_build: 1), so any other in-flight merge_group run
-    # is by definition superseded and its queue branch already
-    # abandoned. The merge_group- prefix keeps a queue run from sharing
-    # a group with a workflow_dispatch run on develop, whose github.ref
-    # is the same string.
+    # This queue is serial (max_entries_to_build: 1), so of two
+    # merge_group runs in one of these groups, one is superseded. But
+    # cancel-in-progress cancels whichever entered the group first, which
+    # is not necessarily the superseded one: that is why check_paths
+    # cancels a superseded run before its jobs get here (issue #3998).
+    # The merge_group- prefix keeps a queue run from sharing a group with
+    # a workflow_dispatch run on develop, whose github.ref is the same
+    # string.
     concurrency:
       group: >-
         ${{ github.workflow }}-delinter-${{
