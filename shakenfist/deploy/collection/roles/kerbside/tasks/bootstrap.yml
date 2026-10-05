@@ -1,0 +1,142 @@
+---
+# Install Kerbside on this host, and record what was installed.
+#
+# A Kerbside host need not be a Shaken Fist node, so nothing here assumes the
+# node role has run: the build dependencies, the user and the virtualenv are
+# all Kerbside's own. On a co-located host they sit beside Shaken Fist's and
+# share nothing with them.
+#
+# The apt task is tagged packages, as internal_ca's is, and the user and group
+# tasks system-users, so a test without root can skip them by tag. Everything
+# else writes only under kerbside_state_dir and kerbside_venv, which a test can
+# redirect.
+
+# mysqlclient ships no wheel and is built from source, which needs a compiler,
+# the MariaDB client headers and pkg-config (Kerbside's installation guide).
+# The cache is refreshed because a dedicated Kerbside host gets none of the
+# node role's apt work.
+- name: Install Kerbside's build dependencies
+  ansible.builtin.apt:
+    name:
+      - build-essential
+      - pkg-config
+      - python3-dev
+      - python3-venv
+      - libmariadb-dev-compat
+      - libxml2-dev
+      - libxslt1-dev
+    state: latest
+    update_cache: true
+    cache_valid_time: 3600
+  register: apt_action
+  retries: 100
+  until: >-
+    apt_action is success or
+    ('Failed to lock apt for exclusive operation' not in apt_action.msg and
+     '/var/lib/dpkg/lock' not in apt_action.msg)
+  tags: [packages]
+
+- name: Create the Kerbside group
+  ansible.builtin.group:
+    name: "{{ kerbside_group }}"
+    system: true
+  tags: [system-users]
+
+# Kerbside writes only its API socket directory, which systemd creates for it
+# (RuntimeDirectory=kerbside), so the user needs neither a shell nor a home it
+# owns. The home is the state directory, which stays root's.
+- name: Create the Kerbside user
+  ansible.builtin.user:
+    name: "{{ kerbside_user }}"
+    group: "{{ kerbside_group }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: "{{ kerbside_state_dir }}"
+    create_home: false
+  tags: [system-users]
+
+- name: Create the Kerbside state directory
+  ansible.builtin.file:
+    path: "{{ kerbside_state_dir }}"
+    state: directory
+    owner: "{{ kerbside_file_owner }}"
+    group: "{{ kerbside_file_group }}"
+    mode: "0755"
+
+# Kerbside needs nothing from apt at runtime, so unlike Shaken Fist's this
+# virtualenv does not see the system site-packages.
+- name: Create the Kerbside virtualenv
+  ansible.builtin.command: python3 -m venv {{ kerbside_venv | quote }}
+  args:
+    creates: "{{ kerbside_venv }}/bin/activate"
+
+- name: Upgrade pip and install uv in the Kerbside virtualenv
+  ansible.builtin.command: "{{ kerbside_venv }}/bin/pip install -U pip uv"
+  changed_when: true
+
+# Each package may be a requirement or a local wheel path. --reinstall makes a
+# redeploy pick up a rebuilt wheel with an unchanged version string. An empty
+# kerbside_proxy_package is left out, so the kerbside-proxy which
+# kerbside_package requires is installed. gunicorn serves Kerbside's API, and
+# shakenfist-client is imported by Kerbside's Shaken Fist source but is not a
+# dependency of the kerbside package.
+- name: Install Kerbside, its proxy, gunicorn and the Shaken Fist client
+  # noqa: command-instead-of-shell -- shell word-splitting is required because
+  # kerbside_pip_extra may be empty or expand to several arguments. Everything
+  # else is quoted, so that a requirement such as kerbside>=0.7.0 is not read
+  # as a redirection.
+  ansible.builtin.shell: >-
+    {{ (kerbside_venv ~ '/bin/uv') | quote }} pip install --reinstall
+    {{ kerbside_pip_extra }}
+    {{ kerbside_package | quote }}
+    {{ kerbside_proxy_package | quote if kerbside_proxy_package | length > 0 else '' }}
+    gunicorn
+    {{ kerbside_client_package | quote }}
+  environment:
+    VIRTUAL_ENV: "{{ kerbside_venv }}"
+  changed_when: true
+
+# The code half of the desired state which decides whether Kerbside restarts
+# (the config entry point adds the configuration half, and register compares
+# the two together with what was last deployed). The install above always
+# reports changed, and a rebuilt wheel differs byte for byte even when its
+# source did not, so neither says whether the code changed. The installed files
+# do, as in the node role's bootstrap.
+#
+# What is hashed: the kerbside and shakenfist_client packages, and the
+# kerbside-proxy binary. The kerbside-proxy wheel installs only that binary and
+# no Python package, so the binary is the whole of it. __pycache__ is left out
+# because .pyc files embed timestamps. This is a value, not a changed flag:
+# nothing is written here, so a deploy which fails later leaves nothing behind
+# to say the new code was deployed.
+#
+# The site-packages directory is asked of the virtualenv's own Python, since
+# its version depends on the distribution.
+- name: Find the Kerbside virtualenv's site-packages
+  ansible.builtin.command: >-
+    {{ kerbside_venv }}/bin/python -c
+    'import sysconfig; print(sysconfig.get_path("purelib"))'
+  register: kerbside_site_packages
+  changed_when: false
+
+# find -H follows the binary should it be installed as a symlink. A package
+# which is missing fails find, and pipefail fails the task.
+- name: Compute the installed Kerbside code signature
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail;
+      find -H
+      {{ (kerbside_site_packages.stdout ~ '/kerbside') | quote }}
+      {{ (kerbside_site_packages.stdout ~ '/shakenfist_client') | quote }}
+      {{ (kerbside_venv ~ '/bin/kerbside-proxy') | quote }}
+      -type f -not -path '*__pycache__*' -print0
+      | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}'
+    executable: /bin/bash
+  environment:
+    LC_ALL: C
+  register: kerbside_code_signature
+  changed_when: false
+
+- name: Remember the installed Kerbside code signature
+  ansible.builtin.set_fact:
+    kerbside_code_hash: "{{ kerbside_code_signature.stdout }}"

@@ -1,0 +1,9 @@
+---
+# The kerbside role depends on no other role, because the common role's
+# handlers manage a Shaken Fist node's journald and logind, which a dedicated
+# Kerbside host does not need. It carries its own daemon reload instead, for
+# the units the config entry point writes.
+
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true

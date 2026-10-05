@@ -1,0 +1,64 @@
+---
+# Defaults for the kerbside role. Every variable is documented in
+# meta/argument_specs.yml. The consuming playbook maps its inventory onto
+# these; the role reads no inventory group names and no other host's facts.
+#
+# The values a deployment must supply default to empty, and the validate
+# entry point refuses to deploy while any of them is empty and the kerbside
+# group is not. The secrets (kerbside_system_key, kerbside_auth_secret_seed
+# and kerbside_sql_url) have no usable default on purpose.
+
+# Required when deploying.
+kerbside_url: ""
+kerbside_public_fqdn: ""
+kerbside_system_key: ""
+kerbside_auth_secret_seed: ""
+kerbside_sql_url: ""
+kerbside_sf_ca_cert: ""
+
+# Where the consuming playbook places this host. kerbside_hosts is the whole
+# kerbside group; kerbside_noncolocated_hosts the members of it which are not
+# also Shaken Fist nodes; kerbside_colocated whether this host is one.
+kerbside_hosts: []
+kerbside_noncolocated_hosts: []
+kerbside_colocated: false
+
+# The Shaken Fist cluster Kerbside serves. The same names and defaults as the
+# node role's, since they are the cross-role contract.
+api_url: "http://localhost:13000"
+deploy_name: "sf"
+
+# Packages. kerbside_package floors on the first release which never returns
+# a source's password from the API (see argument_specs). An empty
+# kerbside_proxy_package means the version kerbside_package pins.
+kerbside_package: "kerbside>=0.7.0"
+kerbside_proxy_package: ""
+kerbside_client_package: "shakenfist-client"
+kerbside_pip_extra: ""
+
+# Listeners. Every port must be below 30000, where Shaken Fist's instance
+# console range starts, and no two may be equal.
+kerbside_api_address: "0.0.0.0"
+kerbside_api_port: 13002
+kerbside_api_workers: 2
+kerbside_vdi_secure_port: 5900
+kerbside_vdi_insecure_port: 5901
+kerbside_metrics_port: 13003
+
+# Operator-supplied proxy certificate. All three empty, the default, means the
+# consuming playbook issues one from internal_ca. All three set means these
+# paths on the Kerbside host are used as they are.
+kerbside_proxy_cert_path: ""
+kerbside_proxy_key_path: ""
+kerbside_cacert_path: ""
+
+# Paths and owners. The production values; they are variables only so that a
+# test without root can point them somewhere it may write.
+kerbside_config_dir: "/etc/kerbside"
+kerbside_state_dir: "/srv/kerbside"
+kerbside_venv: "/srv/kerbside/venv"
+kerbside_unit_dir: "/etc/systemd/system"
+kerbside_user: "kerbside"
+kerbside_group: "kerbside"
+kerbside_file_owner: "root"
+kerbside_file_group: "root"
