@@ -146,6 +146,40 @@ be written is a warning on stdout and an exit code of zero, never an
 exception, because a report tool which fails a build over its own output
 file is precisely the instrument changing what it measures.
 
+Why this is one file, at three thousand lines. The code in it is three
+layers with no leakage between them: parsing and modelling the sampled
+series and the census (percentile() to read_census()), building the record
+from those models (ledger_bounds() to write_record()), and rendering prose
+from the record (plural() to print_report(), a little over a thousand
+lines). The renderer layer is a clean cut -- nothing outside this file
+calls into it, and the comment above the record builders states the
+invariant which makes it one: the printers compute nothing of their own.
+
+What stops that cut being made is packaging rather than the code. tools/ is
+not a package, so this file is loaded by path with spec_from_file_location,
+by tools/ci_headroom_harvest.py and by its own tests; nothing here may
+import from shakenfist, and there is no import path into tools/ to use
+instead. Moving the renderers into a second file means making tools/ a
+package first, which changes how every tool in it is loaded rather than
+only this one. And this file is read as text as well as run: shakenfist/actions's
+ci_headroom_verdict.sh greps its source for BAND_VIOLATION_EXIT before it
+will believe an exit status of 3, and ci_headroom_collect.sh greps it for
+the flags it is about to pass. Those greps are given one path, so whatever
+moves has to leave the matched text in the file that path names, or the two
+repositories change together across a workflow reference with no pin to
+bump. Until there is a reason to take both on, the layer comments below are
+what make the length readable, and they are not to be traded for a smaller
+line count.
+
+shakenfist/tests/test_ci_headroom_report.py is about the same length, for
+that reason and one of its own. It loads this module by path once, at
+import, and every one of its classes extends a single base holding the
+series, census and waits fixture builders and the assertion which tells a
+swallowed exception from a clean run. Splitting it means duplicating that
+preamble per file or adding a shared helper module beside the tests, and
+the seam it would split on is the one above -- so it follows a split of
+this file rather than leading one.
+
 Usage:
 
     python3 tools/ci_headroom_report.py --series /srv/ci/traces/headroom.jsonl \\

@@ -38,6 +38,16 @@ looks right, each of which the plan calls out by name:
 The tool is loaded by path: CI tools in ``tools/`` are not importable as a
 package, and this one deliberately imports nothing from shakenfist so that it
 runs under stock python3 on a runner.
+
+That is also why this file is as long as the tool it covers. The path load
+happens once, here at import, and every class below extends one base holding
+the series, census and waits fixture builders and the assertion which tells a
+swallowed exception from a clean run; splitting the file means duplicating
+that preamble per file or adding a shared helper module beside the tests. The
+seam a split would follow is the tool's own render seam, and what blocks that
+is ``tools/`` not being a package -- the reasoning is in
+``tools/ci_headroom_report.py``'s module docstring. So this file follows a
+split of the tool rather than leading one.
 """
 
 import contextlib
