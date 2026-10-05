@@ -15231,16 +15231,28 @@ are:</p>
 <td>Base URL of an operator-deployed Kerbside VDI console proxy. Optional; empty leaves the proxied-console integration off. See the <a href="../vdi_console_tokens/">VDI console tokens operator guide</a>.</td>
 </tr>
 <tr>
+<td><code>kerbside_token_duration</code></td>
+<td>Lifetime in seconds of a minted console token. Defaults to 300. Rendered only when <code>kerbside_url</code> is set.</td>
+</tr>
+<tr>
+<td><code>kerbside_system_key</code></td>
+<td>The key Kerbside authenticates to Shaken Fist with, minted as the <code>kerbside</code> key in the system namespace on every deploy. Optional; requires <code>kerbside_url</code>, must differ from <code>system_key</code>, and must be at least 16 characters. Treat as a secret.</td>
+</tr>
+<tr>
 <td><code>extra_config</code></td>
 <td>A JSON list of additional cluster configuration settings, for example <code>[{"name": "INCLUDE_TRACEBACKS", "value": "1"}]</code>. Optional.</td>
 </tr>
 </tbody>
 </table>
 <p>To offer users proxied graphical consoles via Kerbside, set <code>kerbside_url</code>
-(and optionally <code>KERBSIDE_TOKEN_DURATION</code> through <code>extra_config</code>), then
-bootstrap and rotate the signing key as described in the
-<a href="../vdi_console_tokens/">VDI console tokens operator guide</a>. This is a manual,
-opt-in integration; it stays disabled while <code>KERBSIDE_URL</code> is unset.</p>
+and, optionally, <code>kerbside_token_duration</code> and <code>kerbside_system_key</code>. The
+deploy then ensures the console token signing key exists before any daemon
+restarts, and mints the Kerbside credential if you set <code>kerbside_system_key</code>.
+The deploy stops if a <code>KERBSIDE_URL</code> or <code>KERBSIDE_TOKEN_DURATION</code>
+<code>cluster_config</code> row differs from its variable; see the
+<a href="../vdi_console_tokens/">VDI console tokens operator guide</a> for the fix and for
+key rotation. Deploying Kerbside itself is still done out of band, and the
+integration stays disabled while <code>kerbside_url</code> is unset.</p>
 <h2 id="run-the-playbook">Run the playbook<a class="headerlink" href="#run-the-playbook" title="Permanent link">&para;</a></h2>
 <p>The examples share a single playbook, <code>examples/_shared/site.yml</code>, which maps
 your inventory groups onto the collection's roles, computes the cluster-wide

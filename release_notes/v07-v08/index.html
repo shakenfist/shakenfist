@@ -15485,7 +15485,9 @@
   <code>/proc/&lt;pid&gt;/environ</code> on every node; see the
   <a href="/operator_guide/vdi_console_tokens/">VDI console tokens operator guide</a>.</li>
 <li>If Kerbside is already configured with this cluster as a console source,
-  run <code>sf-ctl ensure-kerbside-signing-key</code> <em>before</em> rolling the daemons.
+  run <code>sf-ctl ensure-kerbside-signing-key</code> <em>before</em> rolling the daemons (a
+  deploy with the collection and <code>kerbside_url</code> set does this for you, ahead of
+  the daemon restarts).
   Kerbside v0.5.0 and earlier abandon a scrape whose signing-key fetch
   fails, and the cleanup pass which follows then deletes every console
   recorded for the cluster — including the direct and proxy routes, which
@@ -15493,6 +15495,25 @@
   halves of that — the fetch failure no longer errors the source, and the
   cleanup no longer touches a source it did not enumerate — so it is the
   release to upgrade to. See the
+  <a href="/operator_guide/vdi_console_tokens/">VDI console tokens operator guide</a>.</li>
+<li>The collection now handles the Shaken Fist side of the Kerbside integration.
+  Set <code>kerbside_url</code>, and optionally <code>kerbside_token_duration</code> (default 300)
+  and <code>kerbside_system_key</code>. The deploy ensures the console token signing key
+  exists before any daemon restarts, and mints <code>kerbside_system_key</code> as the
+  <code>kerbside</code> key in the system namespace on every deploy; changing the
+  variable rotates it, and removing it does not revoke the key (use
+  <code>sf-client namespace delete-key system kerbside</code>). If you followed the old
+  documentation and set <code>KERBSIDE_URL</code> or <code>KERBSIDE_TOKEN_DURATION</code> with
+  <code>sf-ctl set-config</code> or <code>extra_config</code>, note that when <code>kerbside_url</code> is set
+  a deploy now <strong>stops</strong> if either <code>cluster_config</code> row differs from its
+  variable, or if <code>extra_config</code> sets either name, because the row would
+  override the rendered configuration. Fix it by running
+  <code>sf-ctl unset-config &lt;NAME&gt;</code> and deploying again, or by moving the value into
+  the variable; a row equal to its variable only warns. Deploying Kerbside
+  itself is still out of band. Separately, <code>sf-ctl show-config</code> now shows
+  numeric values even when the name looks secret (<code>KERBSIDE_TOKEN_DURATION</code>,
+  <code>API_TOKEN_DURATION</code>, <code>FEDERATION_MAX_TOKEN_BYTES</code>); string values under such
+  names are still redacted. See the
   <a href="/operator_guide/vdi_console_tokens/">VDI console tokens operator guide</a>.</li>
 <li>There are now API calls for managing trusted issuers
   (<code>GET</code>/<code>POST /auth/issuers</code>, <code>GET</code>/<code>PUT</code>/<code>DELETE /auth/issuers/...issuerref...</code>).

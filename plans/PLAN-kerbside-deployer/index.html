@@ -15001,7 +15001,11 @@ branch.</p>
 <h1 id="4097-records-as-item-4-that-the-ansible-kerbside_url">4097 records, as item 4, that "the ansible <code>kerbside_url</code><a class="headerlink" href="#4097-records-as-item-4-that-the-ansible-kerbside_url" title="Permanent link">&para;</a></h1>
 <p>variable has never been read by a running sf-api". #4093 asks for
 the mint test to run somewhere. #4367 notes that Kerbside's deploy
-lane has no headroom instrumentation. All three are open.</p>
+lane has no headroom instrumentation. #4097 and #4367 are open.</p>
+<h1 id="4093-was-closed-on-2026-10-03-by-the-merge-of-this-plans-own-pull">4093 was closed on 2026-10-03 by the merge of this plan's own pull<a class="headerlink" href="#4093-was-closed-on-2026-10-03-by-the-merge-of-this-plans-own-pull" title="Permanent link">&para;</a></h1>
+<p>request, #4420, whose phase table said phase 4 "closes" it. GitHub
+read that as a closing keyword; nothing makes the mint test run yet
+(phase 2's survey, S7).</p>
 <h3 id="what-deploying-kerbside-involves">What deploying Kerbside involves<a class="headerlink" href="#what-deploying-kerbside-involves" title="Permanent link">&para;</a></h3>
 <p>All references below are to the Kerbside repository unless marked
 otherwise.</p>
@@ -15265,10 +15269,13 @@ minted in the cluster-config play with
 dedicated key can be rotated or revoked without touching the
 cluster's own credential, and shows up separately in
 <code>log_token_use</code> audit events.</p>
-<p><strong>Uncertain:</strong> whether <code>bootstrap-system-key</code> replaces an existing
-key of the same name, which is how rotation would work.
-<code>ctl.py:173-192</code> must be read in phase 2. If it does not replace,
-phase 2 adds that behaviour.</p>
+<p><em>Answered in phase 2's survey (S2).</em> <code>bootstrap-system-key</code> calls
+<code>Namespace.add_key</code>, which has always overwritten a key of the same
+name -- a rotation, with a new hash and a new nonce. Rotation is
+changing the variable and redeploying; nothing needs adding. Because
+the play mints on every deploy, as it already does the <code>deploy</code> key,
+the nonce also changes on every deploy, which <code>shakenfist_client</code>
+absorbs by re-authenticating once on the resulting 401.</p>
 <h3 id="6-what-should-happen-when-a-cluster_config-row-shadows-the-variable">6. What should happen when a <code>cluster_config</code> row shadows the variable?<a class="headerlink" href="#6-what-should-happen-when-a-cluster_config-row-shadows-the-variable" title="Permanent link">&para;</a></h3>
 <p><strong>Default:</strong> fail fast. When <code>kerbside_url</code> is set and a
 <code>KERBSIDE_URL</code> row exists in <code>cluster_config</code> with a different
@@ -15342,13 +15349,13 @@ every phase has been completed, abandoned or superseded.</p>
 <tr>
 <td>1. <code>internal_ca</code> issues certificates to any host at caller-chosen paths, and renews them</td>
 <td><a href="../PLAN-kerbside-deployer-phase-01-internal-ca/">PLAN-kerbside-deployer-phase-01-internal-ca.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>12441652b</code> (#4430)</td>
 </tr>
 <tr>
 <td>2. Shaken Fist side: signing key, Kerbside credential, token duration, shadow guard</td>
-<td>PLAN-kerbside-deployer-phase-02-sf-side.md</td>
-<td>Proposed</td>
+<td><a href="../PLAN-kerbside-deployer-phase-02-sf-side/">PLAN-kerbside-deployer-phase-02-sf-side.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -15437,16 +15444,30 @@ certificate on every cluster is reissued.</p>
 <li><code>sf-ctl ensure-kerbside-signing-key</code>, run when <code>kerbside_url</code>
   is set (open question 7).</li>
 <li><code>sf-ctl bootstrap-system-key --key-from-stdin kerbside</code>, run
-  when the <code>kerbside</code> group is non-empty (open question 5),
-  including whatever rotation semantics the read of <code>ctl.py</code>
-  shows are missing.</li>
-<li>The shadow guard from open question 6.</li>
+  when the <code>kerbside_system_key</code> variable is set (open question
+  5). Not when the <code>kerbside</code> group is non-empty: that group does
+  not exist until phase 3, and an operator who runs Kerbside some
+  other way needs the credential without one. Phase 3 makes the
+  variable required when the group is non-empty. Rotation already
+  works (open question 5).</li>
+<li>The shadow guard from open question 6, covering
+  <code>KERBSIDE_TOKEN_DURATION</code> as well as <code>KERBSIDE_URL</code>, and the
+  play's own <code>extra_config</code> as well as existing rows: the
+  documentation told operators to set the duration both ways.</li>
+<li><code>sf-ctl show-config</code> stops redacting numeric values, as
+  <code>redacted_config_items()</code> already does, so the guard can read
+  <code>KERBSIDE_TOKEN_DURATION</code> without <code>--show-secrets</code>.</li>
 </ul>
-<p>argument_specs validate the new variables. The <code>kerbside</code> key
-must differ from <code>system_key</code>; the play asserts it.</p>
+<p>The cluster-config play is in <code>examples/_shared/site.yml</code>, not a
+role, so it has no argument_specs. The Kerbside steps therefore
+become two node role entry points that the play includes, which
+gives the new variables argument_specs and makes them testable
+without a cluster. The <code>kerbside</code> key must differ from
+<code>system_key</code>; the entry point asserts it.</p>
 <p>This phase alone retires every manual step in
-<code>vdi_console_tokens.md</code> for an operator who runs Kerbside some
-other way. It is useful even if phase 3 never lands.</p>
+<code>vdi_console_tokens.md</code> but the rotation runbook for an operator
+who runs Kerbside some other way. It is useful even if phase 3
+never lands.</p>
 <p>Planned at high effort: it changes what the cluster-config play
 does on every deploy of every cluster, including those that never
 turn the feature on, so the "feature off" path needs the explicit

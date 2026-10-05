@@ -14794,6 +14794,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-kerbside-credential" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Kerbside credential
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#publishing-the-public-keys" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14907,30 +14918,48 @@ offer the direct-to-hypervisor console described in the
 adds the proxied path.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Kerbside deployment itself is not yet automated by the Shaken Fist
-ansible collection, so enabling the integration is a <strong>manual</strong> step
-today. You deploy and configure a Kerbside proxy out of band (see the
-<a href="/components/kerbside/">Kerbside component documentation</a>), then point
-Shaken Fist at it as below.</p>
+<p>The Shaken Fist ansible collection does not deploy Kerbside itself. You
+deploy and configure a Kerbside proxy out of band (see the
+<a href="/components/kerbside/">Kerbside component documentation</a>). The collection
+does handle the Shaken Fist side: the URL, the token duration, the
+signing key and the Kerbside credential, as below.</p>
 </div>
 <p>To enable it, set <code>KERBSIDE_URL</code> to your Kerbside deployment's public base
-URL. You can do this at deploy time by setting the collection's
-<code>kerbside_url</code> variable in your <code>group_vars/all.yml</code> (see
-<a href="../installation/">Installation</a>), which renders it into every node's
-<code>/etc/sf/config</code>:</p>
+URL. For a cluster deployed with the collection, set the <code>kerbside_url</code>
+variable in your <code>group_vars/all.yml</code> (see <a href="../installation/">Installation</a>),
+which renders it into every node's <code>/etc/sf/config</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">kerbside_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://kerbside.example.com</span>
 </code></pre></div>
-<p>or on a running cluster with <code>sf-ctl</code> (a <code>cluster_config</code> value overrides
-the rendered file at process start):</p>
+<p>Setting it also makes the deploy ensure the console token signing key exists
+(see <a href="#signing-key-custody">Signing key custody</a>). The optional
+<code>kerbside_system_key</code> variable mints the credential Kerbside uses to talk to
+Shaken Fist (see <a href="#the-kerbside-credential">The Kerbside credential</a>).</p>
+<p>For a cluster not deployed with the collection, use <code>sf-ctl</code> instead (a
+<code>cluster_config</code> value overrides the rendered file at process start):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sf-ctl<span class="w"> </span>set-config<span class="w"> </span>KERBSIDE_URL<span class="w"> </span>https://kerbside.example.com
 </code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Do not set these in both places</p>
+<p>A <code>cluster_config</code> row overrides <code>/etc/sf/config</code>, so a <code>KERBSIDE_URL</code> or
+<code>KERBSIDE_TOKEN_DURATION</code> row which differs from the variable would make
+every daemon ignore it. When <code>kerbside_url</code> is set, the collection deploy
+therefore stops, before it writes anything, if either row exists with a
+different value, or if <code>extra_config</code> sets either name. The message names
+the fix: remove the row with <code>sf-ctl unset-config KERBSIDE_URL</code> (or
+<code>KERBSIDE_TOKEN_DURATION</code>) and deploy again, relying on the variable. A row
+equal to its variable does not stop the deploy; it is reported as a warning
+and can be removed the same way. An <code>sf-ctl</code> older than the collection
+shows the row as <code>&lt;redacted&gt;</code>, which the deploy treats as different.</p>
+</div>
 <p><code>KERBSIDE_URL</code> is both the base for the returned console URL and the token
 <strong>audience</strong> (<code>aud</code>) claim. Kerbside's expected audience — its own
 <code>SF_CONSOLE_TOKEN_AUDIENCE</code>, or a value derived from its <code>PUBLIC_FQDN</code> if
 that is unset — must equal this string exactly, or verification fails.</p>
 <p>Optionally set <code>KERBSIDE_TOKEN_DURATION</code>, the lifetime in seconds of a
 minted token. It defaults to 300 seconds (five minutes), which is ample for
-a viewer to redeem the URL:</p>
+a viewer to redeem the URL. With the collection, set the
+<code>kerbside_token_duration</code> variable, which must be positive and is rendered
+only alongside <code>kerbside_url</code>. Otherwise:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sf-ctl<span class="w"> </span>set-config<span class="w"> </span>KERBSIDE_TOKEN_DURATION<span class="w"> </span><span class="m">300</span>
 </code></pre></div>
 <p>Both values are read from cluster configuration at <code>sf-api</code> start, so change
@@ -14960,11 +14989,16 @@ maintenance pass — it is simply no longer <em>retained</em> in their environme
 An attacker who can read a daemon's memory is therefore not shut out by this
 change; one who can read its environment, or the environment of a command
 privexec ran, now is.</p>
-<p>The key is <strong>not</strong> created automatically: it must be provisioned explicitly
-before the first console is opened. Until it exists, the <code>vdiconsoleproxy</code>
-endpoint returns HTTP 500 naming the command to run below — minting never
-self-bootstraps a key. Create it — for example so you can publish the public
-key to Kerbside before anyone opens a console — with the idempotent:</p>
+<p>Shaken Fist never creates the key lazily while minting: until it exists, the
+<code>vdiconsoleproxy</code> endpoint returns HTTP 500 naming the command to run below.
+A deploy with the collection ensures the key whenever <code>kerbside_url</code> is set.
+It does so in the cluster configuration play, which runs before the plays that
+restart daemons, so an <code>sf-api</code> restarted with <code>KERBSIDE_URL</code> set always finds
+a key behind it. It creates the key if it is absent and otherwise changes
+nothing.</p>
+<p>For a cluster not deployed with the collection, provision it explicitly before
+the first console is opened — for example so you can publish the public key to
+Kerbside before anyone opens a console — with the idempotent:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sf-ctl<span class="w"> </span>ensure-kerbside-signing-key
 </code></pre></div>
 <p>This prints the active key id and how many keys are published; it never
@@ -14972,7 +15006,9 @@ prints private material and does nothing if a key already exists.</p>
 <div class="admonition warning">
 <p class="admonition-title">Provision the key before upgrading a cluster Kerbside already scrapes</p>
 <p>Do this <em>before</em> you roll the daemons, if Kerbside is already
-configured with this cluster as a console source.</p>
+configured with this cluster as a console source. A collection deploy
+with <code>kerbside_url</code> set already does, in that order; otherwise run the
+command above yourself.</p>
 <p>Until the key exists, <code>GET /admin/vditokenpubkey</code> returns HTTP 404.
 <strong>Kerbside v0.5.0 and earlier</strong> treat that failure as making the whole
 source unusable: the scrape is abandoned before it enumerates any
@@ -14996,22 +15032,49 @@ scrape — an unreachable cluster, an error fetching the cluster CA —
 deleted that source's consoles, whether or not tokens were involved.
 On v0.5.0 and earlier, provision the key before you upgrade.</p>
 </div>
+<h2 id="the-kerbside-credential">The Kerbside credential<a class="headerlink" href="#the-kerbside-credential" title="Permanent link">&para;</a></h2>
+<p>Kerbside's Shaken Fist source authenticates to the cluster with a key in the
+system namespace, using the username <code>system</code>. This is separate from the
+signing key: the signing key lets Shaken Fist mint tokens, the credential lets
+Kerbside read the cluster's consoles and fetch the public keys below. Enter
+the same value as the password when you configure the source in Kerbside (see
+the <a href="/components/kerbside/console-sources/">Kerbside console sources page</a>).</p>
+<p>With the collection, set <code>kerbside_system_key</code> (a secret; at least 16
+characters, different from <code>system_key</code>, and only valid with <code>kerbside_url</code>).
+The deploy mints it as the <code>kerbside</code> key in the system namespace on every
+run, the same way <code>system_key</code> is minted as the <code>deploy</code> key. Each mint issues
+a new nonce, which Kerbside's client absorbs with one re-authentication, so
+Kerbside is not disturbed.</p>
+<ul>
+<li><strong>Rotate</strong> it by changing the variable and deploying, then update the
+  value in Kerbside's source configuration.</li>
+<li><strong>Removing</strong> the variable does not delete the key, because a secrets file
+  which failed to decrypt looks the same as a removed variable. Revoke the
+  credential explicitly:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sf-client<span class="w"> </span>namespace<span class="w"> </span>delete-key<span class="w"> </span>system<span class="w"> </span>kerbside
+</code></pre></div>
+<p>Clusters not deployed with the collection create the key by hand, on a
+database node, the same way the deploy does -- on stdin, so the key never
+appears in the process table or shell history:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>sf-ctl<span class="w"> </span>bootstrap-system-key<span class="w"> </span>--key-from-stdin<span class="w"> </span>kerbside<span class="w"> </span>&lt;<span class="w"> </span>kerbside-key-file
+</code></pre></div>
 <h2 id="publishing-the-public-keys">Publishing the public keys<a class="headerlink" href="#publishing-the-public-keys" title="Permanent link">&para;</a></h2>
 <p>Kerbside verifies tokens with the <strong>public</strong> half of the signing key, which
 Shaken Fist serves to admin callers at
 <a href="https://openapi.shakenfist.com/#/admin/get_admin_vditokenpubkey"><code>GET /admin/vditokenpubkey</code></a>.
 The response is the active key id and every currently published public key:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="nt">"active_kid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"3f2a9c1e"</span><span class="p">,</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">"keys"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">        </span><span class="p">{</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">            </span><span class="nt">"kid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"3f2a9c1e"</span><span class="p">,</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">            </span><span class="nt">"alg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"EdDSA"</span><span class="p">,</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">            </span><span class="nt">"public_pem"</span><span class="p">:</span><span class="w"> </span><span class="s2">"-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----\n"</span><span class="p">,</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">            </span><span class="nt">"created"</span><span class="p">:</span><span class="w"> </span><span class="mi">1789000000</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">        </span><span class="p">}</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">    </span><span class="p">]</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span><span class="nt">"active_kid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"3f2a9c1e"</span><span class="p">,</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nt">"keys"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">        </span><span class="p">{</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">            </span><span class="nt">"kid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"3f2a9c1e"</span><span class="p">,</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">            </span><span class="nt">"alg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"EdDSA"</span><span class="p">,</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">            </span><span class="nt">"public_pem"</span><span class="p">:</span><span class="w"> </span><span class="s2">"-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----\n"</span><span class="p">,</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">            </span><span class="nt">"created"</span><span class="p">:</span><span class="w"> </span><span class="mi">1789000000</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">        </span><span class="p">}</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">    </span><span class="p">]</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="p">}</span>
 </code></pre></div>
 <p>It returns HTTP 404 until a signing key exists (run
 <code>sf-ctl ensure-kerbside-signing-key</code> first). Kerbside fetches this endpoint
@@ -15023,7 +15086,7 @@ verifiable, so a rotation never invalidates tokens that are still in flight.
 The stored key list is a <strong>two-key window</strong>: rotation prepends a new key,
 marks it active, and trims the list to the two newest entries.</p>
 <p>To rotate:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>sf-ctl<span class="w"> </span>rotate-kerbside-signing-key
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sf-ctl<span class="w"> </span>rotate-kerbside-signing-key
 </code></pre></div>
 <p>This prints the new active key id and the published key count (which is 2
 after the first rotation). New tokens are signed only with the active key;
