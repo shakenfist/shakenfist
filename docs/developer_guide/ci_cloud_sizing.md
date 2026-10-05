@@ -666,7 +666,7 @@ health, and the confirmation window beside it is too small to recompute
 a distribution from. What they do establish is that a running probe
 banked a series on every bundle it wrote.
 
-Two things to know before reading its output:
+Three things to know before reading its output:
 
 * Clearing the sample floor is necessary but not sufficient for the
   gate, which counts the samples that produced a CPU fraction. A
@@ -686,8 +686,9 @@ Two things to know before reading its output:
   2026-10-05 the runs listing twice, minutes apart, served a window
   weeks out of date as the newest merge runs -- its newest run on 11
   September the first time and 24 September the second -- and the
-  harvest, which trusts the listing, read each as the current window. Every record in it was well formed. Only the age
-  of the newest run says anything was wrong.
+  harvest, which trusts the listing, read each as the current window.
+  Every record in it was well formed. Only the age of the newest run
+  says anything was wrong.
 
 ### The topology assertion fails rather than skipping
 

@@ -40,9 +40,12 @@ jobs:
     # the artifacts API. The rest of the timeout is for a slower link or a
     # slow API day, not for a harvest expected to take it.
     timeout-minutes: 45
+    # Queue rather than cancel: a manual dispatch landing on top of the
+    # scheduled run would otherwise cancel it, and a cancelled scheduled
+    # run sends no failure notification -- the only alerting this has.
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
-      cancel-in-progress: true
+      cancel-in-progress: false
 
     steps:
       - name: Checkout the shakenfist repository

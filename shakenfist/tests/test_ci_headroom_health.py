@@ -267,6 +267,15 @@ class LaneTestCase(HealthTestCase):
         self.assertIn('FAIL gate withheld', out)
         self.assertIn('32 on ungated lanes', out)
 
+    def test_the_harvests_fallback_label_reads_as_ungated(self):
+        # With no label file the harvest does not write None: it writes the
+        # topology it read from the bundle name, which is half a label and
+        # matches no gated lane. The answer has to be the same as above.
+        status, out = self.run_health(healthy_window(label='slim-primary'))
+        self.assertEqual(1, status, out)
+        self.assertIn('FAIL gate withheld', out)
+        self.assertIn('32 on ungated lanes', out)
+
 
 class SeriesPresenceTestCase(HealthTestCase):
     def test_a_window_whose_probe_stopped_running_fails(self):
@@ -585,6 +594,65 @@ class UnreadableDatasetTestCase(HealthTestCase):
             self.assertEqual(2, status, out)
             self.assertIn('line 3', out)
             self.assertIn(message, out)
+
+    def wrong_type_names_the_line(self, broken, message):
+        path = self.dataset([record(), record(), broken], name='scalar.jsonl')
+        status, out = self.run_health([], path=path)
+        self.assertEqual(2, status, out)
+        self.assertIn('line 3', out)
+        self.assertIn(message, out)
+
+    def test_every_scalar_a_check_reads_of_the_wrong_type_names_the_line(self):
+        # A list is none of the listed types, and unhashable, so it is the
+        # one value which would crash any check that read it unvalidated.
+        for path, key, _types in health.RECORD_SCALARS:
+            broken = record()
+            container = broken
+            for step in path:
+                container = container[step]
+            container[key] = ['wrong']
+            self.wrong_type_names_the_line(broken, '.'.join(path + (key,)))
+
+    def test_a_string_count_names_the_line_rather_than_raising(self):
+        # '80' < 20 raises a TypeError in the sample floor check.
+        broken = record()
+        broken['summary']['series']['samples_usable'] = '80'
+        self.wrong_type_names_the_line(broken, "samples_usable is '80', not int")
+
+    def test_a_string_count_is_not_read_as_true(self):
+        # '0' is a true value, so a census which matched nothing would have
+        # read as one which observed the scheduler. This is the case where
+        # the wrong type does not crash anything and gives a wrong answer.
+        broken = record()
+        broken['summary']['census']['stage_events'] = '0'
+        self.wrong_type_names_the_line(broken, "stage_events is '0', not int")
+
+    def test_a_bool_is_not_a_count(self):
+        broken = record()
+        broken['summary']['series']['samples_failed'] = True
+        self.wrong_type_names_the_line(broken, 'samples_failed is True, not int')
+
+    def test_withheld_reasons_must_be_a_list_of_strings(self):
+        # A bare string would be joined one character at a time.
+        for value in ('thin series', [1], {'reason': 'thin series'}):
+            broken = record()
+            broken['summary']['verdict']['gate_withheld'] = value
+            self.wrong_type_names_the_line(broken, 'gate_withheld %r' % (value,))
+
+    def test_absent_scalars_are_left_to_the_checks(self):
+        # None is how the harvest writes a field it could not fill, and each
+        # check reads it as unknown. The shape check must not pre-empt that:
+        # this window fails on its census and its creation times, not as an
+        # unreadable file.
+        entries = healthy_window(census_state=None, stage_events=None,
+                                 capacity_shortage_drops=None)
+        for entry in entries:
+            entry['run_created_at'] = None
+            entry['job_conclusion'] = None
+        status, out = self.run_health(entries)
+        self.assertEqual(1, status, out)
+        self.assertIn('FAIL census stage events', out)
+        self.assertIn('FAIL window age', out)
 
 
 class UnreadableReportTestCase(HealthTestCase):

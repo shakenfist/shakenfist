@@ -79,9 +79,10 @@ import sys
 SERIES_PRESENT_FLOOR = 0.90
 
 # The fewest records, once cancelled jobs are set aside, a harvest may
-# yield before the window itself is suspect. The modes which produce no record at all -- a run that banked no
-# bundle, a collect which could not reach the primary -- leave nothing for a
-# per-record check to find, so they are only visible as a count.
+# yield before the window itself is suspect. The modes which produce no
+# record at all -- a run that banked no bundle, a collect which could not
+# reach the primary -- leave nothing for a per-record check to find, so they
+# are only visible as a count.
 #
 # Scaled to the ten newest merge runs the scheduled job harvests. Four
 # instrumented jobs per run is 40 records; the baseline window yielded 217
@@ -118,9 +119,9 @@ CADENCE_TOLERANCE_SECONDS = 1.0
 # stale window as the newest runs: once a single short page whose newest
 # run was 2026-09-11, so the harvest stopped paginating, and once a full
 # walk whose newest was 2026-09-24. Each read as the current window.
-# Nothing per-record can see that: old records are well-formed records. Merges land several
-# times a day, so a week would do; two weeks keeps a quiet holiday from
-# reading as a broken instrument.
+# Nothing per-record can see that: old records are well-formed records.
+# Merges land several times a day, so a week would do; two weeks keeps a
+# quiet holiday from reading as a broken instrument.
 MAX_WINDOW_AGE_DAYS = 14
 
 # How many records from gated lanes may carry a withheld verdict.
@@ -221,29 +222,79 @@ def default_report_path():
                         'ci_headroom_report.py')
 
 
+# Every scalar a check compares, counts, hashes or tests for truth, by where
+# it sits in a record and the types it may hold. None is allowed for each,
+# since an absent field is read as unknown by the check which reads it, but
+# nothing else is taken on trust: a string '0' is a true value and a list is
+# unhashable, so the wrong type here is not an error a check can be relied
+# upon to raise -- it is as likely to be read as a passing answer. Fields
+# which are only printed are not listed. bool is refused wherever a number
+# is wanted, because JSON true is an int as far as isinstance() is concerned.
+RECORD_SCALARS = (
+    ((), 'run_created_at', (str,)),
+    ((), 'job_conclusion', (str,)),
+    ((), 'label', (str,)),
+    ((), 'series_present', (bool,)),
+    (('summary',), 'record_version', (int,)),
+    (('summary', 'series'), 'samples_usable', (int,)),
+    (('summary', 'series'), 'samples_failed', (int,)),
+    (('summary', 'series'), 'window_seconds', (int, float)),
+    (('summary', 'census'), 'state', (str,)),
+    (('summary', 'census'), 'stage_events', (int,)),
+    (('summary', 'census'), 'capacity_shortage_drops', (int,)),
+)
+
+
+def scalar_type_error(container, key, types):
+    """Why container[key] is neither absent nor one of types, or None."""
+    value = container.get(key)
+    if value is None:
+        return None
+    if isinstance(value, types) and (bool in types or not isinstance(value, bool)):
+        return None
+    return '%s is %r, not %s' % (key, value, ' or '.join(t.__name__ for t in types))
+
+
 def record_shape_error(record):
     """Why a parsed line is not shaped like a harvest record, or None.
 
-    Only the containers the checks call into are asserted -- a record is an
-    object, and a summary, where there is one, is an object holding a
-    ``series`` object and, where it has them, ``census`` and ``verdict``
-    objects. Everything below that is read with ``.get()`` and judged by
-    the checks themselves. A line which parses but is the wrong
-    shape is a truncated or foreign file, and must exit two and name the
-    line, not crash a check half way through with a traceback.
+    A record is an object, and a summary, where there is one, is an object
+    holding a ``series`` object and, where it has them, ``census`` and
+    ``verdict`` objects. Every scalar in RECORD_SCALARS is the type it is
+    listed as or absent, and ``verdict.gate_withheld``, where present, is a
+    list of strings, since the withheld check joins it. A line which parses
+    but is the wrong shape is a truncated or foreign file, and must exit two
+    and name the line, not crash a check half way through with a traceback
+    -- or, worse, be read by one as an answer.
     """
     if not isinstance(record, dict):
         return 'is not a JSON object'
     summary = record.get('summary')
-    if summary is None:
-        return None
-    if not isinstance(summary, dict):
-        return 'has a summary which is not a JSON object'
-    if not isinstance(summary.get('series'), dict):
-        return 'has a summary with no series object'
-    for key in ('census', 'verdict'):
-        if summary.get(key) is not None and not isinstance(summary[key], dict):
-            return 'has a summary whose %s is not a JSON object' % key
+    if summary is not None:
+        if not isinstance(summary, dict):
+            return 'has a summary which is not a JSON object'
+        if not isinstance(summary.get('series'), dict):
+            return 'has a summary with no series object'
+        for key in ('census', 'verdict'):
+            if summary.get(key) is not None and not isinstance(summary[key], dict):
+                return 'has a summary whose %s is not a JSON object' % key
+
+    for path, key, types in RECORD_SCALARS:
+        container = record
+        for step in path:
+            container = container.get(step)
+            if container is None:
+                break
+        if container is None:
+            continue
+        problem = scalar_type_error(container, key, types)
+        if problem:
+            return 'has %s' % '.'.join(path + (problem,))
+
+    withheld = ((summary or {}).get('verdict') or {}).get('gate_withheld')
+    if withheld is not None and (not isinstance(withheld, list)
+                                 or not all(isinstance(reason, str) for reason in withheld)):
+        return 'has summary.verdict.gate_withheld %r, not a list of strings' % (withheld,)
     return None
 
 
@@ -426,11 +477,12 @@ def check_samples_usable(records, args):
 
     On a lane the gate is armed on, the floor is the band gate's own sample
     floor, which is where the number comes from; on any other lane it is
-    MIN_SAMPLES_UNGATED, for the reason given beside it. Note that clearing it is necessary and not sufficient for the
-    gate: the gate counts the samples which produced a CPU fraction, and the
-    first two or three minutes of a cluster's life produce usable samples
-    whose capacity table is still empty. The gate says so itself, which is
-    what the withheld check below reads.
+    MIN_SAMPLES_UNGATED, for the reason given beside it. Note that clearing
+    it is necessary and not sufficient for the gate: the gate counts the
+    samples which produced a CPU fraction, and the first two or three
+    minutes of a cluster's life produce usable samples whose capacity table
+    is still empty. The gate says so itself, which is what the withheld
+    check below reads.
     """
     offenders = []
     worst = {True: None, False: None}
