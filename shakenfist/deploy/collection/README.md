@@ -237,9 +237,13 @@ and the `kerbside` hosts, for example in `group_vars/all`: the deploy refuses a
 would then fail Kerbside's audience check. The other three may live in
 `group_vars/kerbside`. Every Kerbside port (`kerbside_api_port`,
 `kerbside_vdi_secure_port`, `kerbside_vdi_insecure_port` and
-`kerbside_metrics_port`) must be below 30000 and distinct from the others.
+`kerbside_metrics_port`) must be below 30000 and distinct from the others, and
+on a Kerbside host which is also a Shaken Fist node none may be 13000, 13001,
+13005, 13006 or 13007, the ports Shaken Fist's daemons listen on. Every Kerbside
+host is validated with its own variables, before any host is changed.
 Kerbside fetches the signing key from `api_url`, so `api_url` must not be a
-loopback address if any Kerbside host is dedicated.
+loopback address on a dedicated Kerbside host (a co-located one reaches its
+own `sf-api` there).
 
 **Database.** Bring your own MySQL or MariaDB: create a `kerbside` database and
 a user with all privileges on it, and give its URL as `kerbside_sql_url`.
@@ -260,7 +264,8 @@ sdist ([kerbside#326](https://github.com/shakenfist/kerbside/issues/326)).
 **Redeploys.** Each deploy waits, for up to about three minutes
 (`kerbside_ready_retries`), for Kerbside to fetch the signing key with the
 credential that deploy minted. A redeploy restarts Kerbside only when its
-code, configuration, systemd units or certificate changed.
+code (including the version of any package in its virtualenv other than pip
+and uv), configuration, systemd units or certificate changed.
 
 Without a `kerbside` group, ansible prints `Could not match supplied host
 pattern, ignoring: kerbside`. This is harmless; defining an empty `kerbside:`

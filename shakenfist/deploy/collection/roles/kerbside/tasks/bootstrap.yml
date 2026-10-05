@@ -101,14 +101,29 @@
 # the two together with what was last deployed). The install above always
 # reports changed, and a rebuilt wheel differs byte for byte even when its
 # source did not, so neither says whether the code changed. The installed files
-# do, as in the node role's bootstrap.
+# and package versions do, as in the node role's bootstrap.
 #
-# What is hashed: the kerbside and shakenfist_client packages, and the
-# kerbside-proxy binary. The kerbside-proxy wheel installs only that binary and
-# no Python package, so the binary is the whole of it. __pycache__ is left out
-# because .pyc files embed timestamps. This is a value, not a changed flag:
-# nothing is written here, so a deploy which fails later leaves nothing behind
-# to say the new code was deployed.
+# What is hashed, in one stream:
+#
+#   * the files of the kerbside and shakenfist_client packages, and the
+#     kerbside-proxy binary. The kerbside-proxy wheel installs only that binary
+#     and no Python package, so the binary is the whole of it. These catch a
+#     rebuilt wheel whose version did not change. __pycache__ is left out
+#     because .pyc files embed timestamps.
+#   * the virtualenv's resolved package set, from uv pip freeze, sorted here
+#     rather than trusting uv's order. A dependency-only upgrade (sqlalchemy,
+#     gunicorn, ...) changes no file above, but --reinstall has still rewritten
+#     files under the running processes, so any version change must restart
+#     Kerbside. pip and uv are left out: the task above upgrades them on every
+#     deploy, Kerbside never imports them, and uv releases often enough that
+#     including them would restart Kerbside, dropping its consoles, after most
+#     uv releases. A package installed from a wheel path freezes as
+#     "name @ file:///path", so a wheel at a new path also restarts it.
+#
+# The freeze is piped straight into the hash, never registered: a package
+# installed from a URL with a credential in it freezes with that URL. This is
+# a value, not a changed flag: nothing is written here, so a deploy which
+# fails later leaves nothing behind to say the new code was deployed.
 #
 # The site-packages directory is asked of the virtualenv's own Python, since
 # its version depends on the distribution.
@@ -119,21 +134,28 @@
   register: kerbside_site_packages
   changed_when: false
 
-# find -H follows the binary should it be installed as a symlink. A package
-# which is missing fails find, and pipefail fails the task.
+# find -H follows the binary should it be installed as a symlink. errexit and
+# pipefail fail the task when a package is missing (find fails) or uv pip
+# freeze fails, rather than hashing whatever half of the stream was produced.
+# VIRTUAL_ENV selects the virtualenv for uv, as for the install above.
 - name: Compute the installed Kerbside code signature
   ansible.builtin.shell:
     cmd: >-
-      set -o pipefail;
+      set -o errexit -o pipefail;
+      {
       find -H
       {{ (kerbside_site_packages.stdout ~ '/kerbside') | quote }}
       {{ (kerbside_site_packages.stdout ~ '/shakenfist_client') | quote }}
       {{ (kerbside_venv ~ '/bin/kerbside-proxy') | quote }}
       -type f -not -path '*__pycache__*' -print0
-      | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}'
+      | sort -z | xargs -0 sha256sum;
+      {{ (kerbside_venv ~ '/bin/uv') | quote }} pip freeze
+      | sed -E '/^(pip|uv)(==| @ )/d' | sort;
+      } | sha256sum | awk '{print $1}'
     executable: /bin/bash
   environment:
     LC_ALL: C
+    VIRTUAL_ENV: "{{ kerbside_venv }}"
   register: kerbside_code_signature
   changed_when: false
 

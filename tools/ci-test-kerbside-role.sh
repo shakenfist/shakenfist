@@ -1,13 +1,16 @@
 #!/bin/bash
 # Copyright 2026 Michael Still and contributors
 #
-# ci-test-kerbside-role.sh -- drive the kerbside role's validate and config
-# entry points against localhost, and examples/_shared/site.yml's Kerbside
-# plays against a test inventory, and check what they do.
+# ci-test-kerbside-role.sh -- drive the kerbside role's validate, bootstrap
+# and config entry points against localhost, and examples/_shared/site.yml's
+# Kerbside plays against a test inventory, and check what they do.
 #
 # It proves that validate refuses each configuration the role cannot deploy,
 # each with its own message, and passes a correct one and an empty kerbside
-# group; that config renders a kerbside.ini which configparser reads back with
+# group, and that a Kerbside port one of Shaken Fist's daemons uses is refused
+# on a co-located host only; that bootstrap's code hash follows every package
+# version in the virtualenv and the installed files, but not pip's, uv's,
+# __pycache__ or the freeze order; that config renders a kerbside.ini which configparser reads back with
 # interpolation (a % in kerbside_sql_url included), whose token audience is
 # kerbside_url byte for byte, and a sources.yaml whose ca_cert is
 # kerbside_sf_ca_cert byte for byte; that a render either checker refuses
@@ -16,13 +19,16 @@
 # returns to its first value when they are restored; that site.yml reaches a
 # Kerbside host outside allsf only in the reachability and Kerbside plays, and
 # changes no play's hosts when the kerbside group is absent; that its first
-# plays really validate a dedicated Kerbside host with the variables that host
-# sees; and that the secrets never reach the ansible output.
+# plays really validate every Kerbside host, dedicated or co-located, with the
+# variables that host sees; that internal_ca installs the proxy certificate
+# under the names config reads; and that the secrets never reach the ansible
+# output.
 #
 # register is not run: it needs systemd, MariaDB and a Shaken Fist API, and
-# its first real run is the merge-queue cluster lane's. Nor is bootstrap,
-# whose install needs PyPI: kerbside_code_hash, which it sets, is passed in
-# as an extra var instead.
+# its first real run is the merge-queue cluster lane's. bootstrap runs against
+# a stub virtualenv whose pip and uv install nothing, since a real install
+# needs PyPI, and with the apt, user and group tasks skipped by tag; the other
+# cases are given kerbside_code_hash, which it sets, as an extra var instead.
 #
 # It runs without root. The role's paths and owners are variables with the
 # production defaults, so they point into a temporary directory, which is
@@ -188,7 +194,6 @@ with open(sys.argv[1], 'w') as f:
         'kerbside_sql_url': env['SQL_URL'],
         'kerbside_sf_ca_cert': sf_ca,
         'kerbside_hosts': ['localhost'],
-        'kerbside_noncolocated_hosts': [],
         'kerbside_colocated': True,
         'kerbside_code_hash': 'code-hash-1',
         'kerbside_config_dir': env['CONF'],
@@ -248,10 +253,11 @@ RUNS=0
 # run_ansible PLAYBOOK [extra vars file...]: run a playbook against localhost
 # into a fresh log, at ${VERBOSITY} if that is set, leaving the PLAY RECAP's
 # changed= and skipped= counts in CHANGED and SKIPPED. Returns its status.
+# COMMON_VARS replaces common.json as the first extra vars file.
 run_ansible() {
     local playbook="$1"
     shift
-    local args=(-e "@${WORK}/common.json")
+    local args=(-e "@${COMMON_VARS:-${WORK}/common.json}")
     local f
     for f in "$@"; do
         args+=(-e "@${f}")
@@ -349,7 +355,7 @@ case_2_valid() {
     # A dedicated host with a routable api_url, all three overrides, and the
     # highest legal port.
     validate_passes "$(write_vars valid-dedicated "{
-      \"kerbside_noncolocated_hosts\": [\"kb-1\"],
+      \"kerbside_colocated\": false,
       \"api_url\": \"https://sf-api.example.com:13000\",
       \"kerbside_metrics_port\": 29999,
       \"kerbside_proxy_cert_path\": \"${OVERRIDE}/cert.pem\",
@@ -367,7 +373,7 @@ case_3_required_empty() {
     for name in kerbside_url kerbside_system_key kerbside_public_fqdn kerbside_sql_url \
             kerbside_auth_secret_seed; do
         CURRENT_CASE="case 3: validate refuses an empty ${name}"
-        validate_fails "${name} is empty, but the kerbside group is not" \
+        validate_fails "${name} is empty on localhost, but the kerbside group is not" \
             "$(write_vars "empty-${name}" "{\"${name}\": \"\"}")"
         assert_validate_refused
     done
@@ -375,12 +381,12 @@ case_3_required_empty() {
 
 case_4_seed() {
     CURRENT_CASE='case 4a: validate refuses the sentinel seed'
-    validate_fails "kerbside_auth_secret_seed is Kerbside's placeholder value" \
+    validate_fails "kerbside_auth_secret_seed on localhost is Kerbside's placeholder value" \
         "$(write_vars sentinel '{"kerbside_auth_secret_seed": "~~unconfigured~~"}')"
     assert_validate_refused
 
     CURRENT_CASE='case 4b: validate refuses a 31 character seed'
-    VERBOSITY=-vvv validate_fails 'kerbside_auth_secret_seed is shorter than 32 characters' \
+    VERBOSITY=-vvv validate_fails 'kerbside_auth_secret_seed on localhost is shorter than 32 characters' \
         "$(write_vars short-seed "{\"kerbside_auth_secret_seed\": \"${SEED:0:31}\"}")"
     assert_validate_refused
     assert_output_lacks "placeholder value"
@@ -396,19 +402,47 @@ case_5_ports() {
     local port
     for port in 'kerbside_api_port is 30000' 'kerbside_vdi_secure_port is 30001' \
             'kerbside_vdi_insecure_port is 40000' 'kerbside_metrics_port is 65535'; do
-        assert_output_has "${port}, but every Kerbside port must be below 30000"
+        assert_output_has "${port} on localhost, but every Kerbside port must be below 30000"
     done
 
     CURRENT_CASE='case 5b: validate refuses two equal ports'
-    validate_fails 'Two Kerbside ports are equal' \
+    validate_fails 'Two Kerbside ports on localhost are equal' \
         "$(write_vars equal-ports '{"kerbside_metrics_port": 5900}')"
     assert_validate_refused
     assert_output_has 'kerbside_vdi_secure_port=5900'
+
+    # Every port in kerbside_sf_listener_ports, across two runs since there
+    # are five of them and four Kerbside ports. common.json's host is
+    # co-located.
+    CURRENT_CASE="case 5c: validate refuses a Shaken Fist daemon's port on a co-located host"
+    validate_fails 'but localhost is also a Shaken Fist node, where' "$(write_vars sf-ports '{
+      "kerbside_api_port": 13000, "kerbside_metrics_port": 13001,
+      "kerbside_vdi_secure_port": 13005, "kerbside_vdi_insecure_port": 13007
+    }')"
+    assert_validate_refused
+    local listener
+    for listener in 'kerbside_api_port is 13000|sf-api' \
+            "kerbside_metrics_port is 13001|sf-resources' metrics (RESOURCES_METRICS_PORT)" \
+            "kerbside_vdi_secure_port is 13005|sf-database's gRPC gateway (MARIADB_GATEWAY_PORT)" \
+            "kerbside_vdi_insecure_port is 13007|sf-cluster's metrics (CLUSTER_METRICS_PORT)"; do
+        assert_output_has "${listener%%|*}, but localhost is also a Shaken Fist node, where ${listener#*|} listens on that port."
+    done
+    validate_fails "kerbside_metrics_port is 13006, but localhost is also a Shaken Fist node, where sf-database's metrics \\(MARIADB_GATEWAY_METRICS_PORT\\) listens" \
+        "$(write_vars sf-port-13006 '{"kerbside_metrics_port": 13006}')"
+    assert_validate_refused
+
+    CURRENT_CASE="case 5c: validate passes a Shaken Fist daemon's port on a dedicated host"
+    validate_passes "$(write_vars sf-ports-dedicated '{
+      "kerbside_colocated": false,
+      "api_url": "https://sf-api.example.com:13000",
+      "kerbside_api_port": 13000, "kerbside_metrics_port": 13001,
+      "kerbside_vdi_secure_port": 13005, "kerbside_vdi_insecure_port": 13007
+    }')"
 }
 
 case_6_partial_overrides() {
     CURRENT_CASE='case 6: validate refuses a partial set of certificate overrides'
-    validate_fails 'Only some of the Kerbside certificate override paths are set \(kerbside_proxy_cert_path\)' \
+    validate_fails 'Only some of the Kerbside certificate override paths are set on localhost \(kerbside_proxy_cert_path\)' \
         "$(write_vars one-override "{\"kerbside_proxy_cert_path\": \"${OVERRIDE}/cert.pem\"}")"
     assert_validate_refused
     validate_fails 'kerbside_cacert_path is empty' "$(write_vars two-overrides "{
@@ -421,13 +455,19 @@ case_6_partial_overrides() {
 case_7_loopback_api_url() {
     local url
     for url in 'http://localhost:13000' 'http://127.0.0.1:13000' 'http://[::1]:13000'; do
-        CURRENT_CASE="case 7: validate refuses api_url ${url} with a dedicated Kerbside host"
-        validate_fails 'a loopback address, but this Kerbside host is not a Shaken Fist node: kb-1' \
+        CURRENT_CASE="case 7: validate refuses api_url ${url} on a dedicated Kerbside host"
+        validate_fails 'a loopback address, but localhost is not a Shaken Fist node' \
             "$(write_vars loopback "{
-          \"kerbside_noncolocated_hosts\": [\"kb-1\"], \"api_url\": \"${url}\"
+          \"kerbside_colocated\": false, \"api_url\": \"${url}\"
         }")"
         assert_validate_refused
     done
+
+    # Case 2 also passes the default, loopback, api_url on a co-located host.
+    CURRENT_CASE='case 7: validate passes a loopback api_url on a co-located Kerbside host'
+    validate_passes "$(write_vars loopback-colocated '{
+      "kerbside_colocated": true, "api_url": "http://127.0.0.1:13000"
+    }')"
 }
 
 case_8_url_mismatch() {
@@ -664,6 +704,171 @@ PYEOF
         || fail "the desired state hashes ${DESIRED_FILES}, not ${expected}"
 }
 
+# bootstrap's virtualenv, a stub: its Python only answers bootstrap's
+# site-packages question, its pip does nothing, and its uv installs nothing
+# and freezes ${WORK}/freeze.txt, or fails to when ${WORK}/uv-freeze-fails
+# exists. uv refuses to run without VIRTUAL_ENV set to the virtualenv, as the
+# real one would then look elsewhere. bin/activate exists, so bootstrap does
+# not create the virtualenv.
+BVENV="${WORK}/bvenv"
+BSITE="${BVENV}/lib/site-packages"
+mkdir -p "${BVENV}/bin" "${BSITE}/kerbside/__pycache__" "${BSITE}/shakenfist_client"
+: > "${BVENV}/bin/activate"
+printf '#!/bin/sh\necho %s\n' "'${BSITE}'" > "${BVENV}/bin/python"
+printf '#!/bin/sh\nexit 0\n' > "${BVENV}/bin/pip"
+cat > "${BVENV}/bin/uv" << EOF
+#!/bin/sh
+if [ "\${VIRTUAL_ENV:-}" != '${BVENV}' ]; then
+    echo "uv stub: VIRTUAL_ENV is '\${VIRTUAL_ENV:-}', not the virtualenv" >&2
+    exit 2
+fi
+case "\$1 \$2" in
+    'pip install') exit 0 ;;
+    'pip freeze')
+        if [ -f '${WORK}/uv-freeze-fails' ]; then
+            echo 'uv stub: freeze failed' >&2
+            exit 1
+        fi
+        cat '${WORK}/freeze.txt' ;;
+    *) echo "uv stub: unexpected arguments: \$*" >&2; exit 2 ;;
+esac
+EOF
+chmod +x "${BVENV}/bin/python" "${BVENV}/bin/pip" "${BVENV}/bin/uv"
+
+# The installed code, as files whose contents a case can change.
+install_stub_code() {
+    echo 'kerbside 0.7.0' > "${BSITE}/kerbside/__init__.py"
+    echo 'kerbside.db 0.7.0' > "${BSITE}/kerbside/db.py"
+    echo 'bytecode at time 1' > "${BSITE}/kerbside/__pycache__/db.cpython-313.pyc"
+    echo 'shakenfist_client 0.8.0' > "${BSITE}/shakenfist_client/__init__.py"
+    echo 'kerbside-proxy 0.7.0' > "${BVENV}/bin/kerbside-proxy"
+    write_freeze kerbside==0.7.0 gunicorn==23.0.0 pip==26.2.1 shakenfist-client==0.8.0 \
+        sqlalchemy==2.0.40 uv==0.12.23
+}
+
+# write_freeze LINE...: what uv pip freeze prints, in the order given.
+write_freeze() {
+    printf '%s\n' "$@" > "${WORK}/freeze.txt"
+}
+
+# bootstrap's extra vars: no kerbside_code_hash, since an extra var would
+# outrank the fact bootstrap sets, and the stub virtualenv.
+USER_NAME="$(id -un)" GROUP_NAME="$(id -gn)" STATE="${STATE}" BVENV="${BVENV}" \
+    "${PY}" - "${WORK}/bootstrap-common.json" << 'PYEOF2'
+import json
+import os
+import sys
+
+env = os.environ
+with open(sys.argv[1], 'w') as f:
+    json.dump({
+        'kerbside_state_dir': env['STATE'],
+        'kerbside_venv': env['BVENV'],
+        'kerbside_user': env['USER_NAME'],
+        'kerbside_group': env['GROUP_NAME'],
+        'kerbside_file_owner': env['USER_NAME'],
+        'kerbside_file_group': env['GROUP_NAME'],
+    }, f, indent=2)
+PYEOF2
+
+cat > "${WORK}/bootstrap.yml" << 'EOF'
+---
+- name: Run the kerbside role's bootstrap entry point
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Bootstrap Kerbside
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.kerbside
+        tasks_from: bootstrap
+
+    - name: Report the code hash
+      ansible.builtin.debug:
+        msg: "CODE_HASH={{ kerbside_code_hash }}"
+EOF
+
+# run_bootstrap: bootstrap against the stub virtualenv, without its apt, user
+# and group tasks. Returns its status, and leaves the hash in CODE_HASH.
+run_bootstrap() {
+    local rc=0
+    ANSIBLE_SKIP_TAGS=packages,system-users COMMON_VARS="${WORK}/bootstrap-common.json" \
+        run_ansible "${WORK}/bootstrap.yml" || rc=$?
+    CODE_HASH="$(sed -n 's/.*"msg": "CODE_HASH=\([0-9a-f]\{64\}\)".*/\1/p' "${LAST_LOG}")"
+    return "${rc}"
+}
+
+# code_hash_step DESCRIPTION same|new EDIT...: run the command EDIT, then
+# bootstrap, and check that the code hash is the first one, or one not seen
+# before.
+SEEN_CODE_HASHES=()
+code_hash_step() {
+    local what="$1" expect="$2"
+    shift 2
+    CURRENT_CASE="case 14: bootstrap's code hash after ${what}"
+    "$@"
+    run_bootstrap || fail 'bootstrap failed'
+    [ -n "${CODE_HASH}" ] || fail 'bootstrap did not report a code hash'
+    local seen
+    if [ "${expect}" = same ]; then
+        [ "${CODE_HASH}" = "${FIRST_CODE_HASH}" ] \
+            || fail "the code hash changed, but ${what} must not restart Kerbside"
+    else
+        for seen in "${SEEN_CODE_HASHES[@]}"; do
+            [ "${CODE_HASH}" != "${seen}" ] \
+                || fail "the code hash did not change, but ${what} must restart Kerbside"
+        done
+        SEEN_CODE_HASHES+=("${CODE_HASH}")
+    fi
+}
+
+case_14_bootstrap_code_hash() {
+    CURRENT_CASE="case 14: bootstrap computes a code hash"
+    install_stub_code
+    run_bootstrap || fail 'bootstrap failed'
+    [ -n "${CODE_HASH}" ] || fail 'bootstrap did not report a code hash'
+    FIRST_CODE_HASH="${CODE_HASH}"
+    SEEN_CODE_HASHES=("${CODE_HASH}")
+
+    code_hash_step 'a rerun' same :
+    code_hash_step 'uv listing packages in another order' same \
+        write_freeze uv==0.12.23 sqlalchemy==2.0.40 shakenfist-client==0.8.0 pip==26.2.1 \
+        gunicorn==23.0.0 kerbside==0.7.0
+    code_hash_step 'a recompiled .pyc' same \
+        eval "echo 'bytecode at time 2' > '${BSITE}/kerbside/__pycache__/db.cpython-313.pyc'"
+    code_hash_step 'a pip and uv upgrade' same \
+        write_freeze kerbside==0.7.0 gunicorn==23.0.0 pip==26.3 shakenfist-client==0.8.0 \
+        sqlalchemy==2.0.40 uv==0.13.0
+    code_hash_step 'a dependency-only upgrade' new \
+        write_freeze kerbside==0.7.0 gunicorn==23.0.0 pip==26.2.1 shakenfist-client==0.8.0 \
+        sqlalchemy==2.0.41 uv==0.12.23
+    code_hash_step 'everything restored' same install_stub_code
+    code_hash_step 'a rebuilt kerbside wheel with an unchanged version' new \
+        eval "echo 'kerbside.db 0.7.0, rebuilt' > '${BSITE}/kerbside/db.py'"
+    code_hash_step 'a rebuilt kerbside-proxy wheel with an unchanged version' new \
+        eval "install_stub_code; echo 'kerbside-proxy 0.7.0, rebuilt' > '${BVENV}/bin/kerbside-proxy'"
+    code_hash_step 'a changed Shaken Fist client' new \
+        eval "install_stub_code; echo 'shakenfist_client 0.8.0, patched' > '${BSITE}/shakenfist_client/__init__.py'"
+
+    CURRENT_CASE="case 14: bootstrap fails when uv pip freeze fails"
+    install_stub_code
+    : > "${WORK}/uv-freeze-fails"
+    if run_bootstrap; then
+        fail 'bootstrap succeeded although uv pip freeze failed'
+    fi
+    rm -f "${WORK}/uv-freeze-fails"
+    assert_output_has 'uv stub: freeze failed'
+    [ -z "${CODE_HASH}" ] || fail 'bootstrap reported a code hash although uv pip freeze failed'
+
+    CURRENT_CASE="case 14: bootstrap fails when a hashed package is missing"
+    mv "${BSITE}/shakenfist_client" "${WORK}/shakenfist_client.moved"
+    if run_bootstrap; then
+        fail 'bootstrap succeeded although shakenfist_client is not installed'
+    fi
+    mv "${WORK}/shakenfist_client.moved" "${BSITE}/shakenfist_client"
+    [ -z "${CODE_HASH}" ] || fail 'bootstrap reported a code hash although a package is missing'
+}
+
 # hosts_by_play LOG: "NAME<TAB>host,host" per play, in order, from
 # ansible-playbook --list-hosts output.
 hosts_by_play() {
@@ -697,8 +902,8 @@ PROBE_PLAY='Probe every node for reachability'
 VALIDATE_PLAY='Validate the Kerbside configuration'
 DEPLOY_PLAY='Deploy Kerbside'
 
-case_14_list_hosts() {
-    CURRENT_CASE='case 14: site.yml reaches a dedicated Kerbside host only in its plays'
+case_15_list_hosts() {
+    CURRENT_CASE='case 15: site.yml reaches a dedicated Kerbside host only in its plays'
     # The reachable group is built by add_host at run time, which
     # --list-hosts cannot see, so the inventory declares it.
     local common='[allsf]
@@ -737,8 +942,8 @@ sf-3
     done
 }
 
-case_15_list_hosts_feature_off() {
-    CURRENT_CASE='case 15: without a kerbside group, site.yml targets what it did before'
+case_16_list_hosts_feature_off() {
+    CURRENT_CASE='case 16: without a kerbside group, site.yml targets what it did before'
     list_hosts "${WORK}/inventory-off.ini" > "${WORK}/plays-off.tsv"
     # Every play as with the group, less kb-1 everywhere and sf-2 from the
     # two Kerbside plays, which match nothing.
@@ -761,6 +966,19 @@ PYEOF
 # and the validate wiring really run. A Kerbside host outside allsf joins
 # reachable only through the widened loop, and validate sees group_vars/kerbside
 # only when it runs on a Kerbside host.
+# site_inventory KERBSIDE_HOST...: the test inventory, whose kerbside group
+# is the hosts given. sf-1 is the whole Shaken Fist cluster.
+site_inventory() {
+    mkdir -p "${WORK}/site"
+    {
+        printf '[allsf]\nsf-1\n[hypervisors]\nsf-1\n[network_node]\nsf-1\n'
+        printf '[database_node]\nsf-1\n[kerbside]\n'
+        printf '%s\n' "$@"
+        printf '[all:vars]\nansible_connection=local\n'
+        printf 'ansible_python_interpreter={{ ansible_playbook_python }}\n'
+    } > "${WORK}/site/hosts.ini"
+}
+
 run_site_head() {
     RUNS=$((RUNS + 1))
     LAST_LOG="${WORK}/logs/run-${RUNS}.log"
@@ -768,8 +986,8 @@ run_site_head() {
         < /dev/null > "${LAST_LOG}" 2>&1
 }
 
-case_16_site_validation_runs() {
-    CURRENT_CASE='case 16: site.yml validates a dedicated Kerbside host with its own variables'
+case_17_site_validation_runs() {
+    CURRENT_CASE='case 17: site.yml validates a dedicated Kerbside host with its own variables'
     local out
     out="$("${PY}" - "${SITE_YML}" "${WORK}/site-head.yml" \
         "${PROBE_PLAY}" 'Quarantine unreachable nodes and validate the cluster shape' \
@@ -790,21 +1008,7 @@ PYEOF
 )" || fail "${out}"
 
     mkdir -p "${WORK}/site/group_vars"
-    cat > "${WORK}/site/hosts.ini" << 'EOF'
-[allsf]
-sf-1
-[hypervisors]
-sf-1
-[network_node]
-sf-1
-[database_node]
-sf-1
-[kerbside]
-kb-1
-[all:vars]
-ansible_connection=local
-ansible_python_interpreter={{ ansible_playbook_python }}
-EOF
+    site_inventory kb-1
     cat > "${WORK}/site/group_vars/kerbside.yml" << EOF
 kerbside_public_fqdn: ${FQDN}
 kerbside_system_key: ${SYSTEM_KEY}
@@ -819,27 +1023,72 @@ EOF
         || fail 'the refusal is not the kerbside_url mismatch'
     assert_output_has 'fatal: [kb-1]: FAILED!'
 
-    CURRENT_CASE='case 16: site.yml refuses a loopback api_url for a dedicated Kerbside host'
+    CURRENT_CASE='case 17: site.yml refuses a loopback api_url for a dedicated Kerbside host'
     echo "kerbside_url: '${URL}'" > "${WORK}/site/group_vars/all.yml"
     run_site_head && fail 'site.yml passed a loopback api_url for a dedicated Kerbside host'
-    grep -qF 'a loopback address, but this Kerbside host is not a Shaken Fist node: kb-1' \
+    grep -qF 'a loopback address, but kb-1 is not a Shaken Fist node' \
         "${LAST_LOG}" || fail 'the refusal is not the loopback api_url'
 
-    CURRENT_CASE='case 16: site.yml passes a valid inventory'
+    CURRENT_CASE='case 17: site.yml passes a valid inventory'
     printf "kerbside_url: '%s'\napi_url: https://sf-api.example.com:13000\n" "${URL}" \
         > "${WORK}/site/group_vars/all.yml"
     run_site_head || fail 'site.yml refused a valid inventory'
     assert_output_has "TASK [shakenfist.shakenfist.kerbside : Refuse a kerbside_url which Shaken Fist's nodes see differently]"
     grep -A1 -F "TASK [shakenfist.shakenfist.kerbside : Refuse a kerbside_url which" "${LAST_LOG}" \
         | grep -q '^ok: \[kb-1\]' || fail 'validate did not run on kb-1'
+
+    # The first Kerbside host is valid and the second is not, through a
+    # host_vars override only the second sees.
+    CURRENT_CASE="case 17: site.yml validates every Kerbside host, not only the first"
+    site_inventory kb-1 kb-2
+    mkdir -p "${WORK}/site/host_vars"
+    echo 'kerbside_metrics_port: 30001' > "${WORK}/site/host_vars/kb-2.yml"
+    run_site_head && fail "site.yml passed the second Kerbside host's bad kerbside_metrics_port"
+    assert_output_has 'failed: [kb-2] (item=kerbside_metrics_port)'
+    assert_output_has 'kerbside_metrics_port is 30001 on kb-2, but every Kerbside port must be below 30000'
+    assert_output_lacks 'failed: [kb-1]'
+    assert_output_lacks 'fatal: [kb-1]'
+    rm "${WORK}/site/host_vars/kb-2.yml"
+
+    # A co-located Kerbside host may not take sf-api's port; a dedicated one
+    # may, so site.yml must tell the two apart.
+    CURRENT_CASE="case 17: site.yml refuses a Shaken Fist daemon's port on a co-located Kerbside host only"
+    site_inventory kb-1 sf-1
+    echo 'kerbside_api_port: 13000' > "${WORK}/site/host_vars/kb-1.yml"
+    echo 'kerbside_api_port: 13000' > "${WORK}/site/host_vars/sf-1.yml"
+    run_site_head && fail "site.yml passed sf-api's port on a co-located Kerbside host"
+    assert_output_has 'failed: [sf-1] (item=kerbside_api_port)'
+    assert_output_has 'kerbside_api_port is 13000, but sf-1 is also a Shaken Fist node, where sf-api listens on that port.'
+    assert_output_lacks 'failed: [kb-1]'
+    assert_output_lacks 'fatal: [kb-1]'
+    rm "${WORK}/site/host_vars/kb-1.yml" "${WORK}/site/host_vars/sf-1.yml"
+
+    # api_url is judged per host: a co-located host's loopback api_url reaches
+    # its own sf-api, whatever another Kerbside host is, and a dedicated
+    # host's does not.
+    CURRENT_CASE="case 17: site.yml passes a co-located host's loopback api_url beside a dedicated host"
+    echo 'api_url: http://localhost:13000' > "${WORK}/site/host_vars/sf-1.yml"
+    run_site_head || fail "site.yml refused a co-located host's loopback api_url"
+    grep -A2 -F "TASK [shakenfist.shakenfist.kerbside : Refuse a loopback api_url" "${LAST_LOG}" \
+        | grep -q '^ok: \[sf-1\]' || fail 'the loopback check did not run on sf-1'
+
+    CURRENT_CASE="case 17: site.yml refuses a dedicated host's loopback api_url only"
+    echo 'api_url: http://127.0.0.1:13000' > "${WORK}/site/host_vars/kb-1.yml"
+    run_site_head && fail "site.yml passed a dedicated host's loopback api_url"
+    assert_output_has 'fatal: [kb-1]: FAILED!'
+    assert_output_has "api_url's host on kb-1 is 127.0.0.1, a loopback address, but kb-1 is not a Shaken Fist node"
+    assert_output_lacks 'fatal: [sf-1]'
+    rm "${WORK}/site/host_vars/kb-1.yml" "${WORK}/site/host_vars/sf-1.yml"
 }
 
 # The order and shape of site.yml's Kerbside plays.
-case_17_site_yml_structure() {
-    CURRENT_CASE='case 17: examples/_shared/site.yml places and wires the Kerbside plays'
+case_18_site_yml_structure() {
+    CURRENT_CASE='case 18: examples/_shared/site.yml places and wires the Kerbside plays, and internal_ca installs what the role reads'
     local out
     out="$("${PY}" - "${SITE_YML}" "${COLLECTION_DIR}/roles/kerbside/meta/argument_specs.yml" \
-        << 'PYEOF' 2>&1
+        "${COLLECTION_DIR}/roles/internal_ca/defaults/main.yml" \
+        "${COLLECTION_DIR}/roles/kerbside/vars/main.yml" << 'PYEOF' 2>&1
+import re
 import sys
 
 import yaml
@@ -890,8 +1139,16 @@ v_includes = [include(t) for t in validate['tasks'] if include(t)]
 if v_includes != [('shakenfist.shakenfist.kerbside', 'validate')]:
     sys.exit(f'{VALIDATE!r} includes {v_includes}')
 v_task = [t for t in validate['tasks'] if include(t)][0]
-if v_task.get('run_once') is not True:
-    sys.exit(f'{VALIDATE!r} does not run validate run_once')
+if v_task.get('run_once'):
+    sys.exit(f"{VALIDATE!r} runs validate run_once, so only the first Kerbside host's variables are checked")
+want_vars = {'kerbside_hosts', 'kerbside_colocated', 'kerbside_url_on_sf_nodes'}
+if set(v_task.get('vars') or {}) != want_vars:
+    sys.exit(f'{VALIDATE!r} passes validate {sorted(v_task.get("vars") or {})}, not {sorted(want_vars)}')
+COLOCATED = "{{ inventory_hostname in groups['allsf'] }}"
+for where, where_vars in ((f'{VALIDATE!r} include', v_task.get('vars') or {}),
+                          (f'{DEPLOY!r} play', deploy.get('vars') or {})):
+    if where_vars.get('kerbside_colocated') != COLOCATED:
+        sys.exit(f'the {where} sets kerbside_colocated to {where_vars.get("kerbside_colocated")!r}')
 
 d_tasks = [t for t in deploy['tasks'] if include(t)]
 d_includes = [include(t) for t in d_tasks]
@@ -908,6 +1165,31 @@ for task in d_tasks[1:3]:
     if 'kerbside_proxy_cert_path' not in str(task.get('when', '')):
         sys.exit(f'{task["name"]!r} is not skipped when the certificate overrides are set')
 
+# internal_ca installs the proxy certificate, key and CA as cert_dest_dir
+# joined with its cert_dest_*_name defaults, and the kerbside role reads
+# them as kerbside_pki_dir joined with the names in its vars/main.yml. The
+# play passes a cert_dest_dir which is kerbside_pki_dir and leaves the names
+# to internal_ca, so the two sets of names must agree.
+with open(sys.argv[3]) as f:
+    ca_defaults = yaml.safe_load(f)
+with open(sys.argv[4]) as f:
+    kerbside_vars = yaml.safe_load(f)
+for kerbside_var, ca_var in (('kerbside_proxy_cert_file', 'cert_dest_cert_name'),
+                             ('kerbside_proxy_key_file', 'cert_dest_key_name'),
+                             ('kerbside_cacert_file', 'cert_dest_ca_name')):
+    found = re.findall(r"kerbside_pki_dir ~ '/([^']+)'", kerbside_vars[kerbside_var])
+    if found != [ca_defaults[ca_var]]:
+        sys.exit(f"the kerbside role's {kerbside_var} reads {found} under kerbside_pki_dir, but "
+                 f"internal_ca installs {ca_defaults[ca_var]!r} ({ca_var})")
+for task in d_tasks[1:3]:
+    task_vars = task.get('vars') or {}
+    if 'kerbside_pki_dir' not in str(task_vars.get('cert_dest_dir', '')):
+        sys.exit(f'{task["name"]!r} passes internal_ca cert_dest_dir {task_vars.get("cert_dest_dir")!r}, '
+                 'not kerbside_pki_dir')
+    named = sorted(k for k in task_vars if re.match(r'^cert_dest_.*_name$', k))
+    if named:
+        sys.exit(f'{task["name"]!r} overrides internal_ca {named}, which the kerbside role does not read')
+
 # Play vars outrank inventory group_vars (#4441), so a play may set only the
 # names derived from the inventory, never a setting an operator makes. Task
 # and include vars outrank them too, so neither may set a kerbside role
@@ -921,8 +1203,7 @@ if extra:
 role_args = set()
 for spec in specs.values():
     role_args |= set(spec.get('options', {}))
-derived = {'kerbside_hosts', 'kerbside_noncolocated_hosts', 'kerbside_colocated',
-           'kerbside_url_on_sf_nodes'}
+derived = {'kerbside_hosts', 'kerbside_colocated', 'kerbside_url_on_sf_nodes'}
 for play in (validate, deploy):
     for task in play['tasks']:
         bad = (set(task.get('vars') or {}) & role_args) - derived
@@ -932,8 +1213,8 @@ PYEOF
 )" || fail "${out}"
 }
 
-case_18_secrets() {
-    CURRENT_CASE='case 18: no secret reaches the ansible output'
+case_19_secrets() {
+    CURRENT_CASE='case 19: no secret reaches the ansible output'
     LAST_LOG=''
     # Prove the verbose runs happened, or their absence of secrets proves
     # nothing.
@@ -961,10 +1242,11 @@ case_10_sources
 case_11_desired_state
 case_12_refused_render
 case_13_overrides
-case_14_list_hosts
-case_15_list_hosts_feature_off
-case_16_site_validation_runs
-case_17_site_yml_structure
-case_18_secrets
+case_14_bootstrap_code_hash
+case_15_list_hosts
+case_16_list_hosts_feature_off
+case_17_site_validation_runs
+case_18_site_yml_structure
+case_19_secrets
 
-echo "kerbside role: all eighteen cases passed (${RUNS} ansible runs, $((SECONDS - START))s)"
+echo "kerbside role: all nineteen cases passed (${RUNS} ansible runs, $((SECONDS - START))s)"

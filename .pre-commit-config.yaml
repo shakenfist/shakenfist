@@ -70,10 +70,10 @@ repos:
       # Requires: ansible-core, openssl
       - id: test-kerbside-role
         name: Test the kerbside role
-        description: Drive the kerbside role's validate and config entry points and site.yml's Kerbside plays, rootless
+        description: Drive the kerbside role's validate, bootstrap and config entry points and site.yml's Kerbside plays, rootless
         entry: tools/ci-test-kerbside-role.sh
         language: system
-        files: ^(shakenfist/deploy/collection/roles/kerbside/|examples/_shared/site\.yml$|tools/ci-test-kerbside-role\.sh$)
+        files: ^(shakenfist/deploy/collection/roles/kerbside/|shakenfist/deploy/collection/roles/internal_ca/(defaults|tasks|vars)/|examples/_shared/site\.yml$|tools/ci-test-kerbside-role\.sh$)
         pass_filenames: false
 
   # Flake8 style checking via tox

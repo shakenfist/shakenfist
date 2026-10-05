@@ -25,6 +25,18 @@ before restarting Kerbside. Prints exactly one JSON object on stdout:
   fetched_at null. It names the exception's type and never its message, which
   can quote the database URL and so its password.
 
+This reads Kerbside's internals, not a stable interface, and relies on these
+identifiers in kerbside.db: the module-level ENGINE; the Source model's name
+and errored columns; and the SfTokenKeys model's source and fetched_at
+columns. They were checked against Kerbside v0.6.0 and develop at d0963ff. A
+Kerbside which renamed or removed one fails the import or the query with an
+AttributeError (or an ImportError, for a module which moved), and either is
+reported as error, naming the type, like any other failure to read the
+database: "importing kerbside.db failed: AttributeError" or "reading the
+database failed: AttributeError". The register entry point's failure message
+tells the operator that such an error means this script and the installed
+Kerbside disagree, not that the CA or credential is wrong.
+
 Nothing printed ever includes a key or a secret: the keys themselves and the
 source's credentials are never selected.
 

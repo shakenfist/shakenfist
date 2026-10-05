@@ -21,11 +21,10 @@ kerbside_sf_ca_cert: ""
 # check is skipped; an empty string means Shaken Fist's nodes have none.
 kerbside_url_on_sf_nodes: null
 
-# Where the consuming playbook places this host. kerbside_hosts is the whole
-# kerbside group; kerbside_noncolocated_hosts the members of it which are not
-# also Shaken Fist nodes; kerbside_colocated whether this host is one.
+# Where the consuming playbook places this host. kerbside_hosts is the
+# Kerbside hosts this run validates or deploys to; kerbside_colocated whether
+# this host is also a Shaken Fist node.
 kerbside_hosts: []
-kerbside_noncolocated_hosts: []
 kerbside_colocated: false
 
 # The Shaken Fist cluster Kerbside serves. The same names and defaults as the
@@ -42,7 +41,9 @@ kerbside_client_package: "shakenfist-client"
 kerbside_pip_extra: ""
 
 # Listeners. Every port must be below 30000, where Shaken Fist's instance
-# console range starts, and no two may be equal.
+# console range starts, and no two may be equal. On a host which is also a
+# Shaken Fist node, none may be one of the ports its daemons listen on
+# (kerbside_sf_listener_ports, vars/main.yml).
 kerbside_api_address: "0.0.0.0"
 kerbside_api_port: 13002
 kerbside_api_workers: 2

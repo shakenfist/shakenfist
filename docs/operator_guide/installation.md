@@ -232,8 +232,11 @@ inventory group. Members may be Shaken Fist nodes or dedicated hosts. Set
 `kerbside_sql_url` and `kerbside_auth_secret_seed`. `kerbside_url` and
 `kerbside_system_key` must be visible to both the Shaken Fist and the Kerbside
 hosts (put them in `group_vars/all`), and every Kerbside port must be below
-30000 and distinct. If any Kerbside host is not a Shaken Fist node, `api_url`
-must not be a loopback address. Kerbside's certificate is issued from the
+30000 and distinct. On a Kerbside host which is also a Shaken Fist node, no
+Kerbside port may be 13000, 13001, 13005, 13006 or 13007, which Shaken Fist's
+daemons listen on. On a Kerbside host which is not a Shaken Fist node,
+`api_url` must not be a loopback address. Each Kerbside host is checked with its own
+variables, so a `host_vars` override is checked too. Kerbside's certificate is issued from the
 deployment's internal CA unless you set all three of `kerbside_proxy_cert_path`,
 `kerbside_proxy_key_path` and `kerbside_cacert_path`.
 

@@ -302,15 +302,18 @@ need. The role carries its own daemon-reload instead.
 * **Reachability (plays 1-2):** probe and `add_host` over
   `allsf:kerbside`.
 * **Validation (a play of its own, straight after play 2):** on
-  `kerbside:&reachable`, `run_once`, include `kerbside` `validate` with
-  `kerbside_hosts`, `kerbside_noncolocated_hosts` and
-  `kerbside_url_on_sf_nodes`. Not on `localhost`, as first planned:
-  operators keep the Kerbside variables in `group_vars/kerbside`, which
-  `localhost` cannot see, so it would refuse a correct inventory. That
+  `kerbside:&reachable`, include `kerbside` `validate` on every host
+  with `kerbside_hosts`, `kerbside_colocated` and
+  `kerbside_url_on_sf_nodes`. Not on
+  `localhost`, as first planned: operators keep the Kerbside variables
+  in `group_vars/kerbside`, which `localhost` cannot see, so it would
+  refuse a correct inventory. Not `run_once` either, as first built
+  (review of PR #4465): a `host_vars` override on a second Kerbside host
+  is seen by no other, so validating only the first would miss it. That
   is #4441's family, a play reading variables other than the ones the
   hosts will use. With no `kerbside` group the play matches no host and
   nothing runs, which is the feature-off path. `any_errors_fatal` makes
-  a refusal end the run before any later play.
+  a refusal on any host end the run before any later play.
 * **Deployment: new plays after the final sanity checks.** One play on
   `kerbside:&reachable` runs bootstrap, then the certificate (D6), then
   config, then register. They come last so that `sf-api` is proven up,
@@ -333,12 +336,19 @@ non-empty and any of these hold:
 * `kerbside_auth_secret_seed` is the sentinel `~~unconfigured~~`
   (kerbside#131) or shorter than 32 characters.
 * Any configured Kerbside port (API, VDI secure and insecure, metrics)
-  is 30000 or above (open question 1), or two of them are equal.
+  is 30000 or above (open question 1), or two of them are equal, or,
+  on a host which is also a Shaken Fist node (`kerbside_colocated`), is
+  one a Shaken Fist daemon listens on by default: 13000, 13001 or
+  13005-13007 (S6; review of PR #4465). The defaults collide with none
+  of them, but an operator's choice could.
 * The three certificate override paths are neither all set nor all
   empty (D6).
-* `api_url` is a loopback URL and some Kerbside host is not co-located
-  (S10). The message names the host and says what `api_url` needs to
-  be.
+* `api_url` is a loopback URL and this Kerbside host is not co-located
+  (S10), judged per host from `kerbside_colocated` (review of PR #4465;
+  first built as a group-wide `kerbside_noncolocated_hosts` list, which
+  refused a co-located host's working loopback `api_url` whenever another
+  Kerbside host was dedicated). The message names the host and says what
+  `api_url` needs to be.
 * `kerbside_url_on_sf_nodes` is supplied and is not `kerbside_url` byte
   for byte. `site.yml` supplies it as `kerbside_url` as the first `allsf`
   host sees it, empty when it sees none. This enforces the invariant
@@ -425,7 +435,12 @@ the day an operator supplies their own SPICE certificates (Embrace TLS).
 
 `bootstrap` hashes the installed `kerbside`, `kerbside_proxy` and
 `shakenfist_client` files, plus the `kerbside-proxy` binary, as the node
-role does (S11). `config` hashes the rendered INI, `sources.yaml`, both
+role does (S11), and the virtualenv's `uv pip freeze`, sorted, less pip
+and uv (review of PR #4465): a dependency-only upgrade changes none of
+those files, but `--reinstall` still rewrites files under the running
+processes. pip and uv are upgraded on every deploy and never imported
+by Kerbside, so hashing them would restart Kerbside after most uv
+releases. `config` hashes the rendered INI, `sources.yaml`, both
 units, and the certificate, key and CA files, however they were
 produced. The two hashes combine into one desired-state value.
 
@@ -581,8 +596,8 @@ debug line saying so, when `kerbside_hosts` is empty. Use
 never interpolate a secret. Mirror the message style of
 `roles/node/tasks/kerbside_credentials.yml`. The loopback check parses
 `api_url`'s host (`localhost`, `127.0.0.0/8`, `::1`). It needs
-per-host co-location, so take `kerbside_noncolocated_hosts` (a list
-`site.yml` computes) rather than reading `hostvars`.
+per-host co-location, so take `kerbside_colocated` (which `site.yml`
+computes per host) rather than reading `hostvars`.
 
 `bootstrap.yml` mirrors `roles/node/tasks/bootstrap.yml`:
 
@@ -704,10 +719,9 @@ In `examples/_shared/site.yml`:
   host warning must still name Kerbside hosts.
 * A new play straight after play 2, on `kerbside:&reachable`, with
   `gather_facts: false` and `any_errors_fatal: true`, including
-  `kerbside` `validate` `run_once` with:
+  `kerbside` `validate` on every host (not `run_once`; D2) with:
   * `kerbside_hosts: "{{ groups.get('kerbside', []) }}"`;
-  * `kerbside_noncolocated_hosts` set to the Kerbside hosts not in
-    `groups['allsf']`;
+  * `kerbside_colocated: "{{ inventory_hostname in groups['allsf'] }}"`;
   * `kerbside_url_on_sf_nodes` set to the first `allsf` host's
     `kerbside_url`, defaulting to empty (D3).
 

@@ -12,8 +12,8 @@
 #     Kerbside where the desired state differs from what was last deployed,
 #     waits for a fresh signing key fetch, and then records the desired state.
 #
-# validate is not part of main. It runs once, before any host is changed, and
-# does nothing when the kerbside group is empty.
+# validate is not part of main. It runs on every Kerbside host, before any host
+# is changed, and does nothing when the kerbside group is empty.
 - name: Bootstrap Kerbside
   ansible.builtin.include_tasks: bootstrap.yml
 

@@ -18,6 +18,23 @@ kerbside_cacert_file: >-
   {{ kerbside_cacert_path if kerbside_cacert_path | length > 0
      else kerbside_pki_dir ~ '/ca-cert.pem' }}
 
+# The ports Shaken Fist's daemons listen on, by default, on every node they run
+# on, and the daemon behind each. validate refuses any of them as a Kerbside
+# port on a Kerbside host which is also a Shaken Fist node (kerbside_colocated).
+# sf-api binds 13000 in roles/node/templates/sf-api.service:33; the others are
+# the defaults of RESOURCES_METRICS_PORT and CLUSTER_METRICS_PORT
+# (shakenfist/config.py:537-542) and of MARIADB_GATEWAY_PORT and
+# MARIADB_GATEWAY_METRICS_PORT (shakenfist/config.py:896-901). sf-database
+# runs only on the database tier, but which nodes those are is the
+# inventory's, so its ports are refused on every co-located host. A change to
+# any of those defaults belongs here too.
+kerbside_sf_listener_ports:
+  13000: sf-api
+  13001: sf-resources' metrics (RESOURCES_METRICS_PORT)
+  13005: sf-database's gRPC gateway (MARIADB_GATEWAY_PORT)
+  13006: sf-database's metrics (MARIADB_GATEWAY_METRICS_PORT)
+  13007: sf-cluster's metrics (CLUSTER_METRICS_PORT)
+
 # Where the role's helper scripts are copied on the Kerbside host. They run
 # there, with the virtualenv's Python: the validate commands which check
 # kerbside.ini and sources.yaml before either replaces the running file, the

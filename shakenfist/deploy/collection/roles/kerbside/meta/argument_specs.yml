@@ -6,12 +6,11 @@ argument_specs:
       - >-
         Runs the per-host entry points in order: bootstrap, config, then
         register. validate is not part of main, because the consuming
-        playbook runs it once, before any host is changed.
+        playbook runs it on every Kerbside host before any host is changed.
       - >-
         Every value is a plain role variable. The role reads no inventory group
         names and no other host's facts; the consuming playbook maps the
-        kerbside group onto kerbside_hosts, kerbside_noncolocated_hosts and
-        kerbside_colocated.
+        kerbside group onto kerbside_hosts and kerbside_colocated.
     options: &kerbside_options
       kerbside_url:
         type: str
@@ -104,28 +103,21 @@ argument_specs:
         default: []
         description:
           - >-
-            Every host in the kerbside group, in inventory order. Empty, the
-            default, means Kerbside is not deployed, and validate does
-            nothing. Run-once work (migrations, the readiness check) happens
-            on the first host.
-      kerbside_noncolocated_hosts:
-        type: list
-        elements: str
-        default: []
-        description:
-          - >-
-            The members of kerbside_hosts which are not also Shaken Fist
-            nodes. validate refuses a loopback api_url while this is not
-            empty, since such a host cannot reach Shaken Fist at localhost.
-            The example playbook computes it from the kerbside and allsf
-            groups.
+            The Kerbside hosts this run validates or deploys to, in inventory
+            order. Empty, the default, means Kerbside is not deployed, and
+            validate does nothing. Run-once work (the database migration and
+            the readiness check) happens on the first.
       kerbside_colocated:
         type: bool
         default: false
         description:
           - >-
-            Whether this host is also a Shaken Fist node. The example playbook
-            sets it per host.
+            Whether this host is also a Shaken Fist node. When it is,
+            validate refuses a Kerbside port which a Shaken Fist daemon
+            listens on (13000, 13001 and 13005-13007 by default); when it is
+            not, validate refuses a loopback api_url, since nothing answers
+            there. The example playbook sets it per host, from the allsf
+            group.
       api_url:
         type: str
         default: "http://localhost:13000"
@@ -135,7 +127,8 @@ argument_specs:
             key from, written into sources.yaml as the source's url. The same
             variable as the node role's. Its default only works on a Kerbside
             host which is also a Shaken Fist node, so validate refuses a
-            loopback URL when any Kerbside host is not one.
+            loopback URL on a Kerbside host which is not one
+            (kerbside_colocated false).
       deploy_name:
         type: str
         default: "sf"
@@ -202,7 +195,9 @@ argument_specs:
           - >-
             The port Kerbside's API (gunicorn) binds. Every Kerbside port must
             be below 30000, where Shaken Fist's instance console range begins,
-            and no two may be equal.
+            and no two may be equal. On a Kerbside host which is also a Shaken
+            Fist node (kerbside_colocated), none may be a port a Shaken Fist
+            daemon listens on: 13000, 13001, 13005, 13006 or 13007.
       kerbside_api_workers:
         type: int
         default: 2
@@ -346,9 +341,9 @@ argument_specs:
     short_description: Refuse a Kerbside configuration which cannot work.
     description:
       - >-
-        Run once, before any host is changed, with the variables a Kerbside
-        host sees (the example playbook runs it on the first reachable one;
-        it changes nothing there). Does nothing at all, and says so, when
+        Run on every Kerbside host, before any host is changed, with that
+        host's own variables (the example playbook runs it on each reachable
+        one; it changes nothing there). Does nothing at all, and says so, when
         kerbside_hosts is empty: Kerbside is not being deployed, and
         kerbside_url alone is the bring-your-own-Kerbside path.
       - >-
@@ -356,9 +351,10 @@ argument_specs:
         kerbside_public_fqdn, kerbside_sql_url or kerbside_auth_secret_seed is
         empty; when kerbside_auth_secret_seed is ~~unconfigured~~ or shorter
         than 32 characters; when a Kerbside port is 30000 or above, or two are
-        equal; when only some of the three certificate override paths are set;
-        when api_url is a loopback URL and kerbside_noncolocated_hosts is not
-        empty; or when kerbside_url_on_sf_nodes is supplied and differs from
+        equal, or kerbside_colocated is true and a port is one a Shaken Fist
+        daemon listens on; when only some of the three certificate override
+        paths are set; when api_url is a loopback URL and kerbside_colocated
+        is false; or when kerbside_url_on_sf_nodes is supplied and differs from
         kerbside_url. No message includes a secret.
     options: *kerbside_options
   bootstrap:

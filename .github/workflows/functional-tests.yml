@@ -238,9 +238,10 @@ jobs:
           . /tmp/venv-test/bin/activate
           tools/ci-test-kerbside-cluster-config.sh
 
-      # Rootless test of the kerbside role's validate and config entry points
-      # (register needs systemd, MariaDB and Shaken Fist, so it waits for the
-      # cluster lane), and of examples/_shared/site.yml's Kerbside plays.
+      # Rootless test of the kerbside role's validate, bootstrap (against a
+      # stub virtualenv) and config entry points (register needs systemd,
+      # MariaDB and Shaken Fist, so it waits for the cluster lane), and of
+      # examples/_shared/site.yml's Kerbside plays.
       # Needs the ansible-core which ansible-lint brought in above, which
       # also brings the cryptography and PyYAML config's helper scripts use,
       # and openssl.

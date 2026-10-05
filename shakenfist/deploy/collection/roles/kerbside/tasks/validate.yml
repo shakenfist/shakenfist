@@ -1,12 +1,15 @@
 ---
 # Refuse a Kerbside configuration which cannot work, before any host is
-# changed. The consuming playbook runs this once, with kerbside_hosts set to
-# the kerbside group, kerbside_noncolocated_hosts to the members of it which
-# are not Shaken Fist nodes, and kerbside_url_on_sf_nodes to kerbside_url as
-# the Shaken Fist nodes see it. It runs with a Kerbside host's variables
-# rather than the control node's, since operators commonly keep the Kerbside
-# settings in group_vars/kerbside, which the control node cannot see. Every
-# task here is an assert or a debug, so nothing is changed on that host.
+# changed. The consuming playbook runs this on every Kerbside host, with
+# kerbside_hosts set to the kerbside group, kerbside_colocated to whether this
+# host is also a Shaken Fist node, and kerbside_url_on_sf_nodes to kerbside_url
+# as the Shaken Fist nodes see it. Each host is checked with its own variables, rather than
+# the control node's or one host's for all, since operators commonly keep the
+# Kerbside settings in group_vars/kerbside, which the control node cannot see,
+# and may override them per host in host_vars, which no other host sees. Every
+# task here is an assert or a debug, so nothing is changed on any host, and
+# nothing here assumes it runs on one host only. The messages name the host
+# whose variables failed, since one host's may be fine and another's not.
 #
 # An empty group means Kerbside is not being deployed, and nothing here
 # applies. That includes kerbside_url set on its own: Shaken Fist is then
@@ -35,8 +38,8 @@
       ansible.builtin.assert:
         that: lookup('ansible.builtin.vars', item) | string | length > 0
         fail_msg: >-
-          {{ item }} is empty, but the kerbside group is not. Set it, or remove
-          every host from the kerbside group.
+          {{ item }} is empty on {{ inventory_hostname }}, but the kerbside
+          group is not. Set it, or remove every host from the kerbside group.
         quiet: true
       loop:
         - kerbside_url
@@ -51,16 +54,17 @@
       ansible.builtin.assert:
         that: kerbside_auth_secret_seed != '~~unconfigured~~'
         fail_msg: >-
-          kerbside_auth_secret_seed is Kerbside's placeholder value
-          ~~unconfigured~~. Generate a random value of at least 32 characters.
+          kerbside_auth_secret_seed on {{ inventory_hostname }} is Kerbside's
+          placeholder value ~~unconfigured~~. Generate a random value of at
+          least 32 characters.
         quiet: true
 
     - name: Refuse a short Kerbside auth secret seed
       ansible.builtin.assert:
         that: kerbside_auth_secret_seed | length >= 32
         fail_msg: >-
-          kerbside_auth_secret_seed is shorter than 32 characters. Generate a
-          longer random value.
+          kerbside_auth_secret_seed on {{ inventory_hostname }} is shorter than
+          32 characters. Generate a longer random value.
         quiet: true
 
     # Shaken Fist hands out instance console ports from 30000 upwards, so on a
@@ -70,9 +74,9 @@
       ansible.builtin.assert:
         that: item.value | int < 30000
         fail_msg: >-
-          {{ item.key }} is {{ item.value }}, but every Kerbside port must be
-          below 30000: Shaken Fist allocates instance console ports from 30000
-          upwards. Choose a lower port.
+          {{ item.key }} is {{ item.value }} on {{ inventory_hostname }}, but
+          every Kerbside port must be below 30000: Shaken Fist allocates
+          instance console ports from 30000 upwards. Choose a lower port.
         quiet: true
       loop: "{{ kerbside_ports | dict2items }}"
       loop_control:
@@ -84,13 +88,36 @@
           kerbside_vdi_insecure_port: "{{ kerbside_vdi_insecure_port }}"
           kerbside_metrics_port: "{{ kerbside_metrics_port }}"
 
+    # On a Kerbside host which is also a Shaken Fist node, a Kerbside listener
+    # on one of Shaken Fist's ports (kerbside_sf_listener_ports, vars/main.yml)
+    # fails to bind, or takes the port from the Shaken Fist daemon, whichever
+    # starts second. A dedicated Kerbside host runs no Shaken Fist daemon, so
+    # the ports are free there. The listener is looked up with get() because
+    # the message is templated whether or not the assert fails.
+    - name: Refuse a Kerbside port which a Shaken Fist daemon on this host uses
+      ansible.builtin.assert:
+        that: >-
+          not kerbside_colocated | bool
+          or item.value | int not in kerbside_sf_listener_ports
+        fail_msg: >-
+          {{ item.key }} is {{ item.value }}, but {{ inventory_hostname }} is
+          also a Shaken Fist node, where
+          {{ kerbside_sf_listener_ports.get(item.value | int, 'a Shaken Fist daemon') }}
+          listens on that port. Choose another port.
+        quiet: true
+      loop: "{{ kerbside_ports | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      vars: *kerbside_ports_vars
+
     - name: Refuse two Kerbside listeners on the same port
       ansible.builtin.assert:
         that: >-
           kerbside_ports.values() | map('int') | unique | list | length
           == kerbside_ports | length
         fail_msg: >-
-          Two Kerbside ports are equal, but each needs a port of its own:
+          Two Kerbside ports on {{ inventory_hostname }} are equal, but each
+          needs a port of its own:
           {% for name, port in kerbside_ports.items() %}{{ name }}={{ port
           }}{{ ', ' if not loop.last else '.' }}{% endfor %}
         quiet: true
@@ -101,8 +128,8 @@
       ansible.builtin.assert:
         that: kerbside_overrides_set | length in [0, kerbside_overrides | length]
         fail_msg: >-
-          Only some of the Kerbside certificate override paths are set
-          ({{ kerbside_overrides_set | join(', ') }}), and
+          Only some of the Kerbside certificate override paths are set on
+          {{ inventory_hostname }} ({{ kerbside_overrides_set | join(', ') }}), and
           {{ kerbside_overrides | dict2items | selectattr('value', 'equalto', '')
           | map(attribute='key') | join(', ') }} {{ 'is' if
           kerbside_overrides_set | length == 2 else 'are' }} empty. Set all
@@ -118,33 +145,33 @@
           {{ kerbside_overrides | dict2items
              | rejectattr('value', 'equalto', '') | map(attribute='key') | list }}
 
-    # Kerbside fetches the console token signing key from api_url. Its default,
-    # http://localhost:13000, works on a Kerbside host which is also a Shaken
-    # Fist node, since sf-api listens on every node, and reaches nothing from
-    # one which is not. Loopback here is localhost and any name under it,
+    # Kerbside fetches the console token signing key from api_url, as this host
+    # sees it. Its default, http://localhost:13000, works on a Kerbside host
+    # which is also a Shaken Fist node, since sf-api listens on every node, and
+    # reaches nothing from one which is not. So it is judged per host: a
+    # co-located host may use loopback even when another Kerbside host is
+    # dedicated and uses a routable address. Loopback here is localhost and any name under it,
     # 127.0.0.0/8 (including the short forms such as 127.1 which the resolver
     # accepts), ::1 in any spelling, its IPv4-mapped form, and the unspecified
     # addresses 0.0.0.0 and ::, which Linux connects to the local host. Host
     # names are not secrets; the message names the host part of api_url
     # rather than the whole URL, in case the URL carries a credential.
-    - name: Refuse a loopback api_url when a Kerbside host is not a Shaken Fist node
+    - name: Refuse a loopback api_url on a Kerbside host which is not a Shaken Fist node
       ansible.builtin.assert:
         that: >-
-          kerbside_noncolocated_hosts | length == 0 or not (
+          kerbside_colocated | bool or not (
             kerbside_api_host in ['0.0.0.0', '::']
             or kerbside_api_host is match('^(.*[.])?localhost[.]?$')
             or kerbside_api_host is match('^127([.][0-9]+){0,3}$')
             or kerbside_api_host is match('^[0:]*:0{0,3}1$')
             or kerbside_api_host is match('^(0{0,4}:)*:?ffff:127[.]'))
         fail_msg: >-
-          api_url's host is {{ kerbside_api_host }}, a loopback address, but
-          {{ 'this Kerbside host is not a Shaken Fist node' if
-          kerbside_noncolocated_hosts | length == 1 else
-          'these Kerbside hosts are not Shaken Fist nodes' }}:
-          {{ kerbside_noncolocated_hosts | join(', ') }}. Kerbside reaches
-          Shaken Fist at api_url, so it must be an address of the Shaken Fist
-          API which every Kerbside host can reach, such as the cluster's load
-          balancer or an API node's address.
+          api_url's host on {{ inventory_hostname }} is {{ kerbside_api_host }},
+          a loopback address, but {{ inventory_hostname }} is not a Shaken Fist
+          node, so nothing answers there. Kerbside reaches Shaken Fist at
+          api_url, so on this host it must be an address of the Shaken Fist
+          API which this host can reach, such as the cluster's load balancer
+          or an API node's address.
         quiet: true
       vars:
         kerbside_api_host: "{{ api_url | urlsplit('hostname') | default('', true) | lower }}"
@@ -159,8 +186,8 @@
       ansible.builtin.assert:
         that: kerbside_url_on_sf_nodes is none or kerbside_url == kerbside_url_on_sf_nodes
         fail_msg: >-
-          The Kerbside hosts see kerbside_url as {{ kerbside_url }}, but Shaken
-          Fist's nodes render {{ ('a different kerbside_url, ' ~
+          {{ inventory_hostname }} sees kerbside_url as {{ kerbside_url }}, but
+          Shaken Fist's nodes render {{ ('a different kerbside_url, ' ~
           kerbside_url_on_sf_nodes) if kerbside_url_on_sf_nodes | default('', true)
           | length > 0 else 'no kerbside_url at all' }}. It is both Shaken Fist's
           KERBSIDE_URL and Kerbside's token audience, so it must be set once,

@@ -40,8 +40,8 @@
 # kerbside_url as KERBSIDE_URL and mint the credential, Kerbside renders the
 # same values as its token audience and its source password, and the Kerbside
 # validation play refuses a kerbside_url the two sides see differently.
-# api_url must be an address of the Shaken Fist API every Kerbside host can
-# reach when any Kerbside host is not in allsf.
+# On a Kerbside host which is not in allsf, api_url must be an address of the
+# Shaken Fist API that host can reach, not a loopback address.
 
 
 # ---------------------------------------------------------------------------
@@ -140,18 +140,22 @@
 
 # ---------------------------------------------------------------------------
 # Refuse a Kerbside configuration which cannot work, before any host is
-# changed. The kerbside role's validate entry point runs once, with the
-# variables the first reachable Kerbside host sees: operators commonly keep
-# the Kerbside settings in group_vars/kerbside, which localhost cannot see, so
-# validating on localhost would refuse a correct inventory. With no kerbside
-# group this play matches no host and nothing runs, which is the feature-off
-# path.
+# changed. The kerbside role's validate entry point runs on every reachable
+# Kerbside host, with that host's own variables: operators commonly keep the
+# Kerbside settings in group_vars/kerbside, which localhost cannot see, so
+# validating on localhost would refuse a correct inventory, and a host_vars
+# override on one Kerbside host is seen by no other, so validating one host
+# would miss it. With no kerbside group this play matches no host and nothing
+# runs, which is the feature-off path.
 #
+# kerbside_colocated says whether this Kerbside host is also a Shaken Fist
+# node, where validate refuses a Kerbside port a Shaken Fist daemon uses, and
+# where a loopback api_url reaches that node's own sf-api.
 # kerbside_url_on_sf_nodes is kerbside_url as the Shaken Fist nodes see it.
 # validate requires it to equal the Kerbside hosts' kerbside_url, since the one
 # variable is both Shaken Fist's KERBSIDE_URL and Kerbside's token audience.
-# any_errors_fatal makes a refusal end the whole run, not just this play's
-# hosts, so no later play touches allsf.
+# any_errors_fatal makes a refusal on any one host end the whole run, not just
+# this play's hosts, so no later play touches allsf.
 # ---------------------------------------------------------------------------
 - name: Validate the Kerbside configuration
   hosts: kerbside:&reachable
@@ -163,10 +167,9 @@
       ansible.builtin.include_role:
         name: shakenfist.shakenfist.kerbside
         tasks_from: validate
-      run_once: true
       vars:
         kerbside_hosts: "{{ groups.get('kerbside', []) }}"
-        kerbside_noncolocated_hosts: "{{ groups.get('kerbside', []) | difference(groups['allsf']) }}"
+        kerbside_colocated: "{{ inventory_hostname in groups['allsf'] }}"
         kerbside_url_on_sf_nodes: "{{ hostvars[groups['allsf'][0]]['kerbside_url'] | default('') }}"
 
 

@@ -121,7 +121,10 @@
       it cannot parse that file (kerbside#313), and reads no other. Its output
       is withheld here because it can quote the file, which holds secrets; run
       "runuser -u {{ kerbside_user }} -- {{ kerbside_venv }}/bin/kerbside db
-      upgrade" as root on that host to see it.
+      upgrade" as root on that host to see it. This check looks for Kerbside
+      printing "INI file processing complete" on stdout, so a Kerbside release
+      which changed or dropped that message would also trip it, even with a
+      good kerbside.ini.
     quiet: true
   run_once: true
   tags: [kerbside-database]
@@ -137,7 +140,10 @@
       connecting to the database. Kerbside is still running on its old code
       and schema. The error is withheld here because it can quote the database
       URL; run "runuser -u {{ kerbside_user }} -- {{ kerbside_venv }}/bin/kerbside
-      db upgrade" as root on that host to see it.
+      db upgrade" as root on that host to see it. This check also looks for
+      alembic logging "Context impl" on stderr, so a Kerbside release which
+      changed its alembic logging would also trip it, even after a migration
+      which succeeded.
     quiet: true
   run_once: true
   tags: [kerbside-database]
@@ -188,8 +194,13 @@
 # interval (60 seconds). The script prints one JSON object and never a secret.
 # kerbside_ready_fetched_at (vars/main.yml) reads fetched_at from it, and
 # anything else it prints, including nothing, counts as not ready; its exit
-# status is ignored (kerbside#313). Running out of retries is reported by the
-# assert which follows, so this task's own failure is ignored.
+# status is ignored (kerbside#313): until alone decides when to stop, and an
+# attempt which exits non-zero is retried like any other. Exhausting the
+# retries is ignored on purpose, by ignore_errors, and reported by the assert
+# which follows, which names what the last check printed. failed_when: false
+# would not do that: ansible marks a task which ran out of retries failed
+# whatever failed_when says, so only ignore_errors lets the run reach the
+# assert.
 - name: Wait for Kerbside to fetch Shaken Fist's signing keys
   ansible.builtin.command:
     argv:
@@ -202,7 +213,6 @@
       - "{{ deploy_name }}"
   register: kerbside_ready
   changed_when: false
-  failed_when: false
   ignore_errors: true
   retries: "{{ kerbside_ready_retries }}"
   delay: 3
@@ -230,6 +240,11 @@
       certificate does not match the one Shaken Fist serves, or Shaken Fist
       refused its kerbside credential. See
       journalctl -u kerbside-daemon -u kerbside-api on the Kerbside hosts.
+      An "error" naming AttributeError or ImportError is different: the
+      installed Kerbside is incompatible with this role's readiness check,
+      which reads Kerbside's database models directly (the identifiers it
+      relies on are listed in kerbside-ready.py), and is not a CA or
+      credential problem.
     quiet: true
   run_once: true
   tags: [kerbside-readiness]
