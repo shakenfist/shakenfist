@@ -1546,19 +1546,22 @@ devcontainer turns that job red instead of leaving it quietly green.
 
 ## Mutation harness for the differencing tests
 
-`tools/mutate-differencing.sh` answers one question about the
-differencing output path (`instar create -f {vpc,vhdx} -b PARENT`):
-**can the tests that guard it actually fail?** It is not a coverage
-tool and it measures nothing. Each case breaks one specific behaviour
-in `src/` and requires one named test to notice; a test that still
-passes against a deliberately broken emitter is not guarding what its
-name says it guards. See
-[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) for the path being
-guarded.
+`tools/mutate-differencing.sh` answers one question about
+differencing support, on both sides of it — writing an image with
+`instar create -f {vpc,vhdx} -b PARENT`, and composing one back
+against its parent in the guest chain walker: **can the tests that
+guard it actually fail?** It is not a coverage tool and it measures
+nothing. Each case breaks one specific behaviour in `src/` and
+requires one named test to notice; a test that still passes against a
+deliberately broken emitter is not guarding what its name says it
+guards. See [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) for the
+path being guarded.
 
-There are **26 cases**: fourteen mutate a library crate (`create`,
-`vhd`, `vhdx`) and are caught by a Rust unit or round-trip test, and
-twelve are caught by a Python integration test through the real
+There are **62 cases**, in two groups.
+
+Twenty-six cover the writer. Fourteen mutate a library crate
+(`create`, `vhd`, `vhdx`) and are caught by a Rust unit or round-trip
+test; twelve are caught by a Python integration test through the real
 binary. Ten of those twelve mutate the `create` guest operation, which
 is excluded from `cargo test --workspace`, so a unit test written
 beside that code would never run; the other two mutate the `create`
@@ -1566,23 +1569,73 @@ crate but break something only an external parser can see. Going
 through the real binary means `make instar` before the test and again
 after the source is restored.
 
+The other **36 reader cases** cover the reader — the VHD and VHDX arms of
+`read_chain_virtual_cluster`, the sector-bitmap helpers in the `vhd`
+and `vhdx` crates, and the differencing refusals in
+`init_chain_states`. Most of them name a test in the `qcow2`
+crate and run it with the full input-format feature list, because the
+arms are behind `vhd-input` and `vhdx-input` and a run without those
+compiles the mutation away and reports a pass nobody earned. Several
+also break a unit test in the `vhd` or `vhdx` crate, which is
+deliberate duplication: the crate test pins the helper and the case
+here pins the arm that calls it. Running one named test in one package
+is what keeps them separate, since `make test-rust` stops at the first
+failing crate and would otherwise never reach the arm.
+
+Some name a `vhd` or `vhdx` test instead, because the property is
+genuinely the crate's and not the arm's — `--list` shows which, so
+the number is deliberately not written here. The arm calls the
+ownership coalescer once per run, each time with a correct starting
+byte, so a coalescer that stops at a bitmap byte boundary serves the
+same bytes in two runs instead of one and no arm test can see the
+difference. The same goes for a chunk group of no sectors, which is a
+property of the state's geometry rather than of any read. That is not
+a weak arm test; it is where the property lives. Each such case says
+so where it is defined, and each was established by watching the case
+fail while it named an arm test.
+
+**1 survivor case** is among them: `rust_survivor_case` asserts that a
+mutation is *not* caught, with the reason recorded at the case.
+`vhd-read-classify-stops-at-the-first-mixed-verdict` applies an early
+exit a review suggested for `classify_vhd_chunk_ownership`; it
+survives because the classifier's full walk is also the chunk's
+validation, and `read_vhd_child_runs` repeats that walk and refuses an
+undescribed stretch by itself. The change is therefore
+behaviour-preserving, and declining it keeps two independent checks on
+a fail-closed path rather than one. The verdict is inverted for these:
+surviving scores `SURVIVOR` and passes, and being *killed* scores
+`FAIL` — not because catching a bug is bad, but because it means the
+recorded reason no longer holds and the comment is now lying. A
+surviving mutation is a real result about the tests, and keeping it as
+a case means the next person to meet it reads the reason instead of
+concluding the test is weak.
+
 Four of the integration cases (`oracle-*`) name the libvhdi
 cross-check in `tests/test_differencing.py`, which skips without
 `vhdiinfo` on `PATH` (Debian: `libvhdi-utils`). A skipped test scores
 `BROKEN`, not `PASS`, so the harness needs that package installed to
 report a clean run; it warns once up front when it is missing.
 
-A full run took **2m32s, 2m44s and 3m35s** on three measured runs of
-this tree, with `vhdiinfo` present and all 26 cases passing — so
-budget three to four minutes and expect the spread, which is cargo and
-docker layer caching. Those are observations: an earlier "about two
-minutes" here was a guess, and an understated figure invites the
-reader to assume a run has hung. Most of the time is the 24 `make
-instar` rebuilds the integration cases need; the 21 baselines add test
-runs but no rebuilds.
+A full run took **4m59s** on a warm tree with `vhdiinfo` present and
+everything passing, and 4m43s when it held 57 cases; an earlier run
+of the same tree took 9m38s because it also had to build a docker
+image. Before the reader cases existed the 26 writer cases alone took
+2m32s, 2m44s and 3m35s on three measured runs. Those are observations rather than estimates:
+an earlier "about two minutes" here was a guess, and an understated
+figure invites the reader to assume a run has hung. Expect a spread,
+which is cargo and docker layer caching. The writer cases are
+dominated by the 24 `make instar` rebuilds their integration tests
+need; the reader cases need no rebuild but each recompiles the
+`qcow2` crate in release with the full feature list.
+
+Both devcontainer images must already exist, because
+`tools/cargo-in-container.sh` and the integration cases run them
+rather than building them. On a machine that has neither, `make
+instar-devcontainer` and `make instar` build them first, and that is
+tens of minutes rather than minutes.
 
 ```bash
-tools/mutate-differencing.sh          # every case, three to four minutes
+tools/mutate-differencing.sh          # every case
 tools/mutate-differencing.sh --list   # the case names, run nothing
 tools/mutate-differencing.sh NAME...  # only the named cases
 tools/mutate-differencing.sh --self-test        # check the verdict classifier
@@ -1598,7 +1651,7 @@ trusted.
 | Guard | Answers | Cost |
 |---|---|---|
 | `--self-test` | does the verdict classifier classify correctly? | milliseconds |
-| `--check-patterns` | does every mutation still have exactly one place to land, and do the case count here and in the script still agree? | a few seconds |
+| `--check-patterns` | does every mutation still have exactly one place to land, and do the case, reader and survivor counts here and in the script still agree? | a few seconds |
 | `tools/ci/test-replace-once.sh` | does the literal replace helper still refuse zero and multiple matches? | milliseconds |
 
 None of them needs docker, a venv, testdata or a build.
@@ -1608,7 +1661,7 @@ harness nothing else checks — everything else is checked *by* it — and
 it shipped misreading `FAILED (errors=1)` as a caught mutation, which
 no run of the harness itself would have revealed.
 
-`--check-patterns` exists because the 26 search strings are pinned to
+`--check-patterns` exists because every search string is pinned to
 `src/` byte for byte, indentation included. A `rustfmt` change that
 moves a space turns a case `BROKEN`, and without this nothing would
 say so until someone spent the full run. It reports `LANDS` and
@@ -1646,8 +1699,8 @@ the harness closes each:
   the failure gets credited to the mutation. Each named test is
   therefore run once against unmutated source first, and a case whose
   baseline does not pass is `BROKEN` rather than `PASS`. Baselines are
-  cached per target: the 26 cases name 21 distinct targets (14 Rust,
-  7 integration), so that is 21 extra test runs and no extra rebuilds
+  cached per target: the 62 cases name 50 distinct targets (43 Rust,
+  7 integration), so that is 50 extra test runs and no extra rebuilds
   — the integration baselines reuse the clean binary each case
   restores anyway.
 * **The test errored rather than failed.** `unittest` reports an

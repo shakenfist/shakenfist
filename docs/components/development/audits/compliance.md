@@ -24,7 +24,7 @@ many manual runs came before it. See
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-10-03T11:21:04.118845+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-10-04T20:49:57.259433+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -228,7 +228,7 @@ Criterion: [docs-external-links.md](/components/development/audits/docs-external
 | actions | compliant | - |
 | agent-python | compliant | - |
 | client-python | compliant | - |
-| client-python-k3s | compliant | - |
+| client-python-k3s | non-compliant | shakenfist/client-python-k3s#99 |
 | clingwrap | compliant | - |
 | cloudgood | non-compliant | shakenfist/cloudgood#7 |
 | development | compliant | - |
@@ -249,6 +249,7 @@ Criterion: [docs-external-links.md](/components/development/audits/docs-external
 
 Details for non-compliant projects:
 
+- **client-python-k3s** (Status): 1 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/plans/PLAN-cumulative-health-signals.md -> library-api-and-collection-phase-03-missing-verbs.md
 - **cloudgood** (Status): 2 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/index.md -> more-fundamentals.md, docs/virtualization-history.md -> more-fundamentals.md
 - **instar** (Status): 1 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/plans/PLAN-differencing-phase-08-tests.md -> docs/plans/PLAN-differencing.md
 - **uncalibrated-sextant** (Status): 67 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/plans/PLAN-audit-cleanup-phase-02-structural.md -> ../../src/bootloader.rs, docs/plans/PLAN-audit-cleanup-phase-02-structural.md -> ../../src/renderer/mod.rs, docs/plans/PLAN-audit-cleanup-phase-02-structural.md -> ../../src/scene.rs, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -> ../../Makefile, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -> ../../scripts/screenshot.sh, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -> ../../scripts/verify-release.sh, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -> ../../src/scene.rs, docs/plans/PLAN-audit-cleanup.md -> ../../AGENTS.md, docs/plans/PLAN-audit-cleanup.md -> ../../ARCHITECTURE.md, docs/plans/PLAN-audit-cleanup.md -> ../../PUSH-AUDIT.md (+57 more)
@@ -329,7 +330,7 @@ Criterion: [export-repo-config.md](/components/development/audits/export-repo-co
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
-| instar | non-compliant | shakenfist/instar#600 |
+| instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | non-compliant | shakenfist/kerbside-client#7 |
 | kerbside-patches | compliant | - |
@@ -345,7 +346,6 @@ Criterion: [export-repo-config.md](/components/development/audits/export-repo-co
 Details for non-compliant projects:
 
 - **cloudgood** (Status): Missing .github/workflows/export-repo-config.yml
-- **instar** (Status): Passing "secrets: inherit" to export-repo-config.yml: export-repo-config.yml. The shared workflow reads no secrets and authenticates with github.token, so every secret this repository holds is handed to a workflow in another repository for no benefit. Delete the line.
 - **kerbside-client** (Status): Missing .github/workflows/export-repo-config.yml
 - **uncalibrated-sextant** (Status): Missing .github/workflows/export-repo-config.yml
 
@@ -772,7 +772,7 @@ Criterion: [plan-audit-phase.md](/components/development/audits/plan-audit-phase
 | actions | N/A | - |
 | agent-python | N/A | - |
 | client-python | compliant | - |
-| client-python-k3s | N/A | - |
+| client-python-k3s | compliant | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
@@ -846,7 +846,7 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 | instar | non-compliant | shakenfist/instar#605 |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
-| kerbside-patches | compliant | - |
+| kerbside-patches | non-compliant | shakenfist/kerbside-patches#1826 |
 | library-utilities | compliant | - |
 | occystrap | compliant | - |
 | private-ci | non-compliant | shakenfist/private-ci#64 |
@@ -859,8 +859,9 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 Details for non-compliant projects:
 
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121
-- **client-python-k3s** (Status): 4 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/library-api.md:100, docs/library-api.md:126, docs/library-api.md:169, docs/library-api.md:260
-- **instar** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/development.md:1017
+- **client-python-k3s** (Status): 5 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/collection.md:21, docs/library-api.md:100, docs/library-api.md:126, docs/library-api.md:172, docs/library-api.md:264
+- **instar** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/development.md:1052
+- **kerbside-patches** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:67
 - **private-ci** (Status): 29 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/dashboard-freshness.md:84, docs/dashboard-freshness.md:132, docs/dashboard-freshness.md:133, docs/dashboard-freshness.md:227, docs/dashboard-freshness.md:258, docs/dashboard-freshness.md:285, docs/dashboard-freshness.md:297, docs/dashboard-freshness.md:300, docs/dashboard-freshness.md:301 (+19 more)
 - **uncalibrated-sextant** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137, ARCHITECTURE.md:236 (+12 more)
 
@@ -873,7 +874,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 | actions | N/A | - |
 | agent-python | N/A | - |
 | client-python | non-compliant | shakenfist/client-python#403 |
-| client-python-k3s | N/A | - |
+| client-python-k3s | compliant | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
@@ -896,7 +897,7 @@ Details for non-compliant projects:
 
 - **client-python** (Status): 2 of 4 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist_client/apiclient.py:185 -> docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md, shakenfist_client/tests/test_client_apiclient.py:2320 -> docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md
 - **instar** (Status): 2 of 269 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): tools/ci/test-check-doc-phrases.sh:43 -> PLAN-differencingflow.md, tools/ci/test-check-doc-phrases.sh:142 -> /docs/plans/PLAN-example.md
-- **shakenfist** (Status): 2 of 412 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist/tests/test_plan_phase_references.py:86 -> docs/plans/PLAN-thing.md, shakenfist/tests/test_plan_phase_references.py:88 -> docs/other/plans/PLAN-deep.md
+- **shakenfist** (Status): 3 of 426 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist/mariadb.py:3656 -> PLAN-claim-coverage-and-sizing-phase-02b-peak-measurement.md, shakenfist/tests/test_plan_phase_references.py:86 -> docs/plans/PLAN-thing.md, shakenfist/tests/test_plan_phase_references.py:88 -> docs/other/plans/PLAN-deep.md
 
 ## plan-template
 
@@ -1195,7 +1196,7 @@ Criterion: [reusable-workflow-secrets.md](/components/development/audits/reusabl
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
-| instar | non-compliant | shakenfist/instar#610 |
+| instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
 | kerbside-patches | compliant | - |
@@ -1208,17 +1209,13 @@ Criterion: [reusable-workflow-secrets.md](/components/development/audits/reusabl
 | uncalibrated-sextant | compliant | - |
 | visual-digest-rust | compliant | - |
 
-Details for non-compliant projects:
-
-- **instar** (Status): 1 job(s) pass "secrets: inherit" to a reusable workflow, handing it every secret this repository holds. Declare the secrets the called workflow reads under on.workflow_call.secrets and pass those by name; if it reads none, delete the line
-
 ## review-coverage
 
 Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | compliant | - |
+| actions | non-compliant | shakenfist/actions#138 |
 | agent-python | N/A | - |
 | client-python | N/A | - |
 | client-python-k3s | N/A | - |
@@ -1242,10 +1239,11 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **development** (Status): 196 of 203 in-scope files reviewed at HEAD; 7 need review (threshold 5)
-- **kerbside** (Status): 134 of 252 in-scope files reviewed at HEAD (9 imported from shakenfist/development); 118 need review (threshold 5)
+- **actions** (Status): 128 of 136 in-scope files reviewed at HEAD (4 imported from shakenfist/development); 8 need review (threshold 5)
+- **development** (Status): 117 of 203 in-scope files reviewed at HEAD; 86 need review (threshold 5)
+- **kerbside** (Status): 133 of 252 in-scope files reviewed at HEAD (8 imported from shakenfist/development); 119 need review (threshold 5)
 - **kerbside-client** (Status): 3 of 15 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 12 need review (threshold 5)
-- **ryll** (Status): 188 of 222 in-scope files reviewed at HEAD (10 imported from shakenfist/development); 34 need review (threshold 5)
+- **ryll** (Status): 162 of 224 in-scope files reviewed at HEAD (8 imported from shakenfist/development); 62 need review (threshold 5)
 - **sfui** (Status): 3 of 52 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 49 need review (threshold 5)
 
 ## review-scope-completeness

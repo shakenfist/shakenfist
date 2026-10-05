@@ -368,8 +368,8 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 | 9. Coverage fuzzing of the locator parsers | [PLAN-differencing-phase-09-fuzz.md](/components/instar/plans/PLAN-differencing-phase-09-fuzz/) | Complete | `044ad77` (#594) |
 | 10. Documentation | [PLAN-differencing-phase-10-docs.md](/components/instar/plans/PLAN-differencing-phase-10-docs/) | Complete | `036252f` (#598) |
 | 11. Composition: host chain discovery and `info --chain` | [PLAN-differencing-phase-11-chain-host.md](/components/instar/plans/PLAN-differencing-phase-11-chain-host/) | Complete | `c66f8b2` (#603) |
-| 12. Composition: guest VHD sector-bitmap read path | [PLAN-differencing-phase-12-vhd-compose.md](/components/instar/plans/PLAN-differencing-phase-12-vhd-compose/) | In progress | |
-| 13. Composition: guest VHDX sector-bitmap read path | PLAN-differencing-phase-13-vhdx-compose.md | Not started | |
+| 12. Composition: guest VHD sector-bitmap read path | [PLAN-differencing-phase-12-vhd-compose.md](/components/instar/plans/PLAN-differencing-phase-12-vhd-compose/) | Complete | `b4ae7fc` (#615) |
+| 13. Composition: guest VHDX sector-bitmap read path | [PLAN-differencing-phase-13-vhdx-compose.md](/components/instar/plans/PLAN-differencing-phase-13-vhdx-compose/) | In progress | |
 | 14. Composition: per-op rollout, replacing phase 4's refusals | PLAN-differencing-phase-14-op-rollout.md | Not started | |
 | 15. Composition: integration tests and fuzz | PLAN-differencing-phase-15-compose-tests.md | Not started | |
 | 16. Composition: documentation | PLAN-differencing-phase-16-compose-docs.md | Not started | |
@@ -500,7 +500,10 @@ rather than left as one phase to be split later, the way
   2026-09-30**, which found the guest chain walker already built
   and already carrying a VHD arm: `read_chain_virtual_cluster`
   (`src/crates/qcow2/src/lib.rs:7930`) dispatches per format at
-  `:8486`, `ChainStates` already holds `vhd_states` (`:9385`),
+  `:8486`, `ChainStates` already holds `vhd_states` (`:9385`)
+  -- every line number in this bullet is as it stood before phase
+  12, which added about 2,800 lines to that file; the two a phase
+  13 reader follows are corrected at the end of the bullet --
   and an unallocated BAT entry already descends to the next
   device -- which is the correct reading for a differencing
   child's wholly-parent-owned block. What is missing is the
@@ -510,7 +513,10 @@ rather than left as one phase to be split later, the way
   for the sub-ranges this device does not own. The phase 4
   refusal these phases were expected to relax is a single `if` in
   `init_chain_states` (`:9528` for VHD, `:9556` for VHDX), not a
-  guard inside either parser crate. **Falsified by phase 12's
+  guard inside either parser crate. **Post-phase-12 locations**,
+  for phase 13: the VHDX refusal is
+  `src/crates/qcow2/src/lib.rs:11298`, and the VHDX arm of
+  `read_chain_virtual_cluster` is `:10269`. **Falsified by phase 12's
   execution**: the planned condition -- lift the refusal when
   another device follows the child -- is unsafe, because
   `init_chain_states`'s `device_count` counts a flat, possibly
@@ -530,9 +536,28 @@ rather than left as one phase to be split later, the way
   `init_chain_states`'s refusal, and phase 12 found that doing so
   safely requires knowing a device's own chain boundary, which
   `device_count` alone does not give it.
+
+  It also needs issue #623 settled first, and for the same kind of
+  reason. Phase 13 found that a differencing VHDX pads its BAT out
+  to whole chunk groups where a dynamic one does not, and that the
+  writer's `calculate_bat_layout` sizes the region by the shorter
+  dynamic rule. The phase 13 reader reaches the padded entries but
+  caps itself at the declared region, deliberately, so that the
+  differencing images that load today keep loading. The consequence
+  is that lifting the refusal before #623 lands ships a reader which
+  cannot resolve the sector bitmaps of images instar itself wrote
+  whenever that region is sized exactly -- a silent read failure on
+  our own output, which is the worst shape this gap could take.
+  Treat both issues as gates on phase 14's first step rather than as
+  work the phase can absorb.
 * **Phase 15, tests and fuzz.** Cross-validation against the
   phase 1 oracle for chains instar wrote and chains it did not,
-  plus coverage fuzzing of the compose path. Its harness drives
+  plus coverage fuzzing of the compose path. Phase 13 left it one
+  specific gap to close: every multi-group and partial-group VHDX
+  compose test runs at 512-byte logical sectors, where `chunk_ratio`
+  is 4096. At 4096-byte sectors it is 32768, so the padded BAT bound
+  and the chunk-group stride are arithmetic nothing drives at the
+  larger geometry. Its harness drives
   the `python3-libvhdi` binding with an explicit `set_parent()`
   rather than a CLI export, and its VHD fixtures are subject to
   the sector-bitmap caveat above. Phase 9 fuzzes the locator
