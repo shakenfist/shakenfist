@@ -1,8 +1,12 @@
 ---
 # Refuse a Kerbside configuration which cannot work, before any host is
-# changed. The consuming playbook runs this once, on the control node, with
-# kerbside_hosts set to the kerbside group and kerbside_noncolocated_hosts to
-# the members of it which are not Shaken Fist nodes.
+# changed. The consuming playbook runs this once, with kerbside_hosts set to
+# the kerbside group, kerbside_noncolocated_hosts to the members of it which
+# are not Shaken Fist nodes, and kerbside_url_on_sf_nodes to kerbside_url as
+# the Shaken Fist nodes see it. It runs with a Kerbside host's variables
+# rather than the control node's, since operators commonly keep the Kerbside
+# settings in group_vars/kerbside, which the control node cannot see. Every
+# task here is an assert or a debug, so nothing is changed on that host.
 #
 # An empty group means Kerbside is not being deployed, and nothing here
 # applies. That includes kerbside_url set on its own: Shaken Fist is then
@@ -144,3 +148,22 @@
         quiet: true
       vars:
         kerbside_api_host: "{{ api_url | urlsplit('hostname') | default('', true) | lower }}"
+
+    # kerbside_url is the single source of truth for the console token
+    # audience: the node role renders it as Shaken Fist's KERBSIDE_URL, and
+    # config renders it as Kerbside's SF_CONSOLE_TOKEN_AUDIENCE. Set where
+    # only one side reads it, such as group_vars/kerbside, the two differ, and
+    # Kerbside rejects every console token (or Shaken Fist never issues one).
+    # URLs are not secrets, so the message names both values.
+    - name: Refuse a kerbside_url which Shaken Fist's nodes see differently
+      ansible.builtin.assert:
+        that: kerbside_url_on_sf_nodes is none or kerbside_url == kerbside_url_on_sf_nodes
+        fail_msg: >-
+          The Kerbside hosts see kerbside_url as {{ kerbside_url }}, but Shaken
+          Fist's nodes render {{ ('a different kerbside_url, ' ~
+          kerbside_url_on_sf_nodes) if kerbside_url_on_sf_nodes | default('', true)
+          | length > 0 else 'no kerbside_url at all' }}. It is both Shaken Fist's
+          KERBSIDE_URL and Kerbside's token audience, so it must be set once,
+          where both the allsf and the kerbside hosts read it, for example in
+          group_vars/all.
+        quiet: true

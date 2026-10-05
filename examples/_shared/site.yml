@@ -16,6 +16,9 @@
 #                      deprecation warning, and is removed in the next release
 #   * storage       -- optional, reserved for future use (no role flag yet)
 #   * allsf         -- every Shaken Fist host
+#   * kerbside      -- optional: hosts which run the Kerbside VDI console proxy.
+#                      A member may also be in allsf (co-located) or not
+#                      (dedicated). Absent or empty, Kerbside is not deployed.
 #
 # Per-host identity (node_name/node_egress_*/node_mesh_*) comes from host_vars.
 #
@@ -26,6 +29,19 @@
 # kerbside_system_key (a secret, minted as the system namespace's "kerbside"
 # key), and the optional sf_build_local_wheels / repo_path / client_repo_path
 # for a git-checkout deploy.
+#
+# With a kerbside group, the Kerbside hosts also need kerbside_public_fqdn,
+# kerbside_sql_url and kerbside_auth_secret_seed (both secrets), and may
+# override the kerbside role's other defaults: its packages, ports and the
+# three proxy certificate paths (kerbside_proxy_cert_path,
+# kerbside_proxy_key_path and kerbside_cacert_path). kerbside_url and
+# kerbside_system_key must be visible to both the allsf and the kerbside hosts
+# (group_vars/all, not group_vars/kerbside): Shaken Fist's nodes render
+# kerbside_url as KERBSIDE_URL and mint the credential, Kerbside renders the
+# same values as its token audience and its source password, and the Kerbside
+# validation play refuses a kerbside_url the two sides see differently.
+# api_url must be an address of the Shaken Fist API every Kerbside host can
+# reach when any Kerbside host is not in allsf.
 
 
 # ---------------------------------------------------------------------------
@@ -42,9 +58,13 @@
 # it never contacts an absent node again -- this probe is the only place one is
 # reached, and keeping unreachable hosts out of the later plays also keeps them
 # out of ansible_play_hosts, which the cross-host reductions depend on.
+#
+# Kerbside hosts are probed too, since a dedicated one is not in allsf and
+# would otherwise never join 'reachable'. With no kerbside group the pattern
+# matches allsf alone.
 # ---------------------------------------------------------------------------
 - name: Probe every node for reachability
-  hosts: allsf
+  hosts: allsf:kerbside
   gather_facts: false
   become: false
   ignore_unreachable: true
@@ -74,12 +94,13 @@
   become: false
   vars:
     database_tier: "{{ (groups.get('database_node', []) + groups.get('etcd_master', [])) | unique }}"
+    probed_hosts: "{{ groups['allsf'] | union(groups.get('kerbside', [])) }}"
   tasks:
     - name: Register the nodes that answered in the 'reachable' group
       ansible.builtin.add_host:
         name: "{{ item }}"
         groups: reachable
-      loop: "{{ groups['allsf'] }}"
+      loop: "{{ probed_hosts }}"
       when:
         - hostvars[item].node_probe is defined
         - hostvars[item].node_probe is not unreachable
@@ -89,10 +110,10 @@
       ansible.builtin.debug:
         msg: >-
           Deploying around absent node(s):
-          {{ groups['allsf'] | difference(groups['reachable'] | default([])) | join(', ') }}.
+          {{ probed_hosts | difference(groups['reachable'] | default([])) | join(', ') }}.
           They did not answer and are excluded from this run; re-run once they
           return.
-      when: (groups['allsf'] | difference(groups['reachable'] | default([]))) | length > 0
+      when: (probed_hosts | difference(groups['reachable'] | default([]))) | length > 0
 
     - name: Fail if no hypervisor is reachable
       ansible.builtin.assert:
@@ -115,6 +136,38 @@
         fail_msg: >-
           No database-tier node answered this deploy. At least one must be
           reachable to bootstrap and serve the cluster database.
+
+
+# ---------------------------------------------------------------------------
+# Refuse a Kerbside configuration which cannot work, before any host is
+# changed. The kerbside role's validate entry point runs once, with the
+# variables the first reachable Kerbside host sees: operators commonly keep
+# the Kerbside settings in group_vars/kerbside, which localhost cannot see, so
+# validating on localhost would refuse a correct inventory. With no kerbside
+# group this play matches no host and nothing runs, which is the feature-off
+# path.
+#
+# kerbside_url_on_sf_nodes is kerbside_url as the Shaken Fist nodes see it.
+# validate requires it to equal the Kerbside hosts' kerbside_url, since the one
+# variable is both Shaken Fist's KERBSIDE_URL and Kerbside's token audience.
+# any_errors_fatal makes a refusal end the whole run, not just this play's
+# hosts, so no later play touches allsf.
+# ---------------------------------------------------------------------------
+- name: Validate the Kerbside configuration
+  hosts: kerbside:&reachable
+  gather_facts: false
+  become: false
+  any_errors_fatal: true
+  tasks:
+    - name: Run the kerbside role's validate entry point
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.kerbside
+        tasks_from: validate
+      run_once: true
+      vars:
+        kerbside_hosts: "{{ groups.get('kerbside', []) }}"
+        kerbside_noncolocated_hosts: "{{ groups.get('kerbside', []) | difference(groups['allsf']) }}"
+        kerbside_url_on_sf_nodes: "{{ hostvars[groups['allsf'][0]]['kerbside_url'] | default('') }}"
 
 
 # ---------------------------------------------------------------------------
@@ -716,3 +769,89 @@
           Sanity checks passed: sf-api={{ sf_api_status.stdout }},
           sf-queues={{ sf_queues_status.stdout }},
           API HTTP {{ api_response.stdout }} (expected 401).
+
+
+# ---------------------------------------------------------------------------
+# Play 8: deploy Kerbside on the kerbside group, last, so that sf-api is proven
+# up above and play 6a has already minted the signing key and the "kerbside"
+# credential before Kerbside's first scrape. A Kerbside failure is then never
+# confused with a Shaken Fist one. With no kerbside group this play matches no
+# host. A member may be in allsf or not; nothing here assumes the node role ran.
+#
+# kerbside_hosts is the reachable members only, since register runs its
+# migration and readiness check on kerbside_hosts[0]. Only derived names are
+# play vars: play vars outrank inventory group_vars (#4441), so an operator
+# setting would be silently ignored here.
+#
+# The proxy certificate comes from internal_ca unless the operator supplied
+# all three override paths (validate refused anything in between). Its
+# cert_dest_dir is the kerbside role's kerbside_pki_dir, which the role reads
+# itself and is not passed here: the same expression as the role's default
+# (kerbside_config_dir/pki), and an inventory kerbside_pki_dir or
+# kerbside_config_dir reaches both.
+# ---------------------------------------------------------------------------
+- name: Deploy Kerbside
+  hosts: kerbside:&reachable
+  become: true
+  gather_facts: false
+  vars:
+    kerbside_hosts: "{{ groups.get('kerbside', []) | intersect(groups['reachable'] | default([])) }}"
+    kerbside_colocated: "{{ inventory_hostname in groups['allsf'] }}"
+  tasks:
+    # The CA /admin/cacert serves, from the file it serves it from, so that
+    # Kerbside's comparison of sources.yaml's ca_cert with it passes by
+    # construction, whatever issued the SPICE certificates. A run_once
+    # result is registered on every host in the play.
+    - name: Read the CA which Shaken Fist's /admin/cacert serves
+      ansible.builtin.slurp:
+        src: /etc/pki/libvirt-spice/ca-cert.pem
+      register: kerbside_sf_ca_slurp
+      run_once: true
+      delegate_to: "{{ kerbside_sf_ca_host }}"
+      vars:
+        kerbside_sf_ca_host: >-
+          {{ ((groups.get('database_node', []) + groups.get('etcd_master', []))
+              | unique | intersect(groups['reachable'] | default([]))) | first }}
+
+    - name: Remember the CA which Shaken Fist's /admin/cacert serves
+      ansible.builtin.set_fact:
+        kerbside_sf_ca_cert: "{{ kerbside_sf_ca_slurp.content | b64decode }}"
+
+    # Creates the kerbside group the certificate's key is readable by.
+    - name: Bootstrap Kerbside
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.kerbside
+        tasks_from: bootstrap
+
+    - name: Issue this host's Kerbside proxy certificate (generated on the control node)
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.internal_ca
+        tasks_from: host_certificate
+      vars: &kerbside_certificate_vars
+        hostname: "{{ inventory_hostname }}"
+        cert_name: "{{ inventory_hostname }}-kerbside"
+        cert_cn: "{{ kerbside_public_fqdn }}"
+        cert_san_dns:
+          - "{{ kerbside_public_fqdn }}"
+        cert_dest_dir: "{{ kerbside_pki_dir | default((kerbside_config_dir | default('/etc/kerbside')) ~ '/pki') }}"
+        cert_owner: "{{ kerbside_file_owner | default('root') }}"
+        cert_group: "{{ kerbside_group | default('kerbside') }}"
+        cert_key_mode: "0640"
+      when: kerbside_proxy_cert_path | default('') | length == 0
+
+    - name: Distribute this host's Kerbside proxy certificate
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.internal_ca
+        tasks_from: distribute_certificates
+      vars: *kerbside_certificate_vars
+      when: kerbside_proxy_cert_path | default('') | length == 0
+
+    - name: Configure Kerbside
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.kerbside
+        tasks_from: config
+
+    - name: Start Kerbside and wait for its first scrape
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.kerbside
+        tasks_from: register

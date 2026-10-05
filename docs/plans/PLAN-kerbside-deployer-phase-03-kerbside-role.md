@@ -278,16 +278,17 @@ not need to redo any of this.
 
 `roles/kerbside/` with:
 
-* `validate`: every assertion that can fail a deploy, run on
-  `localhost` before any host changes. It is the phase 2 pattern of
-  keeping logic in role entry points, where argument_specs and a
-  rootless test reach it, with `site.yml` only wiring.
+* `validate`: every assertion that can fail a deploy, run once, with a
+  Kerbside host's variables, before any host changes. It is the phase 2
+  pattern of keeping logic in role entry points, where argument_specs
+  and a rootless test reach it, with `site.yml` only wiring.
 * `bootstrap`: user, packages, venv, code-change detection.
 * `config`: INI, `sources.yaml`, units, and the desired-state hash.
 * `register`: migrate, start or restart, wait for readiness, record
   the deployed state.
 * `main`: bootstrap, config, register, as the node role does. `validate`
-  is not part of `main`, because `site.yml` runs it on `localhost`.
+  is not part of `main`, because `site.yml` runs it once, in a play of
+  its own, before any host changes.
 
 The role reads plain variables only. `site.yml` maps
 `groups.get('kerbside', [])` to `kerbside_hosts`, and computes
@@ -300,10 +301,16 @@ need. The role carries its own daemon-reload instead.
 
 * **Reachability (plays 1-2):** probe and `add_host` over
   `allsf:kerbside`.
-* **Validation (play 2, `localhost`):** include `kerbside` `validate`
-  with `kerbside_hosts` and the operator variables, beside the existing
-  tier asserts. With an empty group and `kerbside_url` unset, it does
-  nothing and says so.
+* **Validation (a play of its own, straight after play 2):** on
+  `kerbside:&reachable`, `run_once`, include `kerbside` `validate` with
+  `kerbside_hosts`, `kerbside_noncolocated_hosts` and
+  `kerbside_url_on_sf_nodes`. Not on `localhost`, as first planned:
+  operators keep the Kerbside variables in `group_vars/kerbside`, which
+  `localhost` cannot see, so it would refuse a correct inventory. That
+  is #4441's family, a play reading variables other than the ones the
+  hosts will use. With no `kerbside` group the play matches no host and
+  nothing runs, which is the feature-off path. `any_errors_fatal` makes
+  a refusal end the run before any later play.
 * **Deployment: new plays after the final sanity checks.** One play on
   `kerbside:&reachable` runs bootstrap, then the certificate (D6), then
   config, then register. They come last so that `sf-api` is proven up,
@@ -332,6 +339,15 @@ non-empty and any of these hold:
 * `api_url` is a loopback URL and some Kerbside host is not co-located
   (S10). The message names the host and says what `api_url` needs to
   be.
+* `kerbside_url_on_sf_nodes` is supplied and is not `kerbside_url` byte
+  for byte. `site.yml` supplies it as `kerbside_url` as the first `allsf`
+  host sees it, empty when it sees none. This enforces the invariant
+  that `kerbside_url` is the single source of truth for Shaken Fist's
+  `KERBSIDE_URL` and Kerbside's audience: set only in
+  `group_vars/kerbside`, it would configure Kerbside and leave Shaken
+  Fist without it. The message says to set it where both groups read it,
+  such as `group_vars/all`. Not supplied (`null`, the default) skips the
+  check, for a playbook other than `site.yml`.
 
 `kerbside_url` set with an empty group stays legal: that is the
 bring-your-own-Kerbside path phase 2 serves.
@@ -686,10 +702,17 @@ In `examples/_shared/site.yml`:
 * Plays 1-2: the reachability probe and the `add_host` loop cover
   `allsf` plus `groups.get('kerbside', [])` (`:47`, `:82`). The absent
   host warning must still name Kerbside hosts.
-* Play 2: after the tier asserts, include `kerbside` `validate` with:
+* A new play straight after play 2, on `kerbside:&reachable`, with
+  `gather_facts: false` and `any_errors_fatal: true`, including
+  `kerbside` `validate` `run_once` with:
   * `kerbside_hosts: "{{ groups.get('kerbside', []) }}"`;
   * `kerbside_noncolocated_hosts` set to the Kerbside hosts not in
-    `groups['allsf']`.
+    `groups['allsf']`;
+  * `kerbside_url_on_sf_nodes` set to the first `allsf` host's
+    `kerbside_url`, defaulting to empty (D3).
+
+  Not play 2 itself: on `localhost`, `validate` would not see
+  `group_vars/kerbside` (D2).
 * A new play after the final sanity checks, `hosts: kerbside:&reachable`.
   * Play-level vars: `kerbside_hosts` as above, and `kerbside_colocated`.
   * A delegated `slurp` of `/etc/pki/libvirt-spice/ca-cert.pem` from
@@ -705,8 +728,8 @@ In `examples/_shared/site.yml`:
   the new variables to `:22-28`.
 
 The feature-off path must be untouched apart from the widened
-reachability loop and a skipped `validate`. Run `pre-commit run
---all-files`.
+reachability loop, and the validation and deployment plays matching no
+host. Run `pre-commit run --all-files`.
 
 ### Brief 5 -- the rootless test
 

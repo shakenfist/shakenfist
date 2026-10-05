@@ -6,8 +6,7 @@ argument_specs:
       - >-
         Runs the per-host entry points in order: bootstrap, config, then
         register. validate is not part of main, because the consuming
-        playbook runs it once on the control node before any host is
-        changed.
+        playbook runs it once, before any host is changed.
       - >-
         Every value is a plain role variable. The role reads no inventory group
         names and no other host's facts; the consuming playbook maps the
@@ -82,6 +81,23 @@ argument_specs:
             to fetch the console token signing key unless the two match. The
             example playbook reads it from the first database-tier host's
             /etc/pki/libvirt-spice/ca-cert.pem, the file /admin/cacert serves.
+      kerbside_url_on_sf_nodes:
+        type: str
+        default: null
+        description:
+          - >-
+            kerbside_url as Shaken Fist's nodes see it. When it is supplied
+            and kerbside_hosts is not empty, validate requires kerbside_url to
+            equal it byte for byte, since the one variable is both Shaken
+            Fist's KERBSIDE_URL and Kerbside's console token audience, and a
+            difference makes every console token fail Kerbside's audience
+            check.
+          - >-
+            Not supplied (null), the default, skips the check. An empty string
+            means Shaken Fist's nodes have no kerbside_url, which fails it. The
+            example playbook supplies it from the first allsf host's
+            variables, so kerbside_url kept only where the kerbside hosts read
+            it (group_vars/kerbside) is refused before any host is changed.
       kerbside_hosts:
         type: list
         elements: str
@@ -330,18 +346,20 @@ argument_specs:
     short_description: Refuse a Kerbside configuration which cannot work.
     description:
       - >-
-        Run once, on the control node, before any host is changed. Does
-        nothing at all, and says so, when kerbside_hosts is empty: Kerbside is
-        not being deployed, and kerbside_url alone is the
-        bring-your-own-Kerbside path.
+        Run once, before any host is changed, with the variables a Kerbside
+        host sees (the example playbook runs it on the first reachable one;
+        it changes nothing there). Does nothing at all, and says so, when
+        kerbside_hosts is empty: Kerbside is not being deployed, and
+        kerbside_url alone is the bring-your-own-Kerbside path.
       - >-
         Otherwise fails the deploy when kerbside_url, kerbside_system_key,
         kerbside_public_fqdn, kerbside_sql_url or kerbside_auth_secret_seed is
         empty; when kerbside_auth_secret_seed is ~~unconfigured~~ or shorter
         than 32 characters; when a Kerbside port is 30000 or above, or two are
         equal; when only some of the three certificate override paths are set;
-        or when api_url is a loopback URL and kerbside_noncolocated_hosts is
-        not empty. No message includes a secret.
+        when api_url is a loopback URL and kerbside_noncolocated_hosts is not
+        empty; or when kerbside_url_on_sf_nodes is supplied and differs from
+        kerbside_url. No message includes a secret.
     options: *kerbside_options
   bootstrap:
     short_description: Install Kerbside and record what was installed.

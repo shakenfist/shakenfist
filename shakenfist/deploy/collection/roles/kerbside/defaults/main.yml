@@ -16,6 +16,11 @@ kerbside_auth_secret_seed: ""
 kerbside_sql_url: ""
 kerbside_sf_ca_cert: ""
 
+# kerbside_url as Shaken Fist's nodes see it, which validate requires to equal
+# kerbside_url. null, the default, means the caller did not supply it and the
+# check is skipped; an empty string means Shaken Fist's nodes have none.
+kerbside_url_on_sf_nodes: null
+
 # Where the consuming playbook places this host. kerbside_hosts is the whole
 # kerbside group; kerbside_noncolocated_hosts the members of it which are not
 # also Shaken Fist nodes; kerbside_colocated whether this host is one.
