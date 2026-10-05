@@ -146,6 +146,16 @@ be written is a warning on stdout and an exit code of zero, never an
 exception, because a report tool which fails a build over its own output
 file is precisely the instrument changing what it measures.
 
+Why this is one file, at three thousand lines: the renderer layer
+(plural() to print_report()) is a clean cut, and what stops it being made is
+packaging rather than the code. tools/ is not a package, so this file is
+loaded by path, and shakenfist/actions greps its source by path as well (see
+BAND_VIOLATION_EXIT below). The full account, including why the tests are
+the same length, is in docs/developer_guide/ci_cloud_sizing.md under "Why
+the report is one three-thousand-line file". The layer comments below are
+what make the length readable, and they are not to be traded for a smaller
+line count.
+
 Usage:
 
     python3 tools/ci_headroom_report.py --series /srv/ci/traces/headroom.jsonl \\

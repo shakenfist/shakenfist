@@ -38,6 +38,13 @@ looks right, each of which the plan calls out by name:
 The tool is loaded by path: CI tools in ``tools/`` are not importable as a
 package, and this one deliberately imports nothing from shakenfist so that it
 runs under stock python3 on a runner.
+
+That is also why this file is as long as the tool it covers: the path load
+happens once, here at import, and all but one class below extend a single
+base holding the fixture builders, so this file follows a split of the tool
+rather than leading one. The reasoning is in
+docs/developer_guide/ci_cloud_sizing.md under "Why the report is one
+three-thousand-line file".
 """
 
 import contextlib
