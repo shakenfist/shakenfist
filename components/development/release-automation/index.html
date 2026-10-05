@@ -15302,13 +15302,21 @@ checkout and downloads into the per-job <code>${{ runner.temp }}</code> instead.
 <h3 id="step-2-configure-pypi-trusted-publisher">Step 2: Configure PyPI Trusted Publisher<a class="headerlink" href="#step-2-configure-pypi-trusted-publisher" title="Permanent link">&para;</a></h3>
 <ol>
 <li>Log in to <a href="https://pypi.org">pypi.org</a></li>
-<li>Navigate to your project's <strong>Publishing</strong> settings</li>
+<li>If the package has never been published, there is no project to
+   scope a publisher to: add a <strong>pending publisher</strong> from
+   <a href="https://pypi.org/manage/account/publishing/">https://pypi.org/manage/account/publishing/</a> instead, which also
+   asks for the PyPI project name and becomes an ordinary trusted
+   publisher on the first upload. Otherwise, navigate to your project's
+   <strong>Publishing</strong> settings</li>
 <li>Add a trusted publisher:</li>
 <li><strong>Owner</strong>: <code>shakenfist</code></li>
 <li><strong>Repository</strong>: your repo name</li>
 <li><strong>Workflow</strong>: <code>release.yml</code></li>
 <li><strong>Environment</strong>: <code>release</code></li>
 </ol>
+<p>A wrong value here only fails at <code>publish-pypi</code>, after <code>sign-tag</code> has
+already pushed the signed tag, so the recovery is the next version
+rather than a re-pushed tag.</p>
 <h3 id="step-3-create-github-environment">Step 3: Create GitHub Environment<a class="headerlink" href="#step-3-create-github-environment" title="Permanent link">&para;</a></h3>
 <ol>
 <li>Go to <strong>Settings</strong> &gt; <strong>Environments</strong> in the repository</li>
@@ -15319,10 +15327,15 @@ checkout and downloads into the per-job <code>${{ runner.temp }}</code> instead.
 <h3 id="step-4-configure-protected-tags">Step 4: Configure Protected Tags<a class="headerlink" href="#step-4-configure-protected-tags" title="Permanent link">&para;</a></h3>
 <ol>
 <li>Go to <strong>Settings</strong> &gt; <strong>Rules</strong> &gt; <strong>Rulesets</strong></li>
-<li>Create a tag ruleset for <code>v*</code> with restricted creation and
-   deletion</li>
-<li>Add maintainers to the bypass list</li>
+<li>Create a tag ruleset for <code>v*</code> restricting creation, deletion and
+   force pushes</li>
+<li>Add maintainers to the bypass list, and not GitHub Actions:
+   <code>sign-tag</code> collides with none of those rules, so the bypass would
+   only let every workflow create and delete release tags</li>
 </ol>
+<p>Tag <em>updates</em> stay unrestricted, so anyone with write access can
+rewrite a released tag. <code>RELEASE-SETUP.md</code> step 3 explains why the
+fleet accepts that gap rather than close it with <strong>Restrict updates</strong>.</p>
 <h3 id="step-5-remove-old-release-scripts">Step 5: Remove Old Release Scripts<a class="headerlink" href="#step-5-remove-old-release-scripts" title="Permanent link">&para;</a></h3>
 <p>Delete any existing <code>release.sh</code> and commit the removal.</p>
 <h2 id="projects-using-this-infrastructure">Projects Using This Infrastructure<a class="headerlink" href="#projects-using-this-infrastructure" title="Permanent link">&para;</a></h2>

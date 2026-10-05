@@ -15357,6 +15357,17 @@ per-channel, each a list of 32-bit words (word <code>n</code> holds bits
 common word (<code>AUTH_SELECTION | AUTH_SPICE | MINI_HEADER</code>) and one
 channel word chosen by channel type (see
 <a href="#display-channel-capabilities">Display Channel Capabilities</a>).</p>
+<p>The main channel advertises <code>SEMI_SEAMLESS_MIGRATE</code>,
+<code>AGENT_CONNECTED_TOKENS</code> and <code>SEAMLESS_MIGRATE</code>. With
+<code>AGENT_CONNECTED_TOKENS</code>, the server sends <code>AGENT_CONNECTED_TOKENS</code>
+instead of <code>AGENT_CONNECTED</code> when the guest agent (re)connects, carrying
+a fresh agent token window. spice-server resets its token accounting
+whenever the agent detaches, so ryll adopts that window rather than
+keeping its old count, which could leave both ends waiting on each
+other. Channels without their own default (inputs, cursor, playback and
+the rest) still advertise the word they always have, without
+<code>AGENT_CONNECTED_TOKENS</code>, because capability bits mean different things
+on each channel type.</p>
 <p>A proxy that must forward a real client's capabilities to the
 server instead uses <code>perform_link_with_caps</code>, or
 <code>SpiceClient::connect_channel_with_caps</code>, which take the common

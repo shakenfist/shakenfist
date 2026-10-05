@@ -15103,8 +15103,8 @@ with:</p>
 </code></pre></div>
 <p>The hooks run:</p>
 <ul>
-<li><code>skillsaw</code> - Lints the agent context (<code>AGENTS.md</code>, <code>CLAUDE.md</code>, the
-  skills) for malformed frontmatter, smuggled unicode and pasted secrets</li>
+<li><code>skillsaw</code> - Lints the agent context (<code>AGENTS.md</code> and the skills) for
+  malformed frontmatter, smuggled unicode and pasted secrets</li>
 <li><code>actionlint</code> - GitHub Actions workflow validation</li>
 <li><code>shellcheck</code> - Shell script linting</li>
 <li><code>check-log-levels</code> - Enforces max LOG.info() calls per file</li>
@@ -15118,7 +15118,18 @@ with:</p>
 <p>Unit tests are in <code>occystrap/tests/</code> and can be run with:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>tox -epy3
 </code></pre></div>
-<p>Functional tests are in <code>deploy/occystrap_ci/tests/</code> and are run in CI.</p>
+<p>Arguments after <code>--</code> are passed to <code>stestr run</code> as a test filter, so a
+single test or module runs with:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tox -epy3 -- occystrap.tests.test_quay
+</code></pre></div>
+<p><code>tox -eflake8</code> lints only the Python files changed in the most recent
+commit (it runs <code>tools/flake8wrap.sh -HEAD</code>), and the pre-commit hook
+inherits that scope. To lint the whole tree:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>flake8 --max-line-length=120 occystrap/
+</code></pre></div>
+<p>Functional tests are in <code>deploy/occystrap_ci/tests/</code> and are run in CI,
+against a local registry at <code>localhost:5000</code> that the workflow populates
+with test images.</p>
 <p>Both CI lanes -- <code>Sanity checks</code> and <code>Functional tests</code> -- run on
 ephemeral VM runners and skip changes that touch only <code>docs/**</code> or
 markdown at the top of the tree, because nothing they run reads those
@@ -15148,8 +15159,8 @@ on every pull request, on pushes to <code>develop</code>, and weekly. It is
 deliberately not path filtered: a credential pasted into a documentation
 code sample is still a credential.</p>
 <p>To run the same scan locally:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sudo apt-get install -y gitleaks    # Debian 13 or later
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>tools/gitleaks-scan.sh
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sudo apt-get install -y gitleaks    # Debian 13 or later
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>tools/gitleaks-scan.sh
 </code></pre></div>
 <p>The script needs a full clone, not a shallow one -- a secret which was
 committed and later reverted is still in the history, and still needs
@@ -15183,16 +15194,16 @@ diagram commits cleanly and then shows an error box on the rendered
 page. The <code>Mermaid lint</code> workflow renders every tracked markdown file
 that contains a diagram and fails if any of them does not parse. To run
 it locally, with a docker daemon available:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>tools/mermaid-lint.sh              # every tracked markdown file
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>tools/mermaid-lint.sh docs/foo.md  # just this one
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>tools/mermaid-lint.sh              # every tracked markdown file
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>tools/mermaid-lint.sh docs/foo.md  # just this one
 </code></pre></div>
 <p>It is not in the <code>Supply chain</code> workflow because it needs a docker
 daemon and therefore a different runner image.</p>
 <h2 id="releasing">Releasing<a class="headerlink" href="#releasing" title="Permanent link">&para;</a></h2>
 <p>Releases are automated via GitHub Actions. Push a version tag to trigger the
 pipeline:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>git tag -s v0.5.0 -m "Release v0.5.0"
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>git push origin v0.5.0
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>git tag -s v0.5.0 -m "Release v0.5.0"
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>git push origin v0.5.0
 </code></pre></div>
 <p>The workflow builds the package, signs the tag with Sigstore, publishes to
 PyPI, and creates a GitHub Release. See
@@ -15236,12 +15247,12 @@ kept that way so that drift is a <code>diff</code> rather than a judgement:</p>
 <tr>
 <td><code>.github/workflows/pr-re-review.yml</code></td>
 <td><code>templates/ci-review-automation/pr-re-review.yml</code></td>
-<td><code>c6f3a88</code></td>
+<td><code>3b5142c</code></td>
 </tr>
 <tr>
 <td><code>.github/workflows/pr-retest.yml</code></td>
 <td><code>templates/ci-review-automation/pr-retest.yml</code></td>
-<td><code>c6f3a88</code></td>
+<td><code>5e9a4b3</code></td>
 </tr>
 <tr>
 <td><code>.github/workflows/pr-fix-tests.yml</code></td>
@@ -15266,6 +15277,11 @@ was rewritten was that the previous hand-rolled copy had quietly
 diverged from the shared action's fork handling. Anything genuinely
 occystrap-specific belongs in this file instead, which is why the note
 about runner containment above is here and not in a workflow header.</p>
+<p><code>pr-retest.yml</code> dispatches the workflow named by the <code>RETEST_WORKFLOW</code>
+repository variable, or <code>functional-tests.yml</code> when it is unset.
+occystrap leaves it unset: <code>functional-tests.yml</code> is the suite a retest
+is for, and it carries the <code>workflow_dispatch</code> trigger the dispatch
+needs.</p>
 <p><code>test-drift-fix.yml</code> is the one copy that cannot be byte-identical:
 the template ships <code>{{PLACEHOLDER}}</code> markers for the dependency
 install, the test command and the Claude prompt, because those are the
