@@ -2578,18 +2578,36 @@ class Instance(dbowo):
     def pause(self):
         with util_libvirt.LibvirtConnection() as lc:
             inst = lc.get_domain_from_sf_uuid(self.uuid)
-            if not inst:
-                # Not returning a libvirt domain here indicates that the instance
-                # is "powered off" (destroyed in libvirt speak). It doesn't make
-                # sense to reboot a powered off machine
+            if not inst or not inst.isActive():
+                # Our domains are persistent, so a powered off instance is
+                # normally a defined but inactive domain. No domain at all is
+                # also possible if the instance has never been started on this
+                # node. Either way it doesn't make sense to pause a powered
+                # off machine.
                 raise exceptions.InvalidLifecycleState(
                     'you cannot pause a powered off instance')
 
+            if lc.extract_power_state(inst) == 'paused':
+                # Already paused. Succeed without calling libvirt again, which
+                # also covers the stored value being 'paused' already (as the
+                # cleaner may have written) while the domain agrees.
+                self.update_power_state('paused')
+                self.agent_state = constants.AGENT_INSTANCE_PAUSED
+                return
+
             attempts = 1
-            inst.suspend()
+            try:
+                inst.suspend()
+            except lc.libvirt.libvirtError as e:
+                # The domain can shut off between the isActive() check above
+                # and the suspend attempt.
+                if 'domain is not running' in str(e):
+                    raise exceptions.InvalidLifecycleState(
+                        'you cannot pause a powered off instance') from e
+                raise
             self.add_event(EVENT_TYPE_AUDIT, 'pause', extra={'attempt': attempts})
 
-            while not self.update_power_state(lc.extract_power_state(inst)):
+            while lc.extract_power_state(inst) != 'paused':
                 if attempts > 2:
                     self.add_event(EVENT_TYPE_AUDIT, 'pause failed')
                     raise exceptions.InvalidLifecycleState(
@@ -2597,26 +2615,52 @@ class Instance(dbowo):
 
                 time.sleep(1)
                 attempts += 1
-                inst.suspend()
+                try:
+                    inst.suspend()
+                except lc.libvirt.libvirtError as e:
+                    if 'domain is not running' in str(e):
+                        raise exceptions.InvalidLifecycleState(
+                            'you cannot pause a powered off instance') from e
+                    raise
                 self.add_event(EVENT_TYPE_AUDIT, 'pause', extra={'attempt': attempts})
 
+            self.update_power_state('paused')
             self.agent_state = constants.AGENT_INSTANCE_PAUSED
 
     def unpause(self):
         with util_libvirt.LibvirtConnection() as lc:
             inst = lc.get_domain_from_sf_uuid(self.uuid)
-            if not inst:
-                # Not returning a libvirt domain here indicates that the instance
-                # is "powered off" (destroyed in libvirt speak). It doesn't make
-                # sense to reboot a powered off machine
+            if not inst or not inst.isActive():
+                # Our domains are persistent, so a powered off instance is
+                # normally a defined but inactive domain. No domain at all is
+                # also possible if the instance has never been started on this
+                # node. Either way it doesn't make sense to unpause a powered
+                # off machine.
                 raise exceptions.InvalidLifecycleState(
                     'you cannot unpause a powered off instance')
 
+            if lc.extract_power_state(inst) == 'on':
+                # Already running. Succeed without calling libvirt again.
+                # agent_state is left alone here: sidechannel only rewrites it
+                # when its own cached view changes, so resetting it to
+                # AGENT_NEVER_TALKED on an instance that is already running
+                # would strand a connected agent at "not ready (no contact)".
+                self.update_power_state('on')
+                return
+
             attempts = 1
-            inst.resume()
+            try:
+                inst.resume()
+            except lc.libvirt.libvirtError as e:
+                # The domain can shut off between the isActive() check above
+                # and the resume attempt.
+                if 'domain is not running' in str(e):
+                    raise exceptions.InvalidLifecycleState(
+                        'you cannot unpause a powered off instance') from e
+                raise
             self.add_event(EVENT_TYPE_AUDIT, 'unpause', extra={'attempt': attempts})
 
-            while not self.update_power_state(lc.extract_power_state(inst)):
+            while lc.extract_power_state(inst) != 'on':
                 if attempts > 2:
                     self.add_event(EVENT_TYPE_AUDIT, 'unpause failed')
                     raise exceptions.InvalidLifecycleState(
@@ -2624,9 +2668,16 @@ class Instance(dbowo):
 
                 time.sleep(1)
                 attempts += 1
-                inst.resume()
+                try:
+                    inst.resume()
+                except lc.libvirt.libvirtError as e:
+                    if 'domain is not running' in str(e):
+                        raise exceptions.InvalidLifecycleState(
+                            'you cannot unpause a powered off instance') from e
+                    raise
                 self.add_event(EVENT_TYPE_AUDIT, 'unpause', extra={'attempt': attempts})
 
+            self.update_power_state('on')
             self.agent_state = constants.AGENT_NEVER_TALKED
 
     def get_console_data(self, length):

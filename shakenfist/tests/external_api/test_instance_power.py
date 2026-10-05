@@ -128,3 +128,35 @@ class InstancePowerOffEndpointTestCase(InstancePowerEndpointTestCase):
             'power off failed', duration=None,
             extra={'error': 'internal error: something else entirely'},
             suppress_event_logging=False, log_as_error=False)
+
+
+class InstancePauseUnpauseEndpointTestCase(InstancePowerEndpointTestCase):
+    """Pausing or unpausing a powered off instance answers 409, not the
+    generic 500 a leaked libvirtError would give (F6, F7).
+    """
+
+    def test_pause_of_powered_off_instance_answers_409(self):
+        with mock.patch.object(
+                Instance, 'pause',
+                side_effect=exceptions.InvalidLifecycleState(
+                    'you cannot pause a powered off instance')):
+            resp = self.client.post(
+                '/instances/%s/pause' % self.instance_uuid,
+                headers=self.auth, data=json.dumps({}))
+
+        self.assertEqual(409, resp.status_code)
+        self.assertIn(
+            'you cannot pause a powered off instance', resp.get_json()['error'])
+
+    def test_unpause_of_powered_off_instance_answers_409(self):
+        with mock.patch.object(
+                Instance, 'unpause',
+                side_effect=exceptions.InvalidLifecycleState(
+                    'you cannot unpause a powered off instance')):
+            resp = self.client.post(
+                '/instances/%s/unpause' % self.instance_uuid,
+                headers=self.auth, data=json.dumps({}))
+
+        self.assertEqual(409, resp.status_code)
+        self.assertIn(
+            'you cannot unpause a powered off instance', resp.get_json()['error'])

@@ -581,6 +581,8 @@ class FakeDomain:
         self._error = error
         self.reboot_flags = None
         self.reset_calls = 0
+        self.suspend_calls = 0
+        self.resume_calls = 0
         self.attached_xml = None
 
     def isActive(self):
@@ -600,6 +602,16 @@ class FakeDomain:
         if self._error:
             raise self._error
         self.reset_calls += 1
+
+    def suspend(self):
+        if self._error:
+            raise self._error
+        self.suspend_calls += 1
+
+    def resume(self):
+        if self._error:
+            raise self._error
+        self.resume_calls += 1
 
 
 class FakeLibvirtConnection:
@@ -1314,6 +1326,194 @@ class InstancePowerOffAutostartTestCase(InstanceLibvirtTestCase):
         self._mock_libvirt(None)
         self.inst.power_off()
         self.mock_add_event.assert_not_called()
+
+
+class InstancePauseUnpauseTestCase(InstanceLibvirtTestCase):
+    """pause() and unpause() judge success by the domain's own state (F6,
+    F7), following the inactive-domain pattern reboot() uses (issue 3630):
+
+    * No domain, or an inactive one, raises InvalidLifecycleState (409),
+      including the race where the domain stops between the isActive()
+      check and the suspend()/resume() call.
+    * Already being in the target state succeeds without calling libvirt
+      again, so pausing or unpausing twice both answer 200 (D5).
+    * A domain that never reaches the target state still raises
+      InvalidLifecycleState after three attempts.
+    """
+
+    def setUp(self):
+        super().setUp()
+        p = mock.patch('shakenfist.instance.time.sleep')
+        self.mock_sleep = p.start()
+        self.addCleanup(p.stop)
+
+    def test_pause_no_domain_raises(self):
+        self._mock_libvirt(None)
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.pause()
+
+    def test_unpause_no_domain_raises(self):
+        self._mock_libvirt(None)
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.unpause()
+
+    def test_pause_inactive_domain_raises(self):
+        domain = FakeDomain(active=False)
+        self._mock_libvirt(domain, power_state='off')
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.pause()
+        # Refused outright: the inactive domain must never be asked to
+        # suspend.
+        self.assertEqual(0, domain.suspend_calls)
+
+    def test_unpause_inactive_domain_raises(self):
+        domain = FakeDomain(active=False)
+        self._mock_libvirt(domain, power_state='off')
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.unpause()
+        self.assertEqual(0, domain.resume_calls)
+
+    def test_pause_domain_stops_after_check_raises(self):
+        # The domain can shut off between the isActive() check and the
+        # suspend() attempt.
+        domain = FakeDomain(error=FakeLibvirtError(
+            'Requested operation is not valid: domain is not running'))
+        self._mock_libvirt(domain, power_state='on')
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.pause()
+
+    def test_unpause_domain_stops_after_check_raises(self):
+        domain = FakeDomain(error=FakeLibvirtError(
+            'Requested operation is not valid: domain is not running'))
+        self._mock_libvirt(domain, power_state='paused')
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.unpause()
+
+    def test_pause_twice_succeeds_without_a_second_suspend(self):
+        domain = FakeDomain()
+        self._mock_libvirt(domain, power_state='paused')
+        self.inst.agent_state = constants.AGENT_READY
+
+        self.inst.pause()
+
+        self.assertEqual(0, domain.suspend_calls)
+        self.assertEqual('paused', self.inst.power_state['power_state'])
+        self.assertEqual(
+            constants.AGENT_INSTANCE_PAUSED, self.inst.agent_state.value)
+
+    def test_unpause_of_running_domain_succeeds_without_resume(self):
+        domain = FakeDomain()
+        self._mock_libvirt(domain, power_state='on')
+        self.inst.agent_state = constants.AGENT_READY
+
+        self.inst.unpause()
+
+        self.assertEqual(0, domain.resume_calls)
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        # Resetting agent_state here would strand a connected agent, since
+        # sidechannel only rewrites it when its own cached view changes.
+        self.assertEqual(constants.AGENT_READY, self.inst.agent_state.value)
+
+    def test_pause_when_stored_value_already_paused_still_succeeds(self):
+        # The cleaner may have already written 'paused'. Judging success by
+        # whether update_power_state() changed anything (the F6 bug) would
+        # treat this as "the operation did not take effect" and raise.
+        domain = FakeDomain()
+        self._mock_libvirt(domain, power_state='paused')
+        self.inst.update_power_state('paused')
+
+        self.inst.pause()
+
+        self.assertEqual(0, domain.suspend_calls)
+        self.assertEqual('paused', self.inst.power_state['power_state'])
+
+    def _mock_libvirt_transition(self, domain, counter, before, after):
+        # The domain reports `before` until the libvirt call has happened at
+        # least once (tracked by `counter`, a FakeDomain attribute name),
+        # then `after`. This is what a real suspend()/resume() does: the
+        # state read before the call is the old one.
+        conn = FakeLibvirtConnection(domain)
+        conn.extract_power_state = (
+            lambda d: after if getattr(domain, counter) else before)
+        p = mock.patch(
+            'shakenfist.instance.util_libvirt.LibvirtConnection',
+            return_value=conn)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_pause_success(self):
+        domain = FakeDomain()
+        self._mock_libvirt_transition(
+            domain, 'suspend_calls', before='on', after='paused')
+        self.inst.update_power_state('on')
+
+        self.inst.pause()
+
+        self.assertEqual(1, domain.suspend_calls)
+        self.assertEqual('paused', self.inst.power_state['power_state'])
+        self.assertEqual(
+            constants.AGENT_INSTANCE_PAUSED, self.inst.agent_state.value)
+
+    def test_unpause_success(self):
+        domain = FakeDomain()
+        self._mock_libvirt_transition(
+            domain, 'resume_calls', before='paused', after='on')
+        self.inst.update_power_state('paused')
+        self.inst.agent_state = constants.AGENT_INSTANCE_PAUSED
+
+        self.inst.unpause()
+
+        self.assertEqual(1, domain.resume_calls)
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        self.assertEqual(
+            constants.AGENT_NEVER_TALKED, self.inst.agent_state.value)
+
+    def test_pause_succeeds_despite_db_race_with_cleaner(self):
+        # The cleaner can write 'paused' to the database while the domain
+        # itself is still 'on', just before this pause() call starts. The
+        # domain is really paused by this call's own suspend(), but
+        # update_power_state() sees no change from the database's point of
+        # view and would (F6) report "nothing happened".
+        domain = FakeDomain()
+        self._mock_libvirt_transition(
+            domain, 'suspend_calls', before='on', after='paused')
+        self.inst.update_power_state('paused')
+
+        self.inst.pause()
+
+        self.assertEqual(1, domain.suspend_calls)
+        self.assertEqual('paused', self.inst.power_state['power_state'])
+
+    def test_unpause_succeeds_despite_db_race_with_cleaner(self):
+        domain = FakeDomain()
+        self._mock_libvirt_transition(
+            domain, 'resume_calls', before='paused', after='on')
+        self.inst.update_power_state('on')
+
+        self.inst.unpause()
+
+        self.assertEqual(1, domain.resume_calls)
+        self.assertEqual('on', self.inst.power_state['power_state'])
+
+    def test_pause_never_reaching_target_raises_after_three_attempts(self):
+        # The domain stays active and reports 'on' forever, so the loop
+        # never sees 'paused'.
+        domain = FakeDomain()
+        self._mock_libvirt(domain, power_state='on')
+
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.pause()
+
+        self.assertEqual(3, domain.suspend_calls)
+
+    def test_unpause_never_reaching_target_raises_after_three_attempts(self):
+        domain = FakeDomain()
+        self._mock_libvirt(domain, power_state='paused')
+
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.unpause()
+
+        self.assertEqual(3, domain.resume_calls)
 
 
 class InstanceDomainXMLEscapingTestCase(base.ShakenFistTestCase):
