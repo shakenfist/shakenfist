@@ -327,6 +327,45 @@ operations themselves read back, and it is what users see. Asserting it
 remains right, and the functional tests here assert it after every call
 that this phase changes.
 
+### D9 -- unpause restarts the agent monitor (found in implementation)
+
+The first functional run,
+[37285857342](https://github.com/shakenfist/shakenfist/actions/runs/37285857342),
+found a defect older than this phase. It stranded
+`test_lifecycle_power_on_paused` at agent state "not ready (no contact)"
+for 30 minutes after a pause of a few seconds, although the domain was
+running.
+
+* **The cause.** `unpause()` writes "no contact" and relies on the
+  sidechannel monitor to write the agent's real state. The monitor
+  caches readiness and writes `agent_state` only when that cache
+  changes, and once it reads ready it sends plain pings whose replies
+  change nothing.
+* **Why the existing test missed it.** The sidechannel daemon tears down
+  a paused domain's monitor, so a long pause gets a fresh monitor.
+  `test_lifecycle_pause_cycle` waits for not-ready before unpausing,
+  which is why it never saw this. A short pause leaves the old monitor's
+  cache at ready, and nothing corrects the database.
+
+Mikal chose to fix this in sidechannel rather than in the test. A
+reply-gap check alone could not see a pause shorter than a healthy
+agent's two to three second reply interval, so the fix
+(`df54e28f4`) has two parts:
+
+* `unpause()` sets the instance's monitor abort file after a resume that
+  ran, so the daemon replaces the monitor and the new one re-handshakes,
+  whatever the length of the pause. Agent operation executors have
+  their own abort file and are not affected.
+* The monitor resets its cached readiness after six seconds with no data
+  from the agent. This is a backstop for freezes outside pause and
+  unpause.
+
+The same run was refused capacity in the Guests job for
+`test_lifecycle_power_on_failure`, because each new test brought its own
+instances. Brief 5's first three tests were folded into one,
+`test_lifecycle_pause_semantics` (`ec22aa708`), which ends by awaiting
+the agent after a short pause, as a regression check for D9.
+
 ## Step plan
 
 Steps run one at a time in the phase worktree. Steps 1 to 4 all edit
@@ -341,7 +380,7 @@ share a worktree concurrently, because pre-commit's stash is repo-wide.
 | 4 | low | sonnet | none | Declare the codes on all six endpoints (F12; D6). See brief 4. Commit: "Declare 406 on the power endpoints." |
 | 5 | medium | opus | none | Functional tests. See brief 5. Commit: "Test what the power endpoints answer." |
 | 6 | low | sonnet | none | Documentation and the #2241 comment. See brief 6. Commit: "Document what the power endpoints answer." |
-| 7 | -- | management | -- | Dispatch the functional tests on the branch and read the result. See brief 7. |
+| 7 | -- | management | -- | Dispatch the functional tests on the branch and read the result. See brief 7. The first run found D9; its fix and the test consolidation were added as two further commits. |
 
 Every step ends with `pre-commit run --all-files` passing. The
 management session reads each diff before committing it, and re-runs
@@ -494,7 +533,8 @@ Helpers live in `shakenfist/deploy/shakenfist_ci/base.py`:
 `_domain_autostart`. Existing tests show how to start a target
 (`_start_target`) and await power changes.
 
-Add tests:
+Add tests. (Tests 1 to 3 were later folded into one,
+`test_lifecycle_pause_semantics`, on one instance; see D9.)
 
 1. **`test_lifecycle_pause_powered_off`.** Power off, then pause gives
    `ResourceStateConflictException` (409), not `InternalServerError`.
@@ -540,7 +580,7 @@ as phase 2 did for `_domain_autostart`.
 ### Brief 7 -- functional run
 
 Dispatch the functional workflow on the branch, as phases 1b and 2 did.
-Read the result. Confirm the four new tests ran rather than skipped,
+Read the result. Confirm the new tests ran rather than skipped,
 and that `test_lifecycle_pause_cycle`, `test_lifecycle_power_cycle` and
 the reboot tests still pass.
 
@@ -586,9 +626,12 @@ the reboot tests still pass.
 * [ ] Every guard in briefs 1 to 3 has a named test that fails without
       it. The management session has re-run at least two mutations per
       step.
-* [ ] The functional run shows the four new tests passed, not skipped,
+* [ ] The functional run shows `test_lifecycle_pause_semantics` and
+      `test_lifecycle_power_on_failure` passed, not skipped,
       and the existing lifecycle tests still pass.
 * [ ] #2241 has the D7 comment.
+* [ ] A short pause and unpause leaves the agent ready:
+      `test_lifecycle_pause_semantics` passes in the functional run (D9).
 * [ ] `pre-commit run --all-files` passes.
 
 ## Back brief
