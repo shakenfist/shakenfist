@@ -1112,8 +1112,12 @@ class InstancePowerEventTimestampsTestCase(InstanceLibvirtTestCase):
         self.assertIsNone(self._event_extra('poweroff'))
 
     def test_poweroff_failure_records_no_timestamps(self):
-        domain = ClockedDomain(self.clock, destroy_error=FakeLibvirtError(
-            'internal error: something else entirely'))
+        # destroy() raised but the domain stopped anyway, so a 'poweroff'
+        # event is still written (D2). A still running domain writes none,
+        # and raises instead.
+        domain = ClockedDomain(
+            self.clock, active=False, destroy_error=FakeLibvirtError(
+                'internal error: something else entirely'))
         self._mock_libvirt(domain)
         self.inst.power_off()
 
@@ -1122,18 +1126,26 @@ class InstancePowerEventTimestampsTestCase(InstanceLibvirtTestCase):
 
 class AutostartDomain(FakeDomain):
     """A domain which records each setAutostart() flag, and can be told to
-    raise on destroy() or on setAutostart() itself.
+    raise on destroy(), on isActive() or on setAutostart() itself. Whether it
+    is active is FakeDomain's active argument.
     """
 
-    def __init__(self, destroy_error=None, autostart_error=None, **kwargs):
+    def __init__(self, destroy_error=None, autostart_error=None,
+                 is_active_error=None, **kwargs):
         super().__init__(**kwargs)
         self._destroy_error = destroy_error
         self._autostart_error = autostart_error
+        self._is_active_error = is_active_error
         self.autostart_calls = []
 
     def destroy(self):
         if self._destroy_error:
             raise self._destroy_error
+
+    def isActive(self):
+        if self._is_active_error:
+            raise self._is_active_error
+        return super().isActive()
 
     def setAutostart(self, flag):
         if self._autostart_error:
@@ -1175,11 +1187,92 @@ class InstancePowerOffAutostartTestCase(InstanceLibvirtTestCase):
     def test_power_off_leaves_autostart_when_destroy_failed(self):
         # Any other destroy() error may leave the domain running, and a
         # running domain must keep its autostart flag: nothing sets it again.
+        # The domain is still active here, so power_off() now raises (F5).
         domain = AutostartDomain(destroy_error=FakeLibvirtError(
             'internal error: something else entirely'))
         self._mock_libvirt(domain)
-        self.inst.power_off()
+        self.assertRaises(
+            exceptions.InstancePowerOffFailed, self.inst.power_off)
         self.assertEqual([], domain.autostart_calls)
+
+    def test_power_off_failed_on_running_domain_raises_and_records_state(self):
+        # destroy() failed and the domain is still running (F5, D2). The
+        # instance must not be recorded as off: its real state is recorded,
+        # autostart and agent_state are left alone, a 'poweroff failed'
+        # event carries the error, and the caller is told.
+        domain = AutostartDomain(destroy_error=FakeLibvirtError(
+            'internal error: something else entirely'))
+        self._mock_libvirt(domain, power_state='on')
+        self.inst.update_power_state('on')
+        self.inst.agent_state = constants.AGENT_READY
+
+        with self.assertRaises(exceptions.InstancePowerOffFailed) as ctx:
+            self.inst.power_off()
+
+        self.assertEqual(
+            'internal error: something else entirely', str(ctx.exception))
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        self.assertEqual([], domain.autostart_calls)
+        self.assertEqual(constants.AGENT_READY, self.inst.agent_state.value)
+        self.mock_add_event.assert_any_call(
+            EVENT_TYPE_AUDIT, 'poweroff failed',
+            extra={'message': 'internal error: something else entirely'})
+        self.assertNotIn('poweroff', self._event_messages())
+
+    def test_power_off_failed_records_the_domains_real_state(self):
+        # The state recorded is what libvirt reports, not a guess of 'on'.
+        domain = AutostartDomain(destroy_error=FakeLibvirtError(
+            'internal error: something else entirely'))
+        self._mock_libvirt(domain, power_state='paused')
+        self.inst.update_power_state('on')
+
+        self.assertRaises(
+            exceptions.InstancePowerOffFailed, self.inst.power_off)
+        self.assertEqual('paused', self.inst.power_state['power_state'])
+
+    def test_power_off_failed_but_domain_stopped_records_off(self):
+        # destroy() raised, but the domain is inactive anyway: the power off
+        # took effect, so it is treated as stopped. Its event carries no
+        # libvirt timing, since destroy() did not return.
+        domain = AutostartDomain(
+            active=False, destroy_error=FakeLibvirtError(
+                'internal error: something else entirely'))
+        self._mock_libvirt(domain)
+        self.inst.update_power_state('on')
+
+        self.inst.power_off()
+
+        self.assertEqual('off', self.inst.power_state['power_state'])
+        self.assertEqual([0], domain.autostart_calls)
+        self.assertEqual(
+            constants.AGENT_INSTANCE_OFF, self.inst.agent_state.value)
+        self.mock_add_event.assert_any_call(
+            EVENT_TYPE_AUDIT, 'poweroff', extra=None)
+        self.assertNotIn('poweroff failed', self._event_messages())
+
+    def test_power_off_failed_and_state_unreadable_writes_nothing(self):
+        # destroy() failed and the domain's state cannot be read either, so
+        # the outcome is unknowable: raise without writing a power state,
+        # and leave the cleaner to settle it.
+        domain = AutostartDomain(
+            destroy_error=FakeLibvirtError(
+                'internal error: something else entirely'),
+            is_active_error=FakeLibvirtError('internal error: no connection'))
+        self._mock_libvirt(domain)
+        self.inst.update_power_state('on')
+        self.inst.agent_state = constants.AGENT_READY
+
+        with self.assertRaises(exceptions.InstancePowerOffFailed) as ctx:
+            self.inst.power_off()
+
+        self.assertEqual(
+            'internal error: something else entirely', str(ctx.exception))
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        self.assertEqual([], domain.autostart_calls)
+        self.assertEqual(constants.AGENT_READY, self.inst.agent_state.value)
+        messages = self._event_messages()
+        self.assertNotIn('poweroff', messages)
+        self.assertNotIn('poweroff failed', messages)
 
     def test_power_off_autostart_failure_is_recorded_not_raised(self):
         domain = AutostartDomain(autostart_error=FakeLibvirtError(
@@ -1192,6 +1285,30 @@ class InstancePowerOffAutostartTestCase(InstanceLibvirtTestCase):
         messages = self._event_messages()
         self.assertIn('instance autostart configuration error', messages)
         self.assertIn('poweroff', messages)
+
+    def test_power_off_failed_and_power_state_unreadable_writes_nothing(self):
+        # As above, but the domain is active and it is reading its power
+        # state which fails.
+        domain = AutostartDomain(destroy_error=FakeLibvirtError(
+            'internal error: something else entirely'))
+        conn = FakeLibvirtConnection(domain)
+
+        def extract_power_state(d):
+            raise FakeLibvirtError('internal error: no connection')
+
+        conn.extract_power_state = extract_power_state
+        p = mock.patch(
+            'shakenfist.instance.util_libvirt.LibvirtConnection',
+            return_value=conn)
+        p.start()
+        self.addCleanup(p.stop)
+        self.inst.update_power_state('on')
+
+        self.assertRaises(
+            exceptions.InstancePowerOffFailed, self.inst.power_off)
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        self.assertEqual([], domain.autostart_calls)
+        self.assertNotIn('poweroff failed', self._event_messages())
 
     def test_power_off_no_domain_calls_nothing(self):
         self._mock_libvirt(None)

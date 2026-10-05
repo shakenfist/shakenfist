@@ -1600,6 +1600,12 @@ class InstancePowerOffEndpoint(api_base.Resource):
                 return instance_from_db.power_off()
         except exceptions.InvalidLifecycleState as e:
             return sf_api.error(409, f'Invalid lifecycle state: {e}')
+        except exceptions.InstancePowerOffFailed as e:
+            instance_from_db.add_event(
+                EVENT_TYPE_AUDIT, 'power off failed', extra={'error': str(e)})
+            return sf_api.error(
+                500, f'instance failed to power off: {e}',
+                suppress_traceback=True)
 
 
 class InstancePowerOnEndpoint(api_base.Resource):

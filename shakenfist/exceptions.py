@@ -92,6 +92,14 @@ class InstancePowerOnFailed(InstanceException):
     """
 
 
+class InstancePowerOffFailed(InstanceException):
+    """destroy() failed and the instance's domain is still running, or its
+    state could not be read afterwards.
+
+    The message is destroy()'s error.
+    """
+
+
 class NoSuchChannel(InstanceException):
     ...
 

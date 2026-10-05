@@ -14,6 +14,7 @@ re-raise so the operation still lands in the error state.
 from unittest import mock
 from uuid import uuid4
 
+from shakenfist.exceptions import InstancePowerOffFailed
 from shakenfist.exceptions import ProcessExecutionError
 from shakenfist.operations.node_inst_op import NodeInstOp
 from shakenfist.schema.object_state import State
@@ -158,3 +159,23 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
         second.update_dnsmasq.assert_called_once_with()
         self.mock_bvn.return_value.\
             _apply_delete_on_hypervisor.assert_called_once()
+
+    def test_failed_power_off_does_not_abandon_the_delete(self):
+        # power_off() raises when destroy() leaves the domain running (D2
+        # in docs/plans/PLAN-power-state-correctness-phase-03-power-api.md).
+        # Delete behaved the same before that, so it must carry on: the
+        # instance is still deleted and its networks still cleaned up.
+        inst = FakeInstance()
+        inst.power_off.side_effect = InstancePowerOffFailed(
+            'internal error: something else entirely')
+
+        op = self._make_op()
+        op._instance_delete(inst)
+
+        inst.power_off.assert_called_once_with()
+        inst.delete.assert_called_once_with()
+        for n in self.networks.values():
+            n.update_dnsmasq.assert_called_once_with()
+        self.assertEqual(
+            2, self.mock_bvn.return_value.
+            _apply_delete_on_hypervisor.call_count)

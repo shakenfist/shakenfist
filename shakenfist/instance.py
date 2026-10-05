@@ -2486,21 +2486,18 @@ class Instance(dbowo):
             # once, and a destroy() which found the domain already stopped,
             # or failed, says nothing about when it went away.
             extra = None
-            stopped = False
             libvirt_requested_at = time.time()
             try:
                 inst.destroy()
-                stopped = True
                 extra = {
                     'libvirt_requested_at': libvirt_requested_at,
                     'libvirt_returned_at': time.time()
                 }
             except lc.libvirt.libvirtError as e:
-                if str(e).startswith('Requested operation is not valid: '
-                                     'domain is not running'):
-                    stopped = True
-                else:
+                if not str(e).startswith('Requested operation is not valid: '
+                                         'domain is not running'):
                     self.log.error('Failed to delete domain: %s', e)
+                    self._check_domain_stopped_after_failed_destroy(lc, inst, e)
 
             # Autostart is the only thing which restarts this domain after a
             # hypervisor reboot (S2 in docs/plans/PLAN-power-state-correctness-
@@ -2508,22 +2505,48 @@ class Instance(dbowo):
             # off instance off. A failure is recorded rather than raised (D5):
             # the domain is off either way, and the cleaner retries the clear.
             #
-            # If destroy() failed for any other reason the domain may still be
-            # running, so leave the flag alone: nothing ever sets it again on
-            # a running domain, and the cleaner clears it on a later pass if
-            # the domain did in fact stop. Recording such an instance as off
-            # anyway is F5, which phase 3 fixes.
-            if stopped:
-                try:
-                    inst.setAutostart(0)
-                except lc.libvirt.libvirtError as e:
-                    self.add_event(
-                        EVENT_TYPE_AUDIT, 'instance autostart configuration error',
-                        extra={'message': str(e)})
+            # Only a domain which did stop reaches here. If destroy() failed
+            # and the domain is still running, it must keep the flag, because
+            # nothing ever sets it again on a running domain:
+            # _check_domain_stopped_after_failed_destroy() raises in that case
+            # (F5) rather than letting it be recorded as off.
+            try:
+                inst.setAutostart(0)
+            except lc.libvirt.libvirtError as e:
+                self.add_event(
+                    EVENT_TYPE_AUDIT, 'instance autostart configuration error',
+                    extra={'message': str(e)})
 
             self.agent_state = constants.AGENT_INSTANCE_OFF
             self.update_power_state('off')
             self.add_event(EVENT_TYPE_AUDIT, 'poweroff', extra=extra)
+
+    def _check_domain_stopped_after_failed_destroy(self, lc, domain, error):
+        # destroy() can fail after the domain has stopped, so ask libvirt
+        # whether it is still running before deciding what to record (D2 in
+        # docs/plans/PLAN-power-state-correctness-phase-03-power-api.md).
+        # Returns if the domain did stop. Otherwise raises, leaving autostart
+        # and agent_state alone, because the instance is not off.
+        try:
+            still_active = domain.isActive()
+            if still_active:
+                power_state = lc.extract_power_state(domain)
+        except lc.libvirt.libvirtError as e:
+            # The outcome is unknowable, so write no power state and leave
+            # the cleaner to settle it.
+            self.add_event(
+                EVENT_TYPE_AUDIT,
+                'failed to determine instance power state after failed power off',
+                extra={'message': str(e)})
+            raise exceptions.InstancePowerOffFailed(str(error)) from error
+
+        if not still_active:
+            return
+
+        self.update_power_state(power_state)
+        self.add_event(
+            EVENT_TYPE_AUDIT, 'poweroff failed', extra={'message': str(error)})
+        raise exceptions.InstancePowerOffFailed(str(error)) from error
 
     def reboot(self, hard=False):
         with util_libvirt.LibvirtConnection() as lc:

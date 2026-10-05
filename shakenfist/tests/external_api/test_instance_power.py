@@ -1,7 +1,8 @@
 # Copyright 2026 Michael Still and contributors
 #
-# End to end tests for what POST /instances/<ref>/poweron answers
-# (InstancePowerOnEndpoint).
+# End to end tests for what POST /instances/<ref>/poweron and
+# POST /instances/<ref>/poweroff answer (InstancePowerOnEndpoint and
+# InstancePowerOffEndpoint).
 
 import json
 from unittest import mock
@@ -19,9 +20,9 @@ from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
-class InstancePowerOnEndpointTestCase(base.ShakenFistTestCase):
-    """A power on which failed answers 500 with the hypervisor's last error,
-    not 200 with a null body (F4).
+class InstancePowerEndpointTestCase(base.ShakenFistTestCase):
+    """An authenticated client and an instance placed on this node, shared by
+    the power on and power off endpoint tests.
     """
 
     def setUp(self):
@@ -60,6 +61,12 @@ class InstancePowerOnEndpointTestCase(base.ShakenFistTestCase):
         self.auth = {
             'Authorization': 'Bearer %s' % resp.get_json()['access_token']}
 
+
+class InstancePowerOnEndpointTestCase(InstancePowerEndpointTestCase):
+    """A power on which failed answers 500 with the hypervisor's last error,
+    not 200 with a null body (F4).
+    """
+
     def _power_on(self, **power_on_kwargs):
         with mock.patch.object(Instance, 'power_on', **power_on_kwargs):
             return self.client.post(
@@ -90,3 +97,34 @@ class InstancePowerOnEndpointTestCase(base.ShakenFistTestCase):
             'you cannot power on a paused instance; unpause it instead'))
         self.assertEqual(409, resp.status_code)
         self.assertIn('unpause it instead', resp.get_json()['error'])
+
+
+class InstancePowerOffEndpointTestCase(InstancePowerEndpointTestCase):
+    """A power off which left the instance running answers 500 with
+    destroy()'s error, not 200 with the instance recorded as off (F5).
+    """
+
+    def _power_off(self, **power_off_kwargs):
+        with mock.patch.object(Instance, 'power_off', **power_off_kwargs):
+            return self.client.post(
+                '/instances/%s/poweroff' % self.instance_uuid,
+                headers=self.auth, data=json.dumps({}))
+
+    def test_power_off_success_answers_200_with_null_body(self):
+        resp = self._power_off(return_value=None)
+        self.assertEqual(200, resp.status_code, resp.get_json())
+        self.assertIsNone(resp.get_json())
+
+    def test_failed_power_off_answers_500_with_the_error(self):
+        resp = self._power_off(side_effect=exceptions.InstancePowerOffFailed(
+            'internal error: something else entirely'))
+
+        self.assertEqual(500, resp.status_code)
+        self.assertEqual(
+            'instance failed to power off: internal error: something else '
+            'entirely', resp.get_json()['error'])
+        eventlog.add_event_multi.assert_any_call(
+            EVENT_TYPE_AUDIT, [('instance', UUID(self.instance_uuid))],
+            'power off failed', duration=None,
+            extra={'error': 'internal error: something else entirely'},
+            suppress_event_logging=False, log_as_error=False)
