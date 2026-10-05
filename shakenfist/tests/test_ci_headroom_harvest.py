@@ -785,6 +785,46 @@ class LoudFailureTestCase(HarvestTestCase):
             {run['id']: []}, {})
         self.assertRaises(harvest.HarvestError, self._harvest, github)
 
+    def test_runs_which_carry_no_bundle_say_the_output_was_truncated(self):
+        # The other half of the contract, and the half the error message
+        # makes a claim about: by the time this raises the output has
+        # already been opened for writing, so the previous dataset is
+        # gone and the message has to say so rather than leave an
+        # operator believing their file survived. The case above asserts
+        # only that something raised, which an open deferred until the
+        # first record -- or an append rather than a truncate -- would
+        # also satisfy while making the message a lie. Pre-seeding and
+        # checking, the way the empty-enumeration case does, is what
+        # tells the two orderings apart.
+        with open(self.output, 'w') as f:
+            f.write('{"run_id":1}\n')
+        run = self._run_payload()
+        github = FakeGitHub(
+            [run], {run['id']: [{'id': 9800, 'name': 'coverage',
+                                 'expired': False}]},
+            {run['id']: []}, {})
+
+        try:
+            self._harvest(github)
+        except harvest.HarvestError as e:
+            self.assertIn(
+                'now empty', str(e),
+                'The error did not say the output had been emptied, which '
+                'is the difference between a harvest an operator can '
+                're-run and one whose dataset they have just lost.')
+        else:
+            self.fail('a window whose every run carried no bundle did not '
+                      'raise')
+
+        with open(self.output) as f:
+            self.assertEqual(
+                '', f.read(),
+                'The pre-existing dataset survived, so the output is '
+                'opened after the runs are read (or opened for append). '
+                'Either way the error message above is wrong about what '
+                'happened, and a reader who believes it deletes a file '
+                'which was fine or keeps one which is not.')
+
     def test_a_harvest_which_produced_a_record_is_not_an_error(self):
         # The guard must not fire on a harvest which worked, including one
         # whose only record is an absence: an expired artifact is a fact

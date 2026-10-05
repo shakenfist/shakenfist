@@ -403,6 +403,20 @@ raises: a failure just writes an error record and the polling loop
 continues, so one bad sample never costs the run the rest of the
 series.
 
+Every record, successful or failed, also carries:
+
+* `writes_failed` -- int, how many records this run has already failed
+  to write before this one. A write which fails writes nothing at all,
+  so this is the only place the failure can be recorded: the first line
+  to land after a gap says how many lines the gap swallowed. It is
+  cumulative for the run rather than per-gap, so any one surviving line
+  carries the whole run's loss, and a healthy run carries an explicit
+  `0` on every line. Read it with `.get()`: it is absent from records
+  written by a probe predating the counter, and absent is "not counted"
+  rather than "nothing lost". The one case it cannot report is a disk
+  which stays unwritable to the end of a run, which leaves no line to
+  carry the count and arrives instead as a series that simply stops.
+
 The roster is recorded on *every* sample, not once at the start of the
 run, and that is deliberate. `summarize_resources()` silently omits
 from `per_node` any node that is not a hypervisor, whose metrics are

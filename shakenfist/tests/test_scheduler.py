@@ -1,3 +1,5 @@
+import importlib.util
+import os
 import random
 import time
 from unittest import mock
@@ -11,6 +13,31 @@ from shakenfist.constants import GiB
 from shakenfist.node import nodes_by_free_disk_descending
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
+
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__))))
+SIZING_PATH = os.path.join(
+    REPO_ROOT, 'shakenfist', 'deploy', 'shakenfist_ci', 'sizing.py')
+HEADROOM_REPORT_PATH = os.path.join(
+    REPO_ROOT, 'tools', 'ci_headroom_report.py')
+
+
+def _load_by_path(name, path):
+    """Load a module which cannot be imported, by path.
+
+    Two of the three readers of the published CPU ceiling are
+    deliberately unimportable from here. ``shakenfist_ci/sizing.py``
+    imports nothing from the functional suite so that it can be loaded
+    this way, and ``tools/`` is not a package at all because the headroom
+    report has to run under stock python3 on a CI runner. Neither can
+    import this server, which is why the agreement between them and it
+    needs asserting rather than arranging.
+    """
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 fake_config = SFConfig(
@@ -2083,9 +2110,12 @@ class HasSufficientCPUPredicateTestCase(SchedulerTestCase):
         ``hard_max_cpus``, ``committed_cpus`` is zero because there is no
         row to read one from, and the boundary is still the strict one.
         This is the branch ``shakenfist_ci/sizing.py``'s
-        ``effective_cpu_ceiling()`` mirrors when it reads a null
-        ``cpu_limit`` as the node's ``cpu_hard_max``, so the two must
-        agree about what bounds an unguarded node.
+        ``effective_cpu_ceiling()`` and ``ci_headroom_report.py``'s
+        ``NodeSample`` each mirror when they read a null ``cpu_limit`` as
+        the node's ``cpu_hard_max``. That the three agree is asserted by
+        ``CpuCeilingAgreementTestCase`` rather than here, because this
+        test drives only the server and would stay green while a reader
+        drifted away from it.
         """
         node = self._node_uuid('node2')
         hard_max = 4 * fake_config.CPU_OVERCOMMIT_RATIO
@@ -2122,6 +2152,143 @@ class HasSufficientCPUPredicateTestCase(SchedulerTestCase):
             'cpu_schedulable': 4,
             'cpu_schedulable_from_fallback': False,
         }, reason)
+
+
+class CpuCeilingAgreementTestCase(SchedulerTestCase):
+    """The published CPU ceiling reads the same to the server and to both
+    of its out-of-tree readers.
+
+    ``_has_sufficient_cpu()`` is the authority: the ceiling it enforces
+    is the capacity row's ``limit_cpus`` where there is a row and the
+    node's own live ``cpu_hard_max`` where there is not. That same
+    arithmetic is written out twice more, in
+    ``shakenfist_ci/sizing.py``'s ``effective_cpu_ceiling()`` and in
+    ``tools/ci_headroom_report.py``'s ``NodeSample``, and the duplication
+    is not an accident to be removed -- the report must be
+    standard-library-only to run on a bare runner and the sizing module
+    must import nothing from the functional suite so it can be loaded by
+    path, so neither can import the server and share its copy.
+
+    What that leaves is three copies which can drift apart silently, and
+    the direction of the drift matters: a reader which treated an
+    unguarded node's null ``cpu_limit`` as a zero ceiling, or dropped the
+    node from its ``max()``, would understate the cluster's real ceiling
+    and conclude that a request the scheduler will happily admit is
+    impossible. Asserting the server's side alone cannot catch that,
+    because the readers are where the understatement would live; asserting
+    the readers alone cannot catch the server changing under them.
+
+    So each test here publishes one node through the real
+    ``summarize_resources()``, hands that payload to both readers, and
+    then checks the scheduler admits an instance of exactly the ceiling
+    they computed and refuses one vCPU more. The fixture is shared, the
+    payload is the server's own, and a change to the fallback on either
+    side of the boundary breaks this.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.sizing = _load_by_path('ci_sizing_agreement', SIZING_PATH)
+        self.headroom = _load_by_path(
+            'ci_headroom_report_agreement', HEADROOM_REPORT_PATH)
+        self.mock_mariadb.set_node_metrics_same({
+            'cpu_max_per_instance': 1024,
+            'cpu_max': 4,
+            'cpu_schedulable': 4,
+            'cpu_total_instance_vcpus': 0,
+            'memory_available': 1000000,
+            'memory_max': 1000000,
+            'memory_reserved_mb': 0,
+            'disk_free_instances': 2000 * GiB,
+        })
+        self.node = self._node_uuid('node2')
+
+    def _published(self):
+        """One node's slice of /admin/resources, from the server itself.
+
+        Read through ``summarize_resources()`` rather than hand-built, so
+        this test cannot agree with a payload shape the API does not
+        actually publish.
+        """
+        return scheduler.Scheduler().summarize_resources()[
+            'per_node'][self.node]
+
+    def _admits(self, cpus):
+        """Whether the pre-filter admits an instance of this many vCPUs.
+
+        The capacity mapping comes from the same helper
+        ``summarize_resources()`` read it with, so the ledger the
+        published payload describes and the ledger the predicate is
+        measured against cannot be two different readings.
+        """
+        s = scheduler.Scheduler()
+        capacity, _ = s._capacity_by_node()
+        inst = self.mock_mariadb.create_instance(
+            'ceiling-%d' % cpus, cpus=cpus)
+        ok, _ = s._has_sufficient_cpu(
+            s.log.with_fields({'instance': inst}), inst, self.node, capacity)
+        return ok
+
+    def _assert_all_three_agree(self, expected):
+        payload = self._published()
+        self.assertEqual(
+            expected, self.sizing.effective_cpu_ceiling(payload),
+            'shakenfist_ci/sizing.py computes a different ceiling from the '
+            'one the server enforces, so a saturation request sized from it '
+            'is either servable (and the refusal under test never arrives) '
+            'or needlessly large.')
+        self.assertEqual(
+            expected,
+            self.headroom.NodeSample(self.node, payload).cpu_ledger,
+            'tools/ci_headroom_report.py computes a different ledger from '
+            'the one the server enforces, so every headroom percentile it '
+            'publishes is measured against the wrong denominator.')
+        self.assertTrue(
+            self._admits(int(expected)),
+            'The server refused an instance of exactly the ceiling all '
+            'three readers agree on, so the readers are overstating it.')
+        self.assertFalse(
+            self._admits(int(expected) + 1),
+            'The server admitted one vCPU beyond the ceiling all three '
+            'readers agree on, so the readers are understating it and '
+            'anything sized from them reads a tight cluster as roomy.')
+
+    def test_an_unguarded_node_is_bounded_by_its_live_hard_max(self):
+        """The fallback, which is the branch all three copies spell out.
+
+        A node the capacity reconciler has not written a row for
+        publishes a null ``cpu_limit`` and is not thereby limitless: the
+        scheduler charges it against its own live ``cpu_hard_max``. Every
+        node reads this way for the first few minutes of a cluster's
+        life, while the capacity table is still unpopulated, so a reader
+        which got this branch wrong would be wrong about the start of
+        every CI job.
+        """
+        payload = self._published()
+        self.assertIsNone(
+            payload['cpu_limit'],
+            'The fixture was meant to leave this node unguarded.')
+        self._assert_all_three_agree(payload['cpu_hard_max'])
+
+    def test_a_guarded_node_is_bounded_by_its_capacity_row(self):
+        """The other branch, which must not quietly become the fallback too.
+
+        A reader which read ``cpu_hard_max`` unconditionally would agree
+        with the server about every unguarded node and be wrong about
+        every guarded one, by exactly the margin the reconciler was
+        trying to impose.
+        """
+        self.mock_mariadb.set_node_capacity(
+            self.node, limit_cpus=20, limit_memory_mb=1000000, used_cpus=0)
+
+        payload = self._published()
+        self.assertEqual(20, payload['cpu_limit'])
+        self.assertGreater(
+            payload['cpu_hard_max'], payload['cpu_limit'],
+            'The fixture is only meaningful while the row binds below the '
+            'live derivation; otherwise both branches return the same '
+            'number and nothing is distinguished.')
+        self._assert_all_three_agree(payload['cpu_limit'])
 
 
 class HasSufficientRAMPredicateTestCase(SchedulerTestCase):
