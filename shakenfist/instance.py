@@ -77,6 +77,9 @@ from shakenfist.util import libvirt as util_libvirt
 
 LOG, _ = logs.setup(__name__)
 
+# How many times power_on() tries to start a domain before giving up.
+POWER_ON_ATTEMPTS = 5
+
 
 def _get_defaulted_disk_bus(disk):
     bus = disk.get('bus')
@@ -391,6 +394,11 @@ class Instance(dbowo):
         self.__secure_boot = static_values.get('secure_boot', False)
         self.__machine_type = static_values.get('machine_type', 'pc')
         self.__side_channels = static_values.get('side_channels', [])
+
+        # The error from the most recent failed power on attempt. It is only
+        # needed to explain a failed power_on() to its caller, so it lives
+        # on this object rather than in the database.
+        self._power_on_last_error = None
 
         if not self.__disk_spec:
             # This should not occur since the API will filter for zero disks.
@@ -1539,7 +1547,13 @@ class Instance(dbowo):
         # done in power_on().
         self._configure_block_devices()
 
-        self.power_on()
+        # A failed power on is judged below by the domain's state, as it
+        # was before power_on() raised, so that create's error handling and
+        # its event are unchanged.
+        try:
+            self.power_on()
+        except exceptions.InstancePowerOnFailed:
+            pass
         self._record_domain_xml()
 
         if self.is_powered_on():
@@ -2290,22 +2304,44 @@ class Instance(dbowo):
         # for port binding to work. Revisiting this is tracked by issue 320 on
         # github. Additionally, sometimes ports are not released correctly by a
         # domain destroy, which means we need to reassign on domain start.
-        if not self._power_on_inner():
-            attempts = 1
-            while not self._power_on_inner() and attempts < 5:
-                self.add_event(
-                    EVENT_TYPE_STATUS,
-                    'instance required an additional attempt to power on',
-                    extra={'attempt': attempts})
-                time.sleep(1)
-                attempts += 1
+        self._power_on_last_error = None
+        attempts = 1
+        while not self._power_on_inner():
+            if attempts >= POWER_ON_ATTEMPTS:
+                self._record_power_state_after_failed_power_on()
+                raise exceptions.InstancePowerOnFailed(
+                    self._power_on_last_error)
+            self.add_event(
+                EVENT_TYPE_STATUS,
+                'instance required an additional attempt to power on',
+                extra={'attempt': attempts})
+            time.sleep(1)
+            attempts += 1
 
-            self.agent_state = constants.AGENT_NEVER_TALKED
+    def _record_power_state_after_failed_power_on(self):
+        # Every attempt failed. Record what the domain really is, so that an
+        # earlier 'on' is not left behind. If even the state cannot be read
+        # the outcome is unknowable, so write nothing and leave the cleaner
+        # to settle it.
+        with util_libvirt.LibvirtConnection() as lc:
+            try:
+                domain = lc.get_domain_from_sf_uuid(self.uuid)
+                state = lc.extract_power_state(domain) if domain else 'off'
+            except lc.libvirt.libvirtError as e:
+                state = None
+                self.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'failed to determine instance power state after failed power on',
+                    extra={'message': str(e)})
+
+        if state:
+            self.update_power_state(state)
 
     def _power_on_retry_prep(self, domain, message,
                              needs_port_reallocation=False):
         if needs_port_reallocation:
             message += ' (TCP ports reallocated)'
+        self._power_on_last_error = message
         self.add_event(
             EVENT_TYPE_STATUS, 'instance power on requires new attempt',
             extra={'message': message})
@@ -2358,13 +2394,25 @@ class Instance(dbowo):
             # to this instance when other instances are starting and stopping
             # on the node too.
             libvirt_requested_at = time.time()
+            started = False
             try:
                 domain.create()
                 libvirt_returned_at = time.time()
+                started = True
             except lc.libvirt.libvirtError as e:
                 if str(e).startswith('Requested operation is not valid: '
                                      'domain is already running'):
-                    return True
+                    # A paused domain is active too, so it lands here.
+                    # Powering it on would leave it paused while answering
+                    # success; unpause is the operation which resumes it. A
+                    # running domain is a success, and falls through so its
+                    # autostart flag and power state are set as for a fresh
+                    # start. That is also how a running instance whose
+                    # autostart flag was lost gets it back.
+                    if lc.extract_power_state(domain) == 'paused':
+                        raise exceptions.InvalidLifecycleState(
+                            'you cannot power on a paused instance; '
+                            'unpause it instead') from e
                 elif (str(e).find('Failed to find an available port: '
                                   'Address already in use') != -1):
                     self._power_on_retry_prep(
@@ -2380,8 +2428,11 @@ class Instance(dbowo):
                         domain, str(e), needs_port_reallocation=False)
                     return False
                 else:
+                    # Undefine the domain, so the retry defines fresh XML
+                    # naming the reallocated ports rather than starting the
+                    # old domain again.
                     self._power_on_retry_prep(
-                        None, f'unhandled instance start error: {str(e)}',
+                        domain, f'unhandled instance start error: {str(e)}',
                         needs_port_reallocation=True)
                     return False
 
@@ -2402,6 +2453,17 @@ class Instance(dbowo):
                     extra={'message': str(e)})
                 raise e
 
+            if not started:
+                # This call did not start the domain, so it has no timing
+                # to bracket, and the agent has not restarted: sidechannel
+                # only writes agent_state when its cached view changes, so
+                # resetting it here would leave it reading "no contact".
+                self.add_event(EVENT_TYPE_AUDIT, 'poweron')
+                return True
+
+            # The domain has just started, so whatever the agent said
+            # before no longer holds.
+            self.agent_state = constants.AGENT_NEVER_TALKED
             self.add_event(
                 EVENT_TYPE_AUDIT, 'poweron',
                 extra={'libvirt_requested_at': libvirt_requested_at,

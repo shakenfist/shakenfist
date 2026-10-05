@@ -1631,6 +1631,12 @@ class InstancePowerOnEndpoint(api_base.Resource):
                 EVENT_TYPE_AUDIT, 'power on failed: UEFI boot unavailable',
                 extra={'error': str(e)})
             return sf_api.error(409, f'UEFI boot unavailable: {e}')
+        except exceptions.InstancePowerOnFailed as e:
+            instance_from_db.add_event(
+                EVENT_TYPE_AUDIT, 'power on failed', extra={'error': str(e)})
+            return sf_api.error(
+                500, f'instance failed to power on: {e}',
+                suppress_traceback=True)
 
 
 class InstancePauseEndpoint(api_base.Resource):
