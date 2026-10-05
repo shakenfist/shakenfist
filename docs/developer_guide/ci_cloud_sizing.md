@@ -370,8 +370,8 @@ it into the job log, which is a separate, later change.
 Since [#4337](https://github.com/shakenfist/shakenfist/issues/4337)
 landed as `62bb1ddeb`, a trace file that exists and is empty is a
 real zero for any run whose base contains that commit:
-`BaseTestCase.setUp()` (`shakenfist/deploy/shakenfist_ci/base.py:214`)
-calls `ensure_capacity_wait_trace()` (`:180`), which touches the file
+`BaseTestCase.setUp()` in `shakenfist/deploy/shakenfist_ci/base.py`
+calls `ensure_capacity_wait_trace()`, which touches the file
 into existence at suite start-up and swallows every failure exactly
 as the append path does. `absent` and `unparseable` remain unknown,
 and an absent file still cannot be read as zero, because the same
@@ -385,12 +385,12 @@ caller's job.
 [PLAN-transient-capacity-refusals-phase-05-queue-decision.md](../plans/PLAN-transient-capacity-refusals-phase-05-queue-decision.md)'s
 D43 -- "`empty` is a real zero; `absent` and `unparseable` stay
 unknown" -- is the decision this unlocked.
-A file that was read but whose every line was malformed is reported
-the same way, for the same reason, and carries its own `state` of
-`unparseable` in the machine-readable record rather than an
-`available` file with a count of zero -- the prose and the record have
-to say the same thing, because the tooling that reads this consumes
-the record, not the prose.
+A file that was read but whose every line was malformed is unknown
+as well -- not a zero -- for the same reason an absent one is, and it
+carries its own `state` of `unparseable` in the machine-readable
+record rather than appearing as an `available` file with a count of
+zero. The prose and the record have to say the same thing, because
+the tooling that reads this consumes the record, not the prose.
 
 ### The series record format
 

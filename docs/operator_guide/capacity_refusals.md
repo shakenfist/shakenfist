@@ -66,17 +66,19 @@ before any of the data was read, and is recorded in full in
 under *Outcome -- second reading*.
 
 Two things about that result need stating precisely, because the short version
-overstates it. The rule selected its middle-ground default rather than any of
-its own clauses: two of the second window's three capacity waits ran past the
-210 second line the rule treats as long -- the reading that stopped it
-abandoning the idea outright -- while none of its build clauses fired. How
-close that was depends on how the units are counted: on the narrowest
-counting the margin is wide, and on the broadest the reading sits one
-long-wait run short of building a queue after all. Three waits were
-recorded across 95 instrumented units, the longest 290.83 s against a
-420 s deadline.
+overstates it. First, the rule selected its middle-ground default -- the answer
+it prescribes when neither the clauses that would have it build a queue nor the
+clauses that would have it abandon the idea outright are satisfied -- rather
+than any of its own clauses: two of the second window's three capacity waits
+ran past the 210 second line the rule treats as long, which is what stopped it
+abandoning the idea outright, while none of the build clauses fired. How close
+that was depends on the unit the waits are counted over -- per test bundle, per
+run-and-topology, or per run: on the narrowest counting the margin is wide, and
+on the broadest the reading sits one long-wait run short of building a queue
+after all. Three waits were recorded across 95 instrumented units, the longest
+290.83 s against a 420 s deadline.
 
-And the evidence has three limits:
+Second, the evidence has three limits:
 
 - **CI-only.** Every wait came from the functional suite's own creates against
   CI clusters. No production cloud contributed.

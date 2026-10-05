@@ -1247,15 +1247,22 @@ because the following statements will be true:
   records. D8 rejected hold-until-fittable on state-surface
   grounds; the measurement agrees for a different reason -- there
   was not enough waiting in CI to pay for a queue.
-- **CI tier topology and sizing as a capacity consumer.** The
-  Debian 13 tier runs three "hypervisors", of which `primary`
-  is also the network *and* database node and `sf1` is also a
-  database node. With `NODE_CPU_RESERVATION_THREADS=4` each
-  has a `cpu_schedulable` of 1-2, so at the default overcommit
-  `limit_cpus` is 3 and three 1-vCPU instances fill a node —
-  while the suite runs at stestr concurrency 5 and several of
-  the tests that fail this way use `force_placement`, which by
-  construction cannot fall back to another node. The per-host
+- **CI tier topology and sizing as a capacity consumer.** On the
+  `Debian 12 tier` -- the shape this reading was taken on -- the
+  lane ran three "hypervisors", of which `primary` was also the
+  network *and* database node and `sf1` also a database node. With
+  `NODE_CPU_RESERVATION_THREADS=4` each had a `cpu_schedulable` of
+  1-2, so at the default overcommit `limit_cpus` was 3 and three
+  1-vCPU instances filled a node — while the suite runs at stestr
+  concurrency 5 and several of the tests that fail this way use
+  `force_placement`, which by construction cannot fall back to
+  another node. That arithmetic no longer describes the live lane:
+  the sizing plan's phase 4 reshaped the tier to three 6 vCPU
+  nodes publishing 24 schedulable vCPU, and it is now named
+  `Debian 13 tier`. See
+  [the CI cloud sizing guide](../developer_guide/ci_cloud_sizing.md)
+  for the current per-node figures rather than a copy of them
+  here. The per-host
   reservations are arithmetically right; they just make an
   already small cluster genuinely small, which is why the
   role-awareness work landed in phase 00a made these failures
