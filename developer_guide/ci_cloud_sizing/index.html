@@ -15388,20 +15388,34 @@ only inside a live job, this summary is available for any run that
 wrote the trace -- the evidence does not wait for
 <code>ci_headroom_collect.sh</code> to grow its own <code>--waits</code> plumbing and print
 it into the job log, which is a separate, later change.</p>
-<p>An absent or empty file reports as unknown, never as zero waits, for
-the same reason an absent or empty census reports as unknown rather
-than as zero refusals (see
-<a href="#one-bound-gates-and-everything-else-is-information">One bound gates, and everything else is information</a>
-below): "no
-one collected this" and "the wrapper never had to wait" are different
-findings, and the reading that looks reassuring -- zero -- is exactly
-the wrong one to print when the file was never written or never read.
-A file that was read but whose every line was malformed is reported
-the same way, for the same reason, and carries its own <code>state</code> of
-<code>unparseable</code> in the machine-readable record rather than an
-<code>available</code> file with a count of zero -- the prose and the record have
-to say the same thing, because the tooling that reads this consumes
-the record, not the prose.</p>
+<p>Since <a href="https://github.com/shakenfist/shakenfist/issues/4337">#4337</a>
+landed as <code>62bb1ddeb</code>, a trace file that exists and is empty is a
+real zero for any run whose base contains that commit:
+<code>BaseTestCase.setUp()</code> in <code>shakenfist/deploy/shakenfist_ci/base.py</code>
+calls <code>ensure_capacity_wait_trace()</code>, which touches the file
+into existence at suite start-up and swallows every failure exactly
+as the append path does. A missing file -- <code>absent</code> in D43's
+vocabulary, which the tool reports as <code>unreadable</code> -- and one whose
+every line was malformed both remain unknown, and a missing file
+still cannot be read as zero, because the same on-disk signature
+covers both a component ref predating the wrapper and a run whose
+every write failed. <code>tools/ci_headroom_report.py</code> still nulls an
+empty trace's counts, and that is correct: the report runs over a
+downloaded bundle and cannot see the run's base, so the five states
+it emits in the record's <code>state</code> -- <code>not requested</code> when <code>--waits</code>
+was not passed, <code>unreadable</code>, <code>empty</code>, <code>read</code>, and <code>unparseable</code>
+when the file was read but every line in it was malformed -- are the
+raw reading, and applying the ancestry condition is the caller's
+job.
+<a href="../../plans/PLAN-transient-capacity-refusals-phase-05-queue-decision/">PLAN-transient-capacity-refusals-phase-05-queue-decision.md</a>'s
+D43 -- "<code>empty</code> is a real zero; <code>absent</code> and <code>unparseable</code> stay
+unknown" -- is the decision this unlocked.
+A file that was read but whose every line was malformed is unknown
+as well -- not a zero -- for the same reason an absent one is, and it
+carries its own <code>state</code> of <code>unparseable</code> in the machine-readable
+record rather than appearing as an <code>available</code> file with a count of
+zero. The prose and the record have to say the same thing, because
+the tooling that reads this consumes the record, not the prose.</p>
 <h3 id="the-series-record-format">The series record format<a class="headerlink" href="#the-series-record-format" title="Permanent link">&para;</a></h3>
 <p><code>headroom.jsonl</code> is parsed as a contract, so treat the shape below as
 load-bearing rather than as prose to paraphrase; the tool's own

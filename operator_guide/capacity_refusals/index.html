@@ -14772,6 +14772,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#is-the-refusal-queued-server-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Is the refusal queued server-side?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-response-body" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14967,6 +14978,49 @@ fifteen seconds, in an hour, or after every instance on it had been deleted:</p>
   the request is not in the active node list.</p>
 </li>
 </ul>
+<h2 id="is-the-refusal-queued-server-side">Is the refusal queued server-side?<a class="headerlink" href="#is-the-refusal-queued-server-side" title="Permanent link">&para;</a></h2>
+<p>No. When the scheduler cannot place an instance, the server refuses the
+request; it does not hold the create until capacity appears. A client that
+wants the create to survive a transient refusal retries it, either itself or
+through the <a href="#client-side-retry">opt-in client retry</a> described below.</p>
+<p>That is a measured position rather than a design preference. It was decided
+over two windows of merge-CI data against a numeric decision rule written down
+before any of the data was read, and is recorded in full in
+<a href="../../plans/PLAN-transient-capacity-refusals-phase-05-queue-decision/">PLAN-transient-capacity-refusals-phase-05-queue-decision.md</a>
+under <em>Outcome -- second reading</em>.</p>
+<p>Two things about that result need stating precisely, because the short version
+overstates it. First, the no-queue answer came from the rule's middle-ground
+default rather than from any of its own clauses. That default is Abandon -- the
+answer the rule prescribes when neither the clauses that would have it build a
+queue nor the clauses that would have it abandon the idea outright are
+satisfied -- so the outcome is no queue, not something between the two: two of
+the second window's three capacity waits
+ran past the 210 second line the rule treats as long, which is what stopped it
+abandoning the idea outright, while none of the build clauses fired. How close
+that was depends on the unit the waits are counted over -- per test bundle, per
+run-and-topology, or per run: on the narrowest counting the margin is wide, and
+on the broadest the reading sits one long-wait run short of building a queue
+after all. Three waits were recorded across 95 instrumented units, the longest
+290.83 s against a 420 s deadline.</p>
+<p>Second, the evidence has three limits:</p>
+<ul>
+<li>
+<p><strong>CI-only.</strong> Every wait came from the functional suite's own creates against
+  CI clusters. No production cloud contributed.</p>
+</li>
+<li>
+<p><strong>Post-reshape.</strong> The window ran after the CI clusters were resized, so it
+  describes the pressure they are under now.</p>
+</li>
+<li>
+<p><strong>Client retry off.</strong> The suite ran with the opt-in retry disabled, so the
+  waits are the server's refusals rather than a client's replays.</p>
+</li>
+</ul>
+<p>One question the evidence cannot answer either way: whether a create pinned to
+a node fares worse than an unpinned one. Every refused create the suite issues
+is pinned, so there is no unpinned comparison arm, and that stays untested
+rather than settled.</p>
 <h2 id="the-response-body">The response body<a class="headerlink" href="#the-response-body" title="Permanent link">&para;</a></h2>
 <p>A scheduling <code>507</code> returns a JSON body with four fields:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>

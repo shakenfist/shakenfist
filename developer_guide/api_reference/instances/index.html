@@ -15061,7 +15061,10 @@ already a 400.</p>
 <li>size (integer): the size of the disk in gigabytes. Must be zero or greater; a
   negative size is refused with a 400, because it corrupts the cluster's capacity
   accounting. Omit this value, or send null, for a disk the size of its base
-  image.</li>
+  image. A request the cluster has no room for is refused later, by the
+  scheduler, with a 507 -- see
+  <a href="/operator_guide/capacity_refusals/">capacity refusals</a> for that response's
+  format, its <code>stage</code> and <code>transient</code> fields, and the <code>Retry-After</code> header.</li>
 <li>base (string): the base image for the disk. This can be a variety of URL-like strings,
   as documented on <a href="/user_guide/artifacts/">the artifacts page in the user guide</a>.
   For a blank disk, omit this value, send null, or send the literal string

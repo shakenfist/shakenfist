@@ -15606,12 +15606,12 @@ every phase has been completed, abandoned or superseded.</p>
 <td>5. Decide on server-side queued placement from the phase 2 data</td>
 <td><a href="../PLAN-transient-capacity-refusals-phase-05-queue-decision/">PLAN-transient-capacity-refusals-phase-05-queue-decision.md</a></td>
 <td>Complete</td>
-<td>—</td>
+<td><code>b398cb890</code> (#4362), <code>a5e4a5e8c</code> (#4390), <code>48584e589</code> (#4406)</td>
 </tr>
 <tr>
 <td>6. Documentation and close-out</td>
-<td>PLAN-transient-capacity-refusals-phase-06-docs.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-transient-capacity-refusals-phase-06-docs/">PLAN-transient-capacity-refusals-phase-06-docs.md</a></td>
+<td>Complete</td>
 <td>—</td>
 </tr>
 <tr>
@@ -15628,7 +15628,11 @@ range where the phase landed directly. It is filled in as each
 phase lands, so <code>—</code> means the phase has not landed yet, even
 where its phase plan is already written and linked above. Phase 1
 took two: the implementation, and the close-out which recorded its
-measurement. Phase 2 took the same two.</p>
+measurement. Phase 2 took the same two. Phase 5 took three and no
+implementation at all: it is a decision phase, so each pull request
+records a reading rather than a change -- the first reading, the
+amendment that made the second reading possible, and the second
+reading, which decided.</p>
 <p>Phases 1, 2 and 3 are independent of one another and can run in
 parallel. Phase 4 follows 2, because the client retry should match
 the semantics the suite has already proven. Phase 5 needs phase 2
@@ -15908,15 +15912,30 @@ recorded as open question 8's answer rather than as a phase status.
 Nothing was designed and no code changed. See open question 8 above
 and that plan's <em>Outcome -- second reading</em>.</p>
 <h3 id="phase-6-documentation-and-close-out">Phase 6 -- Documentation and close-out<a class="headerlink" href="#phase-6-documentation-and-close-out" title="Permanent link">&para;</a></h3>
-<p>Document the transient-refusal contract in
-<code>docs/operator_guide/scheduler.md</code> and the API reference, the suite
-wrapper and its allowlist marker in <code>docs/developer_guide/ci.md</code>,
-and the wait summary beside the headroom probe's documentation.
-Update <code>docs/plans/index.md</code> and the sibling plans' cross-references
-to their final state. Comment on #3772 with the before-and-after
-pass rate and close it only if the <code>Debian 12 tier</code> job's failures
-are no longer <code>sufficient_idle_cpu</code>; otherwise leave it open with
-the numbers.</p>
+<p>Document the answer to open question 8 beside the contract a client
+sees, correct the one documentation statement that #4337 overturned,
+and close the plan out. Update <code>docs/plans/index.md</code> and the sibling
+plans' cross-references to their final state. Comment on #3772 with
+the before-and-after pass rate and close it only if the
+<code>Debian 13 tier</code> job's failures are no longer <code>sufficient_idle_cpu</code>;
+otherwise leave it open with the numbers.</p>
+<p>This section originally sent the phase to document the
+transient-refusal contract in <code>docs/operator_guide/scheduler.md</code>,
+the suite wrapper and its allowlist marker in
+<code>docs/developer_guide/ci.md</code>, and the wait summary beside the
+headroom probe's documentation. Phase 6's survey found all three
+already discharged, two of them on pages that did not exist when
+this was written: phase 4 created
+<code>docs/operator_guide/capacity_refusals.md</code> and had <code>scheduler.md</code>
+link to it rather than restate it, phase 2 documented the wrapper
+and the marker in <code>ci.md</code>, and the sizing plan's own phase 6 moved
+the headroom material -- and the wait summary with it -- to
+<code>docs/developer_guide/ci_cloud_sizing.md</code>. What that page now says
+about an empty wait trace is what #4337 made false, and correcting
+it is the phase's one real documentation change. The job named here
+was also renamed: <code>e9e8c86658d</code> retired the Debian 12 matrix lanes,
+so the close condition is read against <code>Debian 13 tier</code>. See
+<a href="../PLAN-transient-capacity-refusals-phase-06-docs/">phase 6's <em>What the survey found</em></a>.</p>
 <h3 id="phase-7-push-audit">Phase 7 -- Push audit<a class="headerlink" href="#phase-7-push-audit" title="Permanent link">&para;</a></h3>
 <p>Runs <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase in
 this plan, not the last phase's diff alone. Auditing one phase at a
@@ -16186,7 +16205,7 @@ because the following statements will be true:</p>
 <li>The decision on server-side queued placement is written down in
   the phase 5 file with the data it was made from, whichever way
   it went.</li>
-<li>The <code>Debian 12 tier</code> job's pass rate is comparable to the other
+<li>The <code>Debian 13 tier</code> job's pass rate is comparable to the other
   cluster jobs, and its remaining failures are not
   <code>sufficient_idle_cpu</code>.</li>
 <li>The code passes <code>pre-commit run --all-files</code> (flake8, stestr
@@ -16363,9 +16382,9 @@ while planning it.</p>
 <ul>
 <li><strong>#3772</strong> (open, umbrella) -- the refusal this plan is about.
   Stays open until phase 6 has the before-and-after numbers.</li>
-<li><strong>#4087</strong> (open; #4106 attempted it and did not close it) -- the
-  warm-up window. Phase 1 fixes it, comments with what #4106 did and
-  did not cover, and closes it.</li>
+<li><strong>#4087</strong> (closed by phase 1; #4106 attempted it and did not close
+  it) -- the warm-up window. Phase 1 fixes it, comments with what
+  #4106 did and did not cover, and closes it.</li>
 <li><strong>#3498, #3602, #3670, #3728, #3749, #3767</strong> (closed into #3772)
   -- the per-test victims. Do not file another; the umbrella exists
   because per-test tracking stopped paying for itself.</li>
@@ -16377,6 +16396,21 @@ while planning it.</p>
   phase 3 each carry a budget declaration.</li>
 <li><strong>#1364</strong> (open) -- lame-duck and evacuate. Where node-scoped
   reservations would earn their place; see open question 5.</li>
+<li><strong><a href="https://github.com/shakenfist/shakenfist/issues/4337">#4337</a></strong>
+  (closed) -- the capacity-wait trace could not express zero, which
+  made 92.3% of phase 5's first window unreadable; its fix is what
+  the second window rests on.</li>
+<li><strong><a href="https://github.com/shakenfist/shakenfist/issues/4403">#4403</a></strong>
+  (open) -- <code>ci_headroom_harvest</code>'s point-in-time bundle tables
+  reinterpreting historical windows, phase 5's F8. Left for a
+  human, labelled <code>automated-fix-attempted</code>.</li>
+<li><strong><a href="https://github.com/shakenfist/shakenfist/issues/4197">#4197</a></strong>
+  (open) -- the load-budget re-derivation phase 3 left behind.</li>
+<li><strong><a href="https://github.com/shakenfist/shakenfist/issues/4438">#4438</a></strong>
+  (open) -- the Ansible modules bundle can never carry a
+  capacity-wait trace, because that suite is six playbooks with no
+  Python harness; it is the finding this plan's D44 exclusion rests
+  on, left for a human for the same reason #4403 is.</li>
 </ul>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
 <p>Before executing any step of this plan, please back brief the
