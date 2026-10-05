@@ -1535,6 +1535,7 @@ class InstanceRebootSoftEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
+         (406, 'Instance is not ready.', None),
          (409, 'The instance cannot be rebooted.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -1560,6 +1561,7 @@ class InstanceRebootHardEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
+         (406, 'Instance is not ready.', None),
          (409, 'The instance cannot be rebooted.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -1585,7 +1587,9 @@ class InstancePowerOffEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
-         (409, 'The instance cannot be powered off.', None)]))
+         (406, 'Instance is not ready.', None),
+         (409, 'The instance cannot be powered off.', None),
+         (500, 'Power off failed on the hypervisor.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -1616,7 +1620,10 @@ class InstancePowerOnEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
-         (409, 'The instance cannot be powered on.', None)]))
+         (406, 'Instance is not ready.', None),
+         (409, 'The instance cannot be powered on: it is paused, or UEFI '
+          'boot is unavailable.', None),
+         (500, 'Power on failed on the hypervisor.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -1653,6 +1660,7 @@ class InstancePauseEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
+         (406, 'Instance is not ready.', None),
          (409, 'The instance cannot be paused.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -1678,6 +1686,7 @@ class InstanceUnpauseEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
+         (406, 'Instance is not ready.', None),
          (409, 'The instance cannot be unpaused.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
