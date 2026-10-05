@@ -267,12 +267,76 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         })
         self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
 
-    def test_lifecycle_pause_powered_off(self):
-        # A powered off instance cannot be paused or unpaused. Both must be
-        # the documented 409, not a 500, and must leave it off. See
-        # docs/plans/PLAN-power-state-correctness-phase-03-power-api.md.
-        inst = self._start_target('pauseoff')
+    def test_lifecycle_pause_semantics(self):
+        # One instance covers every pause/unpause edge the power API
+        # defines (D3 and D5 in
+        # docs/plans/PLAN-power-state-correctness-phase-03-power-api.md),
+        # rather than one each, to keep the Guests suite's capacity
+        # footprint down (functional run 37285857342 ran the suite out of
+        # cpus headroom with four pause/power-on tests each starting their
+        # own instance).
+        #
+        # Part 1: pause is idempotent (D5), power on of a paused instance
+        # is refused (D3) and leaves it paused, and unpause is idempotent
+        # (D5) and leaves the instance usable again. The final unpause and
+        # ready-wait is also the regression check for the sidechannel fix
+        # in df54e28f4: a short pause left the agent monitor's cache
+        # stale, stranding agent_state at "no contact" rather than
+        # recovering to ready.
+        inst = self._start_target('pausesemantics')
+        ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
 
+        self.test_client.pause_instance(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'paused', 'after first pause')
+        self.test_client.pause_instance(inst['uuid'])
+        self._emit_tracing_event({
+            'msg': 'Paused instance twice',
+            'instance_uuid': inst['uuid']
+        })
+        self._assert_power_state(inst['uuid'], 'paused', 'after second pause')
+
+        paused = True
+        try:
+            self.assertRaises(
+                apiclient.ResourceStateConflictException,
+                self.test_client.power_on_instance, inst['uuid'])
+            self._emit_tracing_event({
+                'msg': 'Power on of paused instance refused',
+                'instance_uuid': inst['uuid']
+            })
+            self._assert_power_state(
+                inst['uuid'], 'paused', 'after rejected power on')
+
+            self.test_client.unpause_instance(inst['uuid'])
+            paused = False
+            self._assert_power_state(inst['uuid'], 'on', 'after first unpause')
+            self.test_client.unpause_instance(inst['uuid'])
+            self._emit_tracing_event({
+                'msg': 'Unpaused instance twice',
+                'instance_uuid': inst['uuid']
+            })
+            self._assert_power_state(
+                inst['uuid'], 'on', 'after second unpause')
+
+            # Regression check for df54e28f4: a pause this short must not
+            # strand agent_state, so the instance must still come back
+            # ready.
+            self._await_instance_ready(inst['uuid'])
+            self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
+
+        finally:
+            if paused:
+                # Best effort only: the test has already failed, and that
+                # failure is the one to report.
+                try:
+                    self.test_client.unpause_instance(inst['uuid'])
+                except apiclient.APIException as e:
+                    LOG.info('Cleanup unpause of %s failed: %s'
+                             % (inst['uuid'], e))
+
+        # Part 2: a powered off instance cannot be paused or unpaused.
+        # Both must be the documented 409, not a 500, and must leave it
+        # off.
         self.test_client.power_off_instance(inst['uuid'])
         self._assert_power_state(inst['uuid'], 'off', 'after power off')
 
@@ -293,70 +357,6 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             'instance_uuid': inst['uuid']
         })
         self._assert_power_state(inst['uuid'], 'off', 'after rejected unpause')
-
-    def test_lifecycle_pause_twice(self):
-        # D5: pause and unpause are idempotent, so repeating either
-        # succeeds. See
-        # docs/plans/PLAN-power-state-correctness-phase-03-power-api.md.
-        inst = self._start_target('pausetwice')
-        ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
-
-        self.test_client.pause_instance(inst['uuid'])
-        self._assert_power_state(inst['uuid'], 'paused', 'after first pause')
-        self.test_client.pause_instance(inst['uuid'])
-        self._emit_tracing_event({
-            'msg': 'Paused instance twice',
-            'instance_uuid': inst['uuid']
-        })
-        self._assert_power_state(inst['uuid'], 'paused', 'after second pause')
-
-        self.test_client.unpause_instance(inst['uuid'])
-        self._assert_power_state(inst['uuid'], 'on', 'after first unpause')
-        self.test_client.unpause_instance(inst['uuid'])
-        self._emit_tracing_event({
-            'msg': 'Unpaused instance twice',
-            'instance_uuid': inst['uuid']
-        })
-        self._assert_power_state(inst['uuid'], 'on', 'after second unpause')
-
-        self._await_instance_ready(inst['uuid'])
-        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
-
-    def test_lifecycle_power_on_paused(self):
-        # Powering on a paused instance would leave it paused while
-        # answering success, so it is refused with a 409; unpause is the
-        # operation which resumes it. See
-        # docs/plans/PLAN-power-state-correctness-phase-03-power-api.md.
-        inst = self._start_target('poweronpaused')
-
-        self.test_client.pause_instance(inst['uuid'])
-        self._assert_power_state(inst['uuid'], 'paused', 'after pause')
-        paused = True
-        try:
-            self.assertRaises(
-                apiclient.ResourceStateConflictException,
-                self.test_client.power_on_instance, inst['uuid'])
-            self._emit_tracing_event({
-                'msg': 'Power on of paused instance refused',
-                'instance_uuid': inst['uuid']
-            })
-            self._assert_power_state(
-                inst['uuid'], 'paused', 'after rejected power on')
-
-            self.test_client.unpause_instance(inst['uuid'])
-            paused = False
-            self._assert_power_state(inst['uuid'], 'on', 'after unpause')
-            self._await_instance_ready(inst['uuid'])
-
-        finally:
-            if paused:
-                # Best effort only: the test has already failed, and that
-                # failure is the one to report.
-                try:
-                    self.test_client.unpause_instance(inst['uuid'])
-                except apiclient.APIException as e:
-                    LOG.info('Cleanup unpause of %s failed: %s'
-                             % (inst['uuid'], e))
 
     def test_lifecycle_power_on_failure(self):
         # D1: a power on which fails on the hypervisor answers 500 rather
