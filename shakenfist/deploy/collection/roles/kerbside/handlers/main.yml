@@ -3,7 +3,14 @@
 # handlers manage a Shaken Fist node's journald and logind, which a dedicated
 # Kerbside host does not need. It carries its own daemon reload instead, for
 # the units the config entry point writes.
+#
+# A reload is only needed when the units were written where the system manager
+# loads units from. A test without root points kerbside_unit_dir at a directory
+# of its own, and must not reload the host's real systemd: handlers run when
+# notified even under --skip-tags, so the condition is on the directory.
 
 - name: Reload systemd
   ansible.builtin.systemd_service:
     daemon_reload: true
+  when: >-
+    kerbside_unit_dir is match('^/(etc|run|usr/local/lib|usr/lib|lib)/systemd/system/?$')

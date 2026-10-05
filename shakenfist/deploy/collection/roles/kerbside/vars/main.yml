@@ -1,0 +1,25 @@
+---
+# Values derived from the role's variables. They live here rather than in
+# defaults/main.yml because they are not settings: each follows from variables
+# which are, and nothing should override one independently of those.
+
+# The certificate, key and CA Kerbside's proxy and API are configured with:
+# the operator's override paths when they are set (validate requires all three
+# or none), otherwise the internal_ca destination names (cert_dest_cert_name,
+# cert_dest_key_name and cert_dest_ca_name) under kerbside_pki_dir, where the
+# consuming playbook has internal_ca install them.
+kerbside_proxy_cert_file: >-
+  {{ kerbside_proxy_cert_path if kerbside_proxy_cert_path | length > 0
+     else kerbside_pki_dir ~ '/server-cert.pem' }}
+kerbside_proxy_key_file: >-
+  {{ kerbside_proxy_key_path if kerbside_proxy_key_path | length > 0
+     else kerbside_pki_dir ~ '/server-key.pem' }}
+kerbside_cacert_file: >-
+  {{ kerbside_cacert_path if kerbside_cacert_path | length > 0
+     else kerbside_pki_dir ~ '/ca-cert.pem' }}
+
+# Where the role's helper scripts are copied on the Kerbside host. They run
+# there, with the virtualenv's Python: the validate commands which check
+# kerbside.ini and sources.yaml before either replaces the running file, and
+# the script which renders the proxy certificate's subject.
+kerbside_helper_dir: "{{ kerbside_state_dir }}/bin"

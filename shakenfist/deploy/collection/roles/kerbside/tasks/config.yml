@@ -1,0 +1,163 @@
+---
+# Write Kerbside's configuration and systemd units, and compute the desired
+# state which decides whether Kerbside restarts.
+#
+# Runs on each Kerbside host after bootstrap, which installs Kerbside and sets
+# kerbside_code_hash, and after the consuming playbook has put the proxy
+# certificate in place (from internal_ca, or the operator's override paths).
+# Nothing is started or restarted here: register compares the desired state
+# with what was last deployed, and records it only once Kerbside is ready.
+#
+# Kerbside reads its INI from /etc/kerbside/kerbside.ini and nowhere else, so
+# kerbside_config_dir must stay /etc/kerbside in production. It is a variable
+# only so a test without root can render into a directory it may write.
+
+- name: Require bootstrap to have run first
+  ansible.builtin.assert:
+    that: kerbside_code_hash | default('') | length > 0
+    fail_msg: >-
+      kerbside_code_hash is not set. The config entry point folds it into the
+      desired state, so run the bootstrap entry point on this host first.
+    quiet: true
+
+# The CA certificate is not a secret, but its absence is only otherwise caught
+# by the sources.yaml check, which cannot say where the value should come from.
+- name: Require the Shaken Fist CA certificate
+  ansible.builtin.assert:
+    that: "'-----BEGIN CERTIFICATE-----' in kerbside_sf_ca_cert"
+    fail_msg: >-
+      kerbside_sf_ca_cert does not hold a PEM certificate. It must be the CA
+      which Shaken Fist's /admin/cacert serves (the API node's
+      /etc/pki/libvirt-spice/ca-cert.pem), or Kerbside will refuse to fetch
+      the console token signing key.
+    quiet: true
+
+# The service reads its configuration and may not change it: the directory and
+# the files in it are owned by kerbside_file_owner and readable by the group.
+- name: Create Kerbside's configuration directory
+  ansible.builtin.file:
+    path: "{{ kerbside_config_dir }}"
+    state: directory
+    owner: "{{ kerbside_file_owner }}"
+    group: "{{ kerbside_group }}"
+    mode: "0750"
+
+# internal_ca's distribute_certificates entry point creates this directory
+# 0755 before config runs, so it is created here with the same mode: anything
+# else would be flipped back and forth on every deploy. The key in it is
+# protected by its own mode (0640, readable by kerbside_group).
+- name: Create Kerbside's certificate directory
+  ansible.builtin.file:
+    path: "{{ kerbside_pki_dir }}"
+    state: directory
+    owner: "{{ kerbside_file_owner }}"
+    group: "{{ kerbside_file_group }}"
+    mode: "0755"
+  when: kerbside_proxy_cert_path | length == 0
+
+- name: Create the directory for the role's helper scripts
+  ansible.builtin.file:
+    path: "{{ kerbside_helper_dir }}"
+    state: directory
+    owner: "{{ kerbside_file_owner }}"
+    group: "{{ kerbside_file_group }}"
+    mode: "0755"
+
+- name: Install the role's helper scripts
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ kerbside_helper_dir }}/{{ item }}"
+    owner: "{{ kerbside_file_owner }}"
+    group: "{{ kerbside_file_group }}"
+    mode: "0755"
+  loop:
+    - kerbside-check-ini.py
+    - kerbside-check-sources.py
+    - kerbside-host-subject.py
+
+# Kerbside embeds PROXY_HOST_SUBJECT in the console files it hands to SPICE
+# clients, which compare it with the certificate the proxy presents. It is
+# rendered by Shaken Fist's rules for a hypervisor's subject, by a script a
+# unit test pins to shakenfist/node.py, from whichever certificate is in use.
+# A certificate whose subject cannot be rendered fails here, with the reason.
+- name: Render the proxy certificate's subject
+  ansible.builtin.command:
+    argv:
+      - "{{ kerbside_venv }}/bin/python"
+      - "{{ kerbside_helper_dir }}/kerbside-host-subject.py"
+      - "{{ kerbside_proxy_cert_file }}"
+  register: kerbside_host_subject
+  changed_when: false
+
+- name: Write kerbside.ini
+  ansible.builtin.include_tasks: config_file.yml
+  vars:
+    kerbside_config_file_template: kerbside.ini
+    kerbside_config_file_dest: "{{ kerbside_config_dir }}/kerbside.ini"
+    kerbside_config_file_checker: kerbside-check-ini.py
+
+# Read by both the daemon and the API, so it is group readable rather than
+# 0600: Kerbside runs both as kerbside_user, but neither owns the file.
+- name: Write sources.yaml
+  ansible.builtin.include_tasks: config_file.yml
+  vars:
+    kerbside_config_file_template: sources.yaml
+    kerbside_config_file_dest: "{{ kerbside_config_dir }}/sources.yaml"
+    kerbside_config_file_checker: kerbside-check-sources.py
+
+- name: Write Kerbside's systemd units
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "{{ kerbside_unit_dir }}/{{ item }}"
+    owner: "{{ kerbside_file_owner }}"
+    group: "{{ kerbside_file_group }}"
+    mode: "0644"
+  loop:
+    - kerbside-api.service
+    - kerbside-daemon.service
+  notify: Reload systemd
+
+# The configuration half of the desired state. Every file Kerbside's processes
+# read at start is hashed, whatever produced it, so a renewed certificate is a
+# change even though internal_ca signals nothing when it replaces one. Each
+# checksum is joined with its path, the lot with kerbside_code_hash from
+# bootstrap, and the result hashed again. register restarts Kerbside when this
+# differs from what it last recorded, and records it only after Kerbside is
+# ready, so a deploy which fails part way restarts again next time.
+- name: Checksum the files Kerbside runs with
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    get_checksum: true
+    checksum_algorithm: sha256
+  loop:
+    - "{{ kerbside_config_dir }}/kerbside.ini"
+    - "{{ kerbside_config_dir }}/sources.yaml"
+    - "{{ kerbside_unit_dir }}/kerbside-api.service"
+    - "{{ kerbside_unit_dir }}/kerbside-daemon.service"
+    - "{{ kerbside_proxy_cert_file }}"
+    - "{{ kerbside_proxy_key_file }}"
+    - "{{ kerbside_cacert_file }}"
+  register: kerbside_config_stats
+
+- name: Require every file Kerbside runs with to exist
+  ansible.builtin.assert:
+    that: kerbside_missing_files | length == 0
+    fail_msg: >-
+      Kerbside is configured to read {{ kerbside_missing_files | join(', ') }},
+      which {{ 'does' if kerbside_missing_files | length == 1 else 'do' }} not
+      exist on this host.
+    quiet: true
+  vars:
+    kerbside_missing_files: >-
+      {{ kerbside_config_stats.results | rejectattr('stat.exists')
+         | map(attribute='item') | list }}
+
+- name: Compute Kerbside's desired state
+  ansible.builtin.set_fact:
+    kerbside_desired_state: >-
+      {{ ([kerbside_code_hash]
+          + (kerbside_config_stats.results
+             | map(attribute='item')
+             | zip(kerbside_config_stats.results | map(attribute='stat.checksum'))
+             | map('join', ' ') | list))
+         | join('\n') | hash('sha256') }}

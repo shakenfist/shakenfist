@@ -52,6 +52,11 @@ kerbside_proxy_cert_path: ""
 kerbside_proxy_key_path: ""
 kerbside_cacert_path: ""
 
+# Where the consuming playbook has internal_ca install the proxy certificate,
+# key and CA when the overrides above are empty. Under kerbside_config_dir, so
+# a test without root redirects both together.
+kerbside_pki_dir: "{{ kerbside_config_dir }}/pki"
+
 # Paths and owners. The production values; they are variables only so that a
 # test without root can point them somewhere it may write.
 kerbside_config_dir: "/etc/kerbside"

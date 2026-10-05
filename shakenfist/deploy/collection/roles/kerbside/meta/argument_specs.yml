@@ -4,8 +4,8 @@ argument_specs:
     short_description: Deploy a Kerbside VDI console proxy.
     description:
       - >-
-        Runs the per-host entry points in order. Today that is bootstrap only;
-        config and register join it as they are written. validate is not part
+        Runs the per-host entry points in order. Today that is bootstrap then
+        config; register joins them once it is written. validate is not part
         of main, because the consuming playbook runs it once on the control
         node before any host is changed.
       - >-
@@ -176,7 +176,9 @@ argument_specs:
         type: str
         default: "0.0.0.0"
         description:
-          - The address Kerbside's API (gunicorn) binds.
+          - >-
+            The address Kerbside's API (gunicorn) binds. An IPv6 address may
+            be given bare, such as ::, and is bracketed for gunicorn.
       kerbside_api_port:
         type: int
         default: 13002
@@ -241,13 +243,25 @@ argument_specs:
             kerbside_proxy_cert_path, embedded in the console files Kerbside
             hands to clients. Set with the other two override paths or not at
             all.
+      kerbside_pki_dir:
+        type: str
+        default: "/etc/kerbside/pki"
+        description:
+          - >-
+            Where the proxy certificate, key and CA are read from when the
+            three override paths are empty, as server-cert.pem, server-key.pem
+            and ca-cert.pem: internal_ca's default destination names. The
+            consuming playbook passes it to internal_ca as cert_dest_dir. The
+            default is kerbside_config_dir/pki.
       kerbside_config_dir:
         type: str
         default: "/etc/kerbside"
         description:
           - >-
-            The directory Kerbside's configuration is written to. A variable
-            only so a test without root can redirect it.
+            The directory Kerbside's configuration is written to. Kerbside
+            reads its INI from /etc/kerbside/kerbside.ini and nowhere else, so
+            in production this must stay /etc/kerbside. A variable only so a
+            test without root can redirect it.
       kerbside_state_dir:
         type: str
         default: "/srv/kerbside"
@@ -336,4 +350,20 @@ argument_specs:
       - >-
         The apt task is tagged packages, and the user and group tasks
         system-users, so a test without root can skip them.
+    options: *kerbside_options
+  config:
+    short_description: Write Kerbside's configuration and systemd units.
+    description:
+      - >-
+        Run on each Kerbside host after bootstrap, and after the proxy
+        certificate is in place. Writes kerbside.ini and sources.yaml
+        (kerbside_file_owner, group kerbside_group, 0640), each checked by a
+        helper script before it replaces the running file, and the
+        kerbside-api and kerbside-daemon units, which are wanted by
+        multi-user.target. Renders PROXY_HOST_SUBJECT from the certificate by
+        Shaken Fist's rules for a hypervisor's subject.
+      - >-
+        Then hashes those files, the certificate, key and CA, and
+        kerbside_code_hash from bootstrap into the fact kerbside_desired_state.
+        Nothing is started or restarted; register decides that.
     options: *kerbside_options

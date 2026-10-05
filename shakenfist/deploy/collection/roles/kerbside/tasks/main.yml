@@ -6,11 +6,16 @@
 #
 #   * bootstrap (per host) creates the kerbside user, installs Kerbside into
 #     its virtualenv, and hashes what was installed.
+#   * config (per host) writes Kerbside's INI, sources.yaml and systemd units,
+#     and hashes them with the certificate files into the desired state.
 #
-# config (the INI, sources.yaml and the units) and register (migrations,
-# restart on change and readiness) follow bootstrap here as they are written.
+# register (migrations, restart on change and readiness) follows config here
+# once it is written.
 #
 # validate is not part of main. It runs once, on the control node, before any
 # host is changed, and does nothing when the kerbside group is empty.
 - name: Bootstrap Kerbside
   ansible.builtin.include_tasks: bootstrap.yml
+
+- name: Configure Kerbside
+  ansible.builtin.include_tasks: config.yml
