@@ -39,15 +39,12 @@ The tool is loaded by path: CI tools in ``tools/`` are not importable as a
 package, and this one deliberately imports nothing from shakenfist so that it
 runs under stock python3 on a runner.
 
-That is also why this file is as long as the tool it covers. The path load
-happens once, here at import, and every class below extends one base holding
-the series, census and waits fixture builders and the assertion which tells a
-swallowed exception from a clean run; splitting the file means duplicating
-that preamble per file or adding a shared helper module beside the tests. The
-seam a split would follow is the tool's own render seam, and what blocks that
-is ``tools/`` not being a package -- the reasoning is in
-``tools/ci_headroom_report.py``'s module docstring. So this file follows a
-split of the tool rather than leading one.
+That is also why this file is as long as the tool it covers: the path load
+happens once, here at import, and all but one class below extend a single
+base holding the fixture builders, so this file follows a split of the tool
+rather than leading one. The reasoning is in
+docs/developer_guide/ci_cloud_sizing.md under "Why the report is one
+three-thousand-line file".
 """
 
 import contextlib

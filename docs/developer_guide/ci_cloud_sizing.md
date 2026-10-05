@@ -342,38 +342,49 @@ moves with the day it is run on.
 
 `tools/ci_headroom_report.py` and its unit tests are each about three
 thousand lines, which is well past the length at which a reviewer is
-entitled to ask why they have not been split. The answer is recorded
-in the report's module docstring, and it is about packaging rather
-than about the code, so it is worth knowing before anyone plans the
-split.
+entitled to ask why they have not been split. The answer is about
+packaging rather than about the code, so it is worth knowing before
+anyone plans the split. This section is the full account; the report's
+module docstring and the test file's both point here.
 
-The code is three layers with no leakage between them -- parsing and
-modelling the series and the census, building the summary record from
-those models, and rendering prose from the record -- and the renderer
-layer, a little over a thousand lines, is a cut nothing outside the
-file depends on. `summary_record()` and the record's conventions are
-the whole of its public surface; `ci_headroom_harvest.py` uses that
-function and `DEFAULT_CENSUS_LIMIT`, and nothing else reaches past
-them.
+The code is three layers with no leakage between them: parsing and
+modelling the series and the census (`percentile()` to
+`read_census()`), building the summary record from those models
+(`ledger_bounds()` to `write_record()`), and rendering prose from the
+record (`plural()` to `print_report()`). The renderer layer, a little
+over a thousand lines, is a cut nothing outside the file depends on,
+and the comment above the record builders states the invariant that
+makes it one: the printers compute nothing of their own. The surface
+other code reaches is `summary_record()`, `DEFAULT_CENSUS_LIMIT` and
+`RECORD_VERSION` -- the first two used by `ci_headroom_harvest.py`,
+the third by the harvest's tests -- and none of them is in the
+renderer layer.
 
 Two things hold the cut up. `tools/` is not a package, so the report
-is loaded by path with `spec_from_file_location` -- by the harvest and
-by the report's own tests -- and the report imports nothing from
-shakenfist, so there is no import path into `tools/` to use instead.
-Moving the renderers out means making `tools/` importable, which
-changes how every tool in it is loaded. And the file is read as text
-as well as run: `ci_headroom_verdict.sh` in `shakenfist/actions` greps
-its source for the string `BAND_VIOLATION_EXIT` before it will believe
-an exit status of 3, and `ci_headroom_collect.sh` greps it for the
-flags it is about to pass. Those greps are given one path, so whatever
-moves has to leave the matched text in the file that path names, or
-the two repositories have to change together across a workflow
-reference that carries no pin to bump.
+is loaded by path with `spec_from_file_location` -- by the harvest, by
+the harvest's tests and by the report's own tests -- and the report
+imports nothing from shakenfist, so there is no import path into
+`tools/` to use instead. Moving the renderers out means making
+`tools/` importable, which changes how every tool in it is loaded
+rather than only this one. And the file is read as text as well as
+run: `ci_headroom_verdict.sh` in `shakenfist/actions` greps its source
+for the string `BAND_VIOLATION_EXIT` before it will believe an exit
+status of 3, and `ci_headroom_collect.sh` greps it for the
+`--census-limit` and `--waits` flags before passing them. Those greps
+are given one path, so whatever moves has to leave the matched text in
+the file that path names, or the two repositories have to change
+together across a workflow reference that carries no pin to bump.
 
 The test file is the same length for the same reason and one of its
-own: it loads the module by path once at import, and every test class
-extends a single base carrying the series, census and waits fixture
-builders. It follows a split of the tool rather than leading one.
+own: it loads the module by path once, at import, and all but one of
+its classes extend a single base, `HeadroomReportTestCase`, which holds
+the series, census and waits fixture builders and the assertion that
+tells a swallowed exception from a clean run. (The exception is
+`PercentileTestCase`, which calls `percentile()` directly and needs
+none of them.) Splitting the file means duplicating that preamble per
+file or adding a shared helper module beside the tests, and the seam
+it would split on is the tool's render seam, so it follows a split of
+the tool rather than leading one.
 
 Neither file is to be shortened by removing the comments above the
 record builders and beside `BAND_VIOLATION_EXIT`. Those are what make
