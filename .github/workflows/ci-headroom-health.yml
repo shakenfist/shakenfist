@@ -1,0 +1,84 @@
+# Weekly: harvest the ten newest merge runs' CI headroom bundles and assert
+# the instrument which wrote them is still working.
+#
+# The headroom probe runs inside the functional cluster job it measures, so
+# every failure in its path is swallowed deliberately -- an instrument which
+# could fail that job would change the failure surface it exists to observe.
+# The cost is that a dead probe and a healthy cluster produce the same green
+# job, with the truth sitting in record fields nothing reads. This job reads
+# them. tools/ci_headroom_health.py has the detail, including each threshold
+# and the measurement behind it.
+#
+# This is the one place in the headroom instrument which is allowed to fail
+# loudly, and it is allowed to because it is scheduled: it sits in no pull
+# request's path, so there is no run for its failure to perturb, and a check
+# which cannot fail is the problem it was written to fix. Do not give it a
+# pull_request or merge_group trigger, and do not make the functional
+# workflow depend on it. The moment a sick instrument can redden somebody's
+# merge, the instrument is part of what it is measuring again.
+#
+# A failing run is reported by GitHub's own scheduled-workflow failure
+# notification; there is nothing else watching it.
+
+name: CI headroom instrument health
+
+permissions:
+  contents: read
+  # The harvest enumerates workflow runs and downloads their artifacts.
+  actions: read
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 07 * * 1'        # utc, mondays
+
+jobs:
+  headroom-health:
+    runs-on: [self-hosted, static]
+    # Measured on 2026-10-05: ten merge runs were 34 bundles, 227 MB, and
+    # four minutes from a developer machine, fetched one at a time through
+    # the artifacts API. The rest of the timeout is for a slower link or a
+    # slow API day, not for a harvest expected to take it.
+    timeout-minutes: 45
+    # Queue rather than cancel: a manual dispatch landing on top of the
+    # scheduled run would otherwise cancel it, and a cancelled scheduled
+    # run sends no failure notification -- the only alerting this has.
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout the shakenfist repository
+        uses: actions/checkout@v7
+        with:
+          path: shakenfist
+
+      # Not $GITHUB_WORKSPACE: a dataset written into the checkout would show
+      # up in git status. The cache is per-run scratch space, emptied with
+      # RUNNER_TEMP when the job ends, and that is deliberate: a week apart,
+      # the ten newest merge runs share no bundles with the last ten, so a
+      # persistent cache would only grow.
+      - name: Harvest the ten newest merge runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 ${GITHUB_WORKSPACE}/shakenfist/tools/ci_headroom_harvest.py \
+              --limit 10 --cache-dir ${RUNNER_TEMP}/ci-headroom-cache \
+              --output ${RUNNER_TEMP}/ci-headroom.jsonl
+
+      - name: Assert the headroom instrument is alive
+        run: |
+          python3 ${GITHUB_WORKSPACE}/shakenfist/tools/ci_headroom_health.py \
+              ${RUNNER_TEMP}/ci-headroom.jsonl
+
+      # The bundles this was computed from expire in ninety days, so the
+      # records are kept for as long as the bundles were, and a failing run
+      # can be read again without harvesting it again.
+      - name: Keep the harvested records
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-headroom-health-records
+          path: ${{ runner.temp }}/ci-headroom.jsonl
+          retention-days: 90
+          if-no-files-found: warn
