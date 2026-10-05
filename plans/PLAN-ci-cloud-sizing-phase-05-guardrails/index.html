@@ -15733,12 +15733,28 @@ brief requires naming a reader for the refusal warning or deleting it.</p>
 <p>Harvested with <code>tools/ci_headroom_harvest.py --since 2026-09-21T11:10:53Z
 --until 2026-09-24T12:00:00Z</code>, which is every <code>merge_group</code> run of
 <code>functional-tests.yml</code> from phase 4's reshape (<code>6856aad74</code>, #4289) to the
-morning #4308 merged. Ten merge runs carried cluster bundles; three
-further runs in the window (<code>35909829697</code>, <code>35935845390</code>, <code>35975439402</code>)
-are documentation syncs whose <code>check_paths</code> reported <code>code_changed ==
-'false'</code>, so they ran no functional job at all and are not in the table.
+morning #4308 merged. Ten merge runs carried cluster bundles; the other
+ten in the window ran no functional job at all, their <code>check_paths</code>
+having reported <code>code_changed == 'false'</code>, so they are not in the table.
 That is ten runs per cluster job, against the six per topology 5e asked
 for.</p>
+<p><strong>This window is now committed</strong>, as
+<code>docs/plans/data/ci-cloud-sizing-baseline/records-warn-window.jsonl</code>
+(50 records, 40 carrying a usable series), and every figure in the two
+tables below is recomputed from it by
+<code>tools/ci_headroom_check_window.py</code>, which runs in the test suite. The
+tables are no longer the evidence; they are a rendering of it. See
+<em>The warn window</em> in that directory's <code>README.md</code> for how it was
+produced, and for the harvest-tool fix it needed.</p>
+<p>Two corrections the re-harvest made, neither of which touches a figure
+the gate was armed on. This section originally said <em>three</em> further
+runs in the window ran no functional job, naming <code>35909829697</code>,
+<code>35935845390</code> and <code>35975439402</code>; the API reports twenty <code>merge_group</code>
+runs in the window, ten of which carried a bundle, so the figure is ten
+and not three. And the two Debian under-cloud lanes were renamed to
+Debian 13 on 2026-09-29, after this window ran, so the job names below
+are the ones its bundles carry and are not the names a window harvested
+today would use.</p>
 <p>The first version of this section tabulated only the three jobs 5e named
 and left <code>Guests</code> out, though the harvest had read it and it is the
 fourth entry of the same merge matrix. It is restored below. It changes
@@ -15905,6 +15921,30 @@ window, re-harvested with the current report, carry <code>n_fraction</code>
 directly: it equals <code>n</code> in every one, the smallest is 67, and none has
 the gate withheld. So the guard would have withheld nothing in any of
 the three datasets.</p>
+<p><strong>Recomputed from committed records, after the fact.</strong> The paragraph
+above was written from a harvest that was not kept, which made this --
+the one irreversible decision in the phase -- the one claim in it that
+could not be checked once the bundles expired. The window is committed
+now, and <code>tools/ci_headroom_check_window.py</code> recomputes the whole of
+it: 40 job-runs, zero the gate would have failed, zero with the gate
+withheld, <code>n_fraction</code> equal to <code>n</code> in every one, a smallest count of
+67 against a floor of 20, and a highest cluster-wide p90 fraction of
+0.417 against a bound of 0.70. Every figure agrees with what is
+written here, including all forty rows of <em>The per-run window</em> below
+and their drop and denial counts. The checker fails and names the
+claim that moved if that ever stops being true.</p>
+<p>One qualification on the paragraph above, which the re-harvest makes
+precise. The sentence about the two older datasets is right that they
+support the floor through their usable-sample counts, but it reads as
+though all three datasets were checked against the same three
+conditions. They were not, and cannot be: <code>n_fraction</code> and the two
+<code>capacity_degraded</code> counters arrived at record version 3, and
+<code>records.jsonl</code> and <code>records-addendum.jsonl</code> are versions 1 and 2. So
+"the guard would have withheld nothing in any of the three datasets"
+is a direct measurement on the warn window and an argument from
+usable-sample counts on the other two. The checker reports a job-run
+which cannot answer as <em>unanswered</em> rather than as clean, which is the
+distinction that sentence elides.</p>
 <p><strong>Where the gate is armed.</strong> Only on job shapes this window measured.
 The harvest reads <code>merge_group</code> runs, so the window covers exactly the
 four entries of the merge matrix, and the gate is armed there alone.
@@ -15949,6 +15989,10 @@ hardcoded <code>10.0.0.20</code>-<code>10.0.0.24</code> upload-target list in th
 <code>.github/workflows/functional-tests.yml</code>, phase 0's D4 commitment and
 why phase 5 is not fixing it. It is in the master plan's Future work.</p>
 <h3 id="the-per-run-window">The per-run window<a class="headerlink" href="#the-per-run-window" title="Permanent link">&para;</a></h3>
+<p>Recomputed from <code>records-warn-window.jsonl</code> rather than read from a
+harvest that no longer exists; all forty rows match. The job names are
+the merge matrix's names as it stood in the window, before the Debian
+13 rename.</p>
 <table>
 <thead>
 <tr>
