@@ -75,7 +75,7 @@ support that suspicion. Every finding below was checked against
 |---|---|---|---|
 | F1 | `util/libvirt.py` `get_all_domains()`; `daemons/cleaner/scheduled_tasks.py` second loop (~line 218) | `get_all_domains()` iterates `listDomainsID()`, which lists only *active* domains. It used `listDefinedDomains()` until `3b013bd3e` ("Correct counting of running instances", July 2022), and that commit also deleted the cleaner test's `listDefinedDomains` fake and its expectations that inactive domains become `off` -- the regression was visible in its diff. The cleaner's second loop acts only on domains absent from `seen`, which the first loop fills from the same active-only iterator. | The loop's power off and files-missing branches are dead: a guest which powers itself off (`on_poweroff` is `destroy`) is reported `on` forever. The `not inst` branch still runs for an unknown active SF domain whose destroy in the first loop failed, and a libvirtError partway through the first loop leaves `seen` partial, so the second loop can today mark *running* instances `off`. `get_all_domains()` also drops non-`sf:` domains, so the apparmor sweep's `all_libvirt_uuids` never holds foreign domains despite the comment claiming it does. |
 | F2 | `daemons/queues/startup_tasks.py` ~line 156 | `inst.power_state` is a dict (`{'power_state': ...}`) but is tested with `not in [...]`, which is always true, so every instance is skipped. The call it would then make, `inst.create_on_hypervisor()`, no longer exists on `Instance` (only `Network` has it). | Instance restore on sf-queues start is a silent no-op. The two defects cancel: fixing only the comparison raises `AttributeError` for every instance and error-deletes it. Of the four states it matches, `initial` is real (written at `instance.py:654`), but `transition-to-on` and `unknown` are never written. |
-| F3 | `operations/node_inst_op.py` `_health_check_kvm_process` | Compares the `power_state` dict to `'on'`; never called. | Dead. Wired up correctly it would error-delete every guest which powered itself off, because `kvm_pid` goes stale, so delete it rather than fix it. |
+| F3 | `operations/node_inst_op.py` `_health_check_kvm_process` | Compares the `power_state` dict to `'on'`. This row first said it was never called; phase 2 found it is dispatched by name, for every created instance, from the `health_check_kvm_process` task the cluster daemon enqueues. | Its delete branch is dead. Wired up correctly it would error-delete every guest which powered itself off, because `kvm_pid` goes stale. Its stale `kvm_pid` clearing is live, so phase 2 removed only the delete branch. |
 | F4 | `instance.py` `power_on()`; `external_api/instance.py` `InstancePowerOnEndpoint` | `power_on()` ignores the result of its last `_power_on_inner()` and returns `None`, which the endpoint returns. | An API power on which failed five times answers 200 with a `null` body. |
 | F5 | `instance.py` `power_off()` | Logs any `destroy()` error other than "not running", then writes `power_state='off'` and returns. | The API reports a still-running instance as off. |
 | F6 | `instance.py` `pause()`/`unpause()` | Treat "`update_power_state()` did not change the stored value" as "the operation failed". libvirt's qemu driver returns success for suspending a paused domain or resuming a running one. | Pausing twice, or losing a race with the cleaner writing `paused` first, raises a 409 for an operation which succeeded. |
@@ -367,7 +367,7 @@ establishing the `libvirt-guests` default on Debian 13 and Ubuntu 24.04
 (open question 1). Delete the instance half of sf-queues restore (F2) in
 the same change, and with it
 `test_failed_restore_enqueues_delete_and_continues` and `FakeInstance`'s
-string `power_state`. Delete F3's `_health_check_kvm_process`. Plan at
+string `power_state`. Remove F3's dead delete branch. Plan at
 high effort: this is behaviour on every node at startup and reboot.
 
 The phase survey corrected three things in this section. The phase plan
@@ -395,7 +395,10 @@ only cover the placement reconciliation has in its file (S5).
 F4 to F8 and F12, with their functional tests. `power_on()` reports
 failure and the endpoint answers 507 or 500 (open question 2);
 `power_off()` does not record `off` when `destroy()` failed and stays
-consistent with phase 2's autostart change; pause and unpause judge
+consistent with phase 2's autostart change (phase 2 already leaves the
+autostart flag set when `destroy()` failed for any reason other than
+"not running", and nothing ever sets the flag again on a domain which is
+running -- decide whether the cleaner's detected power on should); pause and unpause judge
 success by the domain's state rather than by whether the stored value
 changed, and raise `InvalidLifecycleState` for an inactive domain the
 way `reboot()` does after #3630; `_power_on_inner()` updates

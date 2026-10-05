@@ -11,7 +11,7 @@ date.
 
 This criterion is that memory written down. A retired release is
 listed once, in `EOL_RELEASES` in
-`scripts/audit/checks/distros.py`, and from the next morning's run
+`scripts/audit/checks/distros.py`, and from the next audit run
 every repository still building on it fails until it moves.
 
 ### The retired list
@@ -54,17 +54,24 @@ but not reported -- otherwise an entry added a quarter early fails
 every repository at once, with an issue whose own text says the
 release goes end of life next quarter.
 
-`debian-gnome-12` is listed although the CI conductor advertises no
-`debian-gnome-13` label yet. The guest image it is built from exists --
-[images](https://github.com/shakenfist/images) has built
-`debian-gnome:13` since August 2026 -- so what is missing is an entry
-in [private-ci](https://github.com/shakenfist/private-ci)'s
-`IMAGE_BUILDS` table, not an image. A finding naming it is therefore
-a request there rather than a one-line edit in the repository the
-issue lands on. It is
-listed anyway, because leaving the fleet's one remaining bookworm
-runner off would make this page claim Debian 12 was gone when it was
-not.
+`debian-gnome-12` is listed even though
+[private-ci](https://github.com/shakenfist/private-ci) no longer
+builds it. A `debian-gnome-13` entry now exists in its
+`IMAGE_BUILDS` table, built from the `debian-gnome:13` guest image
+[images](https://github.com/shakenfist/images) has published since
+August 2026, and the `debian-gnome-12` entry it replaced is gone. A
+finding naming `debian-gnome-12` is therefore now a request to
+retire the old label wherever a workflow still names it, not a
+request to add a successor entry that is missing -- the successor
+already exists. It is a desktop image rather than a runner boot
+image, which is why retiring it did not move any runner.
+
+It stays listed for a different reason than it used to. This table
+is the registry of what a workflow may not ask for, not an inventory
+of what the conductor builds, so the entry is what lets the
+criterion report a workflow still naming `debian-gnome-12` now that
+nothing can serve it. Emptying the table as each producer goes would
+retire the check along with the image.
 
 ### Where we look
 
@@ -183,5 +190,5 @@ container build files, not a file to install.
 
 ## Projects
 
-Per-project compliance is regenerated every morning by the consistency
+Per-project compliance is regenerated on every run of the consistency
 audit: see [the compliance page](/components/development/audits/compliance/#eol-distro).

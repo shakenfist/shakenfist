@@ -125,18 +125,19 @@ on people trusting these figures. It also means this file has exactly one
 place where each figure is computed, so a reader checking the arithmetic
 checks it once.
 
-The record carries one statistic the prose does not print: the per-node
-maximum committed fraction (D21). For each sample it is the largest
-committed-over-ledger ratio any single node stood at, percentiled across the
-run beside the cluster-wide figure the band verdict uses. It exists because
-a cluster-wide fraction averages a full node against an empty one: a real
-merge run sat at a cluster-wide p90 of 0.407 while one node was pinned at
-1.000 for its whole duration and the scheduler refused twelve candidates at
-sufficient_idle_cpu. The scheduler does not admit against an average, so the
-average is the wrong number to size a cloud against. It is recorded rather
-than printed only because this step is bound to leave the printed report
-byte-identical, and D21's bounds do not exist until phase 2's harvest sets
-them; the phase which sets them is the phase which should print it.
+The record carries a second committed-CPU statistic beside the cluster-wide
+one: the per-node maximum committed fraction. For each sample it is the
+largest committed-over-ledger ratio any single node stood at, percentiled
+across the run beside the cluster-wide figure the band verdict uses. It
+exists because a cluster-wide fraction averages a full node against an empty
+one: a real merge run sat at a cluster-wide p90 of 0.407 while one node was
+pinned at 1.000 for its whole duration and the scheduler refused twelve
+candidates at sufficient_idle_cpu. The scheduler does not admit against an
+average, so the average is the wrong number to size a cloud against. It is
+printed beside the cluster-wide verdict, raised as an annotation and carried
+in the step summary, and read against its own bound -- which never fails a
+job, because the statistic saturates at its ceiling in a large fraction of
+runs that pass.
 
 The record is a plain dict of standard-library types for the same reason the
 rest of this file is: it has to serialise under stock python3 on a runner.
@@ -269,7 +270,19 @@ PER_NODE_BAND_UPPER = 0.85
 # reads them with .get() and treats absence as "written before the gate".
 # n_fraction joined every metric block in place for the same reason: the
 # gate's sample floor is counted from it.
-RECORD_VERSION = 3
+#
+# Version 4 (phase 7) changed what verdict.refusal_warning says about a
+# census which was read and matched no scheduler stage event: False before,
+# null now. See verdict_record(). That is the non-additive kind of change --
+# a version 3 record and a version 4 record carry different values for the
+# same observation, and the earlier one is wrong in the direction that
+# matters, reading an instrument which did not look as a cluster which
+# refused nothing. A consumer pooling across the boundary must re-derive the
+# warning from census.records and census.stage_events, which every version
+# carries, rather than trusting the stored flag; below version 4 a False
+# there means "no capacity-stage drops were tallied", which is not the same
+# claim.
+RECORD_VERSION = 4
 
 # Loki's own max_entries_limit_per_query, and the value
 # tools/ci_headroom_collect.sh in shakenfist/actions issues its query with. A
@@ -347,8 +360,8 @@ GUARD_DIMENSION_NOTES = collections.OrderedDict([
     ('cpus', 'allocated vCPU'),
     ('memory_mb', 'allocated memory'),
     ('disk_gb', 'allocated disk'),
-    ('demand', 'measured CPU load plus the D13 feedforward estimate -- '
-               'NOT an allocation'),
+    ('demand', "measured CPU load plus the scheduler's feedforward "
+               'demand estimate -- NOT an allocation'),
 ])
 
 UNKNOWN_STAGE = '(no failing_stage recorded)'
@@ -1795,10 +1808,31 @@ def verdict_record(record):
     than recomputed, so the verdict cannot disagree with the table a reader
     checks it against.
 
-    ``refusal_warning`` is deliberately tri-state. Per D3 any capacity-stage
-    refusal is a warning on its own, independent of the ratio -- but a
-    census which was never read cannot say there were none, so it is null
-    rather than False.
+    ``refusal_warning`` is deliberately tri-state. Any capacity-stage refusal
+    is a warning on its own, independent of the ratio -- but a census which
+    could not say there were none reads null rather than False. There are two
+    ways it cannot say. The obvious one is a census that was never read. The
+    other is a census read successfully which found not one scheduler stage
+    event, which looks like a quiet cluster and is not: every job this runs
+    in deploys a cluster and schedules instances, so the scheduler cannot
+    have been silent.
+
+    The test is ``stage_events`` rather than ``records`` because the two
+    instrument failures it catches part company there. A shipping path which
+    stopped leaves no lines at all. Message forms the LogQL filter no longer
+    names leave whatever else the query selects -- the capacity guard's own
+    events, say -- counted in ``records`` while no stage is tallied, and
+    ``capacity_shortage_drops`` is computed from the stage tallies alone, so
+    keying on ``records`` would read that second failure as a clean run.
+    ``print_census`` already calls the same state suspicious, and the two
+    must not disagree.
+
+    Records banked before RECORD_VERSION 4 carry False here for a census
+    which was read and matched no stage event, because this read
+    ``records`` instead. Nothing re-derives those, so an analysis pooling
+    across that boundary must compute the warning from ``census.records``
+    and ``census.stage_events`` -- both present in every version -- rather
+    than from the stored flag.
 
     The per-node maximum (D21) is judged against PER_NODE_BAND_UPPER (D4).
     Phase 2 found 0.85 the cleanest separation in the dataset, but also
@@ -1818,7 +1852,10 @@ def verdict_record(record):
     else:
         band = 'WITHIN BAND'
 
-    shortage = record['census']['capacity_shortage_drops']
+    census = record['census']
+    shortage = census['capacity_shortage_drops']
+    if census['state'] == 'read' and not census['stage_events']:
+        shortage = None
     per_node_max = record['per_node_max_cpu_fraction']
     per_node_p90 = per_node_max['p90']
     if per_node_p90 is None:
@@ -1953,7 +1990,7 @@ def write_record(record, path):
               % (path, e))
         print('The report above is unaffected, and this is not an error: an')
         print('instrument which can fail the job it measures changes what it')
-        print('is measuring (D15).')
+        print('is measuring.')
 
 
 def plural(count, singular, plural_form=None):
@@ -2142,7 +2179,7 @@ def print_ledger_provenance(record):
     total = provenance['node_samples_total']
     sole = record['series']['sole_node_without_row_samples']
 
-    print_heading('Ledger provenance (D7)')
+    print_heading('Ledger provenance')
     print('  Node-samples with a capacity row (cpu_limit):     %d' % from_row)
     print('  Node-samples which fell back to cpu_hard_max:     %d' % fallback)
     print('  Fallbacks inside ledger-unreadable samples:       %d'
@@ -2151,7 +2188,8 @@ def print_ledger_provenance(record):
     if fallback_unreadable:
         print('  The third figure is a failed capacity read, not evidence about')
         print('  the two ledgers. Those samples are already excluded from the')
-        print('  headroom figures, and D7 should read the second line alone.')
+        print('  headroom figures, so a ledger comparison should read the')
+        print('  second line alone.')
     if sole:
         print('  %d %s had one visible node and no capacity row for it. That is'
               % (sole, plural(sole, 'sample')))
@@ -2162,9 +2200,9 @@ def print_ledger_provenance(record):
         return
     if fallback == total:
         print('  EVERY node-sample fell back. No capacity row was ever visible,')
-        print('  so this run cannot speak to the 12-versus-10 discrepancy D7')
-        print('  asks phase 2 to reconcile -- but that it saw no row at all is')
-        print('  itself a finding to carry forward.')
+        print('  so this run cannot speak to the difference between the two')
+        print('  ledgers at all -- but that it saw no row is itself a finding')
+        print('  to carry forward.')
     elif fallback:
         print('  A mixed run: some node-samples saw a capacity row and some did')
         print('  not, so the two ledgers can be compared directly here.')
@@ -2284,7 +2322,7 @@ def print_census(record):
               % (census['state'], census['detail']))
         print('  File: %s' % census['path'])
         print('  Read this as "unknown", never as zero refusals. The census')
-        print('  depends on the log shipping path being healthy (D11), so a')
+        print('  depends on the log shipping path being healthy, so a')
         print('  broken shipper looks exactly like a cluster with room to')
         print('  spare unless the difference is said out loud.')
         return
@@ -2321,7 +2359,7 @@ def print_census(record):
             str(tally['dropped']), note])
     print_table(['stage', 'events', 'aborts', 'dropped', 'kind'], rows)
     print('  Tallied by the stage string observed in the events, never by a')
-    print('  list held here (D10), so a stage added or renamed in the')
+    print('  list held here, so a stage added or renamed in the')
     print('  scheduler still appears above.')
 
     missing = [name for name in CAPACITY_STAGE_NOTES if name not in stages]
@@ -2468,7 +2506,7 @@ def print_guard_census(record):
               % (demand_total, plural(demand_total, 'refusal')))
         print('    %5d  measured CPU load alone was already over the limit'
               % guard['demand_measured_alone'])
-        print('    %5d  the D13 feedforward estimate is what carried it over'
+        print('    %5d  the feedforward demand estimate carried it over'
               % guard['demand_estimate_tipped'])
         if guard['demand_unsplit']:
             print('    %5d  no cpu_load_1 / expected_demand split recorded'
@@ -2535,7 +2573,7 @@ def print_guard_census(record):
     print('    These placements SUCCEEDED. CLAIM_ENFORCEMENT_HARD is False, so')
     print('    advisory mode admits over a claim on purpose and this is the')
     print('    system doing what the operator asked. It is the signal a')
-    print('    declared footprint needs revising (D9), and it is never added')
+    print('    declared footprint needs revising, and it is never added')
     print('    to the refusal count above.')
     if guard['claim_malformed']:
         print('    %d carried no usable claim_dimensions list.'
@@ -2620,7 +2658,7 @@ def print_verdict(record):
     census = record['census']
     guard = record['guard']
     verdict = record['verdict']
-    print_heading('D3 band verdict (bounds %.2f / %.2f)'
+    print_heading('Band verdict (bounds %.2f / %.2f)'
                   % (BAND_LOWER, BAND_UPPER))
     ratio = verdict['p90_cpu_fraction']
     if ratio is None:
@@ -2642,54 +2680,72 @@ def print_verdict(record):
         print('  Verdict: %s' % text)
 
     if verdict['gates']:
-        print('  This verdict gates (5f): the report returns exit status %d.'
+        print('  This verdict gates: the report returns exit status %d.'
               % BAND_VIOLATION_EXIT)
         print('  Whether that fails this job is decided by the caller\'s')
         print('  headroom_gate input and the CI_HEADROOM_GATE switch.')
     elif verdict['band'] == 'OVERSUBSCRIBED':
-        print('  This verdict would gate (5f), but the series cannot support')
+        print('  This verdict would gate, but the series cannot support')
         print('  it, so the report returns 0:')
         for reason in verdict['gate_withheld']:
             print('    - %s' % reason)
         print('  An unreadable instrument is not a statement about the cloud.')
     else:
-        print('  Only the cluster-wide upper bound gates (5f). Nothing else')
+        print('  Only the cluster-wide upper bound gates. Nothing else')
         print('  here can fail a job: the lower bound is information rather')
-        print('  than an alarm (D8), and the per-node bound never gates (D4).')
+        print('  than an alarm, and the per-node bound never gates.')
 
     per_node_p90 = verdict['per_node_max_p90_fraction']
     per_node_upper = verdict['per_node_band_upper']
     print()
-    print('  Per-node maximum p90, D4 bound %.2f: %s'
+    print('  Per-node maximum p90, bound %.2f: %s'
           % (per_node_upper, fmt_fraction(per_node_p90)))
     if verdict['per_node_band'] is None:
         print('  NO VERDICT: no sample produced a per-node committed-vCPU-')
         print('  over-ledger fraction.')
     else:
         print('  Verdict: %s' % verdict['per_node_band'])
-    print('  This statistic is saturated: phase 2 found it sitting at its')
+    print('  This statistic is saturated: it was measured sitting at its')
     print('  ceiling in a large fraction of passing job-runs, so it is read')
     print('  as what a topology should achieve, not as a per-run alarm the')
-    print('  current clouds could pass -- and, per D4, it never gates.')
+    print('  current clouds could pass -- and it never gates.')
 
     print()
     if verdict['refusal_warning'] is None:
-        print('  Refusal warning: UNKNOWN. Per D3 any capacity-stage refusal is')
-        print('  a warning on its own, independent of the ratio above -- but no')
-        print('  census was read, so that half of the verdict is missing.')
-        return
-    shortage = census['capacity_shortage_drops']
-    if verdict['refusal_warning']:
+        print('  Refusal warning: UNKNOWN. Any capacity-stage refusal is a')
+        print('  warning on its own, independent of the ratio above -- but')
+        if census['state'] != 'read':
+            print('  no census was read, so that half of the verdict is')
+            print('  missing.')
+        elif not census['records']:
+            print('  this census read not one log line, and a run which')
+            print('  deployed a cluster cannot have logged nothing, so the')
+            print('  census did not observe rather than observing no refusal.')
+        else:
+            print('  this census read %d %s and found no scheduler stage'
+                  % (census['records'], plural(census['records'], 'line')))
+            print('  event among them. A run which deployed a cluster cannot')
+            print('  have scheduled nothing, and the lines prove the shipping')
+            print('  path is healthy, so the query is what stopped matching:')
+            print('  the census did not observe rather than observing no')
+            print('  refusal.')
+        # Falls through rather than returning. The stage half being
+        # unreadable says nothing about the guard half below, and the guard
+        # half is the stronger evidence of the two -- a collected guard
+        # census with denials in it must not be silenced by a stage filter
+        # which stopped matching.
+    elif verdict['refusal_warning']:
+        shortage = census['capacity_shortage_drops']
         print('  Refusal warning: YES. %d candidate %s at a capacity stage.'
               % (shortage, plural(shortage, 'drop')))
-        print('  Per D3 that is a warning in its own right, whatever the ratio')
+        print('  That is a warning in its own right, whatever the ratio')
         print('  says: a poll every fifteen seconds cannot see a refusal, which')
         print('  begins and ends between samples.')
-        print('  Per D5, that count is close to invariant under node size, so it')
+        print('  That count is close to invariant under node size, so it')
         print('  is not evidence this cloud is too small: expected_demand')
         print('  accumulates cpus x SCHEDULER_DEMAND_PER_VCPU per placement, and')
         print('  the guard admits until whatever bound it is given fills up and')
-        print('  then refuses. Phase 4 doubled a cluster\'s ledger and refusals')
+        print('  then refuses. Doubling a cluster\'s ledger left refusals')
         print('  held at essentially the same rate. Read the count as the')
         print('  earliest sign the demand estimator has drifted, nothing more.')
         if census['disk_bandwidth_drops']:
@@ -2809,8 +2865,8 @@ def band_annotations(record):
         annotations.append((
             'CI headroom: cluster OVERSIZED',
             'Cluster-wide p90 committed-vCPU/ledger fraction is %s, below '
-            'the lower bound of %.2f%s. Informational for a single run '
-            '(D8): the oversized question is read from a window of runs '
+            'the lower bound of %.2f%s. Informational for a single run: '
+            'the oversized question is read from a window of runs '
             'with tools/ci_headroom_harvest.py, not from one job.'
             % (fmt_fraction(verdict['p90_cpu_fraction']), BAND_LOWER, where)))
 
@@ -2818,7 +2874,7 @@ def band_annotations(record):
         annotations.append((
             'CI headroom: per-node maximum above band',
             'Per-node maximum p90 committed-vCPU/ledger fraction is %s, '
-            'above the bound of %.2f%s. This bound never gates (D4): it is '
+            'above the bound of %.2f%s. This bound never gates: it is '
             'saturated at its ceiling on plenty of runs that otherwise '
             'pass, and is read as a statement about what the topology '
             'should achieve, not as a per-run alarm.'
@@ -2831,8 +2887,8 @@ def band_annotations(record):
             'CI headroom: capacity-stage refusals observed',
             '%d capacity-stage %s in this run%s. This is a signal about '
             'the demand estimator\'s calibration, not evidence the cloud '
-            'is too small (D5): phase 4 doubled a cluster\'s ledger and '
-            'the guard refused at essentially the same rate afterwards, '
+            'is too small: doubling a cluster\'s ledger left the guard '
+            'refusing at essentially the same rate afterwards, '
             'because expected_demand accumulates and the guard admits '
             'until whatever bound it is given fills up.'
             % (shortage, plural(shortage, 'drop'), where)))
@@ -2886,15 +2942,23 @@ def step_summary_lines(record):
         lines.append('* Per-node maximum p90: NO VERDICT (no usable samples)')
     else:
         lines.append(
-            '* Per-node maximum p90: %s -- %s (bound %.2f, never gates, D4)'
+            '* Per-node maximum p90: %s -- %s (bound %.2f, never gates)'
             % (fmt_fraction(verdict['per_node_max_p90_fraction']),
                verdict['per_node_band'], verdict['per_node_band_upper']))
     if verdict['refusal_warning'] is None:
-        lines.append('* Refusal warning: UNKNOWN (no census read)')
+        census = record['census']
+        if census['state'] != 'read':
+            why = 'no census read'
+        elif not census['records']:
+            why = 'the census read no log lines at all'
+        else:
+            why = ('the census read %d %s and no scheduler stage events'
+                   % (census['records'], plural(census['records'], 'line')))
+        lines.append('* Refusal warning: UNKNOWN (%s)' % why)
     elif verdict['refusal_warning']:
         lines.append(
             '* Refusal warning: YES -- a demand-estimator calibration '
-            'signal (D5), not evidence the cloud is undersized')
+            'signal, not evidence the cloud is undersized')
     else:
         lines.append('* Refusal warning: no capacity-stage drops in the '
                      'census window')
@@ -2905,7 +2969,7 @@ def step_summary_lines(record):
         lines.append(
             '* Gate: this verdict returns exit status %d; whether that '
             'fails this job is decided by the caller\'s headroom_gate input '
-            'and the CI_HEADROOM_GATE switch (5f)'
+            'and the CI_HEADROOM_GATE switch'
             % BAND_VIOLATION_EXIT)
     elif verdict['band'] == 'OVERSUBSCRIBED':
         lines.append(
@@ -3041,12 +3105,12 @@ def main(argv=None):
     parser.add_argument(
         '--json', default=None,
         help=('Write the machine-readable summary record to this path, as one '
-              'JSON object (D18). The printed report above is rendered from '
-              'the same record, so the two cannot disagree; phase 2\'s '
-              'harvest and phase 5\'s guardrail read this rather than parsing '
+              'JSON object. The printed report above is rendered from '
+              'the same record, so the two cannot disagree; the harvest and '
+              'the band gate read this rather than parsing '
               'the prose. A path which cannot be written is a warning, never '
               'an error: nothing this instrument does may fail the job it is '
-              'measuring (D15).'))
+              'measuring.'))
     parser.add_argument(
         '--census-limit', type=int, default=DEFAULT_CENSUS_LIMIT,
         help=('The entry limit the census query was issued with. A response '
@@ -3060,8 +3124,7 @@ def main(argv=None):
         help=('Path to the capacity-wait JSONL trace written by '
               'create_instance() on BaseTestCase '
               '(/srv/ci/traces/instance-waits.jsonl in the bundle) -- one '
-              'line per transient 507 the suite waited out '
-              '(PLAN-transient-capacity-refusals phase 2, D14). Optional: '
+              'line per transient 507 the suite waited out. Optional: '
               'the report says so explicitly when it is absent or empty, '
               'rather than printing zero seconds waited.'))
 
@@ -3082,7 +3145,7 @@ def main(argv=None):
         print('The headroom report failed to render:')
         traceback.print_exc(file=sys.stdout)
         print('Reported rather than raised: an instrument which can fail a job')
-        print('over its own defects changes what it measures (D15). Only a')
+        print('over its own defects changes what it measures. Only a')
         print('band verdict gates, and there is no verdict to read here.')
 
     # The only non-zero status this tool returns, and it is deliberately

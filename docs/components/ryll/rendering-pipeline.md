@@ -9,26 +9,38 @@ playback is driven, and how user-facing notifications are raised.
 
 ### GUI Mode (egui)
 
-Ryll uses **immediate mode rendering** via egui:
+Ryll uses **immediate mode rendering** via egui. `RyllApp` splits its
+per-frame work across eframe's two entry points:
 
 ```rust
-// Each frame:
-fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-    // 1. Process incoming events (new images, cursor updates)
+// Before every frame, and on its own while the window is hidden:
+fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    // Process incoming events (new images, cursor updates), then
+    // advance timers: reconnect, notifications, bug reports.
     self.process_events();
+}
 
-    // 2. For each surface, get texture and draw
+// Only when the window is drawn:
+fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+    // For each surface, get texture and draw
     for surface in &mut self.surfaces {
-        let texture = surface.texture(ctx);  // Upload pixels to GPU
+        let texture = surface.texture(ui.ctx());  // Upload pixels to GPU
         ui.image(texture, size);              // Draw texture
     }
 }
 ```
 
+The split matters when the window is minimised or occluded, including
+under the macOS lock screen. eframe then runs no egui pass and never calls
+`ui`, but it still answers each repaint request from the event bridge with
+a `logic`-only pass. Draining in `logic` keeps the bounded event queue
+moving, so the renderer's channels never back up behind a hidden window.
+Surfaces are updated in place, so this costs no extra memory (issue #444).
+
 No objects accumulate - the surface pixel buffer is updated in place, and the
 texture is re-uploaded each frame when dirty.
 
-Each frame's `process_events` drains the `ChannelEvent`
+Each pass's `process_events` drains the `ChannelEvent`
 channel and dispatches image / fill / copy-bits /
 invert / chroma / alpha events into the corresponding
 `DisplaySurface` helper. See the [draw-op coverage

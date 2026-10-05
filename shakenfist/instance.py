@@ -2424,17 +2424,40 @@ class Instance(dbowo):
             # once, and a destroy() which found the domain already stopped,
             # or failed, says nothing about when it went away.
             extra = None
+            stopped = False
             libvirt_requested_at = time.time()
             try:
                 inst.destroy()
+                stopped = True
                 extra = {
                     'libvirt_requested_at': libvirt_requested_at,
                     'libvirt_returned_at': time.time()
                 }
             except lc.libvirt.libvirtError as e:
-                if not str(e).startswith('Requested operation is not valid: '
-                                         'domain is not running'):
+                if str(e).startswith('Requested operation is not valid: '
+                                     'domain is not running'):
+                    stopped = True
+                else:
                     self.log.error('Failed to delete domain: %s', e)
+
+            # Autostart is the only thing which restarts this domain after a
+            # hypervisor reboot (S2 in docs/plans/PLAN-power-state-correctness-
+            # phase-02-autostart-restore.md), so clear it to keep a powered
+            # off instance off. A failure is recorded rather than raised (D5):
+            # the domain is off either way, and the cleaner retries the clear.
+            #
+            # If destroy() failed for any other reason the domain may still be
+            # running, so leave the flag alone: nothing ever sets it again on
+            # a running domain, and the cleaner clears it on a later pass if
+            # the domain did in fact stop. Recording such an instance as off
+            # anyway is F5, which phase 3 fixes.
+            if stopped:
+                try:
+                    inst.setAutostart(0)
+                except lc.libvirt.libvirtError as e:
+                    self.add_event(
+                        EVENT_TYPE_AUDIT, 'instance autostart configuration error',
+                        extra={'message': str(e)})
 
             self.agent_state = constants.AGENT_INSTANCE_OFF
             self.update_power_state('off')

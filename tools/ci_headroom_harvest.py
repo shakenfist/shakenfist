@@ -110,6 +110,15 @@ LABEL_MEMBER = TRACES_PREFIX + 'headroom-label'
 # ['bundle.zip'] and the 1399 real entries are inside it.
 INNER_BUNDLE_MEMBER = 'bundle.zip'
 
+# The decompression ceiling for any single member read out of an archive.
+# A real artifact zip is about 5 MB, so this is two orders of magnitude
+# above the largest bundle ever harvested: a member declaring more is a zip
+# bomb from the harvested repository, not a measurement. The declared
+# ZipInfo.file_size is an honest ceiling to check, because CPython's
+# ZipExtFile stops returning bytes at the declared size even when the
+# compressed stream holds more.
+MAX_MEMBER_BYTES = 256 * 1024 * 1024
+
 # Every artifact this tool will even look at starts with this. A run also
 # uploads 'coverage', which is not a bundle and is not a missing bundle
 # either, so it is passed over without comment -- whereas an unrecognised
@@ -183,7 +192,7 @@ BUNDLE_TOPOLOGIES = {
 #
 # * 'Node lifecycle' never reaches the reusable smoke-cluster workflow at
 #   all. It calls the build-smoke-cluster composite action directly
-#   (functional-tests.yml:581), and the probe steps live in the workflow
+#   (functional-tests.yml:587), and the probe steps live in the workflow
 #   rather than in the action, so they are not in its job. Fixing this means
 #   moving or duplicating the probe steps into the composite action, which
 #   changes how *every* caller deploys -- shakenfist's five call sites,
@@ -243,6 +252,13 @@ class GitHubCLI:
     rather than writing a short dataset.
     """
 
+    # How long one gh invocation may take. Without these a gh hung on a
+    # network stall hangs the harvest indefinitely with no diagnostic. A
+    # json() call returns one page of metadata; download() streams a bundle
+    # of about 5 MB, so its ceiling is minutes rather than seconds.
+    JSON_TIMEOUT = 120
+    DOWNLOAD_TIMEOUT = 1800
+
     def __init__(self, repo=DEFAULT_REPO, gh='gh', verbose=False):
         self.repo = repo
         self.gh = gh
@@ -261,7 +277,11 @@ class GitHubCLI:
         try:
             completed = subprocess.run(
                 [self.gh, 'api', full], stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE)
+                stderr=subprocess.PIPE, timeout=self.JSON_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            raise GitHubCLIError(
+                'gh api %s did not complete within %d seconds'
+                % (full, self.JSON_TIMEOUT))
         except OSError as e:
             raise GitHubCLIError(
                 'could not run %s: %s. This tool shells out to the GitHub '
@@ -292,7 +312,14 @@ class GitHubCLI:
         try:
             with open(partial, 'wb') as f:
                 completed = subprocess.run(
-                    [self.gh, 'api', full], stdout=f, stderr=subprocess.PIPE)
+                    [self.gh, 'api', full], stdout=f, stderr=subprocess.PIPE,
+                    timeout=self.DOWNLOAD_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            if os.path.exists(partial):
+                os.unlink(partial)
+            raise GitHubCLIError(
+                'gh api %s did not complete within %d seconds'
+                % (full, self.DOWNLOAD_TIMEOUT))
         except OSError as e:
             raise GitHubCLIError('could not run %s: %s' % (self.gh, e))
         if completed.returncode != 0:
@@ -334,6 +361,11 @@ def load_report(path):
     The tools/ directory is not a package and this file deliberately imports
     nothing from shakenfist, so there is no import path to reach it by. The
     report's own tests load it exactly this way.
+
+    Executing a module named by --report is code execution from a CLI
+    argument on the operator's own machine, which is what running a Python
+    script already is. Issue #4412 records it as not a finding; do not
+    re-file it.
     """
     spec = importlib.util.spec_from_file_location('ci_headroom_report', path)
     if spec is None or spec.loader is None:
@@ -545,6 +577,13 @@ def open_bundle(path):
     outer = zipfile.ZipFile(path)
     if INNER_BUNDLE_MEMBER not in outer.namelist():
         return outer
+    info = outer.getinfo(INNER_BUNDLE_MEMBER)
+    if info.file_size > MAX_MEMBER_BYTES:
+        outer.close()
+        raise HarvestError(
+            'bundle %s declares a %d byte %s, over the %d byte ceiling; '
+            'refusing to decompress it into memory'
+            % (path, info.file_size, INNER_BUNDLE_MEMBER, MAX_MEMBER_BYTES))
     inner_bytes = outer.read(INNER_BUNDLE_MEMBER)
     outer.close()
     return zipfile.ZipFile(io.BytesIO(inner_bytes))
@@ -558,12 +597,23 @@ def extract_traces(path, dest_dir):
     outcome -- a run predating phase 1, or one whose probe never started --
     and is reported by the caller, not raised here.
     """
+    # No archive-supplied name ever reaches a path here: the members
+    # iterated are module constants, the namelist is used only for a
+    # membership test, and the join is over os.path.basename() of a
+    # constant. A hostile namelist therefore has no way to traverse out
+    # of dest_dir, which is why there is no sanitisation to see.
     found = {}
     with open_bundle(path) as bundle:
         names = set(bundle.namelist())
         for member in (SERIES_MEMBER, CENSUS_MEMBER, LABEL_MEMBER):
             if member not in names:
                 continue
+            info = bundle.getinfo(member)
+            if info.file_size > MAX_MEMBER_BYTES:
+                raise HarvestError(
+                    'bundle %s declares a %d byte %s, over the %d byte '
+                    'ceiling; refusing to decompress it'
+                    % (path, info.file_size, member, MAX_MEMBER_BYTES))
             basename = os.path.basename(member)
             target = os.path.join(dest_dir, basename)
             with open(target, 'wb') as f:
@@ -688,6 +738,24 @@ def bundle_record(github, run, artifact, kind, jobs, cache_dir, report,
     return record
 
 
+def checked_artifact_id(artifact):
+    """The artifact's id as an int, refusing anything that is not one.
+
+    The id comes out of an API response body and is interpolated into a
+    cache filename and an API path, so it is outside data used to build
+    both: anything but an integer is refused before either string exists,
+    rather than embedded in a path and discovered later.
+    """
+    raw = artifact.get('id')
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        raise HarvestError(
+            'artifact %r has a non-integer id %r; refusing to build a '
+            'cache path or an API path from it'
+            % (artifact.get('name'), raw))
+
+
 def cached_artifact(github, artifact, cache_dir):
     """Return a local path to the artifact zip, downloading it if need be.
 
@@ -697,7 +765,7 @@ def cached_artifact(github, artifact, cache_dir):
     runs times four bundles at roughly 5 MB, so about 1.3 GB, and step 2d
     will not get the harvest right on the first try.
     """
-    artifact_id = artifact.get('id')
+    artifact_id = checked_artifact_id(artifact)
     os.makedirs(cache_dir, exist_ok=True)
     path = os.path.join(cache_dir, '%s.zip' % artifact_id)
     if os.path.exists(path) and zipfile.is_zipfile(path):
@@ -741,7 +809,7 @@ def harvest_run(github, run, cache_dir, report, census_limit, workdir):
         # directory would leave the second reading the first's leftovers
         # whenever it is missing a file -- which is precisely the case this
         # tool has to report accurately.
-        unpacked = os.path.join(workdir, str(artifact.get('id')))
+        unpacked = os.path.join(workdir, str(checked_artifact_id(artifact)))
         os.makedirs(unpacked, exist_ok=True)
         records.append(bundle_record(
             github, run, artifact, kind, jobs, cache_dir, report,
@@ -788,7 +856,7 @@ def default_report_path():
 def build_parser(default_census_limit):
     parser = argparse.ArgumentParser(
         description=('Harvest the banked CI headroom bundles from merge runs '
-                     'into one JSONL dataset (phase 2, D16/D17).'))
+                     'into one JSONL dataset.'))
     parser.add_argument(
         '--repo', default=DEFAULT_REPO,
         help='The repository to harvest, as owner/name.')
@@ -797,9 +865,9 @@ def build_parser(default_census_limit):
         help='The workflow file whose merge_group runs carry the bundles.')
     parser.add_argument(
         '--since', type=parse_since, default=None,
-        help=('Only runs created at or after this date (ISO 8601). The phase '
-              '2 window starts at 2026-08-30, the day the census filter fix '
-              'merged.'))
+        help=('Only runs created at or after this date (ISO 8601). The '
+              'committed baseline window starts at 2026-08-30, the day the '
+              'census filter fix merged.'))
     parser.add_argument(
         '--until', type=parse_since, default=None,
         help=('Only runs created at or before this date (ISO 8601). Give it '
@@ -820,8 +888,7 @@ def build_parser(default_census_limit):
               'of zips.'))
     parser.add_argument(
         '--output', '-o', required=True,
-        help=('Where to write the dataset, as one compact JSON object per '
-              'line (D22).'))
+        help='Where to write the dataset, as one compact JSON object per line.')
     parser.add_argument(
         '--report', default=default_report_path(),
         help='Path to tools/ci_headroom_report.py, whose summary_record() this calls.')
@@ -837,7 +904,11 @@ def build_parser(default_census_limit):
 
 
 def harvest(github, args, report):
-    """Enumerate, download, summarise and write. Returns the record count.
+    """Enumerate, download, summarise and write.
+
+    Returns the number of records written and, of those, how many carry a
+    usable series. The second number is what an analysis can actually be
+    computed over, so it is reported rather than left for a reader to derive.
 
     An empty result is an error at both of the points it can arise. The
     ordering defect this tool was fixed for presented as a harvest which
@@ -870,6 +941,7 @@ def harvest(github, args, report):
                  args.workflow), file=sys.stderr)
 
     written = 0
+    usable = 0
     # Written incrementally rather than accumulated and dumped at the end.
     # A harvest of the full window is an hour of downloads, and an
     # interruption two thirds of the way through should leave two thirds of
@@ -885,6 +957,10 @@ def harvest(github, args, report):
                 records = harvest_run(
                     github, run, args.cache_dir, report, args.census_limit,
                     workdir)
+            usable += sum(
+                1 for record in records
+                if ((record.get('summary') or {}).get('series')
+                    or {}).get('samples_usable'))
             written += write_records(records, handle)
             handle.flush()
 
@@ -895,7 +971,28 @@ def harvest(github, args, report):
             'bundle naming change this tool has not been told about.'
             % (len(runs), 'run was' if len(runs) == 1 else 'runs were',
                args.output))
-    return written
+    # The third way an empty result arises, and the one which does not look
+    # empty. Records are written, each honestly saying it carries no usable
+    # series, and the file parses -- but pooled they are a population of
+    # zero, and an analysis over them reports on nothing while reading like
+    # it reported on the window. A probe which stopped starting looks like
+    # this, and so does a window predating the instrument.
+    #
+    # Not an error, because a bundle with no series is a record and not a gap
+    # -- that is this tool's design, stated in the module docstring and
+    # relied on by a one-run harvest of an expired artifact, which is a
+    # legitimate thing to ask for and whose answer is the reason in the
+    # record. So the count is reported either way and its absence is called
+    # out, rather than refused. What would make this an assertion rather than
+    # a line of prose is a consumer which reads the dataset on a schedule;
+    # there is none, which is its own issue.
+    if not args.quiet and written and not usable:
+        print('WARNING: not one of the %d %s written carries a usable series, '
+              'so this window measured nothing. Narrow it to runs the probe '
+              'was running in, or find out why it was not.'
+              % (written, 'record' if written == 1 else 'records'),
+              file=sys.stderr)
+    return written, usable
 
 
 def main(argv=None):
@@ -921,11 +1018,11 @@ def main(argv=None):
                      'retention window')
 
     github = GitHubCLI(repo=args.repo, verbose=not args.quiet)
-    written = harvest(github, args, report)
+    written, usable = harvest(github, args, report)
     if not args.quiet:
-        print('Wrote %d %s to %s in %d API calls'
+        print('Wrote %d %s to %s (%d with a usable series) in %d API calls'
               % (written, 'record' if written == 1 else 'records',
-                 args.output, github.calls), file=sys.stderr)
+                 args.output, usable, github.calls), file=sys.stderr)
     return 0
 
 

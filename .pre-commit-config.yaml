@@ -49,6 +49,24 @@ repos:
         files: ^shakenfist/deploy/collection/
         pass_filenames: false
 
+      # Requires: ansible-core, gnutls-bin (certtool) and openssl
+      - id: test-internal-ca
+        name: Test the internal_ca role
+        description: Issue and renew certificates with the internal_ca role, rootless, and check them with openssl
+        entry: tools/ci-test-internal-ca.sh
+        language: system
+        files: ^(shakenfist/deploy/collection/roles/internal_ca/|tools/ci-test-internal-ca\.sh$)
+        pass_filenames: false
+
+      # Requires: ansible-core
+      - id: test-kerbside-cluster-config
+        name: Test the Kerbside cluster config
+        description: Drive the node role's Kerbside entry points against a stub sf-ctl, rootless
+        entry: tools/ci-test-kerbside-cluster-config.sh
+        language: system
+        files: ^(shakenfist/deploy/collection/roles/node/(tasks/kerbside_(preflight|credentials)\.yml|meta/argument_specs\.yml|defaults/main\.yml|templates/config)|examples/_shared/site\.yml|tools/ci-test-kerbside-cluster-config\.sh)$
+        pass_filenames: false
+
   # Flake8 style checking via tox
   # Requires: pip install tox flake8
   - repo: local

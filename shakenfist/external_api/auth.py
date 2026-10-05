@@ -1348,6 +1348,9 @@ claim_example = """{
     "used_cpus": 12,
     "used_memory_mb": 24576,
     "used_disk_gb": 600,
+    "peak_used_cpus": 28,
+    "peak_used_memory_mb": 57344,
+    "peak_used_disk_gb": 1400,
     "expires_at": 1755300000.0,
     "updated_at": 1755213600.0
 }

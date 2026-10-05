@@ -979,6 +979,121 @@ class CensusTestCase(HeadroomReportTestCase):
             'makes a refusal in an otherwise-idle-looking run a warning '
             'independent of the ratio, and this run is both at once.')
 
+    def test_a_census_which_read_no_log_lines_cannot_say_there_were_none(self):
+        """A healthy Loki and a broken shipper must not read as a clean run.
+
+        The warning is tri-state so that a census which could not speak says
+        so. Being unreadable is the obvious way that happens; reading
+        successfully and matching nothing is the other, and it is the
+        dangerous one, because zero capacity-stage drops out of zero log
+        lines is arithmetically the same as zero out of thousands. Every job
+        this runs in deploys a cluster and schedules instances, so the
+        scheduler cannot have been silent: an empty result means the shipping
+        path stopped or the message forms were renamed.
+        """
+        census = self._census([])
+        path = self._series([
+            sample({NODE_ONE: node_payload(cpu_measured=1, cpu_committed=1)}),
+        ])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'Refusal warning: UNKNOWN', output,
+            'A census which matched not one log line reported no refusals '
+            'rather than reporting that it could not tell. That is the same '
+            'output a genuinely clean run produces, so a log shipper which '
+            'stopped is indistinguishable from a cluster which refused '
+            'nothing.')
+        self.assertIn('did not observe', output)
+
+    def test_a_census_which_read_lines_but_no_stage_events_cannot_tell(self):
+        """The renamed-filter case, which counting log lines alone misses.
+
+        A LogQL filter which no longer names the scheduler's message forms
+        does not leave the census empty. It leaves whatever else the query
+        selects -- the capacity guard's own events here -- counted as
+        records, while no stage is tallied. Capacity-stage drops are summed
+        from the stage tallies, so keying the unknown state on the record
+        count reads this as a clean run: lines were read, no drop was
+        counted, warning False.
+
+        That is the same state ``print_census`` already calls suspicious,
+        and the verdict must not disagree with the table a reader checks it
+        against.
+        """
+        census = self._census([
+            census_event('instance placement denied'),
+            census_event('something this report has never heard of'),
+        ])
+        path = self._series([
+            sample({NODE_ONE: node_payload(cpu_measured=1, cpu_committed=1)}),
+        ])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn(
+            'Refusal warning: UNKNOWN', output,
+            'A census which read log lines but matched no scheduler stage '
+            'event reported no refusals rather than reporting that it '
+            'could not tell. A filter which stopped matching the stage '
+            'messages is the instrument failing to look, and it is '
+            'indistinguishable from a cluster which refused nothing unless '
+            'the difference is said.')
+        self.assertIn(
+            'no scheduler stage', output,
+            'The UNKNOWN was reported with the wrong reason. There are '
+            'three, and which one it was is the whole of what a reader '
+            'needs: no census, no lines, or lines without stages.')
+        self.assertNotIn('read not one log line', output)
+
+    def test_the_step_summary_names_which_of_the_three_unknowns_it_is(self):
+        """$GITHUB_STEP_SUMMARY carries the reason, not just the verdict.
+
+        The summary is what a reviewer reads without opening the job log, so
+        a bare UNKNOWN there sends them to the log to find out which kind it
+        was.
+        """
+        census = self._census([census_event('instance placement denied')])
+        path = self._series([
+            sample({NODE_ONE: node_payload(cpu_measured=1, cpu_committed=1)}),
+        ])
+        summary = os.path.join(self.tempdir, 'step-summary.md')
+        self.useFixture(fixtures.EnvironmentVariable(
+            'GITHUB_STEP_SUMMARY', summary))
+        code, _ = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        with open(summary) as f:
+            contents = f.read()
+        self.assertIn('Refusal warning: UNKNOWN', contents)
+        self.assertIn(
+            'no scheduler stage events', contents,
+            'The step summary said UNKNOWN without saying why. The three '
+            'reasons call for different actions: fix the collector, fix the '
+            'shipper, or fix the query.')
+
+    def test_a_census_which_read_lines_but_no_refusals_still_says_none(self):
+        """The converse, so the fix above cannot have made every run unknown.
+
+        A census that saw the scheduler run and found no capacity-stage drop
+        has observed the absence, and must keep saying so.
+
+        The event here has to be a real stage event -- STAGE_SURVIVED_PREFIX
+        -- and not merely a well-formed log line. This test was first
+        written with 'schedule have highest affinity', which stage_of()
+        returns None for, so the fixture was in exactly the state the test
+        above now pins and this one passed only because the warning was
+        keyed on the record count.
+        """
+        census = self._census([
+            census_event('schedule at stage sufficient_free_disk'),
+        ])
+        path = self._series([
+            sample({NODE_ONE: node_payload(cpu_measured=1, cpu_committed=1)}),
+        ])
+        code, output = self._run('--series', path, '--census', census)
+        self.assertEqual(0, code)
+        self.assertIn('no capacity-stage drops in the census window', output)
+        self.assertNotIn('Refusal warning: UNKNOWN', output)
+
     def test_the_refusal_warning_is_framed_as_calibration_not_undersizing(self):
         """D5: the job-log prose, not just the annotation, carries the frame.
 
@@ -1117,12 +1232,12 @@ class BandVerdictTestCase(HeadroomReportTestCase):
         code, output = self._run('--series', path)
         self.assertEqual(0, code)
         self.assertIn(
-            'Per-node maximum p90, D4 bound 0.85: 1.000', output,
-            'The per-node maximum and the D4 bound it is judged against '
+            'Per-node maximum p90, bound 0.85: 1.000', output,
+            'The per-node maximum and the bound it is judged against '
             'were not both printed.')
         self.assertIn(
             'ABOVE BAND', output,
-            'A per-node maximum of 1.000 is above the D4 bound of 0.85 and '
+            'A per-node maximum of 1.000 is above the bound of 0.85 and '
             'must read as such.')
         self.assertIn(
             'saturated', output,
@@ -1144,7 +1259,7 @@ class BandVerdictTestCase(HeadroomReportTestCase):
         code, output = self._run('--series', path)
         self.assertEqual(0, code)
         self.assertIn(
-            'Per-node maximum p90, D4 bound 0.85: 0.100', output)
+            'Per-node maximum p90, bound 0.85: 0.100', output)
         self.assertIn('WITHIN BAND', output)
         self.assertNotIn('ABOVE BAND', output)
 
@@ -1622,7 +1737,7 @@ class ReviewFixesTestCase(HeadroomReportTestCase):
         self.assertIn('Fallbacks inside ledger-unreadable samples:       2',
                       output)
         self.assertIn(
-            'D7 should read the second line alone', output,
+            'a ledger comparison should read the', output,
             'The two causes of a fallback were reported as one number, '
             'so a reader reconciling the ledgers cannot tell a real '
             'fallback from a failed capacity read.')
@@ -1884,7 +1999,7 @@ class GuardCensusTestCase(HeadroomReportTestCase):
             '    1  measured CPU load alone was already over the limit',
             output)
         self.assertIn(
-            '    1  the D13 feedforward estimate is what carried it over',
+            '    1  the feedforward demand estimate carried it over',
             output,
             'The demand split counted `requested` into the comparison, which '
             'the guard does not since phase 4a, so an estimator defect reads '
@@ -2400,18 +2515,22 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
         self.assertEqual('slim-tier', written['label'])
         self.assertEqual(report.RECORD_VERSION, written['record_version'])
 
-    def test_record_version_is_3_and_band_provisional_is_gone(self):
-        """Phase 5's D2: the band is defended, not provisional, as of version 3.
+    def test_record_version_is_4_and_band_provisional_is_gone(self):
+        """The band is defended, not provisional, and has been since version 3.
 
         The flag itself is dropped rather than merely flipped to False --
         nothing read it, and a reader wanting to know whether a record's
         band is defended checks record_version instead (see RECORD_VERSION's
         own comment).
+
+        The version is pinned exactly rather than as a lower bound, so that
+        a bump has to come past this test and the comment block it points
+        at. Version 4 is the refusal_warning tri-state widening.
         """
         path = self._series([sample({NODE_ONE: node_payload()})])
         record = report.summary_record(path)
-        self.assertEqual(3, report.RECORD_VERSION)
-        self.assertEqual(3, record['record_version'])
+        self.assertEqual(4, report.RECORD_VERSION)
+        self.assertEqual(4, record['record_version'])
         self.assertNotIn(
             'band_provisional', record['verdict'],
             'band_provisional should no longer be a key in the verdict '
@@ -2668,7 +2787,8 @@ class OutputOrderingTestCase(HeadroomReportTestCase):
             'raised first. The record is what the harvest reads; an '
             'annotation failing must not cost a run its data.')
         with open(record_path) as f:
-            self.assertEqual(3, json.load(f)['record_version'])
+            self.assertEqual(report.RECORD_VERSION,
+                             json.load(f)['record_version'])
 
     def test_the_record_survives_a_step_summary_which_raises(self):
         path = self._series_with_a_verdict()
@@ -2791,7 +2911,7 @@ class BandGateTestCase(HeadroomReportTestCase):
             'failed the job. That is the instrument talking about itself, '
             'which D15 says may never gate.')
         self.assertIn('OVERSUBSCRIBED', output)
-        self.assertIn('This verdict would gate (5f), but', output)
+        self.assertIn('This verdict would gate, but', output)
         self.assertIn(
             reason, output,
             'The report withheld the gate without saying why.')
@@ -2983,7 +3103,7 @@ class BandGateTestCase(HeadroomReportTestCase):
         code, output = self._run(
             '--series', self._series(self._readable(per_node)))
         self.assertEqual(report.BAND_VIOLATION_EXIT, code)
-        self.assertIn('This verdict gates (5f)', output)
+        self.assertIn('This verdict gates:', output)
 
     def test_the_floor_counts_samples_which_produced_a_fraction(self):
         """The second review's reproduction: usable, but with no ledger.

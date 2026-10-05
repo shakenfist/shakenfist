@@ -136,9 +136,9 @@ class TestNodes(base.BaseNamespacedTestCase):
         Four tests in this directory read a topology precondition and
         skip when it is not met: test_network_lifecycle.py:53 needs two
         hypervisors which are not the network node, test_scheduler.py's
-        test_affinity (:128) and
-        test_binary_affinity_prefers_the_tagged_node (:291) each need
-        three nodes, and test_database_tier.py:37 needs two sf-database
+        test_affinity and
+        test_binary_affinity_prefers_the_tagged_node each need
+        three nodes, and test_database_tier.py needs two sf-database
         instances. A skip reports as a pass, so a topology edit which
         removes capacity fails nothing -- it silently stops proving
         scheduler affinity and network teardown while every job stays
@@ -146,7 +146,7 @@ class TestNodes(base.BaseNamespacedTestCase):
         (PLAN-ci-cloud-sizing-phase-05-guardrails.md's D6).
 
         It deliberately fails rather than skipping, for the reason
-        database_tier.py:130-142 gives for its own _database_nodes():
+        database_tier.py's own _database_nodes() gives:
         skipping would turn the assertion into a silent no-op, which is
         the same vacuous pass this check exists to prevent -- and a
         check which skips on precisely the topologies it was written to

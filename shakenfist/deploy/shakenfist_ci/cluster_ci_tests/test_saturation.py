@@ -119,7 +119,7 @@ class _CapacityReadingTestCase(base.BaseNamespacedTestCase):
           size a request beyond.
 
         Both conditions are logged with the figure the test wanted,
-        following the ``test_nodes.py:111`` skip idiom, so a skipped run
+        following ``test_nodes.py``'s skip idiom, so a skipped run
         says why rather than just not running.
 
         ``polled`` says this is one reading in a sequence rather than the
@@ -144,14 +144,14 @@ class _CapacityReadingTestCase(base.BaseNamespacedTestCase):
             self.skipTest(
                 'total.capacity_degraded is true: the capacity counters '
                 'could not be read, so any refusal seen here would not be '
-                'the sizing refusal this test means to prove (D26)')
+                'the sizing refusal this test means to prove')
 
         per_node = resources['per_node']
         if not per_node:
             self.skipTest(
                 'per_node is empty: no hypervisor is currently publishing '
                 'resources, so there is no per-node ceiling to size an '
-                'impossible request beyond (D26)')
+                'impossible request beyond')
 
         return resources, per_node
 
@@ -178,12 +178,12 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
         * Every node's ``cpu_max_per_instance`` (the libvirt per-domain
           vCPU cap) is smaller than the computed request: **skipped**,
           naming both figures. That cap is an *earlier* scheduler stage
-          than ``sufficient_idle_cpu`` (``scheduler.py:643-655``, which
+          than ``sufficient_idle_cpu`` (the ``cpu_max_per_instance`` stage, which
           drops any candidate where ``inst.cpus > cpu_max_per_instance``),
           so the refusal would be real but would arrive from the wrong
           stage -- an unanswerable premise rather than a wrong answer, and
           D26 says those skip. ``/admin/resources`` publishes the figure
-          per node (``scheduler.py:1058``), so this is observable before
+          per node, so this is observable before
           the request is made rather than something to be inferred from a
           stage-mismatch failure. It has not been seen on either CI
           topology, where the cap comes from libvirt's own host limit and
@@ -225,7 +225,7 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
                 'cpu_max_per_instance published by any node is %r -- so the '
                 'create would be refused at the earlier cpu_max_per_instance '
                 'stage rather than at sufficient_idle_cpu, and this test '
-                'cannot prove the stage it is about (D26)'
+                'cannot prove the stage it is about'
                 % (requested_cpus, max_ceiling, max_per_instance))
 
         exc = self.assertRaises(
@@ -248,7 +248,7 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
         ``sizing.effective_ram_ceiling()`` for why this is a ceiling and
         not headroom. The vCPU and disk asks are
         the smallest the suite ever asks for (1 vCPU, a single 1 GB empty
-        disk -- the shape ``test_nodes.py:116-122`` already uses for a
+        disk -- the shape ``test_nodes.py`` already uses for a
         zero-cost create), so this test's only impossible dimension is
         memory.
 
@@ -443,19 +443,19 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                 'Node %s is no longer in /admin/resources per_node %s: its '
                 'metrics went stale or its queue grew past '
                 'UNREASONABLE_QUEUE_LENGTH, so its ledger can no longer be '
-                'read (D26)' % (node_uuid, when))
+                'read' % (node_uuid, when))
 
         if not entry.get('cpu_committed_row_present'):
             self.skipTest(
                 'Node %s reports cpu_committed_row_present false %s: it has '
                 'no scheduler_node_capacity row, so it is admitting '
                 'unguarded and a refusal from it would not be the ledger '
-                'refusal this test means to prove (D26)' % (node_uuid, when))
+                'refusal this test means to prove' % (node_uuid, when))
 
         if entry.get('cpu_limit') is None:
             self.skipTest(
                 'Node %s publishes a null cpu_limit %s, so there is no '
-                'published ledger ceiling to fill it to (D26)'
+                'published ledger ceiling to fill it to'
                 % (node_uuid, when))
 
         return entry
@@ -478,7 +478,8 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
         listing still returns for the node, which is the third question a
         residue raises and the one ``_assert_ledger_returns()`` turns on:
         the listing's default prefilter is ``active``
-        (``external_api/instance.py:485``, ``Instance.ACTIVE_STATES``), so
+        (``external_api/instance.py``'s ``prefilter = 'active'``, over
+        ``Instance.ACTIVE_STATES``), so
         an instance which appears here at all has not reached ``deleted``
         yet. A ledger still charging an instance the cluster has not
         finished deleting is correct; a ledger charging one which is gone
@@ -513,7 +514,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
         suite that shares the cluster.
 
         The placement is asserted immediately, the way
-        ``test_nodes.py:125`` asserts its own forced create, and it is an
+        ``test_nodes.py`` asserts its own forced create, and it is an
         assertion rather than a skip: a create which names a node and lands
         on another one is issue 3496, a defect in the very accounting D23
         is about. Without this check such a placement would charge a
@@ -595,8 +596,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
             'sits at cpu_committed %r after %d creates, of which %r vCPU '
             'belongs to other namespaces. The ledger is charging this '
             'test\'s own placements correctly, so another stestr worker is '
-            'releasing capacity on this node as fast as it is being claimed '
-            '(D26)'
+            'releasing capacity on this node as fast as it is being claimed'
             % (node_name, entry['cpu_limit'], reason, entry['cpu_committed'],
                len(fill), foreign))
 
@@ -634,8 +634,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                     'cpu_limit %r during the fill: the node is recorded past '
                     'its ledger (a lowered limit, or placements admitted '
                     'during an unguarded window), so "filled exactly to the '
-                    'limit" is not a state this test can establish here '
-                    '(D26)'
+                    'limit" is not a state this test can establish here'
                     % (node_name, entry['cpu_committed'], entry['cpu_limit']))
 
             if entry['cpu_committed'] == entry['cpu_limit']:
@@ -687,7 +686,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                     'was still only at cpu_committed %r of cpu_limit %r, so '
                     'the node ran out of memory or disk before it ran out of '
                     'vCPU ledger. That is a shortage this test did not '
-                    'create and cannot assert on: %s (D26)'
+                    'create and cannot assert on: %s'
                     % (node_name, entry['cpu_committed'], entry['cpu_limit'],
                        e.text))
 
@@ -695,7 +694,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                 self.skipTest(
                     'Node %s stopped being an active scheduling candidate '
                     'mid-fill, most likely because it is restarting, so the '
-                    'fill cannot be completed: %s (D26)' % (node_name, e))
+                    'fill cannot be completed: %s' % (node_name, e))
 
     def _resolve_unexpected_admission(self, inst, node_uuid, node_name):
         """Resolve a create the full node admitted, which D28 did not expect.
@@ -742,7 +741,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                     self.skipTest(
                         'A targeted create at node %s was admitted and its '
                         'instance row then went away, so which path answered '
-                        'cannot be established (D26)' % node_name)
+                        'cannot be established' % node_name)
                 state = i.get('state', '')
                 message = i.get('error_message') or ''
 
@@ -772,21 +771,21 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                         'The node was not full at the moment the request '
                         'was made, so there was no refusal to assert -- and '
                         'the ledger was not over-committed either, so this '
-                        'is a sibling worker\'s load rather than a defect '
-                        '(D26)' % node_name)
+                        'is a sibling worker\'s load rather than a defect'
+                        % node_name)
 
                 if state == 'deleted':
                     self.skipTest(
                         'A targeted create at node %s was admitted and then '
                         'deleted without recording an error message, so '
-                        'which path answered cannot be established (D26)'
+                        'which path answered cannot be established'
                         % node_name)
 
                 if time.time() > deadline:
                     self.skipTest(
                         'A targeted create at node %s was admitted and was '
                         'still in state %r after %ds, so which path '
-                        'answered cannot be established (D26)'
+                        'answered cannot be established'
                         % (node_name, state,
                            self.ADMISSION_OUTCOME_DEADLINE_SECONDS))
 
@@ -892,7 +891,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                         'an instance which is not yet deleted is correct, so '
                         'there is no ledger regression to report here -- the '
                         'delete queue is simply slower than this test\'s '
-                        'deadline (D26)'
+                        'deadline'
                         % (node_name, committed,
                            self.LEDGER_RETURN_DEADLINE_SECONDS,
                            baseline_committed, len(still_listed),
@@ -1038,7 +1037,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
             self.skipTest(
                 'No node appears in both /admin/resources per_node and the '
                 'node list, so no hypervisor can be named to force a '
-                'placement onto (D26)')
+                'placement onto')
 
         node_uuid = max(
             candidates, key=lambda uuid: candidates[uuid]['cpu_available'])
@@ -1053,13 +1052,13 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                 'The roomiest hypervisor %s reports cpu_committed_row_present '
                 'false: it has no scheduler_node_capacity row, so it admits '
                 'unguarded and a refusal from it would not be the ledger '
-                'refusal this test means to prove (D26)' % node_name)
+                'refusal this test means to prove' % node_name)
 
         cpu_limit = entry.get('cpu_limit')
         if cpu_limit is None:
             self.skipTest(
                 'The roomiest hypervisor %s publishes a null cpu_limit, so '
-                'there is no published ledger ceiling to fill it to (D26)'
+                'there is no published ledger ceiling to fill it to'
                 % node_name)
 
         baseline_committed = entry['cpu_committed']
@@ -1175,7 +1174,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                         'ledger reading this test sized itself from was '
                         'already stale when the create was issued. The '
                         'premise is invalid rather than the refusal wrong: '
-                        '%s (D26)' % (node_name, body))
+                        '%s' % (node_name, body))
 
                 # Path 1, as expected and as reasoned in this method's
                 # docstring: the single forced candidate was pruned by the
@@ -1187,7 +1186,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                 self.skipTest(
                     'Node %s stopped being an active scheduling candidate '
                     'before the create at its full ledger could be refused, '
-                    'most likely because it is restarting: %s (D26)'
+                    'most likely because it is restarting: %s'
                     % (node_name, e))
 
             else:

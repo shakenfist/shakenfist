@@ -24,6 +24,7 @@ for how each subsystem works internally see
 
 - **Multi-channel support** - Handles main, display, cursor, inputs, playback, usbredir, and webdav channels.
 - **Keyboard forwarding** - Keys are sent to the guest as PC scancodes for their physical position, so the guest's keyboard layout decides which character is typed. ryll tracks which keys it has sent as pressed: host auto-repeats of a held key are not forwarded, and held keys are released in the guest when ryll's window loses focus or a ryll dialog takes over input, so no key is left stuck down.
+- **Clipboard sync** - With spice-vdagent running in the guest, UTF-8 text copied on the host can be pasted in the guest and vice versa. Only the CLIPBOARD selection is synced. In an X11 guest, text that is merely selected (the PRIMARY selection, pasted with middle-click) stays in the guest, so selecting text never overwrites the host clipboard.
 - **Paste-as-keystrokes** - Type arbitrary text into guests without vdagent by translating characters into US-QWERTY scancode sequences. Cooperative timer-driven state machine keeps the inputs channel responsive during long pastes. Triggered via Ctrl+Alt+V shortcut or Menu → Paste in the GUI (when enabled). Automatically disabled when vdagent is connected. Characters are mapped to US-QWERTY scancodes; guests with a different keyboard layout will see different characters. Maximum paste length is 4096 characters. CLI flags: `--enable-paste-as-keystrokes`, `--paste-text TEXT`, `--paste-char-delay-ms N`.
 - **Screenshot capture** - Press F8 or use Menu → Screenshot to save the current display as a PNG via a native file dialog. With multiple monitors, one PNG per surface is saved with `-1`, `-2` suffixes.
 
@@ -38,7 +39,7 @@ for how each subsystem works internally see
 
 - **TLS support** - Secure connections with inline CA certificates from .vv files.
 - **Reconnect on disconnect** - When a session ends unexpectedly, the disconnect dialog offers a Reconnect button that drops all per-session state and re-attempts the SPICE handshake against the same target without exiting the application. Preserves the configured virtual disk list, shared folder, paste-as-keystrokes toggle, and notification history; resets statistics, traffic buffers, and per-channel state. See [session-lifecycle.md](/components/ryll/session-lifecycle/) "Reconnection" for the full lifecycle.
-- **Ticket lifecycle handling** - Honours `delete-this-file=1` (single-use ticket: auto-reconnect suppressed) and the ryll extension key `ticket-valid-until` (expiry warning and modal) in .vv files. See [configuration.md](/components/ryll/configuration/) for the full key reference.
+- **Ticket lifecycle handling** - Honours `delete-this-file=1` (the `.vv` is deleted once read, and the single-use ticket suppresses auto-reconnect) and the ryll extension key `ticket-valid-until` (expiry warning and modal) in .vv files. See [configuration.md](/components/ryll/configuration/) for the full key reference.
 - **Graceful Ctrl+C shutdown** - Cross-platform signal handling via `ctrlc` crate; the GUI and headless event loops check a flag and shut down cleanly, ensuring capture files are finalized.
 
 ## Diagnostics and debugging

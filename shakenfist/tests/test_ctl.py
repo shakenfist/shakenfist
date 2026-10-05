@@ -9,6 +9,7 @@
 # Note: The ctl module runs verify_config() on import, so we need to mock
 # the config module before importing any ctl components.
 
+import json
 import sys
 from unittest import mock
 
@@ -407,6 +408,36 @@ class CliCommandsTestCase(base.ShakenFistTestCase):
         self.assertNotIn('abc123', result.output)
         self.assertIn('<redacted>', result.output)
         self.assertIn('8.8.8.8', result.output)
+
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_show_config_numeric_token_not_redacted(self, mock_mariadb):
+        from shakenfist.client.ctl import show_config
+
+        mock_mariadb.get_cluster_config.return_value = {
+            'KERBSIDE_TOKEN_DURATION': 3600,
+            'AUTH_SECRET_SEED': 'sekrit'
+        }
+
+        result = self.runner.invoke(show_config)
+
+        self.assertEqual(result.exit_code, 0)
+        data = json.loads(result.output)
+        self.assertEqual(3600, data['KERBSIDE_TOKEN_DURATION'])
+        self.assertEqual('<redacted>', data['AUTH_SECRET_SEED'])
+
+    @mock.patch('shakenfist.client.ctl.mariadb')
+    def test_show_config_string_token_redacted(self, mock_mariadb):
+        from shakenfist.client.ctl import show_config
+
+        mock_mariadb.get_cluster_config.return_value = {
+            'KERBSIDE_TOKEN_DURATION': 'notanumber'
+        }
+
+        result = self.runner.invoke(show_config)
+
+        self.assertEqual(result.exit_code, 0)
+        self.assertNotIn('notanumber', result.output)
+        self.assertIn('<redacted>', result.output)
 
     @mock.patch('shakenfist.client.ctl.mariadb')
     def test_show_config_show_secrets(self, mock_mariadb):

@@ -90,6 +90,15 @@ class ConfigRedactionTestCase(base.ShakenFistTestCase):
         for key in ['NODE_NAME', 'ZONE', 'API_PORT', 'LOKI_BASE_URL']:
             self.assertFalse(SECRET_CONFIG_KEY_RE.search(key), key)
 
+    def test_config_value_is_secret(self):
+        from shakenfist.config import config_value_is_secret
+        self.assertTrue(config_value_is_secret('AUTH_SECRET_SEED', 'x'))
+        self.assertTrue(config_value_is_secret('KERBSIDE_TOKEN_DURATION', 'x'))
+        self.assertFalse(config_value_is_secret('KERBSIDE_TOKEN_DURATION', 3600))
+        self.assertFalse(config_value_is_secret('SOME_TOKEN_FLAG', True))
+        self.assertFalse(config_value_is_secret('SOME_TOKEN_RATIO', 0.5))
+        self.assertFalse(config_value_is_secret('NODE_NAME', 'x'))
+
 
 class ConfigDumpCallerTestCase(base.ShakenFistTestCase):
     """Both dumping sites must route through the shared helper.

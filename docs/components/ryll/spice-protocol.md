@@ -157,15 +157,26 @@ byte-shape assertion respectively — so a regression in
 either the negotiation logic or the wire format fails
 loudly during `cargo test`.
 
-#### Agent reply-lag tracking
+#### Agent flow control and stall detection
 
-The main channel tracks guest agent responsiveness by measuring the round-trip
-time of `VD_AGENT_REPLY` messages to periodic `VD_AGENT_MONITORS_CONFIG`
-probes. Reply-lag fields (`agent_request_count`, `agent_reply_count`,
-`last_agent_reply_lag_us`, `recent_agent_reply_lag_us`, and
-`outstanding_agent_request_count`) are exposed on `MainSnapshot` for
-bug reports and diagnostics. See the "Guest agent diagnostics" section
-in [troubleshooting.md](/components/ryll/troubleshooting/) for interpretation.
+Each `AGENT_DATA` chunk the client sends costs one agent token. MAIN_INIT
+grants `REDS_AGENT_WINDOW_SIZE` (10), and spice-server returns them in
+batches of `REDS_TOKENS_TO_SEND` (5) as the guest consumes the data, or at
+once for data the server consumes itself. ryll queues agent messages
+(`channels/agent_queue.rs`), sends one chunk per token, and never abandons
+a message part-way: spice-server reassembles messages by byte count and
+disconnects a client whose next message overruns the one it is still
+expecting.
+
+A client at zero tokens with messages queued has at least six chunks the
+guest has not read, so the main channel treats 5 seconds of that as a
+stalled agent. Replies are not used for this. On QXL guests spice-server
+diverts `VD_AGENT_MONITORS_CONFIG` to the display device
+(`agent-msg-filter.c`, `reds_on_main_agent_monitors_config`), so the agent
+never sees it and never sends `VD_AGENT_REPLY`. Reply counts and lags are
+still recorded on `MainSnapshot` as passive diagnostics, next to the token
+and queue fields; the "Guest agent diagnostics" section in
+[troubleshooting.md](/components/ryll/troubleshooting/) explains each one.
 
 ## Image Types and Compression
 
@@ -183,7 +194,7 @@ Values from `spice-protocol/spice/enums.h`:
 |  103 | FromCache        | Supported (image cache lookup) |
 |  104 | Surface          | Not implemented |
 |  105 | Jpeg             | Supported (via the `image` crate) |
-|  106 | FromCacheLossless| Not implemented |
+|  106 | FromCacheLossless| Supported (image cache lookup) |
 |  107 | ZlibGlzRgb      | Supported (zlib-wrapped GLZ) |
 |  108 | JpegAlpha        | Not implemented |
 |  109 | LZ4              | Supported (per-row compressed) |
@@ -234,8 +245,30 @@ tracked per display channel and included in bug reports for performance analysis
   `top_down` flag (bit 2 of flags) controls row ordering.
 - **JPEG**: preceded by a 4-byte `data_size` (u32 LE), then a standard
   JPEG stream. Decoded via the `image` crate and converted to RGBA.
-- **FromCache**: no pixel data, uses `image_id` from the descriptor
-  to look up a previously cached decompressed image.
+- **FromCache** and **FromCacheLossless**: no data at all after the
+  descriptor; `image_id` names a previously cached decompressed image.
+  spice-server marshals a draw's source image after its fixed fields
+  and before any mask, so on a draw without a mask the descriptor ends
+  the message. The server sends FromCacheLossless instead of FromCache
+  when JPEG is enabled and the cached copy is lossless.
+
+### Image cache flags
+
+The descriptor's `flags` byte controls the client's image cache, which
+holds decoded non-GLZ images keyed by `image_id` (GLZ images go to the
+GLZ dictionary instead):
+
+- **CACHE_ME** (bit 0): cache this image after decoding it.
+- **HIGH_BITS_SET** (bit 1): not used by ryll.
+- **CACHE_REPLACE_ME** (bit 2): overwrite the entry already cached under
+  this id. spice-server sets it, instead of CACHE_ME, when it resends a
+  lossy cached image losslessly so a later FromCacheLossless finds the
+  lossless pixels.
+
+spice-server only caches images whose guest driver asked for it with
+`QXL_IMAGE_CACHE`. The Linux KMS qxl driver never does, so Linux guests
+on that driver produce no cache hits; Xorg's `xf86-video-qxl` and the
+Windows QXL drivers do.
 
 ### Compression algorithms
 
@@ -296,6 +329,30 @@ dimensions, version (major=0, minor=1), and codec type.
 
 All decompressors output RGBA pixels (BGRX/BGRA/BGR on the wire
 is converted to RGBA with alpha=255 for opaque formats).
+
+### Decode limits
+
+The image dimensions come from the server, so every image decoder
+(QUIC, LZ, GLZ, zlib-GLZ, LZ4, JPEG, H.264/video, pixmap and
+cursor) refuses an image over the shared per-side and total-pixel
+caps before allocating its RGBA output. For the pure-Rust decoders
+that is everything they allocate. The H.264 decoder and the
+platform JPEG backends (WIC on Windows, ImageIO on macOS) hand the
+compressed data to a codec library first, and it allocates its own
+intermediate buffers before ryll sees the dimensions, so those
+buffers are bounded only by the library's own limits. Of the JPEG
+backends, `jpeg-decoder` is capped through its
+`set_max_decoding_buffer_size`, and mozjpeg's dimensions are
+checked after the header is read and before any scanline is
+decoded. The constants (`MAX_IMAGE_DIMENSION` and
+`MAX_IMAGE_PIXELS`) and the checked `rgba_len` size helper live in
+the [`limits`
+module](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-compression/src/limits.rs)
+of `shakenfist-spice-compression`. A refused image is dropped and
+not painted, in the same way as a truncated LZ4 image above. The
+zlib layer of `ZLIB_GLZ_RGB` is inflated against a bound slightly
+above the RGBA size, because a GLZ stream can be a little larger
+than the pixels it decodes to.
 
 ## Display Channel Capabilities
 

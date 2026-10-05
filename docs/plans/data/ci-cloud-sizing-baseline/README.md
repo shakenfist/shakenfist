@@ -133,7 +133,7 @@ Inside `summary`:
 
 | Field | Meaning |
 |---|---|
-| `record_version` | Schema version of the report record. `records.jsonl` is **1**; `records-addendum.jsonl` is **2**, which adds the four series counters below. A consumer that reads both must expect the older shape. |
+| `record_version` | Schema version of the report record. `records.jsonl` is **1**; `records-addendum.jsonl` is **2**, which adds the four series counters below. A consumer that reads both must expect the older shape. The tool writes **4** today; see *Two fields whose meaning changed after this was harvested* below. |
 | `series` | Sample counts (usable, failed, unparseable), the window start/end/duration, `ledger_unreadable_samples`, and -- from record version 2 -- `ledger_unreadable_prefix_samples`, `ledger_unreadable_prefix_seconds`, `capacity_degraded_samples` and `capacity_degraded_absent_samples`. The last four are what say whether an unreadable ledger was a warm-up or a fault. |
 | `ledger_provenance` | Node-samples with a real capacity row, with a fallback to `cpu_hard_max`, with a fallback inside an unreadable sample, and with no ledger at all. |
 | `cluster` | Committed vCPU and committed memory MB, cluster-wide: `n`, `p90`, `peak`, `ledger_min`, `ledger_max`, and the two as fractions of ledger. |
@@ -143,6 +143,41 @@ Inside `summary`:
 | `census` | Per-stage tally: events, aborts, drops, shortage drops and drop reasons, plus `capacity_shortage_drops`, `unclassified_shortage_drops`, `disk_bandwidth_drops` and `missing_data_drops`. |
 | `guard` | The capacity guard census. In this window its `state` is `not_collected` on every record -- see below. |
 | `verdict` | The D3 band verdict against the provisional 0.35/0.70 bounds, and the per-node maximum D21 adds. |
+
+### Two fields whose meaning changed after this was harvested
+
+Both files here were harvested before the report tool reached
+`record_version` 4, and two fields inside `verdict` do not mean today
+what they meant when these records were written. Neither can be
+re-derived by re-harvesting, because the bundles are gone.
+
+`verdict.per_node_band` is the additive one, and version 3 is where it
+changed: in these records it is the constant `null`, meaning *not
+judged*. From version 3 on, `null` means *no sample produced a per-node
+fraction*, and a real verdict is published otherwise.
+
+`verdict.refusal_warning` is the one to be careful with. In these
+records it reads `false` for a census which was read and matched no
+scheduler stage event at all -- the same value a census which saw the
+scheduler and tallied no capacity-stage drop gets. Version 4 separates
+them and writes `null` for the first, because a filter which stopped
+matching is the instrument failing to look, not the cluster failing to
+refuse. An analysis pooling these files with records written after that
+change will count the older ones as observed-clean unless it re-derives
+the warning itself:
+
+```python
+census = r['summary']['census']
+observed = census['state'] == 'read' and census['stage_events']
+warning = bool(census['capacity_shortage_drops']) if observed else None
+```
+
+That computes the version 4 reading from fields every version carries.
+In practice it changes nothing about *this* dataset -- `stage_events`
+is non-zero on all 204 summarised records in `records.jsonl` and all 32
+in `records-addendum.jsonl`, so no record here is actually in the
+ambiguous state. The boundary matters for windows harvested across it,
+which is why it is written down rather than left to be rediscovered.
 
 ## What this dataset does not know
 

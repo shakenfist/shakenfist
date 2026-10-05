@@ -410,15 +410,20 @@ class TestAgentOperationDeadlines(base.BaseNamespacedTestCase):
         # the rescuer replaces the path with a regular file for the
         # next attempt to find -- while holding the original FIFO's
         # write end open and silent, so the attached attempt can see
-        # neither data nor EOF and provably stalls. The subshell's fds
-        # are all redirected because the agent collects execute output
-        # with communicate(), which would otherwise wait on the
-        # inherited pipes for the length of the rescuer's sleep.
+        # neither data nor EOF and provably stalls. The replacement is a
+        # rename of a file prepared in advance, so the path is never
+        # absent: the attached attempt is still between its open() and
+        # whatever it does next by path, and an rm-then-create left a
+        # window where that found nothing and errored instead of
+        # stalling. The subshell's fds are all redirected because the
+        # agent collects execute output with communicate(), which
+        # would otherwise wait on the inherited pipes for the length of
+        # the rescuer's sleep.
         target = '/tmp/sf-retry-target'
         arm = (
+            f'printf {RETRY_RESCUE_CONTENT} > {target}.rescue; '
             f'mkfifo {target}; '
-            f'( exec 9>{target}; rm -f {target}; '
-            f'printf {RETRY_RESCUE_CONTENT} > {target}; '
+            f'( exec 9>{target}; mv -f {target}.rescue {target}; '
             f'sleep {RETRY_RESCUE_HOLD_SECONDS} ) >/dev/null 2>&1 </dev/null &'
         )
         armed = self.nonblocking_client.instance_execute(inst['uuid'], arm)

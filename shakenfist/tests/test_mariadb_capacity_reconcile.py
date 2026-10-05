@@ -323,6 +323,26 @@ class ClaimUsageStatementTestCase(base.ShakenFistTestCase):
                       text)
         self.assertIn('c.used_disk_gb = COALESCE(u.used_disk_gb, 0)', text)
 
+    def test_the_peak_is_raised_and_never_written_flat(self):
+        text = str(mariadb._RECONCILE_CLAIM_USAGE_SQL)
+        # Claim sizing phase 2b D3's one dangerous line. Written as
+        # ``c.peak_used_cpus = COALESCE(u.used_cpus, 0)`` this statement
+        # would pass every single-pass test and discard the peak of
+        # every real workload within five minutes of it being reached,
+        # because this pass runs every five minutes and a CI job deletes
+        # its instances before anybody asks what it used.
+        for dimension in ('cpus', 'memory_mb', 'disk_gb'):
+            self.assertIn(
+                f'c.peak_used_{dimension} = GREATEST(\n'
+                f'               c.peak_used_{dimension}, '
+                f'COALESCE(u.used_{dimension}, 0))', text)
+        # And it is raised towards the recomputed ground truth, not
+        # towards whatever this statement is about to write into
+        # used_*: the only column of the target the mark reads is
+        # itself, which is what makes the SET order here immaterial.
+        self.assertNotIn('GREATEST(\n               c.peak_used_cpus, '
+                         'c.used_cpus)', text)
+
     def test_only_active_claims_are_touched(self):
         self.assertIn("WHERE c.state = 'active'",
                       str(mariadb._RECONCILE_CLAIM_USAGE_SQL))

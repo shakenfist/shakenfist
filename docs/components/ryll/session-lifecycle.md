@@ -13,10 +13,11 @@ Ryll installs a SIGINT handler (via `libc::signal`) in `main.rs` that sets a
 global `AtomicBool` flag (`SHUTDOWN_REQUESTED`). This allows Ctrl+C to trigger
 a clean shutdown instead of killing the process immediately.
 
-- **GUI mode**: The `eframe::App::update()` loop in `app.rs` checks the flag
-  each frame and calls `ctx.send_viewport_cmd(ViewportCommand::Close)` when
-  set, which lets eframe run its normal teardown path and finalize the capture
-  session.
+- **GUI mode**: `RyllApp::logic` in `app.rs` checks the flag on every pass
+  and calls `ctx.send_viewport_cmd(ViewportCommand::Close)` when set, which
+  lets eframe run its normal teardown path and finalize the capture session.
+  eframe calls `logic` even while the window is hidden, so Ctrl+C works on a
+  minimised window too.
 - **Headless mode**: The tokio `select!` loop polls the flag alongside channel
   events and breaks out cleanly when shutdown is requested. However the loop
   ends, `run_headless` then winds the connection task down and joins it
@@ -187,9 +188,40 @@ disconnected" (no-op). It is set to `true` when the
 GUI-tick poll calls `reconnect()` from a `Pending` state
 and cleared on the next event (success or failure).
 
+### Connection attempts that fail before a session exists
+
+`run_connection` returns an error only when it could not set a session
+up: the dial, TLS, link or authentication failed or timed out (each
+stage is bounded, see `DIAL_TIMEOUT` and `HANDSHAKE_TIMEOUT` in
+`shakenfist-spice-protocol/src/client.rs`), or a secondary channel
+would not open. Once a session exists, channel failures arrive as
+`ChannelEvent::Error` instead. The GUI's connection thread sends that
+error to the UI on a per-attempt oneshot, `connection_failure_rx`,
+which `reconnect()` replaces just as it replaces `event_rx`. A
+superseded attempt's failure therefore goes nowhere.
+
+`process_events` acts on the failure only once `event_rx` is empty.
+The failure travels on its own channel, so it can arrive before events
+the attempt sent ahead of it, and a `SessionInitialized` among those
+decides how the failure is handled.
+`RyllApp::handle_connection_failed` then routes the failure in one of
+two ways:
+
+- If a session was established, or the attempt was an auto-retry, the
+  failure goes to `handle_critical_disconnect` like any other
+  disconnect. The ticket policy and the retry budget apply.
+- Otherwise this was a first attempt or a manual Reconnect that never
+  reached a session, so it lands in `Modal(ConnectFailed)`. It does not
+  retry in the background. With `delete-this-file=1` it also does not
+  claim that a session which never existed consumed the ticket. These
+  failures are usually a mistyped port or a server that is down, and
+  there is no traffic to capture. They therefore write a disconnect
+  snapshot only when `--bug-report-dir` or `--capture` is set, whereas
+  the first branch always writes one, as any disconnect does.
+
 ### Modal variants and console.vv ticket keys
 
-The `Modal` variant carries one of three discriminants:
+The `Modal` variant carries one of four discriminants:
 
 - `Generic { latest_error }` — auto-reconnect budget
   exhausted on a reusable ticket. Buttons: Reconnect, Close.
@@ -201,6 +233,10 @@ The `Modal` variant carries one of three discriminants:
   `ticket-valid-until=<unix-ts>` and that wall time has
   passed. Auto-reconnect is suppressed and the modal shows
   the expiry time. Buttons: Close only.
+- `ConnectFailed { error }` — a first attempt or a manual
+  Reconnect failed before it reached a session (see above).
+  Buttons: Reconnect, Close, whatever the ticket policy says,
+  since nothing was consumed that ryll knows of.
 
 `ReconnectPolicy::forbid_retry(now_wall)` consults the two
 ticket-related `Config` fields and returns the appropriate

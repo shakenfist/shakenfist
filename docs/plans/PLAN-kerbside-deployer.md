@@ -163,7 +163,11 @@ branch.
 #4097 records, as item 4, that "the ansible `kerbside_url`
 variable has never been read by a running sf-api". #4093 asks for
 the mint test to run somewhere. #4367 notes that Kerbside's deploy
-lane has no headroom instrumentation. All three are open.
+lane has no headroom instrumentation. #4097 and #4367 are open.
+#4093 was closed on 2026-10-03 by the merge of this plan's own pull
+request, #4420, whose phase table said phase 4 "closes" it. GitHub
+read that as a closing keyword; nothing makes the mint test run yet
+(phase 2's survey, S7).
 
 ### What deploying Kerbside involves
 
@@ -314,12 +318,26 @@ therefore silently shadows whatever the collection later renders.
 
 ### Defects found while writing this plan
 
-- **SPICE certificates never renew.** `host_certificate.yml:6-14`
-  stats and expiry-checks `/etc/pki/libvirt-spice/server_cert.pem`
-  (underscore), but `distribute_certificates.yml:52` writes
-  `server-cert.pem` (hyphen). The renewal branch can never fire,
-  so every hypervisor certificate will simply expire. Phase 1
-  rewrites this file anyway; the fix belongs there.
+- **SPICE certificates never renew, and expire after a year.**
+  `host_certificate.yml:6-14` stats and expiry-checks
+  `/etc/pki/libvirt-spice/server_cert.pem` (underscore), but
+  `distribute_certificates.yml:52` writes `server-cert.pem`
+  (hyphen). The renewal branch therefore never fires. Phase 1's
+  survey found three more faults behind that one:
+  - the `when:` reads `.meta.stdout`, which does not exist, so it
+    would crash;
+  - its condition is inverted;
+  - it moves the certificate aside under the key's name.
+
+  Fixing only the filename would have turned a silent no-op into a
+  failure on every deploy. The host template also sets no
+  lifetime, so certtool's 365-day default applies. sfcbr's sf-1
+  certificate expires on 2027-07-11. Every collection-deployed
+  cluster's hypervisor SPICE TLS stops verifying a year after its
+  first deploy, and redeploying does not help. The private key is
+  installed `0444`. Phase 1 fixes the renewal and the lifetime,
+  and records the key mode as future work; see its "What the
+  survey found" section.
 - **`vdi_console_tokens.md:172` says** `/admin/vditokenpubkey` is
   served "to admin callers". It carries only `@log_token_use`
   (`admin.py:78-101`), so any authenticated caller can read it.
@@ -436,10 +454,15 @@ start.
 `PROXY_HOST_SUBJECT` is read back from the issued or supplied
 certificate on the Kerbside host, never composed from variables.
 Composing it is how the string drifts from the certificate.
-**Uncertain:** the exact subject string format the `.vv`
-`host-subject` needs (virt-viewer's comma-separated `C=..,O=..,CN=..`
-versus OpenSSL's default one-line form). Phase 1 settles it by
-test, against both ryll and remote-viewer.
+
+The format question this section originally left open is
+answered by code already in the tree; phase 1's survey (S5) has
+the detail. `shakenfist/node.py` `_spice_host_subject_from_cert()`
+renders a subject in DER order as comma-joined `SHORT=value`
+pairs, with `\` and `,` escaped. That is what Shaken Fist's own
+direct `.vv` files carry as `host-subject`, for the same clients,
+and what Kerbside's proxy compares against. Phase 3 renders
+`PROXY_HOST_SUBJECT` by the same rules. No client test is needed.
 
 ### 5. What does Kerbside authenticate to Shaken Fist with?
 
@@ -453,10 +476,13 @@ dedicated key can be rotated or revoked without touching the
 cluster's own credential, and shows up separately in
 `log_token_use` audit events.
 
-**Uncertain:** whether `bootstrap-system-key` replaces an existing
-key of the same name, which is how rotation would work.
-`ctl.py:173-192` must be read in phase 2. If it does not replace,
-phase 2 adds that behaviour.
+*Answered in phase 2's survey (S2).* `bootstrap-system-key` calls
+`Namespace.add_key`, which has always overwritten a key of the same
+name -- a rotation, with a new hash and a new nonce. Rotation is
+changing the variable and redeploying; nothing needs adding. Because
+the play mints on every deploy, as it already does the `deploy` key,
+the nonce also changes on every deploy, which `shakenfist_client`
+absorbs by re-authenticating once on the resulting 401.
 
 ### 6. What should happen when a `cluster_config` row shadows the variable?
 
@@ -530,8 +556,8 @@ spelling above is the one to write.
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 1. `internal_ca` issues certificates to any host at caller-chosen paths, and renews them | PLAN-kerbside-deployer-phase-01-internal-ca.md | Proposed | — |
-| 2. Shaken Fist side: signing key, Kerbside credential, token duration, shadow guard | PLAN-kerbside-deployer-phase-02-sf-side.md | Proposed | — |
+| 1. `internal_ca` issues certificates to any host at caller-chosen paths, and renews them | [PLAN-kerbside-deployer-phase-01-internal-ca.md](PLAN-kerbside-deployer-phase-01-internal-ca.md) | Complete | `12441652b` (#4430) |
+| 2. Shaken Fist side: signing key, Kerbside credential, token duration, shadow guard | [PLAN-kerbside-deployer-phase-02-sf-side.md](PLAN-kerbside-deployer-phase-02-sf-side.md) | In progress | — |
 | 3. A `kerbside` role and the `kerbside` group in `site.yml` | PLAN-kerbside-deployer-phase-03-kerbside-role.md | Proposed | — |
 | 4. A merge-queue lane with the feature on | PLAN-kerbside-deployer-phase-04-ci.md | Proposed | — |
 | 5. Kerbside's sf-e2e lane deploys through the collection | PLAN-kerbside-deployer-phase-05-kerbside-lane.md | Proposed | — |
@@ -559,33 +585,35 @@ Ordering:
 
 ### Phase 1 -- `internal_ca` issues certificates to any host
 
+Planned in
+[PLAN-kerbside-deployer-phase-01-internal-ca.md](PLAN-kerbside-deployer-phase-01-internal-ca.md).
+
 `host_certificate.yml` and `distribute_certificates.yml` gain
 parameters for:
 
-- the subject CN;
-- a SAN list;
-- the destination directory;
-- the destination file names.
+- the file stem on the control node;
+- the CN;
+- DNS and IP SANs;
+- the lifetime and the renewal window;
+- the destination directory, file names, owner, group and modes.
 
 They default to today's `/etc/pki/libvirt-spice/` layout, so the
-existing `allsf` plays do not change. `site.yml` gains a play that
-issues the Kerbside proxy certificate to `kerbside` hosts that
-supplied no override. It is installed under `/etc/kerbside/pki/`,
-and its CN and SAN are `kerbside_public_fqdn`.
+existing `allsf` plays do not change.
 
-The renewal check is fixed to stat the file it actually installs.
-It gets a unit-level test (template rendering, as
-`test_node_config_template.py` does for the node config) and a
-note in `docs/operator_guide/` that renewal had never worked
-before.
+Renewal is rewritten to work: it checks expiry on the control
+node's copy, branches on the return code, and also reissues when
+the template changes. Lifetime becomes an explicit setting. A
+rootless scripted test, `tools/ci-test-internal-ca.sh`, runs in
+the sanity-checks job and covers issue, idempotence, SANs and
+both kinds of renewal.
 
-This phase also settles open question 4's subject-format
-uncertainty. It issues a certificate and renders the subject both
-ways. It connects with ryll and with remote-viewer through a
-proxy configured from it, and records which form both accept.
+The `site.yml` play that issues the Kerbside certificate moved to
+phase 3, which defines the `kerbside` group and variables it
+needs. The subject-format question needed no test (open
+question 4).
 
-Planned at high effort: the subject-format question decides
-whether every `.vv` the cluster hands out is accepted by clients.
+Planned at high effort: renewal decides when every node's
+certificate on every cluster is reissued.
 
 ### Phase 2 -- Shaken Fist side
 
@@ -598,17 +626,31 @@ All of this lands in the cluster-config play and the node role:
 - `sf-ctl ensure-kerbside-signing-key`, run when `kerbside_url`
   is set (open question 7).
 - `sf-ctl bootstrap-system-key --key-from-stdin kerbside`, run
-  when the `kerbside` group is non-empty (open question 5),
-  including whatever rotation semantics the read of `ctl.py`
-  shows are missing.
-- The shadow guard from open question 6.
+  when the `kerbside_system_key` variable is set (open question
+  5). Not when the `kerbside` group is non-empty: that group does
+  not exist until phase 3, and an operator who runs Kerbside some
+  other way needs the credential without one. Phase 3 makes the
+  variable required when the group is non-empty. Rotation already
+  works (open question 5).
+- The shadow guard from open question 6, covering
+  `KERBSIDE_TOKEN_DURATION` as well as `KERBSIDE_URL`, and the
+  play's own `extra_config` as well as existing rows: the
+  documentation told operators to set the duration both ways.
+- `sf-ctl show-config` stops redacting numeric values, as
+  `redacted_config_items()` already does, so the guard can read
+  `KERBSIDE_TOKEN_DURATION` without `--show-secrets`.
 
-argument_specs validate the new variables. The `kerbside` key
-must differ from `system_key`; the play asserts it.
+The cluster-config play is in `examples/_shared/site.yml`, not a
+role, so it has no argument_specs. The Kerbside steps therefore
+become two node role entry points that the play includes, which
+gives the new variables argument_specs and makes them testable
+without a cluster. The `kerbside` key must differ from
+`system_key`; the entry point asserts it.
 
 This phase alone retires every manual step in
-`vdi_console_tokens.md` for an operator who runs Kerbside some
-other way. It is useful even if phase 3 never lands.
+`vdi_console_tokens.md` but the rotation runbook for an operator
+who runs Kerbside some other way. It is useful even if phase 3
+never lands.
 
 Planned at high effort: it changes what the cluster-config play
 does on every deploy of every cluster, including those that never
@@ -644,7 +686,22 @@ A new `shakenfist.shakenfist.kerbside` role with `bootstrap`,
   same bytes `/admin/cacert` serves, so the equality check passes
   by construction;
 - the two systemd units;
-- `PROXY_HOST_SUBJECT`, read back from the installed certificate.
+- `PROXY_HOST_SUBJECT`, read back from the installed certificate
+  and rendered by the rules of `node.py`'s
+  `_spice_host_subject_from_cert()` (open question 4).
+
+The proxy certificate comes from the `internal_ca` role, called
+with phase 1's parameters, for `kerbside` hosts that supplied no
+override:
+
+- `cert_name: <host>-kerbside`, so it cannot collide with a
+  co-located node's SPICE certificate;
+- `cert_cn` and `cert_san_dns` set to `kerbside_public_fqdn`;
+- `cert_dest_dir: /etc/kerbside/pki`;
+- a key mode that is not world-readable.
+
+The play lives in `site.yml` beside the existing certificate
+plays.
 
 `register` runs `kerbside db upgrade` with `run_once` on the
 first Kerbside host, then starts or restarts on change. It waits
@@ -1106,9 +1163,12 @@ where one exists, for directly related issues that we should
 either resolve as part of this master plan or at least be aware of
 while planning it.
 
-- **SPICE certificate renewal never fires** (found while planning;
-  see Situation). Phase 1 fixes it. File an issue when phase 1
-  starts, so the fix closes something.
+- **#4415** (open): SPICE certificate renewal never fires, and
+  certificates expire after 365 days (found while planning; see
+  Situation). Phase 1 fixes it and closes the issue.
+- **#4416** (open): the SPICE private key is installed
+  world-readable. Phase 1 adds the parameters a fix needs, but
+  leaves the default unchanged; see its Future work.
 - **#4004** (closed by #4024) delivered the first increment
   only. This plan is the remainder; phase 2 comments on #4004
   with a link here.

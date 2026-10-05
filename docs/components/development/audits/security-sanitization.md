@@ -109,6 +109,6 @@ implementations are `SafeHeaderMixin` and `safe_path_join()` in
 ## Projects
 
 Per-project compliance for the header sanitization check -- the only
-part of this criterion with an automated check -- is regenerated every
-morning by the consistency audit: see
+part of this criterion with an automated check -- is regenerated on
+every run of the consistency audit: see
 [the compliance page](/components/development/audits/compliance/#security-sanitization).

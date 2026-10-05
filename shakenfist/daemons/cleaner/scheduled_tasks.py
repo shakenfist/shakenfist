@@ -331,6 +331,39 @@ def _enqueue_stray_delete(inst, log_ctx):
             extra={'attempt': attempts}, log_as_error=True)
 
 
+def _clear_autostart_of_powered_off(lc, domain, inst, instance_uuid, pet, log_ctx):
+    """Clear autostart on a domain whose instance the database says is off.
+
+    Autostart means "should be running", so a powered off instance's domain
+    must not have it, or a hypervisor reboot starts it. Domains powered off
+    before power_off() cleared the flag, and those whose clear failed there,
+    are found here. The flag is read without the lock, so the steady state
+    takes no lock and makes no write. It is cleared holding the lock, on a
+    domain looked up again inside it, and only while the power state still
+    reads off, so that a concurrent power on is never undone. See D2 and D6
+    in docs/plans/PLAN-power-state-correctness-phase-02-autostart-restore.md.
+    A libvirtError is left to the caller, and the next pass retries.
+    """
+    if not domain.autostart():
+        return
+
+    with _instance_lock(inst, pet) as locked:
+        if not locked:
+            return
+        domain = _inactive_domain_inside_lock(lc, instance_uuid, log_ctx)
+        if not domain:
+            return
+        if inst.power_state.get('power_state') != 'off':
+            # A power on finished while we waited for the lock.
+            return
+
+        domain.setAutostart(0)
+        log_ctx.info('Cleared autostart on powered off instance')
+        inst.add_event(
+            EVENT_TYPE_AUDIT, 'autostart cleared',
+            extra={'reason': 'instance is powered off'})
+
+
 def _update_inactive_domain(lc, domain, instance_uuid, pet):
     """Reconcile one inactive Shaken Fist domain with its instance.
 
@@ -421,9 +454,10 @@ def _update_inactive_domain(lc, domain, instance_uuid, pet):
             inst.add_event(EVENT_TYPE_AUDIT, 'instance files missing')
         return
 
-    # When the database already says off there is nothing to write, and no
-    # lock is taken (S14).
+    # When the database already says off there is no power state to write,
+    # and no lock is taken (S14), unless the domain still has autostart set.
     if inst.power_state.get('power_state') == 'off':
+        _clear_autostart_of_powered_off(lc, domain, inst, instance_uuid, pet, log_ctx)
         return
 
     with _instance_lock(inst, pet) as locked:
@@ -452,6 +486,12 @@ def _update_inactive_domain(lc, domain, instance_uuid, pet):
                 'reason': lc.extract_shutoff_reason(domain),
                 'previous_power_state': previous
             })
+
+        # Autostart means "should be running", and this instance is now off,
+        # so a hypervisor reboot must not start it. Nothing waits on this, so
+        # it goes after the event. See D2 and D6 in
+        # docs/plans/PLAN-power-state-correctness-phase-02-autostart-restore.md.
+        domain.setAutostart(0)
 
 
 @util_general.recorded_method
@@ -563,7 +603,14 @@ def update_power_states(pet_watchdog=None):
                 if domain.name() in seen:
                     continue
 
-                _update_inactive_domain(lc, domain, instance_uuid, pet)
+                # A libvirt error on one domain, such as a failed
+                # setAutostart(), skips that domain this pass rather than
+                # every domain listed after it.
+                try:
+                    _update_inactive_domain(lc, domain, instance_uuid, pet)
+                except lc.libvirt.libvirtError as e:
+                    LOG.with_fields({'instance': instance_uuid}).warning(
+                        f'Failed to update inactive domain, skipping it this pass: {e}')
 
         except lc.libvirt.libvirtError as e:
             LOG.debug(f'Failed to lookup inactive domains: {e}')

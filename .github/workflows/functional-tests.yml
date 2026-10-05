@@ -218,6 +218,26 @@ jobs:
           ansible-lint --config-file shakenfist/deploy/collection/.ansible-lint \
               shakenfist/deploy/collection/
 
+      # Rootless issue and renewal test of the internal_ca role. Uses the
+      # ansible-core which ansible-lint brought in above, and needs certtool
+      # (gnutls-bin) on the runner image.
+      - name: Test the internal_ca role
+        timeout-minutes: 5
+        run: |
+          . /tmp/venv-test/bin/activate
+          tools/ci-test-internal-ca.sh
+
+      # Rootless test of the node role's kerbside_preflight and
+      # kerbside_credentials entry points against a stub sf-ctl, and of the
+      # Kerbside lines in its config template. No cluster lane turns the
+      # feature on, so this is what runs the "on" path. Needs only the
+      # ansible-core which ansible-lint brought in above.
+      - name: Test the Kerbside cluster config
+        timeout-minutes: 5
+        run: |
+          . /tmp/venv-test/bin/activate
+          tools/ci-test-kerbside-cluster-config.sh
+
       - name: Attempt to install requirements
         timeout-minutes: 5
         run: |

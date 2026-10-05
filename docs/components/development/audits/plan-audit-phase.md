@@ -194,7 +194,7 @@ opposite of what a reader has to be told.
   declines to judge the plan. Only the omitted cell and the absent
   column escape. Naming every statusless plan in the verdict is the
   whole of the mitigation for those two: a repository opting out says
-  so on the compliance page every morning rather than quietly passing.
+  so on the compliance page every week rather than quietly passing.
 
 ## Template
 
@@ -243,5 +243,5 @@ finding says which:
 ## Projects
 
 Per-project compliance for this criterion is regenerated
-every morning by the consistency audit: see
+on every run of the consistency audit: see
 [the compliance page](/components/development/audits/compliance/#plan-audit-phase).

@@ -167,7 +167,12 @@ port=5900
 ryll also reads two ticket-related keys with ryll-specific behaviour:
 
 - **`delete-this-file=1`** — the standard "remove this file
-  after reading" hint. ryll additionally treats this as a
+  after reading" hint. As remote-viewer does, ryll deletes a
+  `--file` `.vv` as soon as it has parsed it, before
+  connecting, so the ticket it carries is not left behind in
+  the downloads directory. A file that fails to parse is kept,
+  and a failed removal is logged as a warning without stopping
+  the connection. ryll additionally treats this as a
   signal that the SPICE ticket is **single-use**: any
   reconnect attempt would be rejected by the server, so
   auto-reconnect is suppressed and a "single-use ticket"

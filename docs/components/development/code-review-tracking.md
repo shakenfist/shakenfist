@@ -869,7 +869,7 @@ whether this clone or a worktree of it, is a no-op: it prints
 of imported reviews`, writes nothing, and exits zero, so that the
 shared `prune-reviews` workflow can run it here unchanged.
 
-**Backlog alerting.** The daily consistency audit runs a
+**Backlog alerting.** The weekly consistency audit runs a
 `review-coverage` check (`docs/audits/review-coverage.md`) against
 every repository in its matrix. Repositories without a
 `.vscode/review-scope.toml` are reported as not applicable, so

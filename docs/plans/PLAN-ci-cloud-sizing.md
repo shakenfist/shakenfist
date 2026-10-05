@@ -1022,8 +1022,8 @@ those are corrected here as well.
 | 3. Explicit saturation coverage, so that growing a cloud cannot silence a defect | [PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md](PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md) | Complete | `ead1ccba5` (#4152), `f3b245304` (#4170), `c13d2c6fd` (#4186), `210fb4469` (#4193) |
 | 4. Re-shape the topologies against the phase 2 data | [PLAN-ci-cloud-sizing-phase-04-topologies.md](PLAN-ci-cloud-sizing-phase-04-topologies.md) | Complete | `870a5fbec` (#4202), `6856aad74` (#4289) |
 | 5. Guardrails: the headroom band, and a structural-minimum assertion that names the ledger | [PLAN-ci-cloud-sizing-phase-05-guardrails.md](PLAN-ci-cloud-sizing-phase-05-guardrails.md) | Complete | `de87bcde2` (#4308), `633c56b31` (shakenfist/actions#94), `704416829` (#4328), `e2243a554` (shakenfist/actions#102) |
-| 6. Documentation, and the instrument seam the propagation half turned out to be | [PLAN-ci-cloud-sizing-phase-06-docs.md](PLAN-ci-cloud-sizing-phase-06-docs.md) | Complete | — |
-| 7. Push audit | PLAN-ci-cloud-sizing-phase-07-push-audit.md | Not started | — |
+| 6. Documentation, and the instrument seam the propagation half turned out to be | [PLAN-ci-cloud-sizing-phase-06-docs.md](PLAN-ci-cloud-sizing-phase-06-docs.md) | Complete | `174c0b819` (#4373), `cd9a89242` (#4396), `a742c99b0` (shakenfist/actions#120) |
+| 7. Push audit | [PLAN-ci-cloud-sizing-phase-07-push-audit.md](PLAN-ci-cloud-sizing-phase-07-push-audit.md) | Complete | — by design, see below |
 
 The `Merged` column records what put each phase on `develop`. These
 entries were reconstructed after the fact, because the plan did not
@@ -1034,6 +1034,18 @@ say which commits arrived inside a pull request. Every SHA is the
 merge commit of the pull request named beside it, so
 `<sha>^1..<sha>` is the whole of what that pull request put on
 `develop`. A phase which has not landed reads `—`.
+
+Phase 7's cell reads `—` permanently, and that is the one blank in this
+column which is not a gap. A push audit closes itself out inside its own
+pull request -- there is no later phase to come back and fill the cell in,
+and the merge commit cannot be known from inside the pull request being
+merged. The audit's own first finding is that a blank cell makes a plan
+unauditable, so the distinction has to be stated rather than assumed: the
+other cells are blank when nobody recorded them, and this one is blank
+because nothing could. What the phase put on `develop` is #4424, named
+here instead of in the cell, and the audit of this plan's own audit is
+therefore the pull request rather than the table. No later plan reads this
+cell, because no phase 8 exists to read it.
 
 Phase 3 records a fourth merge which did not put it on `develop` but
 repaired what did. `c13d2c6fd` (#4186) added the `# raw-create:`
@@ -1358,16 +1370,20 @@ If the audit finds nothing, that is recorded in one sentence.
 Two things make this plan's audit unusual and are worth planning
 for rather than discovering. The work is split across
 repositories -- the probe and its tooling live here, the
-invocation lives in `shakenfist/actions` -- so the audit of the
-half that landed elsewhere runs against that repository's default
-branch, as part of the pull request that lands it, and this phase
-cites that audit rather than re-running it. And most of the
-change is CI configuration and measurement tooling rather than
-product code, so the wave 2 code-quality and security lenses have
-less to read than usual while the documentation lens has more:
-the sizing model, the ledger arithmetic and the band all have to
-say the same thing in `docs/developer_guide/ci.md` as the
-topology files do.
+invocation lives in `shakenfist/actions`. That repository has no
+`PUSH-AUDIT.md`, so there is no audit of the other half to cite
+and the phase 7 plan's D2 audits those three merges from here,
+read-only, filing rather than fixing. And the balance between the
+wave 2 lenses is not what it looks like: most of the change is CI
+configuration and measurement tooling, but `shakenfist/scheduler.py`
+is in three of the ranges and `shakenfist/config.py` in one, and
+two of those added fields to the `/admin/resources` response, so
+the code-quality and security lenses have real product code to
+read. The documentation lens has the most: the sizing model, the
+ledger arithmetic and the band all have to say the same thing on
+`docs/developer_guide/ci_cloud_sizing.md` -- which phase 6
+created as the canonical page, with `docs/developer_guide/ci.md`
+carrying a summary and a link -- as the topology files do.
 
 ## Agent guidance
 
@@ -1751,9 +1767,38 @@ which is what `tools/check-plan-status.py` enforces.
 
 ### Bugs fixed during this work
 
-Related issues to resolve or be aware of while planning. None of
-these is closed by growing a cloud, and phase 3 exists to make
-sure none of them is closed by accident:
+#### Phase 7's audit
+
+Phase 7's audit found and fixed four defects in the plan's own output, none
+of which invalidates a conclusion. The instrument's central file opened with
+a docstring stating the opposite of what the code does. The page walk that
+assembles a harvest window had no test, which left half of the 2026-09-08
+unordered-listing fix unheld. A harvest window in which nothing measured
+anything reported success unqualified. And a census read successfully from a
+healthy Loki with a broken log shipper reported no capacity refusals, which
+is what a genuinely idle cluster also reports.
+
+The last three are one shape, and the audit's own lens is what found it: the
+instrument records its failures honestly, reports them silently, and nothing
+reads the records. That gap is [#4409](https://github.com/shakenfist/shakenfist/issues/4409);
+the band gate's arming evidence expiring with its artifacts is
+[#4410](https://github.com/shakenfist/shakenfist/issues/4410), which has a
+deadline. The audit also reached into `shakenfist/actions`, which has no
+audit template of its own, and found that an unrecognised `test_kind` there
+deploys a full topology, runs no tests, and passes (shakenfist/actions#127).
+
+What the audit did *not* find is worth as much: the band is not fitted to
+under-measured data. Across all 236 summarised records the probe recorded
+zero failed samples, no series below 51 usable samples, no degraded capacity
+reads, and a mean sample cadence of 15.000s to within 10µs -- which is the
+figure that proves no sample was ever dropped or delayed.
+
+### Related issues
+
+Issues to resolve or be aware of, carried from when this plan was
+being written and kept because none of them is closed by growing a
+cloud -- phase 3 exists to make sure none of them is closed by
+accident:
 
 - **#3772** (open, umbrella) -- instance creates refused with
   `507 sufficient_idle_cpu` under suite concurrency. Its own

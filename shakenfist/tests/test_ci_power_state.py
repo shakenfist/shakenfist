@@ -196,3 +196,105 @@ class AssertPowerStateTestCase(test_base.ShakenFistTestCase):
         self.assertRaises(
             AssertionError, self.harness._assert_power_state,
             'uuid1', 'on', 'after create')
+
+
+# Realistic `virsh dominfo` output, trimmed to the lines _domain_autostart()
+# cares about plus enough neighbours that a parser keyed on the wrong line
+# would be caught.
+DOMINFO_AUTOSTART_ENABLED = """\
+Id:             3
+Name:           sf:1234abcd-0000-0000-0000-000000000000
+UUID:           1234abcd-0000-0000-0000-000000000000
+State:          running
+CPU(s):         1
+Max memory:     1048576 KiB
+Used memory:    1048576 KiB
+Persistent:     yes
+Autostart:      enable
+Managed save:   no
+Security model: none
+Security DOI:   0
+"""
+
+DOMINFO_AUTOSTART_DISABLED = DOMINFO_AUTOSTART_ENABLED.replace(
+    'Autostart:      enable', 'Autostart:      disable')
+
+DOMINFO_NO_AUTOSTART_LINE = (
+    'Id:             3\n'
+    'Name:           sf:1234abcd-0000-0000-0000-000000000000\n'
+    'State:          running\n'
+    'Persistent:     yes\n'
+    'Managed save:   no\n')
+
+DOMINFO_UNEXPECTED_AUTOSTART_VALUE = DOMINFO_AUTOSTART_ENABLED.replace(
+    'Autostart:      enable', 'Autostart:      maybe')
+
+
+class _DomainAutostartHarness(ci_base.BaseTestCase):
+    """A bound ``self`` for ``_domain_autostart()`` without setUp().
+
+    Mirrors _PowerStateHarness above: setUp() does things a unit test
+    should not, so the harness supplies only what the helper reads, and
+    the test patches ``_node_exec`` directly (as an instance attribute
+    overriding the method inherited from ci_base.BaseTestCase).
+    """
+
+    def __init__(self, node_exec):
+        # Deliberately not calling TestCase.__init__: this is not being
+        # run as a test, only used as a bound self for the helper.
+        self._node_exec = node_exec
+
+
+class DomainAutostartTestCase(test_base.ShakenFistTestCase):
+    """Unit tests for ``BaseTestCase._domain_autostart()``.
+
+    Phase 2 reads libvirt's autostart flag with ``virsh dominfo`` on the
+    instance's hypervisor (D7 in
+    docs/plans/PLAN-power-state-correctness-phase-02-autostart-restore.md).
+    These tests exercise the parsing without a real cluster, the same way
+    phase 1b's AssertPowerStateTestCase above and
+    _detected_poweroff_reason's tests exercise their helpers.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.node_exec = mock.MagicMock()
+        self.harness = _DomainAutostartHarness(self.node_exec)
+        self.node = {'name': 'sf2', 'ip': '192.168.1.2'}
+
+    def test_enabled_returns_true(self):
+        self.node_exec.return_value = (DOMINFO_AUTOSTART_ENABLED, '')
+
+        result = self.harness._domain_autostart(self.node, 'uuid1')
+
+        self.assertTrue(result)
+        self.node_exec.assert_called_once_with(
+            self.node, ['virsh', 'dominfo', 'sf:uuid1'], sudo=True)
+
+    def test_disabled_returns_false(self):
+        self.node_exec.return_value = (DOMINFO_AUTOSTART_DISABLED, '')
+
+        result = self.harness._domain_autostart(self.node, 'uuid1')
+
+        self.assertFalse(result)
+        self.node_exec.assert_called_once_with(
+            self.node, ['virsh', 'dominfo', 'sf:uuid1'], sudo=True)
+
+    def test_missing_autostart_line_fails(self):
+        self.node_exec.return_value = (DOMINFO_NO_AUTOSTART_LINE, '')
+
+        exc = self.assertRaises(
+            AssertionError, self.harness._domain_autostart, self.node, 'uuid1')
+
+        self.assertIn('No Autostart line', str(exc))
+        self.assertIn('uuid1', str(exc))
+        self.assertIn(DOMINFO_NO_AUTOSTART_LINE, str(exc))
+
+    def test_unexpected_autostart_value_fails(self):
+        self.node_exec.return_value = (DOMINFO_UNEXPECTED_AUTOSTART_VALUE, '')
+
+        exc = self.assertRaises(
+            AssertionError, self.harness._domain_autostart, self.node, 'uuid1')
+
+        self.assertIn('Unexpected Autostart value', str(exc))
+        self.assertIn("'maybe'", str(exc))

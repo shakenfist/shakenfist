@@ -52,6 +52,7 @@ import threading
 import time
 import unittest
 from unittest import mock
+from uuid import UUID
 from uuid import uuid4
 
 import sqlalchemy as sa
@@ -802,6 +803,58 @@ class NamespaceClaimCrudLiveTestCase(_LiveClaimFixture):
         self.assertIsNotNone(result, 'reconcile pass failed')
         return result
 
+    def test_a_claim_created_over_instances_starts_with_a_mark(self):
+        # The seed, end to end: a claim created for a namespace which
+        # already holds instances starts at that drawdown in both the
+        # counter and the mark, because the next reconcile pass would
+        # raise the mark from zero anyway and make a zero seed look like
+        # a defect (claim sizing phase 2b, D3).
+        node = self._add_node()
+        self._add_instance(node, cpus=4, memory_mb=4096, disk_gb=40)
+        self._add_instance(node, cpus=2, memory_mb=2048, disk_gb=20)
+
+        claim = self._create()['claim']
+
+        self.assertEqual(6, claim['used_cpus'])
+        self.assertEqual(6, claim['peak_used_cpus'])
+        self.assertEqual(6144, claim['peak_used_memory_mb'])
+        self.assertEqual(60, claim['peak_used_disk_gb'])
+
+    def test_a_claim_created_over_nothing_starts_at_zero(self):
+        # And nothing invents a peak for an empty namespace.
+        claim = self._create()['claim']
+        self.assertEqual(0, claim['peak_used_cpus'])
+        self.assertEqual(0, claim['peak_used_memory_mb'])
+        self.assertEqual(0, claim['peak_used_disk_gb'])
+
+    def test_the_mark_survives_the_instances_it_measured(self):
+        # The defect this phase exists for, in its own shape: a
+        # namespace deletes its instances, a reconcile pass recomputes
+        # its counters from ground truth, and the question "what did
+        # that job actually use" is asked afterwards. used_* cannot
+        # answer it; the mark can.
+        node = self._add_node()
+        instance = self._add_instance(node, cpus=4, memory_mb=4096,
+                                      disk_gb=40)
+        claim = self._create()['claim']
+        self.assertEqual(4, claim['peak_used_cpus'])
+
+        states = mariadb._get_object_states_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.update(states).where(sa.and_(
+                states.c.object_type == ObjectType.INSTANCE,
+                states.c.object_uuid == str(instance))).values(
+                    state_value='deleted'))
+            conn.commit()
+
+        self._reconcile()
+
+        recomputed = mariadb._direct_get_namespace_claim(claim['uuid'])
+        self.assertEqual(0, recomputed['used_cpus'])
+        self.assertEqual(4, recomputed['peak_used_cpus'])
+        self.assertEqual(4096, recomputed['peak_used_memory_mb'])
+        self.assertEqual(40, recomputed['peak_used_disk_gb'])
+
     def test_create_then_reconcile_moves_nothing(self):
         """The most valuable assertion in this module.
 
@@ -840,6 +893,15 @@ class NamespaceClaimCrudLiveTestCase(_LiveClaimFixture):
         self.assertEqual(seeded['used_memory_mb'],
                          recomputed['used_memory_mb'])
         self.assertEqual(seeded['used_disk_gb'], recomputed['used_disk_gb'])
+        # And the mark moves no more than the counter does: the pass
+        # raises it towards the same recomputed figure the seed came
+        # from, so a correct seed leaves it exactly where it was.
+        self.assertEqual(seeded['peak_used_cpus'],
+                         recomputed['peak_used_cpus'])
+        self.assertEqual(seeded['peak_used_memory_mb'],
+                         recomputed['peak_used_memory_mb'])
+        self.assertEqual(seeded['peak_used_disk_gb'],
+                         recomputed['peak_used_disk_gb'])
 
     def test_a_second_reconcile_pass_moves_nothing_either(self):
         # Belt and braces on the same property: the first pass could
@@ -855,6 +917,112 @@ class NamespaceClaimCrudLiveTestCase(_LiveClaimFixture):
 
         self.assertEqual(claim['used_cpus'], first['used_cpus'])
         self.assertEqual(first['used_cpus'], second['used_cpus'])
+
+
+@unittest.skipUnless(
+    os.environ.get(DSN_ENV),
+    f'{DSN_ENV} not set; requires a disposable MariaDB database')
+class NamespaceClaimsSchemaMigrationLiveTestCase(_LiveClaimFixture):
+    """The v1-to-2 high-water mark migration, against real DDL.
+
+    The unit suite covers the branching and the existence guard against
+    a mocked engine, which cannot show that the ALTER statements are
+    valid DDL, that the columns they add really are NOT NULL DEFAULT 0,
+    or that running the migration twice is harmless. This can.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._prepare_database()
+        self.now = time.time()
+
+    def _columns(self):
+        inspector = sa.inspect(self.engine)
+        return {col['name']: col
+                for col in inspector.get_columns('namespace_claims')}
+
+    def _revert_to_version_one(self):
+        """Put the table back in the shape a pre-phase-2b cluster has."""
+        with self.engine.connect() as conn:
+            for column in mariadb.NAMESPACE_CLAIMS_PEAK_COLUMNS:
+                conn.execute(sa.text(
+                    f'ALTER TABLE namespace_claims DROP COLUMN {column}'))
+            conn.commit()
+        mariadb._set_table_version(self.engine, 'namespace_claims', 1)
+
+    def test_a_version_one_table_gains_the_columns(self):
+        self._revert_to_version_one()
+        self.assertNotIn('peak_used_cpus', self._columns())
+
+        result = mariadb._ensure_namespace_claims_schema(self.engine)
+
+        self.assertEqual(1, result['start_version'])
+        self.assertEqual(2, result['end_version'])
+        self.assertTrue(result['migrated'])
+        columns = self._columns()
+        for name in mariadb.NAMESPACE_CLAIMS_PEAK_COLUMNS:
+            self.assertIn(name, columns)
+            self.assertFalse(columns[name]['nullable'], name)
+
+    def test_an_existing_row_is_migrated_to_a_zero_mark(self):
+        # NOT NULL with a server-side default, so a claim written before
+        # the upgrade reads as a zero mark rather than as NULL -- every
+        # reader of the mark does arithmetic on it, and the reconciler
+        # raises a zero but would propagate a NULL through GREATEST.
+        self._set_cluster()
+        claim = self._create()['claim']
+        self._revert_to_version_one()
+
+        mariadb._ensure_namespace_claims_schema(self.engine)
+
+        row = self._claim_row(claim['uuid'])
+        self.assertEqual(0, row.peak_used_cpus)
+        self.assertEqual(0, row.peak_used_memory_mb)
+        self.assertEqual(0, row.peak_used_disk_gb)
+
+    def test_a_re_run_is_a_no_op(self):
+        # Both halves of idempotence: running ensure again at the target
+        # version changes nothing, and running it again from v1 over a
+        # table which already has the columns does not fail on a
+        # duplicate column either.
+        self._revert_to_version_one()
+        mariadb._ensure_namespace_claims_schema(self.engine)
+        before = self._columns()
+
+        again = mariadb._ensure_namespace_claims_schema(self.engine)
+        self.assertEqual(2, again['start_version'])
+        self.assertEqual(2, again['end_version'])
+        self.assertFalse(again['migrated'])
+
+        mariadb._set_table_version(self.engine, 'namespace_claims', 1)
+        from_one_again = mariadb._ensure_namespace_claims_schema(self.engine)
+        self.assertTrue(from_one_again['migrated'])
+        self.assertEqual(sorted(before), sorted(self._columns()))
+
+    def test_the_marked_table_still_takes_a_claim(self):
+        # The end state is usable, not merely present: a migrated table
+        # accepts a create and the mark it writes.
+        self._revert_to_version_one()
+        mariadb._ensure_namespace_claims_schema(self.engine)
+        self._set_cluster()
+        node = self._add_node()
+        self._add_instance(node, cpus=4, memory_mb=4096, disk_gb=40)
+
+        claim = self._create()['claim']
+        self.assertEqual(4, claim['peak_used_cpus'])
+
+    def _create(self, namespace='ci-1', limit_cpus=16,
+                limit_memory_mb=16384, limit_disk_gb=160,
+                expires_in_seconds=3600):
+        return mariadb._direct_create_namespace_claim(
+            str(uuid4()), namespace, limit_cpus, limit_memory_mb,
+            limit_disk_gb, expires_in_seconds)
+
+    def _claim_row(self, claim_uuid):
+        table = mariadb._get_namespace_claims_table()
+        with self.engine.connect() as conn:
+            return conn.execute(sa.select(table).where(
+                table.c.uuid == UUID(claim_uuid))).first()
 
 
 @unittest.skipUnless(

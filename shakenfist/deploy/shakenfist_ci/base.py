@@ -830,6 +830,39 @@ class BaseTestCase(testtools.TestCase):
         out, _ = self._node_exec(node, ['ip', '-json', 'link', 'show'])
         return [link['ifname'] for link in json.loads(out) if link]
 
+    def _domain_autostart(self, node, instance_uuid):
+        """Whether instance_uuid's libvirt domain has autostart set.
+
+        Reads libvirt's autostart flag with ``virsh dominfo`` on node,
+        the hypervisor the domain is defined on. That flag is what
+        decides whether the domain starts again after the hypervisor
+        reboots (phase 2's D1/D7 in
+        docs/plans/PLAN-power-state-correctness-phase-02-autostart-restore.md):
+        power on sets it, and power off or the cleaner detecting a
+        powered off guest clears it. Returns True for 'enable' and False
+        for 'disable'; fails the test, with the command's output
+        attached, if the ``Autostart:`` line is missing or has some
+        other value.
+        """
+        out, _ = self._node_exec(
+            node, ['virsh', 'dominfo', 'sf:%s' % instance_uuid], sudo=True)
+        for line in out.splitlines():
+            if line.startswith('Autostart:'):
+                value = line.split(':', 1)[1].strip()
+                if value == 'enable':
+                    return True
+                if value == 'disable':
+                    return False
+                self.fail(
+                    'Unexpected Autostart value %r for instance %s on node '
+                    '%s. Full dominfo output:\n%s'
+                    % (value, instance_uuid, node.get('name'), out))
+
+        self.fail(
+            'No Autostart line in virsh dominfo for instance %s on node '
+            '%s. Full dominfo output:\n%s'
+            % (instance_uuid, node.get('name'), out))
+
     def _await_power_off(self, instance_uuid, after=None):
         return self._await_instance_event(
             instance_uuid, 'detected poweroff', after=after)
@@ -1583,9 +1616,10 @@ class BaseTestCase(testtools.TestCase):
     def assertRefusedAtStage(self, response, stage):
         """Assert a create was refused at a scheduler stage, per D27.
 
-        The contract asserted here, as of 2026-09 (``scheduler.py:540``
-        and the create path's ``except exceptions.LowResourceException``
-        clause, ``external_api/instance.py:901-906``):
+        The contract asserted here, as of 2026-09 (the scheduler's
+        ``LowResourceException`` raise, and the create path's ``except
+        exceptions.LowResourceException`` clause in
+        ``external_api/instance.py``):
 
         * HTTP status 507.
         * A body whose ``error`` field is ``No nodes remaining at

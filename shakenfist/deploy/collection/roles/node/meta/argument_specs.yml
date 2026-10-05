@@ -192,7 +192,7 @@ argument_specs:
           - Loki auth header (a secret). Rendered into
             SHAKENFIST_LOKI_AUTH_HEADER on every node when set, because every
             daemon ships its own logs.
-      kerbside_url:
+      kerbside_url: &kerbside_url_option
         type: str
         default: ""
         description:
@@ -200,12 +200,49 @@ argument_specs:
             Base URL of a Kerbside VDI console proxy, for example
             https://kerbside.example.com. Rendered into
             SHAKENFIST_KERBSIDE_URL on every node when set; empty, the
-            default, leaves the proxied-console integration off. The value
-            is used verbatim as the console token audience, so it must
-            equal the Kerbside deployment's SF_CONSOLE_TOKEN_AUDIENCE
-            exactly. Deploying Kerbside itself, and provisioning the
-            signing key with sf-ctl ensure-kerbside-signing-key, remain
-            the operator's job.
+            default, leaves the proxied-console integration off and makes
+            the kerbside_preflight and kerbside_credentials entry points do
+            nothing. The value is used verbatim as the console token
+            audience, so it must equal the Kerbside deployment's
+            SF_CONSOLE_TOKEN_AUDIENCE exactly.
+          - >-
+            When set, kerbside_credentials ensures the console token signing
+            key exists with sf-ctl ensure-kerbside-signing-key, and
+            kerbside_preflight refuses to deploy while a KERBSIDE_URL or
+            KERBSIDE_TOKEN_DURATION cluster_config row differs from its
+            variable, or while extra_config sets either. Deploying Kerbside
+            itself is a separate job.
+      kerbside_token_duration: &kerbside_token_duration_option
+        type: int
+        default: 300
+        description:
+          - >-
+            Lifetime in seconds of a minted console token; must be positive.
+            Rendered into SHAKENFIST_KERBSIDE_TOKEN_DURATION on every node,
+            but only when kerbside_url is set, since a duration without a URL
+            means nothing.
+      sf_ctl_path: &sf_ctl_path_option
+        type: str
+        default: /srv/shakenfist/venv/bin/sf-ctl
+        description:
+          - >-
+            The sf-ctl which the kerbside_preflight and kerbside_credentials
+            entry points run on cluster_db_host. A variable only so a test can
+            substitute a stub.
+      kerbside_system_key: &kerbside_system_key_option
+        type: str
+        default: ""
+        no_log: true
+        description:
+          - >-
+            The key Kerbside authenticates to Shaken Fist with (a secret).
+            When set, kerbside_credentials mints it as the "kerbside" key in
+            the system namespace on every deploy, as system_key is minted as
+            the "deploy" key, so changing it rotates it. It requires
+            kerbside_url, must differ from system_key, and must be at least
+            16 characters. Empty, the default, mints nothing; removing it
+            later does not delete the key, which is revoked with
+            sf-client namespace delete-key system kerbside.
       federation_jwks_ca_bundle:
         type: str
         default: ""
@@ -277,3 +314,81 @@ argument_specs:
         ordering of database-tier hosts first is the consuming playbook's
         responsibility.
     options: *node_options
+  kerbside_preflight:
+    short_description: Refuse a Kerbside configuration a cluster_config row would shadow.
+    description:
+      - >-
+        Run once per cluster, before anything writes to cluster_config. Does
+        nothing at all unless kerbside_url is set. When it is, fails if
+        kerbside_token_duration is not positive, or if extra_config sets
+        KERBSIDE_URL or KERBSIDE_TOKEN_DURATION (the cluster config play would
+        write that row this very run). It then reads the existing rows with
+        sf-ctl show-config, never with --show-secrets, and fails if either row
+        differs from its variable, naming the sf-ctl unset-config command which
+        fixes it. A row equal to its variable is left alone with a warning.
+        Rows are compared as strings, since set-config stores 300 as an
+        integer.
+      - >-
+        Every sf-ctl call is delegated to cluster_db_host, which must have
+        direct database access. Reads no inventory groups.
+    options:
+      kerbside_url: *kerbside_url_option
+      kerbside_token_duration: *kerbside_token_duration_option
+      extra_config: &extra_config_option
+        type: str
+        default: "[]"
+        description:
+          - >-
+            The cluster's extra_config, as the JSON string the cluster config
+            play receives: a list of objects with name and value keys.
+      sf_ctl_path: *sf_ctl_path_option
+      cluster_db_host: &cluster_db_host_option
+        type: str
+        required: true
+        description:
+          - >-
+            The inventory name of the database-tier host every sf-ctl call is
+            delegated to. The example playbook passes the first database-tier
+            host.
+  kerbside_credentials:
+    short_description: Mint the Kerbside signing key and system namespace credential.
+    description:
+      - >-
+        Run once per cluster, after the system namespace's deploy key is
+        minted and before any daemon restarts. Does nothing at all unless
+        kerbside_url or kerbside_system_key is set.
+      - >-
+        When kerbside_url is set, runs sf-ctl ensure-kerbside-signing-key,
+        which creates the console token signing key if it is absent and
+        otherwise changes nothing, so an sf-api restarted with KERBSIDE_URL set
+        always finds a key.
+      - >-
+        When kerbside_system_key is set, refuses it unless kerbside_url is also
+        set, it differs from system_key, and it is at least 16 characters, and
+        then mints it as the "kerbside" key in the system namespace with sf-ctl
+        bootstrap-system-key --key-from-stdin, on every run. The key reaches
+        sf-ctl on stdin only and never appears in the output.
+      - >-
+        Every sf-ctl call is delegated to cluster_db_host. Reads no inventory
+        groups.
+    options:
+      kerbside_url: *kerbside_url_option
+      kerbside_system_key: *kerbside_system_key_option
+      system_key:
+        type: str
+        default: "unknown"
+        no_log: true
+        description:
+          - >-
+            The system namespace's deploy key. Read only to refuse a
+            kerbside_system_key equal to it.
+      node_mesh_ip:
+        type: str
+        default: "127.0.0.1"
+        description:
+          - >-
+            The mesh IP of cluster_db_host, passed to sf-ctl as
+            SHAKENFIST_NODE_MESH_IP. The example playbook passes
+            hostvars[cluster_db_host]['node_mesh_ip'].
+      sf_ctl_path: *sf_ctl_path_option
+      cluster_db_host: *cluster_db_host_option

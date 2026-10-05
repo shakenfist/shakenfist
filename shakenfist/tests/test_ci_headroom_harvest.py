@@ -43,12 +43,15 @@ The tool is loaded by path for the same reason its own tests load the report
 that way: ``tools/`` is not a package.
 """
 
+import contextlib
 import importlib.util
 import io
 import json
 import os
 import shutil
+import subprocess
 import tempfile
+from unittest import mock
 import zipfile
 
 from shakenfist.tests import base
@@ -269,7 +272,7 @@ class HarvestTestCase(base.ShakenFistTestCase):
 
     def _harvest(self, github, **kwargs):
         args = Args(self.output, self.cache, **kwargs)
-        count = harvest.harvest(github, args, report)
+        count, _ = harvest.harvest(github, args, report)
         with open(self.output) as f:
             lines = [line for line in f.read().split('\n') if line]
         return count, lines
@@ -560,6 +563,191 @@ class RecordTestCase(HarvestTestCase):
         self.assertIsNone(by_name[TIER_BUNDLE]['summary'])
 
 
+class PagedGitHub(harvest.GitHubCLI):
+    """GitHubCLI with gh replaced by canned pages.
+
+    ``paginate()`` is the one part of that class reachable without a
+    subprocess, and it is also where the window is actually assembled, so
+    the fake replaces ``json()`` and leaves the walk under test.
+    """
+
+    def __init__(self, pages, key='workflow_runs'):
+        super().__init__()
+        self.pages = pages
+        self.key = key
+        self.asked = []
+
+    def json(self, path):
+        # Refetching a page is the one way this loop can go wrong that a
+        # canned-pages fake would otherwise hang on rather than fail: a walk
+        # which never advances asks for page one until the heat death of the
+        # test suite. Raising turns that into a failure.
+        if path in self.asked:
+            raise AssertionError('page refetched, so the walk is not advancing: %s' % path)
+        self.asked.append(path)
+        page = int(path.split('&page=')[1])
+        items = self.pages[page - 1] if page <= len(self.pages) else []
+        return {self.key: items}
+
+
+class PaginationTestCase(base.ShakenFistTestCase):
+    """The page walk itself, which the rest of this module cannot reach.
+
+    Every other test here fakes ``paginate()`` wholesale and so exercises
+    what callers do with a listing rather than how the listing is gathered.
+    That left the walk untested, and the walk is half of the 2026-09-08 fix:
+    the other half is the client-side sort, which ``RunListingTestCase``
+    covers in both orderings. GitHub does not surface the newest
+    ``merge_group`` runs on page one -- that was checked against the live
+    API -- so a run reachable only on a later page is the ordinary case, not
+    an edge one, and an early ``return`` reintroduced into this loop would
+    silently shorten every window.
+    """
+
+    def _runs(self, count, first_id=1):
+        return [{'id': first_id + n,
+                 'created_at': '2026-09-%02dT00:00:00Z' % ((n % 28) + 1)}
+                for n in range(count)]
+
+    def test_every_page_is_walked(self):
+        pages = [self._runs(100, 1), self._runs(100, 101), self._runs(7, 201)]
+        github = PagedGitHub(pages)
+        got = [item for page in github.paginate('p', 'workflow_runs')
+               for item in page]
+        self.assertEqual(207, len(got))
+        self.assertEqual([1, 207], [got[0]['id'], got[-1]['id']])
+        self.assertEqual(3, len(github.asked))
+
+    def test_a_short_page_ends_the_walk(self):
+        # A page holding fewer than per_page items is the last one, so the
+        # walk stops without spending a call to be told the next is empty.
+        github = PagedGitHub([self._runs(100, 1), self._runs(3, 101)])
+        list(github.paginate('p', 'workflow_runs'))
+        self.assertEqual(2, len(github.asked))
+
+    def test_an_empty_first_page_yields_nothing_rather_than_hanging(self):
+        github = PagedGitHub([[]])
+        self.assertEqual([], list(github.paginate('p', 'workflow_runs')))
+        self.assertEqual(1, len(github.asked))
+
+    def test_the_page_number_advances(self):
+        # The defect this guards is a loop which refetches page one forever,
+        # which looks like a working walk until the window never ends.
+        github = PagedGitHub([self._runs(100, 1), self._runs(100, 101),
+                              self._runs(1, 201)])
+        list(github.paginate('p', 'workflow_runs', per_page=100))
+        self.assertEqual(['p?per_page=100&page=1', 'p?per_page=100&page=2',
+                          'p?per_page=100&page=3'], github.asked)
+
+    def test_a_run_reachable_only_on_a_later_page_is_in_the_window(self):
+        # The shape of the 2026-09-08 incident, end to end through list_runs:
+        # the newest run is not on page one, and nothing may stop before it.
+        newest = {'id': 9999, 'created_at': '2026-09-30T00:00:00Z'}
+        github = PagedGitHub([self._runs(100, 1), [newest]])
+        runs = harvest.list_runs(github, workflow='functional-tests.yml')
+        self.assertEqual(101, len(runs))
+        self.assertEqual(9999, runs[0]['id'])
+
+
+class UsableSeriesAccountingTestCase(RecordTestCase):
+    """How many records carry a series anyone can compute over.
+
+    An all-absent window is not an error -- a bundle with no series is a
+    record and not a gap, and a one-run harvest of an expired artifact is a
+    legitimate question whose answer is the reason in the record. But the
+    count written is not the count measured, and reporting only the first
+    lets a window in which the probe never started read as a window of N
+    records. So the harvest returns both.
+    """
+
+    def test_the_usable_count_counts_only_records_with_samples(self):
+        github = self._github({
+            PRIMARY_BUNDLE: instrumented_members(),
+            TIER_BUNDLE: {'bundle/logs/syslog': 'x\n'},
+        })
+        args = Args(self.output, self.cache)
+        written, usable = harvest.harvest(github, args, report)
+        self.assertEqual(2, written)
+        self.assertEqual(
+            1, usable,
+            'Two records were written and only one carries a series, so a '
+            'caller told "2" has been told the size of the file rather than '
+            'the size of the population it can measure.')
+
+    def test_a_window_which_measured_nothing_reports_zero_usable(self):
+        github = self._github({TIER_BUNDLE: {'bundle/logs/syslog': 'x\n'}})
+        args = Args(self.output, self.cache)
+        written, usable = harvest.harvest(github, args, report)
+        self.assertEqual(1, written)
+        self.assertEqual(
+            0, usable,
+            'A window in which no bundle carried a series reported a '
+            'non-zero usable count, which is the shape that lets a dead '
+            'probe read as a measured window.')
+
+    def _stderr(self, members):
+        """Harvest with the warning enabled, and return what it printed.
+
+        The second count is only half the fix. The half an operator actually
+        meets is the line on stderr, so these go through harvest() with
+        quiet off rather than reading the tuple.
+        """
+        github = self._github(members)
+        args = Args(self.output, self.cache, quiet=False)
+        captured = io.StringIO()
+        with contextlib.redirect_stderr(captured):
+            written, usable = harvest.harvest(github, args, report)
+        return written, usable, captured.getvalue()
+
+    def test_a_window_which_measured_nothing_says_so_on_stderr(self):
+        written, usable, printed = self._stderr(
+            {TIER_BUNDLE: {'bundle/logs/syslog': 'x\n'}})
+        self.assertEqual((1, 0), (written, usable))
+        self.assertIn(
+            'WARNING: not one of the 1 record written carries a usable '
+            'series', printed,
+            'The harvest wrote a record, measured nothing, and said nothing '
+            'about it. The returned count is not what an operator reads; '
+            'this line is.')
+        self.assertIn('measured nothing', printed)
+
+    def test_a_window_which_measured_something_prints_no_warning(self):
+        written, usable, printed = self._stderr(
+            {PRIMARY_BUNDLE: instrumented_members(),
+             TIER_BUNDLE: {'bundle/logs/syslog': 'x\n'}})
+        self.assertEqual((2, 1), (written, usable))
+        self.assertNotIn(
+            'WARNING', printed,
+            'One of the two records carries a series, so this window did '
+            'measure something. Warning about it would train an operator to '
+            'ignore the line that matters.')
+
+    def test_main_reports_the_usable_count_beside_the_written_one(self):
+        # main() builds its own client, so the fake is substituted for the
+        # class rather than passed in. This is the only test which goes
+        # through main(): the summary line is printed there and nowhere
+        # else, so nothing below main() can pin it.
+        github = self._github({PRIMARY_BUNDLE: instrumented_members(),
+                               TIER_BUNDLE: {'bundle/logs/syslog': 'x\n'}})
+        original = harvest.GitHubCLI
+        harvest.GitHubCLI = lambda **kwargs: github
+        self.addCleanup(setattr, harvest, 'GitHubCLI', original)
+        captured = io.StringIO()
+        with contextlib.redirect_stderr(captured):
+            code = harvest.main(
+                ['--output', self.output, '--cache-dir', self.cache,
+                 '--since', '2026-08-30'])
+        self.assertEqual(0, code)
+        printed = captured.getvalue()
+        self.assertIn(
+            'Wrote 2 records', printed)
+        self.assertIn(
+            '(1 with a usable series)', printed,
+            'main() printed the file size without the measured size, so a '
+            'window of two records in which one probe ran reads as two '
+            'measurements.')
+
+
 class LoudFailureTestCase(HarvestTestCase):
     """An empty harvest is an error, whatever emptied it.
 
@@ -773,6 +961,137 @@ class RunListingTestCase(HarvestTestCase):
         # command the dataset's README quotes.
         parsed = harvest.parse_since('2026-08-30')
         self.assertEqual('UTC', str(parsed.tzinfo))
+
+
+class ArtifactIdTestCase(HarvestTestCase):
+    """The artifact id is outside data used to build a path and an URL.
+
+    It comes out of a GitHub API response body, and is interpolated into a
+    cache filename and an API path (issue #4412). cached_artifact()'s cache
+    key being 'immutable and unique' says nothing about it being an
+    integer, so checked_artifact_id() makes it one before either string is
+    built, or stops the harvest.
+    """
+
+    def test_an_integer_id_passes_through(self):
+        self.assertEqual(9700, harvest.checked_artifact_id({'id': 9700}))
+
+    def test_a_numeric_string_is_read_as_its_integer(self):
+        self.assertEqual(9700, harvest.checked_artifact_id({'id': '9700'}))
+
+    def test_a_traversal_string_is_refused(self):
+        e = self.assertRaises(
+            harvest.HarvestError, harvest.checked_artifact_id,
+            {'id': '../../../etc/cron.d/evil', 'name': PRIMARY_BUNDLE})
+        self.assertIn(PRIMARY_BUNDLE, str(e))
+        self.assertIn('non-integer id', str(e))
+
+    def test_a_missing_id_is_refused(self):
+        self.assertRaises(
+            harvest.HarvestError, harvest.checked_artifact_id,
+            {'name': PRIMARY_BUNDLE})
+
+    def test_a_hostile_id_stops_the_harvest_before_anything_is_fetched(self):
+        # The check has to run before the cache path and the API path
+        # exist, not after: a check that runs after the parse is not a
+        # check, and here the 'parse' is the string interpolation.
+        run = self._run_payload()
+        artifacts = [{'id': '../../escape', 'name': PRIMARY_BUNDLE,
+                      'expired': False}]
+        github = FakeGitHub([run], {run['id']: artifacts}, {run['id']: []}, {})
+        self.assertRaises(harvest.HarvestError, self._harvest, github)
+        self.assertEqual([], github.downloaded)
+
+
+class GitHubCLITimeoutTestCase(HarvestTestCase):
+    """A gh hung on a network stall fails the harvest loudly (issue #4412).
+
+    Without a timeout the harvest hangs indefinitely with no diagnostic.
+    These tests pin both that a timeout is passed to subprocess at all and
+    that its expiry surfaces as GitHubCLIError, the class's existing error
+    style, rather than as a raw TimeoutExpired.
+    """
+
+    def test_a_json_call_passes_its_timeout_to_subprocess(self):
+        cli = harvest.GitHubCLI()
+        completed = mock.Mock(returncode=0, stdout=b'{}')
+        with mock.patch.object(harvest.subprocess, 'run',
+                               return_value=completed) as run:
+            cli.json('actions/runs/1/jobs')
+        self.assertEqual(harvest.GitHubCLI.JSON_TIMEOUT,
+                         run.call_args.kwargs['timeout'])
+
+    def test_a_json_call_which_times_out_raises_in_the_house_style(self):
+        cli = harvest.GitHubCLI()
+        with mock.patch.object(
+                harvest.subprocess, 'run',
+                side_effect=subprocess.TimeoutExpired('gh', 120)):
+            e = self.assertRaises(
+                harvest.GitHubCLIError, cli.json, 'actions/runs/1/jobs')
+        self.assertIn('did not complete', str(e))
+
+    def test_a_download_passes_its_timeout_to_subprocess(self):
+        cli = harvest.GitHubCLI()
+        dest = os.path.join(self.tempdir, 'artifact.zip')
+        completed = mock.Mock(returncode=0)
+        with mock.patch.object(harvest.subprocess, 'run',
+                               return_value=completed) as run:
+            cli.download('actions/artifacts/1/zip', dest)
+        self.assertEqual(harvest.GitHubCLI.DOWNLOAD_TIMEOUT,
+                         run.call_args.kwargs['timeout'])
+
+    def test_a_download_which_times_out_raises_and_leaves_no_partial(self):
+        # The .part discipline exists so an interrupted harvest never
+        # leaves a truncated zip for the next run to treat as complete; a
+        # timeout is one more way to be interrupted.
+        cli = harvest.GitHubCLI()
+        dest = os.path.join(self.tempdir, 'artifact.zip')
+        with mock.patch.object(
+                harvest.subprocess, 'run',
+                side_effect=subprocess.TimeoutExpired('gh', 1800)):
+            self.assertRaises(
+                harvest.GitHubCLIError, cli.download,
+                'actions/artifacts/1/zip', dest)
+        self.assertFalse(os.path.exists(dest))
+        self.assertFalse(os.path.exists(dest + '.part'))
+
+
+class DecompressionCeilingTestCase(HarvestTestCase):
+    """A zip bomb from the harvested repository must not exhaust memory.
+
+    open_bundle() reads the whole inner bundle.zip into a BytesIO and
+    extract_traces() decompresses each trace member in full, so both check
+    the declared ZipInfo.file_size against MAX_MEMBER_BYTES before the
+    read (issue #4412). The ceiling is patched down here because a real
+    256 MB fixture would be its own small bomb.
+    """
+
+    def test_an_oversized_inner_bundle_is_refused(self):
+        path = self._zip('bomb-nested', instrumented_members())
+        with mock.patch.object(harvest, 'MAX_MEMBER_BYTES', 16):
+            e = self.assertRaises(
+                harvest.HarvestError, harvest.open_bundle, path)
+        self.assertIn('bundle.zip', str(e))
+        self.assertIn('refusing to decompress', str(e))
+
+    def test_an_oversized_trace_member_is_refused_before_it_is_read(self):
+        # Flat rather than nested, so the check being exercised is the
+        # per-member one in extract_traces rather than open_bundle's.
+        path = self._zip('bomb-flat', instrumented_members(), nested=False)
+        dest = os.path.join(self.tempdir, 'unpacked-bomb')
+        os.makedirs(dest)
+        with mock.patch.object(harvest, 'MAX_MEMBER_BYTES', 16):
+            e = self.assertRaises(
+                harvest.HarvestError, harvest.extract_traces, path, dest)
+        self.assertIn('refusing to decompress', str(e))
+        self.assertEqual([], os.listdir(dest))
+
+    def test_the_ceiling_clears_a_real_bundle_by_a_wide_margin(self):
+        # A real artifact zip is about 5 MB; the ceiling must never bite a
+        # real harvest. 50x headroom, so bundle growth does not creep up
+        # on it.
+        self.assertGreaterEqual(
+            harvest.MAX_MEMBER_BYTES, 50 * 5 * 1024 * 1024)
 
 
 class BundleTableShapeTestCase(HarvestTestCase):

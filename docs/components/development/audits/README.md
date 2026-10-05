@@ -6,7 +6,7 @@ what that means: one file per criterion, each defining what we check
 and why, and linking the template that implements it.
 
 Who currently passes what is on [compliance.md](/components/development/audits/compliance/),
-regenerated every morning by the consistency audit and committed by
+regenerated weekly by the consistency audit and committed by
 it. It is the only generated file here; every criterion page beside it
 is hand-written, and each links its own section of the compliance
 page.
@@ -22,7 +22,7 @@ Each file here is independently checkable, so an agent can be spawned
 per criterion to check every project against it in parallel.
 
 `docs/consistency-audits.md` is the working reference for the system as
-a whole: what the daily run does, how issues are filed and closed, how
+a whole: what a run does, how issues are filed and closed, how
 the compliance tables are regenerated, how to add a criterion, and how
 to bring a repository into scope. Read it before adding a file here --
 a new criterion is a check class and this specification, and a
@@ -45,7 +45,7 @@ See: `templates/<name>/README.md`
 ## Projects
 
 Per-project compliance for this criterion is regenerated
-every morning by the consistency audit: see
+on every run of the consistency audit: see
 [the compliance page](/components/development/audits/compliance/#<name>).
 ```
 
@@ -54,7 +54,7 @@ the file's own basename, and the section it points at appears on
 [compliance.md](/components/development/audits/compliance/) at the next run after the check is
 registered. Never put a `consistency-audit` marker block in a
 criterion page: the generated block carries a timestamp that moves
-daily, and a file carrying it can never hold a human review mark,
+every run, and a file carrying it can never hold a human review mark,
 which is why the tables were moved to one page in the first place.
 
 ## In-scope projects
@@ -152,7 +152,7 @@ attached rather than quietly disappearing from the table.
 | [llm-tooling.md](/components/development/audits/llm-tooling/) | AGENTS.md, ARCHITECTURE.md, Claude skills |
 | [llm-doc-structure.md](/components/development/audits/llm-doc-structure/) | AGENTS.md and ARCHITECTURE.md are a summary and an index, detail lives in docs/ |
 | [llm-context-lint.md](/components/development/audits/llm-context-lint/) | Agent context passes skillsaw at error severity, and every skill actually loads |
-| [llm-context-lint-ci.md](/components/development/audits/llm-context-lint-ci/) | skillsaw runs in pre-commit and CI, not just in the daily audit |
+| [llm-context-lint-ci.md](/components/development/audits/llm-context-lint-ci/) | skillsaw runs in pre-commit and CI, not just in the weekly audit |
 | [llm-doc-naming.md](/components/development/audits/llm-doc-naming/) | Agent instructions live in AGENTS.md, not in a file named for one vendor |
 | [release-process.md](/components/development/audits/release-process/) | pyproject.toml, release.yml, RELEASE-SETUP.md |
 | [ci-review-automation.md](/components/development/audits/ci-review-automation/) | Automated review, developer automation workflows |

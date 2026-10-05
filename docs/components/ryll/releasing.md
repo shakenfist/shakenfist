@@ -144,6 +144,18 @@ else runs on the host and requires:
 
 ## Release process
 
+### Choosing the version
+
+The crates are at 0.x, where Cargo treats the minor version as the
+breaking-change boundary: a `^0.1.7` dependency accepts 0.1.8 but
+not 0.2.0. So if any merged PR since the last tag changed a
+published crate's public API incompatibly (a signature, a removed
+item, or a public constant's value), propose the next minor version
+(0.1.x to 0.2.0), not a patch. Such PRs list their breaking changes
+under a "Breaking changes" heading in the PR description. The
+GitHub Release notes are generated from PR titles alone, so copy
+those lists into the release notes by hand.
+
 ### Stage 1: propose the release
 
 From a clean checkout of `develop`, up to date with origin:
