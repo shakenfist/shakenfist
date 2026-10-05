@@ -166,9 +166,23 @@ BundleKind = collections.namedtuple(
 # absent_reason set, because those bundles carry no traces/headroom.jsonl.
 # That is bundle_record()'s designed handling of a probe that has not run,
 # not a bug -- see 'A bundle with no series is a record, not a gap' above.
+#
+# **This table is a history of bundle names, not a copy of today's matrix.**
+# The two Debian 12 entries name lanes which no longer exist: they were
+# renamed to Debian 13 on 2026-09-29 (`e9e8c8665`), and the rename replaced
+# the entries rather than adding to them. That made every window older than
+# the rename unharvestable -- a harvest of one dies on UnknownBundleError at
+# the first run it reaches -- which was found when the warn window the
+# headroom band gate was armed against was harvested for commit, five days
+# later. Artifacts live ninety days and this tool's whole purpose is reading
+# them retrospectively, so a renamed lane keeps its old entry until the last
+# bundle carrying the old name has expired. Deleting one buys nothing and
+# costs the ability to re-derive a decision from the runs it was made on.
 BUNDLE_TOPOLOGIES = {
     'bundle-shakenfist-full-debian-13-slim-primary': BundleKind(
         'Debian 13 cluster', 'slim-primary', 'Debian 13 cluster (collection)'),
+    'bundle-shakenfist-full-debian-12-slim-primary': BundleKind(
+        'Debian 12 cluster', 'slim-primary', 'Debian 12 cluster (collection)'),
     'bundle-shakenfist-full-ubuntu-2404-slim-primary': BundleKind(
         'Ubuntu 24.04 cluster', 'slim-primary',
         'Ubuntu 24.04 cluster (collection)'),
@@ -176,6 +190,8 @@ BUNDLE_TOPOLOGIES = {
         'Guests', 'slim-primary', 'Guests (collection)'),
     'bundle-shakenfist-full-debian-13-slim-tier': BundleKind(
         'Debian 13 tier', 'slim-tier', 'Debian 13 tier (collection)'),
+    'bundle-shakenfist-full-debian-12-slim-tier': BundleKind(
+        'Debian 12 tier', 'slim-tier', 'Debian 12 tier (collection)'),
     'bundle-shakenfist-full-ansible-modules': BundleKind(
         'Ansible modules', 'slim-primary', 'Ansible modules (collection)'),
 }

@@ -586,12 +586,30 @@ Falsifiable, in order:
 Harvested with `tools/ci_headroom_harvest.py --since 2026-09-21T11:10:53Z
 --until 2026-09-24T12:00:00Z`, which is every `merge_group` run of
 `functional-tests.yml` from phase 4's reshape (`6856aad74`, #4289) to the
-morning #4308 merged. Ten merge runs carried cluster bundles; three
-further runs in the window (`35909829697`, `35935845390`, `35975439402`)
-are documentation syncs whose `check_paths` reported `code_changed ==
-'false'`, so they ran no functional job at all and are not in the table.
+morning #4308 merged. Ten merge runs carried cluster bundles; the other
+ten in the window ran no functional job at all, their `check_paths`
+having reported `code_changed == 'false'`, so they are not in the table.
 That is ten runs per cluster job, against the six per topology 5e asked
 for.
+
+**This window is now committed**, as
+`docs/plans/data/ci-cloud-sizing-baseline/records-warn-window.jsonl`
+(50 records, 40 carrying a usable series), and every figure in the two
+tables below is recomputed from it by
+`tools/ci_headroom_check_window.py`, which runs in the test suite. The
+tables are no longer the evidence; they are a rendering of it. See
+*The warn window* in that directory's `README.md` for how it was
+produced, and for the harvest-tool fix it needed.
+
+Two corrections the re-harvest made, neither of which touches a figure
+the gate was armed on. This section originally said *three* further
+runs in the window ran no functional job, naming `35909829697`,
+`35935845390` and `35975439402`; the API reports twenty `merge_group`
+runs in the window, ten of which carried a bundle, so the figure is ten
+and not three. And the two Debian under-cloud lanes were renamed to
+Debian 13 on 2026-09-29, after this window ran, so the job names below
+are the ones its bundles carry and are not the names a window harvested
+today would use.
 
 The first version of this section tabulated only the three jobs 5e named
 and left `Guests` out, though the harvest had read it and it is the
@@ -718,6 +736,32 @@ directly: it equals `n` in every one, the smallest is 67, and none has
 the gate withheld. So the guard would have withheld nothing in any of
 the three datasets.
 
+**Recomputed from committed records, after the fact.** The paragraph
+above was written from a harvest that was not kept, which made this --
+the one irreversible decision in the phase -- the one claim in it that
+could not be checked once the bundles expired. The window is committed
+now, and `tools/ci_headroom_check_window.py` recomputes the whole of
+it: 40 job-runs, zero the gate would have failed, zero with the gate
+withheld, `n_fraction` equal to `n` in every one, a smallest count of
+67 against a floor of 20, and a highest cluster-wide p90 fraction of
+0.417 against a bound of 0.70. Every figure agrees with what is
+written here, including all forty rows of *The per-run window* below
+and their drop and denial counts. The checker fails and names the
+claim that moved if that ever stops being true.
+
+One qualification on the paragraph above, which the re-harvest makes
+precise. The sentence about the two older datasets is right that they
+support the floor through their usable-sample counts, but it reads as
+though all three datasets were checked against the same three
+conditions. They were not, and cannot be: `n_fraction` and the two
+`capacity_degraded` counters arrived at record version 3, and
+`records.jsonl` and `records-addendum.jsonl` are versions 1 and 2. So
+"the guard would have withheld nothing in any of the three datasets"
+is a direct measurement on the warn window and an argument from
+usable-sample counts on the other two. The checker reports a job-run
+which cannot answer as *unanswered* rather than as clean, which is the
+distinction that sentence elides.
+
 **Where the gate is armed.** Only on job shapes this window measured.
 The harvest reads `merge_group` runs, so the window covers exactly the
 four entries of the merge matrix, and the gate is armed there alone.
@@ -766,6 +810,11 @@ hardcoded `10.0.0.20`-`10.0.0.24` upload-target list in the
 why phase 5 is not fixing it. It is in the master plan's Future work.
 
 ### The per-run window
+
+Recomputed from `records-warn-window.jsonl` rather than read from a
+harvest that no longer exists; all forty rows match. The job names are
+the merge matrix's names as it stood in the window, before the Debian
+13 rename.
 
 | Run | Job | p90 fraction | Band | Per-node p90 | Per-node | Capacity-stage drops | Guard denials |
 |---|---|---|---|---|---|---|---|
