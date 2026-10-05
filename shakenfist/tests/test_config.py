@@ -107,6 +107,25 @@ class AgentOperationAttemptCapTestCase(base.ShakenFistTestCase):
         self.assertEqual(1, SFConfig().AGENT_OPERATION_MAX_ATTEMPTS)
 
 
+class KerbsideTokenDurationTestCase(base.ShakenFistTestCase):
+    """KERBSIDE_TOKEN_DURATION must be a positive number of seconds."""
+
+    @mock.patch.dict('os.environ',
+                     {'SHAKENFIST_KERBSIDE_TOKEN_DURATION': '0'})
+    def test_zero_duration_is_refused(self):
+        self.assertRaises(ValueError, SFConfig)
+
+    @mock.patch.dict('os.environ',
+                     {'SHAKENFIST_KERBSIDE_TOKEN_DURATION': '-5'})
+    def test_negative_duration_is_refused(self):
+        self.assertRaises(ValueError, SFConfig)
+
+    @mock.patch.dict('os.environ',
+                     {'SHAKENFIST_KERBSIDE_TOKEN_DURATION': '300'})
+    def test_default_duration_loads(self):
+        self.assertEqual(300, SFConfig().KERBSIDE_TOKEN_DURATION)
+
+
 class SecretConfigFieldTestCase(base.ShakenFistTestCase):
     """The three configuration values which carry credentials.
 

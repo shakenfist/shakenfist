@@ -82,8 +82,13 @@ SHAKENFIST_FEDERATION_JWKS_CA_BUNDLE="{{ federation_jwks_ca_bundle }}"
    API node may mint console tokens, and only when configured; unset leaves
    the proxied-console integration off. The value doubles as the token
    audience and must equal kerbside's SF_CONSOLE_TOKEN_AUDIENCE exactly, so
-   it is rendered verbatim rather than derived. A KERBSIDE_URL row in
-   cluster_config overrides this at process start. #}
+   it is rendered verbatim rather than derived. The token duration is
+   rendered only alongside it, since a duration without a URL means nothing.
+   A KERBSIDE_URL or KERBSIDE_TOKEN_DURATION row in cluster_config still
+   overrides these at process start, so the deploy (the node role's
+   kerbside_preflight entry point) refuses to run while either row differs
+   from its variable. #}
 {% if kerbside_url %}
 SHAKENFIST_KERBSIDE_URL="{{ kerbside_url }}"
+SHAKENFIST_KERBSIDE_TOKEN_DURATION="{{ kerbside_token_duration }}"
 {% endif %}

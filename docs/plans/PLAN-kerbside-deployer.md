@@ -163,7 +163,11 @@ branch.
 #4097 records, as item 4, that "the ansible `kerbside_url`
 variable has never been read by a running sf-api". #4093 asks for
 the mint test to run somewhere. #4367 notes that Kerbside's deploy
-lane has no headroom instrumentation. All three are open.
+lane has no headroom instrumentation. #4097 and #4367 are open.
+#4093 was closed on 2026-10-03 by the merge of this plan's own pull
+request, #4420, whose phase table said phase 4 "closes" it. GitHub
+read that as a closing keyword; nothing makes the mint test run yet
+(phase 2's survey, S7).
 
 ### What deploying Kerbside involves
 
@@ -472,10 +476,13 @@ dedicated key can be rotated or revoked without touching the
 cluster's own credential, and shows up separately in
 `log_token_use` audit events.
 
-**Uncertain:** whether `bootstrap-system-key` replaces an existing
-key of the same name, which is how rotation would work.
-`ctl.py:173-192` must be read in phase 2. If it does not replace,
-phase 2 adds that behaviour.
+*Answered in phase 2's survey (S2).* `bootstrap-system-key` calls
+`Namespace.add_key`, which has always overwritten a key of the same
+name -- a rotation, with a new hash and a new nonce. Rotation is
+changing the variable and redeploying; nothing needs adding. Because
+the play mints on every deploy, as it already does the `deploy` key,
+the nonce also changes on every deploy, which `shakenfist_client`
+absorbs by re-authenticating once on the resulting 401.
 
 ### 6. What should happen when a `cluster_config` row shadows the variable?
 
@@ -549,8 +556,8 @@ spelling above is the one to write.
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 1. `internal_ca` issues certificates to any host at caller-chosen paths, and renews them | [PLAN-kerbside-deployer-phase-01-internal-ca.md](PLAN-kerbside-deployer-phase-01-internal-ca.md) | In progress | — |
-| 2. Shaken Fist side: signing key, Kerbside credential, token duration, shadow guard | PLAN-kerbside-deployer-phase-02-sf-side.md | Proposed | — |
+| 1. `internal_ca` issues certificates to any host at caller-chosen paths, and renews them | [PLAN-kerbside-deployer-phase-01-internal-ca.md](PLAN-kerbside-deployer-phase-01-internal-ca.md) | Complete | `12441652b` (#4430) |
+| 2. Shaken Fist side: signing key, Kerbside credential, token duration, shadow guard | [PLAN-kerbside-deployer-phase-02-sf-side.md](PLAN-kerbside-deployer-phase-02-sf-side.md) | In progress | — |
 | 3. A `kerbside` role and the `kerbside` group in `site.yml` | PLAN-kerbside-deployer-phase-03-kerbside-role.md | Proposed | — |
 | 4. A merge-queue lane with the feature on | PLAN-kerbside-deployer-phase-04-ci.md | Proposed | — |
 | 5. Kerbside's sf-e2e lane deploys through the collection | PLAN-kerbside-deployer-phase-05-kerbside-lane.md | Proposed | — |
@@ -619,17 +626,31 @@ All of this lands in the cluster-config play and the node role:
 - `sf-ctl ensure-kerbside-signing-key`, run when `kerbside_url`
   is set (open question 7).
 - `sf-ctl bootstrap-system-key --key-from-stdin kerbside`, run
-  when the `kerbside` group is non-empty (open question 5),
-  including whatever rotation semantics the read of `ctl.py`
-  shows are missing.
-- The shadow guard from open question 6.
+  when the `kerbside_system_key` variable is set (open question
+  5). Not when the `kerbside` group is non-empty: that group does
+  not exist until phase 3, and an operator who runs Kerbside some
+  other way needs the credential without one. Phase 3 makes the
+  variable required when the group is non-empty. Rotation already
+  works (open question 5).
+- The shadow guard from open question 6, covering
+  `KERBSIDE_TOKEN_DURATION` as well as `KERBSIDE_URL`, and the
+  play's own `extra_config` as well as existing rows: the
+  documentation told operators to set the duration both ways.
+- `sf-ctl show-config` stops redacting numeric values, as
+  `redacted_config_items()` already does, so the guard can read
+  `KERBSIDE_TOKEN_DURATION` without `--show-secrets`.
 
-argument_specs validate the new variables. The `kerbside` key
-must differ from `system_key`; the play asserts it.
+The cluster-config play is in `examples/_shared/site.yml`, not a
+role, so it has no argument_specs. The Kerbside steps therefore
+become two node role entry points that the play includes, which
+gives the new variables argument_specs and makes them testable
+without a cluster. The `kerbside` key must differ from
+`system_key`; the entry point asserts it.
 
 This phase alone retires every manual step in
-`vdi_console_tokens.md` for an operator who runs Kerbside some
-other way. It is useful even if phase 3 never lands.
+`vdi_console_tokens.md` but the rotation runbook for an operator
+who runs Kerbside some other way. It is useful even if phase 3
+never lands.
 
 Planned at high effort: it changes what the cluster-config play
 does on every deploy of every cluster, including those that never

@@ -209,13 +209,19 @@ are:
 | `server_package`, `client_package` | The pip package references to install; default to the released `shakenfist` and `shakenfist-client` on PyPI. |
 | `loki_base_url`, `loki_tenant`, `loki_auth_header` | Optional log shipping to an operator-provided Loki. See [Logging](logging.md). |
 | `kerbside_url` | Base URL of an operator-deployed Kerbside VDI console proxy. Optional; empty leaves the proxied-console integration off. See the [VDI console tokens operator guide](vdi_console_tokens.md). |
+| `kerbside_token_duration` | Lifetime in seconds of a minted console token. Defaults to 300. Rendered only when `kerbside_url` is set. |
+| `kerbside_system_key` | The key Kerbside authenticates to Shaken Fist with, minted as the `kerbside` key in the system namespace on every deploy. Optional; requires `kerbside_url`, must differ from `system_key`, and must be at least 16 characters. Treat as a secret. |
 | `extra_config` | A JSON list of additional cluster configuration settings, for example `[{"name": "INCLUDE_TRACEBACKS", "value": "1"}]`. Optional. |
 
 To offer users proxied graphical consoles via Kerbside, set `kerbside_url`
-(and optionally `KERBSIDE_TOKEN_DURATION` through `extra_config`), then
-bootstrap and rotate the signing key as described in the
-[VDI console tokens operator guide](vdi_console_tokens.md). This is a manual,
-opt-in integration; it stays disabled while `KERBSIDE_URL` is unset.
+and, optionally, `kerbside_token_duration` and `kerbside_system_key`. The
+deploy then ensures the console token signing key exists before any daemon
+restarts, and mints the Kerbside credential if you set `kerbside_system_key`.
+The deploy stops if a `KERBSIDE_URL` or `KERBSIDE_TOKEN_DURATION`
+`cluster_config` row differs from its variable; see the
+[VDI console tokens operator guide](vdi_console_tokens.md) for the fix and for
+key rotation. Deploying Kerbside itself is still done out of band, and the
+integration stays disabled while `kerbside_url` is unset.
 
 ## Run the playbook
 

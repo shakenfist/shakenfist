@@ -33,10 +33,12 @@ from pydantic_settings import NoDecode
 # external_api/base.py rather than in app.py.
 #
 # Match generously -- under-matching leaks a credential, while
-# over-matching merely hides a value behind --show-secrets. It does in
-# fact over-match today, catching the integer API_TOKEN_DURATION,
-# FEDERATION_MAX_TOKEN_BYTES and KERBSIDE_TOKEN_DURATION, which is the
-# harmless direction.
+# over-matching merely hides a value. The name pattern does in fact
+# over-match today, catching the integer API_TOKEN_DURATION,
+# FEDERATION_MAX_TOKEN_BYTES and KERBSIDE_TOKEN_DURATION. Callers
+# should therefore decide through config_value_is_secret() below, which
+# also exempts numbers, rather than testing this pattern against a key
+# name alone: for a number it is no longer an over-match at all.
 #
 # This is deliberately belt-and-braces with the SecretStr types on the
 # secret-carrying fields themselves. The dumping sites iterate every
@@ -1051,8 +1053,11 @@ class SFConfig(BaseSettings):
             'audience.'
         )
     )
+    # gt=0 because a token which has already expired when it is minted
+    # cannot open a console, and nothing about the symptom points here.
     KERBSIDE_TOKEN_DURATION: int = Field(
         300,
+        gt=0,
         description=(
             'Lifetime in seconds of a minted Kerbside VDI console token.'
         )
@@ -1212,6 +1217,22 @@ load_cluster_config()
 config = SFConfig()
 
 
+def config_value_is_secret(key: str, value: Any) -> bool:
+    """Whether a configuration item's value must be masked when displayed.
+
+    True when the name matches SECRET_CONFIG_KEY_RE and the value is not
+    a bool, int or float. The name pattern over-matches by design, but
+    numbers are exempted: API_TOKEN_DURATION, FEDERATION_MAX_TOKEN_BYTES
+    and KERBSIDE_TOKEN_DURATION all match the name pattern, none of them
+    can be a credential, and all three are tunables an operator reads
+    this output to confirm. A credential is always a string (or a
+    SecretStr, which is not an int either, so it is still masked).
+    """
+    if isinstance(value, (bool, int, float)):
+        return False
+    return SECRET_CONFIG_KEY_RE.search(key) is not None
+
+
 def redacted_config_items() -> Iterator[tuple[str, Any]]:
     """The configuration as (key, value) pairs, with secrets masked.
 
@@ -1231,22 +1252,14 @@ def redacted_config_items() -> Iterator[tuple[str, Any]]:
     removing either re-opens a hole the other does not close. See
     docs/plans/PLAN-auth-federation-phase-06-secret-types.md.
 
-    The predicate over-matches by design -- it is shared with
-    sf-ctl show-config, where hiding a value behind --show-secrets costs
-    nothing. Neither caller here has such an escape hatch, so numbers
-    are exempted: API_TOKEN_DURATION, FEDERATION_MAX_TOKEN_BYTES and
-    KERBSIDE_TOKEN_DURATION all match the name pattern, none of them can
-    be a credential, and all three are tunables an operator reads this
-    output to confirm. A credential is always a string (or a SecretStr,
-    which is not an int either, so it is still masked here as well as
-    rendering as asterisks on its own).
+    The decision is made by config_value_is_secret(), which is shared
+    with sf-ctl show-config.
 
     Field order is deliberately left as the model reports it, because
     operators grep this output.
     """
     for key, value in config.model_dump().items():
-        numeric = isinstance(value, (bool, int, float))
-        if SECRET_CONFIG_KEY_RE.search(key) and not numeric:
+        if config_value_is_secret(key, value):
             yield key, '<redacted>'
         else:
             yield key, value
