@@ -8,22 +8,31 @@ step 2d of
 that is described as measured is traceable to a record in
 `records.jsonl`.
 
-There are **two** files here, with the same record schema and different
-jobs to do. `records.jsonl` is the baseline: the retrospective window,
-and the source of every distribution the plan reasons about.
-`records-addendum.jsonl` is step 2g's confirmation window, harvested
-after the two instrument fixes this phase made had merged, and it exists
-to close the two things the baseline could not see. It is a
-classification, not a second baseline, and no distribution should be
-recomputed from it -- it is an eighth the size and covers a day and a
-half.
+There are **three** files here, with three different jobs to do and
+three different versions of the record schema. `records.jsonl` is the
+baseline: the retrospective window, and the source of every
+distribution the plan reasons about. `records-addendum.jsonl` is step
+2g's confirmation window, harvested after the two instrument fixes
+phase 2 made had merged, and it exists to close the two things the
+baseline could not see. It is a classification, not a second baseline,
+and no distribution should be recomputed from it -- it is an eighth
+the size and covers a day and a half. `records-warn-window.jsonl` is
+the window the band gate was *armed* on, harvested afterwards so that
+the arming decision is checkable from this tree rather than from a
+table somebody typed; see *The warn window* below.
+
+Anything reading more than one of them must handle the version mix.
+`records.jsonl` is record version 1, `records-addendum.jsonl` is 2 and
+`records-warn-window.jsonl` is 4, and one field inside `verdict` does
+not mean the same thing on both sides of version 4 -- see *Two fields
+whose meaning changed after this was harvested*.
 
 The bundles this was computed from expire ninety days after their
 merge run, so this directory is the only durable copy. The raw series
 and census are deliberately *not* committed -- D22 -- only the per-job
 summary records the report tool derives from them.
 
-## The window
+## The baseline window
 
 | | |
 |---|---|
@@ -133,7 +142,7 @@ Inside `summary`:
 
 | Field | Meaning |
 |---|---|
-| `record_version` | Schema version of the report record. `records.jsonl` is **1**; `records-addendum.jsonl` is **2**, which adds the four series counters below. A consumer that reads both must expect the older shape. The tool writes **4** today; see *Two fields whose meaning changed after this was harvested* below. |
+| `record_version` | Schema version of the report record. `records.jsonl` is **1**; `records-addendum.jsonl` is **2**, which adds the four series counters below; `records-warn-window.jsonl` is **4**, which carries `n_fraction` in every metric block and `gates`/`gate_withheld` in `verdict` (both added at version 3, and no file here is version 3), and which changed what `verdict.refusal_warning` says. A consumer that reads more than one must expect the older shape, and must read `verdict.refusal_warning` through the derivation in *Two fields whose meaning changed after this was harvested* below rather than trusting the stored flag. |
 | `series` | Sample counts (usable, failed, unparseable), the window start/end/duration, `ledger_unreadable_samples`, and -- from record version 2 -- `ledger_unreadable_prefix_samples`, `ledger_unreadable_prefix_seconds`, `capacity_degraded_samples` and `capacity_degraded_absent_samples`. The last four are what say whether an unreadable ledger was a warm-up or a fault. |
 | `ledger_provenance` | Node-samples with a real capacity row, with a fallback to `cpu_hard_max`, with a fallback inside an unreadable sample, and with no ledger at all. |
 | `cluster` | Committed vCPU and committed memory MB, cluster-wide: `n`, `p90`, `peak`, `ledger_min`, `ledger_max`, and the two as fractions of ledger. |
@@ -146,25 +155,30 @@ Inside `summary`:
 
 ### Two fields whose meaning changed after this was harvested
 
-Both files here were harvested before the report tool reached
-`record_version` 4, and two fields inside `verdict` do not mean today
-what they meant when these records were written. Neither can be
-re-derived by re-harvesting, because the bundles are gone.
+`records.jsonl` and `records-addendum.jsonl` were harvested before the
+report tool reached `record_version` 4, and two fields inside `verdict`
+do not mean in them what they mean today. Neither can be re-derived by
+re-harvesting, because the bundles are gone.
+`records-warn-window.jsonl` sits on the far side of that boundary --
+it is version 4 -- so the three files in this one directory disagree
+about the meaning of a field rather than merely about which fields
+exist, and that is the harder half to notice.
 
 `verdict.per_node_band` is the additive one, and version 3 is where it
-changed: in these records it is the constant `null`, meaning *not
+changed: in the two older files it is the constant `null`, meaning *not
 judged*. From version 3 on, `null` means *no sample produced a per-node
-fraction*, and a real verdict is published otherwise.
+fraction*, and a real verdict is published otherwise -- which is how
+`records-warn-window.jsonl` carries it.
 
-`verdict.refusal_warning` is the one to be careful with. In these
-records it reads `false` for a census which was read and matched no
+`verdict.refusal_warning` is the one to be careful with. In the two
+older files it reads `false` for a census which was read and matched no
 scheduler stage event at all -- the same value a census which saw the
 scheduler and tallied no capacity-stage drop gets. Version 4 separates
 them and writes `null` for the first, because a filter which stopped
 matching is the instrument failing to look, not the cluster failing to
-refuse. An analysis pooling these files with records written after that
-change will count the older ones as observed-clean unless it re-derives
-the warning itself:
+refuse. An analysis pooling those two with `records-warn-window.jsonl`,
+or with any later window, will count the older ones as observed-clean
+unless it re-derives the warning itself:
 
 ```python
 census = r['summary']['census']
@@ -173,11 +187,21 @@ warning = bool(census['capacity_shortage_drops']) if observed else None
 ```
 
 That computes the version 4 reading from fields every version carries.
-In practice it changes nothing about *this* dataset -- `stage_events`
-is non-zero on all 204 summarised records in `records.jsonl` and all 32
-in `records-addendum.jsonl`, so no record here is actually in the
-ambiguous state. The boundary matters for windows harvested across it,
-which is why it is written down rather than left to be rediscovered.
+In practice it changes nothing about the datasets *here* -- `stage_events`
+is non-zero on all 204 summarised records in `records.jsonl`, all 32 in
+`records-addendum.jsonl` and all 40 in `records-warn-window.jsonl`, so
+no record in this directory is actually in the ambiguous state. The
+boundary matters for windows harvested across it, which is why it is
+written down rather than left to be rediscovered.
+
+`tools/ci_headroom_check_window.py` is where that derivation now lives
+in code rather than in prose. It re-derives the warning for every
+record in all three files, asserts that the derivation and the stored
+flag agree wherever the stored flag can have an opinion, and reports
+the count of records in the ambiguous state -- zero today. A fourth
+dataset added to this directory goes in its `DATASETS` list, and if its
+ambiguous count is not zero that needs saying out loud rather than
+discovering.
 
 ## What this dataset does not know
 
@@ -346,11 +370,125 @@ closed at zero. Of the 7 job-runs with a `sufficient_idle_cpu` abort,
 relationship the baseline found over 204 runs, at a sample size that
 could not have established it alone.
 
-## Reproducing an analysis over this file
+## The warn window
 
-The dataset is deliberately plain: each line is one JSON object and
-nothing needs to be joined. To recover, say, the per-topology
-distribution of the cluster-wide committed-CPU p90 fraction:
+`records-warn-window.jsonl`, harvested on 2026-10-05 over the window
+the cluster-wide band gate was armed against.
+
+| | |
+|---|---|
+| Why | Make the arming decision checkable from this tree, before the bundles expire |
+| Nominal window | runs created between **2026-09-21T11:10:53Z** and **2026-09-24T12:00:00Z** |
+| Effective window | **2026-09-21T23:09:16Z** to **2026-09-24T04:08:22Z** |
+| Merge runs enumerated | 20 |
+| Merge runs contributing a bundle | 10 (ten had every functional job skipped by `Check paths`) |
+| Records | **50** |
+| Records carrying a usable series | **40** |
+| Distinct head SHAs | 10 |
+| Record version | **4**, unlike its two siblings |
+| Size on disk | 247 KB |
+
+```
+python3 tools/ci_headroom_harvest.py \
+    --since 2026-09-21T11:10:53Z --until 2026-09-24T12:00:00Z \
+    -o docs/plans/data/ci-cloud-sizing-baseline/records-warn-window.jsonl
+```
+
+That took 41 `gh api` calls and about three minutes, not the couple of
+hours the baseline took: the baseline enumerated 66 runs and downloaded
+217 bundles, and this window enumerated 20 and downloaded 50.
+
+**What it answers that the other two do not.** The band's *bounds*
+recompute from `records.jsonl`, and always did. The decision to *arm* a
+merge-blocking gate on the upper bound did not: it rested on a run-by-run
+statement that the gate would have failed none of the job-runs in this
+window, that every one of them carried enough samples for the gate to
+have an opinion, and that none of them would have had the gate
+withheld. That statement was written down as a table of numbers in
+`PLAN-ci-cloud-sizing-phase-05-guardrails.md`, computed from bundles
+GitHub keeps for ninety days. After roughly 2026-12-20 nobody could
+have checked it. The records are now here and
+`tools/ci_headroom_check_window.py` recomputes every figure from them,
+in the test suite, on every run.
+
+The recomputation agrees with the table in full: 40 job-runs, a highest
+cluster-wide p90 fraction of 0.417 against an upper bound of 0.70, zero
+job-runs the gate would have failed, zero with the gate withheld, a
+smallest sample count of 67 against a floor of 20, and 30 of 40 below
+the lower bound (25 of 30 on `slim-primary`, 5 of 10 on `slim-tier`).
+The per-job minima, maxima, band tallies and per-node counts all match,
+and so do all forty rows of the plan's per-run table, down to the
+capacity-stage drop and guard denial counts.
+
+**Where each of those figures comes from, because the three parts of
+the claim are not equally checkable.** This file is record version 4,
+so it banks `cluster.committed_cpu.n_fraction` and
+`verdict.gates`/`verdict.gate_withheld` directly, and all three parts
+of the claim can be read out of it. The checker reads none of them: it
+recomputes the band from the fraction and the bounds, and the gate and
+withholding conditions from the sample counters, and then compares its
+own answer against the banked verdict -- so a stored verdict which
+disagrees with its own inputs is a failure rather than the thing being
+trusted. Nothing here is confirmed by a field agreeing with itself.
+
+The two older files cannot answer the gate question at all. `n_fraction`
+and the two `capacity_degraded` counters arrived at record version 3,
+after both were harvested, so a check run over either reports its
+job-runs as *unanswered* rather than as clean. That distinction is the
+one a `.get(field, 0)` would quietly destroy, turning "nobody measured
+this" into "nothing was wrong", most confidently about the oldest data;
+`gate_withheld()` raises instead, and the test suite drives that path
+with the real baseline records rather than a fixture.
+
+**The ten records with no series are the Ansible modules job**, which
+uploaded a bundle all along but carried no probe until the
+`shakenfist/actions` change instrumenting it merged on 2026-10-01 --
+after this window ran. They are kept rather than dropped, for the same
+reason the baseline keeps its thirteen: the count of what could not be
+measured belongs in the dataset. The other 40 are the four instrumented
+entries of the merge matrix, ten runs each.
+
+**Harvesting this needed a fix to the harvest tool, which is worth
+knowing before harvesting any other old window.** The two Debian
+under-cloud lanes were renamed from Debian 12 to Debian 13 on
+2026-09-29, and the rename *replaced* their entries in
+`BUNDLE_TOPOLOGIES` rather than adding to them. Since that table is
+keyed by artifact bundle name, every window older than the rename
+became unharvestable: the harvest dies on `UnknownBundleError` at the
+first run it reaches. Both old names are now back in the table
+alongside the new ones, and the table's comment says that a renamed
+lane keeps its old entry until the last bundle carrying the old name
+has expired. The `job` field of these records therefore reads `Debian
+12 cluster` and `Debian 12 tier`, which is what the window measured.
+
+**The boundaries are the plan's, not the convenient ones.** They are
+the ones the arming harvest was run with, to the second, so this file
+is the window the decision was made on rather than a window near it. A
+harvest rounded out to whole days -- `--since 2026-09-21 --until
+2026-09-25` -- enumerates 31 merge runs instead of 20 and would make a
+larger, differently-shaped dataset, which could not be checked against
+the plan's forty rows. If the wider window is ever wanted it belongs in
+a file of its own.
+
+**One normalisation, the same one.** `summary.series.path` and
+`summary.census.path` were removed from every record, for the reason
+given under *What was changed before committing*. Nothing else was
+pruned. With those two fields taken out of both sides, a second harvest
+of the same command reproduces this file record for record, which was
+checked rather than assumed.
+
+## Reproducing an analysis over these files
+
+`tools/ci_headroom_check_window.py` is a worked example as well as a
+check: it loads all three files, handles the version mix, re-derives the
+band verdict and the gate conditions from the raw counters rather than
+from the stored verdict, and prints the per-job table. Reading it is the
+shortest route to a new analysis over this directory.
+
+By hand, the datasets are deliberately plain: each line is one JSON
+object and nothing needs to be joined. To recover, say, the
+per-topology distribution of the cluster-wide committed-CPU p90
+fraction:
 
 ```python
 import json

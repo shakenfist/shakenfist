@@ -146,7 +146,7 @@ new topology.
 
 ### Re-measuring this from scratch
 
-Three steps, none of which depends on the others being believed.
+Four steps, none of which depends on the others being believed.
 
 **Harvest a window.** `tools/ci_headroom_harvest.py` enumerates
 `merge_group` runs and writes one record per job per run; its flags,
@@ -155,6 +155,35 @@ its caching and the reasons it refuses to guess are under
 `--until` if the output is going to be committed -- `--since` alone
 grows with every merge and `--limit` moves with the day the harvest is
 run on, so neither reproduces its own dataset.
+
+A window older than about three months cannot be harvested at all,
+because GitHub deletes the artifacts it would read. Harvesting one
+that is merely old can still fail, in one specific way worth knowing:
+`BUNDLE_TOPOLOGIES` in the harvest tool is keyed by artifact bundle
+name, and a merge matrix lane which has been renamed since the window
+ran produces a name the table may not hold, which stops the harvest
+with `UnknownBundleError` rather than guessing. The table keeps a
+renamed lane's old entry alongside its new one until the last bundle
+carrying the old name has expired, so the fix is to add the row back
+rather than to narrow the window.
+
+**Check a committed window.** `tools/ci_headroom_check_window.py`
+recomputes the figures the band gate was armed against from
+`docs/plans/data/ci-cloud-sizing-baseline/records-warn-window.jsonl`
+-- the band tallies per job, the highest cluster-wide p90 fraction, how
+many job-runs the gate would have failed, how many would have had it
+withheld, and the smallest sample count any of them rests on -- and
+exits non-zero naming any figure that no longer holds. Every figure is
+recomputed from the sample counters and then compared against the
+record's own stored verdict, rather than read out of it, so a stored
+verdict which disagrees with its own inputs fails. A record which does
+not carry the counters the gate question needs -- anything written
+before record version 3 -- is reported as *unanswered* rather than as
+clean. It also re-derives `verdict.refusal_warning` across the three
+committed datasets, which were written by three different versions of
+the record schema and disagree about what a `False` there means. The
+test suite runs it, so the arming decision is checked rather than
+merely written down.
 
 **Read the verdicts.** Each record's `summary.verdict` carries the
 band, the p90 CPU fraction and whether the gate was allowed to judge

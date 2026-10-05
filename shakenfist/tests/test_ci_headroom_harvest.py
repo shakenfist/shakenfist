@@ -319,6 +319,31 @@ class ClassificationTestCase(HarvestTestCase):
         self.assertEqual(
             'Guests', harvest.classify_artifact('bundle-shakenfist-full-guests')[1].job)
 
+    def test_a_renamed_lanes_old_bundle_name_still_classifies(self):
+        # The Debian under-cloud lanes were renamed from Debian 12 to
+        # Debian 13 on 2026-09-29, and the rename replaced these two entries
+        # instead of adding to them. Artifacts live ninety days and this
+        # tool's whole purpose is reading them retrospectively, so that
+        # removal made every window older than the rename unharvestable: a
+        # harvest of one dies on UnknownBundleError at the first run it
+        # reaches. It was found five days later, when the window the band
+        # gate was armed against was harvested for commit. A renamed lane
+        # keeps its old entry until the last bundle carrying the old name
+        # has expired.
+        for name, job, topology in (
+                ('bundle-shakenfist-full-debian-12-slim-primary',
+                 'Debian 12 cluster', 'slim-primary'),
+                ('bundle-shakenfist-full-debian-12-slim-tier',
+                 'Debian 12 tier', 'slim-tier')):
+            action, kind = harvest.classify_artifact(name)
+            self.assertEqual('harvest', action, name)
+            self.assertEqual(job, kind.job)
+            self.assertEqual(topology, kind.topology)
+            # The prefix the jobs API actually returned for these lanes,
+            # read from the committed warn-window dataset's github_job_name
+            # rather than derived from the matrix name.
+            self.assertEqual('%s (collection)' % job, kind.job_prefix)
+
     def test_the_ansible_modules_bundle_is_now_instrumented(self):
         # Phase 6 of PLAN-ci-cloud-sizing-phase-06-docs.md (D3) moved this
         # bundle out of UNINSTRUMENTED_BUNDLES once the matching
