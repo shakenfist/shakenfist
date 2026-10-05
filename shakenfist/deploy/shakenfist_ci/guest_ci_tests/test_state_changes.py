@@ -267,6 +267,163 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         })
         self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
 
+    def test_lifecycle_pause_powered_off(self):
+        # A powered off instance cannot be paused or unpaused. Both must be
+        # the documented 409, not a 500, and must leave it off. See
+        # docs/plans/PLAN-power-state-correctness-phase-03-power-api.md.
+        inst = self._start_target('pauseoff')
+
+        self.test_client.power_off_instance(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'off', 'after power off')
+
+        self.assertRaises(
+            apiclient.ResourceStateConflictException,
+            self.test_client.pause_instance, inst['uuid'])
+        self._emit_tracing_event({
+            'msg': 'Pause of powered off instance refused',
+            'instance_uuid': inst['uuid']
+        })
+        self._assert_power_state(inst['uuid'], 'off', 'after rejected pause')
+
+        self.assertRaises(
+            apiclient.ResourceStateConflictException,
+            self.test_client.unpause_instance, inst['uuid'])
+        self._emit_tracing_event({
+            'msg': 'Unpause of powered off instance refused',
+            'instance_uuid': inst['uuid']
+        })
+        self._assert_power_state(inst['uuid'], 'off', 'after rejected unpause')
+
+    def test_lifecycle_pause_twice(self):
+        # D5: pause and unpause are idempotent, so repeating either
+        # succeeds. See
+        # docs/plans/PLAN-power-state-correctness-phase-03-power-api.md.
+        inst = self._start_target('pausetwice')
+        ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
+
+        self.test_client.pause_instance(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'paused', 'after first pause')
+        self.test_client.pause_instance(inst['uuid'])
+        self._emit_tracing_event({
+            'msg': 'Paused instance twice',
+            'instance_uuid': inst['uuid']
+        })
+        self._assert_power_state(inst['uuid'], 'paused', 'after second pause')
+
+        self.test_client.unpause_instance(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'on', 'after first unpause')
+        self.test_client.unpause_instance(inst['uuid'])
+        self._emit_tracing_event({
+            'msg': 'Unpaused instance twice',
+            'instance_uuid': inst['uuid']
+        })
+        self._assert_power_state(inst['uuid'], 'on', 'after second unpause')
+
+        self._await_instance_ready(inst['uuid'])
+        self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
+
+    def test_lifecycle_power_on_paused(self):
+        # Powering on a paused instance would leave it paused while
+        # answering success, so it is refused with a 409; unpause is the
+        # operation which resumes it. See
+        # docs/plans/PLAN-power-state-correctness-phase-03-power-api.md.
+        inst = self._start_target('poweronpaused')
+
+        self.test_client.pause_instance(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'paused', 'after pause')
+        paused = True
+        try:
+            self.assertRaises(
+                apiclient.ResourceStateConflictException,
+                self.test_client.power_on_instance, inst['uuid'])
+            self._emit_tracing_event({
+                'msg': 'Power on of paused instance refused',
+                'instance_uuid': inst['uuid']
+            })
+            self._assert_power_state(
+                inst['uuid'], 'paused', 'after rejected power on')
+
+            self.test_client.unpause_instance(inst['uuid'])
+            paused = False
+            self._assert_power_state(inst['uuid'], 'on', 'after unpause')
+            self._await_instance_ready(inst['uuid'])
+
+        finally:
+            if paused:
+                # Best effort only: the test has already failed, and that
+                # failure is the one to report.
+                try:
+                    self.test_client.unpause_instance(inst['uuid'])
+                except apiclient.APIException as e:
+                    LOG.info('Cleanup unpause of %s failed: %s'
+                             % (inst['uuid'], e))
+
+    def test_lifecycle_power_on_failure(self):
+        # D1: a power on which fails on the hypervisor answers 500 rather
+        # than success, and does not record the instance as on. A missing
+        # root disk makes every start attempt fail. Node exec is unproven in
+        # the Guests suite, so this skips loudly rather than silently when
+        # it cannot run commands on the instance's hypervisor -- see
+        # _require_node_exec()'s docstring. See
+        # docs/plans/PLAN-power-state-correctness-phase-03-power-api.md.
+        inst = self._start_target('poweronfail')
+        node = self._node_by_uuid(inst['node'])
+        self._require_node_exec(node)
+
+        # The path is stored in the instance's block devices, and every
+        # power on attempt renders the domain XML from them, so the same
+        # path is used again once the disk is restored.
+        disk_path = self._domain_root_disk_path(node, inst['uuid'])
+        aside_path = disk_path + '.moved-aside'
+
+        self.test_client.power_off_instance(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'off', 'after power off')
+
+        moved = False
+        try:
+            self._node_exec(node, ['mv', disk_path, aside_path], sudo=True)
+            moved = True
+            self._emit_tracing_event({
+                'msg': 'Moved root disk aside',
+                'instance_uuid': inst['uuid'],
+                'disk_path': disk_path
+            })
+
+            # power_on() makes five attempts a second apart before giving
+            # up, well inside the client's request timeout.
+            self.assertRaises(
+                apiclient.InternalServerError,
+                self.test_client.power_on_instance, inst['uuid'])
+            self._emit_tracing_event({
+                'msg': 'Power on with missing root disk failed',
+                'instance_uuid': inst['uuid']
+            })
+
+            # Each failed start undefines the domain so the next attempt
+            # defines it afresh, so after the last one there is no domain
+            # and power_on() records 'off'.
+            self._assert_power_state(
+                inst['uuid'], 'off', 'after failed power on')
+
+        finally:
+            if moved:
+                self._node_exec(node, ['mv', aside_path, disk_path], sudo=True)
+                self._emit_tracing_event({
+                    'msg': 'Restored root disk',
+                    'instance_uuid': inst['uuid'],
+                    'disk_path': disk_path
+                })
+
+        # With the disk back the instance must power on normally: the
+        # failed power on left nothing behind that a working one trips on.
+        # This is outside the finally so that, if the test has already
+        # failed, a second failure here does not hide the first; the
+        # namespace cleanup deletes the instance either way.
+        self.test_client.delete_console_data(inst['uuid'])
+        self.test_client.power_on_instance(inst['uuid'])
+        self._assert_power_state(inst['uuid'], 'on', 'after restored power on')
+        self._await_instance_ready(inst['uuid'])
+
     def _detected_poweroff_reason(self, instance_uuid, after):
         """Return the libvirt shutoff reason on a 'detected poweroff' event.
 
