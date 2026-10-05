@@ -40,6 +40,18 @@ common word (`AUTH_SELECTION | AUTH_SPICE | MINI_HEADER`) and one
 channel word chosen by channel type (see
 [Display Channel Capabilities](#display-channel-capabilities)).
 
+The main channel advertises `SEMI_SEAMLESS_MIGRATE`,
+`AGENT_CONNECTED_TOKENS` and `SEAMLESS_MIGRATE`. With
+`AGENT_CONNECTED_TOKENS`, the server sends `AGENT_CONNECTED_TOKENS`
+instead of `AGENT_CONNECTED` when the guest agent (re)connects, carrying
+a fresh agent token window. spice-server resets its token accounting
+whenever the agent detaches, so ryll adopts that window rather than
+keeping its old count, which could leave both ends waiting on each
+other. Channels without their own default (inputs, cursor, playback and
+the rest) still advertise the word they always have, without
+`AGENT_CONNECTED_TOKENS`, because capability bits mean different things
+on each channel type.
+
 A proxy that must forward a real client's capabilities to the
 server instead uses `perform_link_with_caps`, or
 `SpiceClient::connect_channel_with_caps`, which take the common

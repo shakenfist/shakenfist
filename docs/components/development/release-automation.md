@@ -114,12 +114,21 @@ Replace the placeholders in the copied files:
 ### Step 2: Configure PyPI Trusted Publisher
 
 1. Log in to [pypi.org](https://pypi.org)
-2. Navigate to your project's **Publishing** settings
+2. If the package has never been published, there is no project to
+   scope a publisher to: add a **pending publisher** from
+   <https://pypi.org/manage/account/publishing/> instead, which also
+   asks for the PyPI project name and becomes an ordinary trusted
+   publisher on the first upload. Otherwise, navigate to your project's
+   **Publishing** settings
 3. Add a trusted publisher:
    - **Owner**: `shakenfist`
    - **Repository**: your repo name
    - **Workflow**: `release.yml`
    - **Environment**: `release`
+
+A wrong value here only fails at `publish-pypi`, after `sign-tag` has
+already pushed the signed tag, so the recovery is the next version
+rather than a re-pushed tag.
 
 ### Step 3: Create GitHub Environment
 
@@ -131,9 +140,15 @@ Replace the placeholders in the copied files:
 ### Step 4: Configure Protected Tags
 
 1. Go to **Settings** > **Rules** > **Rulesets**
-2. Create a tag ruleset for `v*` with restricted creation and
-   deletion
-3. Add maintainers to the bypass list
+2. Create a tag ruleset for `v*` restricting creation, deletion and
+   force pushes
+3. Add maintainers to the bypass list, and not GitHub Actions:
+   `sign-tag` collides with none of those rules, so the bypass would
+   only let every workflow create and delete release tags
+
+Tag *updates* stay unrestricted, so anyone with write access can
+rewrite a released tag. `RELEASE-SETUP.md` step 3 explains why the
+fleet accepts that gap rather than close it with **Restrict updates**.
 
 ### Step 5: Remove Old Release Scripts
 
