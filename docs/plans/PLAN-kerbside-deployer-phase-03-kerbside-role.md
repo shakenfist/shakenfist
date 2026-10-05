@@ -807,9 +807,10 @@ the README, `installation.md` and `argument_specs`. Do not edit
   it, and every mutation in brief 5 fails a named case.
 * `python3 -m stestr run test_kerbside_host_subject` passes, and fails
   when the script's escaping order is swapped.
-* `grep -rn "sf.target" shakenfist/deploy/collection/roles/kerbside/`
+* `grep -rn "sf.target" shakenfist/deploy/collection/roles/kerbside/templates/`
   prints nothing, and `grep -n WantedBy` on both unit templates prints
-  `multi-user.target`.
+  `multi-user.target`. (The role's tasks mention `sf.target` once, in a
+  comment explaining why the units avoid it.)
 * `grep -rn "kerbside" examples/_shared/site.yml` shows the group read
   only through `groups.get('kerbside', [])`, and
   `grep -rn "groups\[\|hostvars" shakenfist/deploy/collection/roles/kerbside/`

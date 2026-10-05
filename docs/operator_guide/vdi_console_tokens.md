@@ -54,10 +54,11 @@ adds the proxied path.
 
 !!! note
 
-    The Shaken Fist ansible collection does not deploy Kerbside itself. You
-    deploy and configure a Kerbside proxy out of band (see the
-    [Kerbside component documentation](/components/kerbside/)). The collection
-    does handle the Shaken Fist side: the URL, the token duration, the
+    The collection can deploy Kerbside itself onto hosts in an optional
+    `kerbside` inventory group (see [Installation](installation.md)); if you
+    deploy it some other way, see the
+    [Kerbside component documentation](/components/kerbside/). Either way the
+    collection handles the Shaken Fist side: the URL, the token duration, the
     signing key and the Kerbside credential, as below.
 
 To enable it, set `KERBSIDE_URL` to your Kerbside deployment's public base
@@ -73,6 +74,11 @@ Setting it also makes the deploy ensure the console token signing key exists
 (see [Signing key custody](#signing-key-custody)). The optional
 `kerbside_system_key` variable mints the credential Kerbside uses to talk to
 Shaken Fist (see [The Kerbside credential](#the-kerbside-credential)).
+
+To have the collection deploy Kerbside as well, put hosts in the optional
+`kerbside` inventory group and set the further variables described in
+[Installation](installation.md); the manual Kerbside setup described later on
+this page is then only for a Kerbside you deploy some other way.
 
 For a cluster not deployed with the collection, use `sf-ctl` instead (a
 `cluster_config` value overrides the rendered file at process start):

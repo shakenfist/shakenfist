@@ -211,6 +211,10 @@ are:
 | `kerbside_url` | Base URL of an operator-deployed Kerbside VDI console proxy. Optional; empty leaves the proxied-console integration off. See the [VDI console tokens operator guide](vdi_console_tokens.md). |
 | `kerbside_token_duration` | Lifetime in seconds of a minted console token. Defaults to 300. Rendered only when `kerbside_url` is set. |
 | `kerbside_system_key` | The key Kerbside authenticates to Shaken Fist with, minted as the `kerbside` key in the system namespace on every deploy. Optional; requires `kerbside_url`, must differ from `system_key`, and must be at least 16 characters. Treat as a secret. |
+| `kerbside_public_fqdn` | Only to deploy Kerbside onto an optional `kerbside` inventory group. The name SPICE clients use to reach the proxy; also the proxy certificate's CN and DNS SAN. |
+| `kerbside_sql_url` | Only with a `kerbside` group. The URL of Kerbside's own MySQL or MariaDB database, for example `mysql://kerbside:PASSWORD@db.example.com/kerbside`. Treat as a secret. |
+| `kerbside_auth_secret_seed` | Only with a `kerbside` group. Seeds Kerbside's token signing. At least 32 characters, and not Kerbside's placeholder `~~unconfigured~~`. Treat as a secret. |
+| `kerbside_package` | Only with a `kerbside` group. Defaults to `kerbside>=0.7.0`; until 0.7.0 is released, set a version or a wheel built from a git checkout. |
 | `extra_config` | A JSON list of additional cluster configuration settings, for example `[{"name": "INCLUDE_TRACEBACKS", "value": "1"}]`. Optional. |
 
 To offer users proxied graphical consoles via Kerbside, set `kerbside_url`
@@ -220,8 +224,37 @@ restarts, and mints the Kerbside credential if you set `kerbside_system_key`.
 The deploy stops if a `KERBSIDE_URL` or `KERBSIDE_TOKEN_DURATION`
 `cluster_config` row differs from its variable; see the
 [VDI console tokens operator guide](vdi_console_tokens.md) for the fix and for
-key rotation. Deploying Kerbside itself is still done out of band, and the
-integration stays disabled while `kerbside_url` is unset.
+key rotation. The integration stays disabled while `kerbside_url` is unset.
+
+To have the deploy install Kerbside too, add hosts to an optional `kerbside`
+inventory group. Members may be Shaken Fist nodes or dedicated hosts. Set
+`kerbside_url`, `kerbside_system_key`, `kerbside_public_fqdn`,
+`kerbside_sql_url` and `kerbside_auth_secret_seed`. `kerbside_url` and
+`kerbside_system_key` must be visible to both the Shaken Fist and the Kerbside
+hosts (put them in `group_vars/all`), and every Kerbside port must be below
+30000 and distinct. If any Kerbside host is not a Shaken Fist node, `api_url`
+must not be a loopback address. Kerbside's certificate is issued from the
+deployment's internal CA unless you set all three of `kerbside_proxy_cert_path`,
+`kerbside_proxy_key_path` and `kerbside_cacert_path`.
+
+Kerbside needs a MySQL or MariaDB database of its own (it does not support
+sqlite), which you create before deploying: a `kerbside` database and a user
+with all privileges on it.
+
+```sql
+CREATE DATABASE kerbside;
+CREATE USER 'kerbside'@'%' IDENTIFIED BY 'PASSWORD';
+GRANT ALL PRIVILEGES ON kerbside.* TO 'kerbside'@'%';
+```
+
+The deploy runs Kerbside's migrations and then waits, for up to about three
+minutes, for Kerbside to fetch the console token signing key. Without a
+`kerbside` group ansible prints `Could not match supplied host pattern,
+ignoring: kerbside`, which is harmless; an empty `kerbside:` group in the
+inventory silences it. Kerbside's admin login is Keystone-only and the
+deploy configures no Keystone, so its admin UI is unavailable; consoles work. See the
+[collection README](https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/deploy/collection/README.md#kerbside)
+for the details.
 
 ## Run the playbook
 
