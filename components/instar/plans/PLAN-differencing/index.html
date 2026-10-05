@@ -15608,13 +15608,13 @@ records <code>instar-testdata &lt;sha&gt; (#pr)</code> and is audited there.</p>
 <tr>
 <td>12. Composition: guest VHD sector-bitmap read path</td>
 <td><a href="/components/instar/plans/PLAN-differencing-phase-12-vhd-compose/">PLAN-differencing-phase-12-vhd-compose.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td><code>b4ae7fc</code> (#615)</td>
 </tr>
 <tr>
 <td>13. Composition: guest VHDX sector-bitmap read path</td>
-<td>PLAN-differencing-phase-13-vhdx-compose.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-differencing-phase-13-vhdx-compose/">PLAN-differencing-phase-13-vhdx-compose.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -15759,7 +15759,10 @@ rather than left as one phase to be split later, the way
   2026-09-30</strong>, which found the guest chain walker already built
   and already carrying a VHD arm: <code>read_chain_virtual_cluster</code>
   (<code>src/crates/qcow2/src/lib.rs:7930</code>) dispatches per format at
-  <code>:8486</code>, <code>ChainStates</code> already holds <code>vhd_states</code> (<code>:9385</code>),
+  <code>:8486</code>, <code>ChainStates</code> already holds <code>vhd_states</code> (<code>:9385</code>)
+  -- every line number in this bullet is as it stood before phase
+  12, which added about 2,800 lines to that file; the two a phase
+  13 reader follows are corrected at the end of the bullet --
   and an unallocated BAT entry already descends to the next
   device -- which is the correct reading for a differencing
   child's wholly-parent-owned block. What is missing is the
@@ -15769,7 +15772,10 @@ rather than left as one phase to be split later, the way
   for the sub-ranges this device does not own. The phase 4
   refusal these phases were expected to relax is a single <code>if</code> in
   <code>init_chain_states</code> (<code>:9528</code> for VHD, <code>:9556</code> for VHDX), not a
-  guard inside either parser crate. <strong>Falsified by phase 12's
+  guard inside either parser crate. <strong>Post-phase-12 locations</strong>,
+  for phase 13: the VHDX refusal is
+  <code>src/crates/qcow2/src/lib.rs:11298</code>, and the VHDX arm of
+  <code>read_chain_virtual_cluster</code> is <code>:10269</code>. <strong>Falsified by phase 12's
   execution</strong>: the planned condition -- lift the refusal when
   another device follows the child -- is unsafe, because
   <code>init_chain_states</code>'s <code>device_count</code> counts a flat, possibly
@@ -15789,16 +15795,35 @@ rather than left as one phase to be split later, the way
   <code>init_chain_states</code>'s refusal, and phase 12 found that doing so
   safely requires knowing a device's own chain boundary, which
   <code>device_count</code> alone does not give it.</li>
-<li><strong>Phase 15, tests and fuzz.</strong> Cross-validation against the
+</ul>
+<p>It also needs issue #623 settled first, and for the same kind of
+  reason. Phase 13 found that a differencing VHDX pads its BAT out
+  to whole chunk groups where a dynamic one does not, and that the
+  writer's <code>calculate_bat_layout</code> sizes the region by the shorter
+  dynamic rule. The phase 13 reader reaches the padded entries but
+  caps itself at the declared region, deliberately, so that the
+  differencing images that load today keep loading. The consequence
+  is that lifting the refusal before #623 lands ships a reader which
+  cannot resolve the sector bitmaps of images instar itself wrote
+  whenever that region is sized exactly -- a silent read failure on
+  our own output, which is the worst shape this gap could take.
+  Treat both issues as gates on phase 14's first step rather than as
+  work the phase can absorb.
+* <strong>Phase 15, tests and fuzz.</strong> Cross-validation against the
   phase 1 oracle for chains instar wrote and chains it did not,
-  plus coverage fuzzing of the compose path. Its harness drives
+  plus coverage fuzzing of the compose path. Phase 13 left it one
+  specific gap to close: every multi-group and partial-group VHDX
+  compose test runs at 512-byte logical sectors, where <code>chunk_ratio</code>
+  is 4096. At 4096-byte sectors it is 32768, so the padded BAT bound
+  and the chunk-group stride are arithmetic nothing drives at the
+  larger geometry. Its harness drives
   the <code>python3-libvhdi</code> binding with an explicit <code>set_parent()</code>
   rather than a CLI export, and its VHD fixtures are subject to
   the sector-bitmap caveat above. Phase 9 fuzzes the locator
   <em>parsers</em>; composing a chain is new surface, and a malicious
   child pointing at a well-formed parent is a different input
-  space from a malformed locator table.</li>
-<li><strong>Phase 16, documentation.</strong> Separate because phase 10 will
+  space from a malformed locator table.
+* <strong>Phase 16, documentation.</strong> Separate because phase 10 will
   have documented a refusal that phase 14 removes: at minimum
   <code>docs/chain-discovery.md</code>, <code>docs/chain-config.md</code> and the
   read-side rows and divergence notes of
@@ -15812,8 +15837,7 @@ rather than left as one phase to be split later, the way
   one of whose two stated reasons was already falsified by
   <code>vhdx::posix_relative_path</code> before phase 11 began, and
   <code>docs/info.md</code>'s claim that <code>--chain</code> stops at one image. The
-  compose-side rows stay with phase 16.</li>
-</ul>
+  compose-side rows stay with phase 16.</p>
 <p>Two specifics phases 12 and 13 must confront, both already
 visible in the crates:</p>
 <ul>

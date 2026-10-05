@@ -17800,38 +17800,86 @@ run and <code>stestr</code> does not name skipped tests in its output — parsin
 the log could not have caught it. Removing <code>libvhdi-utils</code> from the
 devcontainer turns that job red instead of leaving it quietly green.</p>
 <h2 id="mutation-harness-for-the-differencing-tests">Mutation harness for the differencing tests<a class="headerlink" href="#mutation-harness-for-the-differencing-tests" title="Permanent link">&para;</a></h2>
-<p><code>tools/mutate-differencing.sh</code> answers one question about the
-differencing output path (<code>instar create -f {vpc,vhdx} -b PARENT</code>):
-<strong>can the tests that guard it actually fail?</strong> It is not a coverage
-tool and it measures nothing. Each case breaks one specific behaviour
-in <code>src/</code> and requires one named test to notice; a test that still
-passes against a deliberately broken emitter is not guarding what its
-name says it guards. See
-<a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> for the path being
-guarded.</p>
-<p>There are <strong>26 cases</strong>: fourteen mutate a library crate (<code>create</code>,
-<code>vhd</code>, <code>vhdx</code>) and are caught by a Rust unit or round-trip test, and
-twelve are caught by a Python integration test through the real
+<p><code>tools/mutate-differencing.sh</code> answers one question about
+differencing support, on both sides of it — writing an image with
+<code>instar create -f {vpc,vhdx} -b PARENT</code>, and composing one back
+against its parent in the guest chain walker: <strong>can the tests that
+guard it actually fail?</strong> It is not a coverage tool and it measures
+nothing. Each case breaks one specific behaviour in <code>src/</code> and
+requires one named test to notice; a test that still passes against a
+deliberately broken emitter is not guarding what its name says it
+guards. See <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> for the
+path being guarded.</p>
+<p>There are <strong>62 cases</strong>, in two groups.</p>
+<p>Twenty-six cover the writer. Fourteen mutate a library crate
+(<code>create</code>, <code>vhd</code>, <code>vhdx</code>) and are caught by a Rust unit or round-trip
+test; twelve are caught by a Python integration test through the real
 binary. Ten of those twelve mutate the <code>create</code> guest operation, which
 is excluded from <code>cargo test --workspace</code>, so a unit test written
 beside that code would never run; the other two mutate the <code>create</code>
 crate but break something only an external parser can see. Going
 through the real binary means <code>make instar</code> before the test and again
 after the source is restored.</p>
+<p>The other <strong>36 reader cases</strong> cover the reader — the VHD and VHDX arms of
+<code>read_chain_virtual_cluster</code>, the sector-bitmap helpers in the <code>vhd</code>
+and <code>vhdx</code> crates, and the differencing refusals in
+<code>init_chain_states</code>. Most of them name a test in the <code>qcow2</code>
+crate and run it with the full input-format feature list, because the
+arms are behind <code>vhd-input</code> and <code>vhdx-input</code> and a run without those
+compiles the mutation away and reports a pass nobody earned. Several
+also break a unit test in the <code>vhd</code> or <code>vhdx</code> crate, which is
+deliberate duplication: the crate test pins the helper and the case
+here pins the arm that calls it. Running one named test in one package
+is what keeps them separate, since <code>make test-rust</code> stops at the first
+failing crate and would otherwise never reach the arm.</p>
+<p>Some name a <code>vhd</code> or <code>vhdx</code> test instead, because the property is
+genuinely the crate's and not the arm's — <code>--list</code> shows which, so
+the number is deliberately not written here. The arm calls the
+ownership coalescer once per run, each time with a correct starting
+byte, so a coalescer that stops at a bitmap byte boundary serves the
+same bytes in two runs instead of one and no arm test can see the
+difference. The same goes for a chunk group of no sectors, which is a
+property of the state's geometry rather than of any read. That is not
+a weak arm test; it is where the property lives. Each such case says
+so where it is defined, and each was established by watching the case
+fail while it named an arm test.</p>
+<p><strong>1 survivor case</strong> is among them: <code>rust_survivor_case</code> asserts that a
+mutation is <em>not</em> caught, with the reason recorded at the case.
+<code>vhd-read-classify-stops-at-the-first-mixed-verdict</code> applies an early
+exit a review suggested for <code>classify_vhd_chunk_ownership</code>; it
+survives because the classifier's full walk is also the chunk's
+validation, and <code>read_vhd_child_runs</code> repeats that walk and refuses an
+undescribed stretch by itself. The change is therefore
+behaviour-preserving, and declining it keeps two independent checks on
+a fail-closed path rather than one. The verdict is inverted for these:
+surviving scores <code>SURVIVOR</code> and passes, and being <em>killed</em> scores
+<code>FAIL</code> — not because catching a bug is bad, but because it means the
+recorded reason no longer holds and the comment is now lying. A
+surviving mutation is a real result about the tests, and keeping it as
+a case means the next person to meet it reads the reason instead of
+concluding the test is weak.</p>
 <p>Four of the integration cases (<code>oracle-*</code>) name the libvhdi
 cross-check in <code>tests/test_differencing.py</code>, which skips without
 <code>vhdiinfo</code> on <code>PATH</code> (Debian: <code>libvhdi-utils</code>). A skipped test scores
 <code>BROKEN</code>, not <code>PASS</code>, so the harness needs that package installed to
 report a clean run; it warns once up front when it is missing.</p>
-<p>A full run took <strong>2m32s, 2m44s and 3m35s</strong> on three measured runs of
-this tree, with <code>vhdiinfo</code> present and all 26 cases passing — so
-budget three to four minutes and expect the spread, which is cargo and
-docker layer caching. Those are observations: an earlier "about two
-minutes" here was a guess, and an understated figure invites the
-reader to assume a run has hung. Most of the time is the 24 <code>make
-instar</code> rebuilds the integration cases need; the 21 baselines add test
-runs but no rebuilds.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>tools/mutate-differencing.sh<span class="w">          </span><span class="c1"># every case, three to four minutes</span>
+<p>A full run took <strong>4m59s</strong> on a warm tree with <code>vhdiinfo</code> present and
+everything passing, and 4m43s when it held 57 cases; an earlier run
+of the same tree took 9m38s because it also had to build a docker
+image. Before the reader cases existed the 26 writer cases alone took
+2m32s, 2m44s and 3m35s on three measured runs. Those are observations rather than estimates:
+an earlier "about two minutes" here was a guess, and an understated
+figure invites the reader to assume a run has hung. Expect a spread,
+which is cargo and docker layer caching. The writer cases are
+dominated by the 24 <code>make instar</code> rebuilds their integration tests
+need; the reader cases need no rebuild but each recompiles the
+<code>qcow2</code> crate in release with the full feature list.</p>
+<p>Both devcontainer images must already exist, because
+<code>tools/cargo-in-container.sh</code> and the integration cases run them
+rather than building them. On a machine that has neither, <code>make
+instar-devcontainer</code> and <code>make instar</code> build them first, and that is
+tens of minutes rather than minutes.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>tools/mutate-differencing.sh<span class="w">          </span><span class="c1"># every case</span>
 <a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>tools/mutate-differencing.sh<span class="w"> </span>--list<span class="w">   </span><span class="c1"># the case names, run nothing</span>
 <a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>tools/mutate-differencing.sh<span class="w"> </span>NAME...<span class="w">  </span><span class="c1"># only the named cases</span>
 <a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>tools/mutate-differencing.sh<span class="w"> </span>--self-test<span class="w">        </span><span class="c1"># check the verdict classifier</span>
@@ -17858,7 +17906,7 @@ trusted.</p>
 </tr>
 <tr>
 <td><code>--check-patterns</code></td>
-<td>does every mutation still have exactly one place to land, and do the case count here and in the script still agree?</td>
+<td>does every mutation still have exactly one place to land, and do the case, reader and survivor counts here and in the script still agree?</td>
 <td>a few seconds</td>
 </tr>
 <tr>
@@ -17873,7 +17921,7 @@ trusted.</p>
 harness nothing else checks — everything else is checked <em>by</em> it — and
 it shipped misreading <code>FAILED (errors=1)</code> as a caught mutation, which
 no run of the harness itself would have revealed.</p>
-<p><code>--check-patterns</code> exists because the 26 search strings are pinned to
+<p><code>--check-patterns</code> exists because every search string is pinned to
 <code>src/</code> byte for byte, indentation included. A <code>rustfmt</code> change that
 moves a space turns a case <code>BROKEN</code>, and without this nothing would
 say so until someone spent the full run. It reports <code>LANDS</code> and
@@ -17924,8 +17972,8 @@ the harness closes each:</p>
   the failure gets credited to the mutation. Each named test is
   therefore run once against unmutated source first, and a case whose
   baseline does not pass is <code>BROKEN</code> rather than <code>PASS</code>. Baselines are
-  cached per target: the 26 cases name 21 distinct targets (14 Rust,
-  7 integration), so that is 21 extra test runs and no extra rebuilds
+  cached per target: the 62 cases name 50 distinct targets (43 Rust,
+  7 integration), so that is 50 extra test runs and no extra rebuilds
   — the integration baselines reuse the clean binary each case
   restores anyway.</li>
 <li><strong>The test errored rather than failed.</strong> <code>unittest</code> reports an
