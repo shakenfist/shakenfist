@@ -373,15 +373,19 @@ real zero for any run whose base contains that commit:
 `BaseTestCase.setUp()` in `shakenfist/deploy/shakenfist_ci/base.py`
 calls `ensure_capacity_wait_trace()`, which touches the file
 into existence at suite start-up and swallows every failure exactly
-as the append path does. `absent` and `unparseable` remain unknown,
-and an absent file still cannot be read as zero, because the same
-on-disk signature covers both a component ref predating the wrapper
-and a run whose every write failed. `tools/ci_headroom_report.py`
-still nulls an empty trace's counts, and that is correct: the report
-runs over a downloaded bundle and cannot see the run's base, so the
-four states it emits (`read`, `empty`, `unreadable`, `unparseable`)
-are the raw reading, and applying the ancestry condition is the
-caller's job.
+as the append path does. A missing file -- `absent` in D43's
+vocabulary, which the tool reports as `unreadable` -- and one whose
+every line was malformed both remain unknown, and a missing file
+still cannot be read as zero, because the same on-disk signature
+covers both a component ref predating the wrapper and a run whose
+every write failed. `tools/ci_headroom_report.py` still nulls an
+empty trace's counts, and that is correct: the report runs over a
+downloaded bundle and cannot see the run's base, so the five states
+it emits in the record's `state` -- `not requested` when `--waits`
+was not passed, `unreadable`, `empty`, `read`, and `unparseable`
+when the file was read but every line in it was malformed -- are the
+raw reading, and applying the ancestry condition is the caller's
+job.
 [PLAN-transient-capacity-refusals-phase-05-queue-decision.md](../plans/PLAN-transient-capacity-refusals-phase-05-queue-decision.md)'s
 D43 -- "`empty` is a real zero; `absent` and `unparseable` stay
 unknown" -- is the decision this unlocked.

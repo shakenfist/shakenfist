@@ -268,6 +268,11 @@ live claim**:
   and its success criteria at `:1216`, and
 * `PLAN-scheduler-reservations.md:1244`, which describes the topology
   in the present tense (step 6d, which is already editing that file).
+  **This one was wrong, and the review round reverted it** -- the
+  sentence is present-tense but its arithmetic is the pre-reshape
+  shape, so renaming the lane alone made it false. See *What the
+  review round changed*. The rule this decision needed is whether the
+  claim still holds, not what tense it is in.
 
 `PLAN-transient-capacity-refusals.md:83` is left alone: it is the
 Situation's account of what was read in 2026-09-08 journals, and the
@@ -360,7 +365,7 @@ this worktree, and the `shakenfist/actions` repository is not touched.
 |---|---|
 | **6b writes "a queue is unnecessary"**, which is the one sentence phase 5 forbids, because it is the natural way to summarise an Abandon. | The back brief gates 6b on its wording, and DoD item 6 greps for the forbidden forms. The reviewer to check it is whoever reads the back brief, before any editing starts. |
 | **The #3772 before-and-after comparison spans two confounders** -- the lane rename and the topology reshape -- so any change in pass rate is unattributable. | 6e's brief requires both confounders stated in the comment, and requires the *failure reasons* rather than the rate alone. D48 keeps the issue open regardless of what the rate shows, so a flattering number cannot close it. |
-| **A global `Debian 12 tier` rename falsifies thirty lines of recorded readings.** | D47 scopes it to three lines. DoD items 1 and 2 count occurrences before and after in the files that must not change, so an over-broad `sed` fails a check rather than merging. |
+| **A global `Debian 12 tier` rename falsifies thirty lines of recorded readings.** | D47 scopes it to three lines -- two, after the review round reverted the third. DoD items 1 and 2 count occurrences before and after in the files that must not change, so an over-broad `sed` fails a check rather than merging. |
 | **Editing two merged sibling plans (6d) reads as scope creep.** | Both sentences are addressed to this phase by name, which is why they are in scope; 6d's brief says so, and the commit message should repeat it. If a reviewer disagrees, the right outcome is dropping 6d, not rewording it. |
 | **Two pages come to state the second window's numbers differently.** | DoD item 14: the three-waits figures appear in `capacity_refusals.md` and in phase 5's Outcome and nowhere else, and are compared literally. |
 | **A guessed mkdocs anchor fails the doc-link hook late**, after the prose is written. This happened during phase 5's amendment. | 6a and 6b are both told to link by filename and section name rather than by anchor, and to run the link hook specifically rather than waiting for the full pre-commit run. |
@@ -484,7 +489,10 @@ result (Abandon by the rule's default, three waits in the second
 window, longest 290.83 s against the 420 s deadline) and noting that
 D8's state-surface objection and the measurement reach the same place
 for different reasons. It renamed that file's one present-tense
-`Debian 12 tier` claim to `Debian 13 tier`, and put
+`Debian 12 tier` claim to `Debian 13 tier` -- since reverted by the
+review round, because the sentence's arithmetic predates the reshape
+and the rename made it false; see *What the review round changed* --
+and put
 `PLAN-ci-cloud-sizing-phase-05-guardrails.md`'s D5 open check into the
 past tense: the reader D5 named has since read the series and
 decided, so the refusal warning's purpose is discharged rather than
@@ -664,3 +672,35 @@ resolved to the opposite of its intended meaning; and 6a cited
 `base.py:214` and `:180` in a living developer guide, where no checker
 validates them and any edit above those lines makes them silently
 wrong. The citations are now by symbol name.
+
+The second round raised no `fix` items. Three of its `consider` items
+were taken, all three defects in text this phase added.
+
+The sharpest was self-inflicted in a way worth naming: the wait-trace
+paragraph closes by insisting that "the prose and the record have to
+say the same thing, because the tooling that reads this consumes the
+record, not the prose" -- and the paragraph did not. It said the tool
+emits four states, where `waits_record()` emits five: `read_waits()`
+sets `not requested` when `--waits` was not passed, and the record
+builder overrides the status to `unparseable` when a file was read
+but every line in it was malformed. The prose also used D43's
+`absent` for a missing file, which is the census vocabulary; the tool
+calls that case `unreadable`, and a reader matching the page against
+the JSON would not have found `absent` at all. Both vocabularies are
+now stated, and all five states listed.
+
+The operator page also never said what the middle-ground default
+*is*. It explained that the rule reached its default rather than any
+clause, and that the long waits are what stopped it abandoning the
+idea outright, which together read as an outcome somewhere between
+building a queue and not. The default is Abandon. The section opened
+with "No." and then made its own answer harder to follow; it now says
+so in the explanation as well.
+
+Finally, D47 and step 6d's Outcome paragraph both still described the
+rename that the first round reverted, so a reader stopping at either
+got the superseded version. Both now point forward to this section.
+The affected definition-of-done items were re-run rather than assumed:
+items 1, 3, 4 and 6 still hold, and item 2's named file list never
+included `PLAN-scheduler-reservations.md`, so the revert does not
+touch it.
