@@ -39,10 +39,21 @@ The sampling loop never raises: a failed sample (a network error, an
 unexpected response shape, anything) is written as a record carrying an
 `error` key and the timestamp, and the loop continues to the next interval.
 The write is guarded on the same terms -- a value the json module cannot
-serialise, or a full disk, degrades to a bare error record or to a skipped
-line, never to a dead poller and a series which stops mid-run without
-saying why. The probe exists to give a later analysis step data to work
-with, so it must not itself be the reason a CI run ends up with none.
+serialise degrades to a bare error record, and a full or read-only disk
+costs the line rather than the poller. The probe exists to give a later
+analysis step data to work with, so it must not itself be the reason a CI
+run ends up with none.
+
+A skipped line is not a silent one. Every record carries `writes_failed`,
+the running count of records this run could not write at all, so the first
+line written after a gap says how many lines the gap swallowed -- a poller
+which lost two samples is otherwise indistinguishable from one sampling a
+cluster nobody was using. The count is cumulative rather than per-gap so
+that any one surviving line carries the whole run's loss. The case no field
+can report is a failure which never clears: a disk which stays unwritable
+to the end of the run leaves no line to carry the count, and that arrives
+as a series which simply stops. Counting does not fix that, but it narrows
+an unexplained short series to exactly that one cause.
 
 Samples are paced to a deadline rather than by sleeping a fixed interval
 after each one. A sample is not free -- the API call behind
@@ -89,6 +100,12 @@ Each output line is a JSON object with these keys:
                      roster, absent on error.
     error           string, the exception text, present only when the sample
                      failed. When present, 'resources' and 'nodes' are absent.
+    writes_failed   int, how many records this run has already failed to
+                     write before this one; 0 for the whole of a healthy
+                     run. Absent from a record written by a probe which
+                     predates the counter, which is not the same as 0, so
+                     read it with .get() and treat absence as "not
+                     counted".
 """
 import argparse
 import json
@@ -133,9 +150,15 @@ def take_sample(client):
 def write_record(f, record):
     """Append one record, and never raise doing it.
 
-    Returns True if a line was written. A record which cannot be
-    serialised is retried as a minimal error record, so the series keeps
-    its cadence and says what happened rather than simply stopping.
+    Returns True if a line was written, and False if nothing reached the
+    file. The caller counts a False into the next record it writes, so a
+    gap in the series is accounted for rather than merely survived.
+
+    A record which cannot be serialised is retried as a minimal error
+    record, so the series keeps its cadence and says what happened rather
+    than simply stopping. That retry still carries the caller's running
+    failure count: it is the one field whose whole purpose is to outlive
+    the record it was attached to.
     """
     try:
         line = json.dumps(record)
@@ -144,6 +167,7 @@ def write_record(f, record):
             line = json.dumps({
                 'sampled_at': record.get('sampled_at', time.time()),
                 'error': 'sample could not be serialised: %s' % e,
+                'writes_failed': record.get('writes_failed', 0),
             })
         except Exception:
             return False
@@ -159,7 +183,7 @@ def write_record(f, record):
     return True
 
 
-def main():
+def main(argv=None):
     description = (
         'Poll /admin/resources and the node roster on an interval, appending one JSON record per '
         'sample to a JSONL file, for CI headroom instrumentation.')
@@ -174,7 +198,7 @@ def main():
         help='Stop sampling once this many seconds have elapsed since start. Required: a cancelled '
              'CI job never runs the step that would otherwise stop this poller, so it must carry '
              'its own cap or it spins forever against a leaked cluster.')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     client = apiclient.Client(
         namespace=os.environ.get('SHAKENFIST_NAMESPACE'),
@@ -182,16 +206,24 @@ def main():
         base_url=os.environ.get('SHAKENFIST_API_URL', 'http://localhost:13000'))
 
     if args.interval <= 0:
-        # Not an argparse error: D15 says nothing this phase adds may fail
-        # a build, and a non-positive interval would otherwise spin.
+        # Not an argparse error: nothing this instrument does may fail the
+        # build it is measuring, and a non-positive interval would
+        # otherwise spin the loop below as fast as the API answers.
         print('--interval must be positive, not %r; using 15.' % args.interval)
         args.interval = 15
 
     start_time = time.time()
     next_at = start_time
+    # Carried across iterations rather than discarded with each return
+    # value: a write which fails writes nothing, so the only place the
+    # failure can be recorded is the next record which does land.
+    writes_failed = 0
     with open(args.output, 'a') as f:
         while time.time() - start_time < args.max_seconds:
-            write_record(f, take_sample(client))
+            record = take_sample(client)
+            record['writes_failed'] = writes_failed
+            if not write_record(f, record):
+                writes_failed += 1
             next_at += args.interval
             delay = next_at - time.time()
             if delay > 0:
