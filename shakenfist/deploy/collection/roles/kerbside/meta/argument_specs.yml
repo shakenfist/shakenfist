@@ -4,10 +4,10 @@ argument_specs:
     short_description: Deploy a Kerbside VDI console proxy.
     description:
       - >-
-        Runs the per-host entry points in order. Today that is bootstrap then
-        config; register joins them once it is written. validate is not part
-        of main, because the consuming playbook runs it once on the control
-        node before any host is changed.
+        Runs the per-host entry points in order: bootstrap, config, then
+        register. validate is not part of main, because the consuming
+        playbook runs it once on the control node before any host is
+        changed.
       - >-
         Every value is a plain role variable. The role reads no inventory group
         names and no other host's facts; the consuming playbook maps the
@@ -216,6 +216,15 @@ argument_specs:
             The port Kerbside's Prometheus metrics are served on. Rendered as
             Kerbside's PROMETHEUS_METRICS_PORT. Below 30000 and distinct from
             the other Kerbside ports.
+      kerbside_ready_retries:
+        type: int
+        default: 60
+        description:
+          - >-
+            How many times, three seconds apart, register checks for a fetch
+            of Shaken Fist's console token signing keys made during this
+            deploy before failing it. The default, three minutes, allows three
+            of Kerbside's 60 second scrape passes.
       kerbside_proxy_cert_path:
         type: str
         default: ""
@@ -366,4 +375,28 @@ argument_specs:
         Then hashes those files, the certificate, key and CA, and
         kerbside_code_hash from bootstrap into the fact kerbside_desired_state.
         Nothing is started or restarted; register decides that.
+    options: *kerbside_options
+  register:
+    short_description: Migrate, restart on change, and wait for readiness.
+    description:
+      - >-
+        Run on every Kerbside host together, after config. Runs kerbside db
+        upgrade once, on the first of kerbside_hosts, as kerbside_user, before
+        any host restarts, and fails unless its output shows it read
+        kerbside.ini and connected to the database (Kerbside exits 0 on an INI
+        it cannot parse).
+      - >-
+        Then enables kerbside-api and kerbside-daemon on every host, restarting
+        both where kerbside_desired_state differs from the one recorded in
+        kerbside_state_dir/.deployed-state.sha256, or none is recorded, and
+        otherwise only starting them. Waits for each host's API to answer, and
+        then, on the first host, for Kerbside to store Shaken Fist's console
+        token signing keys later than the time recorded before any restart, on
+        every deploy. Only then records kerbside_desired_state as deployed.
+      - >-
+        Must run as root: the migration and the readiness check drop to
+        kerbside_user with runuser. The migration, the units and API check,
+        and the readiness wait are tagged kerbside-database,
+        kerbside-services and kerbside-readiness, so a test without them can
+        skip them.
     options: *kerbside_options

@@ -8,9 +8,9 @@
 #     its virtualenv, and hashes what was installed.
 #   * config (per host) writes Kerbside's INI, sources.yaml and systemd units,
 #     and hashes them with the certificate files into the desired state.
-#
-# register (migrations, restart on change and readiness) follows config here
-# once it is written.
+#   * register (every host together) migrates the database once, restarts
+#     Kerbside where the desired state differs from what was last deployed,
+#     waits for a fresh signing key fetch, and then records the desired state.
 #
 # validate is not part of main. It runs once, on the control node, before any
 # host is changed, and does nothing when the kerbside group is empty.
@@ -19,3 +19,6 @@
 
 - name: Configure Kerbside
   ansible.builtin.include_tasks: config.yml
+
+- name: Register Kerbside
+  ansible.builtin.include_tasks: register.yml

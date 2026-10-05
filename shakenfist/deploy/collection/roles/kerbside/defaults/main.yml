@@ -45,6 +45,11 @@ kerbside_vdi_secure_port: 5900
 kerbside_vdi_insecure_port: 5901
 kerbside_metrics_port: 13003
 
+# How many times, three seconds apart, register checks for a signing key fetch
+# made during this deploy. The default allows three of Kerbside's 60 second
+# scrape passes.
+kerbside_ready_retries: 60
+
 # Operator-supplied proxy certificate. All three empty, the default, means the
 # consuming playbook issues one from internal_ca. All three set means these
 # paths on the Kerbside host are used as they are.

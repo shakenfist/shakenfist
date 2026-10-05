@@ -74,6 +74,7 @@
     - kerbside-check-ini.py
     - kerbside-check-sources.py
     - kerbside-host-subject.py
+    - kerbside-ready.py
 
 # Kerbside embeds PROXY_HOST_SUBJECT in the console files it hands to SPICE
 # clients, which compare it with the certificate the proxy presents. It is

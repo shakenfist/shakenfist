@@ -20,6 +20,28 @@ kerbside_cacert_file: >-
 
 # Where the role's helper scripts are copied on the Kerbside host. They run
 # there, with the virtualenv's Python: the validate commands which check
-# kerbside.ini and sources.yaml before either replaces the running file, and
-# the script which renders the proxy certificate's subject.
+# kerbside.ini and sources.yaml before either replaces the running file, the
+# script which renders the proxy certificate's subject, and the script register
+# polls for readiness.
 kerbside_helper_dir: "{{ kerbside_state_dir }}/bin"
+
+# Where register records the desired state it last brought to readiness.
+kerbside_deployed_state_file: "{{ kerbside_state_dir }}/.deployed-state.sha256"
+
+# What register's readiness wait reads from kerbside-ready.py: its output must
+# be exactly the one-line JSON object the script prints, matched by
+# kerbside_ready_pattern before it is parsed, since from_json on anything else
+# would fail the task rather than count as not ready. The pattern admits only
+# what the script's json.dumps() can produce, and no backslash, so every match
+# parses. kerbside_ready_fetched_at is the parsed fetched_at as a string, or
+# 'null' when the keys were never fetched or the output was anything else.
+# Evaluated lazily, so each reads the latest kerbside_ready the wait registered.
+kerbside_ready_pattern: >-
+  ^[{]"errored": (true|false|null),
+  "fetched_at": (null|-?[0-9]+([.][0-9]+)?([eE][-+]?[0-9]+)?)(,
+  "error": "[A-Za-z0-9 .:_-]*")?[}]$
+kerbside_ready_output: "{{ kerbside_ready.stdout | default('') | trim }}"
+kerbside_ready_fetched_at: >-
+  {{ (((kerbside_ready_output | from_json).fetched_at
+       if kerbside_ready_output is match(kerbside_ready_pattern) else none)
+      | default('null', true)) | string }}
