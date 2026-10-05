@@ -19,6 +19,7 @@ from shakenfist import instance
 from shakenfist import mariadb
 from shakenfist.config import SFConfig
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.daemons import daemon
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
@@ -1347,6 +1348,18 @@ class InstancePauseUnpauseTestCase(InstanceLibvirtTestCase):
         self.mock_sleep = p.start()
         self.addCleanup(p.stop)
 
+        # unpause() sets the sidechannel monitor's abort file, so it must
+        # never see the real /run/sf, which a developer's machine may have.
+        self.abort_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.abort_dir)
+        p = mock.patch.object(daemon, 'ABORT_PATH_DIR', self.abort_dir)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def _monitor_abort_path(self):
+        return os.path.join(
+            self.abort_dir, f'sidechannel-{self.inst.uuid}.abort')
+
     def test_pause_no_domain_raises(self):
         self._mock_libvirt(None)
         with testtools.ExpectedException(exceptions.InvalidLifecycleState):
@@ -1467,6 +1480,63 @@ class InstancePauseUnpauseTestCase(InstanceLibvirtTestCase):
         self.assertEqual('on', self.inst.power_state['power_state'])
         self.assertEqual(
             constants.AGENT_NEVER_TALKED, self.inst.agent_state.value)
+
+    def _unpause_a_paused_domain(self):
+        domain = FakeDomain()
+        self._mock_libvirt_transition(
+            domain, 'resume_calls', before='paused', after='on')
+        self.inst.update_power_state('paused')
+        self.inst.agent_state = constants.AGENT_INSTANCE_PAUSED
+        self.inst.unpause()
+        return domain
+
+    def test_unpause_restarts_the_sidechannel_monitor(self):
+        # The monitor caches the agent's state and only writes it when
+        # that cache changes, so after a short pause it would never
+        # correct the "no contact" written above. Its abort file has the
+        # sidechannel daemon replace it with one which re-handshakes.
+        self._unpause_a_paused_domain()
+        self.assertTrue(os.path.exists(self._monitor_abort_path()))
+
+        # The monitor's file only: the executor's is its own, and an
+        # in-flight agent operation is left to its budgets.
+        self.assertEqual(
+            [f'sidechannel-{self.inst.uuid}.abort'],
+            os.listdir(self.abort_dir))
+
+    def test_unpause_of_running_domain_leaves_the_monitor_alone(self):
+        # Nothing was frozen, so the monitor's view is current and a
+        # restart would only drop a working connection.
+        domain = FakeDomain()
+        self._mock_libvirt(domain, power_state='on')
+
+        self.inst.unpause()
+
+        self.assertEqual([], os.listdir(self.abort_dir))
+
+    def test_unpause_survives_a_failed_monitor_restart_request(self):
+        # The guest is running whether or not the sidechannel daemon
+        # could be told, and the monitor's reply gap check is the
+        # backstop, so a failure to write is logged rather than raised.
+        with mock.patch.object(daemon, 'set_abort_path',
+                               side_effect=PermissionError('denied')) as sap:
+            domain = self._unpause_a_paused_domain()
+
+        sap.assert_called_once()
+        self.assertEqual(1, domain.resume_calls)
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        self.assertEqual(
+            constants.AGENT_NEVER_TALKED, self.inst.agent_state.value)
+
+    def test_unpause_without_a_run_directory_does_not_try(self):
+        # A node with no /run/sf has no sidechannel daemon to tell.
+        missing = os.path.join(self.abort_dir, 'missing')
+        with mock.patch.object(daemon, 'ABORT_PATH_DIR', missing), \
+                mock.patch.object(daemon, 'set_abort_path') as sap:
+            self._unpause_a_paused_domain()
+
+        sap.assert_not_called()
+        self.assertEqual('on', self.inst.power_state['power_state'])
 
     def test_pause_succeeds_despite_db_race_with_cleaner(self):
         # The cleaner can write 'paused' to the database while the domain

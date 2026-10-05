@@ -49,6 +49,7 @@ from shakenfist.schema.operations.node_inst_snap_op \
     import snapshot as niso_snapshot
 from shakenfist.schema.operations.node_inst_snap_op \
     import model_tasks as niso_tasks
+from shakenfist.daemons import daemon
 from shakenfist import eventlog
 from shakenfist.eventlog import add_event_multi
 from shakenfist import exceptions
@@ -2679,6 +2680,42 @@ class Instance(dbowo):
 
             self.update_power_state('on')
             self.agent_state = constants.AGENT_NEVER_TALKED
+            self._restart_sidechannel_monitor()
+
+    def _restart_sidechannel_monitor(self):
+        # The write of AGENT_NEVER_TALKED above is only corrected if the
+        # sidechannel monitor notices the agent's state may have changed,
+        # and it caches that state, writing agent_state only when its
+        # cached view changes. A pause long enough for the sidechannel
+        # daemon to see has already had the monitor torn down, so the
+        # next one starts afresh; a short one leaves the old monitor
+        # running with its cache still at ready, and the database at
+        # "no contact" for good. Setting the monitor's abort file has the
+        # daemon replace it whatever the length of the pause: the monitor
+        # exits, is reaped, and its replacement re-handshakes with the
+        # agent and writes what it finds.
+        #
+        # Only the monitor's file is set. An in-flight agent operation
+        # has an executor with an abort file of its own and is left
+        # alone -- the guest was frozen under it, and its budgets decide
+        # what that means, as they do for any other stall.
+        #
+        # This runs on the hypervisor, which is the only place the file
+        # means anything. Without /run/sf there is no sidechannel daemon
+        # to tell, and a failure to write is not a failure to unpause: the
+        # guest is running, and the monitor's reply gap check is a
+        # backstop for a pause long enough to show as a gap in replies.
+        abort_path = daemon.sidechannel_abort_path(self.uuid)
+        if not os.path.isdir(os.path.dirname(abort_path)):
+            return
+        try:
+            daemon.set_abort_path(abort_path, 'from unpause')
+        except OSError as e:
+            LOG.with_fields({
+                'instance': self.uuid,
+                'abort_path': abort_path,
+                'error': str(e)
+            }).warning('Failed to request a sidechannel monitor restart')
 
     def get_console_data(self, length):
         console_path = os.path.join(self.instance_path, 'console.log')

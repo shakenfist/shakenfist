@@ -105,6 +105,35 @@ MONITOR_START_INTERVAL = 30
 # them so a drift here shows up as a failing unit test rather than as a
 # budget term nobody can source. See issue #4039.
 
+# How long the monitor can go without receiving anything from the agent
+# before it treats its cached agent state as stale. The monitor only
+# writes agent_state when its cached view changes, but other code writes
+# it too: pause() and unpause() do, and a pause short enough that the
+# monitor management loop never tears this monitor down leaves the cache
+# saying ready while the database says "no contact" -- forever, because
+# ping replies never touch agent_state. A guest which was frozen shows up
+# here as a gap in replies, so a gap resets the cache and the next ping
+# is an is_system_running request whose reply rewrites the database.
+#
+# unpause() also has this monitor restarted (see
+# Instance._restart_sidechannel_monitor()), which covers a pause of any
+# length. This check is the backstop for when that cannot happen -- the
+# abort file could not be written, or the guest was frozen and thawed by
+# something other than pause() and unpause(), such as a host stall or a
+# suspend and resume made directly through libvirt.
+#
+# A healthy agent is never silent for long: a ping goes out once nothing
+# has been seen for two seconds, and the socket timeout is one second,
+# so the normal gap between replies is two to three seconds. Six seconds
+# is two missed ping rounds beyond that. Lower would mistake a briefly
+# busy agent for a frozen one more often; higher would miss more of the
+# short pauses this exists for, since a pause long enough to be seen by
+# the management loop is already handled by restarting the monitor. A
+# false positive costs one is_system_running round trip, one gather
+# facts and one agent_state read, and never a change of state in the
+# database, because the reply restores the value the cache held.
+AGENT_REPLY_GAP = 6
+
 
 class ConnectionFailed(Exception):
     ...
@@ -141,8 +170,10 @@ class SideChannelJob(util_concurrency.Job):
         # clears the file again -- possibly before the wedged
         # executor's one second poll has read it, leaving it wedged
         # with the instance's executor slot held.
-        self.abort_path = (
-            f'/run/sf/sidechannel-{abort_name or self.instance.uuid}.abort')
+        # The derivation is shared with Instance.unpause(), which sets the
+        # monitor's path to have it restarted.
+        self.abort_path = daemon.sidechannel_abort_path(
+            abort_name or self.instance.uuid)
         daemon.clear_abort_path(self.abort_path)
 
         # A count of the number of sent but not yet acknowledged command
@@ -317,6 +348,34 @@ class SideChannelMonitorJob(SideChannelJob):
         self.instance.add_event(EVENT_TYPE_AUDIT, 'received system facts')
         self.instance.agent_facts = facts
 
+    def _note_data_received(self):
+        # self.last_data cannot detect a gap, because sending a ping
+        # moves it too. The check is made when data arrives rather than
+        # on every pass of the loop: a frozen guest then costs nothing
+        # while it stays frozen, the reset happens exactly once per gap,
+        # and a reply which arrives just as the gap crosses the threshold
+        # is not missed between two passes.
+        #
+        # Only the cache is reset. Whoever froze the guest has already
+        # written something more informative than we could (pause()
+        # writes "instance paused"), and the reply to the next
+        # is_system_running request writes the truth through the usual
+        # change detection in _handle_is_system_running(). That includes
+        # the move into ready, so facts are gathered again after a pause,
+        # which is wanted: the guest may have changed while frozen. Every
+        # cached state is reset, not just the ready ones -- a degraded
+        # guest is asked is_system_running on every ping, but its reply
+        # is still only written when it differs from the cache.
+        now = time.time()
+        if now - self.last_received > AGENT_REPLY_GAP:
+            if self.instance_ready != constants.AGENT_NEVER_TALKED:
+                self.log.with_fields({
+                    'gap': now - self.last_received,
+                    'cached_agent_state': self.instance_ready
+                }).info('Agent was silent, re-checking its state')
+                self.instance_ready = constants.AGENT_NEVER_TALKED
+        self.last_received = now
+
     def _execute_inner(self, vsock):
         request = agent_pb2.HypervisorToAgentCommand(
             command_id=sf_random.random_id(),
@@ -327,6 +386,7 @@ class SideChannelMonitorJob(SideChannelJob):
         self.log.debug('...execute request')
         self._send_commands_single_envelope(vsock.sock, [request])
         self.last_data = time.time()
+        self.last_received = self.last_data
 
         buffered = bytearray()
         while daemon.check_abort_path(self.abort_path):
@@ -339,6 +399,7 @@ class SideChannelMonitorJob(SideChannelJob):
                 if not input:
                     return
 
+                self._note_data_received()
                 self.last_data = time.time()
                 buffered += input
 
