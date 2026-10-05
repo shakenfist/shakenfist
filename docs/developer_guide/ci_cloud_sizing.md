@@ -242,7 +242,9 @@ does interact with a check that gates, which is the one reason a
 reader troubleshooting a CI failure might need this section; see "The
 probe's traffic is exempted from the idle-load check". Otherwise it
 matters when reading a job's bundle afterwards, or when working on the
-sizing plan itself.
+sizing plan itself. Whether the instruments are working at all is a
+separate, weekly question; see
+[Is the instrument still alive?](#is-the-instrument-still-alive).
 
 ### Two instruments, not one
 
@@ -581,6 +583,77 @@ floats raises.
 Name both ends of the window. `--since` alone grows with every merge, and
 `--limit` moves with the day the harvest is run on, so neither reproduces
 the dataset it produced.
+
+### Is the instrument still alive?
+
+Nothing in the probe path can fail a job, deliberately: an instrument
+which can fail the job it measures changes the failure surface it
+exists to measure. The price of that honesty is that **a dead probe and
+a healthy cluster produce the same green job.** A probe which never
+started, one which authenticated against nothing, a collect which
+could not reach the primary, and a verdict withheld because the series
+was too thin are each recorded faithfully -- in fields that, until
+there was a consumer for them, nothing read.
+
+`.github/workflows/ci-headroom-health.yml` is that consumer, weekly.
+It harvests the ten newest merge runs and hands the records to
+`tools/ci_headroom_health.py`, which returns non-zero when they say
+the instrument is not working and names the records which say so. By
+hand:
+
+```bash
+python3 tools/ci_headroom_harvest.py --limit 10 -o /tmp/headroom.jsonl
+python3 tools/ci_headroom_health.py /tmp/headroom.jsonl
+```
+
+| Check | Fails when |
+|---|---|
+| records harvested | fewer than 20 records, so bundles stopped arriving at all |
+| series present rate | under 90% of records carry a series |
+| usable samples per record | a record holds fewer samples than the band gate's floor |
+| failed samples | any sample failed, which no record in the committed datasets does |
+| census stage events | a census was read and matched no scheduler event, so the filter stopped looking |
+| sample cadence | mean sample spacing is more than a second from the 15 second poll |
+| gate withheld | the band gate was not allowed to judge a verdict |
+
+**It fails loudly because it is scheduled**, and that is the whole
+design rather than an oversight to tidy up. It sits in no pull
+request's path, so there is nothing for its failure to perturb -- which
+is why the workflow must not grow a `pull_request` or `merge_group`
+trigger, and why nothing which gates may depend on it. A check which
+cannot fail is the problem it was written to fix.
+
+Every threshold is a constant at the top of the tool, with the
+measurement behind it, and every one has a command line flag, because
+each is a number somebody will eventually need to change: a probe
+interval change moves the cadence, a matrix change moves the record
+count. One is not defined there at all. The sample floor is read from
+the report tool's `BAND_GATE_MIN_SAMPLES`, because it is the band
+gate's own floor and a second copy of that number would drift from it.
+
+The series-present floor is an absolute floor and not a comparison
+against the committed datasets, which is the honest shape for the data
+that exists: `records.jsonl` carries a series on 204 of 217 records,
+but twelve of those thirteen gaps are runs which predate the probe
+existing, so its rate measures the instrument's arrival rather than its
+health, and the confirmation window beside it is too small to recompute
+a distribution from. What they do establish is that a running probe
+banked a series on every bundle it wrote.
+
+Two things to know before reading its output:
+
+* Clearing the sample floor is necessary but not sufficient for the
+  gate, which counts the samples that produced a CPU fraction. A
+  cluster's first few minutes produce usable samples whose capacity
+  table is still empty, so a record can clear the floor and still have
+  its verdict withheld. The withheld check is what reads the gate's own
+  answer.
+* Run over the committed datasets in
+  `docs/plans/data/ci-cloud-sizing-baseline/`, the tool fails: their
+  records predate `verdict.gate_withheld`, so no record in them can say
+  whether the gate was allowed to judge. That is the intended reading.
+  An absent field is not an empty list, and a harvest pointed at a
+  window of stale runs reads exactly the same way.
 
 ### The topology assertion fails rather than skipping
 
