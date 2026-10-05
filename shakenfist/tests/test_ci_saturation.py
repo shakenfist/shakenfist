@@ -5,9 +5,8 @@
 refusals against a deployed cluster, and cluster CI only runs in the merge
 queue -- so nothing about that file is checkable on a ``pull_request``.
 Most of it genuinely needs the cluster. Its sizing arithmetic does not: it
-is pure functions of a ``/admin/resources`` reading, and
-PLAN-ci-cloud-sizing-phase-03's review observed that this is the one part
-of the change whose correctness need not wait for a merge run. Those
+is pure functions of a ``/admin/resources`` reading, which is the one
+part of that suite whose correctness need not wait for a merge run. Those
 functions therefore live in ``shakenfist_ci/sizing.py``, a module kept free
 of suite and ``shakenfist_client`` imports so this file can load it by path
 -- the same arrangement ``retries.py`` and
@@ -209,7 +208,7 @@ class EffectiveRAMCeilingTestCase(base.ShakenFistTestCase):
     def test_headroom_alone_never_lowers_the_ceiling(self):
         """The correction this function exists for.
 
-        D24 originally sized this test from ``ram_available``, which is
+        This test was originally sized from ``ram_available``, which is
         headroom: a sibling stestr worker deleting an instance *raises*
         it between the read and the create, and an impossible request
         sized from it becomes possible. A node with almost no headroom

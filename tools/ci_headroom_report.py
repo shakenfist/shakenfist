@@ -7,8 +7,8 @@ scheduler's admission limits. tools/ci_headroom_probe.py now samples
 /admin/resources and the node roster through the test step of every cluster
 job; this tool turns one of those series -- optionally beside a refusal
 census pulled from Loki -- into a printed summary, so that a reader of the
-job log, and later phase 2 of the plan, has a distribution instead of an
-anecdote. See docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md.
+job log, and anyone later sizing the cloud from banked runs, has a
+distribution instead of an anecdote.
 
 Two constraints shape this file, and both are worth stating because they
 look like arbitrary austerity otherwise.
@@ -19,16 +19,16 @@ shakenfist import, no third-party import. The percentile() helper below is
 copied verbatim from tools/queue-wait-report.py for that reason rather than
 imported.
 
-It exits zero whatever it finds about itself (D15): an instrument which can
+It exits zero whatever it finds about itself: an instrument which can
 fail the job changes the thing it is measuring. An unreadable series, an
 absent census, a usage error and even an internal error here are printed
 and shrugged off, never raised. Exactly one thing returns non-zero, and it
-is a statement about the cloud rather than the instrument: from phase 5's
-5f, a cluster-wide OVERSUBSCRIBED band on a series the report could read
-returns BAND_VIOLATION_EXIT. That constant's comment below is where the
+is a statement about the cloud rather than the instrument: a cluster-wide
+OVERSUBSCRIBED band on a series the report could read returns
+BAND_VIOLATION_EXIT. That constant's comment below is where the
 contract, and why it is the only exception, is stated.
 
-Two instruments, reported separately (D9). A fifteen second poll cannot see
+Two instruments, reported separately. A fifteen second poll cannot see
 a refusal, which begins and ends between samples; a census cannot see a
 cloud sitting half empty for an hour. Folding them into one number would
 hide which of the two produced it, so the series section and the census
@@ -51,8 +51,9 @@ counted third and never as a refusal. Advisory claim mode admits that
 placement deliberately -- CLAIM_ENFORCEMENT_HARD is False for a release
 precisely so exceedances are observed before they are refused -- so it is
 the system doing what the operator asked, and it is reported because it
-is the calibration signal D9 asks for, not because anything went wrong.
-Counting it as a refusal would manufacture refusals on a healthy cluster.
+is a calibration signal for the claim machinery, not because anything went
+wrong. Counting it as a refusal would manufacture refusals on a healthy
+cluster.
 
 Like the stage census, both new tallies count every string they observe
 rather than a list held here: a failing_stage or a dimension name this
@@ -67,11 +68,11 @@ What the numbers mean:
   the measurement would read a node whose ledger is full but whose
   instances are still fetching images as idle.
 * **The ledger** is the capacity row's cpu_limit where the row exists and
-  cpu_hard_max where it does not. Those are the two figures D7 asks phase 2
-  to reconcile -- a discrepancy of 12 against 10 which has never been
+  cpu_hard_max where it does not. Those two figures have never been
+  reconciled -- a discrepancy of 12 against 10 which has never been
   explained -- so the count of node-samples which fell back to cpu_hard_max
   is a deliverable of this report, not a diagnostic aside. A run which is
-  entirely fallback says something about D7 by itself.
+  entirely fallback settles that question by itself.
 * **Committed memory** is derived, because the payload publishes no such
   field: ram_available is ram_max minus memory_total_instance_actual, so
   ram_max minus ram_available is what the instances actually hold. A node
@@ -98,31 +99,32 @@ What the numbers mean:
   the other two.
 
 The census tallies whatever stage strings it observes and never a hardcoded
-list (D10): the stage names are bare literals at their call sites in
+list: the stage names are bare literals at their call sites in
 scheduler.py with no enumeration anywhere, so a copy of them in a parser
-would drift silently the first time one was added or renamed -- and the
-plan itself had already drifted, naming three capacity stages when there
-are four. The four capacity stages are named here only to annotate rows and
-to decide what counts as a capacity warning; a stage this file has never
-heard of still appears in the table with its own count.
+would drift silently the first time one was added or renamed -- and one
+hand-written copy had already drifted, naming three capacity stages when
+there are four. The four capacity stages are named here only to annotate
+rows and to decide what counts as a capacity warning; a stage this file has
+never heard of still appears in the table with its own count.
 
 The memory stage's three reasons are reported separately and never summed,
 because one of them -- 'no memory_max in node metrics' -- is missing data
 rather than a shortage. A census which counted it as a memory refusal would
 read a stale metrics row as evidence the cloud is too small, which is the
-precise error this plan exists to avoid.
+precise error this report exists to avoid.
 
-One record, two consumers (D18). Everything printed below is computed once,
+One record, two consumers. Everything printed below is computed once,
 into the plain dict summary_record() returns, and the prose is rendered from
-that dict rather than from the parsed objects beside it. Phase 2's harvest
-runs this tool's summary_record() over several hundred banked bundles and
-phase 5's guardrail will read the --json file, so the alternative -- both of
-them parsing the printed tables -- would make every future change to a
-heading or a column width a silent break of the dataset. Rendering the prose
-from the record instead means the number in the job log and the number in
-the dataset cannot disagree, which matters here because the whole plan turns
-on people trusting these figures. It also means this file has exactly one
-place where each figure is computed, so a reader checking the arithmetic
+that dict rather than from the parsed objects beside it. The harvest in
+tools/ci_headroom_harvest.py runs summary_record() over several hundred
+banked bundles and the headroom gate reads the --json file, so the
+alternative -- both of them parsing the printed tables -- would make every
+future change to a heading or a column width a silent break of the dataset.
+Rendering the prose from the record instead means the number in the job log
+and the number in the dataset cannot disagree, which matters because
+resizing the cloud turns on people trusting these figures. It also means
+this file has exactly one place where each figure is computed, so a reader
+checking the arithmetic
 checks it once.
 
 The record carries a second committed-CPU statistic beside the cluster-wide
@@ -141,7 +143,7 @@ runs that pass.
 
 The record is a plain dict of standard-library types for the same reason the
 rest of this file is: it has to serialise under stock python3 on a runner.
-And writing it obeys D15 like everything else -- a --json path which cannot
+And writing it may not fail the job either -- a --json path which cannot
 be written is a warning on stdout and an exit code of zero, never an
 exception, because a report tool which fails a build over its own output
 file is precisely the instrument changing what it measures.
@@ -162,23 +164,24 @@ import sys
 import traceback
 
 
-# Phase 0's D3 band, as ratios of committed vCPU to ledger. Phase 2 defended
-# both bounds against a 204 job-run distribution -- see the master plan's
-# "The headroom band, with numbers" section. The cluster-wide upper bound of
+# The headroom band, as ratios of committed vCPU to ledger. Both bounds were
+# defended against a 204 job-run distribution -- see
+# docs/developer_guide/ci_cloud_sizing.md. The cluster-wide upper bound of
 # 0.70 is never reached by slim-primary (max 0.519 over 154 job-runs) and is
 # exceeded by 37 of 50 slim-tier job-runs, with no false positives in the
-# window; the lower bound of 0.35 is "numerically right and operationally
-# awkward" (104 of 154 slim-primary job-runs fall below it). Phase 5's D2
-# adopts both numbers unchanged rather than re-deriving them.
+# window; the lower bound of 0.35 is numerically right and operationally
+# awkward (104 of 154 slim-primary job-runs fall below it), and is kept
+# unchanged for that reason rather than re-derived.
 BAND_LOWER = 0.35
 BAND_UPPER = 0.70
 
 # The exit status this tool returns when, and only when, the cluster-wide
-# fraction sits above BAND_UPPER. Phase 5's 5f armed it against a window of
-# 40 cluster job-runs over 10 merge runs in which nothing came within 0.28 of
+# fraction sits above BAND_UPPER. It was armed against a window of 40
+# cluster job-runs over 10 merge runs in which nothing came within 0.28 of
 # that bound (max 0.417), so gating on it would have failed nothing that was
-# fine -- which is the whole test D7 set for it. That window is the merge
-# matrix's four jobs, and the gate is armed on those shapes alone; see
+# fine, which is the only test worth arming a gate against. That window is
+# the merge matrix's four jobs, and the gate is armed on those shapes alone;
+# see
 # shakenfist/tests/test_headroom_gate_workflow_seams.py.
 #
 # The *name* of this constant is load-bearing, not only its value.
@@ -192,13 +195,14 @@ BAND_UPPER = 0.70
 # implement it. Renaming this constant switches the gate off rather than
 # breaking it.
 #
-# Only this one direction gates. D7 rules out the per-node bound (D4) and the
-# refusal clause (D5) as candidates, and D8 rules out the lower bound -- which
-# matters more than it reads, because 30 of those same 40 job-runs are
-# OVERSIZED, so a status returned for a lower-bound violation would redden
+# Only this one direction gates. The per-node bound and the refusal clause
+# are both saturated on runs which are fine, and the lower bound is ruled
+# out too -- which matters more than it reads, because 30 of those same 40
+# job-runs are OVERSIZED, so a lower-bound violation returning a status
+# would redden
 # three quarters of cluster CI on its first run. Everything else this tool can meet --
 # an unreadable series, an absent census, a bug in the report itself -- still
-# returns 0 and is still only printed. D15's rule that an instrument may not
+# returns 0 and is still only printed. The rule that an instrument may not
 # fail the job it measures holds everywhere except here, and this is not an
 # exception to it: a band violation is a statement about the cloud the suite
 # ran on, not about the instrument.
@@ -216,62 +220,62 @@ BAND_VIOLATION_EXIT = 3
 # a usable sample whose ledgered nodes sum to no ledger at all produces no
 # fraction. At the probe's 15 second interval this is five minutes of a
 # cluster which was actually readable; the smallest of the 204 job-runs in
-# the committed phase 2 baseline had 41, and a complete cluster job runs for
+# the committed baseline dataset had 41, and a complete cluster job runs for
 # around 29 minutes, so this withholds only a series which stopped early or
 # could barely be read. Below it the p90 is close to the maximum of a few samples, which
 # is a single busy moment rather than a statement about the cloud.
 BAND_GATE_MIN_SAMPLES = 20
 
-# Phase 5's D4: the per-node maximum's upper bound, also from the master
-# plan's "The headroom band, with numbers" section. It is the cleanest
-# separation phase 2 found in the dataset -- of job-runs recording no
-# capacity refusal at all (n=44) only 1 exceeds it, while of those recording
-# at least one (n=160), 123 do -- but it is also saturated at its ceiling in
-# 48% of slim-primary and 100% of slim-tier job-runs, including plenty that
-# passed, so it cannot discriminate a bad run from a good one at the top of
-# its range. Per D4 it is judged and published, in verdict_record() below,
-# and never gates.
+# The per-node maximum's upper bound, also from
+# docs/developer_guide/ci_cloud_sizing.md. It is the cleanest separation in
+# the baseline dataset -- of job-runs recording no capacity refusal at all
+# (n=44) only 1 exceeds it, while of those recording at least one (n=160),
+# 123 do -- but it is also saturated at its ceiling in 48% of slim-primary
+# and 100% of slim-tier job-runs, including plenty that passed, so it cannot
+# discriminate a bad run from a good one at the top of its range. It is
+# therefore judged and published, in verdict_record() below, and never
+# gates.
 PER_NODE_BAND_UPPER = 0.85
 
-# The shape of the dict summary_record() returns. Phase 2's harvest and phase
-# 5's guardrail both read it from files written by builds older than
+# The shape of the dict summary_record() returns. The harvest and the
+# headroom gate both read it from files written by builds older than
 # themselves, so it is versioned: a consumer which cannot read version 2 can
 # say so rather than silently misreading a renamed field as an absent one.
 #
 # Version 2 added series.capacity_degraded_samples,
 # series.capacity_degraded_absent_samples,
 # series.ledger_unreadable_prefix_samples and
-# series.ledger_unreadable_prefix_seconds. Phase 2's confirmation window
-# had to read those four facts out of the raw series inside the bundles,
+# series.ledger_unreadable_prefix_seconds. Confirming the baseline meant
+# reading those four facts out of the raw series inside the bundles,
 # which expire; a dataset harvested from version 2 records carries them.
 # The committed baseline (records.jsonl) is version 1 and does not.
 #
-# Version 3 (phase 5) dropped the verdict flag that used to mark the
-# cluster-wide band as unchecked. Phase 2 defended it against a 204 job-run
+# Version 3 dropped the verdict flag that used to mark the cluster-wide
+# band as unchecked. The band was defended against a 204 job-run
 # distribution, so that flag would only ever read False from here on, and
 # nothing reads it -- a consumer wanting to know whether a record's band is
 # defended checks record_version >= 3 instead. It also added
 # verdict.per_node_band_upper and gave verdict.per_node_band an actual
 # verdict ('WITHIN BAND' / 'ABOVE BAND' / None) rather than the constant
 # None every version 2 record carried, judging the per-node maximum
-# against PER_NODE_BAND_UPPER (D4). A consumer reading a version 2 record
+# against PER_NODE_BAND_UPPER. A consumer reading a version 2 record
 # already tolerates per_node_band being None, so that half is additive;
 # the dropped flag is the one non-additive change and is why the version
 # bumped rather than the record growing a field in place. Additive is not
 # the same as unchanged, though: None no longer means one thing. Below
 # version 3 it means "not judged"; from version 3 it means "no sample
 # produced a per-node fraction". A harvest over a window which mixes
-# versions (5e's does) must read per_node_band together with
-# record_version, or it pools the two.
+# versions must read per_node_band together with record_version, or it
+# pools the two.
 #
-# 5f added verdict.gates and verdict.gate_withheld to version 3 in place,
+# verdict.gates and verdict.gate_withheld were added to version 3 in place,
 # because they are purely additive: nothing already in the record changed
-# meaning. Version 3 records written before 5f lack both, so a consumer
-# reads them with .get() and treats absence as "written before the gate".
-# n_fraction joined every metric block in place for the same reason: the
-# gate's sample floor is counted from it.
+# meaning. Early version 3 records lack both, so a consumer reads them with
+# .get() and treats absence as "written before the gate". n_fraction joined
+# every metric block in place for the same reason: the gate's sample floor
+# is counted from it.
 #
-# Version 4 (phase 7) changed what verdict.refusal_warning says about a
+# Version 4 changed what verdict.refusal_warning says about a
 # census which was read and matched no scheduler stage event: False before,
 # null now. See verdict_record(). That is the non-additive kind of change --
 # a version 3 record and a version 4 record carry different values for the
@@ -304,7 +308,7 @@ STAGE_ABORTED_SUFFIX = ', aborting'
 # cluster ran out of something" to the something, so rows can be annotated
 # and so a capacity warning can be distinguished from, say, a queue_state
 # drop. It is deliberately NOT a filter over what gets tallied: the census
-# counts every stage string it observes (D10), and a stage absent from this
+# counts every stage string it observes, and a stage absent from this
 # map is still counted, still printed, and flagged as one this tool has not
 # been told about.
 CAPACITY_STAGE_NOTES = collections.OrderedDict([
@@ -353,9 +357,9 @@ GUARD_STAGE_NOTES = collections.OrderedDict([
 ])
 
 # Likewise for dimensions. 'demand' is called out because it is the one
-# dimension which is not a count of anything allocated: it is the D13
-# feedforward estimate added to measured CPU load, so a refusal on demand
-# alone is a rate prediction and not a cloud which ran out of room.
+# dimension which is not a count of anything allocated: it is the
+# feedforward demand estimate added to measured CPU load, so a refusal on
+# demand alone is a rate prediction and not a cloud which ran out of room.
 GUARD_DIMENSION_NOTES = collections.OrderedDict([
     ('cpus', 'allocated vCPU'),
     ('memory_mb', 'allocated memory'),
@@ -423,7 +427,8 @@ class NodeSample:
 
         # The row's own limit where there is a row, the live derivation
         # where there is not. No fallback in the other direction: seeing the
-        # two disagree is the point (D7, D12).
+        # two disagree is the point, since the two have never been
+        # reconciled.
         limit = numeric(payload.get('cpu_limit'))
         hard_max = numeric(payload.get('cpu_hard_max'))
         if limit is not None:
@@ -491,12 +496,12 @@ class Sample:
         self.ledger_unreadable = all_absent and len(flags) > 1
         self.sole_node_without_row = all_absent and len(flags) == 1
 
-        # Step 2a's flag, and the only thing which separates the two
+        # total.capacity_degraded, the only thing which separates the two
         # readings of an all-absent capacity map: a table which could not
         # be read publishes True here, a table which is merely still empty
         # publishes False. Tri-state on purpose -- None is a bundle from a
-        # build older than 2a, which is a different fact from a healthy
-        # read and must not be counted as one.
+        # build older than the flag, which is a different fact from a
+        # healthy read and must not be counted as one.
         total = resources.get('total')
         if isinstance(total, dict) and 'capacity_degraded' in total:
             self.capacity_degraded = bool(total['capacity_degraded'])
@@ -847,12 +852,12 @@ class GuardCensus:
         """Which term of the demand dimension carried it past the limit.
 
         The demand clause is the one dimension which does not charge the
-        incoming placement (phase 4a): it compares cpu_load_1 plus
+        incoming placement: it compares cpu_load_1 plus
         expected_demand against the limit and leaves `requested` out of
         the comparison entirely, which is what makes it satisfiable at
         every node size. So the split is read the same way the guard
         made it -- measured load alone already exceeds the limit, or the
-        D13 feedforward estimate is what carried the sum over it. The
+        feedforward demand estimate is what carried the sum over it. The
         second is an estimator finding rather than a cluster which ran
         out of CPU, and issue 3913 added the two terms to the event for
         exactly this reading. `requested` is deliberately not used here,
@@ -1031,7 +1036,7 @@ class Census:
     def unclassified_shortage_drops(self):
         """Shortage drops at stages CAPACITY_STAGE_NOTES does not name.
 
-        Per D10 the census tallies every stage string it sees, so a stage
+        The census tallies every stage string it sees, so a stage
         added to the scheduler after this tool was written is counted and
         printed. It cannot be counted into the capacity warning, though,
         because nothing here knows whether it is a capacity stage. The
@@ -1054,14 +1059,14 @@ class Census:
 
 
 class Waits:
-    """The capacity-wait trace PLAN-transient-capacity-refusals phase 2 writes.
+    """The capacity-wait trace the CI suite's create_instance() writes.
 
     ``create_instance()`` on ``BaseTestCase`` (shakenfist_ci/base.py) appends
     one JSON object per waited-out 507 to /srv/ci/traces/instance-waits.jsonl,
     and this is that file read back. Absent and empty are kept apart from a
     file which was read and simply holds no records, for the same reason a
     census which was never collected is kept apart from one which found
-    nothing (D14): a wrapper which never ran here and a wrapper which ran and
+    nothing: a wrapper which never ran here and a wrapper which ran and
     never waited are different findings, and only the second is genuinely
     zero.
     """
@@ -1086,7 +1091,7 @@ def read_waits(path):
     not given) is 'not requested', a file which does not exist is
     'unreadable', and a file which exists but is empty is 'empty'. Only a
     file which was actually opened and read is 'read', and even then a
-    malformed line -- one worker's write clipped by a crash, per D14 -- is
+    malformed line -- one worker's write clipped by a crash -- is
     skipped and counted rather than treated as fatal, exactly as
     read_series() treats a truncated final line.
     """
@@ -1225,11 +1230,11 @@ def read_census(path, limit=None):
     return census
 
 
-# The summary record (D18). Everything the report prints is computed here,
+# The summary record. Everything the report prints is computed here,
 # once, into a plain dict; the printers below render prose from that dict and
-# compute nothing of their own. Phase 2's harvest calls summary_record()
-# directly over several hundred banked bundles rather than shelling out to
-# this file, and phase 5's guardrail reads the --json file it writes.
+# compute nothing of their own. The harvest calls summary_record() directly
+# over several hundred banked bundles rather than shelling out to this file,
+# and the headroom gate reads the --json file it writes.
 #
 # Two conventions run through all of it, and both exist to stop a reader --
 # human or program -- inferring a fact the measurement does not support.
@@ -1243,8 +1248,8 @@ def read_census(path, limit=None):
 #
 # A ledger is recorded as the range it moved over rather than as an average,
 # because the reconciler rewriting a capacity row mid-run is exactly the kind
-# of event D7's 12-versus-10 discrepancy might turn out to be made of, and an
-# average would erase it.
+# of event the unexplained 12-versus-10 ledger discrepancy might turn out
+# to be made of, and an average would erase it.
 
 
 def ledger_bounds(values):
@@ -1299,7 +1304,7 @@ def cluster_cpu_fractions(series):
 def per_node_max_cpu_fractions(series):
     """Per sample, the highest committed-over-ledger ratio any one node stood at.
 
-    D21. The cluster-wide fraction sums both sides over every ledgered node,
+    The cluster-wide fraction sums both sides over every ledgered node,
     so it averages a full node against an empty one and reports the mean as
     headroom -- on one real merge run, a cluster-wide p90 of 0.407 while a
     node sat pinned at 1.000 for the whole run and twelve candidates were
@@ -1348,14 +1353,13 @@ def _fully_covered(sample):
 
 
 def capacity_coverage_record(series):
-    """Time to first full scheduler_node_capacity coverage (D6).
+    """Time to first full scheduler_node_capacity coverage.
 
     The offset from the first sample in the series to the first sample in
     which every hypervisor named in that sample's roster carries
-    cpu_committed_row_present true -- the measurement of how long
-    PLAN-transient-capacity-refusals phase 1's warm-up window actually
-    lasted in this run. Until that sample, at least one hypervisor was
-    admitting placements unguarded (P7).
+    cpu_committed_row_present true -- the measurement of how long the
+    capacity table's warm-up window actually lasted in this run. Until that
+    sample, at least one hypervisor was admitting placements unguarded (P7).
 
     ``achieved`` is recorded explicitly rather than left to be inferred from
     ``seconds`` being None: a series with no usable samples and a series
@@ -1424,8 +1428,9 @@ def series_record(series):
     # Without them the count above has two readings -- a warm-up window
     # against an empty table, or a capacity read which is failing -- and
     # the only thing that could tell them apart was the raw series inside
-    # a bundle which expires ninety days after its run. D22 does not commit
-    # those series, so what separates the readings is counted here instead.
+    # a bundle which expires ninety days after its run. The committed
+    # dataset holds records rather than series, so what separates the
+    # readings is counted here instead.
     prefix = series.ledger_unreadable_prefix
     prefix_stamps = [s.sampled_at for s in prefix if s.sampled_at is not None]
     record['ledger_unreadable_prefix_samples'] = len(prefix)
@@ -1440,15 +1445,15 @@ def series_record(series):
 
 
 def ledger_provenance_record(series):
-    """Where each node-sample's ledger came from (D7).
+    """Where each node-sample's ledger came from.
 
     The count which fell back from the capacity row's cpu_limit to the
     derived cpu_hard_max is a deliverable rather than a diagnostic aside:
-    D7 asks phase 2 to reconcile the two ledgers, and a run which is
+    the two ledgers have never been reconciled, and a run which is
     entirely fallback answers that question differently from one which is
     not. Fallbacks inside a ledger-unreadable sample are counted apart
     because they are a failed capacity read wearing the fallback's clothes,
-    and D7 must read the second figure alone.
+    and the reconciliation must read the second figure alone.
 
     The memory-ledger count rides along here rather than in the per-node
     block it is printed beside, because it is the same kind of fact about
@@ -1521,8 +1526,9 @@ def cluster_record(series):
 def per_node_record(series):
     """The same figures again, per node, keyed by node uuid.
 
-    This is the block D21 exists because of, and the one a reader goes to
-    when the cluster-wide fraction looks comfortable. Each node carries its
+    This is the block the per-node statistic exists because of, and the one
+    a reader goes to when the cluster-wide fraction looks comfortable. Each
+    node carries its
     own ledger, so "0.5 of what" is answerable without joining anything.
     """
     nodes = []
@@ -1652,11 +1658,11 @@ def guard_record(census):
     values because there are four different things to know. ``no_census``
     and ``census_unavailable`` mean nothing was looked at.
     ``not_collected`` means the census was read and carried no guard event
-    at all, which -- until D20 widens the collector's LogQL filter -- is a
+    at all, which -- until the collector's LogQL filter is widened -- is a
     statement about the query rather than about the cluster, since the
     filter selects only the scheduler's stage messages. Only ``collected``
     carries counts, and in every other state they are null: a guard census
-    nobody collected must never be reported as zero refusals (D20).
+    nobody collected must never be reported as zero refusals.
     """
     guard = census.guard
     if census.status == 'not requested':
@@ -1725,7 +1731,7 @@ def guard_record(census):
 def waits_record(waits):
     """What the capacity-wait trace says, or an honest account of why not.
 
-    Every count is null unless the trace was actually read (D14), for the
+    Every count is null unless the trace was actually read, for the
     same reason census_record() nulls everything for a census which was
     never collected: --waits not given, and a --waits file which is absent
     or empty, must never print as "0 seconds waited". That reading would
@@ -1736,8 +1742,8 @@ def waits_record(waits):
     never waited is a real zero and is reported as one. A file whose every
     line was malformed is not: nothing can be said about whether the suite
     waited. print_waits() has always said so in prose, but the record is
-    what phase 5 and the sizing plan's guardrail read, and 'available:
-    true, count: 0' is indistinguishable from a clean run to a reader which
+    what the headroom gate reads, and 'available: true, count: 0' is
+    indistinguishable from a clean run to a reader which
     cannot read prose. So that case gets its own state, and its counts are
     nulled exactly as an unread file's are.
     """
@@ -1802,7 +1808,7 @@ def waits_record(waits):
 
 
 def verdict_record(record):
-    """D3's band verdict, and the numbers it was reached from.
+    """The band verdict, and the numbers it was reached from.
 
     Every figure here is taken from the blocks already built above rather
     than recomputed, so the verdict cannot disagree with the table a reader
@@ -1834,12 +1840,12 @@ def verdict_record(record):
     and ``census.stage_events`` -- both present in every version -- rather
     than from the stored flag.
 
-    The per-node maximum (D21) is judged against PER_NODE_BAND_UPPER (D4).
-    Phase 2 found 0.85 the cleanest separation in the dataset, but also
-    found the statistic saturated at its ceiling in a large fraction of
-    passing job-runs -- see PER_NODE_BAND_UPPER's own comment -- so
-    ``per_node_band`` is published information, read against the lower tail
-    rather than as a per-run alarm, and per D4 it never gates.
+    The per-node maximum is judged against PER_NODE_BAND_UPPER. 0.85 is the
+    cleanest separation in the baseline dataset, but the statistic is also
+    saturated at its ceiling in a large fraction of passing job-runs -- see
+    PER_NODE_BAND_UPPER's own comment -- so ``per_node_band`` is published
+    information, read against the lower tail rather than as a per-run
+    alarm, and it never gates.
     """
     ratio = record['cluster']['committed_cpu']['p90_fraction']
     withheld = gate_withheld_reasons(record)
@@ -1904,8 +1910,9 @@ def gate_withheld_reasons(record):
             'the capacity read reported failing on %d %s'
             % (degraded, plural(degraded, 'sample')))
     # Sample.capacity_degraded is tri-state, and None -- a probe built
-    # before step 2a -- cannot say whether its read was failing. The only
-    # route to one here is a partial rollback of shakenfist/actions, which
+    # before the flag existed -- cannot say whether its read was failing.
+    # The only route to one here is a partial rollback of
+    # shakenfist/actions, which
     # is reached at @main, and a series which cannot say is not one to
     # fail a job on.
     absent = series['capacity_degraded_absent_samples']
@@ -1958,7 +1965,7 @@ def summary_record(series, census=None, label=None,
     """Summarise one job's headroom series and refusal census as a plain dict.
 
     ``series`` and ``census`` are paths, exactly as the four command line
-    arguments of the same names are, so that phase 2's harvest can point
+    arguments of the same names are, so that the harvest can point
     this at two files it has just unpacked from a bundle and get back the
     same record --json would have written. ``census`` may be None, which is
     recorded as a census nobody collected rather than as one which found
@@ -1974,7 +1981,7 @@ def summary_record(series, census=None, label=None,
 def write_record(record, path):
     """Write the record as one JSON object, or say why it could not be.
 
-    Never raises. D15 says nothing this instrument does may fail the job it
+    Never raises. Nothing this instrument does may fail the job it
     is measuring, and that has to hold for the output file as much as for
     the input: a full disk, a directory which does not exist, or a value
     which will not serialise is a warning on stdout and an exit code of
@@ -2014,8 +2021,9 @@ def fmt_ledger_range(low, high):
 
     A ledger which changed mid-run is worth seeing rather than averaging:
     the reconciler rewriting a capacity row is exactly the kind of event
-    D7's 12-versus-10 discrepancy might turn out to be made of. The record
-    carries the two bounds; this renders them as one figure when they agree
+    the unexplained 12-versus-10 ledger discrepancy might turn out to be
+    made of. The record carries the two bounds; this renders them as one
+    figure when they agree
     and as a range when they do not.
     """
     if low is None:
@@ -2105,8 +2113,9 @@ def print_series_summary(record):
         print('    Those samples are excluded from the committed CPU figures')
         print('    below. Memory is unaffected: it comes from node metrics.')
 
-        # Which of the two readings it was. Absent on a bundle built before
-        # step 2a published the flag, and said so rather than guessed.
+        # Which of the two readings it was. Absent on a bundle built
+        # before the capacity_degraded flag existed, and said so rather
+        # than guessed.
         degraded = series.get('capacity_degraded_samples')
         absent = series.get('capacity_degraded_absent_samples')
         prefix = series.get('ledger_unreadable_prefix_samples')
@@ -2136,13 +2145,13 @@ def print_series_summary(record):
 
 
 def print_capacity_coverage(record):
-    """Time-to-first-capacity-row (PLAN-transient-capacity-refusals D6).
+    """Time-to-first-capacity-row.
 
     The offset from the first sample to the first sample in which every
     hypervisor in its roster carries a scheduler_node_capacity row -- the
     window during which at least one hypervisor was admitting placements
-    unguarded (P7). Printed only; nothing in this tool gates on it
-    (ci-cloud-sizing D15).
+    unguarded (P7). Printed only; nothing in this tool gates on it,
+    because an instrument may not fail the job it measures.
     """
     coverage = record['capacity_coverage']
     print_heading('Time to first full capacity-row coverage')
@@ -2244,8 +2253,9 @@ def print_cluster_table(record):
 def print_per_node_tables(record):
     """The per-node tables, in the node order the record carries.
 
-    This is the section D21 was argued from: a cluster-wide fraction inside
-    the band, above one node's row reading 1.000 for the whole run.
+    This is the section the per-node bound was argued from: a cluster-wide
+    fraction inside the band, above one node's row reading 1.000 for the
+    whole run.
     """
     cpu_rows = []
     memory_rows = []
@@ -2599,15 +2609,15 @@ def print_guard_census(record):
 def print_waits(waits):
     """The capacity-wait trace, under its own heading.
 
-    PLAN-transient-capacity-refusals phase 2's create_instance() wrapper
-    waits out a transient 507 rather than failing the test on it, and
+    The CI suite's create_instance() wrapper waits out a transient 507
+    rather than failing the test on it, and
     records each wait to /srv/ci/traces/instance-waits.jsonl. This is a
     summary of that file (``waits_record()``'s output), read the same way
     the series and census are: an absent or empty file says so and prints
     no figures, never a zero, because "the wrapper never ran here" and
     "the wrapper ran and never had to wait" are different findings.
 
-    Deliberately not folded into the main summary record (D18's dict): the
+    Deliberately not folded into the main summary record: the
     two files are unrelated inputs on unrelated schedules -- the series and
     census cover one job's headroom, the waits file accumulates across
     every stestr worker of the same job -- and this section is optional in
@@ -2830,23 +2840,23 @@ def _encode_workflow_command_property(text):
 
 
 def band_annotations(record):
-    """Return a (title, message) pair for each D3 band violation in record.
+    """Return a (title, message) pair for each band violation in record.
 
     There are four kinds: the cluster-wide p90 fraction above BAND_UPPER
     (OVERSUBSCRIBED) or below BAND_LOWER (OVERSIZED); the per-node
-    maximum p90 above PER_NODE_BAND_UPPER (D4); and any capacity-stage
-    refusal (D3's refusal clause). Shared by emit_github_annotations() and
+    maximum p90 above PER_NODE_BAND_UPPER; and any capacity-stage
+    refusal. Shared by emit_github_annotations() and
     write_github_step_summary() so the annotation stream and the job
     summary cannot say different things about the same run.
 
     The refusal message is worded as an observation about the demand
-    estimator's calibration, never as evidence the cloud is undersized
-    (D5): phase 4 doubled a cluster's ledger and the guard refused at
-    essentially the same rate, because expected_demand accumulates per
+    estimator's calibration, never as evidence the cloud is undersized:
+    doubling a cluster's ledger left the guard refusing at essentially the
+    same rate, because expected_demand accumulates per
     admitted placement and the guard admits until whatever bound it is
     given fills up, which makes the refusal count close to invariant
     under node size. The per-node message says explicitly that the bound
-    never gates (D4): it is saturated at its ceiling on plenty of runs
+    never gates: it is saturated at its ceiling on plenty of runs
     that otherwise pass, so it cannot discriminate a bad run from a good
     one at the top of its range.
     """
@@ -2897,14 +2907,14 @@ def band_annotations(record):
 
 
 def emit_github_annotations(record):
-    """Print a '::warning::' workflow command for each band violation (D3).
+    """Print a '::warning::' workflow command for each band violation.
 
     GitHub Actions reads annotations from the step's stdout regardless of
     the step's exit code or continue-on-error (F4), which is why this
     exists: the report's own exit code is discarded twice between here
-    and a human reading the job. Unconditional and flagless by design
-    (F5, D3): shakenfist/actions's collect script feature-detects new
-    *flags* by grepping this file's source at a possibly-stale ref, and
+    and a human reading the job. Unconditional and flagless by design:
+    shakenfist/actions's collect script feature-detects new *flags* by
+    grepping this file's source at a possibly-stale ref, and
     an annotation this tool always tries to print needs no such
     detection, so it works the same on every ref.
     """
@@ -2920,7 +2930,7 @@ def emit_github_annotations(record):
 
 
 def step_summary_lines(record):
-    """Render a short markdown verdict block for $GITHUB_STEP_SUMMARY (D3).
+    """Render a short markdown verdict block for $GITHUB_STEP_SUMMARY.
 
     Built from the same verdict fields print_verdict() prints and the
     same band_annotations() emit_github_annotations() uses, so the three
@@ -2986,14 +2996,14 @@ def step_summary_lines(record):
 
 
 def write_github_step_summary(record):
-    """Append a short markdown verdict block to $GITHUB_STEP_SUMMARY (D3).
+    """Append a short markdown verdict block to $GITHUB_STEP_SUMMARY.
 
     Opened in append mode, because other steps in the same job write
     their own sections to the same file. Does nothing at all if the
     variable is unset -- which is the case every time this tool is run
     by hand over a downloaded bundle, not just in CI -- and swallows any
-    error opening or writing the path it names. D15 holds here the same
-    as everywhere else in this tool: nothing it does may fail the job it
+    error opening or writing the path it names. The rule holds here as it
+    does everywhere else in this tool: nothing it does may fail the job it
     is measuring, and that has to include a summary path which is
     unwritable or does not exist.
     """
@@ -3014,12 +3024,12 @@ def print_report(record, waits=None):
     """Render the whole report from the record, and nothing but the record.
 
     Every figure printed here is read out of the dict rather than computed,
-    so the job log and the --json file cannot disagree (D18). The sections
+    so the job log and the --json file cannot disagree. The sections
     which are not printed for an empty series are skipped on the record's
     own sample count for the same reason.
 
     ``waits``, if given, is a waits_record() dict and is printed in its own
-    section (D14). It is a separate argument rather than a key folded into
+    section. It is a separate argument rather than a key folded into
     ``record`` because it is not part of the versioned summary record --
     see write_record() and the note on RECORD_VERSION.
     """
@@ -3070,8 +3080,8 @@ def report(args):
     # dataset ci_headroom_harvest.py reads; the annotation is a convenience
     # for whoever is looking at this one job.
     #
-    # Additional output, not a replacement (D3): the stdout prose above is
-    # unchanged from before this phase, and the annotations below are read
+    # Additional output, not a replacement: the stdout prose above is
+    # unchanged by their presence, and the annotations below are read
     # by GitHub from the same stdout stream regardless of this step's exit
     # code (F4). No new flag gates either call (F5).
     emit_github_annotations(record)
@@ -3135,7 +3145,7 @@ def main(argv=None):
         # fail the job. The one status which can is BAND_VIOLATION_EXIT,
         # and it is a statement about the cloud; a report tool which failed
         # a build over its own arguments would be the instrument changing
-        # what it measures, which is what D15 forbids.
+        # what it measures, which is the one thing it may never do.
         return 0
 
     record = None

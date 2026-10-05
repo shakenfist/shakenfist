@@ -3,11 +3,12 @@
 
 ``tools/ci_headroom_probe.py`` runs unattended for the length of a
 functional job, against a cluster the job is actively hammering, and its
-output is the only input phase 2 has. Everything below is about the
-promise the module docstring makes -- that neither a failed sample nor a
-failed write ends the series -- because ``tools/ci_headroom_report.py``
-is written against exactly that record shape, and a poller which dies
-silently mid-run produces a short series which looks like a quiet one.
+output is the only input the baseline measurement has. Everything below
+is about the promise the module docstring makes -- that neither a failed
+sample nor a failed write ends the series -- because
+``tools/ci_headroom_report.py`` is written against exactly that record
+shape, and a poller which dies silently mid-run produces a short series
+which looks like a quiet one.
 
 These properties are covered:
 
@@ -224,7 +225,11 @@ class TakeSampleTestCase(base.ShakenFistTestCase):
             self.assertIn('error', record)
 
     def test_a_roster_entry_is_reduced_to_the_five_documented_keys(self):
-        """ci_cloud_sizing.md calls this reduction load-bearing for phase 2."""
+        """ci_cloud_sizing.md calls this reduction load-bearing.
+
+        The baseline needs the role booleans to tell the four reasons a
+        node can be missing from ``per_node`` apart.
+        """
         client = FakeClient(nodes=[{
             'uuid': 'u1', 'fqdn': 'node1.local', 'is_hypervisor': True,
             'is_network_node': False, 'is_database_node': True,

@@ -25,10 +25,9 @@ immediately above it, with a non-empty reason, or this guard fails the
 build. Two kinds of caller pay
 that price on purpose: the wrapper's own single internal call in
 ``base.py`` (it has to reach the client somehow), and a caller which
-must see the refusal rather than have it waited out -- the CI cloud
-sizing plan's phase 3 saturation tests, which assert that a full
-cluster actually refuses, are the case this exists for even though none
-of them exist yet.
+must see the refusal rather than have it waited out -- the saturation
+tests, which assert that a full cluster actually refuses, are the case
+this exists for.
 
 The check parses source with ``ast`` rather than importing the suite,
 following ``test_ci_claims_headroom.py``'s ``_calls_of()`` pattern for
