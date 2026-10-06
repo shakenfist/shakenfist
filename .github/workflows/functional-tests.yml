@@ -543,6 +543,16 @@ jobs:
             # 6 vCPU reshape took its cluster ledger from 12 to 24.
             # Six merge runs on that shape took 27 to 42 minutes, so 60
             # carries the same headroom the other entries have.
+            #
+            # This is also the lane with Kerbside on. Its deploy profile
+            # deploys Kerbside on sf2, scraping the primary's sf-api, with
+            # its database on the primary's MariaDB; deploys the cluster a
+            # second time and fails if any sf-* or kerbside-* unit
+            # restarted; and tells the suite to expect a VDI console proxy.
+            # It adds processes, not instances, so the headroom gate's
+            # shape is unchanged. The second deploy costs time inside the
+            # build step, not this timeout. See
+            # docs/plans/PLAN-kerbside-deployer-phase-04-ci.md (D5, D6).
             name: 'Debian 13 tier',
             job_name: 'debian-13-slim-tier',
             base_image: 'sf://label/ci-images/debian-13',
@@ -550,7 +560,8 @@ jobs:
             topology: 'slim-tier',
             concurrency: 5,
             stestr_config: 'cluster-ci.conf',
-            timeout_minutes: 60
+            timeout_minutes: 60,
+            deploy_profile: 'shakenfist/tools/ci-deploy-profiles/kerbside-slim-tier.yml.j2'
           }
         ]
     uses: shakenfist/actions/.github/workflows/smoke-cluster.yml@main
@@ -575,6 +586,9 @@ jobs:
       test_concurrency: ${{ matrix.merge.concurrency }}
       test_timeout_minutes: ${{ matrix.merge.timeout_minutes }}
       concurrency_key: ${{ matrix.merge.job_name }}
+      # Only the slim-tier entry names one; the rest pass '', which changes
+      # nothing.
+      deploy_profile: ${{ matrix.merge.deploy_profile || '' }}
 
   # Native-module lifecycle CI: deploys via the reusable smoke-cluster workflow
   # (slim-primary) and runs ansiblemoduletests.sh against the installed
