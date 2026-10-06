@@ -15239,6 +15239,22 @@ are:</p>
 <td>The key Kerbside authenticates to Shaken Fist with, minted as the <code>kerbside</code> key in the system namespace on every deploy. Optional; requires <code>kerbside_url</code>, must differ from <code>system_key</code>, and must be at least 16 characters. Treat as a secret.</td>
 </tr>
 <tr>
+<td><code>kerbside_public_fqdn</code></td>
+<td>Only to deploy Kerbside onto an optional <code>kerbside</code> inventory group. The name SPICE clients use to reach the proxy; also the proxy certificate's CN and DNS SAN.</td>
+</tr>
+<tr>
+<td><code>kerbside_sql_url</code></td>
+<td>Only with a <code>kerbside</code> group. The URL of Kerbside's own MySQL or MariaDB database, for example <code>mysql://kerbside:PASSWORD@db.example.com/kerbside</code>. Treat as a secret.</td>
+</tr>
+<tr>
+<td><code>kerbside_auth_secret_seed</code></td>
+<td>Only with a <code>kerbside</code> group. Seeds Kerbside's token signing. At least 32 characters, and not Kerbside's placeholder <code>~~unconfigured~~</code>. Treat as a secret.</td>
+</tr>
+<tr>
+<td><code>kerbside_package</code></td>
+<td>Only with a <code>kerbside</code> group. Defaults to <code>kerbside&gt;=0.7.0</code>; until 0.7.0 is released, set a version or a wheel built from a git checkout.</td>
+</tr>
+<tr>
 <td><code>extra_config</code></td>
 <td>A JSON list of additional cluster configuration settings, for example <code>[{"name": "INCLUDE_TRACEBACKS", "value": "1"}]</code>. Optional.</td>
 </tr>
@@ -15251,8 +15267,35 @@ restarts, and mints the Kerbside credential if you set <code>kerbside_system_key
 The deploy stops if a <code>KERBSIDE_URL</code> or <code>KERBSIDE_TOKEN_DURATION</code>
 <code>cluster_config</code> row differs from its variable; see the
 <a href="../vdi_console_tokens/">VDI console tokens operator guide</a> for the fix and for
-key rotation. Deploying Kerbside itself is still done out of band, and the
-integration stays disabled while <code>kerbside_url</code> is unset.</p>
+key rotation. The integration stays disabled while <code>kerbside_url</code> is unset.</p>
+<p>To have the deploy install Kerbside too, add hosts to an optional <code>kerbside</code>
+inventory group. Members may be Shaken Fist nodes or dedicated hosts. Set
+<code>kerbside_url</code>, <code>kerbside_system_key</code>, <code>kerbside_public_fqdn</code>,
+<code>kerbside_sql_url</code> and <code>kerbside_auth_secret_seed</code>. <code>kerbside_url</code> and
+<code>kerbside_system_key</code> must be visible to both the Shaken Fist and the Kerbside
+hosts (put them in <code>group_vars/all</code>), and every Kerbside port must be below
+30000 and distinct. On a Kerbside host which is also a Shaken Fist node, no
+Kerbside port may be 13000, 13001, 13005, 13006 or 13007, which Shaken Fist's
+daemons listen on. On a Kerbside host which is not a Shaken Fist node,
+<code>api_url</code> must not be a loopback address. Each Kerbside host is checked with its own
+variables, so a <code>host_vars</code> override is checked too. Kerbside's certificate is issued from the
+deployment's internal CA unless you set all three of <code>kerbside_proxy_cert_path</code>,
+<code>kerbside_proxy_key_path</code> and <code>kerbside_cacert_path</code>.</p>
+<p>Kerbside needs a MySQL or MariaDB database of its own (it does not support
+sqlite), which you create before deploying: a <code>kerbside</code> database and a user
+with all privileges on it.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">DATABASE</span><span class="w"> </span><span class="n">kerbside</span><span class="p">;</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">USER</span><span class="w"> </span><span class="s1">'kerbside'</span><span class="o">@</span><span class="s1">'%'</span><span class="w"> </span><span class="n">IDENTIFIED</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="s1">'PASSWORD'</span><span class="p">;</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">GRANT</span><span class="w"> </span><span class="k">ALL</span><span class="w"> </span><span class="k">PRIVILEGES</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">kerbside</span><span class="p">.</span><span class="o">*</span><span class="w"> </span><span class="k">TO</span><span class="w"> </span><span class="s1">'kerbside'</span><span class="o">@</span><span class="s1">'%'</span><span class="p">;</span>
+</code></pre></div>
+<p>The deploy runs Kerbside's migrations and then waits, for up to about three
+minutes, for Kerbside to fetch the console token signing key. Without a
+<code>kerbside</code> group ansible prints <code>Could not match supplied host pattern,
+ignoring: kerbside</code>, which is harmless; an empty <code>kerbside:</code> group in the
+inventory silences it. Kerbside's admin login is Keystone-only and the
+deploy configures no Keystone, so its admin UI is unavailable; consoles work. See the
+<a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/deploy/collection/README.md#kerbside">collection README</a>
+for the details.</p>
 <h2 id="run-the-playbook">Run the playbook<a class="headerlink" href="#run-the-playbook" title="Permanent link">&para;</a></h2>
 <p>The examples share a single playbook, <code>examples/_shared/site.yml</code>, which maps
 your inventory groups onto the collection's roles, computes the cluster-wide
@@ -15260,10 +15303,10 @@ values, runs <code>sf-ctl ensure-mariadb-schema</code> against your MariaDB, see
 cluster configuration, and starts the daemons in the correct order. Each
 example's <code>site.yml</code> is a one-line wrapper importing it. Run it as a user
 that can <code>become</code> root on the targets:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>ansible-playbook<span class="w"> </span>-i<span class="w"> </span>examples/single-node/inventory.yaml<span class="w"> </span>examples/single-node/site.yml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>ansible-playbook<span class="w"> </span>-i<span class="w"> </span>examples/single-node/inventory.yaml<span class="w"> </span>examples/single-node/site.yml
 </code></pre></div>
 <p>or for the multi-node example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>ansible-playbook<span class="w"> </span>-i<span class="w"> </span>examples/cluster/inventory.yaml<span class="w"> </span>examples/cluster/site.yml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>ansible-playbook<span class="w"> </span>-i<span class="w"> </span>examples/cluster/inventory.yaml<span class="w"> </span>examples/cluster/site.yml
 </code></pre></div>
 <p>You can copy the example directory and edit it, or write your own playbook
 against the collection's roles — the roles read only plain variables, so
@@ -15272,17 +15315,17 @@ they compose with any inventory layout. See the
 and each role's <code>meta/argument_specs.yml</code> for the full variable set.</p>
 <p>To deploy from a local git checkout instead of released PyPI packages (for
 development or CI), add:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>ansible-playbook<span class="w"> </span>-i<span class="w"> </span>examples/single-node/inventory.yaml<span class="w"> </span>examples/single-node/site.yml<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">sf_build_local_wheels</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">repo_path</span><span class="o">=</span>/path/to/shakenfist<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">client_repo_path</span><span class="o">=</span>/path/to/client-python
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>ansible-playbook<span class="w"> </span>-i<span class="w"> </span>examples/single-node/inventory.yaml<span class="w"> </span>examples/single-node/site.yml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">sf_build_local_wheels</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">repo_path</span><span class="o">=</span>/path/to/shakenfist<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">client_repo_path</span><span class="o">=</span>/path/to/client-python
 </code></pre></div>
 <h2 id="post-deploy-checks">Post-deploy checks<a class="headerlink" href="#post-deploy-checks" title="Permanent link">&para;</a></h2>
 <p>The playbook finishes with its own sanity checks (<code>sf-api</code> and <code>sf-queues</code>
 active, the API answering). To confirm the cluster is healthy yourself,
 source the authentication file the deploy wrote and list the nodes:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>.<span class="w"> </span>/etc/sf/sfrc
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>sf-client<span class="w"> </span>node<span class="w"> </span>list
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>.<span class="w"> </span>/etc/sf/sfrc
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>sf-client<span class="w"> </span>node<span class="w"> </span>list
 </code></pre></div>
 <p>Every node you deployed should be listed, in the <code>created</code> state.</p>
 <h2 id="your-first-instance">Your first instance<a class="headerlink" href="#your-first-instance" title="Permanent link">&para;</a></h2>
@@ -15301,55 +15344,55 @@ It is customized per installation, setting the following variables:</p>
 <li><strong>SHAKENFIST_API_URL</strong>, a URL to the Shaken Fist API server</li>
 </ul>
 <p>Before interacting with Shaken Fist, we need to source the rc file.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>.<span class="w"> </span>/etc/sf/sfrc
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>.<span class="w"> </span>/etc/sf/sfrc
 </code></pre></div>
 <p>Instances must be launched attached to a network.</p>
 <p>Create your first network:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sf-client<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>mynet<span class="w"> </span><span class="m">192</span>.168.42.0/24
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sf-client<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>mynet<span class="w"> </span><span class="m">192</span>.168.42.0/24
 </code></pre></div></p>
 <p>You can get help for the command line client by running <code>`sf-client --help</code>. The above command creates a new network called "mynet", with the IP block 192.168.42.0/24. You will receive some descriptive output back:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>$<span class="w"> </span>sf-client<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>mynet<span class="w"> </span><span class="m">192</span>.168.42.0/24
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>uuid<span class="w">            </span>:<span class="w"> </span>16baa325-5adf-473f-8e7a-75710a822d45
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>name<span class="w">            </span>:<span class="w"> </span>mynet
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>vxlan<span class="w"> </span>id<span class="w">        </span>:<span class="w"> </span><span class="m">2</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>netblock<span class="w">        </span>:<span class="w"> </span><span class="m">192</span>.168.42.0/24
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>provide<span class="w"> </span>dhcp<span class="w">    </span>:<span class="w"> </span>True
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>provide<span class="w"> </span>nat<span class="w">     </span>:<span class="w"> </span>True
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>floating<span class="w"> </span>gateway:<span class="w"> </span>None
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>namespace<span class="w">       </span>:<span class="w"> </span>system
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>state<span class="w">           </span>:<span class="w"> </span>initial
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>
-<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>Metadata:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>$<span class="w"> </span>sf-client<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span>mynet<span class="w"> </span><span class="m">192</span>.168.42.0/24
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>uuid<span class="w">            </span>:<span class="w"> </span>16baa325-5adf-473f-8e7a-75710a822d45
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>name<span class="w">            </span>:<span class="w"> </span>mynet
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>vxlan<span class="w"> </span>id<span class="w">        </span>:<span class="w"> </span><span class="m">2</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>netblock<span class="w">        </span>:<span class="w"> </span><span class="m">192</span>.168.42.0/24
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>provide<span class="w"> </span>dhcp<span class="w">    </span>:<span class="w"> </span>True
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>provide<span class="w"> </span>nat<span class="w">     </span>:<span class="w"> </span>True
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>floating<span class="w"> </span>gateway:<span class="w"> </span>None
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>namespace<span class="w">       </span>:<span class="w"> </span>system
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>state<span class="w">           </span>:<span class="w"> </span>initial
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>Metadata:
 </code></pre></div>
 <p>The UUID is important, as that is how we will refer to the network elsewhere. Let's now create a simple first instance (you'll need to change this to use your actual network UUID):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>$<span class="w"> </span>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myvm<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">1024</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span>-n<span class="w"> </span>16baa325-5adf-473f-8e7a-75710a822d45
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>uuid<span class="w">        </span>:<span class="w"> </span>c6c4ba94-ed34-497d-8964-c223489dee3e
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>name<span class="w">        </span>:<span class="w"> </span>myvm
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>namespace<span class="w">   </span>:<span class="w"> </span>system
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>cpus<span class="w">        </span>:<span class="w"> </span><span class="m">1</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>memory<span class="w">      </span>:<span class="w"> </span><span class="m">1024</span>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>disk<span class="w"> </span>spec<span class="w">   </span>:<span class="w"> </span><span class="nv">type</span><span class="o">=</span>disk<span class="w">   </span><span class="nv">bus</span><span class="o">=</span>None<span class="w">  </span><span class="nv">size</span><span class="o">=</span><span class="m">8</span><span class="w">   </span><span class="nv">base</span><span class="o">=</span>cirros
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>video<span class="w">       </span>:<span class="w"> </span><span class="nv">model</span><span class="o">=</span>cirrus<span class="w">  </span><span class="nv">memory</span><span class="o">=</span><span class="m">16384</span>
-<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>node<span class="w">        </span>:<span class="w"> </span>marvin
-<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>power<span class="w"> </span>state<span class="w"> </span>:<span class="w"> </span>on
-<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>state<span class="w">       </span>:<span class="w"> </span>created
-<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>console<span class="w"> </span>port:<span class="w"> </span><span class="m">31839</span>
-<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>vdi<span class="w"> </span>port<span class="w">    </span>:<span class="w"> </span><span class="m">34442</span>
-<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>
-<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>ssh<span class="w"> </span>key<span class="w">     </span>:<span class="w"> </span>None
-<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>user<span class="w"> </span>data<span class="w">   </span>:<span class="w"> </span>None
-<a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a>
-<a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a>Metadata:
-<a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a>
-<a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a>Interfaces:
-<a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a>
-<a id="__codelineno-10-22" name="__codelineno-10-22" href="#__codelineno-10-22"></a><span class="w">    </span>uuid<span class="w">    </span>:<span class="w"> </span>e56b3c7b-8056-4645-b5b5-1779721ff21d
-<a id="__codelineno-10-23" name="__codelineno-10-23" href="#__codelineno-10-23"></a><span class="w">    </span>network<span class="w"> </span>:<span class="w"> </span>16baa325-5adf-473f-8e7a-75710a822d45
-<a id="__codelineno-10-24" name="__codelineno-10-24" href="#__codelineno-10-24"></a><span class="w">    </span>macaddr<span class="w"> </span>:<span class="w"> </span>ae:15:4d:9c:d8:c0
-<a id="__codelineno-10-25" name="__codelineno-10-25" href="#__codelineno-10-25"></a><span class="w">    </span>order<span class="w">   </span>:<span class="w"> </span><span class="m">0</span>
-<a id="__codelineno-10-26" name="__codelineno-10-26" href="#__codelineno-10-26"></a><span class="w">    </span>ipv4<span class="w">    </span>:<span class="w"> </span><span class="m">192</span>.168.42.76
-<a id="__codelineno-10-27" name="__codelineno-10-27" href="#__codelineno-10-27"></a><span class="w">    </span>floating:<span class="w"> </span>None
-<a id="__codelineno-10-28" name="__codelineno-10-28" href="#__codelineno-10-28"></a><span class="w">    </span>model<span class="w">   </span>:<span class="w"> </span>virtio
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>$<span class="w"> </span>sf-client<span class="w"> </span>instance<span class="w"> </span>create<span class="w"> </span>myvm<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">1024</span><span class="w"> </span>-d<span class="w"> </span><span class="m">8</span>@cirros<span class="w"> </span>-n<span class="w"> </span>16baa325-5adf-473f-8e7a-75710a822d45
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>uuid<span class="w">        </span>:<span class="w"> </span>c6c4ba94-ed34-497d-8964-c223489dee3e
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>name<span class="w">        </span>:<span class="w"> </span>myvm
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>namespace<span class="w">   </span>:<span class="w"> </span>system
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>cpus<span class="w">        </span>:<span class="w"> </span><span class="m">1</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>memory<span class="w">      </span>:<span class="w"> </span><span class="m">1024</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>disk<span class="w"> </span>spec<span class="w">   </span>:<span class="w"> </span><span class="nv">type</span><span class="o">=</span>disk<span class="w">   </span><span class="nv">bus</span><span class="o">=</span>None<span class="w">  </span><span class="nv">size</span><span class="o">=</span><span class="m">8</span><span class="w">   </span><span class="nv">base</span><span class="o">=</span>cirros
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>video<span class="w">       </span>:<span class="w"> </span><span class="nv">model</span><span class="o">=</span>cirrus<span class="w">  </span><span class="nv">memory</span><span class="o">=</span><span class="m">16384</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>node<span class="w">        </span>:<span class="w"> </span>marvin
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>power<span class="w"> </span>state<span class="w"> </span>:<span class="w"> </span>on
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>state<span class="w">       </span>:<span class="w"> </span>created
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>console<span class="w"> </span>port:<span class="w"> </span><span class="m">31839</span>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>vdi<span class="w"> </span>port<span class="w">    </span>:<span class="w"> </span><span class="m">34442</span>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>ssh<span class="w"> </span>key<span class="w">     </span>:<span class="w"> </span>None
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a>user<span class="w"> </span>data<span class="w">   </span>:<span class="w"> </span>None
+<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>
+<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>Metadata:
+<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a>
+<a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a>Interfaces:
+<a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a>
+<a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a><span class="w">    </span>uuid<span class="w">    </span>:<span class="w"> </span>e56b3c7b-8056-4645-b5b5-1779721ff21d
+<a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a><span class="w">    </span>network<span class="w"> </span>:<span class="w"> </span>16baa325-5adf-473f-8e7a-75710a822d45
+<a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a><span class="w">    </span>macaddr<span class="w"> </span>:<span class="w"> </span>ae:15:4d:9c:d8:c0
+<a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a><span class="w">    </span>order<span class="w">   </span>:<span class="w"> </span><span class="m">0</span>
+<a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a><span class="w">    </span>ipv4<span class="w">    </span>:<span class="w"> </span><span class="m">192</span>.168.42.76
+<a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a><span class="w">    </span>floating:<span class="w"> </span>None
+<a id="__codelineno-11-28" name="__codelineno-11-28" href="#__codelineno-11-28"></a><span class="w">    </span>model<span class="w">   </span>:<span class="w"> </span>virtio
 </code></pre></div>
 <p>Probably the easiest way to interact with this instance is to connect to its console port, which is the serial console of the instance over telnet. In the case above, that is available on port 31839 on localhost (my laptop is called marvin).</p>
 

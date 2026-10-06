@@ -15509,12 +15509,31 @@
   variable, or if <code>extra_config</code> sets either name, because the row would
   override the rendered configuration. Fix it by running
   <code>sf-ctl unset-config &lt;NAME&gt;</code> and deploying again, or by moving the value into
-  the variable; a row equal to its variable only warns. Deploying Kerbside
-  itself is still out of band. Separately, <code>sf-ctl show-config</code> now shows
-  numeric values even when the name looks secret (<code>KERBSIDE_TOKEN_DURATION</code>,
-  <code>API_TOKEN_DURATION</code>, <code>FEDERATION_MAX_TOKEN_BYTES</code>); string values under such
-  names are still redacted. See the
+  the variable; a row equal to its variable only warns. Separately,
+  <code>sf-ctl show-config</code> now shows numeric values even when the name looks
+  secret (<code>KERBSIDE_TOKEN_DURATION</code>, <code>API_TOKEN_DURATION</code>,
+  <code>FEDERATION_MAX_TOKEN_BYTES</code>); string values under such names are still
+  redacted. See the
   <a href="/operator_guide/vdi_console_tokens/">VDI console tokens operator guide</a>.</li>
+<li>The collection can now deploy Kerbside itself. Add hosts to an optional
+  <code>kerbside</code> inventory group (Shaken Fist nodes or dedicated hosts) and set
+  <code>kerbside_url</code>, <code>kerbside_system_key</code>, <code>kerbside_public_fqdn</code>,
+  <code>kerbside_sql_url</code> and <code>kerbside_auth_secret_seed</code> (32 or more characters).
+  <code>kerbside_url</code> and <code>kerbside_system_key</code> must be visible to both the Shaken
+  Fist and the Kerbside hosts, for example in <code>group_vars/all</code>. Kerbside needs
+  a MySQL or MariaDB database you create beforehand (a <code>kerbside</code> database and
+  a user with all privileges on it); the deploy runs its migrations. The proxy
+  certificate is issued from the deployment's internal CA unless you set all
+  three of <code>kerbside_proxy_cert_path</code>, <code>kerbside_proxy_key_path</code> and
+  <code>kerbside_cacert_path</code>. <code>kerbside_package</code> defaults to <code>kerbside&gt;=0.7.0</code>
+  because Kerbside 0.6.0's API returns source passwords; until 0.7.0 is
+  released, set it to a version or to a wheel built from a git checkout. With
+  no <code>kerbside</code> group nothing changes, though ansible prints a harmless
+  <code>Could not match supplied host pattern, ignoring: kerbside</code> warning, which an
+  empty <code>kerbside:</code> group in your inventory silences. This role is new and has
+  not yet run in CI against a real cluster; its cluster test arrives with the
+  merge-queue lane. See the
+  <a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/deploy/collection/README.md#kerbside">collection README</a>.</li>
 <li>There are now API calls for managing trusted issuers
   (<code>GET</code>/<code>POST /auth/issuers</code>, <code>GET</code>/<code>PUT</code>/<code>DELETE /auth/issuers/...issuerref...</code>).
   These are administrative: only the system namespace may register or remove an

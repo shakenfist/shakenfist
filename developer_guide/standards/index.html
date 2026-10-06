@@ -15038,6 +15038,13 @@ subdirectories for <code>external_api</code>, <code>operations</code> and <code>
   defaults or config template, <code>examples/_shared/site.yml</code> (whose wiring of
   those entry points it checks structurally), or the script change. The sanity-checks
   workflow runs the same script
+- <code>test-kerbside-role</code> - Drives the <code>kerbside</code> role's <code>validate</code> and <code>config</code>
+  entry points, and lists and runs <code>examples/_shared/site.yml</code>'s Kerbside
+  plays against a test inventory, without root, by running
+  <code>tools/ci-test-kerbside-role.sh</code>. It needs <code>ansible-core</code>, <code>openssl</code> and a
+  <code>python3</code> which can import <code>cryptography</code> and PyYAML (both <code>ansible-core</code>
+  dependencies), and only runs when the role, <code>examples/_shared/site.yml</code> or
+  the script change. The sanity-checks workflow runs the same script
 - <code>flake8</code> - Style check via tox, on changed files
 - <code>py3</code> - Unit tests via tox
 - <code>check-from-db-by-ref-namespace</code> - Every <code>*_from_db_by_ref</code> call passes a

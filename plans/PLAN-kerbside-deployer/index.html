@@ -14881,9 +14881,10 @@ the repository:</p>
   under which only <code>site.yml</code> reads <code>groups[...]</code>, and the
   restart-on-change rules.</li>
 <li><code>examples/_shared/site.yml</code>: the tier modelling for
-  <code>database_node</code> at <code>:234-264</code> and <code>:313-318</code>; the
-  <code>internal_ca</code> plays at <code>:392-420</code>; the cluster-config play at
-  <code>:517-605</code>.</li>
+  <code>database_node</code> at <code>:234-266</code> and <code>:311-320</code>; the
+  <code>internal_ca</code> plays at <code>:388-422</code>; the cluster-config play at
+  <code>:519-631</code>; the final sanity checks at <code>:678-718</code> (line numbers
+  as of phase 3's survey).</li>
 <li><code>roles/internal_ca/tasks/</code>: <code>host_certificate.yml</code> and
   <code>distribute_certificates.yml</code>.</li>
 <li><code>roles/node/templates/config:81-89</code>: the <code>kerbside_url</code>
@@ -14981,8 +14982,9 @@ no <code>kerbside_url</code> and no Kerbside host.</p>
 <code>shakenfist/actions/deploy-kerbside-on-shakenfist</code> composite
 action and Kerbside's <code>tools/sf-e2e/{provision-sf.sh,
 deploy-kerbside.sh, gen-sources.py}</code>. Its own documentation
-(<code>kerbside docs/use-cases/shakenfist.md:304-309</code>) lists the
-shortcuts that make it unfit to copy:</p>
+(<code>kerbside docs/use-cases/shakenfist.md:304-309</code>) lists the first
+two of the shortcuts that make it unfit to copy; the scripts show
+the rest:</p>
 <ul>
 <li>Kerbside is co-located on the SF primary and talks to it over
   loopback, with an <code>http://127.0.0.1:13002</code> audience.</li>
@@ -15004,8 +15006,8 @@ the mint test to run somewhere. #4367 notes that Kerbside's deploy
 lane has no headroom instrumentation. #4097 and #4367 are open.</p>
 <h1 id="4093-was-closed-on-2026-10-03-by-the-merge-of-this-plans-own-pull">4093 was closed on 2026-10-03 by the merge of this plan's own pull<a class="headerlink" href="#4093-was-closed-on-2026-10-03-by-the-merge-of-this-plans-own-pull" title="Permanent link">&para;</a></h1>
 <p>request, #4420, whose phase table said phase 4 "closes" it. GitHub
-read that as a closing keyword; nothing makes the mint test run yet
-(phase 2's survey, S7).</p>
+read that as a closing keyword. It was reopened the same day, since
+nothing makes the mint test run yet (phase 2's survey, S7).</p>
 <h3 id="what-deploying-kerbside-involves">What deploying Kerbside involves<a class="headerlink" href="#what-deploying-kerbside-involves" title="Permanent link">&para;</a></h3>
 <p>All references below are to the Kerbside repository unless marked
 otherwise.</p>
@@ -15257,9 +15259,12 @@ answered by code already in the tree; phase 1's survey (S5) has
 the detail. <code>shakenfist/node.py</code> <code>_spice_host_subject_from_cert()</code>
 renders a subject in DER order as comma-joined <code>SHORT=value</code>
 pairs, with <code>\</code> and <code>,</code> escaped. That is what Shaken Fist's own
-direct <code>.vv</code> files carry as <code>host-subject</code>, for the same clients,
-and what Kerbside's proxy compares against. Phase 3 renders
-<code>PROXY_HOST_SUBJECT</code> by the same rules. No client test is needed.</p>
+direct <code>.vv</code> files carry as <code>host-subject</code>, for the same clients.
+Kerbside's proxy does not compare it: it only logs the value, and
+Kerbside's API embeds it in the <code>.vv</code>, where the SPICE client
+compares it (phase 3's survey, S7). Phase 3 renders
+<code>PROXY_HOST_SUBJECT</code> by the same rules, and pins its renderer to
+<code>node.py</code> with a unit test. No client test is needed.</p>
 <h3 id="5-what-does-kerbside-authenticate-to-shaken-fist-with">5. What does Kerbside authenticate to Shaken Fist with?<a class="headerlink" href="#5-what-does-kerbside-authenticate-to-shaken-fist-with" title="Permanent link">&para;</a></h3>
 <p><strong>Default:</strong> a dedicated <code>kerbside</code> key in the <code>system</code> namespace,
 from a required secret variable <code>kerbside_system_key</code>. It is
@@ -15355,13 +15360,13 @@ every phase has been completed, abandoned or superseded.</p>
 <tr>
 <td>2. Shaken Fist side: signing key, Kerbside credential, token duration, shadow guard</td>
 <td><a href="../PLAN-kerbside-deployer-phase-02-sf-side/">PLAN-kerbside-deployer-phase-02-sf-side.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>80292df08</code> (#4442)</td>
 </tr>
 <tr>
 <td>3. A <code>kerbside</code> role and the <code>kerbside</code> group in <code>site.yml</code></td>
-<td>PLAN-kerbside-deployer-phase-03-kerbside-role.md</td>
-<td>Proposed</td>
+<td><a href="../PLAN-kerbside-deployer-phase-03-kerbside-role/">PLAN-kerbside-deployer-phase-03-kerbside-role.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -15473,70 +15478,75 @@ does on every deploy of every cluster, including those that never
 turn the feature on, so the "feature off" path needs the explicit
 test the tokens plan never had (#4003, #4009, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/412" title="GitHub Issue: shakenfist/kerbside #412">kerbside#412</a>).</p>
 <h3 id="phase-3-the-kerbside-role-and-group">Phase 3 -- The <code>kerbside</code> role and group<a class="headerlink" href="#phase-3-the-kerbside-role-and-group" title="Permanent link">&para;</a></h3>
-<p>A new <code>shakenfist.shakenfist.kerbside</code> role with <code>bootstrap</code>,
-<code>config</code> and <code>register</code> entry points mirroring <code>node</code>.</p>
-<p><code>bootstrap</code> installs:</p>
+<p>Planned in
+<a href="../PLAN-kerbside-deployer-phase-03-kerbside-role/">PLAN-kerbside-deployer-phase-03-kerbside-role.md</a>.
+Its survey corrected several claims this section used to make; the
+summary below reflects them.</p>
+<p>A new <code>shakenfist.shakenfist.kerbside</code> role with <code>validate</code>,
+<code>bootstrap</code>, <code>config</code> and <code>register</code> entry points.</p>
+<p><code>validate</code> runs on <code>localhost</code> before any host changes. When the
+<code>kerbside</code> group is non-empty, it requires:</p>
 <ul>
-<li>the apt build dependencies;</li>
-<li>a <code>/srv/kerbside/venv</code>;</li>
-<li><code>kerbside_package</code> (default <code>kerbside</code>, overridable to a local
-  wheel exactly as <code>server_package</code> is);</li>
-<li><code>kerbside_proxy_package</code> (default empty, meaning the version
-  <code>kerbside</code> pins);</li>
-<li><code>shakenfist_client</code>.</li>
+<li><code>kerbside_url</code>, <code>kerbside_system_key</code>, <code>kerbside_public_fqdn</code>,
+  <code>kerbside_sql_url</code>, and a <code>kerbside_auth_secret_seed</code> that is not
+  the sentinel;</li>
+<li>every Kerbside port below 30000;</li>
+<li>a non-loopback <code>api_url</code> whenever a Kerbside host is not a Shaken
+  Fist node.</li>
 </ul>
+<p>This is where phase 2's deferred "<code>kerbside_system_key</code> is
+required when the group is non-empty" lands.</p>
+<p><code>bootstrap</code> creates a <code>kerbside</code> user, the apt build dependencies
+and a <code>/srv/kerbside/venv</code>, and installs <code>kerbside_package</code>,
+<code>kerbside_proxy_package</code> (default empty, meaning the version the
+release pins), <code>gunicorn</code> and <code>shakenfist_client</code>.</p>
+<p><code>kerbside_package</code> defaults to a floor on the first Kerbside
+release that stops returning source passwords from its API.
+Kerbside 0.6.0, the newest release, returns them, and the password
+is the cluster's <code>kerbside</code> system key. That release has to be cut
+before phase 4.</p>
 <p><code>config</code> renders the following:</p>
 <ul>
-<li><code>/etc/kerbside/kerbside.ini</code>, with <code>%</code> escaped;
-  <code>sf_console_token_audience</code> always set explicitly to
-  <code>kerbside_url</code>; and <code>auth_secret_seed</code> from a required
-  <code>kerbside_auth_secret_seed</code>, asserted non-empty and not the
-  sentinel;</li>
-<li><code>/etc/kerbside/sources.yaml</code>, mode 0600, with
-  <code>source: {{ deploy_name }}</code>, <code>url: {{ api_url }}</code>,
-  <code>username: system</code>, <code>password: {{ kerbside_system_key }}</code>, and
-  <code>ca_cert</code> read from the control node's CA file. That is the
-  same bytes <code>/admin/cacert</code> serves, so the equality check passes
-  by construction;</li>
-<li>the two systemd units;</li>
-<li><code>PROXY_HOST_SUBJECT</code>, read back from the installed certificate
-  and rendered by the rules of <code>node.py</code>'s
-  <code>_spice_host_subject_from_cert()</code> (open question 4).</li>
+<li><code>/etc/kerbside/kerbside.ini</code>, with <code>%</code> escaped and
+  <code>sf_console_token_audience</code> always set to <code>kerbside_url</code>;</li>
+<li><code>/etc/kerbside/sources.yaml</code>, with <code>ca_cert</code> slurped from the
+  file <code>/admin/cacert</code> actually serves;</li>
+<li>both files <code>root:kerbside 0640</code>, and checked with <code>validate:</code>
+  before they replace a working copy (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/313" title="GitHub Issue: shakenfist/kerbside #313">kerbside#313</a>, #465);</li>
+<li>two units wanted by <code>multi-user.target</code>, never <code>sf.target</code>;</li>
+<li><code>PROXY_HOST_SUBJECT</code>, computed from the installed certificate by
+  a script that a unit test pins to <code>node.py</code>'s
+  <code>_spice_host_subject_from_cert()</code>.</li>
 </ul>
-<p>The proxy certificate comes from the <code>internal_ca</code> role, called
-with phase 1's parameters, for <code>kerbside</code> hosts that supplied no
-override:</p>
+<p>The proxy certificate comes from <code>internal_ca</code> (<code>cert_name:
+&lt;host&gt;-kerbside</code>, CN and DNS SAN <code>kerbside_public_fqdn</code>,
+<code>/etc/kerbside/pki</code>, key <code>0640 root:kerbside</code>), unless the operator
+supplies all three override paths.</p>
+<p><code>register</code> runs <code>kerbside db upgrade</code> once, then restarts both
+units when a desired-state hash differs from the one recorded on
+the host. That hash covers code, configuration, units and the
+certificate files, so a renewal counts as a change. The hash is
+written only after readiness succeeds.</p>
+<p>Readiness is a fresh <code>sf_token_keys.fetched_at</code> for the source, read
+through Kerbside's own database module. It is not "the source is
+healthy": a source that has never scraped is not errored, and a
+key-fetch failure does not error it. Kerbside's sf-e2e lane polls
+the same rows (<code>deploy-kerbside.sh:193-224</code>).</p>
+<p><code>site.yml</code> does the following:</p>
 <ul>
-<li><code>cert_name: &lt;host&gt;-kerbside</code>, so it cannot collide with a
-  co-located node's SPICE certificate;</li>
-<li><code>cert_cn</code> and <code>cert_san_dns</code> set to <code>kerbside_public_fqdn</code>;</li>
-<li><code>cert_dest_dir: /etc/kerbside/pki</code>;</li>
-<li>a key mode that is not world-readable.</li>
+<li>widens the reachability preflight to include <code>kerbside</code> hosts, which
+  today never enter <code>reachable</code>;</li>
+<li>runs <code>validate</code> beside the tier asserts;</li>
+<li>deploys Kerbside in a play after the final sanity checks, so <code>sf-api</code>
+  is proven up and the key and credential exist before the first
+  scrape.</li>
 </ul>
-<p>The play lives in <code>site.yml</code> beside the existing certificate
-plays.</p>
-<p><code>register</code> runs <code>kerbside db upgrade</code> with <code>run_once</code> on the
-first Kerbside host, then starts or restarts on change. It waits
-until the SF source reports healthy, meaning the signing key has
-been fetched. That is the same readiness condition
-<code>deploy-kerbside.sh:297-321</code> polls for, and it is the step that
-catches a CA or credential mismatch at deploy time rather than at
-first console.</p>
-<p><code>site.yml</code>:</p>
-<ul>
-<li>maps <code>groups.get('kerbside', [])</code> onto <code>kerbside_hosts</code>;</li>
-<li>asserts that <code>kerbside_url</code> is set whenever the group is
-  non-empty, and that the configured Kerbside ports are below
-  30000;</li>
-<li>adds Kerbside hosts to the reachability preflight;</li>
-<li>runs the role's plays after the Shaken Fist register play, so
-  the signing key exists and <code>sf-api</code> serves it before Kerbside's
-  first scrape.</li>
-</ul>
-<p>A Kerbside host outside <code>allsf</code> must not receive the <code>node</code> role,
-the SPICE certificate or the 401 sanity checks
-(<code>site.yml:652-685</code>). The phase adds a test inventory with such a
-host.</p>
+<p>A Kerbside host outside <code>allsf</code> is already excluded from every Shaken
+Fist play, including the sanity checks (<code>site.yml:678-718</code>), because
+they all target <code>allsf:&amp;reachable</code>. The phase's rootless test checks
+that with <code>--list-hosts</code> against a test inventory.</p>
+<p><code>register</code> cannot run without a cluster. Its first real run is
+phase 4's lane, and the phase's documentation says so.</p>
 <p>Planned at high effort: this is the bulk of the plan, and
 restart-on-change has to be right for a service whose failure
 mode (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/313" title="GitHub Issue: shakenfist/kerbside #313">kerbside#313</a>, a malformed INI exits 0) defeats systemd's
@@ -15551,8 +15561,14 @@ reviewed diff:</p>
 <li>an extra-vars file in <code>deploy-collection.sh</code>, replacing the
   growing list of positional arguments;</li>
 <li>the database and user creation, mirroring
-  <code>deploy-kerbside.sh:188-194</code>.</li>
+  <code>deploy-kerbside.sh:93-99</code>;</li>
+<li>a second <code>site.yml</code> run, after which no <code>sf-*</code> or <code>kerbside-*</code>
+  unit may have restarted (#4459: restart-on-change has never been
+  tested).</li>
 </ul>
+<p>Before it can run, a Kerbside release that stops returning source
+passwords must exist, because phase 3's <code>kerbside_package</code> default
+requires it.</p>
 <p>In this repository:</p>
 <ul>
 <li>a merge-queue job that turns the feature on, with
@@ -15783,7 +15799,10 @@ of them is inferable from the file being edited:</p>
   and unprefixed variables are the cross-role contract.</li>
 <li>Every template or unit change is registered for
   restart-on-change, and a redeploy with nothing changed
-  restarts nothing. That is tested, not assumed.</li>
+  restarts nothing. Phase 3's survey found that the node role's
+  version of this had never been tested (#4459). Phase 3 tests
+  the Kerbside role's change detection without root, and phase
+  4 tests both on a real cluster.</li>
 <li><code>kerbside_url</code> is the single source of truth for both SF's
   <code>KERBSIDE_URL</code> and Kerbside's <code>sf_console_token_audience</code>.
   Neither is ever derived.</li>
@@ -15972,6 +15991,13 @@ while planning it.</p>
   with a link here.</li>
 <li><strong>#4093</strong> (open): the mint test never runs in SF CI. Phase 4
   closes it.</li>
+<li><strong>#4459</strong> (open): restart-on-change in the node role has never
+  been tested (found while planning phase 3). Phase 4 adds the
+  second-deploy check.</li>
+<li><strong>#4460</strong> (open): <code>examples/cluster</code> pairs a load-balancer
+  comment with a prefix-less <code>api_url</code> (found while planning phase
+  3). Unrelated to Kerbside beyond the <code>api_url</code> it writes into
+  <code>sources.yaml</code>.</li>
 <li><strong>#4097</strong> (open): uncovered cross-repository seams. Phase 4
   closes item 4. Items 1-3 and 5-6 are mostly on the Kerbside
   side and stay with that issue.</li>
