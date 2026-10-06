@@ -200,6 +200,7 @@ attached rather than quietly disappearing from the table.
 | [sfui-vendor.md](/components/development/audits/sfui-vendor/) | Vendored sfui copies are verbatim and current |
 | [scope-coverage.md](/components/development/audits/scope-coverage/) | Every repository in the organisation is audited or documented as excluded |
 | [eol-distro.md](/components/development/audits/eol-distro/) | Nothing runs on, or is built from, a distribution release that has reached end of life |
+| [eol-producers.md](/components/development/audits/eol-producers/) | No runner label is offered for a distribution release that has reached end of life |
 
 ## Beyond the audits
 

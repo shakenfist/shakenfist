@@ -115,6 +115,7 @@ nav:
                 - "Audit: Dependency name normalization": components/development/audits/dependency-name-normalization.md
                 - "Audit: diagram format": components/development/audits/diagram-format.md
                 - "Audit: End-of-life distributions": components/development/audits/eol-distro.md
+                - "Audit: End-of-life runner labels offered": components/development/audits/eol-producers.md
                 - "Audit: Expensive lane path filtering": components/development/audits/expensive-lane-path-filter.md
                 - "Audit: Exporting repo configuration changes": components/development/audits/export-repo-config.md
                 - "Audit: Fuzz nightly reporting": components/development/audits/fuzz-nightly-reporting.md
