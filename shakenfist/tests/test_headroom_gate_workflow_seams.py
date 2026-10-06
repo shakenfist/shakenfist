@@ -49,7 +49,10 @@ SHAPE_INPUTS = ('topology', 'tier', 'test_kind', 'stestr_config')
 # base_image is deliberately not part of the shape: the band measures the
 # cloud's committed vCPU against its ledger, not the guest, and the window
 # covered two base images (Debian 12 and Ubuntu 24.04) on the same topology
-# without the fraction separating them.
+# without the fraction separating them. deploy_profile is deliberately not
+# part of the shape either, for the same reason: a profile such as the
+# slim-tier row's Kerbside one adds processes to a node, not instances to the
+# ledger (PLAN-kerbside-deployer-phase-04-ci S3).
 MEASURED_SHAPES = {
     ('slim-primary', 'full', 'functional', 'cluster-ci.conf'),
     ('slim-primary', 'full', 'functional', 'guest-ci.conf'),
