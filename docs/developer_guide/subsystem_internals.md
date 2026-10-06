@@ -222,10 +222,13 @@ that qualifies here but which the reconciler declines to size anyway
 costs one forced pass, not a permanent every-minute one, and
 `scheduler_capacity_reconcile_forced_total` (`SCHEDULER_CAPACITY_FORCED`
 in `shakenfist/daemons/cluster/scheduled_tasks.py`) counts forced
-passes so that a disagreement is visible without grepping logs — a
-count that keeps climbing in an otherwise steady cluster means this
-check and the reconciler disagree about which nodes should have rows,
-which is worth reporting rather than tuning around.
+passes so that a disagreement is visible without grepping logs. Read
+it with the once-per-set memory in mind: a *stable* disagreement
+increments it once and then never again, so a climbing count means the
+unguarded set itself keeps changing — nodes entering and leaving the
+condition — rather than one persistent disagreement. Either is worth
+reporting rather than tuning around, but only the churning case makes
+the number move.
 
 The SQL itself is covered by
 `shakenfist/tests/test_mariadb_capacity_reconcile_live.py`, which runs

@@ -174,7 +174,16 @@ class CapacityErrorTestCase(base.ShakenFistTestCase):
                 continue
             if func.attr != '_log_and_raise_on_error':
                 continue
-            if any(kw.arg == 'exception_class' for kw in node.keywords):
+            # Skip only the one site which is answered 409 rather than
+            # 507, named explicitly: skipping every call which merely
+            # passes exception_class would also skip a future
+            # 507-answered subclass, whose stage would then fall
+            # silently into the non-transient default -- the exact
+            # failure this check exists to prevent.
+            if any(kw.arg == 'exception_class'
+                   and isinstance(kw.value, ast.Attribute)
+                   and kw.value.attr == 'AffinityConstraintUnsatisfiable'
+                   for kw in node.keywords):
                 continue
             stage = node.args[1]
             self.assertIsInstance(

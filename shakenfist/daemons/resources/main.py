@@ -180,8 +180,10 @@ def _should_publish_metrics(last_publish: float, last_domains: set[int] | None,
     observation, so neither can trigger a change publish: reading a failed poll
     as "the set became empty" would publish on the strength of a fabrication,
     and would then publish a second time when the next successful poll appeared
-    to repopulate the node. A failed poll falls through to the interval gate,
-    which is the behaviour this daemon had before the poll existed.
+    to repopulate the node. A poll which raises does not reach this function at
+    all -- it sits inside the same try as this call, so the iteration is
+    abandoned and the next tick starts over; it is a poll which did not run,
+    because the interval had not elapsed, that arrives here as None.
     """
     if polled_domains is not None and polled_domains != last_domains:
         return True
