@@ -106,7 +106,7 @@ cluster with `KERBSIDE_URL` set does three things:
 - advertises the `vdi-console-proxy` capability (`external_api/app.py:438-442`);
 - mints short-lived Ed25519 tokens at
   `GET /instances/<ref>/vdiconsoleproxy`
-  (`external_api/instance.py:2114-2134`);
+  (`external_api/instance.py:2129-2195`);
 - causes `sf-client instance vdiconsolefile` to fetch a
   Kerbside-routed `.vv` instead of a direct one
   (client-python, `commandline/instance.py:705, 786`).
@@ -168,7 +168,7 @@ the mint test to run somewhere. #4367 notes that Kerbside's deploy
 lane has no headroom instrumentation. #4097 and #4367 are open.
 #4093 was closed on 2026-10-03 by the merge of this plan's own pull
 request, #4420, whose phase table said phase 4 "closes" it. GitHub
-read that as a closing keyword. It was reopened the same day, since
+read that as a closing keyword. It was reopened on 2026-10-04, since
 nothing makes the mint test run yet (phase 2's survey, S7).
 
 ### What deploying Kerbside involves
@@ -564,7 +564,7 @@ spelling above is the one to write.
 | 1. `internal_ca` issues certificates to any host at caller-chosen paths, and renews them | [PLAN-kerbside-deployer-phase-01-internal-ca.md](PLAN-kerbside-deployer-phase-01-internal-ca.md) | Complete | `12441652b` (#4430) |
 | 2. Shaken Fist side: signing key, Kerbside credential, token duration, shadow guard | [PLAN-kerbside-deployer-phase-02-sf-side.md](PLAN-kerbside-deployer-phase-02-sf-side.md) | Complete | `80292df08` (#4442) |
 | 3. A `kerbside` role and the `kerbside` group in `site.yml` | [PLAN-kerbside-deployer-phase-03-kerbside-role.md](PLAN-kerbside-deployer-phase-03-kerbside-role.md) | Complete | `b85005f0e` (#4465) |
-| 4. A merge-queue lane with the feature on | PLAN-kerbside-deployer-phase-04-ci.md | Proposed | — |
+| 4. A merge-queue lane with the feature on | [PLAN-kerbside-deployer-phase-04-ci.md](PLAN-kerbside-deployer-phase-04-ci.md) | In progress | — |
 | 5. Kerbside's sf-e2e lane deploys through the collection | PLAN-kerbside-deployer-phase-05-kerbside-lane.md | Proposed | — |
 | 6. Documentation and close-out | PLAN-kerbside-deployer-phase-06-docs.md | Proposed | — |
 | 7. Push audit | PLAN-kerbside-deployer-phase-07-push-audit.md | Proposed | — |
@@ -750,45 +750,63 @@ mode (kerbside#313, a malformed INI exits 0) defeats systemd's
 
 ### Phase 4 -- A merge-queue lane with the feature on
 
-The changes to `shakenfist/actions`, handed to the operator as a
-reviewed diff:
+Planned in
+[PLAN-kerbside-deployer-phase-04-ci.md](PLAN-kerbside-deployer-phase-04-ci.md).
+Its survey corrected several claims this section used to make; the
+summary below reflects them.
 
-- a `kerbside` group in a topology. The default is `slim-tier`,
-  with Kerbside on a tier node that is not the first database
-  host, so the scrape crosses hosts;
-- an extra-vars file in `deploy-collection.sh`, replacing the
-  growing list of positional arguments;
-- the database and user creation, mirroring
-  `deploy-kerbside.sh:93-99`;
-- a second `site.yml` run, after which no `sf-*` or `kerbside-*`
-  unit may have restarted (#4459: restart-on-change has never been
-  tested).
+This repository cannot add an inventory group or a deploy variable to
+the CI deploy. Inventory groups come from three hardcoded role flags in
+`shakenfist/actions`, and `deploy-collection.sh` passes one fixed
+extra-vars string. Phase 4 therefore adds a generic **deploy profile**
+to actions, handed to the operator as a reviewed branch:
 
-Before it can run, a Kerbside release that stops returning source
-passwords must exist, because phase 3's `kerbside_package` default
-requires it.
+- an optional `deploy_profile` input on `smoke-cluster.yml`, naming a
+  Jinja2 file in the caller's checkout;
+- the profile can do the following:
+  - add inventory groups and group variables;
+  - supply extra variables;
+  - create databases on the CI MariaDB;
+  - export variables to the test run;
+  - ask for a second `site.yml` run after which no listed unit's
+    `InvocationID` may change (#4459);
+- `kerbside-*` units added to the per-node checks (including a non-zero
+  `NRestarts`, because `Restart=always` hides a crash loop) and to the
+  failure log bundle.
 
 In this repository:
 
-- a merge-queue job that turns the feature on, with
-  `headroom_gate: false` until it is measured (#4367);
-- `test_vdi_tokens.py`'s mint test un-skipped when the capability
-  is advertised (#4093);
-- a new exchange test that does all of the following:
-  - fetches a `.vv` through `vdiconsoleproxy` and Kerbside's
-    exchange;
-  - asserts it names Kerbside, not the hypervisor;
-  - asserts its `host-subject` equals the proxy certificate's;
-  - completes a TLS handshake to the proxy port against the
-    embedded CA.
+- a `kerbside` profile used by the **existing** `debian-13-slim-tier`
+  merge row, not a new cluster. Kerbside goes on `sf2`, which is a
+  hypervisor outside the database tier. `api_url` is set to the
+  primary, so the scrape crosses hosts; with the default loopback
+  `api_url` it would not. The headroom band measures the vCPU ledger,
+  which Kerbside does not touch, so the row's gate is unchanged;
+- an IP SAN on the proxy certificate when `kerbside_public_fqdn` is an
+  address, which every CI Kerbside host is;
+- `test_vdi_tokens.py`'s mint test is un-skipped when the capability is
+  advertised (#4093). It fails, rather than skips, when the lane
+  expects the capability and does not see it;
+- a new exchange test does all of the following:
+  - fetches a `.vv` through `vdiconsoleproxy` and Kerbside's exchange;
+  - asserts it names Kerbside rather than the hypervisor;
+  - completes a host-name-checked TLS handshake to the proxy port
+    against the `.vv`'s CA;
+  - asserts the certificate's subject equals `host-subject`;
+  - asserts a replay is refused;
+- #4097's live check that the signing key is in no daemon's
+  environment.
 
 That closes #4097 item 4, because the variable is now read by a
-running `sf-api` in CI. Driving a SPICE session through it stays
-in Kerbside's lane, which already has ryll and the drivers.
+running `sf-api` in CI. Driving a SPICE session through it stays in
+Kerbside's lane, which already has ryll and the drivers.
 
-Planned at high effort: it crosses repositories, and the headroom
-and load-budget instruments have seams that a new armed or
-unarmed call site must declare (`test_headroom_gate_workflow_seams.py`).
+The actions branch must merge before this repository's pull request
+is enqueued. Kerbside 0.7.0 must also be on PyPI by then, because phase
+3's `kerbside_package` default requires it.
+
+Planned at high effort: it crosses repositories, and it changes what
+the slowest merge row deploys.
 
 ### Phase 5 -- Kerbside's lane deploys through the collection
 
@@ -1200,6 +1218,9 @@ while planning it.
   with a link here.
 - **#4093** (open): the mint test never runs in SF CI. Phase 4
   closes it.
+- **#4099** (merged): keeps the signing key out of daemon environments.
+  #4097's 2026-09-06 comment asks for a live check of that, which phase
+  4 adds.
 - **#4459** (open): restart-on-change in the node role has never
   been tested (found while planning phase 3). Phase 4 adds the
   second-deploy check.
@@ -1210,11 +1231,14 @@ while planning it.
 - **#4097** (open): uncovered cross-repository seams. Phase 4
   closes item 4. Items 1-3 and 5-6 are mostly on the Kerbside
   side and stay with that issue.
-- **#4367** (open): no headroom instrumentation on Kerbside's
-  deploy lane. Phase 4's job is unarmed until it is measured,
-  and phase 5 moves the lane onto instrumented infrastructure.
-- **kerbside#482** (open): the nightly sf-e2e lane is failing.
-  It must be understood before phase 5 moves the lane.
+- **#4367** (open): Kerbside's deploy lane, and node lifecycle's, call
+  `build-smoke-cluster` directly and so get no headroom probe. Phase 4
+  adds no such job: it uses the existing slim-tier row. Phase 5 moves
+  Kerbside's lane onto `smoke-cluster.yml`, which is instrumented.
+- **kerbside#482** (open): the nightly sf-e2e lane was failing. Phase
+  4's survey found the last ten nightly runs (2026-09-27 to
+  2026-10-06) green, so the issue is stale. Phase 5 confirms that
+  before it moves the lane.
 - **kerbside#131, #313, #465** (open): a forgeable default seed,
   a malformed INI that exits 0, and a malformed `sources.yaml`
   that crash-loops the daemon. Phase 3 guards each at deploy
