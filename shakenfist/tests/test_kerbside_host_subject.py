@@ -12,6 +12,12 @@ the two surfaces only as clients refusing to connect, never as a failed deploy,
 so these tests render the same generated certificates both ways and require
 the same answer, including where both must refuse.
 
+The functional suite has a third renderer,
+``shakenfist/deploy/shakenfist_ci/spice_subject.py``, which checks that the
+host-subject Kerbside hands out matches the certificate its proxy presents. It
+is held to node.py over the same certificates, so that a difference between
+them fails here rather than as a functional test failing on a correct proxy.
+
 The role's defaults are checked against its argument_specs here too, as
 test_node_config_template.py does for the node role.
 """
@@ -37,19 +43,28 @@ ROLE_PATH = os.path.abspath(os.path.join(
     'kerbside'))
 SCRIPT_PATH = os.path.join(ROLE_PATH, 'files', 'kerbside-host-subject.py')
 DEFAULTS_PATH = os.path.join(ROLE_PATH, 'defaults', 'main.yml')
+SPICE_SUBJECT_PATH = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), '..', 'deploy', 'shakenfist_ci',
+    'spice_subject.py'))
 ARGUMENT_SPECS_PATH = os.path.join(ROLE_PATH, 'meta', 'argument_specs.yml')
 
 
-def _load_script():
-    # The script is a standalone file in the role, not an importable module.
-    spec = importlib.util.spec_from_file_location(
-        'kerbside_host_subject', SCRIPT_PATH)
+def _load_by_path(name, path):
+    # Neither file is importable from here: the script is a standalone file in
+    # the role, and the functional suite (shakenfist_ci) is not a package of
+    # this repository's test environment.
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-script = _load_script()
+script = _load_by_path('kerbside_host_subject', SCRIPT_PATH)
+spice_subject = _load_by_path('ci_spice_subject', SPICE_SUBJECT_PATH)
+
+
+def _der(cert):
+    return cert.public_bytes(serialization.Encoding.DER)
 
 
 def _make_cert(name_attrs):
@@ -132,6 +147,8 @@ class KerbsideHostSubjectTestCase(base.ShakenFistTestCase):
     def test_short_names_match_node(self):
         self.assertEqual(
             node_module._SPICE_SUBJECT_SHORT_NAMES, script.SHORT_NAMES)
+        self.assertEqual(
+            node_module._SPICE_SUBJECT_SHORT_NAMES, spice_subject.SHORT_NAMES)
 
     def test_renders_as_node_does(self):
         for name, attrs, expected in RENDERABLE:
@@ -142,6 +159,10 @@ class KerbsideHostSubjectTestCase(base.ShakenFistTestCase):
             self.assertEqual(
                 expected, script.host_subject(cert),
                 f'{name}: the script rendered differently from node.py')
+            self.assertEqual(
+                expected, spice_subject.host_subject(_der(cert)),
+                f'{name}: shakenfist_ci/spice_subject.py rendered differently '
+                f'from node.py')
 
     def test_refuses_where_node_does(self):
         for name, attrs in UNRENDERABLE:
@@ -151,6 +172,10 @@ class KerbsideHostSubjectTestCase(base.ShakenFistTestCase):
                 f'{name}: node.py rendered a subject it should refuse')
             self.assertRaises(
                 script.SubjectError, script.host_subject, cert)
+            self.assertIsNone(
+                spice_subject.host_subject(_der(cert)),
+                f'{name}: shakenfist_ci/spice_subject.py rendered a subject '
+                f'it should refuse')
 
     def _run_main(self, attrs):
         cert = _make_cert(attrs)
