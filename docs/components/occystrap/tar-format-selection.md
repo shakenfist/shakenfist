@@ -47,8 +47,12 @@ long paths more efficiently using a prefix+name split:
 - **prefix field**: 155 bytes for the directory path
 - **Total**: Up to 256 characters without extra headers
 
-USTAR format falls back to PAX only when content requires features that
-USTAR cannot represent.
+Format is chosen per member, not per layer: each file is written with a plain
+USTAR header when it fits, and with a PAX extended header only when it needs
+one. A tar archive may mix the two freely, since a PAX archive is just a USTAR
+archive in which some members are preceded by an extended header. One file
+which needs PAX therefore costs one extended header, not one for every
+long-named file in the layer.
 
 ## USTAR Format Limits
 
@@ -56,42 +60,82 @@ The following conditions trigger automatic fallback to PAX format:
 
 | Limit | USTAR Maximum | Notes |
 |-------|---------------|-------|
-| Path length | 256 characters | prefix (155) + '/' + name (100) |
+| Path length | 256 characters | prefix (155) + '/' + name (100), counting the '/' added to directory names |
 | Basename | 100 characters | Filename portion after last '/' |
 | Symlink target | 100 characters | The path the symlink points to |
 | File size | 8 GiB - 1 byte | Octal representation limit |
 | UID/GID | 2,097,151 | Octal value 7777777 |
-| Character encoding | ASCII only | Non-ASCII requires PAX |
+| Modification time range | 0 to 8,589,934,591 | Octal; negative mtimes require PAX |
+| Owner names | 32 characters | uname and gname |
+| Modification time | Whole seconds | Sub-second mtimes require PAX |
+| Character encoding | ASCII only | Non-ASCII names or owners require PAX |
+| Extended records | None | Any extended record requires PAX |
+
+## Preserving Extended Records
+
+PAX extended headers carry metadata which has no USTAR field at all. The
+important ones for container images are the `SCHILY.xattr.*` records, which
+hold extended attributes:
+
+- `security.capability`: file capabilities set with `setcap`, for example
+  `cap_net_raw` on `ping` or a Prometheus blackbox exporter.
+- `security.selinux`: SELinux labels.
+- `user.*`: arbitrary user xattrs.
+
+Python's USTAR writer silently discards a member's extended records, so a
+member which has any is always written as PAX. Until issue
+[#151](https://github.com/shakenfist/occystrap/issues/151) was fixed the
+format was chosen per layer without considering these records, and the
+`normalize-timestamps` and `exclude` filters stripped file capabilities from
+almost every layer they rewrote.
+
+Not every record is copied forward. When a member is rewritten, occystrap
+drops:
+
+- Records which duplicate a header field (`path`, `linkpath`, `size`, `uid`,
+  `gid`, `uname`, `gname`, `mtime`). Python applies these to the member when
+  reading, but they would take priority over the member's fields when
+  writing, undoing changes such as a normalized mtime. Python regenerates them
+  from the fields when a member needs them.
+- Records which describe how the source archive was encoded (`hdrcharset` and
+  `GNU.sparse.*`). The data written is the decoded data, so these would no
+  longer describe it and would corrupt the output. For the same reason, old
+  GNU sparse members (type `S`) are written as regular files.
+
+The `normalize-timestamps` filter additionally drops `atime`, `ctime` and
+`LIBARCHIVE.creationtime` records, so that they cannot vary between builds.
 
 ## Implementation
 
 The format selection is implemented in `occystrap/tarformat.py`:
 
 ```python
-from occystrap.tarformat import select_tar_format_for_layer
+from occystrap import tarformat
 
-# Scan layer and select optimal format
-tar_format = select_tar_format_for_layer(layer_fileobj, transform_fn)
-
-# Use selected format when writing
-with tarfile.open(fileobj=dest, mode='w', format=tar_format) as tar:
-    ...
+with tarfile.open(fileobj=dest, mode='w') as out:
+    with tarfile.open(fileobj=src, mode='r') as tar:
+        for member in tar:
+            fileobj = tar.extractfile(member) if member.isfile() else None
+            tarformat.add_member(out, member, fileobj)
 ```
 
-The `select_tar_format_for_layer()` function:
+`add_member()`:
 
-1. Scans all members in the source tar
-2. Applies any transformation function (e.g., timestamp normalization)
-3. Checks each member against USTAR limits
-4. Returns `USTAR_FORMAT` if all members fit, `PAX_FORMAT` otherwise
-5. Short-circuits on first PAX-requiring member for efficiency
+1. Drops extended records which must not be copied forward
+   (`prepare_member_for_rewrite()`)
+2. Checks the member for remaining extended records and for information
+   USTAR would silently lose, then asks Python's tarfile to encode a USTAR
+   header for it, so that the hard limits are exactly the ones the writer
+   enforces (`needs_pax_format()`)
+3. Writes the member as USTAR or PAX accordingly
+
+No separate scan of the layer is needed, so each layer is read only once.
 
 ## Affected Components
 
 ### Filters (Smart Format Selection)
 
-The following filters use smart format selection, scanning layer contents to
-determine the optimal format:
+The following filters rewrite layers using per-member format selection:
 
 - **TimestampNormalizer**: Normalizes file timestamps for reproducible builds
 - **ExcludeFilter**: Removes files matching glob patterns
@@ -108,8 +152,9 @@ since the outer tar only contains short paths (SHA256 hashes ~75 characters):
 - **TarWriter**: Creates docker-loadable tarballs
 - **DockerWriter**: Loads images into the Docker daemon
 
-The layer content itself (which may have long paths) is pre-built and added as
-a binary blob, so the outer tar format doesn't affect file paths within layers.
+The layer content itself (which may have long paths and extended records) is
+pre-built and added as a binary blob, so the outer tar format doesn't affect
+file paths or extended attributes within layers.
 
 ## Compatibility
 
@@ -120,24 +165,14 @@ USTAR format is universally supported:
 - All POSIX-compliant tar implementations support USTAR
 - The format is automatically detected when reading
 
-There is no compatibility impact from this change.
+Rewritten layers which contain extended records, or which previously needed
+PAX for some other reason, produce different bytes (and so different digests)
+than older occystrap releases did, because records are now kept and long
+names in those layers now use USTAR headers. Layers which never needed PAX are
+written exactly as before.
 
-## Verification
-
-To verify the format selection is working, enable debug logging
-with the `--verbose` flag:
-
-```bash
-occystrap --verbose process registry://docker.io/library/busybox:latest \
-    tar://busybox.tar
-```
-
-You'll see messages like:
-```
-DEBUG:occystrap.tarformat:Layer compatible with USTAR format
-```
-
-Or when PAX is required:
-```
-DEBUG:occystrap.tarformat:Layer requires PAX format
-```
+Layer cache entries made with filters by older releases are not reused,
+since they may hold layers with their file capabilities stripped. The cache
+key includes a version of the rewriting rules
+(`tarformat.LAYER_REWRITE_VERSION`), so the first push with filters after
+upgrading rewrites and uploads those layers again.

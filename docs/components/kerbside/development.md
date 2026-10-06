@@ -106,6 +106,35 @@ on a syntax error, which is the actual check:
 npx -p @mermaid-js/mermaid-cli mmdc -i docs/index.md -o /tmp/index-rendered.md
 ```
 
+## Documentation site navigation
+
+`docs/` is synchronised into shakenfist/shakenfist and published on
+shakenfist.com by `tools/sync_component_docs.py` in
+[shakenfist/actions](https://github.com/shakenfist/actions), which
+also generates the site navigation. A directory without an
+`order.yml` is listed alphabetically by each page's H1. A directory
+with one is listed in the order it gives, under the titles it gives:
+
+```yaml
+- protocol-overview.md: Protocol overview
+- spice-link-protocol.md: Link protocol and authentication
+```
+
+`docs/spice/` and `docs/use-cases/` carry one, so that the pages
+build on each other in reading order. **A new page in either
+directory must be added to its `order.yml`**; one that is not is
+still published, and links to it still resolve, but it is missing
+from the site navigation.
+
+Do not add an `order.yml` at the root of `docs/` without reading
+the sync script first. There it is an allowlist: a root page it does
+not list is not published at all, and a subdirectory without its own
+`order.yml` (such as `plans/`) drops out of the navigation.
+
+Section labels are the directory name title-cased (`spice/` shows
+as "Spice"), and a directory's pages are always listed before its
+subdirectories. Neither can be overridden from this repository yet.
+
 ## Review tracking
 
 Kerbside receives periodic whole-file human review in addition to the

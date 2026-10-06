@@ -668,7 +668,11 @@ normalize-timestamps:ts=TIMESTAMP
 | `ts=TIMESTAMP` | Unix timestamp to use (default: 0, Unix epoch) |
 
 When timestamps are normalized, layer SHA256 hashes are recalculated and the
-manifest is updated.
+manifest is updated. Access, change and creation times (the `atime`, `ctime`
+and `LIBARCHIVE.creationtime` PAX records) are removed. Other per-file
+metadata, such as the extended attributes which carry file capabilities and
+SELinux labels, is preserved; see
+[Choosing a Tar Format](/components/occystrap/tar-format-selection/#preserving-extended-records).
 
 **Examples:**
 
@@ -754,7 +758,8 @@ exclude:pattern=PATTERN[,PATTERN2,...]
 ```
 
 Files matching the patterns are removed from layers. Layer hashes are
-recalculated after modification.
+recalculated after modification. The files which remain keep their metadata,
+including extended attributes such as file capabilities.
 
 **Examples:**
 
