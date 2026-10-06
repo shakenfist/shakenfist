@@ -563,7 +563,7 @@ spelling above is the one to write.
 |-------|------|--------|--------|
 | 1. `internal_ca` issues certificates to any host at caller-chosen paths, and renews them | [PLAN-kerbside-deployer-phase-01-internal-ca.md](PLAN-kerbside-deployer-phase-01-internal-ca.md) | Complete | `12441652b` (#4430) |
 | 2. Shaken Fist side: signing key, Kerbside credential, token duration, shadow guard | [PLAN-kerbside-deployer-phase-02-sf-side.md](PLAN-kerbside-deployer-phase-02-sf-side.md) | Complete | `80292df08` (#4442) |
-| 3. A `kerbside` role and the `kerbside` group in `site.yml` | [PLAN-kerbside-deployer-phase-03-kerbside-role.md](PLAN-kerbside-deployer-phase-03-kerbside-role.md) | In progress | — |
+| 3. A `kerbside` role and the `kerbside` group in `site.yml` | [PLAN-kerbside-deployer-phase-03-kerbside-role.md](PLAN-kerbside-deployer-phase-03-kerbside-role.md) | Complete | `b85005f0e` (#4465) |
 | 4. A merge-queue lane with the feature on | PLAN-kerbside-deployer-phase-04-ci.md | Proposed | — |
 | 5. Kerbside's sf-e2e lane deploys through the collection | PLAN-kerbside-deployer-phase-05-kerbside-lane.md | Proposed | — |
 | 6. Documentation and close-out | PLAN-kerbside-deployer-phase-06-docs.md | Proposed | — |
