@@ -372,22 +372,22 @@ nav:
                 - "Use case documentation": components/kerbside/plans/PLAN-use-case-docs.md
                 - "Use case documentation phase 6: push audit": components/kerbside/plans/PLAN-use-case-docs-phase-06-push-audit.md
             - Spice:
-                - "console.vv Extensions and Interpretations": components/kerbside/spice/console-vv-extensions.md
-                - "Keyboard Scancodes": components/kerbside/spice/scancodes.md
-                - "SPICE Capabilities": components/kerbside/spice/capabilities.md
-                - "SPICE Channel Protocols": components/kerbside/spice/channel-protocols.md
-                - "SPICE Compression Protocols": components/kerbside/spice/compression-protocols.md
-                - "SPICE Link Protocol": components/kerbside/spice/spice-link-protocol.md
-                - "SPICE Protocol Overview": components/kerbside/spice/protocol-overview.md
-                - "USB Redirection Protocol": components/kerbside/spice/usb-redirection.md
-                - "VD Agent Protocol": components/kerbside/spice/vd-agent-protocol.md
+                - "Protocol overview": components/kerbside/spice/protocol-overview.md
+                - "Link protocol and authentication": components/kerbside/spice/spice-link-protocol.md
+                - "Capability negotiation": components/kerbside/spice/capabilities.md
+                - "Channel protocols": components/kerbside/spice/channel-protocols.md
+                - "Image compression (LZ and GLZ)": components/kerbside/spice/compression-protocols.md
+                - "Keyboard scancodes": components/kerbside/spice/scancodes.md
+                - "VD agent protocol": components/kerbside/spice/vd-agent-protocol.md
+                - "USB redirection": components/kerbside/spice/usb-redirection.md
+                - "console.vv extensions": components/kerbside/spice/console-vv-extensions.md
             - Use Cases:
-                - "Kerbside across several clouds": components/kerbside/use-cases/multi-cloud.md
-                - "Kerbside for OpenStack": components/kerbside/use-cases/openstack.md
-                - "Kerbside for oVirt": components/kerbside/use-cases/ovirt.md
-                - "Kerbside for Shaken Fist": components/kerbside/use-cases/shakenfist.md
-                - "Kerbside placement topologies": components/kerbside/use-cases/placement.md
-                - "Kerbside standalone": components/kerbside/use-cases/standalone.md
+                - "Standalone": components/kerbside/use-cases/standalone.md
+                - "Shaken Fist": components/kerbside/use-cases/shakenfist.md
+                - "OpenStack": components/kerbside/use-cases/openstack.md
+                - "oVirt": components/kerbside/use-cases/ovirt.md
+                - "Across several clouds": components/kerbside/use-cases/multi-cloud.md
+                - "Placement topologies": components/kerbside/use-cases/placement.md
         - Occystrap:
             - "Introduction": components/occystrap/index.md
             - "Command Reference": components/occystrap/command-reference.md

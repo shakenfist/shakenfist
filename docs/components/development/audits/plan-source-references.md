@@ -24,8 +24,9 @@ notice is someone who went looking for the plan and did not find it
 a record exists.
 
 The check runs `git ls-files`, skips markdown files (they are
-`docs-external-links`' scope) and files over 2 MB, and resolves each
-`PLAN-<name>.md` it finds in what remains:
+`docs-external-links`' scope), files under a plans directory in
+`docs/`, and files over 2 MB, and resolves each `PLAN-<name>.md` it
+finds in what remains:
 
 * **Path-qualified references** (`docs/plans/PLAN-foo.md`) resolve as
   written, from the repository root and then from `docs/`. The second
@@ -52,6 +53,17 @@ Three shapes are not flagged:
   where a `PLAN-*.md` string is not a pointer -- a filename pattern in
   a linter config, a fixture naming a plan that deliberately does not
   exist.
+
+A plans directory is skipped because it is the record of how the
+software was built, and citing plans is its job. The case that forced
+the rule was client-python-k3s, whose push-audit phase keeps the diffs
+it reviewed in `docs/plans/audit/diffs/`: those diffs quote every plan
+path they touched, including plans renamed since and plans in other
+repositories, and rewriting them so the pointers resolve would falsify
+the record. The scope is the one `plan-phase-references` exempts -- a
+`plans/` directory under `docs/` at any depth -- so the two agree on
+what a plans directory is. A `plans/` directory elsewhere, such as a
+package in the code, is source and is scanned.
 
 Test suites are scanned like any other source: a test file carries
 prose pointers too and they rot the same way -- instar's
