@@ -1,0 +1,72 @@
+---
+# Write one of Kerbside's secret-bearing configuration files, refusing a render
+# Kerbside could not use. Included by config.yml with:
+#
+#   * kerbside_config_file_template: the template to render;
+#   * kerbside_config_file_dest: where Kerbside reads it;
+#   * kerbside_config_file_checker: the helper script which checks it.
+#
+# The checker runs as the template's validate command, so a refused render
+# never replaces the file Kerbside is running with. The file holds secrets, so
+# the write is no_log, and no_log hides the checker's reasons along with
+# everything else. The rescue renders the refused file again, privately, runs
+# the checker on that copy without no_log (its messages never include a value),
+# removes the copy, and fails with the checker's reasons.
+
+- name: Write {{ kerbside_config_file_dest | basename }}
+  vars:
+    kerbside_refused_file: >-
+      {{ kerbside_state_dir }}/{{ kerbside_config_file_dest | basename }}.refused
+  block:
+    - name: Write {{ kerbside_config_file_dest | basename }}
+      ansible.builtin.template:
+        src: "{{ kerbside_config_file_template }}"
+        dest: "{{ kerbside_config_file_dest }}"
+        owner: "{{ kerbside_file_owner }}"
+        group: "{{ kerbside_group }}"
+        mode: "0640"
+        validate: >-
+          {{ kerbside_venv }}/bin/python
+          {{ kerbside_helper_dir }}/{{ kerbside_config_file_checker }} %s
+      no_log: true
+
+  rescue:
+    - name: Render privately for diagnosis the refused {{ kerbside_config_file_dest | basename }}
+      ansible.builtin.template:
+        src: "{{ kerbside_config_file_template }}"
+        dest: "{{ kerbside_refused_file }}"
+        owner: "{{ kerbside_file_owner }}"
+        group: "{{ kerbside_file_group }}"
+        mode: "0600"
+      no_log: true
+
+    - name: Check the refused {{ kerbside_config_file_dest | basename }}
+      ansible.builtin.command:
+        argv:
+          - "{{ kerbside_venv }}/bin/python"
+          - "{{ kerbside_helper_dir }}/{{ kerbside_config_file_checker }}"
+          - "{{ kerbside_refused_file }}"
+      register: kerbside_refused_check
+      changed_when: false
+      failed_when: false
+
+    - name: Remove the refused {{ kerbside_config_file_dest | basename }}
+      ansible.builtin.file:
+        path: "{{ kerbside_refused_file }}"
+        state: absent
+
+    - name: Refuse to write {{ kerbside_config_file_dest | basename }}
+      ansible.builtin.fail:
+        msg: >-
+          {{ kerbside_refused_msg if kerbside_refused_check.rc | default(1) != 0
+             else kerbside_unexplained_msg }}
+      vars:
+        kerbside_refused_msg: >-
+          The rendered {{ kerbside_config_file_dest | basename }} was refused,
+          so Kerbside keeps running with the file it has.
+          {{ kerbside_refused_check.stderr | default('') | trim }}
+        kerbside_unexplained_msg: >-
+          Writing {{ kerbside_config_file_dest }} failed, but the rendered file
+          passes its check, so the cause is something else, such as its owner,
+          its group ({{ kerbside_group }}) or its directory. ansible hides the
+          error, because the file holds secrets.

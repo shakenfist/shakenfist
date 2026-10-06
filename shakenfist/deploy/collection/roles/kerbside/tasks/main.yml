@@ -1,0 +1,24 @@
+---
+# The kerbside role deploys a Kerbside VDI console proxy. Its per-host entry
+# points are run in order, normally as separate include_role calls with
+# tasks_from, so the consuming playbook can issue the proxy certificate between
+# them:
+#
+#   * bootstrap (per host) creates the kerbside user, installs Kerbside into
+#     its virtualenv, and hashes what was installed.
+#   * config (per host) writes Kerbside's INI, sources.yaml and systemd units,
+#     and hashes them with the certificate files into the desired state.
+#   * register (every host together) migrates the database once, restarts
+#     Kerbside where the desired state differs from what was last deployed,
+#     waits for a fresh signing key fetch, and then records the desired state.
+#
+# validate is not part of main. It runs on every Kerbside host, before any host
+# is changed, and does nothing when the kerbside group is empty.
+- name: Bootstrap Kerbside
+  ansible.builtin.include_tasks: bootstrap.yml
+
+- name: Configure Kerbside
+  ansible.builtin.include_tasks: config.yml
+
+- name: Register Kerbside
+  ansible.builtin.include_tasks: register.yml

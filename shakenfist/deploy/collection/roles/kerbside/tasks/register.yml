@@ -1,0 +1,258 @@
+---
+# Migrate Kerbside's database, restart Kerbside if what it runs with changed,
+# and wait until it has fetched the Shaken Fist console token signing keys with
+# the credential the node role just minted.
+#
+# Runs on every Kerbside host together, after config has set
+# kerbside_desired_state. The migration and the readiness check run once, on
+# kerbside_hosts[0], since every Kerbside host shares one database. Under the
+# default linear strategy every host finishes a task before any host starts the
+# next, so the migration completes before any host restarts on new code.
+#
+# What was deployed is recorded in kerbside_state_dir/.deployed-state.sha256,
+# and only after Kerbside is ready: a deploy which fails part way restarts
+# Kerbside again next time, rather than leaving a half-applied change recorded
+# as deployed.
+#
+# Tasks needing a running system are tagged, so a test without root can skip
+# them: kerbside-database (the migration), kerbside-services (the units and
+# the API's answer) and kerbside-readiness (the signing key wait). The
+# restart decision and the marker are not tagged.
+#
+# The migration and the readiness check run as kerbside_user, through runuser
+# from root (the play must become root), not through become_user: becoming an
+# unprivileged user from a remote user which is not root needs setfacl on the
+# host, or world-readable temporary files, and a Kerbside host is not
+# guaranteed to have the acl package.
+
+- name: Require config to have run first
+  ansible.builtin.assert:
+    that: kerbside_desired_state | default('') | length > 0
+    fail_msg: >-
+      kerbside_desired_state is not set. register compares it with what was
+      last deployed, so run the config entry point on this host first.
+    quiet: true
+
+# So the units config wrote are what systemd starts below.
+- name: Reload systemd if Kerbside's units changed
+  ansible.builtin.meta: flush_handlers
+
+# Recorded before anything restarts, so a signing key fetch is only accepted as
+# readiness if it happened during this deploy. Every Kerbside host's daemon
+# writes the same row, so clocks must agree to within the scrape interval,
+# which NTP provides. A run_once result is given to every host in the play.
+- name: Record when this deploy's readiness wait begins
+  ansible.builtin.command: date +%s.%N
+  register: kerbside_ready_after_cmd
+  changed_when: false
+  run_once: true
+  delegate_to: "{{ kerbside_hosts[0] }}"
+
+- name: Remember when this deploy's readiness wait begins
+  ansible.builtin.set_fact:
+    kerbside_ready_after: "{{ kerbside_ready_after_cmd.stdout | trim | float }}"
+
+- name: Check what was last deployed
+  ansible.builtin.stat:
+    path: "{{ kerbside_deployed_state_file }}"
+  register: kerbside_deployed_state_stat
+
+- name: Read what was last deployed
+  ansible.builtin.slurp:
+    src: "{{ kerbside_deployed_state_file }}"
+  register: kerbside_deployed_state_slurp
+  when: kerbside_deployed_state_stat.stat.exists
+
+# Missing means never deployed, or a deploy which did not reach readiness, and
+# either way Kerbside restarts.
+- name: Remember what was last deployed
+  ansible.builtin.set_fact:
+    kerbside_deployed_state: >-
+      {{ (kerbside_deployed_state_slurp.content | b64decode | trim)
+         if kerbside_deployed_state_stat.stat.exists else '' }}
+
+- name: Decide whether Kerbside needs a restart this run
+  ansible.builtin.set_fact:
+    kerbside_restart_needed: "{{ kerbside_deployed_state != kerbside_desired_state }}"
+
+- name: Report the restart decision
+  ansible.builtin.debug:
+    msg: >-
+      restart_needed={{ kerbside_restart_needed }}
+      (deployed={{ kerbside_deployed_state[:12] if kerbside_deployed_state else 'none' }},
+      desired={{ kerbside_desired_state[:12] }})
+
+# alembic upgrade head, which is idempotent but takes no lock, so it runs once.
+# A failure leaves the old units running on the old schema.
+#
+# kerbside db upgrade exits 0 having done nothing when it cannot parse the INI
+# (kerbside#313), so its exit status is not enough. Two things in its output
+# prove it ran: Kerbside prints "INI file processing complete" on stdout once
+# it has read kerbside.ini (without the INI it would migrate a default URL),
+# and alembic logs "Context impl" on stderr once it has connected to the
+# database. The output is hidden because Kerbside's INI error quotes a line of
+# the file, and a database error can quote the URL; a migration applied shows
+# as alembic's "Running upgrade".
+- name: Migrate Kerbside's database
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - "{{ kerbside_user }}"
+      - --
+      - "{{ kerbside_venv }}/bin/kerbside"
+      - db
+      - upgrade
+  register: kerbside_db_upgrade
+  changed_when: "'Running upgrade' in kerbside_db_upgrade.stderr | default('')"
+  failed_when: false
+  no_log: true
+  run_once: true
+  delegate_to: "{{ kerbside_hosts[0] }}"
+  tags: [kerbside-database]
+
+- name: Require the migration to have read Kerbside's configuration
+  ansible.builtin.assert:
+    that: "'INI file processing complete' in kerbside_db_upgrade.stdout | default('')"
+    fail_msg: >-
+      kerbside db upgrade on {{ kerbside_hosts[0] }} did not read
+      /etc/kerbside/kerbside.ini (exit status
+      {{ kerbside_db_upgrade.rc | default('unknown') }}). Kerbside exits 0 when
+      it cannot parse that file (kerbside#313), and reads no other. Its output
+      is withheld here because it can quote the file, which holds secrets; run
+      "runuser -u {{ kerbside_user }} -- {{ kerbside_venv }}/bin/kerbside db
+      upgrade" as root on that host to see it. This check looks for Kerbside
+      printing "INI file processing complete" on stdout, so a Kerbside release
+      which changed or dropped that message would also trip it, even with a
+      good kerbside.ini.
+    quiet: true
+  run_once: true
+  tags: [kerbside-database]
+
+- name: Require the migration to have succeeded
+  ansible.builtin.assert:
+    that:
+      - kerbside_db_upgrade.rc | default(1) == 0
+      - "'Context impl' in kerbside_db_upgrade.stderr | default('')"
+    fail_msg: >-
+      kerbside db upgrade on {{ kerbside_hosts[0] }} failed (exit status
+      {{ kerbside_db_upgrade.rc | default('unknown') }}), or exited without
+      connecting to the database. Kerbside is still running on its old code
+      and schema. The error is withheld here because it can quote the database
+      URL; run "runuser -u {{ kerbside_user }} -- {{ kerbside_venv }}/bin/kerbside
+      db upgrade" as root on that host to see it. This check also looks for
+      alembic logging "Context impl" on stderr, so a Kerbside release which
+      changed its alembic logging would also trip it, even after a migration
+      which succeeded.
+    quiet: true
+  run_once: true
+  tags: [kerbside-database]
+
+# Both units together, as the node role restarts its daemons. They are wanted by
+# multi-user.target, so the node role isolating sf.target on a co-located host
+# leaves them running. daemon_reload is false: the handler flushed above has
+# already reloaded if the units changed.
+- name: Start Kerbside
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: "{{ 'restarted' if kerbside_restart_needed | bool else 'started' }}"
+    daemon_reload: false
+  loop:
+    - kerbside-api
+    - kerbside-daemon
+  tags: [kerbside-services]
+
+# GET / with a JSON Accept header needs no authentication. A wildcard or
+# loopback bind is asked on 127.0.0.1; a specific address is asked there, since
+# loopback would not answer.
+- name: Wait for Kerbside's API to answer
+  ansible.builtin.uri:
+    url: "http://{{ kerbside_api_check_host }}:{{ kerbside_api_port }}/"
+    headers:
+      Accept: application/json
+    status_code: 200
+  register: kerbside_api_check
+  retries: 20
+  delay: 3
+  until: kerbside_api_check.status | default(0) == 200
+  vars:
+    kerbside_api_check_address: "{{ kerbside_api_address | trim('[]') }}"
+    kerbside_api_check_host: >-
+      {{ '127.0.0.1'
+         if kerbside_api_check_address in ['0.0.0.0', '::', '']
+            or kerbside_api_check_address.startswith('127.')
+         else ('[' ~ kerbside_api_check_address ~ ']'
+               if ':' in kerbside_api_check_address
+               else kerbside_api_check_address) }}
+  tags: [kerbside-services]
+
+# Readiness is a signing key fetch after kerbside_ready_after: proof that
+# Kerbside's credential, which the node role re-mints on every deploy, still
+# authenticates, against a CA which still matches. It is waited for on every
+# deploy, even one which restarted nothing, which costs up to one scrape
+# interval (60 seconds). The script prints one JSON object and never a secret.
+# kerbside_ready_fetched_at (vars/main.yml) reads fetched_at from it, and
+# anything else it prints, including nothing, counts as not ready; its exit
+# status is ignored (kerbside#313): until alone decides when to stop, and an
+# attempt which exits non-zero is retried like any other. Exhausting the
+# retries is ignored on purpose, by ignore_errors, and reported by the assert
+# which follows, which names what the last check printed. failed_when: false
+# would not do that: ansible marks a task which ran out of retries failed
+# whatever failed_when says, so only ignore_errors lets the run reach the
+# assert.
+- name: Wait for Kerbside to fetch Shaken Fist's signing keys
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - "{{ kerbside_user }}"
+      - --
+      - "{{ kerbside_venv }}/bin/python"
+      - "{{ kerbside_helper_dir }}/kerbside-ready.py"
+      - "{{ deploy_name }}"
+  register: kerbside_ready
+  changed_when: false
+  ignore_errors: true
+  retries: "{{ kerbside_ready_retries }}"
+  delay: 3
+  until: >-
+    kerbside_ready_fetched_at != 'null'
+    and kerbside_ready_fetched_at | float > kerbside_ready_after | float
+  run_once: true
+  delegate_to: "{{ kerbside_hosts[0] }}"
+  tags: [kerbside-readiness]
+
+- name: Require Kerbside to have fetched Shaken Fist's signing keys
+  ansible.builtin.assert:
+    that:
+      - kerbside_ready_fetched_at != 'null'
+      - kerbside_ready_fetched_at | float > kerbside_ready_after | float
+    fail_msg: >-
+      Kerbside did not fetch the console token signing keys for source
+      {{ deploy_name }} from Shaken Fist within
+      {{ kerbside_ready_retries | int * 3 }} seconds of this deploy starting
+      its wait at {{ kerbside_ready_after }}. The last check on
+      {{ kerbside_hosts[0] }} printed:
+      {{ kerbside_ready.stdout | default('') | trim | default('nothing', true) }}.
+      A null fetched_at means Kerbside has never stored the keys, and an
+      older one that it has not stored them since: usually Kerbside's CA
+      certificate does not match the one Shaken Fist serves, or Shaken Fist
+      refused its kerbside credential. See
+      journalctl -u kerbside-daemon -u kerbside-api on the Kerbside hosts.
+      An "error" naming AttributeError or ImportError is different: the
+      installed Kerbside is incompatible with this role's readiness check,
+      which reads Kerbside's database models directly (the identifiers it
+      relies on are listed in kerbside-ready.py), and is not a CA or
+      credential problem.
+    quiet: true
+  run_once: true
+  tags: [kerbside-readiness]
+
+- name: Record what was deployed
+  ansible.builtin.copy:
+    content: "{{ kerbside_desired_state }}\n"
+    dest: "{{ kerbside_deployed_state_file }}"
+    owner: "{{ kerbside_file_owner }}"
+    group: "{{ kerbside_file_group }}"
+    mode: "0644"

@@ -67,6 +67,15 @@ repos:
         files: ^(shakenfist/deploy/collection/roles/node/(tasks/kerbside_(preflight|credentials)\.yml|meta/argument_specs\.yml|defaults/main\.yml|templates/config)|examples/_shared/site\.yml|tools/ci-test-kerbside-cluster-config\.sh)$
         pass_filenames: false
 
+      # Requires: ansible-core, openssl
+      - id: test-kerbside-role
+        name: Test the kerbside role
+        description: Drive the kerbside role's validate, bootstrap and config entry points and site.yml's Kerbside plays, rootless
+        entry: tools/ci-test-kerbside-role.sh
+        language: system
+        files: ^(shakenfist/deploy/collection/roles/kerbside/|shakenfist/deploy/collection/roles/internal_ca/(defaults|tasks|vars)/|examples/_shared/site\.yml$|tools/ci-test-kerbside-role\.sh$)
+        pass_filenames: false
+
   # Flake8 style checking via tox
   # Requires: pip install tox flake8
   - repo: local

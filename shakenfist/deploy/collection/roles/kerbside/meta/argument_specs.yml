@@ -1,0 +1,416 @@
+---
+argument_specs:
+  main:
+    short_description: Deploy a Kerbside VDI console proxy.
+    description:
+      - >-
+        Runs the per-host entry points in order: bootstrap, config, then
+        register. validate is not part of main, because the consuming
+        playbook runs it on every Kerbside host before any host is changed.
+      - >-
+        Every value is a plain role variable. The role reads no inventory group
+        names and no other host's facts; the consuming playbook maps the
+        kerbside group onto kerbside_hosts and kerbside_colocated.
+    options: &kerbside_options
+      kerbside_url:
+        type: str
+        default: ""
+        description:
+          - >-
+            Base URL of this Kerbside deployment, for example
+            https://kerbside.example.com. Required when kerbside_hosts is not
+            empty. It is the single source of truth for the console token
+            audience: the node role renders it as Shaken Fist's KERBSIDE_URL,
+            and this role renders it verbatim as Kerbside's
+            SF_CONSOLE_TOKEN_AUDIENCE. Neither is ever derived.
+          - >-
+            Set with an empty kerbside group, it is the bring-your-own-Kerbside
+            path: Shaken Fist is configured for a Kerbside this role does not
+            deploy, and validate passes.
+      kerbside_public_fqdn:
+        type: str
+        default: ""
+        description:
+          - >-
+            The name SPICE clients use to reach the proxy. Required when
+            kerbside_hosts is not empty. Rendered as Kerbside's PUBLIC_FQDN,
+            and used as the proxy certificate's CN and DNS SAN when the
+            certificate comes from internal_ca.
+      kerbside_system_key:
+        type: str
+        default: ""
+        no_log: true
+        description:
+          - >-
+            The key Kerbside authenticates to Shaken Fist with (a secret): the
+            "kerbside" key in the system namespace, which the node role's
+            kerbside_credentials entry point mints from the same variable.
+            Required when kerbside_hosts is not empty. Written into
+            sources.yaml as the source's password, and never onto a command
+            line.
+      kerbside_auth_secret_seed:
+        type: str
+        default: ""
+        no_log: true
+        description:
+          - >-
+            Kerbside's AUTH_SECRET_SEED (a secret), from which it derives the
+            secret its own API tokens are signed with. Required when
+            kerbside_hosts is not empty, at least 32 characters, and never
+            Kerbside's unconfigured sentinel ~~unconfigured~~.
+      kerbside_sql_url:
+        type: str
+        default: ""
+        no_log: true
+        description:
+          - >-
+            The SQLAlchemy URL of Kerbside's MySQL or MariaDB database (a
+            secret, since it carries the password), for example
+            mysql://kerbside:password@db.example.com/kerbside. Required when
+            kerbside_hosts is not empty. The database and its user are the
+            operator's to create; the role runs Kerbside's migrations against
+            it.
+      kerbside_sf_ca_cert:
+        type: str
+        default: ""
+        description:
+          - >-
+            The PEM content of the CA which Shaken Fist's /admin/cacert serves,
+            written into sources.yaml as the source's ca_cert. Kerbside refuses
+            to fetch the console token signing key unless the two match. The
+            example playbook reads it from the first database-tier host's
+            /etc/pki/libvirt-spice/ca-cert.pem, the file /admin/cacert serves.
+      kerbside_url_on_sf_nodes:
+        type: str
+        default: null
+        description:
+          - >-
+            kerbside_url as Shaken Fist's nodes see it. When it is supplied
+            and kerbside_hosts is not empty, validate requires kerbside_url to
+            equal it byte for byte, since the one variable is both Shaken
+            Fist's KERBSIDE_URL and Kerbside's console token audience, and a
+            difference makes every console token fail Kerbside's audience
+            check.
+          - >-
+            Not supplied (null), the default, skips the check. An empty string
+            means Shaken Fist's nodes have no kerbside_url, which fails it. The
+            example playbook supplies it from the first allsf host's
+            variables, so kerbside_url kept only where the kerbside hosts read
+            it (group_vars/kerbside) is refused before any host is changed.
+      kerbside_hosts:
+        type: list
+        elements: str
+        default: []
+        description:
+          - >-
+            The Kerbside hosts this run validates or deploys to, in inventory
+            order. Empty, the default, means Kerbside is not deployed, and
+            validate does nothing. Run-once work (the database migration and
+            the readiness check) happens on the first.
+      kerbside_colocated:
+        type: bool
+        default: false
+        description:
+          - >-
+            Whether this host is also a Shaken Fist node. When it is,
+            validate refuses a Kerbside port which a Shaken Fist daemon
+            listens on (13000, 13001 and 13005-13007 by default); when it is
+            not, validate refuses a loopback api_url, since nothing answers
+            there. The example playbook sets it per host, from the allsf
+            group.
+      api_url:
+        type: str
+        default: "http://localhost:13000"
+        description:
+          - >-
+            The Shaken Fist API URL Kerbside fetches the console token signing
+            key from, written into sources.yaml as the source's url. The same
+            variable as the node role's. Its default only works on a Kerbside
+            host which is also a Shaken Fist node, so validate refuses a
+            loopback URL on a Kerbside host which is not one
+            (kerbside_colocated false).
+      deploy_name:
+        type: str
+        default: "sf"
+        description:
+          - >-
+            The deployment name, used as the name of Kerbside's Shaken Fist
+            source. The same variable as the node role's.
+      kerbside_package:
+        type: str
+        default: "kerbside>=0.7.0"
+        description:
+          - >-
+            The Kerbside package installed into kerbside_venv: a requirement
+            such as the default, or a local wheel path.
+          - >-
+            The default floors on 0.7.0, the first release after Kerbside
+            stopped returning source secrets from its API (Kerbside commits
+            3c5a309 and 8294f22). Kerbside 0.6.0's GET /source/<name> returns
+            the source's password, which here is the cluster's kerbside system
+            namespace key. Until 0.7.0 is released, override this with a wheel
+            or a version.
+          - >-
+            A local kerbside wheel must be built from a git checkout of
+            Kerbside, not from an unpacked sdist: kerbside.sources and
+            kerbside.migrations are only included through setuptools_scm's file
+            finder, so a wheel built without git metadata is missing them
+            (kerbside#326).
+      kerbside_proxy_package:
+        type: str
+        default: ""
+        description:
+          - >-
+            The kerbside-proxy package, which carries the proxy binary.
+            Empty, the default, installs whichever version kerbside_package
+            requires, which a Kerbside release pins exactly. Set it to a wheel
+            path or a requirement to install a particular one.
+      kerbside_client_package:
+        type: str
+        default: "shakenfist-client"
+        description:
+          - >-
+            The Shaken Fist client package Kerbside's Shaken Fist source
+            imports. Not a dependency of the kerbside package, so it is
+            installed separately. A PyPI requirement or a local wheel path.
+      kerbside_pip_extra:
+        type: str
+        default: ""
+        description:
+          - >-
+            Extra arguments passed to uv pip install when installing the
+            packages, for example --index-url or proxy flags. May be empty or
+            expand to several arguments.
+      kerbside_api_address:
+        type: str
+        default: "0.0.0.0"
+        description:
+          - >-
+            The address Kerbside's API (gunicorn) binds. An IPv6 address may
+            be given bare, such as ::, and is bracketed for gunicorn.
+      kerbside_api_port:
+        type: int
+        default: 13002
+        description:
+          - >-
+            The port Kerbside's API (gunicorn) binds. Every Kerbside port must
+            be below 30000, where Shaken Fist's instance console range begins,
+            and no two may be equal. On a Kerbside host which is also a Shaken
+            Fist node (kerbside_colocated), none may be a port a Shaken Fist
+            daemon listens on: 13000, 13001, 13005, 13006 or 13007.
+      kerbside_api_workers:
+        type: int
+        default: 2
+        description:
+          - The number of gunicorn workers serving Kerbside's API.
+      kerbside_vdi_secure_port:
+        type: int
+        default: 5900
+        description:
+          - >-
+            The port the proxy accepts TLS SPICE connections on. Rendered as
+            Kerbside's VDI_SECURE_PORT. Below 30000 and distinct from the other
+            Kerbside ports.
+      kerbside_vdi_insecure_port:
+        type: int
+        default: 5901
+        description:
+          - >-
+            The port the proxy accepts plaintext SPICE connections on.
+            Rendered as Kerbside's VDI_INSECURE_PORT. Below 30000 and distinct
+            from the other Kerbside ports.
+      kerbside_metrics_port:
+        type: int
+        default: 13003
+        description:
+          - >-
+            The port Kerbside's Prometheus metrics are served on. Rendered as
+            Kerbside's PROMETHEUS_METRICS_PORT. Below 30000 and distinct from
+            the other Kerbside ports.
+      kerbside_ready_retries:
+        type: int
+        default: 60
+        description:
+          - >-
+            How many times, three seconds apart, register checks for a fetch
+            of Shaken Fist's console token signing keys made during this
+            deploy before failing it. The default, three minutes, allows three
+            of Kerbside's 60 second scrape passes.
+      kerbside_proxy_cert_path:
+        type: str
+        default: ""
+        description:
+          - >-
+            Path on the Kerbside host to an operator-supplied proxy
+            certificate. Set this, kerbside_proxy_key_path and
+            kerbside_cacert_path together, or none of them; validate refuses
+            anything in between. All three empty, the default, means the
+            example playbook issues the certificate from internal_ca.
+      kerbside_proxy_key_path:
+        type: str
+        default: ""
+        description:
+          - >-
+            Path on the Kerbside host to the private key for
+            kerbside_proxy_cert_path. Set with the other two override paths or
+            not at all.
+      kerbside_cacert_path:
+        type: str
+        default: ""
+        description:
+          - >-
+            Path on the Kerbside host to the CA certificate which signed
+            kerbside_proxy_cert_path, embedded in the console files Kerbside
+            hands to clients. Set with the other two override paths or not at
+            all.
+      kerbside_pki_dir:
+        type: str
+        default: "/etc/kerbside/pki"
+        description:
+          - >-
+            Where the proxy certificate, key and CA are read from when the
+            three override paths are empty, as server-cert.pem, server-key.pem
+            and ca-cert.pem: internal_ca's default destination names. The
+            consuming playbook passes it to internal_ca as cert_dest_dir. The
+            default is kerbside_config_dir/pki.
+      kerbside_config_dir:
+        type: str
+        default: "/etc/kerbside"
+        description:
+          - >-
+            The directory Kerbside's configuration is written to. Kerbside
+            reads its INI from /etc/kerbside/kerbside.ini and nowhere else, so
+            in production this must stay /etc/kerbside. A variable only so a
+            test without root can redirect it.
+      kerbside_state_dir:
+        type: str
+        default: "/srv/kerbside"
+        description:
+          - >-
+            Kerbside's state directory: the kerbside user's home, the parent of
+            the default kerbside_venv, and where the role records what it last
+            deployed. A variable only so a test without root can redirect it.
+      kerbside_venv:
+        type: str
+        default: "/srv/kerbside/venv"
+        description:
+          - >-
+            The virtualenv Kerbside is installed into. It is created without
+            --system-site-packages, since Kerbside needs nothing from apt at
+            runtime.
+      kerbside_unit_dir:
+        type: str
+        default: "/etc/systemd/system"
+        description:
+          - >-
+            The directory Kerbside's systemd units are written to. A variable
+            only so a test without root can redirect it.
+      kerbside_user:
+        type: str
+        default: "kerbside"
+        description:
+          - >-
+            The system user Kerbside runs as. bootstrap creates it, with no
+            login shell and kerbside_state_dir as its home.
+      kerbside_group:
+        type: str
+        default: "kerbside"
+        description:
+          - >-
+            The system group Kerbside runs as. Kerbside's configuration and
+            the proxy key are readable by this group, but owned by
+            kerbside_file_owner, so the service can read them and not change
+            them.
+      kerbside_file_owner:
+        type: str
+        default: "root"
+        description:
+          - >-
+            The owner of the directories and files the role writes which
+            Kerbside must not be able to change. A variable only so a test
+            without root can substitute the invoking user.
+      kerbside_file_group:
+        type: str
+        default: "root"
+        description:
+          - >-
+            The group of the directories and files the role writes which
+            Kerbside need not read. A variable only so a test without root can
+            substitute the invoking user's group.
+  validate:
+    short_description: Refuse a Kerbside configuration which cannot work.
+    description:
+      - >-
+        Run on every Kerbside host, before any host is changed, with that
+        host's own variables (the example playbook runs it on each reachable
+        one; it changes nothing there). Does nothing at all, and says so, when
+        kerbside_hosts is empty: Kerbside is not being deployed, and
+        kerbside_url alone is the bring-your-own-Kerbside path.
+      - >-
+        Otherwise fails the deploy when kerbside_url, kerbside_system_key,
+        kerbside_public_fqdn, kerbside_sql_url or kerbside_auth_secret_seed is
+        empty; when kerbside_auth_secret_seed is ~~unconfigured~~ or shorter
+        than 32 characters; when a Kerbside port is 30000 or above, or two are
+        equal, or kerbside_colocated is true and a port is one a Shaken Fist
+        daemon listens on; when only some of the three certificate override
+        paths are set; when api_url is a loopback URL and kerbside_colocated
+        is false; or when kerbside_url_on_sf_nodes is supplied and differs from
+        kerbside_url. No message includes a secret.
+    options: *kerbside_options
+  bootstrap:
+    short_description: Install Kerbside and record what was installed.
+    description:
+      - >-
+        Installs Kerbside's build dependencies, creates the kerbside system
+        user and group and the state directory, creates kerbside_venv, and
+        installs kerbside_package, kerbside_proxy_package, gunicorn and
+        kerbside_client_package into it.
+      - >-
+        Then hashes the installed kerbside and shakenfist_client packages and
+        the kerbside-proxy binary into the fact kerbside_code_hash, which the
+        config entry point folds into the desired state that decides whether
+        Kerbside restarts.
+      - >-
+        The apt task is tagged packages, and the user and group tasks
+        system-users, so a test without root can skip them.
+    options: *kerbside_options
+  config:
+    short_description: Write Kerbside's configuration and systemd units.
+    description:
+      - >-
+        Run on each Kerbside host after bootstrap, and after the proxy
+        certificate is in place. Writes kerbside.ini and sources.yaml
+        (kerbside_file_owner, group kerbside_group, 0640), each checked by a
+        helper script before it replaces the running file, and the
+        kerbside-api and kerbside-daemon units, which are wanted by
+        multi-user.target. Renders PROXY_HOST_SUBJECT from the certificate by
+        Shaken Fist's rules for a hypervisor's subject.
+      - >-
+        Then hashes those files, the certificate, key and CA, and
+        kerbside_code_hash from bootstrap into the fact kerbside_desired_state.
+        Nothing is started or restarted; register decides that.
+    options: *kerbside_options
+  register:
+    short_description: Migrate, restart on change, and wait for readiness.
+    description:
+      - >-
+        Run on every Kerbside host together, after config. Runs kerbside db
+        upgrade once, on the first of kerbside_hosts, as kerbside_user, before
+        any host restarts, and fails unless its output shows it read
+        kerbside.ini and connected to the database (Kerbside exits 0 on an INI
+        it cannot parse).
+      - >-
+        Then enables kerbside-api and kerbside-daemon on every host, restarting
+        both where kerbside_desired_state differs from the one recorded in
+        kerbside_state_dir/.deployed-state.sha256, or none is recorded, and
+        otherwise only starting them. Waits for each host's API to answer, and
+        then, on the first host, for Kerbside to store Shaken Fist's console
+        token signing keys later than the time recorded before any restart, on
+        every deploy. Only then records kerbside_desired_state as deployed.
+      - >-
+        Must run as root: the migration and the readiness check drop to
+        kerbside_user with runuser. The migration, the units and API check,
+        and the readiness wait are tagged kerbside-database,
+        kerbside-services and kerbside-readiness, so a test without them can
+        skip them.
+    options: *kerbside_options

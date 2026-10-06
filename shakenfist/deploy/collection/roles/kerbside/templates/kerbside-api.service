@@ -1,0 +1,35 @@
+{#
+  gunicorn takes an IPv6 address in brackets, [::]:13002, so a bare one is
+  bracketed here.
+#}
+{% set kerbside_api_bind = ('[' ~ kerbside_api_address ~ ']')
+     if ':' in kerbside_api_address and not kerbside_api_address.startswith('[')
+     else kerbside_api_address %}
+# Kerbside's REST API, written by the shakenfist.shakenfist kerbside role.
+#
+# Wanted by multi-user.target, and deliberately not by Shaken Fist's own
+# target unit: on a host which is also a Shaken Fist node, the node role
+# isolates that target, which keeps running every unit multi-user.target wants
+# (the target requires multi-user.target) and stops every other.
+[Unit]
+Description=Kerbside VDI console proxy API
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User={{ kerbside_user }}
+Group={{ kerbside_group }}
+WorkingDirectory={{ kerbside_state_dir }}
+
+# The timeout matches sf-api's: an unknown signing key id makes Kerbside call
+# Shaken Fist to refresh its keys inside the request.
+ExecStart={{ kerbside_venv }}/bin/gunicorn --bind {{ kerbside_api_bind }}:{{ kerbside_api_port }} --workers {{ kerbside_api_workers }} --timeout 300 --name kerbside-api kerbside.api:app
+
+# always rather than on-failure: Kerbside exits 0 on a configuration it cannot
+# read (kerbside#313), and it never exits 0 on purpose.
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

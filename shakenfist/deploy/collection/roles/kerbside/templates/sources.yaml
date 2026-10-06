@@ -1,0 +1,23 @@
+{#
+  One Shaken Fist source. The list is built as data and dumped by
+  to_nice_yaml, never assembled from strings, so a password which looks like a
+  number, or carries a colon or a quote, is still quoted correctly, and the CA
+  certificate loads back as exactly kerbside_sf_ca_cert. ansible's dumper
+  writes a multi-line string as a quoted scalar rather than a literal block;
+  that is uglier to read, but it loads back byte for byte, which is what
+  Kerbside's ca_cert comparison needs.
+
+  The width is large so that no value is folded across lines. Folding would
+  load back correctly too, but a line per value is easier to read.
+#}
+{% set kerbside_sources = [{
+  'source': deploy_name,
+  'type': 'shakenfist',
+  'url': api_url,
+  'username': 'system',
+  'password': kerbside_system_key,
+  'ca_cert': kerbside_sf_ca_cert,
+}] %}
+# Kerbside's sources, written by the shakenfist.shakenfist kerbside role.
+# Local changes are overwritten on the next deploy.
+{{ kerbside_sources | to_nice_yaml(indent=2, width=100000) }}

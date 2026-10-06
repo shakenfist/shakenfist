@@ -1,0 +1,64 @@
+---
+# Values derived from the role's variables. They live here rather than in
+# defaults/main.yml because they are not settings: each follows from variables
+# which are, and nothing should override one independently of those.
+
+# The certificate, key and CA Kerbside's proxy and API are configured with:
+# the operator's override paths when they are set (validate requires all three
+# or none), otherwise the internal_ca destination names (cert_dest_cert_name,
+# cert_dest_key_name and cert_dest_ca_name) under kerbside_pki_dir, where the
+# consuming playbook has internal_ca install them.
+kerbside_proxy_cert_file: >-
+  {{ kerbside_proxy_cert_path if kerbside_proxy_cert_path | length > 0
+     else kerbside_pki_dir ~ '/server-cert.pem' }}
+kerbside_proxy_key_file: >-
+  {{ kerbside_proxy_key_path if kerbside_proxy_key_path | length > 0
+     else kerbside_pki_dir ~ '/server-key.pem' }}
+kerbside_cacert_file: >-
+  {{ kerbside_cacert_path if kerbside_cacert_path | length > 0
+     else kerbside_pki_dir ~ '/ca-cert.pem' }}
+
+# The ports Shaken Fist's daemons listen on, by default, on every node they run
+# on, and the daemon behind each. validate refuses any of them as a Kerbside
+# port on a Kerbside host which is also a Shaken Fist node (kerbside_colocated).
+# sf-api binds 13000 in roles/node/templates/sf-api.service:33; the others are
+# the defaults of RESOURCES_METRICS_PORT and CLUSTER_METRICS_PORT
+# (shakenfist/config.py:537-542) and of MARIADB_GATEWAY_PORT and
+# MARIADB_GATEWAY_METRICS_PORT (shakenfist/config.py:896-901). sf-database
+# runs only on the database tier, but which nodes those are is the
+# inventory's, so its ports are refused on every co-located host. A change to
+# any of those defaults belongs here too.
+kerbside_sf_listener_ports:
+  13000: sf-api
+  13001: sf-resources' metrics (RESOURCES_METRICS_PORT)
+  13005: sf-database's gRPC gateway (MARIADB_GATEWAY_PORT)
+  13006: sf-database's metrics (MARIADB_GATEWAY_METRICS_PORT)
+  13007: sf-cluster's metrics (CLUSTER_METRICS_PORT)
+
+# Where the role's helper scripts are copied on the Kerbside host. They run
+# there, with the virtualenv's Python: the validate commands which check
+# kerbside.ini and sources.yaml before either replaces the running file, the
+# script which renders the proxy certificate's subject, and the script register
+# polls for readiness.
+kerbside_helper_dir: "{{ kerbside_state_dir }}/bin"
+
+# Where register records the desired state it last brought to readiness.
+kerbside_deployed_state_file: "{{ kerbside_state_dir }}/.deployed-state.sha256"
+
+# What register's readiness wait reads from kerbside-ready.py: its output must
+# be exactly the one-line JSON object the script prints, matched by
+# kerbside_ready_pattern before it is parsed, since from_json on anything else
+# would fail the task rather than count as not ready. The pattern admits only
+# what the script's json.dumps() can produce, and no backslash, so every match
+# parses. kerbside_ready_fetched_at is the parsed fetched_at as a string, or
+# 'null' when the keys were never fetched or the output was anything else.
+# Evaluated lazily, so each reads the latest kerbside_ready the wait registered.
+kerbside_ready_pattern: >-
+  ^[{]"errored": (true|false|null),
+  "fetched_at": (null|-?[0-9]+([.][0-9]+)?([eE][-+]?[0-9]+)?)(,
+  "error": "[A-Za-z0-9 .:_-]*")?[}]$
+kerbside_ready_output: "{{ kerbside_ready.stdout | default('') | trim }}"
+kerbside_ready_fetched_at: >-
+  {{ (((kerbside_ready_output | from_json).fetched_at
+       if kerbside_ready_output is match(kerbside_ready_pattern) else none)
+      | default('null', true)) | string }}
