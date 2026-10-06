@@ -15181,6 +15181,11 @@ commands available on a PR.</p>
 <td>Hourly schedule, manual</td>
 </tr>
 <tr>
+<td><code>ci-headroom-health.yml</code></td>
+<td>Harvest the ten newest merge runs' CI headroom bundles and assert the probe which wrote them is still working (runs <code>tools/ci_headroom_health.py</code>; see <a href="../ci_cloud_sizing/#is-the-instrument-still-alive">Is the instrument still alive?</a>). The one headroom check allowed to fail, because it is scheduled: it must never gain a PR or merge_group trigger</td>
+<td>Weekly schedule (Mondays 07:30 UTC), manual</td>
+</tr>
+<tr>
 <td><code>export-repo-config.yml</code></td>
 <td>Export GitHub repo settings to version control, via a shared reusable workflow in the <code>actions/</code> repository</td>
 <td>Daily schedule</td>
