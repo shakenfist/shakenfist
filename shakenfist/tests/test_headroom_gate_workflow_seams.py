@@ -2,10 +2,10 @@
 
 """Every call of smoke-cluster.yml states its headroom gate policy.
 
-PLAN-ci-cloud-sizing phase 5 made a cluster-wide band violation fail the
-cluster job, in `shakenfist/actions`'s smoke-cluster.yml, which this
-repository reaches at `@main` with no pin. Two rules follow, and this is
-what enforces them; docs/developer_guide/ci_cloud_sizing.md states them.
+A cluster-wide band violation fails the cluster job, in `shakenfist/actions`'s
+smoke-cluster.yml, which this repository reaches at `@main` with no pin. Two
+rules follow, and this is what enforces them;
+docs/developer_guide/ci_cloud_sizing.md states them.
 
 A call site which is gated must pass the CI_HEADROOM_GATE repository
 variable through as `headroom_gate`, because the recovery for a spurious
@@ -18,7 +18,7 @@ to the default shows up in review instead of silently altering a job's
 gating.
 
 And a call site may only be gated on a job shape a warn window measured.
-D7's test for arming the gate was that it would not have failed runs which
+The test for arming the gate was that it would not have failed runs which
 were fine, and that test says nothing about a shape it never saw. The
 shape is derived from what each call site (and each matrix entry) actually
 passes, so a new matrix entry on an unmeasured topology fails here rather
@@ -43,10 +43,9 @@ OFF_SWITCH = "${{ vars.CI_HEADROOM_GATE != 'false' }}"
 # from what the job runs without anything here changing.
 SHAPE_INPUTS = ('topology', 'tier', 'test_kind', 'stestr_config')
 
-# The shapes phase 5's warn window measured -- every job of the merge
-# matrix, ten merge_group runs each, recorded in the 5e Outcome of
-# docs/plans/PLAN-ci-cloud-sizing-phase-05-guardrails.md. Adding a shape
-# here is the act of arming the gate on it, and needs a window of its own.
+# The shapes the warn window measured -- every job of the merge matrix,
+# ten merge_group runs each. Adding a shape here is the act of arming the
+# gate on it, and needs a warn window of its own first.
 # base_image is deliberately not part of the shape: the band measures the
 # cloud's committed vCPU against its ledger, not the guest, and the window
 # covered two base images (Debian 12 and Ubuntu 24.04) on the same topology

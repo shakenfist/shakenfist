@@ -3,13 +3,11 @@
 
 ``cluster_ci_tests/test_nodes.py``'s
 ``test_cluster_topology_meets_the_structural_minimum`` asserts, against a
-deployed cluster, that the topology is big enough for the rest of the
-cluster suite to mean anything
-(PLAN-ci-cloud-sizing-phase-05-guardrails.md's D6). Cluster CI only runs
-in the merge queue, so nothing in that file is checkable on a
-``pull_request`` -- and an assertion which is *itself* wrong is the worst
-kind to discover there, because it fails jobs on clusters which are
-fine.
+deployed cluster, that the topology is big enough for the rest of the cluster
+suite to mean anything. Cluster CI only runs in the merge queue, so nothing in
+that file is checkable on a ``pull_request`` -- and an assertion which is
+*itself* wrong is the worst kind to discover there, because it fails jobs on
+clusters which are fine.
 
 The bounds and the arithmetic therefore live in
 ``shakenfist_ci/sizing.py``, a module deliberately free of suite and
@@ -137,7 +135,7 @@ def _requirements(violations):
 SLIM_PRIMARY = _topology([3, 6, 6, 6, 6], network_node=0,
                          database_only_nodes=1)
 
-# slim-tier, after phase 4 doubled it: a primary carrying network,
+# slim-tier, as it stands today: a primary carrying network,
 # database and hypervisor roles and sf1 carrying database and hypervisor
 # (6 vCPU less 4, times 3), and sf2 a plain hypervisor (6 vCPU less 2,
 # times 3).
@@ -145,10 +143,10 @@ SLIM_TIER = _topology([6, 6, 12], network_node=0, database_nodes=(0, 1))
 
 
 class StructuralMinimumConstantsTestCase(base.ShakenFistTestCase):
-    def test_the_bounds_are_the_ones_the_phase_decided(self):
+    def test_the_bounds_are_pinned_not_followed(self):
         """Pinned deliberately, because loosening one is a topology decision.
 
-        D6 chose a ledger floor with no tolerance at all: 24 is exactly
+        The ledger floor has no tolerance at all: 24 is exactly
         ``slim-tier``'s present total, so any reduction to that topology
         fails immediately and by name. A future, smaller-on-purpose
         cloud is supposed to have to edit this constant in the same
@@ -172,7 +170,7 @@ class RealTopologyTestCase(base.ShakenFistTestCase):
             per_node, nodes))
 
     def test_slim_tier_clears_every_bound_with_nothing_to_spare(self):
-        """And sits exactly on the floor, which is what D6 chose it to do."""
+        """And sits exactly on the floor, which is deliberate."""
         per_node, nodes = SLIM_TIER
         self.assertEqual(3, len(nodes))
         self.assertEqual(
@@ -182,7 +180,7 @@ class RealTopologyTestCase(base.ShakenFistTestCase):
             per_node, nodes))
 
     def test_slim_primary_would_fail_a_database_node_bound(self):
-        """Which is why D6 does not assert one.
+        """Which is why there is no database-node bound.
 
         ``slim-primary``'s primary is the only member of its database
         tier, so a minimum of two database nodes would fail the
@@ -283,13 +281,14 @@ class BoundaryTestCase(base.ShakenFistTestCase):
 class YoungClusterTestCase(base.ShakenFistTestCase):
     """Two readings a healthy cluster publishes while it is warming up.
 
-    Neither is evidence of a small cloud, and phase 2 measured the first
-    one in every single job-run it looked at, so a function which
-    mistook either for a topology fault would fail every cluster job.
+    Neither is evidence of a small cloud, and the baseline measurement
+    found the first one in every single job-run it looked at, so a
+    function which mistook either for a topology fault would fail every
+    cluster job.
     """
 
     def test_a_cluster_with_no_capacity_rows_yet_still_sums_its_ledger(self):
-        # The window phase 2 measured: 9 to 14 samples, 135 to 210
+        # The measured warm-up window: 9 to 14 samples, 135 to 210
         # seconds, in every one of 204 job-runs, where every node
         # publishes cpu_limit None with capacity_degraded false. The
         # fallback to the live cpu_hard_max is what stops that reading

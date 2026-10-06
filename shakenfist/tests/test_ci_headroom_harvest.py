@@ -2,13 +2,13 @@
 """The harvest must never quietly produce a smaller window than it claims.
 
 ``tools/ci_headroom_harvest.py`` turns the banked CI bundles from many merge
-runs into the dataset phase 2's baseline is argued from, and phases 4 and 5
-argue from after that. Almost every way it can be wrong makes the output
-look *better* rather than obviously broken: a job dropped because its
-artifact name was not recognised, a bundle recorded as having no probe
-because the nested zip was not opened, a run's traces read from the previous
-bundle's leftovers. None of those raise, and none of them are visible in the
-resulting file.
+runs into the dataset the CI cloud sizing baseline is argued from, and every
+later re-measure argues from after that. Almost every way it can be wrong
+makes the output look *better* rather than obviously broken: a job dropped
+because its artifact name was not recognised, a bundle recorded as having
+no probe because the nested zip was not opened, a run's traces read from
+the previous bundle's leftovers. None of those raise, and none of them are
+visible in the resulting file.
 
 So the coverage here is deliberately weighted towards the silent failures:
 
@@ -21,17 +21,16 @@ So the coverage here is deliberately weighted towards the silent failures:
   produces no record and no exception. A separate test pins the two tables'
   *shape*: no bundle name is in both, every ``BundleKind`` is fully filled
   in, and every topology it names is one that actually exists -- so a bundle
-  moved between the tables (as the Ansible modules one was, by phase 6 of
-  PLAN-ci-cloud-sizing-phase-06-docs.md) cannot end up in neither, or in
-  both.
+  moved between the tables (as the Ansible modules one was) cannot end up in
+  neither, or in both.
 * The bundle is a nested zip. The traces live inside ``bundle.zip`` inside
   the artifact zip, and a tool which looked only at the outer namelist would
   report every run in the window as having no probe.
 * A bundle with no series is recorded with a reason, not dropped, because the
-  n step 2d states has to include it.
+  n the dataset reports against has to include it.
 * Two bundles in the same run must not read each other's trace files.
-* The output is compact JSONL (D22), because the record is 3.7 KB rather than
-  the few hundred bytes the plan originally guessed.
+* The output is compact JSONL, because the record is 3.7 KB rather than
+  the few hundred bytes first guessed.
 
 GitHub is faked throughout: the real thing is ``gh`` on a subprocess, and a
 test which shelled out would need network, credentials and a live window.
@@ -345,8 +344,7 @@ class ClassificationTestCase(HarvestTestCase):
             self.assertEqual('%s (collection)' % job, kind.job_prefix)
 
     def test_the_ansible_modules_bundle_is_now_instrumented(self):
-        # Phase 6 of PLAN-ci-cloud-sizing-phase-06-docs.md (D3) moved this
-        # bundle out of UNINSTRUMENTED_BUNDLES once the matching
+        # This bundle moved out of UNINSTRUMENTED_BUNDLES once the matching
         # shakenfist/actions change widened the probe-step gate onto that
         # job. job_prefix is read from two real runs (36343591915,
         # 36316642104), not derived, because the derivation broke once
@@ -456,8 +454,8 @@ class RecordTestCase(HarvestTestCase):
         self.assertEqual(3, record['summary']['series']['samples_usable'])
 
     def test_the_job_conclusion_is_the_jobs_not_the_runs(self):
-        # The master plan's central claim is that utilisation explains the
-        # pass rate spread, and it is per job. A run's conclusion is the
+        # The claim this dataset exists to test is that utilisation explains
+        # the pass rate spread, and it is per job. A run's conclusion is the
         # logical AND of six jobs, so recording only that would make every
         # job of a run in which any job failed look like a failure.
         github = self._github({TIER_BUNDLE: instrumented_members()},
@@ -477,10 +475,10 @@ class RecordTestCase(HarvestTestCase):
         self.assertIsNone(record['job_conclusion'])
 
     def test_a_bundle_with_no_series_is_recorded_not_dropped(self):
-        # A run predating phase 1, or one whose probe never started, is part
-        # of the window: the n step 2d states has to include it, and a
-        # silently dropped record makes the window look both smaller and
-        # healthier than it was.
+        # A run from before the probe existed, or one whose probe never
+        # started, is part of the window: the n the dataset reports against
+        # has to include it, and a silently dropped record makes the window
+        # look both smaller and healthier than it was.
         github = self._github({PRIMARY_BUNDLE: {'bundle/logs/syslog': 'x\n'}})
         count, lines = self._harvest(github)
         self.assertEqual(1, count)
@@ -493,7 +491,7 @@ class RecordTestCase(HarvestTestCase):
         self.assertEqual(1000, record['run_id'])
 
     def test_an_absent_census_is_not_collected_rather_than_zero(self):
-        # D20. The retrospective window's census filter could not match the
+        # The retrospective window's census filter could not match the
         # capacity guard messages, and a record saying zero refusals would be
         # read as a cluster which never refused.
         members = instrumented_members()
@@ -507,9 +505,10 @@ class RecordTestCase(HarvestTestCase):
         self.assertIsNone(record['summary']['census']['stage_events'])
 
     def test_the_label_file_overrides_the_artifact_name_table(self):
-        # D20 writes the topology into the bundle so a later harvest need not
-        # infer it. Once it is there it wins, which is what keeps this tool
-        # working as topologies are added after it was written.
+        # The collect script writes the topology into the bundle so a later
+        # harvest need not infer it. Once it is there it wins, which is what
+        # keeps this tool working as topologies are added after it was
+        # written.
         members = instrumented_members(label='slim-fat-experiment cluster-ci.conf')
         github = self._github({PRIMARY_BUNDLE: members})
         _, lines = self._harvest(github)
@@ -542,15 +541,14 @@ class RecordTestCase(HarvestTestCase):
         self.assertEqual(PRIMARY_BUNDLE, json.loads(lines[0])['artifact_name'])
 
     def test_an_ansible_modules_bundle_with_no_traces_yet_is_recorded_absent(self):
-        # The bundle-table half of D3 (phase 6) can land before the matching
-        # shakenfist/actions change is pushed -- the plan's Prepared changes
-        # section says so explicitly. Until then a real 'Ansible modules'
-        # bundle still uploads (the job already produced one; only its
-        # contents change), so a harvest run in that window must not raise
-        # and must not silently drop it: it is now classified 'harvest', so
-        # it goes through the same no-series path as any other instrumented
-        # bundle whose probe did not run, and is recorded with a reason
-        # rather than dropped.
+        # The bundle-table half of instrumenting a job can land before the
+        # matching shakenfist/actions change is pushed. Until then a real
+        # 'Ansible modules' bundle still uploads (the job already produced one;
+        # only its contents change), so a harvest run in that window must not
+        # raise and must not silently drop it: it is now classified 'harvest',
+        # so it goes through the same no-series path as any other instrumented
+        # bundle whose probe did not run, and is recorded with a reason rather
+        # than dropped.
         github = self._github({
             PRIMARY_BUNDLE: instrumented_members(),
             ANSIBLE_BUNDLE: {'bundle/logs/syslog': 'x\n'},
@@ -866,8 +864,8 @@ class LoudFailureTestCase(HarvestTestCase):
 
 class CacheTestCase(HarvestTestCase):
     def test_a_cached_artifact_is_not_downloaded_twice(self):
-        # The full window is roughly 1.3 GB, and step 2d will not get the
-        # harvest right on the first attempt.
+        # The full window is roughly 1.3 GB, and nobody gets a harvest
+        # right on the first attempt.
         run = self._run_payload()
         artifacts = [{'id': 9700, 'name': PRIMARY_BUNDLE, 'expired': False}]
         zips = {9700: self._zip('9700', instrumented_members())}
@@ -892,9 +890,10 @@ class CacheTestCase(HarvestTestCase):
 
 class SerialisationTestCase(HarvestTestCase):
     def test_the_output_is_compact_jsonl(self):
-        # D22, corrected after a real record was measured at 3.7 KB compact
-        # rather than the few hundred bytes the plan first guessed. Indenting
-        # a 264 record dataset costs about half a megabyte for nothing.
+        # The size estimate was corrected after a real record was measured
+        # at 3.7 KB compact rather than the few hundred bytes first guessed.
+        # Indenting a 264 record dataset costs about half a megabyte for
+        # nothing.
         record = {'run_id': 1, 'summary': {'a': 1, 'b': [1, 2]}}
         handle = io.StringIO()
         harvest.write_records([record, record], handle)
@@ -964,7 +963,7 @@ class RunListingTestCase(HarvestTestCase):
 
     def test_until_bounds_the_far_end_of_the_window(self):
         # A window with only a start grows with every merge. The command
-        # step 2g's README first quoted (--since with --limit) stopped
+        # the dataset's README first quoted (--since with --limit) stopped
         # reproducing its own dataset within a day, when two more runs
         # merged and the newest ten became a different ten.
         github = self._listing([
@@ -1165,7 +1164,7 @@ class BundleTableShapeTestCase(HarvestTestCase):
     Distinct from ClassificationTestCase, which checks what classify_artifact
     does with individual names: these tests check the tables it reads never
     drift into an inconsistent shape, which is exactly what moving a bundle
-    between them (as D3 of phase 6 did for the Ansible modules one) risks
+    between them (as happened to the Ansible modules one) risks
     getting wrong -- a bundle left in both tables would be classified by
     whichever dict.__contains__ check runs first (classify_artifact tries
     UNINSTRUMENTED_BUNDLES before BUNDLE_TOPOLOGIES), silently skipping real
@@ -1173,14 +1172,13 @@ class BundleTableShapeTestCase(HarvestTestCase):
     harvest the next time it is run.
     """
 
-    # The topologies a BundleKind is allowed to name. Sourced from D17's
-    # table (PLAN-ci-cloud-sizing.md) and F1's inventory
-    # (PLAN-ci-cloud-sizing-phase-06-docs.md): every merge_group cluster job
-    # this tool ever harvests deploys one of these two shapes. 'localhost'
-    # (the single-node smoke topology) is deliberately excluded -- the smoke
-    # job runs on pull_request, not merge_group, so this tool never sees a
-    # bundle from it (list_runs() only reads merge_group runs), and a
-    # BundleKind naming it would be an error, not a new case to allow.
+    # The topologies a BundleKind is allowed to name: every merge_group cluster
+    # job this tool ever harvests deploys one of these two shapes, read from
+    # the merge matrix. 'localhost' (the single-node smoke topology) is
+    # deliberately excluded -- the smoke job runs on pull_request, not
+    # merge_group, so this tool never sees a bundle from it (list_runs() only
+    # reads merge_group runs), and a BundleKind naming it would be an error,
+    # not a new case to allow.
     KNOWN_TOPOLOGIES = frozenset({'slim-primary', 'slim-tier'})
 
     def test_no_bundle_name_is_in_both_tables(self):

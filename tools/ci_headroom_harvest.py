@@ -2,23 +2,23 @@
 # Copyright 2019 Michael Still and contributors
 """Turn the banked CI headroom bundles from many merge runs into one dataset.
 
-Phase 1 of the CI cloud sizing plan built the instrument: every functional
-cluster job samples ``/admin/resources`` and the node roster every fifteen
-seconds, scrapes a filtered Loki census of the scheduler's per-candidate
-stage events, and drops both into the job's ninety day artifact bundle.
-Phase 2's D16 decided the baseline is computed *retrospectively* from the
-runs already banked rather than by opening a new window and waiting it out:
-the instrument has been running for a week, artifact retention is ninety
-days, and every day spent waiting for the late part of the window is a day
-of the early part expiring.
+Every functional cluster job samples ``/admin/resources`` and the node
+roster every fifteen seconds, scrapes a filtered Loki census of the
+scheduler's per-candidate stage events, and drops both into the job's ninety
+day artifact bundle. A CI cloud sizing baseline is therefore computed
+*retrospectively* from the runs already banked rather than by opening a new
+window and waiting it out: artifact retention is ninety days, and every day
+spent waiting for the late part of a window is a day of the early part
+expiring.
 
 This tool is what makes that retrospective possible. It enumerates the
 ``merge_group`` runs of ``functional-tests.yml``, downloads each run's
-cluster bundles, unpacks the two trace files phase 1 writes, hands them to
-``tools/ci_headroom_report.py``'s ``summary_record()`` (D18), and writes one
-JSON object per job per run. Step 2d runs it over the whole window and
-commits the result; phase 4, phase 5 and any future re-measure check the
-arithmetic against that file rather than trusting a number in a plan.
+cluster bundles, unpacks the two trace files the probe writes, hands them to
+``tools/ci_headroom_report.py``'s ``summary_record()``, and writes one JSON
+object per job per run. Its committed output lives in
+``docs/plans/data/ci-cloud-sizing-baseline/``, and any decision about the
+size of the cloud checks its arithmetic against that file rather than
+trusting a number written down somewhere.
 
 Four things about the shape of the data are load bearing, and each of them
 was checked against a real artifact rather than reasoned about:
@@ -28,26 +28,25 @@ was checked against a real artifact rather than reasoned about:
   *that*, at ``bundle/traces/``. Reading the outer zip's namelist for
   ``traces/headroom.jsonl`` finds nothing and would have looked exactly like
   a run whose probe never started.
-* **Five of the six cluster bundles carry the probe** (D17). Phase 6's D3
-  moved 'Ansible modules' into ``BUNDLE_TOPOLOGIES`` ahead of the
-  shakenfist/actions change that instruments it (#4377); that change merged
-  on 2026-10-01 and the bundle has carried a real series since. A harvest
-  over the window before it reads ``series_present`` false there -- an
-  expected absence, not a probe failure. The sixth, 'Node lifecycle', is
-  skipped by name rather than recorded as missing data. See
-  ``UNINSTRUMENTED_BUNDLES`` below.
+* **Five of the six cluster bundles carry the probe.** 'Ansible modules' was
+  moved into ``BUNDLE_TOPOLOGIES`` ahead of the shakenfist/actions change that
+  instruments it (#4377); that change merged on 2026-10-01 and the bundle has
+  carried a real series since. A harvest over the window before it reads
+  ``series_present`` false there -- an expected absence, not a probe failure.
+  The sixth, 'Node lifecycle', is skipped by name rather than recorded as
+  missing data. See ``UNINSTRUMENTED_BUNDLES`` below.
 * **The topology is not in the series.** It is passed to the report at run
   time and never written down, so a bundle on disk does not say which shape
-  produced it. D20 fixed that prospectively by having the collect script
+  produced it. That was fixed prospectively by having the collect script
   write ``traces/headroom-label``, and runs carrying it now exist: those
   records report ``topology_source`` 'headroom-label' and the table becomes
   a cross-check rather than the only answer. Older runs still map through
   the explicit table in ``BUNDLE_TOPOLOGIES``, which fails loudly on a
   bundle name it does not cover rather than guessing.
-* **A bundle with no series is a record, not a gap.** A run predating phase
-  1, or one whose probe never started, is written out with ``summary`` null
-  and a reason. Dropping it silently would make the window look smaller and
-  healthier than it was.
+* **A bundle with no series is a record, not a gap.** A run from before the
+  probe existed, or one whose probe never started, is written out with
+  ``summary`` null and a reason. Dropping it silently would make the window
+  look smaller and healthier than it was.
 
 Unlike ``ci_headroom_report.py``, which runs on a CI runner under stock
 python3 and is therefore standard library only, this is a developer tool run
@@ -56,10 +55,10 @@ library, but only because it did not need to: the one thing that would have
 wanted a dependency is HTTP, and shelling out to ``gh`` gets authentication,
 retries and enterprise hosts for free.
 
-D15's exit-zero-whatever-happens discipline does **not** apply here. That
-rule exists so an instrument cannot fail the job it is measuring; this tool
-runs on a laptop, and a harvest which silently half-completed and exited
-zero would poison the baseline. It fails loudly instead.
+The report tool's exit-zero-whatever-happens discipline does **not** apply
+here. That rule exists so an instrument cannot fail the job it is measuring;
+this tool runs on a laptop, and a harvest which silently half-completed and
+exited zero would poison the baseline. It fails loudly instead.
 
 Example:
 
@@ -96,7 +95,7 @@ DEFAULT_WORKFLOW = 'functional-tests.yml'
 # would be unable to say which half it could not read.
 HARVEST_VERSION = 1
 
-# Where inside the *inner* zip the phase 1 traces live. The bundle is built
+# Where inside the *inner* zip the probe's traces live. The bundle is built
 # by scp'ing the whole of /srv/ci/traces/ off the cluster primary, so these
 # paths are the primary's directory layout with a 'bundle/' prefix the
 # archive step adds.
@@ -131,16 +130,15 @@ BundleKind = collections.namedtuple(
     'BundleKind', ['job', 'topology', 'job_prefix'])
 
 
-# D17's table, sourced from the merge matrix at
+# The artifact-name table, sourced from the merge matrix at
 # .github/workflows/functional-tests.yml:440-495, plus the Ansible modules
-# entry phase 6 of PLAN-ci-cloud-sizing-phase-06-docs.md added in its 6d
-# (D3 there), which the shakenfist/actions change widening the probe gate
-# onto that job has since made live (#4377). Four of the five jobs run
+# entry, which the shakenfist/actions change widening the probe gate onto
+# that job has since made live (#4377). Four of the five jobs run
 # the *same* topology, which is the point: if slim-primary's four jobs
 # differ from each other in peak demand then the difference is the suite and
-# not the shape, and phase 4 must not respond to it by resizing the cloud.
+# not the shape, and nobody may respond to it by resizing the cloud.
 # Pooling by topology would hide that, so the harvest records the job as well
-# as the topology and step 2d reports both.
+# as the topology, and the dataset carries both.
 #
 # 'job_prefix' is the name GitHub gives the job in the runs/<id>/jobs
 # listing, which is *not* the matrix's 'name': the reusable smoke-cluster
@@ -156,10 +154,8 @@ BundleKind = collections.namedtuple(
 # derived from the matrix's job name.
 #
 # 'Ansible modules' was classified here before the shakenfist/actions change
-# that instruments it existed -- the diff was written out under Prepared
-# changes in docs/plans/PLAN-ci-cloud-sizing-phase-06-docs.md for the
-# operator to push, tracked as #4377, and merged on 2026-10-01. A harvest
-# over the window before that merge still finds the
+# that instruments it existed -- that change was tracked as #4377 and merged
+# on 2026-10-01. A harvest over the window before that merge still finds the
 # 'bundle-shakenfist-full-ansible-modules' artifact (the job uploaded a
 # bundle all along; only its contents changed), classifies it here rather
 # than skipping it, and records it with series_present False and
@@ -199,12 +195,11 @@ BUNDLE_TOPOLOGIES = {
 
 # The one cluster bundle skipped by name because it carries no traces/
 # directory at all, checked empirically against merge run 33944911413.
-# Originally there were two, for two different causes -- see D17 of
-# PLAN-ci-cloud-sizing.md and D3 of PLAN-ci-cloud-sizing-phase-06-docs.md.
-# Phase 6's 6d moved the 'Ansible modules' bundle into BUNDLE_TOPOLOGIES
-# above, and prepared the widening of smoke-cluster.yml's probe-step gate
-# that instruments it; that landed in shakenfist/actions on 2026-10-01
-# (#4377). What remains here is the composite-action seam:
+# Originally there were two, for two different causes. The 'Ansible
+# modules' bundle moved into BUNDLE_TOPOLOGIES above once the widening of
+# smoke-cluster.yml's probe-step gate that instruments it landed in
+# shakenfist/actions on 2026-10-01 (#4377). What remains here is the
+# composite-action seam:
 #
 # * 'Node lifecycle' never reaches the reusable smoke-cluster workflow at
 #   all. It calls the build-smoke-cluster composite action directly
@@ -213,15 +208,14 @@ BUNDLE_TOPOLOGIES = {
 #   moving or duplicating the probe steps into the composite action, which
 #   changes how *every* caller deploys -- shakenfist's five call sites,
 #   client-python's, kerbside's and the canary's -- through an action
-#   consumed at @main with no pin. D4 of phase 6 files an issue for this
-#   rather than making that change in a documentation phase; kerbside's
+#   consumed at @main with no pin. Instrumenting it is therefore deferred,
+#   and tracked as #4367 rather than done here; kerbside's
 #   'sf-e2e-functional.yml' reaches the same seam but uploads no cluster
 #   bundle this tool would ever see, so it is not listed here.
 #
 # Skipping the remaining bundle by name, deliberately, is the difference
 # between a dataset missing one job and one which quietly records a failed
-# harvest per run. D17 (PLAN-ci-cloud-sizing.md) and D4 (phase 6) are where
-# instrumenting it is tracked.
+# harvest per run. Instrumenting it is tracked as #4367.
 UNINSTRUMENTED_BUNDLES = {
     'bundle-functional-node-lifecycle-collection': (
         'the Node lifecycle job calls the build-smoke-cluster composite '
@@ -238,13 +232,13 @@ class UnknownBundleError(HarvestError):
     """A cluster bundle whose topology this tool has not been told.
 
     Named, and raised rather than skipped, because of what the alternatives
-    cost. Guessing a topology from the artifact name would put a made-up
-    label on a real measurement in a dataset the next three phases argue
-    from. Skipping quietly would drop a whole job out of the window without
-    saying so, and the resulting baseline would be a smaller n than it
-    claimed with no way for a reader to tell. A new bundle name means the
-    merge matrix in .github/workflows/functional-tests.yml gained a row, and
-    a human should decide which topology it is.
+    cost. Guessing a topology from the artifact name would put a made-up label
+    on a real measurement in a dataset the cloud is sized from. Skipping
+    quietly would drop a whole job out of the window without saying so, and the
+    resulting baseline would be a smaller n than it claimed with no way for a
+    reader to tell. A new bundle name means the merge matrix in
+    .github/workflows/functional-tests.yml gained a row, and a human should
+    decide which topology it is.
     """
 
 
@@ -464,9 +458,10 @@ def list_runs(github, workflow=DEFAULT_WORKFLOW, since=None, until=None,
     including one would put a spurious probe-absent record in the dataset.
 
     ``since`` and ``until`` are both inclusive and both compared against
-    the run's creation time, which is the field D16's window is defined in
-    terms of (the census fix merged on 2026-08-30, and runs created before
-    that carry a census which could not have collected the guard events).
+    the run's creation time, which is the field a harvested window is
+    defined in terms of (the census fix merged on 2026-08-30, and runs
+    created before that carry a census which could not have collected the
+    guard events).
     They are applied twice, on purpose: as a ``created=`` filter on the API
     call, so that a window never walks the whole of the repository's
     history, and again here, so that a boundary carrying a time of day is
@@ -474,21 +469,21 @@ def list_runs(github, workflow=DEFAULT_WORKFLOW, since=None, until=None,
 
     ``until`` is what makes a harvested window *reproducible*. A window
     bounded only at its start grows with every merge, and one bounded by
-    ``--limit`` moves with the day it is run on: the command step 2g's
+    ``--limit`` moves with the day it is run on: the command the dataset's
     README first quoted, ``--since 2026-09-07 --limit 10``, stopped
     reproducing its own dataset the moment two more runs merged. A dataset
     committed to this repository outlives the week it was harvested in and
     has to name both ends of what it covers.
 
-    **Nothing in here may assume the order the listing arrives in.** The
-    first version of this function did -- it read runs until it met one
-    created before the window and then stopped, documented as "the listing
-    is newest first". On 2026-09-08 the API served this workflow's
-    ``merge_group`` runs *oldest* first, so the very first run was outside
-    any recent window, and step 2g's harvest wrote zero records and exited
-    zero: exactly the silently half-completed harvest this tool's module
-    docstring says it must never be. The window is now bounded at the API
-    and the ordering ``limit`` needs is established here by sorting.
+    **Nothing in here may assume the order the listing arrives in.** The first
+    version of this function did -- it read runs until it met one created
+    before the window and then stopped, documented as "the listing is newest
+    first". On 2026-09-08 the API served this workflow's ``merge_group`` runs
+    *oldest* first, so the very first run was outside any recent window, and a
+    harvest over that window wrote zero records and exited zero: exactly the
+    silently half-completed harvest this tool's module docstring says it must
+    never be. The window is now bounded at the API and the ordering ``limit``
+    needs is established here by sorting.
 
     The cost of that is one listing page which a ``--limit`` alone would
     once have skipped: the limit is applied after the sort rather than
@@ -606,12 +601,12 @@ def open_bundle(path):
 
 
 def extract_traces(path, dest_dir):
-    """Unpack the phase 1 trace files from a bundle, if they are there.
+    """Unpack the probe's trace files from a bundle, if they are there.
 
     Returns a dict of member basename to extracted path, holding only the
     files which were actually present. The series being absent is a normal
-    outcome -- a run predating phase 1, or one whose probe never started --
-    and is reported by the caller, not raised here.
+    outcome -- a run from before the probe existed, or one whose probe
+    never started -- and is reported by the caller, not raised here.
     """
     # No archive-supplied name ever reaches a path here: the members
     # iterated are module constants, the namelist is used only for a
@@ -639,10 +634,10 @@ def extract_traces(path, dest_dir):
 
 
 def read_label(path):
-    """Read traces/headroom-label, D20's fix for the topology guesswork.
+    """Read traces/headroom-label, the cure for the topology guesswork.
 
     The collect script in shakenfist/actions is already passed the label the
-    report prints; D20 has it write that label into the bundle as well, so a
+    report prints, and it writes that label into the bundle as well, so a
     bundle on disk says which shape produced it and a future harvest need
     not infer it from the artifact name. Bundles in the retrospective window
     predate that change and have no such file, which is exactly why the
@@ -661,8 +656,8 @@ def topology_from_label(label):
     The label the workflow passes the report is the topology followed by the
     suite's stestr configuration, so the first whitespace-delimited token is
     the topology. Anything the label file says is taken at face value: the
-    whole point of D20's file is that a topology added after this tool was
-    written should not need the table updating.
+    whole point of the label file is that a topology added after this tool
+    was written should not need the table updating.
     """
     if not label:
         return None
@@ -676,9 +671,9 @@ def bundle_record(github, run, artifact, kind, jobs, cache_dir, report,
 
     Everything about the run and the job is recorded beside the measurement
     rather than left to be joined later. The head SHA in particular is a
-    requirement of D16: a retrospective window spans a week of development,
-    so a step change part way through it has to be visible as one, and it is
-    only visible if each record says which tree produced it.
+    requirement of measuring retrospectively: a window spans a week of
+    development, so a step change part way through it has to be visible as
+    one, and it is only visible if each record says which tree produced it.
     """
     job_name, job_conclusion = find_job(jobs, kind.job_prefix)
 
@@ -739,9 +734,14 @@ def bundle_record(github, run, artifact, kind, jobs, cache_dir, report,
     record['census_present'] = 'headroom-census.json' in traces
 
     if 'headroom.jsonl' not in traces:
-        # Not dropped. A run predating phase 1, or one whose probe never
-        # started, is part of the window and its absence is a finding: the
-        # denominator step 2d states its n against has to include it.
+        # Not dropped. A run from before the probe existed, or one whose
+        # probe never started, is part of the window and its absence is a
+        # finding: the n the dataset reports against has to include it.
+        #
+        # The wording of the reason is frozen, deliberately: it is recorded
+        # verbatim into the committed records in
+        # docs/plans/data/ci-cloud-sizing-baseline/, so rewording it would
+        # split that dataset on one condition.
         record['absent_reason'] = (
             'the bundle carries no traces/headroom.jsonl, so the probe never '
             'ran or predates phase 1')
@@ -778,8 +778,8 @@ def cached_artifact(github, artifact, cache_dir):
     Keyed by artifact id, which is immutable and unique across the
     repository, so a cache hit needs no validation beyond the file being a
     readable zip. This matters more than it looks: the full window is 66
-    runs times four bundles at roughly 5 MB, so about 1.3 GB, and step 2d
-    will not get the harvest right on the first try.
+    runs times four bundles at roughly 5 MB, so about 1.3 GB, and nobody
+    gets a harvest right on the first try.
     """
     artifact_id = checked_artifact_id(artifact)
     os.makedirs(cache_dir, exist_ok=True)
@@ -834,15 +834,15 @@ def harvest_run(github, run, cache_dir, report, census_limit, workdir):
 
 
 def write_records(records, handle):
-    """One compact JSON object per line (D22).
+    """One compact JSON object per line.
 
-    Compact, and not pretty printed, because the size estimate this phase
-    inherited was an order of magnitude out: a real record measured against
-    merge run 33944911413 is 3,675 bytes compact and 5,381 indented, so the
-    full window is roughly 950 KB rather than the 'low hundreds of
-    kilobytes' D22 originally guessed. One object per line so the dataset
-    can be filtered with grep and read a record at a time, and so a harvest
-    interrupted part way through leaves a file which still parses.
+    Compact, and not pretty printed, because the first size estimate was an
+    order of magnitude out: a real record measured against merge run
+    33944911413 is 3,675 bytes compact and 5,381 indented, so the full window
+    is roughly 950 KB rather than the low hundreds of kilobytes first guessed.
+    One object per line so the dataset can be filtered with grep and read a
+    record at a time, and so a harvest interrupted part way through leaves a
+    file which still parses.
     """
     count = 0
     for record in records:
@@ -1028,7 +1028,7 @@ def main(argv=None):
         # Refused rather than defaulted. Without a bound this walks the whole
         # of artifact retention and downloads every bundle in it, and the
         # operator who wanted the whole window should say which window that
-        # is so the README step 2d writes can quote a reproducible command.
+        # is, so the dataset's README can quote a reproducible command.
         parser.error('give at least one of --since, --until or --limit; an '
                      'unbounded harvest downloads the entire 90 day '
                      'retention window')
@@ -1043,8 +1043,8 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
-    # Unlike the report tool, this one is allowed to fail. D15's exit-zero
+    # Unlike the report tool, this one is allowed to fail. The exit-zero
     # rule is about not failing the job an instrument is measuring; a harvest
-    # which half completed and exited zero would hand step 2d a short dataset
+    # which half completed and exited zero would produce a short dataset
     # with nothing to say it was short.
     sys.exit(main())

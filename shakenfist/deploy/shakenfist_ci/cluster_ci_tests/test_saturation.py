@@ -1,23 +1,23 @@
 # Copyright 2019 Michael Still and contributors
 """Deterministic coverage of the scheduler's capacity refusal stages.
 
-PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md's D24 covers three of
-the four capacity stages -- ``sufficient_idle_cpu``, ``sufficient_idle_memory``
-and ``sufficient_free_disk`` -- by asking for a resource no node in the
-cluster could ever supply, copying the shape
-``test_namespace_claims.py``'s ``IMPOSSIBLE_CPUS`` already uses to prove a
-claim refusal. The fourth stage, ``sufficient_idle_disk`` (disk bandwidth
-saturation), has no deterministic functional trigger -- it reads a measured
-rate on a 60 second cadence that ``/admin/resources`` does not publish -- so
-D25 gives it unit coverage instead, in ``shakenfist/tests/test_scheduler.py``.
+Three of the four capacity stages -- ``sufficient_idle_cpu``,
+``sufficient_idle_memory`` and ``sufficient_free_disk`` -- are covered here
+by asking for a resource no node in the cluster could ever supply, copying
+the shape ``test_namespace_claims.py``'s ``IMPOSSIBLE_CPUS`` already uses to
+prove a claim refusal. The fourth stage, ``sufficient_idle_disk`` (disk
+bandwidth saturation), has no deterministic functional trigger -- it reads a
+measured rate on a 60 second cadence that ``/admin/resources`` does not
+publish -- so it has unit coverage instead, in
+``shakenfist/tests/test_scheduler.py``.
 
-Why "impossible" rather than "a lot": D23's fill-one-node test
+Why "impossible" rather than "a lot": the fill-one-node test
 (``TestNodeFillRefusal`` at the foot of this file) proves the *ledger* --
 that a node with real, finite capacity starts refusing at exactly its
 published limit once real placements are made against it. That test
-necessarily consumes cluster capacity to do it, so D26 bounds it to one
-hypervisor and gives it its own headroom-based skip rules, and it is the
-only test in this file with a fill to release. The three tests immediately
+necessarily consumes cluster capacity to do it, so it is bounded to one
+hypervisor and has its own headroom-based skip rules, and it is the only
+test in this file with a fill to release. The three tests immediately
 below prove the *contract* instead -- which status
 code, which stage name, which message -- using a request sized one unit
 beyond the largest figure any node publishes for that dimension. Such a
@@ -26,8 +26,8 @@ cluster happens to be, so these tests:
 
 * Consume nothing. The scheduler raises before any candidate is admitted,
   so there is no fill to release and no risk of starving one of the other
-  stestr workers sharing this cluster (F7 in the phase plan) -- the
-  problem D23 exists to avoid, these three tests cannot cause.
+  stestr workers sharing this cluster -- the problem the fill test has to
+  work around, these three tests cannot cause.
 * Need no fill and no cleanup beyond the namespace teardown
   ``BaseNamespacedTestCase`` already does. The one side effect worth
   knowing about: a refused create still allocates an ``Instance`` row
@@ -40,8 +40,8 @@ cluster happens to be, so these tests:
 * Run identically on every topology and every job, because the sizes are
   read fresh from ``/admin/resources`` on every run rather than
   hardcoded -- a hardcoded "impossible" number is a number a later
-  resizing phase could make possible, and would then leave this file
-  quietly testing nothing.
+  resizing of the cloud could make possible, and would then leave this
+  file quietly testing nothing.
 
 The arithmetic which turns a ``/admin/resources`` reading into an
 impossible size lives in ``shakenfist_ci/sizing.py`` rather than here, so
@@ -50,11 +50,12 @@ pin its boundaries without a cluster -- the same reason ``retries.py``
 keeps itself free of suite imports. Everything below is the part which
 genuinely needs a deployed cluster to exercise.
 
-Every refusal is asserted through ``BaseTestCase.assertRefusedAtStage()``
-(D27), and none of these requests goes anywhere near
-``shakenfist_ci.retries``: a refusal under test must never be retried away,
-for the same reason ``test_namespace_claims.py`` (lines 35-52) gives for
-its own refusal assertions.
+Every refusal is asserted through ``BaseTestCase.assertRefusedAtStage()``,
+which keeps the stage message in exactly one place in this suite, and none of
+these requests goes anywhere near ``shakenfist_ci.retries``: a refusal under
+test must never be retried away, for the same reason
+``test_namespace_claims.py`` (lines 35-52) gives for its own refusal
+assertions.
 """
 
 import json
@@ -68,7 +69,7 @@ from shakenfist_client import apiclient
 
 
 # The two refusal messages this file has to recognise which are *not* the
-# stage refusal ``BaseTestCase.assertRefusedAtStage()`` owns (D27). Neither
+# stage refusal ``BaseTestCase.assertRefusedAtStage()`` owns. Neither
 # string is repeated anywhere else in the suite, and the stage message is
 # still spelled out in exactly one place.
 #
@@ -84,9 +85,9 @@ from shakenfist_client import apiclient
 # out of resources. It reaches a client as an errored instance's
 # ``error_message``, not as an HTTP status.
 #
-# D28 contemplated only two answers to a targeted create at a full node;
-# there are three, because the two 507s above are distinct. Which one
-# arrives says something different about the cluster, so this file tells
+# A targeted create at a full node looks like it has two answers; it has
+# three, because the two 507s above are distinct. Which one arrives says
+# something different about the cluster, so this file tells
 # them apart rather than accepting either -- see
 # ``TestNodeFillRefusal.test_full_node_refuses_a_targeted_create``.
 CAPACITY_GUARD_REFUSAL = 'no node had capacity for this instance'
@@ -96,16 +97,16 @@ REPLACE_ABORT_REFUSAL = 'Requested node lacks resources'
 class _CapacityReadingTestCase(base.BaseNamespacedTestCase):
     """The ``/admin/resources`` read both halves of this file start from.
 
-    Carries no tests of its own -- it exists so that D24's
-    impossible-request tests and D23's node-fill test share one
-    implementation of D26's "skip rather than fail when the capacity table
+    Carries no tests of its own -- it exists so that the
+    impossible-request tests and the node-fill test share one
+    implementation of the "skip rather than fail when the capacity table
     cannot answer the question" rule, rather than two copies which can
     drift apart. ``unittest``'s loader finds no ``test_`` method here and
     so never instantiates it.
     """
 
     def _cluster_resources_or_skip(self, polled=False):
-        """Read ``/admin/resources``, applying D26's two skip rules.
+        """Read ``/admin/resources``, applying two whole-response skip rules.
 
         Skips (rather than fails) when the response cannot support an
         impossible-request calculation at all:
@@ -113,8 +114,8 @@ class _CapacityReadingTestCase(base.BaseNamespacedTestCase):
         * ``total.capacity_degraded`` is true -- the capacity counters
           could not be read, so a 507 seen here would be the refusal of
           an unreadable ledger rather than the refusal this file means
-          to prove, and D26 says that distinction must be answerable
-          rather than guessed.
+          to prove, and that distinction has to be answerable rather
+          than guessed.
         * ``per_node`` is empty -- there is no node ceiling published to
           size a request beyond.
 
@@ -124,13 +125,12 @@ class _CapacityReadingTestCase(base.BaseNamespacedTestCase):
 
         ``polled`` says this is one reading in a sequence rather than the
         single reading a test starts from. testtools' ``addDetail()``
-        overwrites by name, so the fill loop and the ledger-return loop
-        would otherwise leave a failed run holding only their last read --
-        losing the trajectory of how the ledger moved, which is precisely
-        what the phase plan says the first merge run has to record to
-        settle its two open questions. Polled reads are therefore attached
-        under unique names, and the plain ``resources`` name is left to the
-        one read a test takes before it touches anything.
+        overwrites by name, so the fill loop and the ledger-return loop would
+        otherwise leave a failed run holding only their last read -- losing the
+        trajectory of how the ledger moved, which is the only evidence a failed
+        run leaves behind about why the ledger did not behave. Polled reads are
+        therefore attached under unique names, and the plain ``resources`` name
+        is left to the one read a test takes before it touches anything.
         """
         resources = self.system_client.get_cluster_resources()
         detail = content.text_content(json.dumps(
@@ -157,7 +157,7 @@ class _CapacityReadingTestCase(base.BaseNamespacedTestCase):
 
 
 class TestSaturationRefusals(_CapacityReadingTestCase):
-    """D24: one impossible-request test per deterministically-triggerable
+    """One impossible-request test per deterministically-triggerable
     capacity stage."""
 
     def __init__(self, *args, **kwargs):
@@ -173,8 +173,8 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
 
         Failure modes, and whether each is asserted or skipped:
 
-        * ``total.capacity_degraded`` is true: **skipped** (D26).
-        * ``per_node`` is empty: **skipped** (D26).
+        * ``total.capacity_degraded`` is true: **skipped**.
+        * ``per_node`` is empty: **skipped**.
         * Every node's ``cpu_max_per_instance`` (the libvirt per-domain
           vCPU cap) is smaller than the computed request: **skipped**,
           naming both figures. That cap is an *earlier* scheduler stage
@@ -182,7 +182,7 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
           drops any candidate where ``inst.cpus > cpu_max_per_instance``),
           so the refusal would be real but would arrive from the wrong
           stage -- an unanswerable premise rather than a wrong answer, and
-          D26 says those skip. ``/admin/resources`` publishes the figure
+          those skip. ``/admin/resources`` publishes the figure
           per node, so this is observable before
           the request is made rather than something to be inferred from a
           stage-mismatch failure. It has not been seen on either CI
@@ -198,8 +198,8 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
           could ever be guarded to, whether idle or full), not merely
           its momentary headroom -- so the refusal still lands at
           ``sufficient_idle_cpu`` regardless of ambient load. This is
-          exactly why D24 sizes from ``cpu_limit``/``cpu_hard_max``
-          rather than from ``cpu_available``.
+          exactly why the sizing reads ``cpu_limit``/``cpu_hard_max``
+          rather than ``cpu_available``.
         * The request consumes nothing: the scheduler raises before any
           node is admitted, so this test cannot starve a sibling stestr
           worker and needs no cleanup beyond namespace teardown.
@@ -254,8 +254,8 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
 
         Failure modes, and whether each is asserted or skipped:
 
-        * ``total.capacity_degraded`` is true: **skipped** (D26).
-        * ``per_node`` is empty: **skipped** (D26).
+        * ``total.capacity_degraded`` is true: **skipped**.
+        * ``per_node`` is empty: **skipped**.
         * Every node in the cluster is already fully committed on RAM at
           read time: changes nothing here, for the same reason as the CPU
           test -- the request exceeds every node's *ceiling* (the most
@@ -264,21 +264,20 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
           instance and freeing RAM between the read and this create
           cannot make the request satisfiable. This is exactly the flake
           vector the original headroom-based sizing had, and exactly why
-          D24 was amended to size memory from a ceiling instead.
+          memory is sized from a ceiling instead.
         * Every node in the cluster is simultaneously fully committed on
           vCPUs, so even the 1 vCPU ask is refused at the earlier
           ``sufficient_idle_cpu`` stage before memory is ever evaluated:
-          **asserted, not specially guarded**. D26's skip rules for this
-          step are explicitly the two above, and this file does not
+          **asserted, not specially guarded**. The skip rules for this
+          test are explicitly the two above, and this file does not
           widen them, so a coincident whole-cluster vCPU exhaustion
           would surface as a stage-name mismatch from
           ``assertRefusedAtStage()`` rather than a skip. Unlike the RAM
           headroom case above, this is a boundary the ceiling sizing
           cannot remove -- the vCPU ask itself is deliberately non-
           impossible -- so it remains a genuine (if narrow) way ambient
-          load from another worker could fail this specific test; it is
-          called out here, in the D24 implementation step's report, and
-          is worth revisiting if it is ever observed in a merge run.
+          load from another worker could fail this specific test, and is
+          worth revisiting if it is ever observed in a merge run.
         * The request consumes nothing: same reasoning as the CPU test.
         """
         resources, per_node = self._cluster_resources_or_skip()
@@ -329,8 +328,8 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
 
         Failure modes, and whether each is asserted or skipped:
 
-        * ``total.capacity_degraded`` is true: **skipped** (D26).
-        * ``per_node`` is empty: **skipped** (D26).
+        * ``total.capacity_degraded`` is true: **skipped**.
+        * ``per_node`` is empty: **skipped**.
         * A whole-cluster disk release during the test window -- every
           other node's ``disk_available`` at read time actually being
           freed onto the one node that held the maximum, between the
@@ -339,15 +338,15 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
           test while it asserts the ``sufficient_free_disk`` stage,
           because that pre-filter reads live headroom rather than the
           published ``disk_limit_gb`` ceiling (see above). This is the
-          honest residual risk D24's amendment could not remove for this
-          dimension; it is far less likely than the single-unit-of-
+          honest residual risk ceiling-based sizing could not remove for
+          this dimension; it is far less likely than the single-unit-of-
           headroom race the memory test had.
         * Every node in the cluster is simultaneously fully committed on
           vCPUs or memory, so the request is refused at an earlier stage
           (``sufficient_idle_cpu`` or ``sufficient_idle_memory``) before
           disk is ever evaluated: **asserted, not specially guarded**,
-          for the same reason given in the memory test above -- D26's
-          skip rules for this step are exactly the two capacity_degraded
+          for the same reason given in the memory test above -- the
+          skip rules for this test are exactly the two capacity_degraded
           / empty per_node checks, and a coincident whole-cluster
           exhaustion on an earlier dimension would surface as a stage
           mismatch rather than a silent pass.
@@ -379,29 +378,29 @@ class TestSaturationRefusals(_CapacityReadingTestCase):
 
 
 class TestNodeFillRefusal(_CapacityReadingTestCase):
-    """D23: fill one hypervisor to its published ledger, then be refused.
+    """Fill one hypervisor to its published ledger, then be refused.
 
     Where the three tests above prove the refusal *contract* with a request
     no cluster could satisfy, this proves the *ledger*: that a node with
     real, finite capacity, filled with real placements, starts refusing at
     exactly the limit ``/admin/resources`` publishes for it. It is the only
-    test in this phase which would catch a regression where admission
+    test in this file which would catch a regression where admission
     stopped charging placements against ``scheduler_node_capacity`` -- an
     impossible request is refused whether or not anything is being
     counted.
 
-    D23 fills **one hypervisor**, never the cluster. ``cluster-ci.conf``
+    It fills **one hypervisor**, never the cluster. ``cluster-ci.conf``
     sets no ``group_regex``, so this runs concurrently with four sibling
     stestr workers on one cluster; filling the cluster would starve them
     and manufacture the very ``507 sufficient_idle_cpu`` signature this
-    phase exists to make deliberate rather than ambient.
+    file exists to make deliberate rather than ambient.
     """
 
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'nodefill'
         super().__init__(*args, **kwargs)
 
-    # D26's headroom floor. Three vCPU is the smallest fill worth calling a
+    # The headroom floor. Three vCPU is the smallest fill worth calling a
     # fill: it is more than the one placement test_nodes.py already makes,
     # and it is the whole ledger of a CI infra node (whose
     # NODE_CPU_RESERVATION_THREADS of 4 on a 4-thread node leaves
@@ -409,7 +408,8 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
     # the smallest node either topology has.
     MINIMUM_FILL_VCPUS = 3
 
-    # Every wait in this test is bounded, per D26's "carries a deadline".
+    # Every wait in this test is bounded, deliberately: an unbounded poll
+    # here would turn a cluster which never converges into a job timeout.
     # None of them is a retry of a refusal: retries.retry_while_transient()
     # is deliberately not used anywhere in this file, for the reason
     # base.py's assertRefusedAtStage() docstring and
@@ -429,7 +429,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
     def _node_entry_or_skip(self, node_uuid, when):
         """The target node's ``per_node`` entry from a fresh read, or skip.
 
-        Applies D26's per-node rules on top of the two whole-response ones
+        Applies the per-node skip rules on top of the two whole-response ones
         ``_cluster_resources_or_skip()`` already applies. A node which has
         dropped out of ``per_node``, or which has stopped publishing a
         capacity row, cannot answer the question this test is asking, and
@@ -470,8 +470,8 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
         a defect in admission accounting and fails, while a shortfall which
         exactly matches instances another stestr worker owns is that
         worker's load and skips. Without the split, the two are the same
-        number and the test would have to guess -- which, per D26, is what
-        it must not do.
+        number and the test would have to guess, which is exactly what it
+        must not do.
 
         ``ours`` and ``foreign`` are vCPU totals. ``still_listed`` is the
         ``(uuid, state)`` of each of this namespace's own instances the
@@ -516,14 +516,15 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
         The placement is asserted immediately, the way
         ``test_nodes.py`` asserts its own forced create, and it is an
         assertion rather than a skip: a create which names a node and lands
-        on another one is issue 3496, a defect in the very accounting D23
-        is about. Without this check such a placement would charge a
+        on another one is issue 3496, a defect in the very accounting this
+        test is about. Without this check such a placement would charge a
         different node's ledger, so the fill loop would burn its create
         budget without moving the target node's ``cpu_committed``, and the
         ours/foreign split would then count zero vCPUs of "ours" on the
         target and *skip* -- reporting ambient load on the one failure this
         test is best placed to catch, while leaving up to a whole create
-        budget of stray instances on the siblings D23 exists to protect.
+        budget of stray instances on the siblings this test exists to
+        protect.
         """
         # raw-create: filling a node to its ledger limit means walking
         # into the refusal deliberately, and both callers below handle the
@@ -567,11 +568,11 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
         asks the instance list which one happened:
 
         * The ledger is not charging what this test placed. That is the
-          regression D23 exists to catch, it is nothing to do with another
-          worker, and it **fails**.
+          regression this test exists to catch, it is nothing to do with
+          another worker, and it **fails**.
         * The ledger is charging correctly and a sibling worker is
           releasing capacity on this node as fast as this test claims it.
-          That is ambient load, and per D26 it **skips**.
+          That is ambient load, and it **skips**.
         """
         ours, foreign, _ = self._cpus_on_node_by_ownership(node_uuid)
         self.addDetail('incomplete fill', content.text_content(
@@ -697,13 +698,13 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                     'fill cannot be completed: %s' % (node_name, e))
 
     def _resolve_unexpected_admission(self, inst, node_uuid, node_name):
-        """Resolve a create the full node admitted, which D28 did not expect.
+        """Resolve a create the full node admitted, which should not happen.
 
-        Returns only when D28's third path is observed and recorded; every
-        other outcome fails or skips.
+        Returns only when the asynchronous abort is observed and recorded;
+        every other outcome fails or skips.
 
-        This is D28's third path, and the branch which decides whether an
-        admission at a node the ledger said was full is a defect or a race.
+        This is the branch which decides whether an admission at a node the
+        ledger said was full is a defect or a race.
 
         * The node now publishes ``cpu_committed`` above its own
           ``cpu_limit``: the atomic guard admitted past the published
@@ -711,14 +712,12 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
           **fails**.
         * The instance errors carrying ``Requested node lacks resources``:
           the synchronous path admitted and the asynchronous re-place
-          aborted. That is D28's second contemplated answer and it is
-          **asserted** here, so a run which meets it says so rather than
-          passing quietly.
+          aborted. It is **asserted** here rather than merely tolerated,
+          so a run which meets it says so rather than passing quietly.
         * The instance reaches ``created``: a slot on the node genuinely
           freed between the reading which ended the fill and this create,
           so the premise "this node is full" was not true when the request
-          was made. That is a sibling worker's load, and per D26 it
-          **skips**.
+          was made. That is a sibling worker's load, and it **skips**.
         """
         self.addDetail('unexpectedly admitted instance', content.text_content(
             json.dumps(inst, indent=4, sort_keys=True)))
@@ -749,7 +748,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                     # Recorded rather than re-asserted: an assertion here
                     # would restate the condition of the branch it is
                     # inside, so it could never fail while reading as a
-                    # check. The detail is the evidence D28 asked for.
+                    # check. The detail is the evidence instead.
                     self.addDetail(
                         'asynchronous re-place abort',
                         content.text_content(json.dumps(
@@ -918,7 +917,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
 
         Which of the three possible answers this expects, and why. A
         targeted create against a node whose ledger is full can be answered
-        three ways, not the two D28 contemplated, because there are two
+        three ways, not the two it looks like, because there are two
         distinct 507s:
 
         1. The stage refusal -- the message
@@ -927,7 +926,8 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
            and returned as a 507 by the create path. Every candidate --
            here, the single forced one -- was pruned by a stage
            pre-filter. The message itself is deliberately not repeated
-           here: D27 keeps it in exactly one place in this suite.
+           here: ``assertRefusedAtStage()`` keeps it in exactly one place
+           in this suite.
         2. ``no node had capacity for this instance, N candidates refused
            it`` (the create path's ``placement is None`` branch, also
            507). The pre-filter passed the candidate and the atomic
@@ -940,7 +940,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
 
         **This test expects, and asserts, the first.**
         ``_has_sufficient_cpu()``'s own docstring says it is "a cheap CPU
-        pre-filter (P2) ... not the admission decision", and describes
+        pre-filter ... not the admission decision", and describes
         exactly why it nonetheless sees what the guard sees: it reads the
         capacity row's ``limit_cpus`` and charges the candidate
         ``max(measured_cpus, committed_cpus)``, refusing when that plus the
@@ -962,34 +962,33 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
         report a guard refusal as a malformed stage message rather than as
         the different thing it is.
 
-        The third answer is handled as D28 asks: observed, asserted, and
-        recorded. It cannot be reached from a full node by the reasoning
-        above, so if it ever is, the run says so rather than passing.
+        The third answer is observed, asserted and recorded. It cannot be
+        reached from a full node by the reasoning above, so if it ever is, the
+        run says so rather than passing.
 
         Failure modes, and whether each is asserted or skipped:
 
-        * ``total.capacity_degraded`` is true: **skipped** (D26).
+        * ``total.capacity_degraded`` is true: **skipped**.
         * ``per_node`` is empty, or no node in it can be matched to a node
-          name to force placement onto: **skipped** (D26).
+          name to force placement onto: **skipped**.
         * The roomiest hypervisor has ``cpu_committed_row_present`` false,
-          or a null ``cpu_limit``: **skipped** (D26). A refusal from a node
+          or a null ``cpu_limit``: **skipped**. A refusal from a node
           admitting unguarded is not the ledger refusal under test.
         * The roomiest hypervisor has less than ``MINIMUM_FILL_VCPUS`` of
           published headroom, by either ``cpu_available`` or the ledger's
           own ``cpu_limit - cpu_committed``: **skipped**, naming both
-          figures (D26). Phase 2 measured a ``slim-tier`` node at or above
-          its ceiling in 100% of job-runs sampled, so this skip is
-          expected to fire often there; a 3c which never skips on
-          ``slim-tier`` is evidence the predicate is wrong, not that the
-          cluster is roomy.
+          figures. Measurement found a ``slim-tier`` node at or above its
+          ceiling in 100% of job-runs sampled, so this skip is expected to
+          fire often there; a run which never skips on ``slim-tier`` is
+          evidence the predicate is wrong, not that the cluster is roomy.
         * The node drops out of ``per_node``, loses its capacity row, or
           stops being an active scheduling candidate at any point:
-          **skipped** (D26).
+          **skipped**.
         * The node is already recorded above its own ``cpu_limit``:
           **skipped** -- "filled exactly to the limit" is not a state this
           test can establish there.
         * A fill create is refused while the vCPU ledger is still short of
-          the limit, so memory or disk ran out first: **skipped** (D26).
+          the limit, so memory or disk ran out first: **skipped**.
         * A sibling worker releases capacity on this node as fast as the
           fill claims it: **skipped**, but only after asserting that the
           ledger is charging this test's own placements -- so a fill which
@@ -1135,8 +1134,8 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
             # both CI topologies today (cpu_schedulable 1 or 2,
             # CPU_OVERCOMMIT_RATIO 3.0, so cpu_limit 3 or 6 and
             # cpu_hard_max the same figure) that gap is exactly zero and
-            # this reads as "cpu_available <= 0", which is the assertion
-            # D23 asked for. It is stated in its general form so that it
+            # this reads as "cpu_available <= 0", which is the claim
+            # worth asserting. It is stated in its general form so that it
             # stays true rather than becoming a flake the first time the
             # two ledgers differ.
             #
@@ -1194,7 +1193,7 @@ class TestNodeFillRefusal(_CapacityReadingTestCase):
                     admitted, node_uuid, node_name)
 
         finally:
-            # D26: release the fill before returning, whatever happened,
+            # Release the fill before returning, whatever happened,
             # with the namespace teardown as the backstop for the case
             # where this does not run at all.
             self._release_fill(fill)

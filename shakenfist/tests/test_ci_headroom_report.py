@@ -3,11 +3,10 @@
 
 ``tools/ci_headroom_report.py`` reads a JSONL series written by a poller
 which is routinely killed mid-write, beside a Loki census which may not have
-been collected at all, and prints a summary into a CI job log. Phase 1 of the
-CI cloud sizing plan says the report exits zero whatever it finds (D15),
-because an instrument which can fail the job changes the thing it is
-measuring -- and it would do so during the very baseline window phase 2 means
-to read.
+been collected at all, and prints a summary into a CI job log. The report
+exits zero whatever it finds, because an instrument which can fail the job
+changes the thing it is measuring -- and it would do so during the very
+window a sizing baseline is read from.
 
 So the first thing covered here is that none of the malformed inputs the real
 world produces raises: an empty file, a truncated final line, a sample which
@@ -15,11 +14,11 @@ recorded an error instead of a payload, a census which is missing, and a
 census which is not JSON.
 
 The rest of the coverage is about readings which are wrong in a way that
-looks right, each of which the plan calls out by name:
+looks right:
 
 * A census which was never collected must not print as zero refusals. "We
   did not look" and "nothing was refused" are different findings and the
-  second is the one the whole plan is hunting for.
+  second is the one a sizing decision is hunting for.
 * An all-false ``cpu_committed_row_present`` across every node in a sample
   is ``_capacity_by_node()`` swallowing a read failure, not an idle cluster,
   so that sample must not be averaged into the committed figures as zeros.
@@ -28,11 +27,11 @@ looks right, each of which the plan calls out by name:
   too small.
 * A stage string the tool has never seen must still be tallied and printed.
   The scheduler's stage names are bare literals with no enumeration, so a
-  hardcoded list in a parser drifts silently -- the plan itself had already
-  drifted, naming three capacity stages where there are four (D10).
+  hardcoded list in a parser drifts silently -- one hand-written copy had
+  already drifted, naming three capacity stages where there are four.
 * The count of node-samples which fell back from the capacity row's
-  ``cpu_limit`` to the derived ``cpu_hard_max`` is a deliverable, because D7
-  asks phase 2 to reconcile the two ledgers and a run which is entirely
+  ``cpu_limit`` to the derived ``cpu_hard_max`` is a deliverable, because
+  the two ledgers have never been reconciled and a run which is entirely
   fallback answers that question differently.
 
 The tool is loaded by path: CI tools in ``tools/`` are not importable as a
@@ -123,9 +122,9 @@ def sample(per_node, nodes=None, sampled_at=1756000000.0,
         'cpu_available': sum(n['cpu_available'] for n in per_node.values()),
         'ram_available': sum(n['ram_available'] for n in per_node.values()),
     }
-    # Absent by default, which is what a bundle built before step 2a
-    # published the flag looks like. Pass True or False to be one of the
-    # builds which does.
+    # Absent by default, which is what a bundle built before the flag
+    # existed looks like. Pass True or False to be one of the builds which
+    # publishes it.
     if capacity_degraded is not None:
         total['capacity_degraded'] = capacity_degraded
     record = {
@@ -159,7 +158,7 @@ def wait_event(test_id='pkg.mod.TestCase.test_something', instance_name='i1',
                binding_dimension=None, seconds_waited=12.5, mode='informed',
                attempt_number=1, headroom_at_first_refusal=0,
                headroom_at_admission=2):
-    """One line of the capacity-wait trace create_instance() writes (D14).
+    """One line of the capacity-wait trace create_instance() writes.
 
     These keys must stay identical to the record
     BaseTestCase._append_capacity_wait_trace() builds in
@@ -281,16 +280,16 @@ class RobustnessTestCase(HeadroomReportTestCase):
     def test_an_empty_series_is_not_an_error(self):
         """A run whose poller never wrote a sample still exits zero.
 
-        D15: nothing this phase adds may fail a job, because the phase
-        exists to observe CI's failure surface and an instrument which
-        can fail the job changes what is being measured.
+        Nothing this instrument does may fail a job: it exists to observe
+        CI's failure surface, and one which can fail the job changes what
+        is being measured.
         """
         path = self._series([])
         code, output = self._run('--series', path)
         self.assertEqual(
             0, code, 'An empty series made the report exit non-zero, which '
-                     'would let the instrument fail the job it is measuring '
-                     '(D15).')
+                     'would let the instrument fail the job it is '
+                     'measuring.')
         self.assertIn('0 usable', output)
 
     def test_a_truncated_final_line_is_counted_not_fatal(self):
@@ -339,10 +338,9 @@ class RobustnessTestCase(HeadroomReportTestCase):
     def test_a_missing_census_file_is_never_zero_refusals(self):
         """An absent census must read as unknown, never as nothing refused.
 
-        This is the dangerous reading the plan calls out by name: the
-        census depends on log shipping being healthy (D11), so a broken
-        shipper looks exactly like a cluster with room to spare unless
-        the difference is stated.
+        This is the dangerous reading: the census depends on log shipping
+        being healthy, so a broken shipper looks exactly like a cluster
+        with room to spare unless the difference is stated.
         """
         path = self._series([sample({NODE_ONE: node_payload()})])
         code, output = self._run(
@@ -361,7 +359,7 @@ class RobustnessTestCase(HeadroomReportTestCase):
         code, output = self._run('--series', path, '--census', census)
         self.assertEqual(
             0, code, 'A census which is not valid JSON made the report exit '
-                     'non-zero (D15).')
+                     'non-zero.')
         self.assertIn('NO CENSUS IS AVAILABLE', output)
         self.assertIn('unparseable', output)
 
@@ -375,7 +373,7 @@ class RobustnessTestCase(HeadroomReportTestCase):
             'rather than printing a refusal count of zero.')
 
     def test_a_usage_error_still_exits_zero(self):
-        """Even argparse may not fail the job (D15)."""
+        """Even argparse may not fail the job."""
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             with open(os.devnull, 'w') as devnull:
@@ -383,19 +381,19 @@ class RobustnessTestCase(HeadroomReportTestCase):
                     code = report.main(['--not-an-argument'])
         self.assertEqual(
             0, code, 'A usage error exited non-zero, so a typo in the '
-                     'workflow step would fail a CI job this phase promised '
-                     'it could not fail (D15).')
+                     'workflow step would fail a CI job this instrument '
+                     'must never be able to fail.')
 
 
 class LedgerTestCase(HeadroomReportTestCase):
     def test_the_fallback_count_is_reported_and_correct(self):
-        """D7 needs to know how often cpu_limit was missing.
+        """How often cpu_limit was missing is a reportable figure.
 
         The ledger is the capacity row's limit where there is a row and
         the derived cpu_hard_max where there is not. A run which is
-        entirely fallback tells phase 2 something quite different about
-        the 12-versus-10 discrepancy than a mixed one does, so the count
-        is a deliverable rather than a diagnostic.
+        entirely fallback says something quite different about the
+        unexplained 12-versus-10 discrepancy than a mixed one does, so the
+        count is a deliverable rather than a diagnostic.
         """
         path = self._series([
             sample({NODE_ONE: node_payload(cpu_limit=10),
@@ -409,12 +407,12 @@ class LedgerTestCase(HeadroomReportTestCase):
         self.assertIn(
             'Node-samples with a capacity row (cpu_limit):     2', output,
             'The count of node-samples denominated in the capacity row is '
-            'wrong, so D7 cannot be answered from this report.')
+            'wrong, so the two ledgers cannot be reconciled from this '
+            'report.')
         self.assertIn(
             'Node-samples which fell back to cpu_hard_max:     2', output,
-            'The fallback count is wrong. Phase 2 reads it to tell a run '
-            'which saw both ledgers from one which never saw a capacity row '
-            'at all.')
+            'The fallback count is wrong. It is what tells a run which saw '
+            'both ledgers from one which never saw a capacity row at all.')
 
     def test_an_entirely_fallback_run_says_so(self):
         path = self._series([
@@ -425,15 +423,15 @@ class LedgerTestCase(HeadroomReportTestCase):
         self.assertIn(
             'EVERY node-sample fell back', output,
             'A run in which no capacity row was ever visible did not say so, '
-            'so phase 2 would read its ledger as the row limit when it is '
-            'the derived twin.')
+            'so a reader would take its ledger for the row limit when it '
+            'is the derived twin.')
 
     def test_the_ledger_uses_the_row_limit_where_there_is_one(self):
         """cpu_limit and cpu_hard_max deliberately disagree; the row wins.
 
         Publishing the derived twin while admission uses the real row is
         exactly the gap that let a 12-versus-10 discrepancy sit
-        unexplained (D12), so the report must denominate in the row.
+        unexplained, so the report must denominate in the row.
         """
         path = self._series([
             sample({NODE_ONE: node_payload(
@@ -446,7 +444,7 @@ class LedgerTestCase(HeadroomReportTestCase):
             '0.500', output,
             'Committed 5 against a row limit of 10 should read as 0.500. A '
             '0.417 here means the report denominated in cpu_hard_max (12) '
-            'while admission uses the row (D7).')
+            'while admission uses the row.')
 
 
 class LedgerUnreadableTestCase(HeadroomReportTestCase):
@@ -516,12 +514,13 @@ class CapacityDegradedTestCase(HeadroomReportTestCase):
 
     An all-absent capacity map means either a table which could not be read
     or a table which is not populated yet, and the count of unreadable
-    samples cannot tell them apart. Step 2a's ``capacity_degraded`` and the
+    samples cannot tell them apart. ``total.capacity_degraded`` and the
     shape of the run can: a warm-up is an unbroken prefix at the start of
-    the series with a healthy read throughout, a fault is neither. Phase 2's
-    confirmation window had to read both facts out of raw series inside
-    bundles which expire ninety days after their run, and D22 does not
-    commit those series, so they are counted into the record instead.
+    the series with a healthy read throughout, a fault is neither.
+    Confirming that meant reading both facts out of raw series inside
+    bundles which expire ninety days after their run, and the committed
+    dataset holds records rather than series, so they are counted into the
+    record instead.
     """
 
     def _blind(self, sampled_at, capacity_degraded=None):
@@ -613,8 +612,8 @@ class CapacityDegradedTestCase(HeadroomReportTestCase):
 
     def test_a_bundle_predating_the_flag_says_so_rather_than_guessing(self):
         # The retrospective half of the baseline. Reading an absent flag as
-        # a healthy read would put a confirmation that step 2a's instrument
-        # never made into the dataset.
+        # a healthy read would put a confirmation the probe never made
+        # into the dataset.
         path = self._series([
             self._blind(1756000000.0), self._busy(1756000015.0)])
         record = report.summary_record(path)
@@ -641,8 +640,8 @@ class MemoryTestCase(HeadroomReportTestCase):
             '8000.0', output,
             'Committed memory should be ram_max minus ram_available '
             '(32000 - 24000). A different figure means the derivation '
-            'changed and the memory dimension no longer measures what D5 '
-            'asked for.')
+            'changed and the memory dimension no longer measures what the '
+            'instances actually hold.')
 
     def test_a_node_with_no_memory_ledger_is_counted_not_divided_by(self):
         """ram_max of zero is a node with no memory ledger, not a crash."""
@@ -653,7 +652,7 @@ class MemoryTestCase(HeadroomReportTestCase):
         code, output = self._run('--series', path)
         self.assertEqual(
             0, code, 'A node publishing ram_max of zero made the report fail, '
-                     'which is a division by zero the plan asked to be '
+                     'which is a division by zero that should have been '
                      'counted instead.')
         self.assertIn(
             'node-samples published no ram_max', output,
@@ -727,12 +726,12 @@ class NodeAbsenceTestCase(HeadroomReportTestCase):
 
 
 class CapacityCoverageTestCase(HeadroomReportTestCase):
-    """Time-to-first-capacity-row (PLAN-transient-capacity-refusals D6).
+    """Time-to-first-capacity-row.
 
     The offset from the first sample to the first sample in which every
     hypervisor in the roster carries cpu_committed_row_present true. The
-    case the plan calls out by name is the one where that never happens:
-    reporting zero there would read as an instant window, which is exactly
+    case worth covering is the one where that never happens: reporting
+    zero there would read as an instant window, which is exactly
     backwards, so it must be reported as absent instead.
     """
 
@@ -872,7 +871,7 @@ class CapacityCoverageTestCase(HeadroomReportTestCase):
 
 class CensusTestCase(HeadroomReportTestCase):
     def test_an_unknown_stage_string_is_tallied_and_printed(self):
-        """No hardcoded stage list (D10).
+        """No hardcoded stage list.
 
         The scheduler's stage names are bare literals with no
         enumeration anywhere, so a list held in a parser drifts silently
@@ -890,7 +889,7 @@ class CensusTestCase(HeadroomReportTestCase):
             'a_stage_invented_next_year', output,
             'A stage string the tool has not been told about was discarded, '
             'which means the census is filtered by a hardcoded list and will '
-            'drift the first time the scheduler gains a stage (D10).')
+            'drift the first time the scheduler gains a stage.')
         self.assertIn(
             'something entirely new', output,
             'The drop reason from an unknown stage was discarded.')
@@ -921,7 +920,7 @@ class CensusTestCase(HeadroomReportTestCase):
 
         Counting it as a memory refusal would read missing data as
         evidence the cloud is too small, which is the precise error this
-        plan exists to avoid making (D10).
+        report exists to avoid making.
         """
         census = self._census([
             census_event('schedule at stage sufficient_idle_memory',
@@ -940,7 +939,7 @@ class CensusTestCase(HeadroomReportTestCase):
             'Two drops carrying "no memory_max in node metrics" raised a '
             'capacity shortage warning. That reads a stale metrics row as '
             'evidence the cloud is too small, which is exactly the error '
-            'this plan exists to avoid.')
+            'this report exists to avoid.')
 
     def test_the_three_memory_reasons_are_reported_separately(self):
         census = self._census([
@@ -958,17 +957,17 @@ class CensusTestCase(HeadroomReportTestCase):
                 reason, output,
                 'The memory stage carries three distinct reasons and %r was '
                 'not reported on its own. Summing them hides that one of the '
-                'three is missing data (D10).' % reason)
+                'three is missing data.' % reason)
         self.assertIn(
             'Refusal warning: YES. 2 candidate drops', output,
             'The capacity shortage count should be two of the three memory '
             'drops, with the missing-data one excluded.')
 
     def test_a_capacity_refusal_is_a_warning_of_its_own(self):
-        """D3: any capacity-stage refusal warns, whatever the ratio says.
+        """Any capacity-stage refusal warns, whatever the ratio says.
 
         A fifteen second poll cannot see a refusal, which begins and ends
-        between samples, so the two instruments answer separately (D9).
+        between samples, so the two instruments answer separately.
         """
         census = self._census([
             census_event('schedule at stage sufficient_free_disk',
@@ -982,8 +981,8 @@ class CensusTestCase(HeadroomReportTestCase):
         self.assertIn('OVERSIZED', output)
         self.assertIn(
             'Refusal warning: YES', output,
-            'A capacity-stage refusal did not raise its own warning. D3 '
-            'makes a refusal in an otherwise-idle-looking run a warning '
+            'A capacity-stage refusal did not raise its own warning. A '
+            'refusal in an otherwise-idle-looking run is a warning '
             'independent of the ratio, and this run is both at once.')
 
     def test_a_census_which_read_no_log_lines_cannot_say_there_were_none(self):
@@ -1102,11 +1101,11 @@ class CensusTestCase(HeadroomReportTestCase):
         self.assertNotIn('Refusal warning: UNKNOWN', output)
 
     def test_the_refusal_warning_is_framed_as_calibration_not_undersizing(self):
-        """D5: the job-log prose, not just the annotation, carries the frame.
+        """The job-log prose, not just the annotation, carries the frame.
 
-        Step 5c relabelled the GitHub annotation and step summary; this
-        closes the gap left in print_verdict()'s stdout, which is what
-        lands in the job log a human actually reads.
+        The GitHub annotation and the step summary were relabelled first;
+        this covers print_verdict()'s stdout, which is what lands in the
+        job log a human actually reads.
         """
         census = self._census([
             census_event('schedule at stage sufficient_free_disk',
@@ -1119,26 +1118,26 @@ class CensusTestCase(HeadroomReportTestCase):
         self.assertEqual(0, code)
         self.assertIn(
             'not evidence this cloud is too small', output,
-            'D5: the refusal warning prose must say the count is not '
+            'The refusal warning prose must say the count is not '
             'evidence of undersizing.')
         self.assertIn(
             'close to invariant under node size', output,
-            'D5: the prose must say the refusal count is close to '
-            'invariant under node size -- phase 4 doubled a ledger and '
-            'the refusal rate held essentially steady.')
+            'The prose must say the refusal count is close to '
+            'invariant under node size -- doubling a ledger left the '
+            'refusal rate essentially steady.')
         self.assertIn(
             'SCHEDULER_DEMAND_PER_VCPU', output,
-            'D5: the prose must name the mechanism -- expected_demand '
+            'The prose must name the mechanism -- expected_demand '
             'accumulating cpus x SCHEDULER_DEMAND_PER_VCPU per placement '
             '-- that makes the guard admit until its bound fills and '
             'then refuse.')
         self.assertIn(
             'earliest sign the demand estimator has drifted', output,
-            'D5: the prose must say what the count IS good for -- the '
+            'The prose must say what the count IS good for -- the '
             'earliest signal that the demand estimator has drifted.')
 
     def test_the_four_capacity_stages_are_named_in_the_output(self):
-        """Including the disk distinction, which the plan itself got wrong.
+        """Including the disk distinction, which is easy to get wrong.
 
         sufficient_idle_disk is disk BANDWIDTH, a rate predicate; the
         stage which means the cluster ran out of disk is
@@ -1187,9 +1186,9 @@ class BandVerdictTestCase(HeadroomReportTestCase):
             'is why, rather than leaving them to hunt a test failure.')
         self.assertNotIn(
             'PROVISIONAL', output,
-            'The band is no longer provisional (D2): phase 2 defended both '
-            'bounds against a 204 job-run distribution, so the verdict must '
-            'not still call them provisional.')
+            'The band is no longer provisional: both bounds were defended '
+            'against a 204 job-run distribution, so the verdict must not '
+            'still call them provisional.')
 
     def test_committed_cpu_is_the_larger_of_measured_and_committed(self):
         """Admission charges max(measured, committed), so the report does too.
@@ -1221,7 +1220,7 @@ class BandVerdictTestCase(HeadroomReportTestCase):
             'shrink the cloud made on no data at all.')
 
     def test_a_node_pinned_at_its_ledger_reads_above_the_per_node_band(self):
-        """D4: the per-node maximum is judged against PER_NODE_BAND_UPPER.
+        """The per-node maximum is judged against PER_NODE_BAND_UPPER.
 
         One node sits at its own ledger for the whole run, well above
         0.85, while the cluster-wide figure alone would call the run
@@ -1249,16 +1248,16 @@ class BandVerdictTestCase(HeadroomReportTestCase):
         self.assertIn(
             'saturated', output,
             'The per-node verdict must say the statistic is saturated -- '
-            'phase 2 found it sitting at its ceiling in a large fraction of '
-            'passing job-runs, so it is read as what a topology should '
-            'achieve, not as a per-run alarm (D4).')
+            'it sits at its ceiling in a large fraction of passing '
+            'job-runs, so it is read as what a topology should achieve, '
+            'not as a per-run alarm.')
         self.assertIn(
             'never gates', output,
-            'D4 excludes the per-node bound from ever gating; the printed '
-            'verdict must say so.')
+            'The per-node bound never gates; the printed verdict must say '
+            'so.')
 
     def test_a_node_well_under_its_ledger_reads_within_the_per_node_band(self):
-        """The lower tail is where the per-node bound has information (D4)."""
+        """The lower tail is where the per-node bound has information."""
         path = self._series([
             sample({NODE_ONE: node_payload(cpu_measured=1, cpu_committed=1,
                                            cpu_limit=10, cpu_hard_max=10)}),
@@ -1272,9 +1271,9 @@ class BandVerdictTestCase(HeadroomReportTestCase):
 
 
 class GithubAnnotationsTestCase(HeadroomReportTestCase):
-    """D3: a ``::warning::`` for each band violation, plus a step summary.
+    """A ``::warning::`` for each band violation, plus a step summary.
 
-    F4 is why this exists at all: the report's exit code is discarded
+    This exists because the report's exit code is discarded
     twice between here and a human, by ``|| true`` in
     ``ci_headroom_collect.sh`` and by ``continue-on-error: true`` in the
     workflow, so a warning that only changed the exit code would be
@@ -1335,7 +1334,7 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
         self.assertIn(
             '::warning title=CI headroom%3A cluster OVERSUBSCRIBED::', output,
             'An OVERSUBSCRIBED band verdict did not raise a GitHub '
-            'annotation (D3).')
+            'annotation.')
         self.assertIn('above the upper bound of 0.70', output)
         self.assertIn(
             '(slim-tier)', output,
@@ -1350,12 +1349,11 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
         self.assertEqual(0, code)
         self.assertIn(
             '::warning title=CI headroom%3A cluster OVERSIZED::', output,
-            'An OVERSIZED band verdict did not raise a GitHub annotation '
-            '(D3).')
+            'An OVERSIZED band verdict did not raise a GitHub annotation.')
         self.assertIn('below the lower bound of 0.35', output)
         self.assertIn(
             'tools/ci_headroom_harvest.py', output,
-            'D8: a single-run OVERSIZED annotation must point at the '
+            'A single-run OVERSIZED annotation must point at the '
             'harvest tool as the way to ask the operational question, '
             'rather than reading as actionable on its own.')
 
@@ -1376,15 +1374,15 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
             '::warning title=CI headroom%3A per-node maximum above band::',
             output,
             'A per-node maximum above PER_NODE_BAND_UPPER did not raise a '
-            'GitHub annotation (D4).')
+            'GitHub annotation.')
         self.assertIn('never gates', output)
         self.assertIn(
             'This bound never gates', output,
-            'D4: the per-node annotation must say the bound never gates, '
+            'The per-node annotation must say the bound never gates, '
             'the same as the printed verdict does.')
 
     def test_a_capacity_refusal_emits_a_warning_annotation_about_calibration(self):
-        """D5: phrased as a calibration signal, never as undersizing evidence."""
+        """Phrased as a calibration signal, never as undersizing evidence."""
         census = self._census([
             census_event('schedule at stage sufficient_free_disk',
                          {NODE_ONE: {'reason': 'insufficient disk'}}),
@@ -1400,16 +1398,16 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
             '::warning title=CI headroom%3A capacity-stage refusals observed::',
             output,
             'A capacity-stage refusal did not raise its own GitHub '
-            'annotation (D3).')
+            'annotation.')
         self.assertIn(
             "demand estimator's calibration", output,
-            'D5: the refusal annotation must be worded as an observation '
+            'The refusal annotation must be worded as an observation '
             'about the demand estimator\'s calibration.')
         self.assertIn(
             'not evidence the cloud is too small', output,
-            'D5: the refusal annotation must explicitly say a refusal is '
-            'not evidence the cloud is undersized -- phase 4 doubled a '
-            "cluster's ledger and the refusal rate stayed essentially the "
+            'The refusal annotation must explicitly say a refusal is '
+            'not evidence the cloud is undersized -- doubling a '
+            "cluster's ledger left the refusal rate essentially the "
             'same.')
 
     def test_the_step_summary_variable_is_left_alone_when_unset(self):
@@ -1439,7 +1437,7 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
             contents = f.read()
         self.assertIn('### CI headroom band verdict -- slim-tier', contents)
         self.assertIn('OVERSUBSCRIBED', contents)
-        # This fixture's single node is also above the D4 per-node band
+        # This fixture's single node is also above the per-node band
         # (0.900 > 0.85), so both annotations fire.
         self.assertIn('2 GitHub annotations raised on this run.', contents)
 
@@ -1481,7 +1479,7 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
                 for line in lines))
 
     def test_an_unwritable_step_summary_path_does_not_raise(self):
-        """A path whose parent directory does not exist is tolerated (D15)."""
+        """A path whose parent directory does not exist is tolerated."""
         summary_path = os.path.join(
             self.tempdir, 'no-such-directory', 'step-summary.md')
         self._set_step_summary(summary_path)
@@ -1491,7 +1489,7 @@ class GithubAnnotationsTestCase(HeadroomReportTestCase):
         ])
         code, output = self._run('--series', path)
         # An unwritable $GITHUB_STEP_SUMMARY path must not raise either:
-        # nothing this tool does may fail the job it is measuring (D15).
+        # nothing this tool does may fail the job it is measuring.
         self._assert_rendered(code, output)
         self.assertFalse(os.path.exists(summary_path))
         self.assertIn(
@@ -1546,7 +1544,7 @@ def unledgered_node_payload(cpu_committed=8):
 
 
 class ReviewFixesTestCase(HeadroomReportTestCase):
-    """Readings which looked right and were not, found in review of phase 1."""
+    """Readings which looked right and were not, found in review."""
 
     def test_an_unledgered_node_cannot_push_the_fraction_above_one(self):
         """The fraction's two sides must be summed over the same nodes.
@@ -1591,8 +1589,8 @@ class ReviewFixesTestCase(HeadroomReportTestCase):
         ledger_unreadable was 'every row_present is False', which a
         single-hypervisor topology satisfies whenever its one node has no
         capacity row yet. Every sample was then discarded and the run
-        printed NO VERDICT -- on slim-primary, the first topology this
-        phase's definition of done names.
+        printed NO VERDICT -- on slim-primary, one of the two topologies
+        cluster CI runs on.
         """
         path = self._series([
             sample({NODE_ONE: node_payload(
@@ -1605,7 +1603,7 @@ class ReviewFixesTestCase(HeadroomReportTestCase):
             'NO VERDICT', output,
             'A single-hypervisor sample whose one node had no capacity '
             'row was treated as a failed capacity read, discarding the '
-            'whole CPU series on the topology phase 1 must report on.')
+            'whole CPU series on a topology the probe has to report on.')
         self.assertIn('0.500', output)
         self.assertIn(
             'one visible node and no capacity row', output,
@@ -1663,7 +1661,9 @@ class ReviewFixesTestCase(HeadroomReportTestCase):
         self.assertNotIn('CENSUS MAY BE TRUNCATED', output)
 
     def test_drops_at_an_unclassified_stage_are_named_in_the_verdict(self):
-        """D10 keeps them out of the warning; they must not vanish from it.
+        """The no-hardcoded-list rule keeps them out of the warning.
+
+        They must not vanish from it, though.
 
         capacity_shortage_drops counts only stages in
         CAPACITY_STAGE_NOTES, so a stage added to the scheduler after
@@ -1689,9 +1689,8 @@ class ReviewFixesTestCase(HeadroomReportTestCase):
     def test_the_disk_bandwidth_caveat_is_absent_when_disk_did_not_drop(self):
         """Stating it about drops which did not happen dilutes it.
 
-        The distinction is real and the plan itself got it wrong, so the
-        note earns its place -- but only over drops that are actually at
-        sufficient_idle_disk.
+        The distinction is real and easy to get wrong, so the note earns its
+        place -- but only over drops that are actually at sufficient_idle_disk.
         """
         census = self._census([
             census_event('schedule at stage sufficient_idle_cpu',
@@ -1718,12 +1717,12 @@ class ReviewFixesTestCase(HeadroomReportTestCase):
         self.assertIn('disk BANDWIDTH', output)
 
     def test_a_read_failure_is_not_counted_as_a_ledger_fallback(self):
-        """D7 reads the fallback count as evidence about the two ledgers.
+        """The fallback count is evidence about the two ledgers.
 
         print_ledger_provenance walked every sample, so node-samples from
         a ledger-unreadable sample were counted as having fallen back to
-        cpu_hard_max. That inflates the one number D7's reconciliation
-        asks phase 2 to read with failures which say nothing about it.
+        cpu_hard_max. That inflates the one number the ledger
+        reconciliation turns on with failures which say nothing about it.
         """
         path = self._series([
             sample({
@@ -1859,19 +1858,19 @@ class GuardCensusTestCase(HeadroomReportTestCase):
         self.assertIn(
             'ci-namespace', output,
             'The namespace whose claim was exceeded was not reported, so the '
-            'calibration signal D9 asks for names no claim to calibrate.')
+            'calibration signal names no claim to calibrate.')
         self.assertNotIn(
             'Guard refusals: YES', output,
             'A claim exceedance was reported as a refusal. It is an ADMITTED '
             'placement; advisory mode did what the operator asked.')
 
     def test_a_forced_write_is_counted_apart_from_refusals(self):
-        """The P5 forced ground-truth write is a recorded placement.
+        """The forced ground-truth write is a recorded placement.
 
-        The collector ships it -- issue 4087's rule-out of the P5
-        mechanism needed exactly this event -- so a report which dropped
-        it would leave the durable record unable to tell a forced write
-        from the never-reconciled window once the bundles expire.
+        The collector ships it -- issue 4087's rule-out of the forced-write
+        mechanism needed exactly this event -- so a report which dropped it
+        would leave the durable record unable to tell a forced write from the
+        never-reconciled window once the bundles expire.
         """
         census = self._census([
             denial_event(dimensions=[
@@ -1885,7 +1884,7 @@ class GuardCensusTestCase(HeadroomReportTestCase):
                                  '--json', target)
         self.assertEqual(0, code)
         self.assertIn('Placements refused by the guard: 1', output)
-        self.assertIn('Forced ground-truth writes past the guard (P5): 1',
+        self.assertIn('Forced ground-truth writes past the guard: 1',
                       output)
         with open(target) as f:
             record = json.load(f)
@@ -1917,18 +1916,18 @@ class GuardCensusTestCase(HeadroomReportTestCase):
         code, output = self._run('--series', path, '--census', census)
         self.assertEqual(0, code)
         self.assertNotIn('NO CAPACITY GUARD EVENTS IN THIS CENSUS.', output)
-        self.assertIn('Forced ground-truth writes past the guard (P5): 1',
+        self.assertIn('Forced ground-truth writes past the guard: 1',
                       output)
         self.assertIn('Placements refused by the guard: 0', output)
         self.assertIn(
             'quantum_flux', output,
             'A dimension this tool has not been told about was dropped '
-            'from a forced write; the no-hardcoded-list rule (D10) applies '
+            'from a forced write; the no-hardcoded-list rule applies '
             'to every guard message equally.')
         self.assertIn('Counted but unrecognised', output)
 
     def test_an_unknown_stage_and_dimension_are_tallied_not_dropped(self):
-        """The same no-hardcoded-list rule the stage census follows (D10)."""
+        """The same no-hardcoded-list rule the stage census follows."""
         census = self._census([
             denial_event(failing_stage='a_guard_stage_from_next_year',
                          dimensions=[
@@ -1967,7 +1966,7 @@ class GuardCensusTestCase(HeadroomReportTestCase):
             'match, so a reader cannot tell the query from the cluster.')
 
     def test_a_malformed_guard_event_is_counted_not_fatal(self):
-        """D15 again: nothing about an event shape may fail the job."""
+        """Again: nothing about an event shape may fail the job."""
         broken = ['1756000000000000000', json.dumps({
             'message': 'instance placement denied', 'extra': 'not a dict'})]
         census = self._census([broken])
@@ -1975,18 +1974,17 @@ class GuardCensusTestCase(HeadroomReportTestCase):
         code, output = self._run('--series', path, '--census', census)
         self.assertEqual(
             0, code, 'A guard event whose extra was not a dict made the '
-                     'report exit non-zero (D15).')
+                     'report exit non-zero.')
         self.assertIn('Placements refused by the guard: 1', output)
         self.assertIn('carried no usable dimensions list', output)
 
     def test_the_demand_split_reads_the_comparison_the_guard_made(self):
         """The demand clause does not charge the incoming placement.
 
-        Since phase 4a the demand guard compares cpu_load_1 plus
-        expected_demand against the limit and leaves `requested` out, so
-        a split which added `requested` would report a comparison the
-        guard never made -- and would call an estimator defect a busy
-        node.
+        The demand guard compares cpu_load_1 plus expected_demand against the
+        limit and leaves `requested` out, so a split which added `requested`
+        would report a comparison the guard never made -- and would call an
+        estimator defect a busy node.
         """
         census = self._census([
             # Measured load is inside the limit; the feedforward estimate
@@ -2009,7 +2007,7 @@ class GuardCensusTestCase(HeadroomReportTestCase):
             '    1  the feedforward demand estimate carried it over',
             output,
             'The demand split counted `requested` into the comparison, which '
-            'the guard does not since phase 4a, so an estimator defect reads '
+            'the guard does not, so an estimator defect reads '
             'as a node which was genuinely busy.')
 
     def test_a_reported_shortfall_is_printed_and_never_recomputed(self):
@@ -2131,10 +2129,10 @@ def metric_cells(block):
 
 
 class SummaryRecordTestCase(HeadroomReportTestCase):
-    """The machine-readable record, and the prose rendered from it (D18).
+    """The machine-readable record, and the prose rendered from it.
 
-    Phase 2's harvest calls ``summary_record()`` over several hundred banked
-    bundles and phase 5's guardrail reads the ``--json`` file, so the
+    The harvest calls ``summary_record()`` over several hundred banked
+    bundles and the headroom gate reads the ``--json`` file, so the
     alternative -- both of them parsing the printed tables -- would make
     every future change to a heading a silent break of the dataset. The
     report now renders its prose from the record, and these tests exist to
@@ -2143,12 +2141,11 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
     numbers in the job log and in the baseline dataset would disagree while
     both looked plausible.
 
-    The second thing covered here is the one the plan is most insistent
-    about. A census which was never collected must leave nulls in the
-    record, never zeros: "we did not look" and "nothing was refused" are
-    different findings, the second is the one the whole plan is hunting
-    for, and a zero in a dataset is indistinguishable from a measurement
-    (D20).
+    The second thing covered here is the one most worth insisting on. A
+    census which was never collected must leave nulls in the record, never
+    zeros: "we did not look" and "nothing was refused" are different
+    findings, the second is the one a sizing decision is hunting for, and a
+    zero in a dataset is indistinguishable from a measurement.
     """
 
     def _rich_series(self):
@@ -2214,9 +2211,9 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
         This walks the printed tables and the printed scalars and checks
         each against the record which produced them. A figure recomputed in
         a printer rather than read from the record fails here -- which is
-        the drift D18 exists to make impossible, because the baseline in
-        the master plan and the numbers in the job log a reader checks it
-        against would then be different numbers.
+        the drift the single record exists to make impossible, because the
+        committed baseline and the numbers in the job log a reader checks
+        it against would then be different numbers.
         """
         record, output = self._record_and_output()
 
@@ -2248,17 +2245,18 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
                 ('  Node-samples with no CPU ledger at all:           %d',
                  'node_samples_without_ledger')):
             self.assertIn(line % provenance[key], output,
-                          'The D7 ledger provenance count %s is not the one '
-                          'printed. D7 is settled from these figures.' % key)
+                          'The ledger provenance count %s is not the one '
+                          'printed. The two ledgers are reconciled from '
+                          'these figures.' % key)
 
         cluster = record['cluster']
         cluster_block = (output.split('Cluster-wide headroom')[1]
                          .split('Committed vCPU, per node')[0])
         for prefix, key, why in (
                 ('  committed vCPU ', 'committed_cpu',
-                 'That row is the one D3\'s band verdict is read from.'),
+                 'That row is the one the band verdict is read from.'),
                 ('  committed memory (MB) ', 'committed_memory_mb',
-                 'Whether memory ever binds is what decides phase 0\'s D5.')):
+                 'Whether memory ever binds is read from this row.')):
             rows = [line for line in cluster_block.splitlines()
                     if line.startswith(prefix)]
             self.assertEqual(1, len(rows),
@@ -2276,9 +2274,9 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
                 cells_under(output, 'Committed vCPU, per node',
                             'Committed memory (MB), per node', node),
                 'Node %s\'s committed vCPU row does not match the record. '
-                'The per-node figures are what D21 is argued from: a '
-                'cluster-wide fraction inside the band above a node pinned '
-                'at 1.000.' % node)
+                'The per-node figures are what the per-node bound is argued '
+                'from: a cluster-wide fraction inside the band above a node '
+                'pinned at 1.000.' % node)
             self.assertEqual(
                 [node] + metric_cells(blocks['committed_memory_mb']),
                 cells_under(output, 'Committed memory (MB), per node',
@@ -2309,8 +2307,8 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
                 [str(tally['events']), str(tally['aborts']),
                  str(tally['dropped'])], cells[1:4],
                 'The census tally for stage %r does not match the record. '
-                'The per-stage refusal census is the corpus phase 3 checks '
-                'its inventory of signatures against.' % stage)
+                'The per-stage refusal census is the corpus the saturation '
+                'suite checks its inventory of signatures against.' % stage)
 
         guard = record['guard']
         self.assertIn('  Placements refused by the guard: %d' % guard['denials'],
@@ -2338,11 +2336,12 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
     def test_an_absent_census_is_null_in_the_record_and_never_zero(self):
         """A census nobody collected must not read as a run which refused nothing.
 
-        This is the misreading the whole plan is most exposed to. A zero in
-        a dataset is indistinguishable from a measurement, and the baseline
-        phase 2 publishes is read by phases 3, 4 and 5 -- so an uncollected
-        census which recorded itself as zero refusals would be evidence for
-        shrinking a cloud that had in fact been refusing creates (D20).
+        This is the misreading the dataset is most exposed to. A zero in
+        a dataset is indistinguishable from a measurement, and every
+        decision about the size of the cloud is read off that baseline --
+        so an uncollected census which recorded itself as zero refusals
+        would be evidence for shrinking a cloud that had in fact been
+        refusing creates.
         """
         path = self._series([sample({NODE_ONE: node_payload()})])
         target = os.path.join(self.tempdir, 'summary.json')
@@ -2374,13 +2373,13 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
         self.assertIsNone(
             record['verdict']['refusal_warning'],
             'The refusal half of the band verdict must be unknown rather '
-            'than False when no census was read (D3).')
+            'than False when no census was read.')
         self.assertIn('NO CENSUS WAS SUPPLIED', output)
 
     def test_a_census_carrying_no_guard_events_is_not_collected_not_zero(self):
         """The retrospective window's blind spot, recorded as a blind spot.
 
-        Until D20 widens the collector's LogQL filter, every banked census
+        Until the collector's LogQL filter is widened, every banked census
         matches the scheduler's stage messages only, so it carries no guard
         event whatever the guard did. That is a fact about the query before
         it is a fact about the cluster, and the record has to say so.
@@ -2419,13 +2418,13 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
         self.assertEqual('census_unavailable', record['guard']['state'])
 
     def test_the_per_node_maximum_fraction_is_recorded(self):
-        """D21: the cluster-wide fraction averages a full node against an empty one.
+        """The cluster-wide fraction averages a full node against an empty one.
 
         The shape here is the one merge run 33944911413 actually recorded:
         a cluster-wide p90 comfortably inside the band while one node sat
         pinned at its own ledger for the whole run. A band written only
         cluster-wide calls that run healthy, which is the precise failure
-        this plan exists to stop making, so the per-node maximum is a
+        this report exists to stop making, so the per-node maximum is a
         first-class figure in the record.
         """
         records = []
@@ -2450,7 +2449,7 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
         self.assertEqual(
             'OVERSIZED', record['verdict']['band'],
             'Read cluster-wide this run is under the lower bound, which is '
-            'exactly the reading D21 says is misleading.')
+            'exactly the misleading reading the per-node figure exists for.')
         self.assertEqual(
             {'n': 10, 'p90': 1.0, 'peak': 1.0},
             record['per_node_max_cpu_fraction'],
@@ -2464,10 +2463,10 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
             'cluster-wide ratio it judged.')
         self.assertEqual(
             'ABOVE BAND', record['verdict']['per_node_band'],
-            'D4 judges the per-node maximum against PER_NODE_BAND_UPPER '
+            'The per-node maximum is judged against PER_NODE_BAND_UPPER '
             '(0.85). A p90 of 1.0 is above it, and the cluster-wide band '
             'being OVERSIZED must not suppress that -- they are separate '
-            'verdicts (D21).')
+            'verdicts.')
         self.assertEqual(
             report.PER_NODE_BAND_UPPER, record['verdict']['per_node_band_upper'],
             'The record must carry the bound the per-node verdict was '
@@ -2477,8 +2476,9 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
     def test_the_ledger_is_recorded_as_the_range_it_moved_over(self):
         """A ledger which changed mid-run is a finding, not something to average.
 
-        The reconciler rewriting a capacity row is the kind of event D7's
-        12-versus-10 discrepancy might turn out to be made of.
+        The reconciler rewriting a capacity row is the kind of event the
+        unexplained 12-versus-10 ledger discrepancy might turn out to be
+        made of.
         """
         records = [
             sample({NODE_ONE: node_payload(cpu_limit=10)},
@@ -2499,12 +2499,12 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
                       'record carries, not as one of its ends.')
 
     def test_the_record_is_the_same_whether_it_is_written_or_returned(self):
-        """The harvest calls the function; the guardrail reads the file (D18).
+        """The harvest calls the function; the gate reads the file.
 
-        Phase 2's harvest runs this over several hundred bundles locally, so
-        it calls summary_record() rather than shelling out. If the function
-        and the --json file could differ, the dataset and the guardrail
-        would be measuring different things.
+        The harvest runs this over several hundred bundles locally, so it
+        calls summary_record() rather than shelling out. If the function
+        and the --json file could differ, the dataset and the gate would be
+        measuring different things.
         """
         path = self._rich_series()
         census = self._rich_census()
@@ -2518,7 +2518,7 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
         self.assertEqual(
             json.loads(json.dumps(returned)), written,
             'summary_record() and the --json file disagree, so the harvest '
-            'and phase 5\'s guardrail would read different numbers.')
+            'and the headroom gate would read different numbers.')
         self.assertEqual('slim-tier', written['label'])
         self.assertEqual(report.RECORD_VERSION, written['record_version'])
 
@@ -2541,11 +2541,10 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
         self.assertNotIn(
             'band_provisional', record['verdict'],
             'band_provisional should no longer be a key in the verdict '
-            'record (D2); phase 2 defended the band and nothing reads the '
-            'flag.')
+            'record; the band is defended and nothing reads the flag.')
 
     def test_a_json_path_which_cannot_be_written_is_a_warning_not_a_failure(self):
-        """D15 holds for the output file as much as for the inputs.
+        """The exit-zero rule holds for the output file as much as the inputs.
 
         A full disk or a missing directory must not fail the job, and must
         not lose the printed report either -- the record is written after
@@ -2557,8 +2556,7 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
         self.assertEqual(
             0, code,
             'An unwritable --json path failed the job. An instrument which '
-            'can fail the run it is measuring changes what it measures '
-            '(D15).')
+            'can fail the run it is measuring changes what it measures.')
         self.assertIn('WARNING: the summary record could not be written',
                       output)
         self.assertIn('Shaken Fist CI headroom report', output,
@@ -2569,7 +2567,7 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
         """The harvest must be able to record a job which produced nothing.
 
         A bundle whose probe never started is a fact about the window --
-        phase 2 records it rather than dropping the run, because a
+        the harvest records it rather than dropping the run, because a
         disappearing job would silently shrink n.
         """
         record = report.summary_record(
@@ -2584,7 +2582,7 @@ class SummaryRecordTestCase(HeadroomReportTestCase):
 
 
 class CapacityWaitsTestCase(HeadroomReportTestCase):
-    """--waits summarises the JSONL trace create_instance() writes (D14).
+    """--waits summarises the JSONL trace create_instance() writes.
 
     An absent or empty file must read as "unknown", never as "0 seconds
     waited" -- printing a zero there is precisely the misreading a broken
@@ -2672,11 +2670,10 @@ class CapacityWaitsTestCase(HeadroomReportTestCase):
     def test_an_all_malformed_file_reads_as_unknown_to_a_machine_too(self):
         """The prose said unknown; the record said 'available, zero waits'.
 
-        waits_record() is what phase 5 and the sizing plan's guardrail
-        read, and a consumer which cannot read prose saw 'available: true,
-        count: 0' -- indistinguishable from a run which genuinely never
-        waited, which is the exact confusion the printed text spends three
-        paragraphs guarding against.
+        waits_record() is what the headroom gate reads, and a consumer which
+        cannot read prose saw 'available: true, count: 0' -- indistinguishable
+        from a run which genuinely never waited, which is the exact confusion
+        the printed text spends three paragraphs guarding against.
         """
         path = self._write('instance-waits.jsonl', 'garbage\nmore garbage\n')
         record = report.waits_record(report.read_waits(path))
@@ -2729,7 +2726,7 @@ class CapacityWaitsTestCase(HeadroomReportTestCase):
     def test_read_waits_and_waits_record_agree_with_the_printed_report(self):
         """The functions the report is built from, exercised directly.
 
-        Phase 2's harvest is expected to call these the way phase 1's does
+        The harvest is expected to call these the way it calls
         summary_record() -- straight over a downloaded bundle -- so they
         need to work without going through main().
         """
@@ -2869,12 +2866,12 @@ class PerNodeNoVerdictTestCase(HeadroomReportTestCase):
         self.assertIn(
             'NO VERDICT: no sample produced a per-node committed-vCPU-',
             output,
-            'print_verdict() printed the D4 per-node bound without saying '
+            'print_verdict() printed the per-node bound without saying '
             'that no verdict could be reached against it.')
 
 
 class BandGateTestCase(HeadroomReportTestCase):
-    """5f armed the cluster-wide upper bound, and nothing else.
+    """Only the cluster-wide upper bound is armed, and nothing else.
 
     The contract has two halves in two repositories.  Here the report
     returns ``BAND_VIOLATION_EXIT`` for an oversubscribed cluster it could
@@ -2916,7 +2913,7 @@ class BandGateTestCase(HeadroomReportTestCase):
             0, code,
             'An OVERSUBSCRIBED verdict the instrument could not trust '
             'failed the job. That is the instrument talking about itself, '
-            'which D15 says may never gate.')
+            'which may never gate.')
         self.assertIn('OVERSUBSCRIBED', output)
         self.assertIn('This verdict would gate, but', output)
         self.assertIn(
@@ -3011,11 +3008,11 @@ class BandGateTestCase(HeadroomReportTestCase):
             'decline to believe a status of 3 and the gate is off.')
 
     def test_an_oversized_cluster_does_not_gate(self):
-        """D8: the lower bound is information, and gating on it would be bad.
+        """The lower bound is information, and gating on it would be bad.
 
-        Not merely undesirable -- 30 of the 40 cluster job-runs 5e measured
-        read OVERSIZED, so a status returned here would redden three
-        quarters of cluster CI on the first run after this merged.
+        Not merely undesirable -- 30 of the 40 cluster job-runs in the
+        measured window read OVERSIZED, so a status returned here would
+        redden three quarters of cluster CI on its first run.
         """
         path = self._series([
             sample({NODE_ONE: node_payload(
@@ -3035,7 +3032,7 @@ class BandGateTestCase(HeadroomReportTestCase):
         self.assertIn('WITHIN BAND', output)
 
     def test_a_node_above_the_per_node_bound_alone_does_not_gate(self):
-        """D4 and D7: the per-node bound is published and never gates.
+        """The per-node bound is published and never gates.
 
         One node pinned at its own ledger while the cluster sits at 0.50.
         The per-node verdict reads ABOVE BAND and the job still passes.
@@ -3051,9 +3048,9 @@ class BandGateTestCase(HeadroomReportTestCase):
         code, output = self._run('--series', path)
         self.assertEqual(
             0, code,
-            'A per-node maximum above its bound failed the job. D4 says '
-            'that statistic never gates: phase 2 found it saturated at its '
-            'ceiling in plenty of passing job-runs.')
+            'A per-node maximum above its bound failed the job. That '
+            'statistic never gates: it is saturated at its ceiling in '
+            'plenty of passing job-runs.')
         self.assertIn('ABOVE BAND', output)
 
     def test_a_series_with_no_verdict_does_not_gate(self):
@@ -3065,7 +3062,7 @@ class BandGateTestCase(HeadroomReportTestCase):
         self.assertIn('NO VERDICT', output)
 
     def test_a_report_which_raises_does_not_gate(self):
-        """D15 in full: the instrument's own defects never fail the job.
+        """In full: the instrument's own defects never fail the job.
 
         This is the case the narrow status exists for.  main() swallows the
         exception, so there is no record, so there is no verdict -- and a
@@ -3146,7 +3143,7 @@ class BandGateTestCase(HeadroomReportTestCase):
     def test_a_series_without_the_capacity_degraded_flag_does_not_gate(self):
         """An absent flag is not a healthy read (Sample.capacity_degraded).
 
-        A probe built before step 2a publishes no flag, and cannot say
+        A probe built before the flag existed publishes none, and cannot say
         whether its capacity read was failing. The realistic route to one
         is a partial rollback of shakenfist/actions, which is reached at
         @main -- and the report elsewhere already says such samples

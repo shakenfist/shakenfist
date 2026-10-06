@@ -6,8 +6,7 @@ nothing today records how close to the scheduler's admission limits those
 runs actually get. `GET /admin/resources` (via `client.get_cluster_resources()`)
 is the same data the scheduler uses to admit or refuse an instance, so
 sampling it repeatedly through a test run builds a time series of headroom
-that a later tool can turn into a p90/peak report -- see
-docs/plans/PLAN-ci-cloud-sizing-phase-01-headroom-probe.md.
+that a later tool can turn into a p90/peak report.
 
 This is a background poller, not a single-shot check like
 tools/ci_wait_schedulable.py (which this tool is modelled on for its
@@ -61,7 +60,7 @@ after each one. A sample is not free -- the API call behind
 it is slowest exactly when the cluster is busiest. Sleeping a constant
 interval afterwards would therefore stretch the gap between samples under
 load, so busy periods would be sampled less often than quiet ones and the
-percentiles a later phase reads would be biased toward idle. That bias
+percentiles the report computes would be biased toward idle. That bias
 points the wrong way: it would argue for shrinking a cloud which was in
 fact tight.
 

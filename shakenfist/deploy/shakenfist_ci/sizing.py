@@ -1,18 +1,6 @@
 # Copyright 2019 Michael Still and contributors
 """Size a request beyond what any node in a cluster could ever serve.
 
-The arithmetic ``cluster_ci_tests/test_saturation.py`` uses to build
-PLAN-ci-cloud-sizing-phase-03-saturation-coverage.md's D24
-"impossible" requests, kept here rather than in the test which uses it
-for the reason ``retries.py`` gives for itself: this module imports
-nothing from the rest of the suite and nothing from
-``shakenfist_client``, so ``shakenfist/tests/test_ci_saturation.py``
-can load it by path and exercise its boundaries directly. The
-functional suite is a client of a deployed cluster and cluster CI only
-runs in the merge queue, so logic which lives in a test module there
-cannot be checked before merging -- and this is the one part of D23/D24
-whose correctness does not depend on a live cluster.
-
 Every function here is a pure function of a ``per_node`` entry from
 ``/admin/resources`` (``scheduler.summarize_resources()``), or of a
 single number read from one. The distinction the whole file turns on is
@@ -21,17 +9,28 @@ single number read from one. The distinction the whole file turns on is
 (``cpu_available``, ``ram_available``, ``disk_available``) *grows* when
 a sibling stestr worker deletes an instance -- so a request sized one
 unit beyond headroom can become servable between the read and the
-create, which is the flake phase 3 exists to remove rather than cause.
+create. Sizing an "impossible" request from a ceiling is therefore the
+difference between a saturation test which proves a refusal and one which
+flakes.
 
-Phase 5's D6 put a second, smaller thing here for the same reason: the
-structural minimums a cluster CI topology has to meet
-(``MINIMUM_NODES`` and the three constants beside it) and the function
-which says which of them a deployed cluster misses. That one reads the
-whole ``per_node`` mapping and the ``GET /nodes`` list rather than a
-single entry, but it is the same kind of thing -- arithmetic over a
-published reading, with no cluster needed to check it -- so
-``shakenfist/tests/test_ci_structural_minimum.py`` exercises its
-boundaries in ``pre-commit`` instead of in a merge-queue cluster job.
+``cluster_ci_tests/test_saturation.py`` is the caller. The arithmetic
+is kept here rather than in that test for the reason ``retries.py``
+gives for itself: this module imports nothing from the rest of the
+suite and nothing from ``shakenfist_client``, so
+``shakenfist/tests/test_ci_saturation.py`` can load it by path and
+exercise its boundaries directly. The functional suite is a client of a
+deployed cluster and cluster CI only runs in the merge queue, so logic
+which lives in a test module there cannot be checked before merging.
+
+A second, smaller thing lives here for the same reason: the structural
+minimums a cluster CI topology has to meet (``MINIMUM_NODES`` and the
+three constants beside it) and the function which says which of them a
+deployed cluster misses. That one reads the whole ``per_node`` mapping
+and the ``GET /nodes`` list rather than a single entry, but it is the
+same kind of thing -- arithmetic over a published reading, with no cluster
+needed to check it -- so ``shakenfist/tests/test_ci_structural_minimum.py``
+exercises those boundaries in ``pre-commit`` instead of in a merge-queue
+cluster job.
 """
 
 import math
@@ -76,7 +75,7 @@ def effective_cpu_ceiling(per_node_entry):
 
     ``summarize_resources()`` (``shakenfist/scheduler.py``) publishes
     ``cpu_limit`` as ``None`` for a node the capacity reconciler has not
-    written a ``scheduler_node_capacity`` row for yet, or ever (P7, an
+    written a ``scheduler_node_capacity`` row for yet, or ever (an
     "unguarded" node). The scheduler does not then treat that node as
     limitless: ``_has_sufficient_cpu()`` falls back to the node's own
     live ``cpu_hard_max`` (``limit_cpus = row['limit_cpus'] if row else
@@ -108,10 +107,9 @@ def effective_ram_ceiling(per_node_entry):
     any moment -- if a sibling frees more than one unit on the node that
     held the maximum at read time, an "impossible" request sized from
     headroom becomes possible between the read and the create, and the
-    test flakes exactly the way the phase plan's risk table warns against.
-    (Recorded as a D24 survey finding: D24's memory and disk rows
-    originally named headroom fields, not ceilings; the CPU row was
-    already right.)
+    test flakes. The memory and disk sizing here originally named
+    headroom fields rather than ceilings, and was corrected for exactly
+    that reason; the CPU sizing was always right.
 
     A guarded node's real ceiling can additionally be bounded *below*
     ``ram_max`` by its capacity row's own ``limit_memory_mb`` -- not
@@ -145,9 +143,8 @@ def effective_ram_ceiling(per_node_entry):
 
 
 # The structural minimum a cluster CI topology has to meet before the
-# cluster suite's results mean anything
-# (PLAN-ci-cloud-sizing-phase-05-guardrails.md's D6). The first three are
-# preconditions tests in ``cluster_ci_tests`` already read and *skip* on,
+# cluster suite's results mean anything. The first three are preconditions
+# tests in ``cluster_ci_tests`` already read and *skip* on,
 # which is why they are gathered here rather than left implicit: a
 # topology shrunk below one of them does not fail, it quietly stops
 # proving the thing the test was written to prove.
@@ -180,13 +177,13 @@ MINIMUM_HYPERVISORS = 3
 MINIMUM_NON_NETWORK_HYPERVISORS = 2
 
 # The total schedulable vCPU ledger, summed across hypervisors. Nothing
-# skips on this; it is the figure PLAN-ci-cloud-sizing cares about and
-# no existing test reads, and node count alone would not have caught
-# ``slim-tier`` at a total of 12 -- that cloud had three nodes and was
-# the one the whole plan was written about.
+# skips on this; it is the figure which decides whether the cloud is
+# big enough and no existing test reads, and node count alone would not
+# have caught ``slim-tier`` at a total of 12 -- that cloud had three
+# nodes and was the undersized cloud which prompted these minimums.
 #
-# 24 is exactly ``slim-tier``'s total after phase 4 doubled it, so the
-# floor sits on the topology phase 4 argued has no slack and any
+# 24 is exactly ``slim-tier``'s present total, so the floor sits on the
+# smaller of the two deployed topologies -- which has no slack -- and any
 # reduction to it fails immediately and by name. ``slim-primary`` clears
 # it at 27. The deliberate cost is that a future, smaller-on-purpose
 # topology cannot be deployed without editing this constant in the same
@@ -205,8 +202,8 @@ def hypervisor_ledger(per_node):
 
     Each node contributes ``effective_cpu_ceiling()`` rather than its raw
     ``cpu_limit``, and that matters most at exactly the moment this
-    figure is first read. Phase 2 measured a contiguous prefix of 9 to 14
-    samples -- 135 to 210 seconds -- at the start of every one of 204
+    figure is first read. Measurement found a contiguous prefix of 9 to
+    14 samples -- 135 to 210 seconds -- at the start of every one of 204
     job-runs in which *every* node's capacity row reads absent at once,
     publishing ``cpu_limit: None`` while ``total.capacity_degraded``
     stayed false: an unpopulated table during warm-up, not a failed read.
@@ -294,10 +291,10 @@ def structural_minimum_violations(per_node, nodes):
     ``per_node`` is a liveness statement -- fresh metrics, and a queue
     under the unreasonable length -- and a hypervisor which is briefly
     missing from the roster has not stopped being a hypervisor. The
-    flags are also what ``base._hypervisor_nodes()`` and the four tests
-    in this phase's F6 already filter on, so counting them the same way
-    means this assertion and those skips cannot disagree about the same
-    cluster. The ledger is the one figure which must come from
+    flags are also what ``base._hypervisor_nodes()`` filters on, and so
+    what ``test_network_lifecycle.py``'s skip counts, so counting them
+    the same way means this assertion and that skip cannot disagree
+    about the same cluster. The ledger is the one figure which must come from
     ``per_node``, because that is the only place it is published.
     """
     nodes = nodes or []

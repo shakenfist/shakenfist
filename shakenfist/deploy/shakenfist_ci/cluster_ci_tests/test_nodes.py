@@ -9,17 +9,16 @@ from shakenfist_ci import sizing
 from shakenfist_client import apiclient
 
 
-# How long a reading below the structural minimum is waited out before it
-# is believed. Phase 2 of PLAN-ci-cloud-sizing measured a contiguous
-# prefix of 9 to 14 samples -- 135 to 210 seconds -- at the start of
-# every one of 204 job-runs in which every node's capacity row read
-# absent at once; separately, a node which has not yet published fresh
-# metrics is missing from /admin/resources altogether. Both make a young
-# cluster read smaller than it is and both resolve on their own, so the
-# assertion must not be able to fire inside that window. Comfortably
-# longer than the longest prefix measured and far shorter than the job
-# timeout, at the cost that a genuinely undersized cloud takes this long
-# to say so.
+# How long a reading below the structural minimum is waited out before it is
+# believed. The CI sizing baseline measured a contiguous prefix of 9 to 14
+# samples -- 135 to 210 seconds -- at the start of every one of its 204
+# job-runs in which every node's capacity row read absent at once; separately,
+# a node which has not yet published fresh metrics is missing from
+# /admin/resources altogether. Both make a young cluster read smaller than it
+# is and both resolve on their own, so the assertion must not be able to fire
+# inside that window. Comfortably longer than the longest prefix measured and
+# far shorter than the job timeout, at the cost that a genuinely undersized
+# cloud takes this long to say so.
 #
 # Deliberately the same number as base.CLUSTER_HEADROOM_WAIT and not
 # derived from it: that one is how long a 507 is waited out before a
@@ -142,8 +141,7 @@ class TestNodes(base.BaseNamespacedTestCase):
         instances. A skip reports as a pass, so a topology edit which
         removes capacity fails nothing -- it silently stops proving
         scheduler affinity and network teardown while every job stays
-        green. This test is where that is asserted instead
-        (PLAN-ci-cloud-sizing-phase-05-guardrails.md's D6).
+        green. This test is where that is asserted instead.
 
         It deliberately fails rather than skipping, for the reason
         database_tier.py's own _database_nodes() gives:
@@ -153,7 +151,7 @@ class TestNodes(base.BaseNamespacedTestCase):
         catch would be worse than not having it. Both cluster topologies
         clear every bound asserted here (27 and 24 of ledger against a
         floor of 24), so a cluster reading below one of them is either
-        smaller than the plan agreed to run or is not reporting its node
+        smaller than its topology was sized to be or is not reporting its node
         roles, and both are findings rather than a configuration to skip
         on.
 
