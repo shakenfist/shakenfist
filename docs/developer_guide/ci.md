@@ -227,6 +227,57 @@ tests planned in
 need the marker too, to assert that a genuinely full cluster refuses
 rather than have the refusal waited away.
 
+## Deploy profiles
+
+A cluster job can deploy more than the default stack without that change
+living in `shakenfist/actions`. It names a deploy profile, a Jinja2 template
+in this repository that the actions render against the topology's facts. A
+profile can do five things, all optional:
+
+* add inventory groups, with group variables, for hosts named in the
+  topology;
+* pass extra variables to `site.yml`;
+* run MariaDB SQL once on the primary before the deploy;
+* ask for a second deploy straight afterwards, after which no unit matching
+  a given pattern may have restarted (compared by systemd `InvocationID`,
+  which changes on every start); and
+* export environment variables into the functional test run.
+
+The profile schema, the facts it renders against and the validation rules
+are in the
+[actions consuming guide](https://github.com/shakenfist/actions/blob/main/docs/consuming.md#deploy-profiles).
+Profiles live in `tools/ci-deploy-profiles/` and are named
+`<purpose>-<topology>.yml.j2`.
+
+### The Kerbside profile
+
+`tools/ci-deploy-profiles/kerbside-slim-tier.yml.j2` is used by the
+`debian-13-slim-tier` merge row. It deploys Kerbside on `sf2`, a hypervisor
+outside the database tier, scraping the primary's `sf-api` across hosts. It
+creates Kerbside's database on the primary's MariaDB, sets throwaway CI
+credentials, and exports `SF_CI_EXPECT_VDI_CONSOLE_PROXY` into the test run.
+It leaves `kerbside_package` at the role's default, so this row needs a
+Kerbside release satisfying `kerbside>=0.7.0`. Kerbside is addressed by IP
+because CI nodes have no DNS, so its certificate carries an IP SAN.
+
+The redeploy check runs straight after the first deploy, before anything
+restarts `sf-api` on purpose and before the tests. It asserts that a second
+`site.yml` run restarts none of the `sf-*` or `kerbside-*` units on any node,
+and a failure names the host and unit. This is the restart-on-change guarantee
+for all three node roles and for Kerbside.
+
+Kerbside's tests skip on clusters without it. On this row
+`SF_CI_EXPECT_VDI_CONSOLE_PROXY` turns those skips into failures, so a deploy
+that silently stopped enabling Kerbside cannot go green. The tests that run
+there are `test_vdi_tokens.py` (minting and verifying a console token) and
+`test_vdi_kerbside_exchange.py` (exchanging a token for a console file at
+Kerbside, replay rejection, the proxy's TLS endpoint, and a check that no
+daemon holds the signing key in its environment).
+
+Profiles are checked offline, without a cluster, by
+`shakenfist/tests/test_ci_deploy_profiles.py`. It renders every profile and
+checks the result against the roles' own validation rules.
+
 ## CI cloud sizing and headroom
 
 CI's clouds are sized against the scheduler's admission ledger rather

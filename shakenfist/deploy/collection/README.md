@@ -251,9 +251,10 @@ Kerbside does not support sqlite. The deploy runs Kerbside's migrations.
 
 **Certificate.** Unless you override it, the proxy certificate is issued from
 the deployment's internal CA into `/etc/kerbside/pki`, with `kerbside_public_fqdn`
-as its CN and DNS SAN. To use your own, set all three of
-`kerbside_proxy_cert_path`, `kerbside_proxy_key_path` and `kerbside_cacert_path`
-to paths on the Kerbside host; all or none.
+as its CN, and as an IP SAN if it is an address or a DNS SAN if it is a name.
+To use your own, set all three of `kerbside_proxy_cert_path`,
+`kerbside_proxy_key_path` and `kerbside_cacert_path` to paths on the Kerbside
+host; all or none.
 
 **Package.** `kerbside_package` defaults to `kerbside>=0.7.0`, because Kerbside
 0.6.0's API returns source passwords, which here is the cluster's `kerbside`
@@ -274,8 +275,10 @@ group in your inventory silences it.
 Kerbside's admin login is Keystone-only, and the role configures no
 Keystone, so its admin UI is unavailable
 ([kerbside#300](https://github.com/shakenfist/kerbside/issues/300)); consoles
-work. The role is new, and its cluster test arrives with the merge-queue lane,
-so it has not yet run in CI against a real cluster.
+work. The `debian-13-slim-tier` merge row deploys Kerbside on a hypervisor
+against a real cluster, and proves the deploy, the migrations, restart-on-change
+across a no-op redeploy, readiness, the token exchange and the proxy's TLS
+endpoint.
 
 ## Consuming the collection
 
