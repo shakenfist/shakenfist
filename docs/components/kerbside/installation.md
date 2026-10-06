@@ -244,6 +244,11 @@ virt-viewer`), and it is the only thing you need on the client side:
 remote-viewer ./demo-console.vv
 ```
 
+The viewer deletes `demo-console.vv` once it has read it. The file
+sets `delete-this-file=1` because the ticket inside it is single-use,
+and `remote-viewer` and `ryll` both honour that. To open another
+session, run `./get-console.sh` again.
+
 **Expect a black screen with boot firmware text, and expect the boot
 to fail.** The demo VM has no disk, so it tries the network, then a
 floppy, then gives up:

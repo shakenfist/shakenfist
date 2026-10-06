@@ -82,23 +82,34 @@ The following projects are subject to consistency audits:
 - uncalibrated-sextant
 - visual-digest-rust
 
-One project is in scope for part of the audit only:
+Two projects are in scope for part of the audit only:
 
 - private-ci is audited for the `plan-phase-references`,
-  `plan-source-references`, `plan-index`, `plan-template` and
-  `sfui-vendor` checks, and nothing else. It is internal tooling and
-  excluded from the conventions, but it vendors sfui and a vendored
-  copy drifts silently: nothing in the consumer fails when the copy
-  falls behind, or when someone edits it in place and the next sync
-  discards the edit. It plans like the rest of the fleet too, so the
-  four criteria that report a defect in a plan as written apply. The
-  two that do not are `plan-audit-phase`, because the plans written
-  there before it adopted the template track progress as checkpoint
-  sections rather than as a phase table and enabling it would file an
-  issue for a retrofit nobody has decided to do, and `push-audit`,
-  which has no `PUSH-AUDIT.md` to read until that changes. It is not
-  expected to grow a `pyproject.toml`, a renovate config, release
-  workflows, or a `develop` branch.
+  `plan-source-references`, `plan-index`, `plan-template`,
+  `eol-producers` and `sfui-vendor` checks, and nothing else. It is
+  internal tooling and excluded from the conventions, but it vendors
+  sfui and a vendored copy drifts silently: nothing in the consumer
+  fails when the copy falls behind, or when someone edits it in place
+  and the next sync discards the edit. It also owns the runner-label
+  producer definitions `eol-producers` checks against the end-of-life
+  table, so that applies too. It plans like the rest of the fleet too,
+  so the four criteria that report a defect in a plan as written
+  apply. The two that do not are `plan-audit-phase`, because the plans
+  written there before it adopted the template track progress as
+  checkpoint sections rather than as a phase table and enabling it
+  would file an issue for a retrofit nobody has decided to do, and
+  `push-audit`, which has no `PUSH-AUDIT.md` to read until that
+  changes. It is not expected to grow a `pyproject.toml`, a renovate
+  config, release workflows, or a `develop` branch.
+
+- images is audited for the `eol-distro` check, and nothing else. It
+  is built fresh every night and the fleet's CI boots on its output,
+  but it is excluded from the conventions because auditing it fully
+  would file findings for conventions its own plan has not adopted, as
+  a deliberate decision rather than a side effect of this one.
+  `eol-distro` alone turns the compliance already confirmed by hand
+  into a verdict the audit reports on a schedule, without
+  manufacturing the rest.
 
 ### Excluded projects
 
@@ -125,6 +136,14 @@ not projects in the sense these criteria mean:
 * terraform-provider-shakenfist
 * uefi-latency-guest
 * website
+
+`client-python-ova`, `divergulent-reviews`, `homebrew-tap`,
+`performance`, `reproducables`, `sonobouy` and `uefi-latency-guest`
+were confirmed on 2026-10-05 to have no `.github/workflows/`
+directory, no container build file and no top-level `templates/`, so
+`eol-distro` would report `not applicable` for every one of them; that
+is why they stay excluded, which is narrower and truer than the
+reasons the list gives above.
 
 The `actions` repository is audited despite being tooling: the whole
 fleet depends on it for its composite actions and reusable workflows,
