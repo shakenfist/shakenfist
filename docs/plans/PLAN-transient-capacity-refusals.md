@@ -587,7 +587,7 @@ spelling above is the one to write.
 | 3. Publish metrics when the running-domain set changes | [PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md](PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md) | Complete | `03cd7be3a` (#4200) |
 | 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | [PLAN-transient-capacity-refusals-phase-04-retry-after.md](PLAN-transient-capacity-refusals-phase-04-retry-after.md) | Complete | `565e36e6e` (#4241), client-python `74d6e129b` (client-python#399) |
 | 5. Decide on server-side queued placement from the phase 2 data | [PLAN-transient-capacity-refusals-phase-05-queue-decision.md](PLAN-transient-capacity-refusals-phase-05-queue-decision.md) | Complete | `b398cb890` (#4362), `a5e4a5e8c` (#4390), `48584e589` (#4406) |
-| 6. Documentation and close-out | [PLAN-transient-capacity-refusals-phase-06-docs.md](PLAN-transient-capacity-refusals-phase-06-docs.md) | Complete | — |
+| 6. Documentation and close-out | [PLAN-transient-capacity-refusals-phase-06-docs.md](PLAN-transient-capacity-refusals-phase-06-docs.md) | Complete | `c08196b19` (#4448) |
 | 7. Push audit | PLAN-transient-capacity-refusals-phase-07-push-audit.md | Not started | — |
 
 The `Merged` column records what put each phase on `develop`: the
