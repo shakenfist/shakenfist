@@ -14878,6 +14878,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#why-the-report-is-one-three-thousand-line-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the report is one three-thousand-line file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#a-third-file-the-capacity-wait-trace-waits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15402,6 +15413,52 @@ wrong cannot be the thing that empties the last good dataset; and any
 harvest whose output is going to be committed names both ends of its
 window, because <code>--since</code> alone grows with every merge and <code>--limit</code>
 moves with the day it is run on.</p>
+<h3 id="why-the-report-is-one-three-thousand-line-file">Why the report is one three-thousand-line file<a class="headerlink" href="#why-the-report-is-one-three-thousand-line-file" title="Permanent link">&para;</a></h3>
+<p><code>tools/ci_headroom_report.py</code> and its unit tests are each about three
+thousand lines, which is well past the length at which a reviewer is
+entitled to ask why they have not been split. The answer is about
+packaging rather than about the code, so it is worth knowing before
+anyone plans the split. This section is the full account; the report's
+module docstring and the test file's both point here.</p>
+<p>The code is three layers with no leakage between them: parsing and
+modelling the series and the census (<code>percentile()</code> to
+<code>read_census()</code>), building the summary record from those models
+(<code>ledger_bounds()</code> to <code>write_record()</code>), and rendering prose from the
+record (<code>plural()</code> to <code>print_report()</code>). The renderer layer, a little
+over a thousand lines, is a cut nothing outside the file depends on,
+and the comment above the record builders states the invariant that
+makes it one: the printers compute nothing of their own. The surface
+other code reaches is <code>summary_record()</code>, <code>DEFAULT_CENSUS_LIMIT</code> and
+<code>RECORD_VERSION</code> -- the first two used by <code>ci_headroom_harvest.py</code>,
+the third by the harvest's tests -- and none of them is in the
+renderer layer.</p>
+<p>Two things hold the cut up. <code>tools/</code> is not a package, so the report
+is loaded by path with <code>spec_from_file_location</code> -- by the harvest, by
+the harvest's tests and by the report's own tests -- and the report
+imports nothing from shakenfist, so there is no import path into
+<code>tools/</code> to use instead. Moving the renderers out means making
+<code>tools/</code> importable, which changes how every tool in it is loaded
+rather than only this one. And the file is read as text as well as
+run: <code>ci_headroom_verdict.sh</code> in <code>shakenfist/actions</code> greps its source
+for the string <code>BAND_VIOLATION_EXIT</code> before it will believe an exit
+status of 3, and <code>ci_headroom_collect.sh</code> greps it for the
+<code>--census-limit</code> and <code>--waits</code> flags before passing them. Those greps
+are given one path, so whatever moves has to leave the matched text in
+the file that path names, or the two repositories have to change
+together across a workflow reference that carries no pin to bump.</p>
+<p>The test file is the same length for the same reason and one of its
+own: it loads the module by path once, at import, and all but one of
+its classes extend a single base, <code>HeadroomReportTestCase</code>, which holds
+the series, census and waits fixture builders and the assertion that
+tells a swallowed exception from a clean run. (The exception is
+<code>PercentileTestCase</code>, which calls <code>percentile()</code> directly and needs
+none of them.) Splitting the file means duplicating that preamble per
+file or adding a shared helper module beside the tests, and the seam
+it would split on is the tool's render seam, so it follows a split of
+the tool rather than leading one.</p>
+<p>Neither file is to be shortened by removing the comments above the
+record builders and beside <code>BAND_VIOLATION_EXIT</code>. Those are what make
+a file this long reviewable at all.</p>
 <h3 id="a-third-file-the-capacity-wait-trace-waits">A third file: the capacity-wait trace (<code>--waits</code>)<a class="headerlink" href="#a-third-file-the-capacity-wait-trace-waits" title="Permanent link">&para;</a></h3>
 <p>A third file lands beside the other two, written by a different
 mechanism. The <code>self.create_instance()</code> wrapper (see <a href="../ci/#creating-instances-in-the-functional-suite">Creating instances in the functional
