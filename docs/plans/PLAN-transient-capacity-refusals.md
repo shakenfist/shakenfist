@@ -588,7 +588,7 @@ spelling above is the one to write.
 | 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | [PLAN-transient-capacity-refusals-phase-04-retry-after.md](PLAN-transient-capacity-refusals-phase-04-retry-after.md) | Complete | `565e36e6e` (#4241), client-python `74d6e129b` (client-python#399) |
 | 5. Decide on server-side queued placement from the phase 2 data | [PLAN-transient-capacity-refusals-phase-05-queue-decision.md](PLAN-transient-capacity-refusals-phase-05-queue-decision.md) | Complete | `b398cb890` (#4362), `a5e4a5e8c` (#4390), `48584e589` (#4406) |
 | 6. Documentation and close-out | [PLAN-transient-capacity-refusals-phase-06-docs.md](PLAN-transient-capacity-refusals-phase-06-docs.md) | Complete | `c08196b19` (#4448) |
-| 7. Push audit | PLAN-transient-capacity-refusals-phase-07-push-audit.md | Not started | — |
+| 7. Push audit | [PLAN-transient-capacity-refusals-phase-07-push-audit.md](PLAN-transient-capacity-refusals-phase-07-push-audit.md) | In progress | — |
 
 The `Merged` column records what put each phase on `develop`: the
 merge commit of its pull request, or an explicit `first..last`
@@ -961,18 +961,30 @@ request, and the plan is not complete until each is resolved or
 declined in writing here. If the audit finds nothing, that is
 recorded in one sentence.
 
-Phase 2 may land partly outside this repository: its suite wrapper
-touches the CI harness. Where it does, its row names the
-repository, and that half is audited against that repository's
-default branch as part of the pull request that lands it, with this
-phase citing that audit rather than re-running it.
+One phase landed partly outside this repository, and it is phase 4
+rather than phase 2 as this section first guessed: phase 2's suite
+wrapper touches the CI harness, but that harness lives here
+(`shakenfist/deploy/shakenfist_ci/`), so both of phase 2's merges are
+in-repository. Phase 4's opt-in client retry is the half that landed
+elsewhere, as `client-python` `74d6e129b` (client-python#399).
 
-Phase 5 is a different situation needing a different response. It
-is a decision phase which may produce no code at all, and if it
-closes as Abandoned there is nothing here for the audit to read.
-That is recorded as such -- an audit which says what it had no
-diff to scope over is a result; one which reports a clean run over
-an empty range is not.
+This section originally said that half is audited against that
+repository's default branch as part of the pull request that lands
+it, and cited here rather than re-run. Phase 7's survey found there
+is no such audit and none can be cited: `client-python` carries no
+`PUSH-AUDIT.md`. That range is therefore audited from here, which
+phase 7 records as D53 and flags as its most arguable decision.
+
+Phase 5 is a different situation needing a different response. It is
+a decision phase, and it produced no code at all: each of its three
+merges touches only its own plan document. It closed **Complete**
+rather than Abandoned -- what was abandoned is the queue, which is
+open question 8's answer rather than a phase status -- so the reason
+the audit has nothing to read there is that the phase shipped a
+decision, not that the phase was abandoned. Those three ranges get
+the documentation lens only. An audit which says what it had no diff
+to scope over is a result; one which reports a clean run over an
+empty range is not.
 
 ## Agent guidance
 
