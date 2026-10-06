@@ -21,8 +21,8 @@
 # changes no play's hosts when the kerbside group is absent; that its first
 # plays really validate every Kerbside host, dedicated or co-located, with the
 # variables that host sees; that internal_ca installs the proxy certificate
-# under the names config reads; and that the secrets never reach the ansible
-# output.
+# under the names config reads, and issues it with an IP SAN for an address and
+# a DNS SAN for a name; and that the secrets never reach the ansible output.
 #
 # register is not run: it needs systemd, MariaDB and a Shaken Fist API, and
 # its first real run is the merge-queue cluster lane's. bootstrap runs against
@@ -1213,8 +1213,82 @@ PYEOF
 )" || fail "${out}"
 }
 
-case_19_secrets() {
-    CURRENT_CASE='case 19: no secret reaches the ansible output'
+# The Kerbside proxy certificate, issued by internal_ca with the variables
+# site.yml's "Deploy Kerbside" play passes it. The task is extracted from
+# site.yml by name and run as it stands, so the test cannot drift from what the
+# play does; only ca_path and kerbside_public_fqdn are extra vars.
+# issue_proxy_cert CA_DIR PUBLIC_FQDN: leaves the certificate in CA_DIR.
+issue_proxy_cert() {
+    local ca_dir="$1" public="$2" out
+    if [ ! -f "${WORK}/issue-proxy-cert.yml" ]; then
+        out="$("${PY}" - "${SITE_YML}" "${WORK}/issue-proxy-cert.yml" "${DEPLOY_PLAY}" << 'PYEOF' 2>&1
+import sys
+
+import yaml
+
+site, dest, name = sys.argv[1:]
+with open(site) as f:
+    plays = yaml.safe_load(f)
+deploy = [p for p in plays if p.get('name') == name]
+if len(deploy) != 1:
+    sys.exit(f'expected one play named {name!r}')
+issue = [t for t in deploy[0]['tasks'] if t.get('name', '').startswith('Issue this host')]
+if len(issue) != 1:
+    sys.exit("expected one task issuing the host's Kerbside proxy certificate")
+bootstrap = {
+    'name': 'Create the CA',
+    'ansible.builtin.include_role': {'name': 'shakenfist.shakenfist.internal_ca', 'tasks_from': 'bootstrap'},
+}
+with open(dest, 'w') as f:
+    yaml.safe_dump([{'name': 'Issue', 'hosts': 'localhost', 'gather_facts': False,
+                     'tasks': [bootstrap] + issue}], f, sort_keys=False)
+PYEOF
+)" || fail "${out}"
+    fi
+    mkdir -p "${ca_dir}"
+    write_vars proxy-cert "$(printf '{"ca_path": "%s", "kerbside_public_fqdn": "%s"}' "${ca_dir}" "${public}")" \
+        > /dev/null
+    ANSIBLE_SKIP_TAGS=packages run_ansible "${WORK}/issue-proxy-cert.yml" "${WORK}/vars/proxy-cert.json" \
+        || fail "internal_ca could not issue a certificate for ${public}: $(tail -n 20 "${LAST_LOG}")"
+    [ -s "${ca_dir}/localhost-kerbside-server-cert.pem" ] || fail "no certificate was issued for ${public}"
+}
+
+# proxy_cert_sans CA_DIR: the issued certificate's subject alternative names,
+# one "TYPE:value" per line, or nothing if it has none.
+proxy_cert_sans() {
+    openssl x509 -noout -ext subjectAltName -in "$1/localhost-kerbside-server-cert.pem" \
+        | sed -n '2,$p' | tr ',' '\n' | sed 's/^ *//'
+}
+
+case_19_proxy_cert_ip_san() {
+    local public sans
+    for public in 10.0.1.12 ::1 fe80::1; do
+        CURRENT_CASE="case 19: an address (${public}) as kerbside_public_fqdn gets an IP SAN and no DNS SAN"
+        issue_proxy_cert "${WORK}/proxy-ca-ip-${public//:/_}" "${public}"
+        sans="$(proxy_cert_sans "${WORK}/proxy-ca-ip-${public//:/_}")"
+        printf '%s\n' "${sans}" | grep -q '^IP Address:' \
+            || fail "the certificate for ${public} has no IP SAN: ${sans:-no SANs}"
+        printf '%s\n' "${sans}" | grep -q '^DNS:' && fail "the certificate for ${public} has a DNS SAN: ${sans}"
+    done
+    return 0
+}
+
+case_20_proxy_cert_dns_san() {
+    local public sans
+    for public in kerbside.example.com localhost; do
+        CURRENT_CASE="case 20: a name (${public}) as kerbside_public_fqdn gets a DNS SAN and no IP SAN"
+        issue_proxy_cert "${WORK}/proxy-ca-dns-${public}" "${public}"
+        sans="$(proxy_cert_sans "${WORK}/proxy-ca-dns-${public}")"
+        printf '%s\n' "${sans}" | grep -qx "DNS:${public}" \
+            || fail "the certificate for ${public} has no DNS SAN for it: ${sans:-no SANs}"
+        printf '%s\n' "${sans}" | grep -q '^IP Address:' \
+            && fail "the certificate for ${public} has an IP SAN: ${sans}"
+    done
+    return 0
+}
+
+case_21_secrets() {
+    CURRENT_CASE='case 21: no secret reaches the ansible output'
     LAST_LOG=''
     # Prove the verbose runs happened, or their absence of secrets proves
     # nothing.
@@ -1247,6 +1321,8 @@ case_15_list_hosts
 case_16_list_hosts_feature_off
 case_17_site_validation_runs
 case_18_site_yml_structure
-case_19_secrets
+case_19_proxy_cert_ip_san
+case_20_proxy_cert_dns_san
+case_21_secrets
 
-echo "kerbside role: all nineteen cases passed (${RUNS} ansible runs, $((SECONDS - START))s)"
+echo "kerbside role: all twenty-one cases passed (${RUNS} ansible runs, $((SECONDS - START))s)"
