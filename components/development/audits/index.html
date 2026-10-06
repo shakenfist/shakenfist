@@ -15081,23 +15081,37 @@ which is why the tables were moved to one page in the first place.</p>
 <li>uncalibrated-sextant</li>
 <li>visual-digest-rust</li>
 </ul>
-<p>One project is in scope for part of the audit only:</p>
+<p>Two projects are in scope for part of the audit only:</p>
 <ul>
-<li>private-ci is audited for the <code>plan-phase-references</code>,
-  <code>plan-source-references</code>, <code>plan-index</code>, <code>plan-template</code> and
-  <code>sfui-vendor</code> checks, and nothing else. It is internal tooling and
-  excluded from the conventions, but it vendors sfui and a vendored
-  copy drifts silently: nothing in the consumer fails when the copy
-  falls behind, or when someone edits it in place and the next sync
-  discards the edit. It plans like the rest of the fleet too, so the
-  four criteria that report a defect in a plan as written apply. The
-  two that do not are <code>plan-audit-phase</code>, because the plans written
-  there before it adopted the template track progress as checkpoint
-  sections rather than as a phase table and enabling it would file an
-  issue for a retrofit nobody has decided to do, and <code>push-audit</code>,
-  which has no <code>PUSH-AUDIT.md</code> to read until that changes. It is not
-  expected to grow a <code>pyproject.toml</code>, a renovate config, release
-  workflows, or a <code>develop</code> branch.</li>
+<li>
+<p>private-ci is audited for the <code>plan-phase-references</code>,
+  <code>plan-source-references</code>, <code>plan-index</code>, <code>plan-template</code>,
+  <code>eol-producers</code> and <code>sfui-vendor</code> checks, and nothing else. It is
+  internal tooling and excluded from the conventions, but it vendors
+  sfui and a vendored copy drifts silently: nothing in the consumer
+  fails when the copy falls behind, or when someone edits it in place
+  and the next sync discards the edit. It also owns the runner-label
+  producer definitions <code>eol-producers</code> checks against the end-of-life
+  table, so that applies too. It plans like the rest of the fleet too,
+  so the four criteria that report a defect in a plan as written
+  apply. The two that do not are <code>plan-audit-phase</code>, because the plans
+  written there before it adopted the template track progress as
+  checkpoint sections rather than as a phase table and enabling it
+  would file an issue for a retrofit nobody has decided to do, and
+  <code>push-audit</code>, which has no <code>PUSH-AUDIT.md</code> to read until that
+  changes. It is not expected to grow a <code>pyproject.toml</code>, a renovate
+  config, release workflows, or a <code>develop</code> branch.</p>
+</li>
+<li>
+<p>images is audited for the <code>eol-distro</code> check, and nothing else. It
+  is built fresh every night and the fleet's CI boots on its output,
+  but it is excluded from the conventions because auditing it fully
+  would file findings for conventions its own plan has not adopted, as
+  a deliberate decision rather than a side effect of this one.
+  <code>eol-distro</code> alone turns the compliance already confirmed by hand
+  into a verdict the audit reports on a schedule, without
+  manufacturing the rest.</p>
+</li>
 </ul>
 <h3 id="excluded-projects">Excluded projects<a class="headerlink" href="#excluded-projects" title="Permanent link">&para;</a></h3>
 <p>The following projects are <strong>excluded</strong> from these criteria, because
@@ -15124,6 +15138,13 @@ not projects in the sense these criteria mean:</p>
 <li>uefi-latency-guest</li>
 <li>website</li>
 </ul>
+<p><code>client-python-ova</code>, <code>divergulent-reviews</code>, <code>homebrew-tap</code>,
+<code>performance</code>, <code>reproducables</code>, <code>sonobouy</code> and <code>uefi-latency-guest</code>
+were confirmed on 2026-10-05 to have no <code>.github/workflows/</code>
+directory, no container build file and no top-level <code>templates/</code>, so
+<code>eol-distro</code> would report <code>not applicable</code> for every one of them; that
+is why they stay excluded, which is narrower and truer than the
+reasons the list gives above.</p>
 <p>The <code>actions</code> repository is audited despite being tooling: the whole
 fleet depends on it for its composite actions and reusable workflows,
 so it is held to the same standards as anything else. <code>development</code>,

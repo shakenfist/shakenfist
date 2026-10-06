@@ -15311,6 +15311,10 @@ expectation below, which is the next step here.)</p>
 virt-viewer</code>), and it is the only thing you need on the client side:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>remote-viewer<span class="w"> </span>./demo-console.vv
 </code></pre></div>
+<p>The viewer deletes <code>demo-console.vv</code> once it has read it. The file
+sets <code>delete-this-file=1</code> because the ticket inside it is single-use,
+and <code>remote-viewer</code> and <code>ryll</code> both honour that. To open another
+session, run <code>./get-console.sh</code> again.</p>
 <p><strong>Expect a black screen with boot firmware text, and expect the boot
 to fail.</strong> The demo VM has no disk, so it tries the network, then a
 floppy, then gives up:</p>
