@@ -134,6 +134,19 @@ SF_CI_NODE_EXEC_TIMEOUT = int(
     os.environ.get('SF_CI_NODE_EXEC_TIMEOUT', '300'))
 
 
+def kerbside_expected():
+    """Return True if this CI run's cluster is deployed with Kerbside.
+
+    A deploy profile which installs Kerbside exports
+    SF_CI_EXPECT_VDI_CONSOLE_PROXY=1 into the test run. Tests which would
+    otherwise skip when the vdi-console-proxy capability is not advertised
+    must fail instead when this is true: a cluster which was told to run
+    Kerbside and does not is a deploy failure, not a legitimate feature-off
+    cluster.
+    """
+    return os.environ.get('SF_CI_EXPECT_VDI_CONSOLE_PROXY') == '1'
+
+
 # The delete endpoint refuses a namespace which still owns a live
 # instance or network with one of "you cannot delete a namespace with
 # instances" or "...with networks". Both are 400s, and so is every other
