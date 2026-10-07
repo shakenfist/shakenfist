@@ -4,6 +4,7 @@ from typing import Any
 import psutil
 from shakenfist_utilities import logs  # noreorder
 
+from shakenfist import exceptions
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.schema.operations import node_inst_op as schema
@@ -226,8 +227,17 @@ class NodeInstOp(BaseClusterOperation):
                 'networks': instance_networks
             }).debug('Instance networking before delete')
 
-            # Stop the instance
-            inst.power_off()
+            # Stop the instance. A power off which leaves the domain running
+            # does not stop the delete: the rest of it, and
+            # _delete_on_hypervisor()'s own power off and undefine, still
+            # need to happen.
+            try:
+                inst.power_off()
+            except exceptions.InstancePowerOffFailed as e:
+                self.log.with_fields({
+                    'instance': inst,
+                    'error': str(e),
+                }).warning('Instance power off failed during delete, continuing')
 
             # Delete the instance's interfaces
             for ni in interfaces:

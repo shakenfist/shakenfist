@@ -299,6 +299,35 @@ The power management actions available are:
     * [POST /instances/{instance_ref}/pause](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__pause): Pause an instance.
     * [POST /instances/{instance_ref}/unpause](https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__unpause): Unpause an instance.
 
+### What each power operation answers
+
+A successful call to any of these always answers 200 with a `null` body.
+Beyond the usual authentication and validation errors, they can answer:
+
+| Operation | 406 | 409 | 500 |
+|-----------|-----|-----|-----|
+| Soft reboot | instance is not `created` | instance is powered off | -- |
+| Hard reboot | instance is not `created` | instance is powered off | -- |
+| Power off | instance is not `created` | -- | `destroy()` failed on the hypervisor and the domain is still running |
+| Power on | instance is not `created` | instance is paused (unpause it instead), or UEFI boot is unavailable | every power on attempt failed |
+| Pause | instance is not `created` | instance is powered off, or it never reached `paused` after three attempts | -- |
+| Unpause | instance is not `created` | instance is powered off, or it never reached `on` after three attempts | -- |
+
+Notes:
+
+* Pausing an already paused instance, and unpausing an already running one,
+  both succeed without calling libvirt again -- these operations are
+  idempotent.
+* Powering on an already running instance also succeeds: it re-sets the
+  libvirt autostart flag and records the instance's power state, which is
+  also how a running instance whose autostart flag was lost gets it set
+  again. Powering on a paused instance is refused rather than silently
+  resuming it.
+* When a power on or power off answers 500, the instance's power state is
+  updated to record what the domain actually is, not the state that was
+  requested. See [power states](/operator_guide/power_states/) for what
+  that means operationally.
+
 ??? example "Python API client: create and then delete a simple instance"
 
     ```python

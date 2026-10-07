@@ -1535,6 +1535,7 @@ class InstanceRebootSoftEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
+         (406, 'Instance is not ready.', None),
          (409, 'The instance cannot be rebooted.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -1560,6 +1561,7 @@ class InstanceRebootHardEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
+         (406, 'Instance is not ready.', None),
          (409, 'The instance cannot be rebooted.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -1585,7 +1587,9 @@ class InstancePowerOffEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
-         (409, 'The instance cannot be powered off.', None)]))
+         (406, 'Instance is not ready.', None),
+         (409, 'The instance cannot be powered off.', None),
+         (500, 'Power off failed on the hypervisor.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -1600,6 +1604,12 @@ class InstancePowerOffEndpoint(api_base.Resource):
                 return instance_from_db.power_off()
         except exceptions.InvalidLifecycleState as e:
             return sf_api.error(409, f'Invalid lifecycle state: {e}')
+        except exceptions.InstancePowerOffFailed as e:
+            instance_from_db.add_event(
+                EVENT_TYPE_AUDIT, 'power off failed', extra={'error': str(e)})
+            return sf_api.error(
+                500, f'instance failed to power off: {e}',
+                suppress_traceback=True)
 
 
 class InstancePowerOnEndpoint(api_base.Resource):
@@ -1610,7 +1620,10 @@ class InstancePowerOnEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
-         (409, 'The instance cannot be powered on.', None)]))
+         (406, 'Instance is not ready.', None),
+         (409, 'The instance cannot be powered on: it is paused, or UEFI '
+          'boot is unavailable.', None),
+         (500, 'Power on failed on the hypervisor.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
@@ -1631,6 +1644,12 @@ class InstancePowerOnEndpoint(api_base.Resource):
                 EVENT_TYPE_AUDIT, 'power on failed: UEFI boot unavailable',
                 extra={'error': str(e)})
             return sf_api.error(409, f'UEFI boot unavailable: {e}')
+        except exceptions.InstancePowerOnFailed as e:
+            instance_from_db.add_event(
+                EVENT_TYPE_AUDIT, 'power on failed', extra={'error': str(e)})
+            return sf_api.error(
+                500, f'instance failed to power on: {e}',
+                suppress_traceback=True)
 
 
 class InstancePauseEndpoint(api_base.Resource):
@@ -1641,6 +1660,7 @@ class InstancePauseEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
+         (406, 'Instance is not ready.', None),
          (409, 'The instance cannot be paused.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
@@ -1666,6 +1686,7 @@ class InstanceUnpauseEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)],
         [(404, 'Instance not found.', None),
+         (406, 'Instance is not ready.', None),
          (409, 'The instance cannot be unpaused.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership

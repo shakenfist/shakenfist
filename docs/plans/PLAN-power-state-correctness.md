@@ -78,13 +78,13 @@ support that suspicion. Every finding below was checked against
 | F3 | `operations/node_inst_op.py` `_health_check_kvm_process` | Compares the `power_state` dict to `'on'`. This row first said it was never called; phase 2 found it is dispatched by name, for every created instance, from the `health_check_kvm_process` task the cluster daemon enqueues. | Its delete branch is dead. Wired up correctly it would error-delete every guest which powered itself off, because `kvm_pid` goes stale. Its stale `kvm_pid` clearing is live, so phase 2 removed only the delete branch. |
 | F4 | `instance.py` `power_on()`; `external_api/instance.py` `InstancePowerOnEndpoint` | `power_on()` ignores the result of its last `_power_on_inner()` and returns `None`, which the endpoint returns. | An API power on which failed five times answers 200 with a `null` body. |
 | F5 | `instance.py` `power_off()` | Logs any `destroy()` error other than "not running", then writes `power_state='off'` and returns. | The API reports a still-running instance as off. |
-| F6 | `instance.py` `pause()`/`unpause()` | Treat "`update_power_state()` did not change the stored value" as "the operation failed". libvirt's qemu driver returns success for suspending a paused domain or resuming a running one. | Pausing twice, or losing a race with the cleaner writing `paused` first, raises a 409 for an operation which succeeded. |
+| F6 | `instance.py` `pause()`/`unpause()` | Treat "`update_power_state()` did not change the stored value" as "the operation failed". libvirt's qemu driver returns success for suspending a paused domain, but raises "domain is already running" for resuming a running one (phase 3 S1). | Pausing twice answers 409 and unpausing twice answers 500, and losing a race with the cleaner writing `paused` first, raises a 409 for an operation which succeeded. |
 | F7 | `instance.py` `pause()`/`unpause()` | Guard on "no domain" only; our domains are persistent, so a powered off instance has an *inactive* domain and `suspend()` raises a raw libvirtError. | 500 instead of the documented 409 -- the defect class #3630 fixed for `reboot()` alone. |
 | F8 | `instance.py` `_power_on_inner()` | "domain is already running" returns `True` without updating `power_state`; the generic start-error path reallocates ports without undefining the domain, so the retry reuses stale XML; `agent_state = AGENT_NEVER_TALKED` is set only when the *first* attempt failed. | Powering on a *paused* instance answers success and leaves it paused. The retry loop's bookkeeping cannot be trusted. |
 | F9 | `util/libvirt.py` `extract_power_state()` | `SHUTDOWN` and `NOSTATE` map to `on`, `PMSUSPENDED` to `paused`; `extract_power_state_pretty()` raises `KeyError` on an unknown enum. | Low: PM suspend is disabled in `libvirt.tmpl`, `SHUTDOWN` is transient. Recorded so the audit phase can confirm it was considered. |
 | F10 | `instance.py` `_power_on_inner()`, `power_off()` | `setAutostart(1)` is called on every power on and nothing ever clears it; `power_off()` only calls `destroy()`. | After a hypervisor reboot libvirtd starts every instance ever powered on, including those the user powered off, and the database says `off` until the cleaner rewrites it. It also means sf-queues restore (F2) has no job: a restart of sf-queues or libvirtd leaves domains running, and autostart covers a reboot. Nothing in the deployer configures `libvirt-guests`, so the distribution default applies. |
 | F11 | `daemons/cleaner/scheduled_tasks.py` ~lines 246-266 | The second loop's `delete-wait` branch rmtree's files, undefines the domain and sets `state = deleted` by hand, bypassing `_delete_globally()`. `_instance_delete` then returns early because the instance is already deleted (`node_inst_op.py:193`). | Dead today (F1). Once F1 is fixed, a powered off instance left in `delete-wait` for five minutes by a queue backlog leaks its ports, placement, references and agent operations. |
-| F12 | the power endpoints | `requires_instance_active` answers 406 for any state other than `created`, but none of the four power endpoints declares 406 in its `swag_from`. | The published API is incomplete. |
+| F12 | the power endpoints | `requires_instance_active` answers 406 for any state other than `created`, but none of the six power endpoints (soft and hard reboot, power on and off, pause and unpause) declares 406 in its `swag_from`. Three non-power endpoints share the gap ([#4449](https://github.com/shakenfist/shakenfist/issues/4449)). | The published API is incomplete. |
 | F13 | `daemons/cleaner/scheduled_tasks.py` first loop (~lines 153-154) | Found by the phase 0 survey. The cleaner reads `extract_power_state(domain)` and only then calls `update_power_state()`, without the instance lock the power endpoints hold, so a power off or pause which completes between the two has its value overwritten with the stale one. | A paused instance reads `on` until the next cleaner pass corrects it. A powered off instance reads `on` indefinitely, because the cleaner cannot see inactive domains (F1). The window is the attribute lock acquisition, so it is rare, but phase 0's assertions can observe it. |
 
 The test suites did not catch any of this, for specific reasons:
@@ -150,16 +150,19 @@ can rely on them.
    Phase 2 established the `libvirt-guests` default from the Debian 13
    and Ubuntu 24.04 packages: guests are shut down at host shutdown and
    nothing is started at boot, so autostart alone decides (phase 2 S2).
-2. **What does a failed power on return?** Answered: 507 for port or
-   memory exhaustion, 500 for anything else. client-python maps 409, 500
+2. **What does a failed power on return?** Answered: 500. This first
+   said 507 for port or memory exhaustion, but phase 3 found nothing can
+   detect either (phase 3 S3, D1): port allocation never fails, and
+   memory refusals arrive as unparsed qemu text. client-python maps 409, 500
    and 507 to distinct exceptions and does not retry in `_request_url`,
    its CLI ignores the response body, and the ansible collection's
    `sf_instance` module has no power operations, so no client breaks.
 3. **Is `power_state` the right thing to assert?** It is a cached value
    written by several actors (the power methods and the cleaner), and
    asserting it tests the cache, which is what users read. This plan
-   assumes that is the right target. Open: phase 3 should say so
-   explicitly if it finds otherwise.
+   assumes that is the right target. Answered by phase 3 (D8): yes,
+   because after phase 3 every power operation writes it from the
+   domain's observed state, on success and failure alike.
 4. **Rename `get_all_domains()`?** Answered: yes. Replace it with
    `listAllDomains()` using `VIR_CONNECT_LIST_DOMAINS_ACTIVE` and
    `_INACTIVE`, which also removes the N+1 lookups and the list-then-look-up
@@ -226,8 +229,8 @@ phases 0, 1b and 3 all rely on `create()` failing when power on fails.
 | 0. Assert power state in the existing lifecycle tests | [PLAN-power-state-correctness-phase-00-assertions.md](PLAN-power-state-correctness-phase-00-assertions.md) | Complete | `250a40871` |
 | 1a. Honest libvirt domain listing | [PLAN-power-state-correctness-phase-01a-listing.md](PLAN-power-state-correctness-phase-01a-listing.md) | Complete | `8aa69c5e4` |
 | 1b. The cleaner sees powered off domains | [PLAN-power-state-correctness-phase-01b-inactive-domains.md](PLAN-power-state-correctness-phase-01b-inactive-domains.md) | Complete | `447ed75ae` |
-| 2. Autostart and instance restore | [PLAN-power-state-correctness-phase-02-autostart-restore.md](PLAN-power-state-correctness-phase-02-autostart-restore.md) | In progress | — |
-| 3. Power operations answer truthfully | PLAN-power-state-correctness-phase-03-power-api.md | Not started | — |
+| 2. Autostart and instance restore | [PLAN-power-state-correctness-phase-02-autostart-restore.md](PLAN-power-state-correctness-phase-02-autostart-restore.md) | Complete | `776dc9e70` |
+| 3. Power operations answer truthfully | [PLAN-power-state-correctness-phase-03-power-api.md](PLAN-power-state-correctness-phase-03-power-api.md) | In progress | — |
 | 4. Push audit | PLAN-power-state-correctness-phase-04-push-audit.md | Not started | — |
 
 Each phase that changes behaviour lands its functional tests with it,
@@ -390,6 +393,17 @@ has the detail as S1 to S9 and D1 to D8.
 The restore test is rewritten rather than deleted, because it is the
 only cover the placement reconciliation has in its file (S5).
 
+Landed as [#4437](https://github.com/shakenfist/shakenfist/pull/4437).
+Functional run
+[37169701355](https://github.com/shakenfist/shakenfist/actions/runs/37169701355)
+read the autostart flag on a real hypervisor through power off and power
+on. An earlier run failed every cluster job because step 4 deleted
+`_health_check_kvm_process()`, which is dispatched by name; it was
+restored without its delete branch, with a test that every dispatched
+task has a handler. Review added one guard: `power_off()` leaves
+autostart set when `destroy()` fails for any reason other than "not
+running", which phase 3's section records.
+
 ### Phase 3: power operations answer truthfully
 
 F4 to F8 and F12, with their functional tests. `power_on()` reports
@@ -404,7 +418,7 @@ changed, and raise `InvalidLifecycleState` for an inactive domain the
 way `reboot()` does after #3630; `_power_on_inner()` updates
 `power_state` on "already running", resumes or refuses a paused domain
 rather than answering success, and undefines stale XML on the generic
-retry path. Declare 406 on the four power endpoints. Resolve or
+retry path. Declare 406 on the six power endpoints. Resolve or
 explicitly exclude [#2241](https://github.com/shakenfist/shakenfist/issues/2241),
 which is about unpause recovering from a crashed guest and overlaps F6
 and F7.
@@ -414,12 +428,26 @@ Unit tests go alongside `InstanceRebootTestCase` and
 against the code it fixes. Functional tests: pausing a powered off
 instance (409, not 500), pausing twice, and a failed power on. The last
 uses `_node_exec` from `base.py`, which needs `sudo=True`, a node with an
-`ip`, and SSH access, and which no guest CI test uses yet: move a
+`ip`, and SSH access, and which phase 2's autostart tests already use: move a
 powered off instance's root disk aside, power on, assert the error and
 `power_state != 'on'`, and restore the disk before cleanup. It must skip
 visibly through `_require_node_exec` where node exec is unavailable.
 Any status code change is an API contract change, so update the
 `swag_from` declarations and `docs/`. Plan at high effort.
+
+The phase survey corrected five things in this section. The phase plan
+has the detail as S1 to S8 and D1 to D8.
+
+* **Unpausing twice is a 500, not a 409.** libvirt refuses to resume a
+  running domain, though it does accept suspending a paused one (S1).
+  Pause and unpause twice both become successes (D5).
+* **There are six power endpoints, not four.** The reboot endpoints
+  lack 406 too (S2).
+* **A failed power on answers 500, not 507.** Nothing distinguishes
+  exhaustion (S3), so open question 2's answer is revised (D1).
+* **`power_on()` and `power_off()` are also called by create and
+  delete.** Making them raise must not change either (S4, D1, D2).
+* **Guest CI tests already use node exec**, since phase 2 (S8).
 
 ### Phase 4: push audit
 

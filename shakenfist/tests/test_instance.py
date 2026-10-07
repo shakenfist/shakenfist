@@ -13,11 +13,13 @@ import pycdlib
 import testtools
 from shakenfist import artifact
 from shakenfist import baseobject
+from shakenfist import constants
 from shakenfist import exceptions
 from shakenfist import instance
 from shakenfist import mariadb
 from shakenfist.config import SFConfig
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.daemons import daemon
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
@@ -580,6 +582,8 @@ class FakeDomain:
         self._error = error
         self.reboot_flags = None
         self.reset_calls = 0
+        self.suspend_calls = 0
+        self.resume_calls = 0
         self.attached_xml = None
 
     def isActive(self):
@@ -599,6 +603,16 @@ class FakeDomain:
         if self._error:
             raise self._error
         self.reset_calls += 1
+
+    def suspend(self):
+        if self._error:
+            raise self._error
+        self.suspend_calls += 1
+
+    def resume(self):
+        if self._error:
+            raise self._error
+        self.resume_calls += 1
 
 
 class FakeLibvirtConnection:
@@ -799,17 +813,241 @@ class InstancePowerStateTestCase(InstanceLibvirtTestCase):
         mock_enqueue_delete.assert_not_called()
 
 
+class PowerOnDomain(FakeDomain):
+    """A domain whose create() raises each of create_errors in turn and then
+    succeeds. undefine() takes it away until define_xml() brings it back,
+    as libvirt would, unless undefine_removes is False. Every libvirt call
+    is recorded in order in calls.
+    """
+
+    def __init__(self, create_errors=None, state='on', undefine_removes=True,
+                 **kwargs):
+        super().__init__(**kwargs)
+        self._create_errors = list(create_errors or [])
+        self._undefine_removes = undefine_removes
+        self.state_value = state
+        self.defined = True
+        self.calls = []
+        self.autostart_calls = []
+
+    def create(self):
+        self.calls.append('create')
+        if self._create_errors:
+            raise self._create_errors.pop(0)
+
+    def setAutostart(self, flag):
+        self.calls.append('setAutostart')
+        self.autostart_calls.append(flag)
+
+    def undefine(self):
+        self.calls.append('undefine')
+        if self._undefine_removes:
+            self.defined = False
+
+
+class PowerOnConnection(FakeLibvirtConnection):
+    def get_domain_from_sf_uuid(self, u):
+        return self._domain if self._domain.defined else None
+
+    def define_xml(self, xml):
+        self._domain.calls.append('define')
+        self._domain.defined = True
+        return self._domain
+
+    def extract_power_state(self, domain):
+        return domain.state_value
+
+
+def _start_error(message):
+    return FakeLibvirtError(f'internal error: {message}')
+
+
+ALREADY_RUNNING = FakeLibvirtError(
+    'Requested operation is not valid: domain is already running')
+
+
+class InstancePowerOnTestCase(InstanceLibvirtTestCase):
+    """power_on() reports a failure rather than returning as if it worked
+    (F4), and the retry loop's bookkeeping follows what really happened
+    (F8).
+    """
+
+    def setUp(self):
+        super().setUp()
+        for name, kwargs in [
+                ('add_event', {}),
+                ('_create_domain_xml', {'return_value': '<domain/>'}),
+                ('allocate_instance_ports', {}),
+                ('deallocate_instance_ports', {})]:
+            p = mock.patch.object(instance.Instance, name, **kwargs)
+            setattr(self, f'mock_{name.lstrip("_")}', p.start())
+            self.addCleanup(p.stop)
+
+        # No config drive: these tests are about starting the domain.
+        p = mock.patch.object(
+            instance.Instance, 'configdrive', new_callable=mock.PropertyMock,
+            return_value='none')
+        p.start()
+        self.addCleanup(p.stop)
+
+        p = mock.patch('shakenfist.instance.time.sleep')
+        self.mock_sleep = p.start()
+        self.addCleanup(p.stop)
+
+    def _mock_power_on(self, domain):
+        lc = mock.patch(
+            'shakenfist.instance.util_libvirt.LibvirtConnection',
+            return_value=PowerOnConnection(domain))
+        lc.start()
+        self.addCleanup(lc.stop)
+
+    def _event_extras(self, message):
+        return [c.kwargs.get('extra')
+                for c in self.mock_add_event.call_args_list
+                if c.args[1] == message]
+
+    def test_every_attempt_failing_raises_and_records_off(self):
+        domain = PowerOnDomain(create_errors=[
+            _start_error(f'failure {i}')
+            for i in range(instance.POWER_ON_ATTEMPTS)])
+        self._mock_power_on(domain)
+        self.inst.update_power_state('on')
+        self.inst.agent_state = constants.AGENT_INSTANCE_OFF
+
+        with testtools.ExpectedException(
+                exceptions.InstancePowerOnFailed,
+                f'.*failure {instance.POWER_ON_ATTEMPTS - 1}.*'):
+            self.inst.power_on()
+
+        self.assertEqual(
+            instance.POWER_ON_ATTEMPTS, domain.calls.count('create'))
+        # The generic error undefined the domain, so there is none to read.
+        self.assertEqual('off', self.inst.power_state['power_state'])
+        # Nothing started, so what the agent last said still stands.
+        self.assertEqual(
+            constants.AGENT_INSTANCE_OFF, self.inst.agent_state.value)
+        self.assertEqual([], domain.autostart_calls)
+
+    def test_every_attempt_failing_records_the_remaining_domain_state(self):
+        domain = PowerOnDomain(
+            create_errors=[_start_error('failure')] * instance.POWER_ON_ATTEMPTS,
+            state='crashed', undefine_removes=False)
+        self._mock_power_on(domain)
+        self.inst.update_power_state('on')
+
+        with testtools.ExpectedException(exceptions.InstancePowerOnFailed):
+            self.inst.power_on()
+
+        self.assertEqual('crashed', self.inst.power_state['power_state'])
+
+    def test_later_attempt_succeeding_returns_and_sets_agent_state(self):
+        domain = PowerOnDomain(create_errors=[
+            _start_error('failure 0'), _start_error('failure 1')])
+        self._mock_power_on(domain)
+        self.inst.agent_state = constants.AGENT_INSTANCE_OFF
+
+        self.assertIsNone(self.inst.power_on())
+
+        self.assertEqual(3, domain.calls.count('create'))
+        self.assertEqual([1], domain.autostart_calls)
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        self.assertEqual(
+            constants.AGENT_NEVER_TALKED, self.inst.agent_state.value)
+
+    def test_first_attempt_succeeding_sets_agent_state(self):
+        # F8: this was only reset when the first attempt had failed, so a
+        # power on after a power off left agent_state reading 'instance
+        # powered off' until sidechannel next connected.
+        domain = PowerOnDomain()
+        self._mock_power_on(domain)
+        self.inst.agent_state = constants.AGENT_INSTANCE_OFF
+
+        self.inst.power_on()
+
+        self.assertEqual(1, domain.calls.count('create'))
+        self.assertEqual(
+            constants.AGENT_NEVER_TALKED, self.inst.agent_state.value)
+
+    def test_already_running_records_on_and_sets_autostart(self):
+        domain = PowerOnDomain(create_errors=[ALREADY_RUNNING], state='on')
+        self._mock_power_on(domain)
+        self.inst.update_power_state('off')
+        self.inst.agent_state = constants.AGENT_READY
+
+        self.inst.power_on()
+
+        self.assertEqual(1, domain.calls.count('create'))
+        self.assertNotIn('undefine', domain.calls)
+        self.assertEqual([1], domain.autostart_calls)
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        # This call did not start the domain, so the event has no libvirt
+        # timing, and the connected agent's state is left alone.
+        self.assertEqual([None], self._event_extras('poweron'))
+        self.assertEqual(constants.AGENT_READY, self.inst.agent_state.value)
+
+    def test_already_paused_is_refused(self):
+        domain = PowerOnDomain(create_errors=[ALREADY_RUNNING], state='paused')
+        self._mock_power_on(domain)
+        self.inst.update_power_state('on')
+
+        with testtools.ExpectedException(
+                exceptions.InvalidLifecycleState, '.*unpause.*'):
+            self.inst.power_on()
+
+        # Refused outright: no retry, no autostart, no power state write.
+        self.assertEqual(['create'], domain.calls)
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        self.assertEqual([], self._event_extras('poweron'))
+
+    def test_generic_start_error_undefines_before_retry(self):
+        # The retry must define fresh XML naming the reallocated ports
+        # rather than start the old domain again.
+        domain = PowerOnDomain(create_errors=[_start_error('surprise')])
+        self._mock_power_on(domain)
+
+        self.inst.power_on()
+
+        self.assertEqual(
+            ['create', 'undefine', 'define', 'create', 'setAutostart'],
+            domain.calls)
+        self.mock_allocate_instance_ports.assert_called_once()
+
+    @mock.patch('shakenfist.instance.os.makedirs')
+    @mock.patch('shakenfist.instance.Instance._configure_block_devices')
+    @mock.patch('shakenfist.instance.Instance.power_on',
+                side_effect=exceptions.InstancePowerOnFailed('failure'))
+    @mock.patch('shakenfist.instance.Instance._record_domain_xml')
+    @mock.patch('shakenfist.instance.Instance.enqueue_delete_due_error')
+    def test_create_whose_power_on_raises_still_error_deletes(
+            self, mock_enqueue_delete, mock_record_xml, mock_power_on,
+            mock_configure, mock_makedirs):
+        self._mock_libvirt(None)
+
+        self.inst.create()
+
+        self.assertNotEqual(
+            instance.Instance.STATE_CREATED, self.inst.state.value)
+        mock_enqueue_delete.assert_called_once_with(
+            'instance failed to power on')
+        self.mock_add_event.assert_any_call(
+            EVENT_TYPE_AUDIT, 'instance failed to power on')
+
+
 class ClockedDomain(FakeDomain):
     """A domain which records the fake clock when libvirt is asked."""
 
-    def __init__(self, clock, destroy_error=None, **kwargs):
+    def __init__(self, clock, destroy_error=None, create_error=None,
+                 **kwargs):
         super().__init__(**kwargs)
         self._clock = clock
         self._destroy_error = destroy_error
+        self._create_error = create_error
         self.called_at = None
 
     def create(self):
         self.called_at = self._clock.time()
+        if self._create_error:
+            raise self._create_error
 
     def destroy(self):
         self.called_at = self._clock.time()
@@ -858,6 +1096,15 @@ class InstancePowerEventTimestampsTestCase(InstanceLibvirtTestCase):
         self.assertLess(extra['libvirt_requested_at'], domain.called_at)
         self.assertGreater(extra['libvirt_returned_at'], domain.called_at)
 
+    def test_poweron_of_running_domain_records_no_timestamps(self):
+        # This call did not start the domain, so there is nothing for the
+        # timestamps to bracket.
+        domain = ClockedDomain(self.clock, create_error=ALREADY_RUNNING)
+        self._mock_libvirt(domain)
+        self.assertTrue(self.inst._power_on_inner())
+
+        self.assertIsNone(self._event_extra('poweron'))
+
     def test_poweroff_brackets_destroy(self):
         domain = ClockedDomain(self.clock)
         self._mock_libvirt(domain)
@@ -878,8 +1125,12 @@ class InstancePowerEventTimestampsTestCase(InstanceLibvirtTestCase):
         self.assertIsNone(self._event_extra('poweroff'))
 
     def test_poweroff_failure_records_no_timestamps(self):
-        domain = ClockedDomain(self.clock, destroy_error=FakeLibvirtError(
-            'internal error: something else entirely'))
+        # destroy() raised but the domain stopped anyway, so a 'poweroff'
+        # event is still written (D2). A still running domain writes none,
+        # and raises instead.
+        domain = ClockedDomain(
+            self.clock, active=False, destroy_error=FakeLibvirtError(
+                'internal error: something else entirely'))
         self._mock_libvirt(domain)
         self.inst.power_off()
 
@@ -888,18 +1139,26 @@ class InstancePowerEventTimestampsTestCase(InstanceLibvirtTestCase):
 
 class AutostartDomain(FakeDomain):
     """A domain which records each setAutostart() flag, and can be told to
-    raise on destroy() or on setAutostart() itself.
+    raise on destroy(), on isActive() or on setAutostart() itself. Whether it
+    is active is FakeDomain's active argument.
     """
 
-    def __init__(self, destroy_error=None, autostart_error=None, **kwargs):
+    def __init__(self, destroy_error=None, autostart_error=None,
+                 is_active_error=None, **kwargs):
         super().__init__(**kwargs)
         self._destroy_error = destroy_error
         self._autostart_error = autostart_error
+        self._is_active_error = is_active_error
         self.autostart_calls = []
 
     def destroy(self):
         if self._destroy_error:
             raise self._destroy_error
+
+    def isActive(self):
+        if self._is_active_error:
+            raise self._is_active_error
+        return super().isActive()
 
     def setAutostart(self, flag):
         if self._autostart_error:
@@ -941,11 +1200,92 @@ class InstancePowerOffAutostartTestCase(InstanceLibvirtTestCase):
     def test_power_off_leaves_autostart_when_destroy_failed(self):
         # Any other destroy() error may leave the domain running, and a
         # running domain must keep its autostart flag: nothing sets it again.
+        # The domain is still active here, so power_off() now raises (F5).
         domain = AutostartDomain(destroy_error=FakeLibvirtError(
             'internal error: something else entirely'))
         self._mock_libvirt(domain)
-        self.inst.power_off()
+        self.assertRaises(
+            exceptions.InstancePowerOffFailed, self.inst.power_off)
         self.assertEqual([], domain.autostart_calls)
+
+    def test_power_off_failed_on_running_domain_raises_and_records_state(self):
+        # destroy() failed and the domain is still running (F5, D2). The
+        # instance must not be recorded as off: its real state is recorded,
+        # autostart and agent_state are left alone, a 'poweroff failed'
+        # event carries the error, and the caller is told.
+        domain = AutostartDomain(destroy_error=FakeLibvirtError(
+            'internal error: something else entirely'))
+        self._mock_libvirt(domain, power_state='on')
+        self.inst.update_power_state('on')
+        self.inst.agent_state = constants.AGENT_READY
+
+        with self.assertRaises(exceptions.InstancePowerOffFailed) as ctx:
+            self.inst.power_off()
+
+        self.assertEqual(
+            'internal error: something else entirely', str(ctx.exception))
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        self.assertEqual([], domain.autostart_calls)
+        self.assertEqual(constants.AGENT_READY, self.inst.agent_state.value)
+        self.mock_add_event.assert_any_call(
+            EVENT_TYPE_AUDIT, 'poweroff failed',
+            extra={'message': 'internal error: something else entirely'})
+        self.assertNotIn('poweroff', self._event_messages())
+
+    def test_power_off_failed_records_the_domains_real_state(self):
+        # The state recorded is what libvirt reports, not a guess of 'on'.
+        domain = AutostartDomain(destroy_error=FakeLibvirtError(
+            'internal error: something else entirely'))
+        self._mock_libvirt(domain, power_state='paused')
+        self.inst.update_power_state('on')
+
+        self.assertRaises(
+            exceptions.InstancePowerOffFailed, self.inst.power_off)
+        self.assertEqual('paused', self.inst.power_state['power_state'])
+
+    def test_power_off_failed_but_domain_stopped_records_off(self):
+        # destroy() raised, but the domain is inactive anyway: the power off
+        # took effect, so it is treated as stopped. Its event carries no
+        # libvirt timing, since destroy() did not return.
+        domain = AutostartDomain(
+            active=False, destroy_error=FakeLibvirtError(
+                'internal error: something else entirely'))
+        self._mock_libvirt(domain)
+        self.inst.update_power_state('on')
+
+        self.inst.power_off()
+
+        self.assertEqual('off', self.inst.power_state['power_state'])
+        self.assertEqual([0], domain.autostart_calls)
+        self.assertEqual(
+            constants.AGENT_INSTANCE_OFF, self.inst.agent_state.value)
+        self.mock_add_event.assert_any_call(
+            EVENT_TYPE_AUDIT, 'poweroff', extra=None)
+        self.assertNotIn('poweroff failed', self._event_messages())
+
+    def test_power_off_failed_and_state_unreadable_writes_nothing(self):
+        # destroy() failed and the domain's state cannot be read either, so
+        # the outcome is unknowable: raise without writing a power state,
+        # and leave the cleaner to settle it.
+        domain = AutostartDomain(
+            destroy_error=FakeLibvirtError(
+                'internal error: something else entirely'),
+            is_active_error=FakeLibvirtError('internal error: no connection'))
+        self._mock_libvirt(domain)
+        self.inst.update_power_state('on')
+        self.inst.agent_state = constants.AGENT_READY
+
+        with self.assertRaises(exceptions.InstancePowerOffFailed) as ctx:
+            self.inst.power_off()
+
+        self.assertEqual(
+            'internal error: something else entirely', str(ctx.exception))
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        self.assertEqual([], domain.autostart_calls)
+        self.assertEqual(constants.AGENT_READY, self.inst.agent_state.value)
+        messages = self._event_messages()
+        self.assertNotIn('poweroff', messages)
+        self.assertNotIn('poweroff failed', messages)
 
     def test_power_off_autostart_failure_is_recorded_not_raised(self):
         domain = AutostartDomain(autostart_error=FakeLibvirtError(
@@ -959,10 +1299,291 @@ class InstancePowerOffAutostartTestCase(InstanceLibvirtTestCase):
         self.assertIn('instance autostart configuration error', messages)
         self.assertIn('poweroff', messages)
 
+    def test_power_off_failed_and_power_state_unreadable_writes_nothing(self):
+        # As above, but the domain is active and it is reading its power
+        # state which fails.
+        domain = AutostartDomain(destroy_error=FakeLibvirtError(
+            'internal error: something else entirely'))
+        conn = FakeLibvirtConnection(domain)
+
+        def extract_power_state(d):
+            raise FakeLibvirtError('internal error: no connection')
+
+        conn.extract_power_state = extract_power_state
+        p = mock.patch(
+            'shakenfist.instance.util_libvirt.LibvirtConnection',
+            return_value=conn)
+        p.start()
+        self.addCleanup(p.stop)
+        self.inst.update_power_state('on')
+
+        self.assertRaises(
+            exceptions.InstancePowerOffFailed, self.inst.power_off)
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        self.assertEqual([], domain.autostart_calls)
+        self.assertNotIn('poweroff failed', self._event_messages())
+
     def test_power_off_no_domain_calls_nothing(self):
         self._mock_libvirt(None)
         self.inst.power_off()
         self.mock_add_event.assert_not_called()
+
+
+class InstancePauseUnpauseTestCase(InstanceLibvirtTestCase):
+    """pause() and unpause() judge success by the domain's own state (F6,
+    F7), following the inactive-domain pattern reboot() uses (issue 3630):
+
+    * No domain, or an inactive one, raises InvalidLifecycleState (409),
+      including the race where the domain stops between the isActive()
+      check and the suspend()/resume() call.
+    * Already being in the target state succeeds without calling libvirt
+      again, so pausing or unpausing twice both answer 200 (D5).
+    * A domain that never reaches the target state still raises
+      InvalidLifecycleState after three attempts.
+    """
+
+    def setUp(self):
+        super().setUp()
+        p = mock.patch('shakenfist.instance.time.sleep')
+        self.mock_sleep = p.start()
+        self.addCleanup(p.stop)
+
+        # unpause() sets the sidechannel monitor's abort file, so it must
+        # never see the real /run/sf, which a developer's machine may have.
+        self.abort_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.abort_dir)
+        p = mock.patch.object(daemon, 'ABORT_PATH_DIR', self.abort_dir)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def _monitor_abort_path(self):
+        return os.path.join(
+            self.abort_dir, f'sidechannel-{self.inst.uuid}.abort')
+
+    def test_pause_no_domain_raises(self):
+        self._mock_libvirt(None)
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.pause()
+
+    def test_unpause_no_domain_raises(self):
+        self._mock_libvirt(None)
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.unpause()
+
+    def test_pause_inactive_domain_raises(self):
+        domain = FakeDomain(active=False)
+        self._mock_libvirt(domain, power_state='off')
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.pause()
+        # Refused outright: the inactive domain must never be asked to
+        # suspend.
+        self.assertEqual(0, domain.suspend_calls)
+
+    def test_unpause_inactive_domain_raises(self):
+        domain = FakeDomain(active=False)
+        self._mock_libvirt(domain, power_state='off')
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.unpause()
+        self.assertEqual(0, domain.resume_calls)
+
+    def test_pause_domain_stops_after_check_raises(self):
+        # The domain can shut off between the isActive() check and the
+        # suspend() attempt.
+        domain = FakeDomain(error=FakeLibvirtError(
+            'Requested operation is not valid: domain is not running'))
+        self._mock_libvirt(domain, power_state='on')
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.pause()
+
+    def test_unpause_domain_stops_after_check_raises(self):
+        domain = FakeDomain(error=FakeLibvirtError(
+            'Requested operation is not valid: domain is not running'))
+        self._mock_libvirt(domain, power_state='paused')
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.unpause()
+
+    def test_pause_twice_succeeds_without_a_second_suspend(self):
+        domain = FakeDomain()
+        self._mock_libvirt(domain, power_state='paused')
+        self.inst.agent_state = constants.AGENT_READY
+
+        self.inst.pause()
+
+        self.assertEqual(0, domain.suspend_calls)
+        self.assertEqual('paused', self.inst.power_state['power_state'])
+        self.assertEqual(
+            constants.AGENT_INSTANCE_PAUSED, self.inst.agent_state.value)
+
+    def test_unpause_of_running_domain_succeeds_without_resume(self):
+        domain = FakeDomain()
+        self._mock_libvirt(domain, power_state='on')
+        self.inst.agent_state = constants.AGENT_READY
+
+        self.inst.unpause()
+
+        self.assertEqual(0, domain.resume_calls)
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        # Resetting agent_state here would strand a connected agent, since
+        # sidechannel only rewrites it when its own cached view changes.
+        self.assertEqual(constants.AGENT_READY, self.inst.agent_state.value)
+
+    def test_pause_when_stored_value_already_paused_still_succeeds(self):
+        # The cleaner may have already written 'paused'. Judging success by
+        # whether update_power_state() changed anything (the F6 bug) would
+        # treat this as "the operation did not take effect" and raise.
+        domain = FakeDomain()
+        self._mock_libvirt(domain, power_state='paused')
+        self.inst.update_power_state('paused')
+
+        self.inst.pause()
+
+        self.assertEqual(0, domain.suspend_calls)
+        self.assertEqual('paused', self.inst.power_state['power_state'])
+
+    def _mock_libvirt_transition(self, domain, counter, before, after):
+        # The domain reports `before` until the libvirt call has happened at
+        # least once (tracked by `counter`, a FakeDomain attribute name),
+        # then `after`. This is what a real suspend()/resume() does: the
+        # state read before the call is the old one.
+        conn = FakeLibvirtConnection(domain)
+        conn.extract_power_state = (
+            lambda d: after if getattr(domain, counter) else before)
+        p = mock.patch(
+            'shakenfist.instance.util_libvirt.LibvirtConnection',
+            return_value=conn)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_pause_success(self):
+        domain = FakeDomain()
+        self._mock_libvirt_transition(
+            domain, 'suspend_calls', before='on', after='paused')
+        self.inst.update_power_state('on')
+
+        self.inst.pause()
+
+        self.assertEqual(1, domain.suspend_calls)
+        self.assertEqual('paused', self.inst.power_state['power_state'])
+        self.assertEqual(
+            constants.AGENT_INSTANCE_PAUSED, self.inst.agent_state.value)
+
+    def test_unpause_success(self):
+        domain = FakeDomain()
+        self._mock_libvirt_transition(
+            domain, 'resume_calls', before='paused', after='on')
+        self.inst.update_power_state('paused')
+        self.inst.agent_state = constants.AGENT_INSTANCE_PAUSED
+
+        self.inst.unpause()
+
+        self.assertEqual(1, domain.resume_calls)
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        self.assertEqual(
+            constants.AGENT_NEVER_TALKED, self.inst.agent_state.value)
+
+    def _unpause_a_paused_domain(self):
+        domain = FakeDomain()
+        self._mock_libvirt_transition(
+            domain, 'resume_calls', before='paused', after='on')
+        self.inst.update_power_state('paused')
+        self.inst.agent_state = constants.AGENT_INSTANCE_PAUSED
+        self.inst.unpause()
+        return domain
+
+    def test_unpause_restarts_the_sidechannel_monitor(self):
+        # The monitor caches the agent's state and only writes it when
+        # that cache changes, so after a short pause it would never
+        # correct the "no contact" written above. Its abort file has the
+        # sidechannel daemon replace it with one which re-handshakes.
+        self._unpause_a_paused_domain()
+        self.assertTrue(os.path.exists(self._monitor_abort_path()))
+
+        # The monitor's file only: the executor's is its own, and an
+        # in-flight agent operation is left to its budgets.
+        self.assertEqual(
+            [f'sidechannel-{self.inst.uuid}.abort'],
+            os.listdir(self.abort_dir))
+
+    def test_unpause_of_running_domain_leaves_the_monitor_alone(self):
+        # Nothing was frozen, so the monitor's view is current and a
+        # restart would only drop a working connection.
+        domain = FakeDomain()
+        self._mock_libvirt(domain, power_state='on')
+
+        self.inst.unpause()
+
+        self.assertEqual([], os.listdir(self.abort_dir))
+
+    def test_unpause_survives_a_failed_monitor_restart_request(self):
+        # The guest is running whether or not the sidechannel daemon
+        # could be told, and the monitor's reply gap check is the
+        # backstop, so a failure to write is logged rather than raised.
+        with mock.patch.object(daemon, 'set_abort_path',
+                               side_effect=PermissionError('denied')) as sap:
+            domain = self._unpause_a_paused_domain()
+
+        sap.assert_called_once()
+        self.assertEqual(1, domain.resume_calls)
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        self.assertEqual(
+            constants.AGENT_NEVER_TALKED, self.inst.agent_state.value)
+
+    def test_unpause_without_a_run_directory_does_not_try(self):
+        # A node with no /run/sf has no sidechannel daemon to tell.
+        missing = os.path.join(self.abort_dir, 'missing')
+        with mock.patch.object(daemon, 'ABORT_PATH_DIR', missing), \
+                mock.patch.object(daemon, 'set_abort_path') as sap:
+            self._unpause_a_paused_domain()
+
+        sap.assert_not_called()
+        self.assertEqual('on', self.inst.power_state['power_state'])
+
+    def test_pause_succeeds_despite_db_race_with_cleaner(self):
+        # The cleaner can write 'paused' to the database while the domain
+        # itself is still 'on', just before this pause() call starts. The
+        # domain is really paused by this call's own suspend(), but
+        # update_power_state() sees no change from the database's point of
+        # view and would (F6) report "nothing happened".
+        domain = FakeDomain()
+        self._mock_libvirt_transition(
+            domain, 'suspend_calls', before='on', after='paused')
+        self.inst.update_power_state('paused')
+
+        self.inst.pause()
+
+        self.assertEqual(1, domain.suspend_calls)
+        self.assertEqual('paused', self.inst.power_state['power_state'])
+
+    def test_unpause_succeeds_despite_db_race_with_cleaner(self):
+        domain = FakeDomain()
+        self._mock_libvirt_transition(
+            domain, 'resume_calls', before='paused', after='on')
+        self.inst.update_power_state('on')
+
+        self.inst.unpause()
+
+        self.assertEqual(1, domain.resume_calls)
+        self.assertEqual('on', self.inst.power_state['power_state'])
+
+    def test_pause_never_reaching_target_raises_after_three_attempts(self):
+        # The domain stays active and reports 'on' forever, so the loop
+        # never sees 'paused'.
+        domain = FakeDomain()
+        self._mock_libvirt(domain, power_state='on')
+
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.pause()
+
+        self.assertEqual(3, domain.suspend_calls)
+
+    def test_unpause_never_reaching_target_raises_after_three_attempts(self):
+        domain = FakeDomain()
+        self._mock_libvirt(domain, power_state='paused')
+
+        with testtools.ExpectedException(exceptions.InvalidLifecycleState):
+            self.inst.unpause()
+
+        self.assertEqual(3, domain.resume_calls)
 
 
 class InstanceDomainXMLEscapingTestCase(base.ShakenFistTestCase):

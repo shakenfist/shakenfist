@@ -863,6 +863,40 @@ class BaseTestCase(testtools.TestCase):
             '%s. Full dominfo output:\n%s'
             % (instance_uuid, node.get('name'), out))
 
+    def _domain_root_disk_path(self, node, instance_uuid):
+        """The path of instance_uuid's root disk on node, its hypervisor.
+
+        The API does not expose disk paths, so this reads them from the
+        libvirt domain with ``virsh domblklist --details``, which works on
+        an inactive domain too. The root disk is the first row whose
+        device is 'disk': the domain XML lists disks in block device
+        order, root first, and libvirt keeps disks on one bus sorted by
+        target. Fails the test, with the command's output attached, if
+        there is no such row, or if its source is not inside the
+        instance's own directory -- callers move this file aside as root,
+        and a shared file such as a backing image must never be the one
+        moved.
+        """
+        out, _ = self._node_exec(
+            node, ['virsh', 'domblklist', '--details', 'sf:%s' % instance_uuid],
+            sudo=True)
+        for line in out.splitlines():
+            fields = line.split()
+            if len(fields) != 4 or fields[1] != 'disk':
+                continue
+
+            path = fields[3]
+            if '/instances/%s/' % instance_uuid not in path:
+                self.fail(
+                    'Root disk %r of instance %s on node %s is not in the '
+                    "instance's directory. Full domblklist output:\n%s"
+                    % (path, instance_uuid, node.get('name'), out))
+            return path
+
+        self.fail(
+            'No disk in virsh domblklist for instance %s on node %s. Full '
+            'domblklist output:\n%s' % (instance_uuid, node.get('name'), out))
+
     def _await_power_off(self, instance_uuid, after=None):
         return self._await_instance_event(
             instance_uuid, 'detected poweroff', after=after)

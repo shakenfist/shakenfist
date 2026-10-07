@@ -70,3 +70,12 @@ This depends on the distribution's own `libvirt-guests` service, which Shaken Fi
 Every Shaken Fist daemon's systemd unit also orders itself after `libvirt-guests.service`. systemd stops units in the reverse of their start order, so this guarantees that every Shaken Fist daemon, including the cleaner, has stopped before `libvirt-guests` shuts guests down at host shutdown. Without that ordering, the cleaner could see guests going down for the reboot, record each as a detected power off, and clear its autostart flag in response -- turning a reboot into every instance on that hypervisor coming back powered off.
 
 `sf-queues` does not restart or power on any instance when it starts. A restart of `sf-queues`, or of `libvirtd`, leaves running domains running regardless. It is only a hypervisor reboot, which stops every domain, where the autostart flag decides what starts again.
+
+Failed power on and power off
+------------------------------
+
+A power on retries starting the domain several times, and a power off's own `destroy()` call can itself fail. When every power on attempt fails, or a power off's `destroy()` fails while the domain is still running, the API answers an error rather than its usual success response -- see [what each power operation answers](/developer_guide/api_reference/instances/#what-each-power-operation-answers) for the status codes. Either way, the instance's recorded power state is updated to match what the domain actually is at that point, not the state that was requested: a failed power on does not leave an earlier `on` behind, and a failed power off does not record `off` while the domain is still running.
+
+These failures add audit events: `power on failed` and `power off failed`, each carrying the error; and, for a power off specifically, a `poweroff failed` event on the instance with the error as `message`. If even reading the domain's own state back fails, no power state is written at all, and the instance instead records `failed to determine instance power state after failed power on` or `... after failed power off` (in place of `poweroff failed`) -- the cleaner settles the instance's recorded state on a later pass.
+
+Pausing or unpausing a powered off instance is refused (409), the same as rebooting one. Pause and unpause are otherwise idempotent: pausing an already paused instance, or unpausing an already running one, succeeds without calling libvirt again.

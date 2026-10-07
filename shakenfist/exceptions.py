@@ -85,6 +85,21 @@ class InvalidLifecycleState(InstanceException):
     ...
 
 
+class InstancePowerOnFailed(InstanceException):
+    """Every attempt to start an instance's domain failed.
+
+    The message is the last attempt's error.
+    """
+
+
+class InstancePowerOffFailed(InstanceException):
+    """destroy() failed and the instance's domain is still running, or its
+    state could not be read afterwards.
+
+    The message is destroy()'s error.
+    """
+
+
 class NoSuchChannel(InstanceException):
     ...
 

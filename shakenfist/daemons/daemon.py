@@ -189,6 +189,21 @@ def write_pid_file(daemon_name):
     logship.start(daemon_name)
 
 
+# Where daemons and their worker threads keep abort files.
+ABORT_PATH_DIR = '/run/sf'
+
+
+def sidechannel_abort_path(name):
+    """The abort file for one sidechannel job thread.
+
+    The sidechannel daemon's jobs derive their paths from this, and so
+    does Instance.unpause(), which sets an instance's monitor path to
+    have the monitor restarted. Keeping the derivation in one place is
+    what keeps the second from silently missing the first.
+    """
+    return os.path.join(ABORT_PATH_DIR, f'sidechannel-{name}.abort')
+
+
 def clear_abort_path(abort_path):
     if os.path.exists(abort_path):
         LOG.info(f'Clearing abort file: {abort_path}')
@@ -304,7 +319,7 @@ class Daemon:
         set_log_level(self.log, name)
         set_syslog_ident(procname)
 
-        self.abort_path = f'/run/sf/{name}.abort'
+        self.abort_path = os.path.join(ABORT_PATH_DIR, f'{name}.abort')
         clear_abort_path(self.abort_path)
         signal.signal(signal.SIGTERM, self.exit_gracefully)
 

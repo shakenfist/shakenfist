@@ -298,3 +298,92 @@ class DomainAutostartTestCase(test_base.ShakenFistTestCase):
 
         self.assertIn('Unexpected Autostart value', str(exc))
         self.assertIn("'maybe'", str(exc))
+
+
+# Realistic `virsh domblklist --details` output for an instance with a root
+# disk and a config drive, as libvirt.tmpl defines them.
+DOMBLKLIST_UUID = '1234abcd-0000-0000-0000-000000000000'
+DOMBLKLIST_ROOT = '/srv/shakenfist/instances/%s/vda' % DOMBLKLIST_UUID
+DOMBLKLIST_OUTPUT = (
+    ' Type   Device   Target   Source\n'
+    '-----------------------------------------------------------------------\n'
+    ' file   disk     vda      %s\n'
+    ' file   disk     vdb      /srv/shakenfist/instances/%s/vdb\n'
+    '\n' % (DOMBLKLIST_ROOT, DOMBLKLIST_UUID))
+
+# A cdrom ahead of the root disk, which must be skipped.
+DOMBLKLIST_CDROM_FIRST = (
+    ' Type   Device   Target   Source\n'
+    '-----------------------------------------------------------------------\n'
+    ' file   cdrom    sda      /srv/shakenfist/instances/%s/sda.raw\n'
+    ' file   disk     vda      %s\n' % (DOMBLKLIST_UUID, DOMBLKLIST_ROOT))
+
+DOMBLKLIST_NO_DISK = (
+    ' Type   Device   Target   Source\n'
+    '-----------------------------------------------------------------------\n'
+    '\n')
+
+DOMBLKLIST_SHARED_PATH = (
+    ' Type   Device   Target   Source\n'
+    '-----------------------------------------------------------------------\n'
+    ' file   disk     vda      /srv/shakenfist/image_cache/abc.qcow2\n')
+
+
+class DomainRootDiskPathTestCase(test_base.ShakenFistTestCase):
+    """Unit tests for ``BaseTestCase._domain_root_disk_path()``.
+
+    Phase 3's failed power on test moves the path this returns aside as
+    root, so these tests pin both the parsing and the refusal to return a
+    path outside the instance's own directory.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.node_exec = mock.MagicMock()
+        self.harness = _DomainAutostartHarness(self.node_exec)
+        self.node = {'name': 'sf2', 'ip': '192.168.1.2'}
+
+    def test_returns_first_disk(self):
+        self.node_exec.return_value = (DOMBLKLIST_OUTPUT, '')
+
+        result = self.harness._domain_root_disk_path(self.node, DOMBLKLIST_UUID)
+
+        self.assertEqual(DOMBLKLIST_ROOT, result)
+        self.node_exec.assert_called_once_with(
+            self.node,
+            ['virsh', 'domblklist', '--details', 'sf:%s' % DOMBLKLIST_UUID],
+            sudo=True)
+
+    def test_skips_cdrom(self):
+        self.node_exec.return_value = (DOMBLKLIST_CDROM_FIRST, '')
+
+        result = self.harness._domain_root_disk_path(self.node, DOMBLKLIST_UUID)
+
+        self.assertEqual(DOMBLKLIST_ROOT, result)
+
+    def test_no_disk_fails(self):
+        self.node_exec.return_value = (DOMBLKLIST_NO_DISK, '')
+
+        exc = self.assertRaises(
+            AssertionError, self.harness._domain_root_disk_path,
+            self.node, DOMBLKLIST_UUID)
+
+        self.assertIn('No disk in virsh domblklist', str(exc))
+        self.assertIn(DOMBLKLIST_UUID, str(exc))
+
+    def test_path_outside_instance_directory_fails(self):
+        self.node_exec.return_value = (DOMBLKLIST_SHARED_PATH, '')
+
+        exc = self.assertRaises(
+            AssertionError, self.harness._domain_root_disk_path,
+            self.node, DOMBLKLIST_UUID)
+
+        self.assertIn("not in the instance's directory", str(exc))
+        self.assertIn('image_cache/abc.qcow2', str(exc))
+
+    def test_another_instances_disk_fails(self):
+        self.node_exec.return_value = (DOMBLKLIST_OUTPUT, '')
+
+        self.assertRaises(
+            AssertionError, self.harness._domain_root_disk_path,
+            self.node, 'ffffffff-0000-0000-0000-000000000000')
