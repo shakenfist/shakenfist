@@ -2654,16 +2654,7 @@ class Instance(dbowo):
                 return
 
             attempts = 1
-            try:
-                inst.resume()
-            except lc.libvirt.libvirtError as e:
-                # The domain can shut off between the isActive() check above
-                # and the resume attempt.
-                if 'domain is not running' in str(e):
-                    raise exceptions.InvalidLifecycleState(
-                        'you cannot unpause a powered off instance') from e
-                raise
-            self.add_event(EVENT_TYPE_AUDIT, 'unpause', extra={'attempt': attempts})
+            self._resume_for_unpause(lc, inst, attempts)
 
             while lc.extract_power_state(inst) != 'on':
                 if attempts > 2:
@@ -2673,18 +2664,34 @@ class Instance(dbowo):
 
                 time.sleep(1)
                 attempts += 1
-                try:
-                    inst.resume()
-                except lc.libvirt.libvirtError as e:
-                    if 'domain is not running' in str(e):
-                        raise exceptions.InvalidLifecycleState(
-                            'you cannot unpause a powered off instance') from e
-                    raise
-                self.add_event(EVENT_TYPE_AUDIT, 'unpause', extra={'attempt': attempts})
+                self._resume_for_unpause(lc, inst, attempts)
 
             self.update_power_state('on')
             self.agent_state = constants.AGENT_NEVER_TALKED
             self._restart_sidechannel_monitor('from unpause')
+
+    def _resume_for_unpause(self, lc, inst, attempt):
+        """Ask libvirt to resume a paused domain, for unpause().
+
+        A domain which is already running is the state unpause() wants, so
+        libvirt refusing to resume it is not an error: the state read
+        before this call can race a resume which landed after it, from an
+        earlier attempt or from another caller, and raising would answer
+        an error for an unpause which happened. The caller's next state
+        read sees the domain running.
+        """
+        try:
+            inst.resume()
+        except lc.libvirt.libvirtError as e:
+            # The domain can shut off between the isActive() check in
+            # unpause() and the resume attempt.
+            if 'domain is not running' in str(e):
+                raise exceptions.InvalidLifecycleState(
+                    'you cannot unpause a powered off instance') from e
+            if 'domain is already running' in str(e):
+                return
+            raise
+        self.add_event(EVENT_TYPE_AUDIT, 'unpause', extra={'attempt': attempt})
 
     def _restart_sidechannel_monitor(self, source):
         # A write of AGENT_NEVER_TALKED, by unpause() or a power on which

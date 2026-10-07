@@ -1610,6 +1610,82 @@ class InstancePauseUnpauseTestCase(InstanceLibvirtTestCase):
 
         self.assertEqual(3, domain.resume_calls)
 
+    def _mock_libvirt_states(self, domain, states):
+        # The domain reports each of states in turn, then the last one for
+        # good.
+        remaining = list(states)
+        conn = FakeLibvirtConnection(domain)
+        conn.extract_power_state = (
+            lambda d: remaining.pop(0) if len(remaining) > 1 else remaining[0])
+        p = mock.patch(
+            'shakenfist.instance.util_libvirt.LibvirtConnection',
+            return_value=conn)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_unpause_retry_finding_the_domain_running_succeeds(self):
+        # The first resume() landed after the loop read the domain as
+        # still paused, so the retry's resume() is refused because the
+        # domain is already running. That is the target, not a failure.
+        domain = ResumeDomain(resume_errors=[None, ALREADY_RUNNING])
+        self._mock_libvirt_states(domain, ['paused', 'paused', 'on'])
+        self.inst.update_power_state('paused')
+        self.inst.agent_state = constants.AGENT_INSTANCE_PAUSED
+
+        self.inst.unpause()
+
+        self.assertEqual(2, domain.resume_attempts)
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        self.assertEqual(
+            constants.AGENT_NEVER_TALKED, self.inst.agent_state.value)
+        self.assertTrue(os.path.exists(self._monitor_abort_path()))
+
+    def test_unpause_first_resume_finding_the_domain_running_succeeds(self):
+        # Something else resumed the domain between the state read and
+        # this resume().
+        domain = ResumeDomain(resume_errors=[ALREADY_RUNNING])
+        self._mock_libvirt_states(domain, ['paused', 'on'])
+        self.inst.update_power_state('paused')
+        self.inst.agent_state = constants.AGENT_INSTANCE_PAUSED
+
+        self.inst.unpause()
+
+        self.assertEqual(1, domain.resume_attempts)
+        self.assertEqual('on', self.inst.power_state['power_state'])
+        self.assertEqual(
+            constants.AGENT_NEVER_TALKED, self.inst.agent_state.value)
+        self.assertTrue(os.path.exists(self._monitor_abort_path()))
+
+    def test_unpause_other_resume_error_still_raises(self):
+        # Only "already running" is the target reached.
+        domain = ResumeDomain(resume_errors=[
+            None, FakeLibvirtError('internal error: something else')])
+        self._mock_libvirt_states(domain, ['paused', 'paused', 'on'])
+        self.inst.update_power_state('paused')
+
+        with testtools.ExpectedException(
+                FakeLibvirtError, '.*something else.*'):
+            self.inst.unpause()
+
+        self.assertEqual('paused', self.inst.power_state['power_state'])
+
+
+class ResumeDomain(FakeDomain):
+    """A domain whose resume() raises each of resume_errors in turn, a None
+    entry meaning that attempt succeeds."""
+
+    def __init__(self, resume_errors, **kwargs):
+        super().__init__(**kwargs)
+        self._resume_errors = list(resume_errors)
+        self.resume_attempts = 0
+
+    def resume(self):
+        self.resume_attempts += 1
+        error = self._resume_errors.pop(0) if self._resume_errors else None
+        if error:
+            raise error
+        self.resume_calls += 1
+
 
 class InstanceDomainXMLEscapingTestCase(base.ShakenFistTestCase):
     """A caller-supplied model value must stay data in the domain XML.
