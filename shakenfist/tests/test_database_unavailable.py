@@ -972,6 +972,63 @@ class StrictInstanceLookupTestCase(base.ShakenFistTestCase):
         self.assertIsNone(result)
 
 
+class GetInstanceServicerTestCase(base.ShakenFistTestCase):
+    """The database daemon's GetInstance must answer a MariaDB error with
+    an error status, not found=False. The client cannot tell an OK
+    found=False from a genuine miss, so a strict lookup (the cleaner's,
+    before it deletes an unknown domain and its disks) would otherwise
+    read a database outage as "this instance does not exist"."""
+
+    INST_UUID = uuid.uuid4()
+
+    def setUp(self):
+        super().setUp()
+        self.servicer = daemons_database_main.DatabaseService(
+            mock.MagicMock())
+
+    @mock.patch('shakenfist.mariadb._get_instances_table')
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_operational_error_is_internal_not_a_miss(
+            self, mock_engine, mock_table):
+        mock_engine.return_value.connect.side_effect = OperationalError(
+            'SELECT', {}, Exception('server has gone away'))
+        context = mock.MagicMock()
+
+        reply = self.servicer.GetInstance(
+            database_pb2.GetInstanceRequest(uuid=str(self.INST_UUID)),
+            context)
+
+        context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
+        self.assertFalse(reply.found)
+
+    @mock.patch('shakenfist.mariadb._direct_get_instance', return_value=None)
+    def test_genuine_miss_is_not_an_error(self, mock_get):
+        # The negative control: a servicer which failed every read would
+        # pass the test above too.
+        context = mock.MagicMock()
+
+        reply = self.servicer.GetInstance(
+            database_pb2.GetInstanceRequest(uuid=str(self.INST_UUID)),
+            context)
+
+        context.set_code.assert_not_called()
+        self.assertFalse(reply.found)
+
+    @mock.patch('shakenfist.mariadb._grpc_call',
+                side_effect=FakeRpcError(grpc.StatusCode.INTERNAL))
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_internal_reply_raises_strict_and_is_none_otherwise(
+            self, mock_use, mock_stub, mock_call):
+        # What the client makes of that INTERNAL reply: strict callers
+        # see the outage, every other caller keeps today's None.
+        self.assertRaises(
+            exceptions.DatabaseUnavailable,
+            mariadb.get_instance, self.INST_UUID, strict=True)
+        self.assertIsNone(mariadb.get_instance(self.INST_UUID))
+
+
 class QueuesWorkItemDatabaseUnavailableTestCase(base.ShakenFistTestCase):
     """Issue 3716: a database outage during the queue worker's operation
     lookup must leave the work item claimed for the stuck-row reaper to
