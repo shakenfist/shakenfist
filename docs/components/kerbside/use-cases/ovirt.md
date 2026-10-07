@@ -1,8 +1,11 @@
 # Kerbside for oVirt
 
-Native SPICE desktops for oVirt users, without exposing
-hypervisors to the client network and without an opaque
-byte-relay in the middle.
+oVirt users want native SPICE desktops, the hypervisors should
+not be reachable from the client network, and the usual bridge
+between the two is an HTTP CONNECT proxy relaying bytes it
+cannot see into. Kerbside replaces that relay with one that
+understands SPICE: it knows which sessions are live, can end
+them, and firewalls what clients send.
 
 ## Value proposition
 
@@ -35,10 +38,9 @@ Kerbside replaces it with a protocol-aware front door:
 - **The backend leg is pinned where the engine supplies a
   subject.** Kerbside verifies the hypervisor's certificate
   against the engine CA *and* pins the certificate subject it
-  discovered from the engine, so a redirected backend
-  connection fails rather than succeeding quietly. A VM the
-  engine reports with no host leaves that subject unset
-  (`kerbside/sources/ovirt.py:99-117`), and an unset subject
+  discovered from the engine, so a redirected backend connection
+  fails rather than succeeding quietly. A VM the engine reports
+  with no host leaves that subject unset, and an unset subject
   relays the leg unpinned rather than erroring. In an ordinary
   cluster every running VM has a host, so this is the edge
   rather than the case.

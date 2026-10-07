@@ -1,8 +1,10 @@
 # Kerbside for Shaken Fist
 
-Shaken Fist's own console flow, with the broker already built:
-the cluster mints the token, Kerbside verifies it offline and
-brokers the desktop.
+Shaken Fist users want a native SPICE desktop, but an
+instance's console lives on whichever hypervisor hosts it, and
+users should not have a route to that. Kerbside is the proxy
+Shaken Fist's own console flow hands off to: the cluster mints
+the token, Kerbside verifies it offline and brokers the session.
 
 ## Value proposition
 

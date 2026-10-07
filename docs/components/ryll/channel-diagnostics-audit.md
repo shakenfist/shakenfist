@@ -25,7 +25,7 @@ channel's snapshot changes.
 | main | 24 | mm_time tracking, session_id, keepalive_timeout_fired, agent request/reply stats | complete |
 | inputs | 18 | motion_count, recent_events, KEY_MODIFIERS restatement counters | complete |
 | cursor | 18 | cache_entries, cache_contents, ack-window state | complete |
-| playback | 28 | full session / decode / device pipeline | complete |
+| playback | 35 | full session / decode / device pipeline, output device and stream-failure state | complete |
 | usbredir | 18 | caps handshake, redirected-device list, connect/disconnect totals | complete |
 | webdav | 18 | HTTP request/response counters | complete |
 | record | 0 | channel skipped at link time | intentional — see below |
@@ -217,16 +217,36 @@ snapshot surfaces:
   the most recent device open (proves the audio device is pulling)
 - `device_underrun_count` — callbacks where the ring buffer had zero
   ready samples at entry: true underruns where we handed the device
-  silence
+  silence. A callback that found the consumer state locked by a
+  dying stream's last callback also hands over silence and is counted
+  here
 - `ring_overflow_count` — decoded samples dropped because the ring
   buffer was full (decoder running ahead of the device clock)
 - `samples_consumed_total` — samples consumed by the device since the
   most recent device open
+- `device_xrun_count` — buffer under- or overruns the platform itself
+  reported on the output stream, as distinct from ryll running dry
+
+**Output stream:**
+- `output` — the device the session is playing through, with the
+  sample rate, channel count and sample format the stream was opened
+  with; `None` when no stream is playing
+- `output_error` — why the last attempt to open or keep a stream
+  failed, cleared when one starts
+- `output_streams_started` / `output_failure_count` /
+  `output_reroute_count` — streams opened (including rebuilds),
+  failures (including each retry), and platform reroutes to a new
+  default device
+- `data_packets_unsupported_codec` — DATA packets dropped because the
+  server negotiated a codec ryll cannot play
 
 Together these answer: "did the server send audio? did we decode it?
-did the device pull it?" — the three questions an audio-silence bug
-report needs, verified against a live session to confirm the
-instrumentation distinguishes the failure modes as designed.
+did the device pull it, and which device was it?" — the questions an
+audio-silence bug report needs, verified against a live session to
+confirm the instrumentation distinguishes the failure modes as
+designed. ryll's own volume slider and mute button are recorded in
+`session.json` (`audio_volume_percent`, `audio_muted`), since they
+apply on top of anything the guest sends.
 
 ### usbredir
 

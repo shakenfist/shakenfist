@@ -1,9 +1,10 @@
 # Kerbside for OpenStack
 
-Nova's own `spice-direct` console, answered by a protocol-aware
-proxy: the URL Nova hands the user points at Kerbside, so
-Kerbside is the console endpoint rather than something bolted on
-beside one.
+Nova's `spice-direct` console type lets OpenStack users open a
+native SPICE client, but leaves the proxy that client connects
+to as someone else's job. Kerbside is that proxy, designed
+alongside `spice-direct`, so the console URL Nova returns is a
+Kerbside URL.
 
 ## Value proposition
 
@@ -85,11 +86,10 @@ audio, and adaptive compression.
 
 Nothing is discovered in advance. There is no OpenStack source
 driver in `kerbside/sources/`, and the maintenance loop's scrape
-pass skips an entry of this type outright
-(`kerbside/main.py:175-178`), so the discovery interval that
-governs the oVirt and Shaken Fist sources does not apply here at
-all. A console exists in Kerbside because a user asked Nova for
-one, and not before.
+pass skips an entry of this type outright, so the discovery
+interval that governs the oVirt and Shaken Fist sources does not
+apply here at all. A console exists in Kerbside because a user
+asked Nova for one, and not before.
 
 ```mermaid
 flowchart TD
@@ -137,10 +137,10 @@ for every cloud listed after it.
 
 The validation answer carries the instance uuid, the compute
 node's address, and that console's plaintext and TLS ports.
-Kerbside writes them into its console table at that moment
-(`kerbside/api.py:665`), creating the row if this instance has
-never been asked for before and refreshing it if it has. This is
-the only thing that ever creates an OpenStack console row.
+Kerbside writes them into its console table at that moment,
+creating the row if this instance has never been asked for
+before and refreshing it if it has. This is the only thing that
+ever creates an OpenStack console row.
 
 **The client leg (5, 6).** The `.vv` file points at
 `PUBLIC_FQDN` and Kerbside's own ports, carries Kerbside's CA
@@ -178,7 +178,7 @@ user.
 removes consoles it can no longer see is scoped to the sources
 it actually enumerated, and an OpenStack entry is skipped rather
 than enumerated, so its consoles are retained indefinitely and
-by design (`kerbside/main.py:242-261`, and see
+by design (see
 [console-sources.md](/components/kerbside/console-sources/#what-happens-when-a-source-fails)).
 A row for an instance that has since been deleted stays listed
 until the cloud is removed from `sources.yaml` altogether. Nova

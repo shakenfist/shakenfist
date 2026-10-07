@@ -256,7 +256,8 @@ instead of static VM passwords:
 
 The SPICE server validates the authentication ticket on **every
 channel link establishment**, not just the first. From the
-reference implementation (`spice/server/reds.cpp:2098`):
+reference implementation (`reds_handle_ticket()` in
+`spice/server/reds.cpp`):
 
 ```cpp
 ltime = spice_get_monotonic_time_ns() / NSEC_PER_SEC;
@@ -286,8 +287,9 @@ function, but no existing client implements per-channel re-attach
 against a fresh token.
 
 The reference client (spice-gtk) reflects this: its
-`SPICE_CHANNEL_STATE_RECONNECTING` machinery at
-`spice-channel.c:1987,2743-2746` is invoked only for the
+`SPICE_CHANNEL_STATE_RECONNECTING` machinery, set in
+`spice_channel_recv_link_msg()` and acted on in
+`spice_channel_coroutine()`, is invoked only for the
 secured-port TLS upgrade dance, not for transport-loss recovery.
 spice-gtk has no "channel dropped, retry" path.
 

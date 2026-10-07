@@ -103,10 +103,10 @@ written to JSON for bug reports.
 | `InputsSnapshot` | Inputs | Button state, motion count, recent input events (last 50), per-opcode recv/send maps, unknown-opcode counter, pcap writer-queue drop counter, bytes in/out |
 | `CursorSnapshot` | Cursor | Cursor cache contents, ACK state, per-opcode recv/send maps, unknown-opcode counter, pcap writer-queue drop counter, bytes in/out |
 | `MainSnapshot` | Main | Session ID, mm_time, keepalive, per-opcode recv/send maps, unknown-opcode counter, pcap writer-queue drop counter, bytes in/out |
-| `PlaybackSnapshot` | Playback | Per-session audio metadata (`PlaybackSessionInfo`), start/stop counts, data-packet and decode counters, PCM byte counts, recent decode-duration ring (cap 64), device-side atomics (callbacks, underruns, ring overflows, samples consumed), volume/mute/latency params, per-opcode recv/send maps |
+| `PlaybackSnapshot` | Playback | Per-session audio metadata (`PlaybackSessionInfo`), start/stop counts, data-packet and decode counters, unsupported-codec drop counter, PCM byte counts, recent decode-duration ring (cap 64), device-side atomics (callbacks, underruns, platform xruns, ring overflows, samples consumed), output device in use (`PlaybackOutputInfo`), last output failure and failure/rebuild/reroute counters, server volume/mute/latency params, per-opcode recv/send maps |
 | `UsbredirSnapshot` | Usbredir | Redirected device list (`RedirectedDevice`), device connect/disconnect totals with timestamps, server/client capability bitmasks from hello handshake, per-opcode recv/send maps, unknown-opcode counter, bytes in/out |
 | `WebdavSnapshot` | Webdav | Transport common + per-opcode recv/send maps (pending) |
-| `AppSnapshot` | App (UI) | FPS, bandwidth, surfaces, cursor position, uptime, video encoder-queue drop counter, render-side mpsc-queue lag aggregates for `ImageReady*` and `DisplayMark` events |
+| `AppSnapshot` | App (UI) | FPS, bandwidth, surfaces, cursor position, uptime, video encoder-queue drop counter, render-side mpsc-queue lag aggregates for `ImageReady*` and `DisplayMark` events, ryll's own volume and mute (`null` where no GUI maintains the snapshot) |
 
 All channel snapshots share an eight-field transport common baseline
 (`bytes_in`, `bytes_out`, `last_recv_ts_secs`, `last_send_ts_secs`,
@@ -171,8 +171,10 @@ ryll-bugreport-YYYY-MM-DDTHH-MM-SSZ.zip
 ```
 
 Report types are `Display`, `Input`, `Cursor`, `Connection`, `Usb`,
-and `Pedantic`, each mapping to one SPICE channel or the
---pedantic observer path.  `BugReport::new()` samples runtime
+`Audio`, and `Pedantic`, each mapping to one SPICE channel or the
+--pedantic observer path. `Connection` covers the main channel only;
+an audio problem needs `Audio`, whose `channel-state.json` is the
+playback snapshot.  `BugReport::new()` samples runtime
 metrics over a 2-second window (blocking the caller), then gathers
 and serialises all data synchronously.  `BugReport::write_zip()`
 writes the zip to the capture directory's `bug-reports/`
@@ -216,7 +218,7 @@ dialog contains:
 
 1. A privacy warning about sensitive data in reports.
 2. Radio buttons to select the report type (Display, Input,
-   Cursor, Connection).
+   Cursor, Connection, USB, Audio).
 3. An optional description text field.
 4. Capture and Cancel buttons.
 

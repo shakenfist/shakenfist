@@ -1,10 +1,10 @@
 # Kerbside placement topologies
 
-Several Kerbsides placed by user population rather than by
-cloud — one per regional office, close to its users — so the
-long hop is the Kerbside-to-hypervisor leg rather than the
-client-to-Kerbside one. No new driver, no new configuration
-key, and nothing in CI.
+Your users sit in regional offices far from the cloud, and you
+do not want every office's client network routed to every
+hypervisor's SPICE ports. Put a Kerbside in each office
+instead: clients reach only their local proxy, and the long
+hop becomes an inspected Kerbside-to-hypervisor session.
 
 ## Value proposition
 
@@ -41,21 +41,20 @@ to check before you do.
   office placement adds is that the traffic crossing the WAN
   is now the aggregate of an office rather than one user's
   client connection.
-- **Whether that leg is encrypted is the hypervisor's
-  decision, not yours.** The proxy dials the hypervisor's
-  plaintext port first and escalates to TLS only when the
-  hypervisor rejects plaintext by asking for a secure
-  connection *and* a secure port is configured to escalate to
-  (`rust/kerbside-proxy/src/backend.rs:85-108`). It pins the
-  backend certificate's subject only when the source supplied
-  one: an empty `host_subject` maps to `None` and leaves the
-  connection unpinned, and an empty `ca_cert` maps to `None`
-  too (`backend.rs:198-211`), which leaves the target checked
-  against the public web trust store — an internal
-  certificate will not satisfy that, so the handshake fails
-  rather than proceeding unverified. Before moving a WAN hop
-  onto this leg, check that your source supplies both. One
-  never does; see the limitations table.
+- **Whether that leg is encrypted is the hypervisor's decision,
+  not yours.** The proxy dials the hypervisor's plaintext port
+  first and escalates to TLS only when the hypervisor rejects
+  plaintext by asking for a secure connection *and* a secure
+  port is configured to escalate to (`backend::run()` in the
+  Rust proxy). It pins the backend certificate's subject only
+  when the source supplied one: an empty `host_subject` maps to
+  `None` and leaves the connection unpinned, and an empty
+  `ca_cert` maps to `None` too (`backend::build_config()`),
+  which leaves the target checked against the public web trust
+  store — an internal certificate will not satisfy that, so the
+  handshake fails rather than proceeding unverified. Before
+  moving a WAN hop onto this leg, check that your source
+  supplies both. One never does; see the limitations table.
 
 ## How it works
 
@@ -73,14 +72,13 @@ flowchart TD
     kerbside2 -- "WAN: the backend leg" --> cloud
 ```
 
-**The address in the `.vv` file is free.** Every `.vv`
-Kerbside emits builds the client-facing address from the
-configuration of the Kerbside that generated it —
-`config.PUBLIC_FQDN`, at `kerbside/api.py:536` for a direct
-request, `:686` for the Nova token exchange and `:814` for the
-Shaken Fist one. An office instance therefore hands out its
-own address without being told anything about the others, and
-without any per-office configuration beyond its own.
+**The address in the `.vv` file is free.** Every `.vv` Kerbside
+emits builds the client-facing address from the configuration of
+the Kerbside that generated it — `config.PUBLIC_FQDN`, whether
+for a direct request, the Nova token exchange or the Shaken Fist
+one. An office instance therefore hands out its own address
+without being told anything about the others, and without any
+per-office configuration beyond its own.
 
 **Who tells the user which Kerbside to use.** That is the axis
 that actually decides whether per-office placement works, and
@@ -90,8 +88,8 @@ it differs by source.
   offline, an Ed25519 signature check against signing keys the
   `shakenfist` source cached during its own scrape
   (`kerbside/sf_token.py`). The exchange route deliberately
-  carries no `@verify_token` decorator, and the comment at
-  `kerbside/api.py:723-727` says why. Any Kerbside that
+  carries no `@verify_token` decorator, and the comment on
+  `SfToken` in `kerbside/api.py` says why. Any Kerbside that
   scrapes the cluster can therefore serve any of the cluster's
   tokens, so an office instance needs no coordination with the
   others.
@@ -117,17 +115,16 @@ no configuration key that has anything to say about the other
 offices; the source page you are deploying from describes the
 whole of the work, done once per office.
 
-What the instances share is worth being exact about. Within
-one deployment the shared MariaDB is the only bus every
-component can reach — there is no API-to-proxy or
-proxy-to-proxy RPC across machines
+What the instances share is worth being exact about. Within one
+deployment the shared MariaDB is the only bus every component
+can reach — there is no API-to-proxy or proxy-to-proxy RPC
+across machines
 ([proxy-architecture.md](/components/kerbside/proxy-architecture/)). Offices
-with their own databases share nothing at all: each runs its
-own sixty-second maintenance pass over its sources
-(`kerbside/main.py:341-354`), and each console token is a
-random value stored in the issuing instance's database
-(`kerbside/consoletoken.py:19-44`), so a `.vv` minted in one
-office is only usable against the Kerbside that minted it.
+with their own databases share nothing at all: each runs its own
+sixty-second maintenance pass over its sources, and each console
+token is a random value stored in the issuing instance's
+database, so a `.vv` minted in one office is only usable against
+the Kerbside that minted it.
 
 The distributed layout Kerbside does support is a different
 thing and is not a substitute. The REST API and the proxy
@@ -170,9 +167,9 @@ Not covered, and worth knowing before you deploy:
 |------------|--------|
 | No CI lane runs two Kerbsides | Every lane deploys exactly one. `tools/sf-e2e/deploy-kerbside.sh` co-locates a single Kerbside on the Shaken Fist primary node, and `tools/ovirt-e2e/deploy-kerbside.sh` deploys a single one on the CI runner pointed at the lane's engine. Nothing anywhere stands up two instances, so this topology is untested end to end. |
 | OpenStack per-office placement needs routing Kerbside does not provide | Nova is configured with one Kerbside URL by [kerbside-patches](https://github.com/shakenfist/kerbside-patches), and the token it mints is presented to whichever Kerbside that URL names, so every user reaches whatever that single URL resolves to regardless of which office they are in. Kerbside has no mechanism for sending a user to their local instance, and nothing of the sort has been tested. Not solved here. |
-| The WAN hop is not protected by moving it | TLS on the backend leg happens only when the hypervisor rejects plaintext by asking for a secure connection and a secure port is configured to escalate to (`rust/kerbside-proxy/src/backend.rs:85-108`), and the certificate subject is pinned only when the source supplied one — an empty subject maps to `None` and leaves the leg unpinned (`backend.rs:198-211`). The OpenStack path supplies neither: `kerbside/api.py:681-687` is the only `db.add_console()` on that path, and it passes no `host_subject` and no `ca_cert`. Putting a wide-area hop on this leg therefore does not encrypt or pin it by itself. |
-| Each instance is its own session and audit view | Tokens, sessions and audit events are rows in the database the instance uses (`kerbside/consoletoken.py:19-44`), and the shared database is the only thing components coordinate through ([proxy-architecture.md](/components/kerbside/proxy-architecture/)). Offices that do not share a database give an operator one console list, one session list and one audit trail per office, with nothing joining them. |
-| Discovery load multiplies with offices | Each instance runs its own maintenance pass every sixty seconds and scrapes its sources independently (`kerbside/main.py:341-354`), so ten offices means ten scrapes of the same cloud. Nothing coordinates or bounds that, and no lane runs even two instances to measure it. |
+| The WAN hop is not protected by moving it | TLS on the backend leg happens only when the hypervisor rejects plaintext by asking for a secure connection and a secure port is configured to escalate to, and the certificate subject is pinned only when the source supplied one — an empty subject maps to `None` and leaves the leg unpinned. The OpenStack path supplies neither: the Nova token exchange makes the only `db.add_console()` call on that path, and it passes no `host_subject` and no `ca_cert`. Putting a wide-area hop on this leg therefore does not encrypt or pin it by itself. |
+| Each instance is its own session and audit view | Tokens, sessions and audit events are rows in the database the instance uses, and the shared database is the only thing components coordinate through ([proxy-architecture.md](/components/kerbside/proxy-architecture/)). Offices that do not share a database give an operator one console list, one session list and one audit trail per office, with nothing joining them. |
+| Discovery load multiplies with offices | Each instance runs its own maintenance pass every sixty seconds and scrapes its sources independently, so ten offices means ten scrapes of the same cloud. Nothing coordinates or bounds that, and no lane runs even two instances to measure it. |
 
 ## See also
 

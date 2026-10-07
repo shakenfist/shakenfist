@@ -228,6 +228,31 @@ avoid locking in the cpal real-time callback.
 The audio thread is spawned on `PLAYBACK_START` and stopped (joined)
 on `PLAYBACK_STOP` or channel disconnect.
 
+Between those, the audio thread keeps an output stream alive rather
+than giving up on the first error. Opening a stream can fail (no
+device), and a running stream can die (the device is unplugged, its
+sample rate changes, the audio server restarts). In either case the
+thread drops the stream, discards the stale audio queued in the ring
+buffer, and opens a new stream on the current default device, retrying
+with a doubling backoff from 1 to 30 seconds. Only a stream that has
+played for 10 seconds resets the backoff and ends the failure streak, so
+a device that dies straight after opening is retried quietly rather
+than every second. cpal reports a default-device change that it
+handled by itself as `DeviceChanged`, which is recorded but needs no
+rebuild. Xruns arrive on the device's real-time thread, so they are
+counted in an atomic rather than logged.
+
+The audio thread has no async context, so it reports these transitions
+over a `std::sync::mpsc` channel. The playback channel drains it on
+every turn of its read loop, folds the events into the playback
+snapshot, and raises notifications when output is lost, restored or
+moved to another device. A routine start on `PLAYBACK_START` is
+silent. In `--web` mode those notifications are suppressed, because
+the operator hears audio through the browser rather than the host's
+speakers. A DATA packet whose negotiated codec is neither raw PCM nor
+Opus is counted and registered as a protocol gap, rather than dropped
+silently.
+
 
 ## Notifications
 

@@ -206,6 +206,7 @@ attached rather than quietly disappearing from the table.
 | [readme-structure.md](/components/development/audits/readme-structure/) | Top-level README.md is a pitch, detail lives in docs/ |
 | [plan-phase-references.md](/components/development/audits/plan-phase-references/) | Docs describe current behaviour, not plan phase history |
 | [diagram-format.md](/components/development/audits/diagram-format/) | Diagrams of structure and flow are mermaid, not drawn in ASCII |
+| [docs-line-references.md](/components/development/audits/docs-line-references/) | Documentation names code by symbol, not by line number |
 | [mermaid-lint-ci.md](/components/development/audits/mermaid-lint-ci/) | Repositories with mermaid diagrams render them in CI, so a broken one fails the build |
 | [plan-source-references.md](/components/development/audits/plan-source-references/) | Plan references in source and configuration still resolve |
 | [plan-index.md](/components/development/audits/plan-index/) | docs/plans/index.md layout, date ordering, plan coverage and the status vocabulary |

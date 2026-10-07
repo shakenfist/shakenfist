@@ -669,12 +669,12 @@ for live debugging without generating a full bug report.
 
 ## Playback channel observability
 
-The playback (audio) channel now exposes detailed diagnostics in bug
-reports to help characterise silent-audio or stuttering symptoms. If
-you file a Connection or Playback-typed bug report (F12), the
-`channel-state.json` will include a `playback` section with counters
-for every stage of the audio pipeline. Use this section to answer
-"where did the audio go?"
+The playback (audio) channel exposes detailed diagnostics in bug
+reports to help characterise silent-audio or stuttering symptoms.
+File an **Audio** bug report (F12): its `channel-state.json` is the
+playback snapshot, with counters for every stage of the audio
+pipeline. A Connection report covers only the main channel and will
+not help here. Use the snapshot to answer "where did the audio go?"
 
 **Reading playback diagnostics:**
 
@@ -706,6 +706,41 @@ for every stage of the audio pipeline. Use this section to answer
   was never started (no SPICE_MSG_PLAYBACK_START received) or was stopped
   (SPICE_MSG_PLAYBACK_STOP received). When present, it includes the sample
   rate, channel count, and codec (Opus or raw PCM) the server declared.
+
+- **`data_packets_unsupported_codec` > 0**: The server negotiated a codec
+  ryll cannot play, so every DATA packet is being dropped. ryll also raises
+  a notification the first time this happens.
+
+- **`output`**: The device the sound is going to. If it is not the device
+  you are listening to, the problem is local routing, not ryll or the
+  guest. On a platform that moves default-device streams by itself (macOS),
+  `output_reroute_count` counts those moves.
+
+- **`output: null` with `output_error` set, during a session**: ryll has
+  no working output stream — no device, or the stream died (device
+  unplugged, sample rate changed underneath it, audio server restarted).
+  ryll retries with a backoff of up to 30 seconds, and raises one
+  notification when output is lost and another once a new stream has
+  played for 10 seconds. If `current_session` is null, nothing is
+  retrying: `output_error` is the last error of an earlier session, kept
+  for the report.
+
+- **`output_streams_started` climbing in step with `output_failure_count`**:
+  the device opens and then dies straight away. ryll keeps doubling the
+  backoff for a stream that dies within 10 seconds, so this settles at
+  one attempt every 30 seconds, inside a single notified failure streak.
+
+- **`--web` mode**: The `output*` fields describe the stream ryll opens
+  on the host it runs on, not what the browser hears; browser audio is
+  forwarded before that stream. On a server with no audio device,
+  `output: null`, an `output_error` of "no audio output device found"
+  and an `output_failure_count` that climbs every 30 seconds are
+  expected and harmless. The notifications are suppressed in this mode
+  for the same reason.
+
+- **`audio_volume_percent` / `audio_muted` in `session.json`**: ryll's own
+  status-bar volume and mute, applied on top of the guest's volume. Check
+  these first.
 
 **USB and WebDAV analogues:**
 
