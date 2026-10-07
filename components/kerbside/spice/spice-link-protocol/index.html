@@ -1709,6 +1709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/docs-line-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Documentation line references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/eol-distro/" class="md-nav__link">
         
   
@@ -15778,7 +15806,8 @@ instead of static VM passwords:</p>
 <h2 id="channel-lifecycle-under-ticket-auth">Channel Lifecycle Under Ticket Auth<a class="headerlink" href="#channel-lifecycle-under-ticket-auth" title="Permanent link">&para;</a></h2>
 <p>The SPICE server validates the authentication ticket on <strong>every
 channel link establishment</strong>, not just the first. From the
-reference implementation (<code>spice/server/reds.cpp:2098</code>):</p>
+reference implementation (<code>reds_handle_ticket()</code> in
+<code>spice/server/reds.cpp</code>):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">ltime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">spice_get_monotonic_time_ns</span><span class="p">()</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">NSEC_PER_SEC</span><span class="p">;</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">expired</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">reds</span><span class="o">-&gt;</span><span class="n">config</span><span class="o">-&gt;</span><span class="n">taTicket</span><span class="p">.</span><span class="n">expiration_time</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">ltime</span><span class="p">);</span>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">expired</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
@@ -15803,8 +15832,9 @@ loses audio for that session. The remaining channels continue to
 function, but no existing client implements per-channel re-attach
 against a fresh token.</p>
 <p>The reference client (spice-gtk) reflects this: its
-<code>SPICE_CHANNEL_STATE_RECONNECTING</code> machinery at
-<code>spice-channel.c:1987,2743-2746</code> is invoked only for the
+<code>SPICE_CHANNEL_STATE_RECONNECTING</code> machinery, set in
+<code>spice_channel_recv_link_msg()</code> and acted on in
+<code>spice_channel_coroutine()</code>, is invoked only for the
 secured-port TLS upgrade dance, not for transport-loss recovery.
 spice-gtk has no "channel dropped, retry" path.</p>
 <h3 id="implications-for-proxies">Implications for proxies<a class="headerlink" href="#implications-for-proxies" title="Permanent link">&para;</a></h3>

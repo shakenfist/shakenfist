@@ -1709,6 +1709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/docs-line-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Documentation line references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/eol-distro/" class="md-nav__link">
         
   
@@ -15099,9 +15127,11 @@
 
 
 <h1 id="kerbside-for-shaken-fist">Kerbside for Shaken Fist<a class="headerlink" href="#kerbside-for-shaken-fist" title="Permanent link">&para;</a></h1>
-<p>Shaken Fist's own console flow, with the broker already built:
-the cluster mints the token, Kerbside verifies it offline and
-brokers the desktop.</p>
+<p>Shaken Fist users want a native SPICE desktop, but an
+instance's console lives on whichever hypervisor hosts it, and
+users should not have a route to that. Kerbside is the proxy
+Shaken Fist's own console flow hands off to: the cluster mints
+the token, Kerbside verifies it offline and brokers the session.</p>
 <h2 id="value-proposition">Value proposition<a class="headerlink" href="#value-proposition" title="Permanent link">&para;</a></h2>
 <p>A Shaken Fist instance with a SPICE video model exposes its
 console on the node that currently hosts it, on the ports the

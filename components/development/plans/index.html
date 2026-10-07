@@ -1711,6 +1711,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../audits/docs-line-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Documentation line references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../audits/eol-distro/" class="md-nav__link">
         
   
@@ -14919,7 +14947,7 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <tr>
 <td>2026-09-13</td>
 <td><a href="/components/development/plans/PLAN-image-supply-chain/">Image supply chain</a></td>
-<td>Close the end-of-life migration and the five silent image-production failures behind it, in an order that does not break CI, and stop the audit being blind to the producers. Phases 1 to 4 are complete: detection, artifact verification, the gnome unblock, and a consumer sweep that cleared both the runner-label half in thirteen repositories and the guest-image half the criterion cannot see -- the half that gates retiring the producers. Phase 5 is planned and retires the producers themselves; its survey found four <code>IMAGE_BUILDS</code> entries to remove rather than two, 22 tests coupled to them, a 23rd that asserts a build of an image that will not exist without failing, and that no criterion reads either list until phase 6. Phases 6 and 7 remain. What each phase found is in the plan</td>
+<td>Close the end-of-life migration and the five silent image-production failures behind it, in an order that does not break CI, and stop the audit being blind to the producers. Phases 1 to 5 are complete: detection, artifact verification, the gnome unblock, a consumer sweep that cleared both the runner-label half in thirteen repositories and the guest-image half the criterion cannot see, and the retirement of the producers themselves -- which grew an <code>ubuntu:18.04</code> removal the section had not enumerated, and whose twelve confirming checks found one check that names a command this environment will not run. Phase 6 is in progress: the <code>eol-producers</code> criterion (#222), the scope that runs it against <code>private-ci</code> and brings <code>images</code> in under <code>eol-distro</code> alone (#226), and the <code>images</code> comment and issue have landed, and only its confirming checks remain. Phase 7 remains. What each phase found is in the plan</td>
 <td>In progress</td>
 </tr>
 <tr>

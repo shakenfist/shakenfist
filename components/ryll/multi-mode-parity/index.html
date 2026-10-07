@@ -1709,6 +1709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/docs-line-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Documentation line references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/eol-distro/" class="md-nav__link">
         
   
@@ -15221,8 +15249,8 @@ poller), media socket binding added 2026-08-21.</p>
 <tr>
 <td>Audio playback (PCM and Opus decoding)</td>
 <td>available</td>
-<td>partial (<code>ryll/src/channels/playback.rs:156-292</code> — <code>PlaybackChannel</code> connects and decodes, but spawns a cpal thread that will fail silently if no audio device is present; no headless-safe "discard" path exists)</td>
-<td>available (MVP; Opus passthrough preferred, PCM→Opus fallback)</td>
+<td>partial (<code>shakenfist-spice-renderer/src/channels/playback.rs</code> — <code>PlaybackChannel</code> connects and decodes, but always spawns a cpal thread; with no audio device present it raises one notification and retries with a backoff of up to 30 s; no headless-safe "discard" path exists)</td>
+<td>available (MVP; Opus passthrough preferred, PCM→Opus fallback; the host-side cpal thread still runs, so on a host with no audio device the snapshot's <code>output_*</code> fields record retries every 30 s, with notifications suppressed)</td>
 </tr>
 <tr>
 <td>Volume control (slider + mute)</td>

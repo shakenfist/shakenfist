@@ -1709,6 +1709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/docs-line-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Documentation line references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/eol-distro/" class="md-nav__link">
         
   
@@ -14999,11 +15027,11 @@
 
 
 <h1 id="kerbside-placement-topologies">Kerbside placement topologies<a class="headerlink" href="#kerbside-placement-topologies" title="Permanent link">&para;</a></h1>
-<p>Several Kerbsides placed by user population rather than by
-cloud — one per regional office, close to its users — so the
-long hop is the Kerbside-to-hypervisor leg rather than the
-client-to-Kerbside one. No new driver, no new configuration
-key, and nothing in CI.</p>
+<p>Your users sit in regional offices far from the cloud, and you
+do not want every office's client network routed to every
+hypervisor's SPICE ports. Put a Kerbside in each office
+instead: clients reach only their local proxy, and the long
+hop becomes an inspected Kerbside-to-hypervisor session.</p>
 <h2 id="value-proposition">Value proposition<a class="headerlink" href="#value-proposition" title="Permanent link">&para;</a></h2>
 <p>The other five use-case pages describe what a Kerbside talks
 to. This one describes where you put it, and there is really
@@ -15037,21 +15065,20 @@ to check before you do.</p>
   office placement adds is that the traffic crossing the WAN
   is now the aggregate of an office rather than one user's
   client connection.</li>
-<li><strong>Whether that leg is encrypted is the hypervisor's
-  decision, not yours.</strong> The proxy dials the hypervisor's
-  plaintext port first and escalates to TLS only when the
-  hypervisor rejects plaintext by asking for a secure
-  connection <em>and</em> a secure port is configured to escalate to
-  (<code>rust/kerbside-proxy/src/backend.rs:85-108</code>). It pins the
-  backend certificate's subject only when the source supplied
-  one: an empty <code>host_subject</code> maps to <code>None</code> and leaves the
-  connection unpinned, and an empty <code>ca_cert</code> maps to <code>None</code>
-  too (<code>backend.rs:198-211</code>), which leaves the target checked
-  against the public web trust store — an internal
-  certificate will not satisfy that, so the handshake fails
-  rather than proceeding unverified. Before moving a WAN hop
-  onto this leg, check that your source supplies both. One
-  never does; see the limitations table.</li>
+<li><strong>Whether that leg is encrypted is the hypervisor's decision,
+  not yours.</strong> The proxy dials the hypervisor's plaintext port
+  first and escalates to TLS only when the hypervisor rejects
+  plaintext by asking for a secure connection <em>and</em> a secure
+  port is configured to escalate to (<code>backend::run()</code> in the
+  Rust proxy). It pins the backend certificate's subject only
+  when the source supplied one: an empty <code>host_subject</code> maps to
+  <code>None</code> and leaves the connection unpinned, and an empty
+  <code>ca_cert</code> maps to <code>None</code> too (<code>backend::build_config()</code>),
+  which leaves the target checked against the public web trust
+  store — an internal certificate will not satisfy that, so the
+  handshake fails rather than proceeding unverified. Before
+  moving a WAN hop onto this leg, check that your source
+  supplies both. One never does; see the limitations table.</li>
 </ul>
 <h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>flowchart TD
@@ -15065,14 +15092,13 @@ to check before you do.</p>
     client2 -- "LAN: office B's own .vv" --&gt; kerbside2
     kerbside1 -- "WAN: the backend leg" --&gt; cloud
     kerbside2 -- "WAN: the backend leg" --&gt; cloud</code></pre>
-<p><strong>The address in the <code>.vv</code> file is free.</strong> Every <code>.vv</code>
-Kerbside emits builds the client-facing address from the
-configuration of the Kerbside that generated it —
-<code>config.PUBLIC_FQDN</code>, at <code>kerbside/api.py:536</code> for a direct
-request, <code>:686</code> for the Nova token exchange and <code>:814</code> for the
-Shaken Fist one. An office instance therefore hands out its
-own address without being told anything about the others, and
-without any per-office configuration beyond its own.</p>
+<p><strong>The address in the <code>.vv</code> file is free.</strong> Every <code>.vv</code> Kerbside
+emits builds the client-facing address from the configuration of
+the Kerbside that generated it — <code>config.PUBLIC_FQDN</code>, whether
+for a direct request, the Nova token exchange or the Shaken Fist
+one. An office instance therefore hands out its own address
+without being told anything about the others, and without any
+per-office configuration beyond its own.</p>
 <p><strong>Who tells the user which Kerbside to use.</strong> That is the axis
 that actually decides whether per-office placement works, and
 it differs by source.</p>
@@ -15081,8 +15107,8 @@ it differs by source.</p>
   offline, an Ed25519 signature check against signing keys the
   <code>shakenfist</code> source cached during its own scrape
   (<code>kerbside/sf_token.py</code>). The exchange route deliberately
-  carries no <code>@verify_token</code> decorator, and the comment at
-  <code>kerbside/api.py:723-727</code> says why. Any Kerbside that
+  carries no <code>@verify_token</code> decorator, and the comment on
+  <code>SfToken</code> in <code>kerbside/api.py</code> says why. Any Kerbside that
   scrapes the cluster can therefore serve any of the cluster's
   tokens, so an office instance needs no coordination with the
   others.</li>
@@ -15106,17 +15132,16 @@ configuration. There is no clustering step, no peer list, and
 no configuration key that has anything to say about the other
 offices; the source page you are deploying from describes the
 whole of the work, done once per office.</p>
-<p>What the instances share is worth being exact about. Within
-one deployment the shared MariaDB is the only bus every
-component can reach — there is no API-to-proxy or
-proxy-to-proxy RPC across machines
+<p>What the instances share is worth being exact about. Within one
+deployment the shared MariaDB is the only bus every component
+can reach — there is no API-to-proxy or proxy-to-proxy RPC
+across machines
 (<a href="/components/kerbside/proxy-architecture/">proxy-architecture.md</a>). Offices
-with their own databases share nothing at all: each runs its
-own sixty-second maintenance pass over its sources
-(<code>kerbside/main.py:341-354</code>), and each console token is a
-random value stored in the issuing instance's database
-(<code>kerbside/consoletoken.py:19-44</code>), so a <code>.vv</code> minted in one
-office is only usable against the Kerbside that minted it.</p>
+with their own databases share nothing at all: each runs its own
+sixty-second maintenance pass over its sources, and each console
+token is a random value stored in the issuing instance's
+database, so a <code>.vv</code> minted in one office is only usable against
+the Kerbside that minted it.</p>
 <p>The distributed layout Kerbside does support is a different
 thing and is not a substitute. The REST API and the proxy
 nodes may be on different machines, with a load balancer
@@ -15165,15 +15190,15 @@ a lane.</p>
 </tr>
 <tr>
 <td>The WAN hop is not protected by moving it</td>
-<td>TLS on the backend leg happens only when the hypervisor rejects plaintext by asking for a secure connection and a secure port is configured to escalate to (<code>rust/kerbside-proxy/src/backend.rs:85-108</code>), and the certificate subject is pinned only when the source supplied one — an empty subject maps to <code>None</code> and leaves the leg unpinned (<code>backend.rs:198-211</code>). The OpenStack path supplies neither: <code>kerbside/api.py:681-687</code> is the only <code>db.add_console()</code> on that path, and it passes no <code>host_subject</code> and no <code>ca_cert</code>. Putting a wide-area hop on this leg therefore does not encrypt or pin it by itself.</td>
+<td>TLS on the backend leg happens only when the hypervisor rejects plaintext by asking for a secure connection and a secure port is configured to escalate to, and the certificate subject is pinned only when the source supplied one — an empty subject maps to <code>None</code> and leaves the leg unpinned. The OpenStack path supplies neither: the Nova token exchange makes the only <code>db.add_console()</code> call on that path, and it passes no <code>host_subject</code> and no <code>ca_cert</code>. Putting a wide-area hop on this leg therefore does not encrypt or pin it by itself.</td>
 </tr>
 <tr>
 <td>Each instance is its own session and audit view</td>
-<td>Tokens, sessions and audit events are rows in the database the instance uses (<code>kerbside/consoletoken.py:19-44</code>), and the shared database is the only thing components coordinate through (<a href="/components/kerbside/proxy-architecture/">proxy-architecture.md</a>). Offices that do not share a database give an operator one console list, one session list and one audit trail per office, with nothing joining them.</td>
+<td>Tokens, sessions and audit events are rows in the database the instance uses, and the shared database is the only thing components coordinate through (<a href="/components/kerbside/proxy-architecture/">proxy-architecture.md</a>). Offices that do not share a database give an operator one console list, one session list and one audit trail per office, with nothing joining them.</td>
 </tr>
 <tr>
 <td>Discovery load multiplies with offices</td>
-<td>Each instance runs its own maintenance pass every sixty seconds and scrapes its sources independently (<code>kerbside/main.py:341-354</code>), so ten offices means ten scrapes of the same cloud. Nothing coordinates or bounds that, and no lane runs even two instances to measure it.</td>
+<td>Each instance runs its own maintenance pass every sixty seconds and scrapes its sources independently, so ten offices means ten scrapes of the same cloud. Nothing coordinates or bounds that, and no lane runs even two instances to measure it.</td>
 </tr>
 </tbody>
 </table>

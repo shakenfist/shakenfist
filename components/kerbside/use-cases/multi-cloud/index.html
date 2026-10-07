@@ -1709,6 +1709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/docs-line-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Documentation line references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/eol-distro/" class="md-nav__link">
         
   
@@ -14999,19 +15027,16 @@
 
 
 <h1 id="kerbside-across-several-clouds">Kerbside across several clouds<a class="headerlink" href="#kerbside-across-several-clouds" title="Permanent link">&para;</a></h1>
-<p>One Kerbside in front of more than one cloud. <code>sources.yaml</code> is
-a list; each entry is a source with a type, and the daemon
-drives every one of them. Aggregation is therefore a deployment
-shape rather than a feature: it adds no driver, no
-configuration key and no API of its own, and the four sibling
-pages each describe one of the things it aggregates.</p>
+<p>Your consoles live on more than one platform, and your users
+should not have to care which. One Kerbside can front every
+cloud you run at once, giving a single console entry point, a
+single audit trail and a single firewall policy, with nothing
+extra to deploy: <code>sources.yaml</code> is simply a list.</p>
 <h2 id="value-proposition">Value proposition<a class="headerlink" href="#value-proposition" title="Permanent link">&para;</a></h2>
-<p>The sibling pages each put Kerbside in front of one platform.
-Most estates are not one platform. A migration that runs for a
-year, an oVirt fleet being retired into OpenStack, two clouds
-in two regions, a rack of appliance VMs no API will ever
-enumerate — each of those is an entry in one file, and they sit
-in it together.</p>
+<p>A migration that runs for a year, an oVirt fleet being retired
+into OpenStack, two clouds in two regions, a rack of appliance
+VMs no API will ever enumerate: each is an entry in the same
+file, and each sibling page describes one kind of entry.</p>
 <ul>
 <li><strong>Users keep one console entry point as workloads move.</strong>
   The address a client connects to is Kerbside's own, and it
@@ -15039,29 +15064,25 @@ in it together.</p>
   they allowed to send"; behind one Kerbside it has one.</li>
 <li><strong>A failing platform does not cost you the others'
   inventory.</strong> The maintenance pass tracks what it learned per
-  source and deletes consoles only for a source it enumerated
-  to exhaustion, so a cloud that errored or could not be
-  reached keeps its published consoles rather than having them
-  cleaned up by a pass that never saw them
-  (<code>kerbside/main.py:229-246</code>). Sources are neighbours in a
+  source and deletes consoles only for a source it enumerated to
+  exhaustion, so a cloud that errored or could not be reached
+  keeps its published consoles rather than having them cleaned
+  up by a pass that never saw them. Sources are neighbours in a
   file, not a shared fate — with the exceptions in the
   limitations table.</li>
 </ul>
 <h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
 <p>Nothing new happens. <code>sources.yaml</code> is a list, and nothing in
-Kerbside treats the second entry differently from the first.
-The maintenance pass walks the entries in file order
-(<code>kerbside/main.py:92-227</code>) and the entry's type decides how
-its consoles arrive:</p>
+Kerbside treats the second entry differently from the first. The
+maintenance pass walks the entries in file order and the entry's
+type decides how its consoles arrive:</p>
 <ul>
 <li><strong>Scraped sources</strong> — <code>shakenfist</code>, <code>ovirt</code> and <code>static</code> —
   are enumerated by the pass, which constructs the driver for
-  each entry's type and records what it yields
-  (<code>kerbside/main.py:169-174</code>).</li>
+  each entry's type and records what it yields.</li>
 <li><strong>OpenStack is not scraped at all.</strong> The pass skips an entry
-  of that type outright (<code>kerbside/main.py:175-178</code>). Those
-  consoles are recorded when a user presents a Nova token, not
-  in advance.</li>
+  of that type outright. Those consoles are recorded when a user
+  presents a Nova token, not in advance.</li>
 </ul>
 <pre class="mermaid"><code>flowchart TD
     client["SPICE client&lt;br/&gt;(remote-viewer, ryll)"]
@@ -15079,30 +15100,27 @@ its consoles arrive:</p>
     kerbside &lt;-- "then, if A declined" --&gt; os2
     kerbside -- "read from the file" --&gt; static</code></pre>
 <p><strong>Several OpenStack clouds behind one Kerbside.</strong> More than one
-OpenStack cloud can be configured at once, and a presented
-token is offered to each in turn, in <code>sources.yaml</code> order,
-until one validates it. <code>kerbside/api.py:615-661</code> iterates the
-parsed sources in file order, skips every entry whose type is
-not <code>openstack</code>, and continues past both a <code>NotFoundException</code>
-and an empty validation result — so the first cloud that
-validates the token wins, and the loop falls through to a 404
-when none of them does (<code>kerbside/api.py:699</code>). Two
-consequences follow, and both are in the limitations table:
-every configured cloud is asked to validate tokens minted by
-the others, and a cloud that fails to answer stops the exchange
-for the rest.</p>
+OpenStack cloud can be configured at once, and a presented token
+is offered to each in turn, in <code>sources.yaml</code> order, until one
+validates it. The Nova token exchange (<code>NovaToken</code> in
+<code>kerbside/api.py</code>) iterates the parsed sources in file order,
+skips every entry whose type is not <code>openstack</code>, and continues
+past both a <code>NotFoundException</code> and an empty validation result —
+so the first cloud that validates the token wins, and the loop
+falls through to a 404 when none of them does. Two consequences
+follow, and both are in the limitations table: every configured
+cloud is asked to validate tokens minted by the others, and a
+cloud that fails to answer stops the exchange for the rest.</p>
 <p><strong>A console's source travels with it, mostly.</strong> Each console
 carries the source it came from, and that source is part of how
 Kerbside talks about it: console tokens and audit events are
-looked up by source and identifier together
-(<code>kerbside/db.py:351</code>, <code>:364</code>), and the maintenance pass keys
-its own bookkeeping on the pair (<code>kerbside/main.py:88</code>,
-<code>:207</code>). The console row itself is not keyed that way —
-<code>add_console()</code>, <code>get_console()</code> and <code>remove_console()</code> all
-filter on the identifier alone (<code>kerbside/db.py:308</code>, <code>:392</code>,
-<code>:434</code>). Identifiers are generated per cloud and nothing
-coordinates them between clouds, so see the limitations table
-before assuming two sources can never collide.</p>
+looked up by source and identifier together, and the maintenance
+pass keys its own bookkeeping on the pair. The console row
+itself is not keyed that way — <code>add_console()</code>, <code>get_console()</code>
+and <code>remove_console()</code> all filter on the identifier alone.
+Identifiers are generated per cloud and nothing coordinates them
+between clouds, so see the limitations table before assuming two
+sources can never collide.</p>
 <h2 id="how-to-set-it-up">How to set it up<a class="headerlink" href="#how-to-set-it-up" title="Permanent link">&para;</a></h2>
 <p>There is nothing to enable. <code>sources.yaml</code> already holds a
 list, so a second cloud is a second entry in it and a third is
@@ -15157,23 +15175,23 @@ lanes the sibling pages describe.</p>
 <tbody>
 <tr>
 <td>Nothing in CI runs two sources at once</td>
-<td>Each lane writes a single-source <code>sources.yaml</code> and says so itself: <code>tools/ovirt-e2e/gen-sources.py:4</code> emits "exactly one <code>type: ovirt</code> source", <code>tools/sf-e2e/deploy-kerbside.sh:8</code> writes "sources.yaml with one type: shakenfist source", and the heredoc at <code>tools/direct-qemu/lane-up.sh:48</code> declares one static entry. Aggregation itself is therefore untested end to end: every property on this page is read out of code which is only ever exercised one source at a time.</td>
+<td>Each lane writes a single-source <code>sources.yaml</code> and says so itself: <code>tools/ovirt-e2e/gen-sources.py</code> emits "exactly one <code>type: ovirt</code> source", <code>tools/sf-e2e/deploy-kerbside.sh</code> writes "sources.yaml with one type: shakenfist source", and the heredoc in <code>tools/direct-qemu/lane-up.sh</code> declares one static entry. Aggregation itself is therefore untested end to end: every property on this page is read out of code which is only ever exercised one source at a time.</td>
 </tr>
 <tr>
 <td>Configured OpenStack clouds share a trust domain</td>
-<td>A presented token is offered to each OpenStack entry in turn until one accepts it (<code>kerbside/api.py:615-661</code>), so every configured cloud is asked to validate tokens minted by the others, and any of them can claim a token it recognises. Nothing scopes the exchange to one cloud. This suits several clouds under one operator; it is not a boundary between clouds in separate trust domains.</td>
+<td>A presented token is offered to each OpenStack entry in turn until one accepts it, so every configured cloud is asked to validate tokens minted by the others, and any of them can claim a token it recognises. Nothing scopes the exchange to one cloud. This suits several clouds under one operator; it is not a boundary between clouds in separate trust domains.</td>
 </tr>
 <tr>
 <td>One broken cloud degrades the others</td>
-<td>Only a clean "not mine" moves the exchange on to the next cloud: a <code>NotFoundException</code> (<code>kerbside/api.py:647</code>) or an empty validation result. Every other failure ends the whole request rather than stepping over that cloud — an SSL failure talking to its Keystone returns a 500 immediately (<code>kerbside/api.py:665-672</code>), and anything else, such as bad credentials or an unreachable Keystone, is caught by the enclosing handler and returns a 500 too. Either way the clouds after it in the file are never asked, and their users cannot get a console either.</td>
+<td>Only a clean "not mine" moves the exchange on to the next cloud: a <code>NotFoundException</code> or an empty validation result. Every other failure ends the whole request rather than stepping over that cloud — an SSL failure talking to its Keystone returns a 500 immediately, and anything else, such as bad credentials or an unreachable Keystone, is caught by the enclosing handler and returns a 500 too. Either way the clouds after it in the file are never asked, and their users cannot get a console either.</td>
 </tr>
 <tr>
 <td>Two sources publishing one identifier are one console</td>
-<td>The console row is keyed on the identifier alone. <code>add_console()</code> looks the row up by identifier without the source (<code>kerbside/db.py:308</code>), so a second source publishing the same identifier overwrites the first's address, ports and recorded certificate subject while the row keeps the source it was first inserted under, and <code>remove_console()</code> deletes by identifier alone (<code>kerbside/db.py:434</code>), so one source retiring a console can remove another's. Cloud-generated uuids make this unlikely between two real clouds; a hand-written static entry, or an identifier that followed a VM to its new home during a migration, is where it bites.</td>
+<td>The console row is keyed on the identifier alone. <code>add_console()</code> looks the row up by identifier without the source, so a second source publishing the same identifier overwrites the first's address, ports and recorded certificate subject while the row keeps the source it was first inserted under, and <code>remove_console()</code> deletes by identifier alone, so one source retiring a console can remove another's. Cloud-generated uuids make this unlikely between two real clouds; a hand-written static entry, or an identifier that followed a VM to its new home during a migration, is where it bites.</td>
 </tr>
 <tr>
 <td>Discovery is serial across the sources</td>
-<td>The maintenance pass walks the configured sources in file order and does each one's discovery inline (<code>kerbside/main.py:92-227</code>), with nothing running two sources concurrently. A platform which is slow to answer therefore delays every source after it in the file, and stretches the cycle for all of them. No lane has ever had two sources to run, so the behaviour at a fleet's worth of them is uncharacterised.</td>
+<td>The maintenance pass walks the configured sources in file order and does each one's discovery inline, with nothing running two sources concurrently. A platform which is slow to answer therefore delays every source after it in the file, and stretches the cycle for all of them. No lane has ever had two sources to run, so the behaviour at a fleet's worth of them is uncharacterised.</td>
 </tr>
 <tr>
 <td>Authentication does not aggregate</td>

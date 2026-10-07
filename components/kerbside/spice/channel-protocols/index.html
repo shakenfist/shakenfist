@@ -1709,6 +1709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/docs-line-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Documentation line references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/eol-distro/" class="md-nav__link">
         
   
@@ -16805,12 +16833,13 @@ level:</p>
 </tr>
 </tbody>
 </table>
-<p>Reference: <code>spice-gtk/src/spice-session.c:2300</code>,
-<code>spice-gtk/src/spice-channel.c:2606</code>. These are kernel-level
-probes; they do not generate SPICE messages and therefore do not
-satisfy the server's rcc check on their own. They only detect a
-half-open connection promptly when the client cannot reach the
-server.</p>
+<p>Reference: <code>spice_session_channel_open_host()</code> in spice-gtk's
+<code>src/spice-session.c</code>, and <code>spice_channel_coroutine()</code> in
+<code>src/spice-channel.c</code> for a client-provided socket. These are
+kernel-level probes; they do not generate SPICE messages and
+therefore do not satisfy the server's rcc check on their own.
+They only detect a half-open connection promptly when the client
+cannot reach the server.</p>
 <p>When a channel disconnects (whether via the rcc timeout, a TCP
 RST/FIN, or the client sending a <code>DISCONNECTING</code> message), the
 session implications depend on the authentication model — see

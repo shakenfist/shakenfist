@@ -1711,6 +1711,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../audits/docs-line-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Documentation line references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../audits/eol-distro/" class="md-nav__link">
         
   
@@ -15802,13 +15830,13 @@ needs the same treatment, and phase 6 says so.</p>
 </tr>
 <tr>
 <td>5. Retire the end-of-life producers</td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>private-ci e77fca7 (#100, 5a), actions 2351ece (#136, 5b), 33fl e92a1b4 (#925, 5c), development b464fcc (#218, 5d), and the <code>ubuntu:18.04</code> removal the phase grew: actions 587683a (#140) with development 13fec36 (#221) carrying its plan bullet and its 5f check. 5e and 5f carry no commit.</td>
 </tr>
 <tr>
 <td>6. Close the audit's blind spot</td>
-<td>Not started</td>
-<td></td>
+<td>In progress</td>
+<td>development 358bef0 (#222, 6a), development 6163de8 (#226, 6b), images 707768f (#14, 6c). 6d filed <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/images/issues/13" title="GitHub Issue: shakenfist/images #13">images#13</a> and carries no commit; 6e has not run.</td>
 </tr>
 <tr>
 <td>7. Push audit</td>
@@ -17775,7 +17803,26 @@ because the three bullets this section carried named two of the four
 <code>IMAGE_BUILDS</code> entries that have to go, missed the one phase 3
 assigned here by name, and described 33fl's half as hand work that a
 tool in that repository has been doing weekly since July.</p>
-<p><strong>Status: planned, 2026-10-02.</strong> The survey below was run on
+<p><strong>Status: complete, 2026-10-05.</strong> All six steps ran and all six
+pull requests merged -- the four planned and the two the
+<code>ubuntu:18.04</code> removal added; 5f's twelve checks all agreed and closed
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/38" title="GitHub Issue: shakenfist/private-ci #38">private-ci#38</a>. <strong>One of the twelve could not be run as written.</strong>
+Check (6) specifies <code>ansible static_runners -m setup -a
+'filter=ansible_distribution_release'</code>, which this environment's
+command classifier refuses against live remote hosts, so the step
+established the same fact a different way: for each of the eight
+hosts, today's <code>manage.yml</code> deploy logged an <code>apt_repository</code>
+invocation with <code>codename=None</code> resolving to <code>trixie</code>, which means
+the codename came from each host's own <code>ansible_distribution_release</code>
+fact rather than from a variable in <code>33fl</code> -- the distinction that
+makes the log equivalent to the query rather than merely consistent
+with it. That provenance is recorded in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/38" title="GitHub Issue: shakenfist/private-ci #38">private-ci#38</a>'s thread, and
+phase 6 should not write another check that names a command the
+fleet cannot run. <strong>An anchor proves a grep still fires; nothing in
+this phase's design catches a check whose command is unavailable</strong>,
+which is the one gap in the vacuous-pass armour the phase was built
+around.</p>
+<p>The survey below was run on
 2026-10-02, the day phase 4 closed, and it moved the phase in both
 directions: the retirement is larger than the section said in
 <code>private-ci</code> and in <code>actions</code>, and smaller in <code>33fl</code>, where the
@@ -18223,18 +18270,18 @@ check when the phase was first written, which is the same gap phase 4
 closed with, and it was found here only by counting them against 5f
 (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/207" title="GitHub Issue: shakenfist/development #207">development#207</a>).</p>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> In a fresh <code>private-ci</code> clone, <code>conductor/imagebuilder.py</code>'s
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> In a fresh <code>private-ci</code> clone, <code>conductor/imagebuilder.py</code>'s
       <code>IMAGE_BUILDS</code> contains no <code>debian-11</code>, <code>debian-12</code>,
       <code>debian-12-docker</code> or <code>debian-gnome-12</code> entry, and
       <code>conductor/provisioner.py</code>'s <code>CI_IMAGES</code> contains none of the
       first three. Four entries and three entries, not seven and
       seven: the desktop images are not runner boot images
       (finding 2).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>grep -rn 'debian-12' .github/</code> in <code>private-ci</code> returns
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>grep -rn 'debian-12' .github/</code> in <code>private-ci</code> returns
       nothing. This is the one repository phase 4's equivalent
       bullet exempted, because it has no workflows for the
       declaration to govern; the declaration goes with the entries.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>pytest conductor/tests</code> on 5a's merge commit gives <strong>no
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>pytest conductor/tests</code> on 5a's merge commit gives <strong>no
       fewer passed and the same skipped</strong> as on its parent. A green
       run with fewer passed fails this bullet; more passed is fine if
       5a's commit message names what was added. Measured
@@ -18244,41 +18291,41 @@ closed with, and it was found here only by counting them against 5f
       count is the criterion precisely because 22
       tests fail on the deletion alone and the cheapest ways to make
       them pass are all wrong (decision 5.3).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>conductor/tests/test_web.py</code>'s <code>test_build_known_image</code> names
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>conductor/tests/test_web.py</code>'s <code>test_build_known_image</code> names
       a label that <code>IMAGE_BUILDS</code> still contains. It does not fail
       when it stops doing so -- <code>request_build</code> is mocked -- which
       is why it is a bullet of its own rather than part of the one
       above.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> In <code>shakenfist/actions</code>, <code>grep -n 'debian.11'
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> In <code>shakenfist/actions</code>, <code>grep -n 'debian.11'
       ansible/ci-image.yml</code> returns nothing and <code>grep -c 'name: Add
       to ansible' ansible/ci-image.yml</code> returns <strong>2</strong>. The second
       half catches the inverse mistake of keeping the
       force-python3 arm instead of the detect arm, which a grep for
       the condition alone cannot see.
       <code>tools/ansible-syntax-check.sh</code> passes.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>ansible/ci-dependencies.yml</code>'s cached image list still
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>ansible/ci-dependencies.yml</code>'s cached image list still
       contains <code>debian:11</code>, <code>debian:12</code>, <code>ubuntu:20.04</code> and
       <code>fedora:40</code>, and each carries a comment saying it is
       deliberately frozen and what would justify removing it. A
       grep whose passing output is non-empty, for the same reason
       phase 3's <code>debian:11</code> bullet was: a bullet asking for nothing
       would be satisfied by deleting the thing decision 5.4 keeps.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A conductor nightly cycle summary generated after 5a merged
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> A conductor nightly cycle summary generated after 5a merged
       lists builds for the surviving labels only, with no
       <code>debian-11</code>, <code>debian-12</code>, <code>debian-12-docker</code> or
       <code>debian-gnome-12</code> line, and no permanent <code>False</code>. Read from
       the summary, not inferred from the absence of a failure
       issue.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> All eight entries of <code>33fl</code>'s <code>static_runner_fleet</code> report
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> All eight entries of <code>33fl</code>'s <code>static_runner_fleet</code> report
       Debian 13, read from the fleet rather than from
       <code>static_runner_debian_release</code>. The variable has said 13 since
       2026-09-12 and said nothing about what is running.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>group_vars/all/static_runners.yml</code> no longer says the GitLab
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>group_vars/all/static_runners.yml</code> no longer says the GitLab
       runners have no retire tool, and names
       <code>tools/retire-gitlab-runners.py</code> and the weekly cycle
       instead. The paragraph about <code>eol-distro</code> being unable to see
       this fleet stays: it is still true and it is phase 6's.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>docs/audits/eol-distro.md</code> no longer says the conductor
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>docs/audits/eol-distro.md</code> no longer says the conductor
       advertises no <code>debian-gnome-13</code> label, and its end-of-life
       table still lists all five labels it bans -- <code>debian-11</code>,
       <code>debian-11-docker</code>, <code>debian-12</code>, <code>debian-12-docker</code> and
@@ -18289,22 +18336,22 @@ closed with, and it was found here only by counting them against 5f
       halves: the table is the registry of what a workflow may not
       name, and emptying it as the labels go would make the
       criterion unable to report a regression.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/40" title="GitHub Issue: shakenfist/private-ci #40">private-ci#40</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/45" title="GitHub Issue: shakenfist/private-ci #45">private-ci#45</a> and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/33fl/issues/826" title="GitHub Issue: shakenfist/33fl #826">33fl#826</a> are closed with
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/40" title="GitHub Issue: shakenfist/private-ci #40">private-ci#40</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/45" title="GitHub Issue: shakenfist/private-ci #45">private-ci#45</a> and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/33fl/issues/826" title="GitHub Issue: shakenfist/33fl #826">33fl#826</a> are closed with
       their merge commits, in 5e. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/38" title="GitHub Issue: shakenfist/private-ci #38">private-ci#38</a> is closed <strong>by 5f</strong>,
       after every one of its checks agrees, with a comment whose
       "after" half quotes their output -- not in 5e, because that
       comment asserts a state only 5f has established
       (decision 5.6).</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> An issue exists in <code>shakenfist/shakenfist</code> for the cache that
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> An issue exists in <code>shakenfist/shakenfist</code> for the cache that
       is not serving reads (finding 6), naming
       <code>build-smoke-cluster/action.yml:257</code>,
       <code>ansible_module_ci/004.yml:120</code> and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4000" title="GitHub Issue: shakenfist/shakenfist #4000">shakenfist#4000</a>.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>compliance.md</code>'s <code>eol-distro</code> table is unchanged by this
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>compliance.md</code>'s <code>eol-distro</code> table is unchanged by this
       phase. Stated as a done criterion rather than omitted,
       because "the audit went green" is the evidence a reader will
       reach for and it is not available here: neither list this
       phase empties is read by any criterion until phase 6.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> In <code>private-ci</code>,
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> In <code>private-ci</code>,
       <code>grep -n 'debian-11\|debian-12\|debian-gnome-12' README.md
       AGENTS.md ARCHITECTURE.md</code> returns nothing -- all three
       alternatives, because <code>debian-12</code> does not match
@@ -18321,7 +18368,7 @@ closed with, and it was found here only by counting them against 5f
       is why 5f's check is a grep rather than a seek. A done list
       that did not mention these files is how the excerpts drifted
       in the first place.</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> In <code>shakenfist/actions</code>, <code>grep -n 'ubuntu:18.04'
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> In <code>shakenfist/actions</code>, <code>grep -n 'ubuntu:18.04'
       ansible/ci-dependencies.yml</code> returns nothing, and the cached
       list still carries the four entries decision 5.4 keeps. Not
       5b's and not any planned step's: decision 5.4 enumerated four
@@ -18378,8 +18425,24 @@ settle now and expensive to redo.</p>
    tooling contradicts.</li>
 </ol>
 <h3 id="6-close-the-audits-blind-spot">6. Close the audit's blind spot<a class="headerlink" href="#6-close-the-audits-blind-spot" title="Permanent link">&para;</a></h3>
-<p>Closes: nothing filed. Depends on: phases 3-5, so the producers
-are compliant before they are measured.</p>
+<p>Closes: nothing filed. Depends on: phases 3-5, complete 2026-10-05,
+so the producers are compliant before they are measured. Planning
+effort: high, 2026-10-05.</p>
+<p><strong>Status: in progress, 2026-10-06.</strong> 6a merged as #222, 6b as</p>
+<h1 id="226-and-6c-as-images14-and-6d-filed-images13-6e-has-not-run">226 and 6c as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/images/issues/14" title="GitHub Issue: shakenfist/images #14">images#14</a>, and 6d filed <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/images/issues/13" title="GitHub Issue: shakenfist/images #13">images#13</a>; 6e has not run.<a class="headerlink" href="#226-and-6c-as-images14-and-6d-filed-images13-6e-has-not-run" title="Permanent link">&para;</a></h1>
+<p>Each of 6a, 6b and 6d is amended in its row below with what it
+turned out to need. The survey below was run on
+2026-10-05, the day phase 5 closed, and it moved the phase in one
+direction: the cost of measuring <code>images</code> is higher than this
+section said, and the reason the section gave for that cost being
+acceptable does not hold. The dependency, though, paid off exactly
+as written -- <code>eol-distro</code> now reports <strong>pass</strong> on <code>images</code>, a real
+scan rather than a skip, because phases 3 to 5 made the producer
+compliant before anything measured it. Had this phase run first it
+would have filed the finding it exists to prevent.</p>
+<h4 id="what-this-section-asked-for-2026-09-13_1">What this section asked for, 2026-09-13<a class="headerlink" href="#what-this-section-asked-for-2026-09-13_1" title="Permanent link">&para;</a></h4>
+<p>Left as written, because the survey below contradicts parts of it
+and the contradiction is the useful record:</p>
 <p>The phase that stops the 80 findings coming back. Per the
 structural finding above, all three producers sit outside the
 criterion that bans what they produce.</p>
@@ -18469,6 +18532,400 @@ in <code>scripts/tests/test_registry.py</code> is what will say so at commit
 time.</p>
 <p>Which instrument does the measuring is Q1 above, and the default
 there is a separate criterion.</p>
+<h4 id="what-the-survey-found_3">What the survey found<a class="headerlink" href="#what-the-survey-found_3" title="Permanent link">&para;</a></h4>
+<p>Run 2026-10-05 against <code>main</code> at <code>13fec36</code>, with a fresh <code>images</code>
+clone at <code>3423343</code> and the audit driven by
+<code>scripts/audit-check.py</code>, which builds a real <code>GhCli</code> when no
+client is passed (<code>scripts/audit/repo.py:163</code>) -- so the
+GitHub-dependent verdicts below are genuine readings rather than
+artifacts of running without a token. That distinction matters
+here: a criterion failing because nobody asked GitHub looks
+identical, in a summary, to one failing because the setting is
+wrong.</p>
+<p><strong>Confirmed, unchanged.</strong> Scope is still stated in three places
+and <code>AuditScopeIsStatedOnceTest</code> still holds them together
+(<code>scripts/tests/test_registry.py:42</code>). <code>private-ci</code>'s <code>only_checks</code>
+is still exactly five entries -- <code>plan-phase-references</code>,
+<code>plan-source-references</code>, <code>plan-index</code>, <code>plan-template</code>,
+<code>sfui-vendor</code> -- and <code>scope.documented_partial_scope()</code> parses the
+sentence at <code>docs/audits/README.md:87-89</code> to that same five, so
+the fourth statement and the code still agree. The matrix comment
+above <code>- private-ci</code> is still stale in exactly the way the section
+says, still reading "Scoped to the sfui-vendor check"
+(<code>.github/workflows/consistency-audit.yml:53-54</code>). Eight
+non-archived repositories are still outside the matrix, and they
+are the same eight. All seven of the non-<code>images</code> ones still
+satisfy all three of <code>eol-distro</code>'s skip conditions -- no
+workflows, no container build file, no top-level <code>templates/</code> --
+checked by clone rather than by assertion, so the criterion would
+report <code>not applicable</code> for every one of them. The three producers
+still sit outside the criterion that bans what they produce.
+<code>33fl</code>'s audit-blindness paragraph is intact above
+<code>static_runner_debian_release: 13</code>.</p>
+<p><strong>The dependency worked.</strong> <code>eol-distro</code> reports <strong>pass</strong> on
+<code>images</code>, with the detail "No workflow runner label or container
+image names any of the 3 retired distribution releases". That is a
+scan, not a skip: <code>images</code> has workflows and build files, so the
+three-way skip at <code>scripts/audit/checks/distros.py:453</code> did not
+fire. The producer is compliant before it is measured, which is
+what "Depends on: phases 3-5" was for.</p>
+<p><strong>Stale, and corrected at source in this commit.</strong></p>
+<ul>
+<li><strong>52 criteria is now 58.</strong> <code>registry.CHECKS</code> holds 58. Six
+  criteria arrived between 2026-09-13 and today, so every
+  arithmetic statement built on 52 was going to drift whether or
+  not anybody noticed.</li>
+<li><strong><code>images</code> measures 12 fail, 17 pass, 29 not applicable</strong>, not
+  8 / 6 / 38. The section told the reader to re-measure before
+  acting, which is the instruction that saved this: the numbers
+  were not merely stale, they were stale in the direction that
+  makes the decision harder rather than easier.</li>
+<li><strong><code>delete-branch-on-merge</code> now passes</strong>, so the section's list
+  of eight failures is wrong in membership as well as in count.
+  The other seven it names all still fail.</li>
+<li><strong>Five failures the section does not name</strong>: <code>llm-doc-structure</code>,
+  <code>readme-structure</code>, <code>docs-external-links</code>, <code>plan-template</code> and
+  <code>secret-scanning-ci</code>.</li>
+<li><strong>"every one of them is already an item in phase 5 of that
+  repository's own plan" is false.</strong> <code>images</code>' own Phase 5,
+  "Repository standards"
+  (<code>docs/plans/PLAN-image-build-modernisation.md:503-530</code>), names a
+  <code>.pre-commit-config.yaml</code>, renovate configuration, and the
+  <code>master</code> versus <code>develop</code> question -- which covers
+  <code>pre-commit-config</code>, <code>renovate</code> and <code>default-branch-naming</code>, and
+  touches <code>llm-doc-structure</code> by way of an <code>AGENTS.md</code> rewrite.
+  <strong>Eight of the twelve have no owner in that plan or in this
+  one.</strong> This was the load-bearing claim: it is what made
+  "whether to file them or do them first" the whole decision, and
+  it does not hold.</li>
+<li><strong>"Joining is otherwise all-or-nothing" is false</strong>, and the same
+  bullet names the mechanism that refutes it two sentences later.
+  <code>only_checks</code> scopes a repository in the matrix to a subset, and
+  <code>private-ci</code> is the live proof. The section even allows for
+  editing <code>REPO_OVERRIDES</code> "if images is to be scoped to a
+  subset", so the all-or-nothing framing contradicts its own next
+  clause rather than the tree.</li>
+<li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/33fl/issues/826" title="GitHub Issue: shakenfist/33fl #826">33fl#826</a> is closed</strong>, by step 5e on 2026-10-05. The section
+  says the issue "records the exposure ... where the next reader
+  will find it", which conflated the issue with the file. The
+  durable record is the comment block in
+  <code>group_vars/all/static_runners.yml</code>, verified present; a closed
+  issue is not where a next reader looks.</li>
+<li><code>EolDistro</code>'s skip is at <code>distros.py:453</code> rather than <code>:450</code>.</li>
+</ul>
+<h4 id="scope_1">Scope<a class="headerlink" href="#scope_1" title="Permanent link">&para;</a></h4>
+<p>In: a new consistency criterion that reads the runner-label
+producer definitions <code>eol-distro</code> cannot see; the scope changes
+that let it run against <code>private-ci</code> and that bring <code>images</code> under
+<code>eol-distro</code>; one prose sentence correcting why seven repositories
+are excluded; one correction to a comment in <code>images</code> whose stated
+reason phase 5 removed; and one issue recording what measuring
+<code>images</code> found.</p>
+<p>Out: <strong>fixing any of <code>images</code>' twelve findings.</strong> Three of them
+belong to <code>images</code>' own Phase 5, a fourth -- <code>llm-doc-structure</code> --
+is touched by that phase's planned <code>AGENTS.md</code> rewrite without
+obviously being closed by it, and the other eight belong to nobody
+yet; this phase's job is to make the repository measurable
+and to record the bill, not to pay it. Also out: widening
+<code>eol-distro</code> itself (decision 6.1), banning the publication of
+guest images on an end-of-life release (decision 6.3), bringing
+the other seven excluded repositories into the matrix (they would
+all report <code>not applicable</code>, so it would buy nothing), auditing
+<code>33fl</code> (another organisation, decision 6.4), and the <code>master</code>
+versus <code>develop</code> question for <code>images</code>, which is one of the twelve
+and therefore out with the rest.</p>
+<h4 id="decisions_4">Decisions<a class="headerlink" href="#decisions_4" title="Permanent link">&para;</a></h4>
+<p><strong>6.1 A separate criterion, not a wider <code>eol-distro</code>.</strong> This
+adopts Q1's stated default rather than re-opening it, and the
+survey strengthens the reason: <code>eol-distro</code> now <em>passes</em> on
+<code>images</code>, so widening it would convert a green verdict into a
+mixed one whose title no longer describes what it measures. The
+decisive argument is unchanged -- an issue title is the
+fleet-wide idempotency key for filing and closing, frozen in
+<code>scripts/tests/test_metadata.py</code> precisely because changing one
+orphans every issue already open under the old title. The new
+criterion is <code>eol-producers</code>: "this repository offers a banned
+label", against <code>eol-distro</code>'s "this repository names one".</p>
+<p><strong>6.2 The criterion measures runner-label producers, and nothing
+else.</strong> Decided 2026-10-05, and it is the decision the rest of the
+phase hangs off. <code>eol-producers</code> reads <code>IMAGE_BUILDS</code> and
+<code>CI_IMAGES</code> in <code>private-ci</code> -- the two definitions that turn a
+published image into a bootable runner label, which is precisely
+the exposure that produced the 80 findings in #123. It does not
+read a build list, and it does not care what images exist.</p>
+<p>The alternative was to measure production as well, and the survey
+is what ruled it out. <code>images/build.sh:80</code> still builds
+<code>debian:12</code>, <code>debian-docker:12</code>, <code>debian-gnome:12</code> and
+<code>debian-xfce:12</code> by default, so a criterion reading the build list
+would fail <code>images</code> on day one, four times, against a documented
+deliberate choice: Debian LTS covers bookworm until 2028, and a
+guest image somebody boots on purpose under LTS is not the same
+defect as a runner label a workflow gets handed by default. <strong>The
+distinction the criterion encodes is who chooses.</strong> A consumer
+naming a runner label mostly inherits whatever the producer
+decided; somebody booting a <code>debian:12</code> guest image chose that
+release. The first is the fleet-wide exposure this plan exists to
+close, and the second is a supported option with an expiry date
+nobody is currently misreading.</p>
+<p><strong>6.3 The stale justification in <code>images</code> is corrected, not
+inherited.</strong> <code>build.sh:41-45</code> keeps <code>debian:12</code> in the default
+list because "private-ci bakes the debian-12 runner labels that
+sixteen repositories boot on from it", and tells the reader to
+"retire it as the eol-distro audit issues are closed, not
+before". Step 5a removed those labels and #123 is closed, so both
+halves of that sentence are now false while the conclusion it
+supports -- keep building bookworm under LTS -- remains correct
+for a different reason. Phase 6 rewrites the comment to give the
+reason that still holds and to stop pointing at a condition that
+has already arrived. <strong>It does not change the build list.</strong> That
+is decision 6.2 applied to the same file: the list is right, the
+explanation is wrong, and leaving a true conclusion resting on a
+false premise is how the <code>ubuntu:20.04</code> freeze comment in phase 5
+came to read as an invitation to delete something load-bearing.</p>
+<p><strong>6.4 The criterion reads one producer, not three.</strong> <code>private-ci</code>
+is the only one of the three that defines runner labels.
+<code>images</code> publishes guest images, which decision 6.2 puts out of
+scope, and <code>33fl</code> is in another organisation and outside this
+tooling -- no criterion can reach it, and this plan does not
+prescribe how another organisation audits itself. What phase 6
+adds there is the generalisation rather than a fix: a static
+runner fleet that advertises only <code>self-hosted</code> and <code>static</code> is
+structurally invisible to a label-based audit, so any future
+fleet of that shape needs the same treatment. That sentence goes
+in <code>docs/audits/eol-producers.md</code>, where a reader of the criterion
+will find it, rather than in a closed issue.</p>
+<p><strong>6.5 <code>images</code> joins the matrix scoped to <code>eol-distro</code> alone.</strong>
+This is the decision most likely to be argued with, so the
+reasoning is stated at length. The case for joining fully is
+real: <code>images</code> is built from every night, the fleet's CI depends
+on its output, and it has been on the excluded list as a
+"historical archive" which it demonstrably is not. The case
+against is the survey's: joining fully files twelve findings, of
+which eight have no owner in any plan. Phase 4 closed with four
+done bullets no step had checked and this plan records that a
+thousand lines above; filing eight findings with no owner is the
+same mistake pointed outward, at a repository whose maintainers
+did not ask for them.</p>
+<p>So <code>images</code> enters the matrix with <code>only_checks: ['eol-distro']</code>.
+What that buys is narrow and worth having: the pass this survey
+measured by hand becomes a verdict the audit reports on a
+schedule, so the next time a producer starts naming a retired
+release the instrument says so instead of a person noticing. It
+also leaves the full-audit decision where <code>images</code>' own plan
+already put it -- "a deliberate decision rather than a side
+effect of this plan". Narrowing honours that sentence; joining
+fully overrides it as a side effect of this plan, which is the
+thing it asked not to happen.</p>
+<p>The counter-argument worth stating: a narrow scope is a decision
+that can quietly become permanent, and <code>private-ci</code>'s stale
+matrix comment is evidence of how that decays. The mitigation is
+that step 6d files the bill as an issue, so widening later is a
+decision against a written list rather than a rediscovery.</p>
+<p><strong>6.6 The seven excluded repositories get one prose sentence, and
+it must not be a bullet or a heading.</strong> This is mechanically
+forced rather than stylistic. The excluded list sits in the span
+<code>scripts/audit/scope.py</code> parses between <code>are **excluded**</code> and
+<code>The `actions` repository</code> (<code>scope.py:46-48</code>), and
+<code>bulleted_block()</code> collects only <code>*</code>-prefixed lines: a prose line
+is ignored and is safe, the same sentence as a bullet raises
+<code>ScopeParseError</code> for not being a repository name, and a
+sub-heading introducing it raises it for running the list past a
+heading. Either failure takes <code>scope-coverage</code> down fleet-wide
+rather than locally. <code>AuditScopeIsStatedOnceTest</code> is what says so
+at commit time, which is why every scope edit in this phase runs
+<code>pre-commit</code> before it is committed rather than after.</p>
+<p><strong>6.7 The twelve findings are filed as one issue, not twelve, and
+not as audit findings.</strong> The audit will file its own issues once
+<code>images</code> is in the matrix, and only for the one criterion
+<code>only_checks</code> admits -- <code>eol-distro</code>, which passes and is not one
+of the twelve. So none of the twelve is an audit finding under
+decision 6.5: they are what joining fully <em>would</em> cost, which is a
+planning fact rather than a compliance one. One issue against
+<code>images</code>, naming all twelve with an ownership verdict for each:
+three its own Phase 5 owns, <code>llm-doc-structure</code> which that phase's
+<code>AGENTS.md</code> rewrite bears on without obviously closing, and eight
+nobody owns.</p>
+<p><strong>6.8 Each scope statement changes in one commit with the thing it
+describes.</strong> <code>private-ci</code>'s widening touches four places and
+<code>images</code>' joining touches three plus <code>REPO_OVERRIDES</code>; a commit
+that moves some and not others leaves <code>scope-coverage</code> reporting a
+repository as decided nowhere. The docstring for the partial-scope
+sentence records that this is the statement with the worst track
+record -- widened once with two other documents left behind and no
+test noticing -- which is why the test exists and why this
+decision is written down rather than assumed.</p>
+<h4 id="step-plan_3">Step plan<a class="headerlink" href="#step-plan_3" title="Permanent link">&para;</a></h4>
+<p>Five steps. 6a is the substance and everything else depends on
+it: <code>only_checks</code> names a criterion id, so the id has to exist in
+<code>registry.CHECKS</code> before any scope statement can mention it. 6a
+was planned as two commits and merged as four in #222, the two it
+grew coming from review. 6b is one pull request against this
+repository, planned as three commits and merged as five in #226,
+because decision 6.8 wants each scope statement atomic and
+decision 5.2's one-pull-request-per-repository habit is worth
+keeping. The two it grew are recorded in its row: both are the
+parse this phase is about failing to hold, found during 6b rather
+than during the survey. 6c is the only step that touches another
+repository's code.</p>
+<p><strong>Line numbers in the briefs are at <code>13fec36</code></strong>, where the survey
+ran. 6a and 6b edited several of the files they cite, so those
+numbers have since moved; where a brief also names a symbol --
+<code>EolDistro.run</code>'s skip, <code>bulleted_block()</code>,
+<code>documented_partial_scope()</code> -- the symbol is the reference and the
+line number is the context. The <code>images</code> references in 6c and 6d
+are at <code>3423343</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Effort</th>
+<th>Model</th>
+<th>Isolation</th>
+<th>Brief for sub-agent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>6a</td>
+<td>high</td>
+<td>opus</td>
+<td>worktree</td>
+<td><strong>The criterion, in this repository, one pull request.</strong> Add <code>eol-producers</code>: a repository is non-compliant if a runner-label producer definition it owns offers a label the end-of-life table in <code>docs/audits/eol-distro.md</code> bans. Read that table for the banned set rather than hardcoding it -- <code>retired_releases()</code> in <code>scripts/audit/checks/distros.py</code> already parses it and reports "3 retired distribution releases", and a second hardcoded copy is the defect <code>eol-distro</code> was written to avoid. The producer definitions are <code>IMAGE_BUILDS</code> in <code>conductor/imagebuilder.py</code> and <code>CI_IMAGES</code> in <code>conductor/provisioner.py</code>, both in <code>private-ci</code>; parse them as Python rather than by grep, because a grep cannot tell a live entry from a label named in a comment and 5a's reworded <code>STALE_LABEL_SECONDS</code> comment is exactly that case -- the plan made 5a avoid single-quoting retired labels there precisely so a grep-shaped gate would not fire forever, and a criterion that repeats the mistake inherits the same false positive. Use <code>ast</code> and read the dict literals. <strong>Decision 6.2 is the scope: runner labels only.</strong> Do not read <code>images/build.sh</code>, do not read a build list, and do not report on published guest images. The deliverables are <code>docs/audits/eol-producers.md</code> (the specification, carrying decision 6.4's generalisation about label-less static fleets), the check class beside <code>EolDistro</code> in <code>scripts/audit/checks/distros.py</code>, its registration in <code>scripts/audit/registry.py</code>'s <code>CHECKS</code>, and the matching entries in <code>scripts/tests/test_metadata.py</code>'s <code>FROZEN_METADATA</code>, <code>FROZEN_ISSUE_TITLES</code> and <code>FROZEN_COLUMN_NAMES</code> -- <code>AUDIT_METADATA</code> and <code>ISSUE_TITLES</code> are derived in <code>scripts/audit_common.py:48-50</code>, so the frozen copies are what you edit and the test is what holds them together. Tests go in <code>scripts/tests/test_distros.py</code> using <code>CheckTestCase</code> from <code>scripts/tests/base.py:166</code>. <strong>Prove the criterion fails, do not assert that it would.</strong> It must report <code>fail</code> against a <code>private-ci</code> clone at <code>8816709</code>, naming <code>debian-11</code>, <code>debian-12</code>, <code>debian-12-docker</code> and <code>debian-gnome-12</code>, and <code>pass</code> against current <code>master</code>; run both and put the outputs in the commit message. A criterion that has only ever been seen to pass is indistinguishable from one whose pattern is wrong, which is the failure mode this plan has spent six phases on. Also assert the <code>not_applicable</code> path: a repository with no <code>conductor/</code> reports not applicable rather than passing, because "no producer here" and "a compliant producer here" are different answers and a criterion that conflates them will report the whole fleet green. Verify with <code>pre-commit run --all-files</code>, which runs all five test suites. Commit subjects: <code>Add the eol-producers criterion.</code> and <code>Register eol-producers in the audit.</code> <strong>Amended 2026-10-06, after the step ran.</strong> Merged as #222 in four commits, not two; both additions came from review. <code>Read eol-producers tables all or nothing.</code> makes an entry the parse cannot read -- not a dict literal, a non-literal key, zero or two label keys, a label that is not a string -- raise <code>ProducerParseError</code> rather than be skipped, and does the same for a module-level change to a table after the assignment that is read: skipping let a table pass on whichever entries happened to be literal, which is a vacuous pass in this plan's own vocabulary. <code>Narrow what the producer change guard claims.</code> then limits what that guard is documented to catch to changes made through the table's own name, rather than tracking aliases. The back brief's gate on the parse's shape was settled by keying off label strings: each release's runner labels live in the one <code>EOL_RELEASES</code> table <code>eol-distro</code> already reads, and <code>retired_labels()</code> inverts it, so the mapping is in one place.</td>
+</tr>
+<tr>
+<td>6b</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>worktree</td>
+<td><strong>After 6a has merged</strong>, gated on a check rather than on this sentence: <code>python3 -c "import sys; sys.path.insert(0,'scripts'); from audit import registry; print([c.id for c in registry.CHECKS])"</code> in a fresh clone must list <code>eol-producers</code>. <strong>Three commits, one pull request, and each one must leave the tree passing <code>pre-commit</code></strong> -- <code>AuditScopeIsStatedOnceTest</code> holds the scope statements against each other at every commit, so a commit that moves three of four places fails at commit time rather than in review (decision 6.8). Commit one widens <code>private-ci</code>: add <code>eol-producers</code> to <code>only_checks</code> in <code>scripts/audit/repo.py:88-93</code>, making six entries, and update in the same commit the sentence at <code>docs/audits/README.md:87-89</code> that <code>scope.documented_partial_scope()</code> parses, the <code>REPO_OVERRIDES</code> comment block above the entry, and the comment above <code>- private-ci</code> in <code>.github/workflows/consistency-audit.yml:53-54</code> -- <strong>which is already stale and must be fixed rather than appended to</strong>: it reads "Scoped to the sfui-vendor check" while the scope has been five checks for some time. Commit two brings <code>images</code> into the matrix with <code>only_checks: ['eol-distro']</code> (decision 6.5): the <code>repo:</code> list in the audit matrix, a new sentence in the partial-scope paragraph of <code>docs/audits/README.md</code>, and a <code>REPO_OVERRIDES</code> entry with a stated reason, because that module's docstring requires one and "an unexplained override is indistinguishable from silencing a real finding". Commit three adds decision 6.6's prose sentence about the seven remaining excluded repositories. <strong>It must be a prose line, not a bullet and not under a sub-heading</strong>: <code>bulleted_block()</code> in <code>scripts/audit/scope.py:137</code> collects <code>*</code>-prefixed lines between <code>are **excluded**</code> and <code>The `actions` repository</code>, so a bullet raises <code>ScopeParseError</code> for not being a repository name and a heading raises it for running the list past its end, and either takes <code>scope-coverage</code> down fleet-wide. The seven are <code>client-python-ova</code>, <code>divergulent-reviews</code>, <code>homebrew-tap</code>, <code>performance</code>, <code>reproducables</code>, <code>sonobouy</code> and <code>uefi-latency-guest</code>; all seven were confirmed on 2026-10-05 to have no <code>.github/workflows/</code>, no container build file and no top-level <code>templates/</code>, so <code>eol-distro</code> would report <code>not applicable</code> for every one -- say that is why they stay excluded, which is a narrower and truer claim than the reasons the list currently gives. Verify after each commit with <code>pre-commit run --all-files</code>, and afterwards confirm <code>scope.documented_partial_scope()</code> returns six entries for <code>private-ci</code> and one for <code>images</code>. Commit subjects: <code>Audit private-ci for eol-producers.</code>, <code>Bring images into the audit matrix.</code> and <code>Say why seven repositories are excluded.</code> <strong>Amended 2026-10-06, after the step ran.</strong> Three corrections, all of them this phase's own subject matter rather than incidental. (i) <strong>The in-scope and excluded lists do not change.</strong> An earlier draft of this row said <code>images</code> "moves from one to the other"; it does not, and doing it fails the suite. A partially scoped repository is in the matrix, in the excluded list, absent from the in-scope list, and named in the partial-scope paragraph -- which is what <code>private-ci</code> has been doing all along. <code>test_matrix_matches_the_documented_scope</code> subtracts the partially scoped set before comparing and <code>test_no_audited_repo_is_also_documented_as_excluded</code> subtracts it again, with a comment saying both statements being true is correct. (ii) <strong>Two anchors in <code>scripts/audit/scope.py</code> could not survive the edit this step makes.</strong> <code>IN_SCOPE_END</code> was the literal <code>'One project is in scope'</code>, which stops matching on precisely the edit that adds a second scoped repository, and <code>PARTIAL_SCOPE_END</code> matched only the plural <code>' checks, and nothing else.'</code>, so a repository scoped to exactly one check -- which <code>images</code> is, and which had never existed before -- could not be written in grammatical English and parsed. Both were fixed in their own commit before the documentation change that needed them, <code>Read scope anchors that do not count.</code>, with the anchor made count-free rather than bumped to "Two" so a third scoped repository needs no edit. (iii) <strong><code>only_checks</code> was held to nothing that executes.</strong> Deleting a scoped repository's line from the audit matrix left all 1546 tests passing, for <code>private-ci</code> as well as <code>images</code>: the two comparisons above both subtract the scoped set, so the repository is on neither side of either equality, and <code>scope-coverage</code> asks <code>organisation - matrix - excluded</code>, where being excluded makes it decided whether or not anything runs it. Fixed in a fifth commit, <code>Hold only_checks to what the matrix runs.</code> All three were found by mutating the tree rather than by reading it, which is the only way to tell a statement that holds from one that cannot fail.</td>
+</tr>
+<tr>
+<td>6c</td>
+<td>low</td>
+<td>sonnet</td>
+<td>worktree</td>
+<td><strong><code>shakenfist/images</code>, one commit, comment only.</strong> Rewrite the paragraph at <code>build.sh:41-45</code> per decision 6.3. It currently keeps <code>debian:12</code> in the default build list because "private-ci bakes the debian-12 runner labels that sixteen repositories boot on from it, and Debian LTS covers bookworm until 2028", and instructs the reader to "retire it as the eol-distro audit issues are closed, not before". <strong>Step 5a removed those runner labels and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/123" title="GitHub Issue: shakenfist/development #123">development#123</a> is closed, so the premise and the trigger are both spent while the conclusion is still right.</strong> The new comment keeps bookworm in the list for the reason that survives -- Debian LTS covers it until 2028 and a guest image somebody boots on purpose is a supported option -- and states that the runner labels it used to feed were retired on 2026-10-03 by <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/100" title="GitHub Issue: shakenfist/private-ci #100">private-ci#100</a>, so a future reader does not go looking for sixteen repositories that no longer boot it. Name the condition for removing the entry in terms that can actually arrive: the LTS end date, not an audit issue that is already closed. <strong>Change no build list and no code.</strong> <code>images</code> is not in the audit matrix when this step runs and the audit does not read <code>build.sh</code> under decision 6.2, so nothing here is gated on 6a or 6b; it is in this phase because the survey found it and the sentence it corrects is about this plan's own work. Do not touch the <code>fedora:43</code>/<code>fedora:44</code> paragraph or the <code>ubuntu:20.04</code> retirement block. Commit subject: <code>Say why bookworm is still built.</code></td>
+</tr>
+<tr>
+<td>6d</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>Housekeeping, no commit, outward-facing.</strong> File one issue in <code>shakenfist/images</code> recording what measuring the repository found, so decision 6.5's narrow scope is a decision against a written list rather than something a later reader has to rediscover. Re-run the measurement rather than copying these numbers -- <code>python3 scripts/audit-check.py --repo-path &lt;clone&gt; --repo-name images</code> from a <code>development</code> checkout, which builds a real <code>GhCli</code> when none is passed, so the GitHub-dependent verdicts are genuine. On 2026-10-05 against <code>images</code> at <code>3423343</code> it gave 58 criteria, 17 pass, 12 fail, 29 not applicable. List the twelve, and <strong>say for each whether anything owns it</strong>: <code>pre-commit-config</code>, <code>renovate</code> and <code>default-branch-naming</code> are items in <code>images</code>' own Phase 5, "Repository standards" (<code>docs/plans/PLAN-image-build-modernisation.md:503-530</code>), which also plans an <code>AGENTS.md</code> rewrite that bears on <code>llm-doc-structure</code>; the other eight -- <code>llm-context-lint-ci</code>, <code>readme-structure</code>, <code>docs-external-links</code>, <code>plan-template</code>, <code>ci-review-automation</code>, <code>secret-scanning-ci</code>, <code>export-repo-config</code> and <code>github-security</code> -- have no owner in that plan or in this one. Say that <code>eol-distro</code> passes, and that <code>only_checks</code> admits it alone, so the audit will file none of the twelve -- <code>eol-distro</code> is not one of them. <strong>Do not claim this plan will fix them</strong> and do not open a pull request. <strong>Never write a bot trigger phrase in any comment</strong>: the match is a substring anywhere in the body, including inside backticks, and two of those phrases start workflows that push commits -- grep the body for <code>retest</code>, <code>re-review</code> and <code>recheck</code> before posting. <strong>Amended 2026-10-06, after the step ran.</strong> Filed as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/images/issues/13" title="GitHub Issue: shakenfist/images #13">images#13</a> on 2026-10-05. It states an ownership verdict for each of the twelve, splitting them three, one and eight as above, but it inherited this row's earlier wording: three times it says "eleven" where it means the twelve -- the audit will not file "the other eleven" -- counting <code>eol-distro</code> as one of the twelve when it passes. 6e (10) checks for that wording, so the phase cannot close on it.</td>
+</tr>
+<tr>
+<td>6e</td>
+<td>medium</td>
+<td>sonnet</td>
+<td>none</td>
+<td><strong>Confirms the phase.</strong> Run after 6a, 6b and 6c have merged and at least one scheduled audit has run. <strong>Every check below, not a counted subset</strong>, each reported with its output, and each anchored one is run on its anchor too -- an anchor is what distinguishes "the work landed" from "the pattern was wrong". <strong>A check that names a command this environment refuses is a defect in the check</strong>: phase 5's check (6) specified an <code>ansible</code> fact gather against live hosts, the classifier blocked it, and the step substituted evidence and reported twelve of twelve. Nothing below reaches outside git, GitHub and this repository's own scripts. (1) In a fresh <code>development</code> clone, <code>registry.CHECKS</code> includes <code>eol-producers</code>, and <code>docs/audits/eol-producers.md</code> exists. (2) <code>eol-producers</code> reports <code>fail</code> against a <code>private-ci</code> clone at <code>8816709</code> naming all four retired labels, and <code>pass</code> against current <code>master</code> -- both run, because the pass alone proves nothing. (3) <code>eol-producers</code> reports <code>not_applicable</code> against a clone with no <code>conductor/</code>; use this repository. (4) <code>scope.documented_partial_scope()</code> returns six entries for <code>private-ci</code> and <code>['eol-distro']</code> for <code>images</code>, and <code>scope.matrix_repos()</code> contains <code>images</code> -- 22 entries against 21 on <code>13fec36</code>, which is the anchor that catches an edit to the README that never reached the matrix. (5) <code>grep -n 'Scoped to the sfui-vendor check' .github/workflows/consistency-audit.yml</code> returns nothing; on <code>13fec36</code> it returns one line at <code>:53</code>. (6) <code>python3 -m pytest scripts/tests/test_registry.py</code> passes, which is <code>AuditScopeIsStatedOnceTest</code> agreeing that all four statements match. (7) <code>scope.documented_excluded()</code> still parses, returns the seven plus the archived repositories and <strong>still contains <code>images</code></strong>, which is the convention <code>private-ci</code> follows and is why the bullet count below is unchanged rather than one short, and the new sentence about the seven is present as prose -- <code>grep -c '^\* '</code> over the excluded span is unchanged from <code>13fec36</code>, which is the check that catches the sentence having been written as a bullet. (8) A scheduled audit run after 6b merged reports <code>eol-producers</code> for <code>private-ci</code> and <code>eol-distro</code> for <code>images</code> on the compliance page, read from the generated page rather than inferred; name the run and its generation timestamp, and compare it in UTC against 6b's merge time rather than against the most recent page you can find. (9) In <code>images</code>, <code>grep -n 'sixteen repositories' build.sh</code> returns nothing and <code>grep -n 'debian:12' build.sh</code> still returns the default build list line -- the comment changed and the list did not, which is decision 6.3 in one check. (10) An issue exists in <code>shakenfist/images</code> listing all twelve findings, each with an ownership verdict -- three owned by its own Phase 5, <code>llm-doc-structure</code> touched by that phase's <code>AGENTS.md</code> rewrite, eight unowned -- and <code>gh issue view</code> on it does not contain the word <code>eleven</code>, which is the check that catches the issue counting <code>eol-distro</code> among findings it never was. (11) The three vacuous-pass fixes 6b grew are each held by a mutation rather than by a passing test: restore <code>PARTIAL_SCOPE_END_PATTERN</code> to the plural-only form and <code>test_a_one_check_partial_scope_sentence_parses</code> must fail; restore <code>IN_SCOPE_END</code> to <code>'One project is in scope'</code> and the lead-in change must break three tests; delete <code>- images</code> and then <code>- private-ci</code> from the audit matrix and <code>test_every_scoped_repo_is_in_the_audit_matrix</code> must fail naming that repository each time. Restore from a copy rather than with <code>git checkout</code>, and report what each mutation said. Report each with its output. <strong>Then, and only if every check agrees</strong>, tick this phase's done list and report; this phase closes no issue, so there is no gated outward-facing action. If any check disagrees, report and stop.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="risks-and-mitigations_3">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations_3" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>The criterion passes vacuously.</strong> A check that reads two dict
+  literals and finds nothing can mean the producer is clean or
+  that the parse found no dicts at all. 6a's brief requires a
+  demonstrated <code>fail</code> on <code>8816709</code> and a separate
+  <code>not_applicable</code> assertion, so all three answers are
+  distinguished; 6e re-runs both rather than trusting the commit
+  message. Checked by 6e (2) and (3).</li>
+<li><strong>A scope edit lands in three places out of four.</strong> This is the
+  statement with the worst recorded track record in the
+  repository. <code>AuditScopeIsStatedOnceTest</code> fails at commit time
+  rather than in review, and decision 6.8 keeps each statement in
+  one commit. Checked by 6e (4) and (6).</li>
+<li><strong>The new sentence about the seven is written as a bullet</strong> and
+  takes <code>scope-coverage</code> down fleet-wide rather than locally.
+  Mechanically caught: <code>bulleted_block()</code> raises
+  <code>ScopeParseError</code>, and the same test suite runs it. Checked by
+  6e (7), which counts bullets in the span rather than reading
+  the sentence.</li>
+<li><strong><code>images</code> joining files findings nobody expects.</strong> Mitigated by
+  decision 6.5 narrowing <code>only_checks</code> to one criterion that
+  already passes, and by 6d filing the rest as one planning issue
+  with ownership stated per item. The residual risk is that the
+  narrow scope becomes permanent by inertia; the written list is
+  the mitigation, and it is a weaker one than a date.</li>
+<li><strong>6c's comment rewrite drifts into a build-list change.</strong> The
+  conclusion in that comment is correct and only its reasons are
+  stale, which is the shape most likely to invite "while I am
+  here". The brief forbids touching the list and 6e (9) checks
+  both halves: the old premise gone, the list still there.</li>
+<li><strong>A check cannot be run as written.</strong> Phase 5 produced exactly
+  this and it reported twelve of twelve. Every check in 6e is
+  confined to git, GitHub and this repository's own scripts, with
+  no command that reaches a live host.</li>
+</ul>
+<h4 id="definition-of-done_3">Definition of done<a class="headerlink" href="#definition-of-done_3" title="Permanent link">&para;</a></h4>
+<p>Eleven bullets, and each one names its owner, because phase 4
+closed with four bullets no step had checked and phase 5 grew two
+more after its own list was written. This list grew one too, for
+what 6b found: the rule below was followed and 6e has a check for
+it. All eleven map to a 6e check; the tenth is 6d's action, and
+6e (10) verifies it.
+<strong>If a bullet is added to this list, 6e gets a check for it in the
+same commit</strong> -- the mapping is the mechanism rather than the
+decoration.</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>registry.CHECKS</code> includes <code>eol-producers</code> and
+      <code>docs/audits/eol-producers.md</code> exists, carrying decision
+      6.4's sentence about label-less static fleets. 6e (1).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>eol-producers</code> reports <code>fail</code> on a <code>private-ci</code> clone at
+      <code>8816709</code>, naming <code>debian-11</code>, <code>debian-12</code>,
+      <code>debian-12-docker</code> and <code>debian-gnome-12</code>, and <code>pass</code> on
+      current <code>master</code>. Both run; the pass alone is not
+      evidence. 6e (2).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>eol-producers</code> reports <code>not_applicable</code>, not <code>pass</code>,
+      against a repository with no producer definition. 6e (3).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>private-ci</code>'s partial scope is six criteria, stated
+      identically in <code>only_checks</code>, the sentence in
+      <code>docs/audits/README.md</code>, the <code>REPO_OVERRIDES</code> comment and
+      the audit matrix comment. 6e (4) and (6).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The audit matrix no longer says <code>private-ci</code> is "scoped to
+      the sfui-vendor check". 6e (5).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>images</code> is in the matrix, scoped to <code>eol-distro</code>, named in
+      the partial-scope paragraph of <code>docs/audits/README.md</code>, and
+      still on the excluded list and still absent from the
+      in-scope list -- the shape <code>private-ci</code> already has. 6e (4).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> The seven remaining excluded repositories are explained by
+      one prose line inside the excluded span, and the number of
+      bullets in that span is unchanged. 6e (7).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> A scheduled audit run after 6b merged reports
+      <code>eol-producers</code> for <code>private-ci</code> and <code>eol-distro</code> for
+      <code>images</code>, read from the generated compliance page. 6e (8).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>images</code>' <code>build.sh</code> no longer justifies bookworm by the
+      runner labels phase 5 retired, and its default build list
+      is unchanged. 6e (9).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> An issue in <code>shakenfist/images</code> lists all twelve findings
+      with an ownership verdict for each -- three owned by that
+      repository's own plan, <code>llm-doc-structure</code> touched by it,
+      eight owned by nobody -- and does not count <code>eol-distro</code>
+      among them. 6d's action. 6e (10).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> No scope statement passes vacuously: neither anchor in
+      <code>scripts/audit/scope.py</code> encodes a count or a plural, and
+      <code>only_checks</code> is held to the audit matrix. Each demonstrated
+      by a mutation that fails, not by a test that passes. 6e
+      (11).</li>
+</ul>
+<h4 id="back-brief_3">Back brief<a class="headerlink" href="#back-brief_3" title="Permanent link">&para;</a></h4>
+<p>Gate before 6a writes any code: <strong>the shape of the criterion's
+parse.</strong> Reading two dict literals out of Python with <code>ast</code> is
+cheap to propose and expensive to redo, and there is a real
+choice inside it -- whether the criterion keys off the label
+strings the dicts contain or off the release names the end-of-life
+table lists, with the mapping between them living in one place or
+two. Agree that before editing, because getting it wrong produces
+a criterion that works on today's dict layout and silently stops
+working when somebody reshapes it, which is the failure
+<code>eol-distro</code>'s quoted-label pattern was already chosen to avoid.
+<strong>Passed, and how is recorded in 6a's row</strong>: the criterion keys off
+label strings, with the label-to-release mapping kept only in
+<code>EOL_RELEASES</code>.</p>
+<p>No gate on 6b, 6c, 6d or 6e: each is mechanical against a brief
+that names its files, and each has a check in 6e that fails
+loudly rather than quietly.</p>
 <h3 id="7-push-audit">7. Push audit<a class="headerlink" href="#7-push-audit" title="Permanent link">&para;</a></h3>
 <p>Per the push audit shared block in <code>PLAN-TEMPLATE.md</code>. Runs
 <code>PUSH-AUDIT.md</code> over the accumulated diff of every phase against
@@ -18550,7 +19007,7 @@ carry the shared blocks <code>PLAN-TEMPLATE.md</code> offers for them.</p>
 fleet is measured against and reaches <code>scripts/audit/</code>, so it is
 high effort per this repository's own guidance, and it is
 exercised with <code>--dry-run</code> before anything files an issue.</p>
-<h2 id="risks-and-mitigations_3">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations_3" title="Permanent link">&para;</a></h2>
+<h2 id="risks-and-mitigations_4">Risks and mitigations<a class="headerlink" href="#risks-and-mitigations_4" title="Permanent link">&para;</a></h2>
 <p><strong>The migration is done and the detection is not.</strong> The most
 likely failure of this plan is that phases 3-5 close visible
 issues, phases 1, 2 and 6 close none, and the plan is declared
@@ -18662,7 +19119,7 @@ because they are the evidence for it:
 <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/images/issues/2" title="GitHub Issue: shakenfist/images #2">images#2</a> (the sixteen-day outage, the grub filesystem
 incompatibility and the two-year bullseye mislabelling) and
 <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/66" title="GitHub Issue: shakenfist/actions #66">actions#66</a> (<code>debian-13-docker</code> publishing without a docker client).</p>
-<h3 id="back-brief_3">Back brief<a class="headerlink" href="#back-brief_3" title="Permanent link">&para;</a></h3>
+<h3 id="back-brief_4">Back brief<a class="headerlink" href="#back-brief_4" title="Permanent link">&para;</a></h3>
 <p>Before executing any step of this plan, please back brief the
 operator as to your understanding of the plan and how the work you
 intend to do aligns with that plan.</p>

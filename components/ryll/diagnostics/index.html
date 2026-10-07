@@ -1709,6 +1709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/docs-line-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Documentation line references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/eol-distro/" class="md-nav__link">
         
   
@@ -15377,7 +15405,7 @@ written to JSON for bug reports.</p>
 <tr>
 <td><code>PlaybackSnapshot</code></td>
 <td>Playback</td>
-<td>Per-session audio metadata (<code>PlaybackSessionInfo</code>), start/stop counts, data-packet and decode counters, PCM byte counts, recent decode-duration ring (cap 64), device-side atomics (callbacks, underruns, ring overflows, samples consumed), volume/mute/latency params, per-opcode recv/send maps</td>
+<td>Per-session audio metadata (<code>PlaybackSessionInfo</code>), start/stop counts, data-packet and decode counters, unsupported-codec drop counter, PCM byte counts, recent decode-duration ring (cap 64), device-side atomics (callbacks, underruns, platform xruns, ring overflows, samples consumed), output device in use (<code>PlaybackOutputInfo</code>), last output failure and failure/rebuild/reroute counters, server volume/mute/latency params, per-opcode recv/send maps</td>
 </tr>
 <tr>
 <td><code>UsbredirSnapshot</code></td>
@@ -15392,7 +15420,7 @@ written to JSON for bug reports.</p>
 <tr>
 <td><code>AppSnapshot</code></td>
 <td>App (UI)</td>
-<td>FPS, bandwidth, surfaces, cursor position, uptime, video encoder-queue drop counter, render-side mpsc-queue lag aggregates for <code>ImageReady*</code> and <code>DisplayMark</code> events</td>
+<td>FPS, bandwidth, surfaces, cursor position, uptime, video encoder-queue drop counter, render-side mpsc-queue lag aggregates for <code>ImageReady*</code> and <code>DisplayMark</code> events, ryll's own volume and mute (<code>null</code> where no GUI maintains the snapshot)</td>
 </tr>
 </tbody>
 </table>
@@ -15451,8 +15479,10 @@ zip contains:</p>
 <a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>                          #   available:false with a reason)
 </code></pre></div>
 <p>Report types are <code>Display</code>, <code>Input</code>, <code>Cursor</code>, <code>Connection</code>, <code>Usb</code>,
-and <code>Pedantic</code>, each mapping to one SPICE channel or the
---pedantic observer path.  <code>BugReport::new()</code> samples runtime
+<code>Audio</code>, and <code>Pedantic</code>, each mapping to one SPICE channel or the
+--pedantic observer path. <code>Connection</code> covers the main channel only;
+an audio problem needs <code>Audio</code>, whose <code>channel-state.json</code> is the
+playback snapshot.  <code>BugReport::new()</code> samples runtime
 metrics over a 2-second window (blocking the caller), then gathers
 and serialises all data synchronously.  <code>BugReport::write_zip()</code>
 writes the zip to the capture directory's <code>bug-reports/</code>
@@ -15490,7 +15520,7 @@ dialog contains:</p>
 <ol>
 <li>A privacy warning about sensitive data in reports.</li>
 <li>Radio buttons to select the report type (Display, Input,
-   Cursor, Connection).</li>
+   Cursor, Connection, USB, Audio).</li>
 <li>An optional description text field.</li>
 <li>Capture and Cancel buttons.</li>
 </ol>

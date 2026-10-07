@@ -1709,6 +1709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/docs-line-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Documentation line references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/eol-distro/" class="md-nav__link">
         
   
@@ -16725,12 +16753,12 @@ for live debugging without generating a full bug report.</p>
 <li>Click <strong>Pause</strong> to freeze the display for inspection.</li>
 </ul>
 <h2 id="playback-channel-observability">Playback channel observability<a class="headerlink" href="#playback-channel-observability" title="Permanent link">&para;</a></h2>
-<p>The playback (audio) channel now exposes detailed diagnostics in bug
-reports to help characterise silent-audio or stuttering symptoms. If
-you file a Connection or Playback-typed bug report (F12), the
-<code>channel-state.json</code> will include a <code>playback</code> section with counters
-for every stage of the audio pipeline. Use this section to answer
-"where did the audio go?"</p>
+<p>The playback (audio) channel exposes detailed diagnostics in bug
+reports to help characterise silent-audio or stuttering symptoms.
+File an <strong>Audio</strong> bug report (F12): its <code>channel-state.json</code> is the
+playback snapshot, with counters for every stage of the audio
+pipeline. A Connection report covers only the main channel and will
+not help here. Use the snapshot to answer "where did the audio go?"</p>
 <p><strong>Reading playback diagnostics:</strong></p>
 <ul>
 <li>
@@ -16767,6 +16795,47 @@ for every stage of the audio pipeline. Use this section to answer
   was never started (no SPICE_MSG_PLAYBACK_START received) or was stopped
   (SPICE_MSG_PLAYBACK_STOP received). When present, it includes the sample
   rate, channel count, and codec (Opus or raw PCM) the server declared.</p>
+</li>
+<li>
+<p><strong><code>data_packets_unsupported_codec</code> &gt; 0</strong>: The server negotiated a codec
+  ryll cannot play, so every DATA packet is being dropped. ryll also raises
+  a notification the first time this happens.</p>
+</li>
+<li>
+<p><strong><code>output</code></strong>: The device the sound is going to. If it is not the device
+  you are listening to, the problem is local routing, not ryll or the
+  guest. On a platform that moves default-device streams by itself (macOS),
+  <code>output_reroute_count</code> counts those moves.</p>
+</li>
+<li>
+<p><strong><code>output: null</code> with <code>output_error</code> set, during a session</strong>: ryll has
+  no working output stream — no device, or the stream died (device
+  unplugged, sample rate changed underneath it, audio server restarted).
+  ryll retries with a backoff of up to 30 seconds, and raises one
+  notification when output is lost and another once a new stream has
+  played for 10 seconds. If <code>current_session</code> is null, nothing is
+  retrying: <code>output_error</code> is the last error of an earlier session, kept
+  for the report.</p>
+</li>
+<li>
+<p><strong><code>output_streams_started</code> climbing in step with <code>output_failure_count</code></strong>:
+  the device opens and then dies straight away. ryll keeps doubling the
+  backoff for a stream that dies within 10 seconds, so this settles at
+  one attempt every 30 seconds, inside a single notified failure streak.</p>
+</li>
+<li>
+<p><strong><code>--web</code> mode</strong>: The <code>output*</code> fields describe the stream ryll opens
+  on the host it runs on, not what the browser hears; browser audio is
+  forwarded before that stream. On a server with no audio device,
+  <code>output: null</code>, an <code>output_error</code> of "no audio output device found"
+  and an <code>output_failure_count</code> that climbs every 30 seconds are
+  expected and harmless. The notifications are suppressed in this mode
+  for the same reason.</p>
+</li>
+<li>
+<p><strong><code>audio_volume_percent</code> / <code>audio_muted</code> in <code>session.json</code></strong>: ryll's own
+  status-bar volume and mute, applied on top of the guest's volume. Check
+  these first.</p>
 </li>
 </ul>
 <p><strong>USB and WebDAV analogues:</strong></p>

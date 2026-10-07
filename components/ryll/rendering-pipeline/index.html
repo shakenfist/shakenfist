@@ -1709,6 +1709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/docs-line-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Documentation line references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/eol-distro/" class="md-nav__link">
         
   
@@ -15245,6 +15273,29 @@ the audio thread via <code>Arc&lt;VolumeControl&gt;</code>, using atomic operati
 avoid locking in the cpal real-time callback.</p>
 <p>The audio thread is spawned on <code>PLAYBACK_START</code> and stopped (joined)
 on <code>PLAYBACK_STOP</code> or channel disconnect.</p>
+<p>Between those, the audio thread keeps an output stream alive rather
+than giving up on the first error. Opening a stream can fail (no
+device), and a running stream can die (the device is unplugged, its
+sample rate changes, the audio server restarts). In either case the
+thread drops the stream, discards the stale audio queued in the ring
+buffer, and opens a new stream on the current default device, retrying
+with a doubling backoff from 1 to 30 seconds. Only a stream that has
+played for 10 seconds resets the backoff and ends the failure streak, so
+a device that dies straight after opening is retried quietly rather
+than every second. cpal reports a default-device change that it
+handled by itself as <code>DeviceChanged</code>, which is recorded but needs no
+rebuild. Xruns arrive on the device's real-time thread, so they are
+counted in an atomic rather than logged.</p>
+<p>The audio thread has no async context, so it reports these transitions
+over a <code>std::sync::mpsc</code> channel. The playback channel drains it on
+every turn of its read loop, folds the events into the playback
+snapshot, and raises notifications when output is lost, restored or
+moved to another device. A routine start on <code>PLAYBACK_START</code> is
+silent. In <code>--web</code> mode those notifications are suppressed, because
+the operator hears audio through the browser rather than the host's
+speakers. A DATA packet whose negotiated codec is neither raw PCM nor
+Opus is counted and registered as a protocol gap, rather than dropped
+silently.</p>
 <h2 id="notifications">Notifications<a class="headerlink" href="#notifications" title="Permanent link">&para;</a></h2>
 <p>Ryll surfaces three categories of operator-relevant events through a
 unified in-memory store and a single GUI surface:</p>

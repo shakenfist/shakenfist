@@ -1709,6 +1709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/docs-line-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Documentation line references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/eol-distro/" class="md-nav__link">
         
   
@@ -15270,8 +15298,8 @@ channel's snapshot changes.</p>
 </tr>
 <tr>
 <td>playback</td>
-<td>28</td>
-<td>full session / decode / device pipeline</td>
+<td>35</td>
+<td>full session / decode / device pipeline, output device and stream-failure state</td>
 <td>complete</td>
 </tr>
 <tr>
@@ -15508,15 +15536,34 @@ snapshot surfaces:</p>
   the most recent device open (proves the audio device is pulling)
 - <code>device_underrun_count</code> — callbacks where the ring buffer had zero
   ready samples at entry: true underruns where we handed the device
-  silence
+  silence. A callback that found the consumer state locked by a
+  dying stream's last callback also hands over silence and is counted
+  here
 - <code>ring_overflow_count</code> — decoded samples dropped because the ring
   buffer was full (decoder running ahead of the device clock)
 - <code>samples_consumed_total</code> — samples consumed by the device since the
-  most recent device open</p>
+  most recent device open
+- <code>device_xrun_count</code> — buffer under- or overruns the platform itself
+  reported on the output stream, as distinct from ryll running dry</p>
+<p><strong>Output stream:</strong>
+- <code>output</code> — the device the session is playing through, with the
+  sample rate, channel count and sample format the stream was opened
+  with; <code>None</code> when no stream is playing
+- <code>output_error</code> — why the last attempt to open or keep a stream
+  failed, cleared when one starts
+- <code>output_streams_started</code> / <code>output_failure_count</code> /
+  <code>output_reroute_count</code> — streams opened (including rebuilds),
+  failures (including each retry), and platform reroutes to a new
+  default device
+- <code>data_packets_unsupported_codec</code> — DATA packets dropped because the
+  server negotiated a codec ryll cannot play</p>
 <p>Together these answer: "did the server send audio? did we decode it?
-did the device pull it?" — the three questions an audio-silence bug
-report needs, verified against a live session to confirm the
-instrumentation distinguishes the failure modes as designed.</p>
+did the device pull it, and which device was it?" — the questions an
+audio-silence bug report needs, verified against a live session to
+confirm the instrumentation distinguishes the failure modes as
+designed. ryll's own volume slider and mute button are recorded in
+<code>session.json</code> (<code>audio_volume_percent</code>, <code>audio_muted</code>), since they
+apply on top of anything the guest sends.</p>
 <h3 id="usbredir">usbredir<a class="headerlink" href="#usbredir" title="Permanent link">&para;</a></h3>
 <p><strong>Handshake:</strong>
 - <code>server_caps</code> / <code>client_caps</code> — the capability bitmaps observed and

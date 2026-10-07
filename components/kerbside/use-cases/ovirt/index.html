@@ -1709,6 +1709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/docs-line-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Documentation line references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/eol-distro/" class="md-nav__link">
         
   
@@ -15099,9 +15127,12 @@
 
 
 <h1 id="kerbside-for-ovirt">Kerbside for oVirt<a class="headerlink" href="#kerbside-for-ovirt" title="Permanent link">&para;</a></h1>
-<p>Native SPICE desktops for oVirt users, without exposing
-hypervisors to the client network and without an opaque
-byte-relay in the middle.</p>
+<p>oVirt users want native SPICE desktops, the hypervisors should
+not be reachable from the client network, and the usual bridge
+between the two is an HTTP CONNECT proxy relaying bytes it
+cannot see into. Kerbside replaces that relay with one that
+understands SPICE: it knows which sessions are live, can end
+them, and firewalls what clients send.</p>
 <h2 id="value-proposition">Value proposition<a class="headerlink" href="#value-proposition" title="Permanent link">&para;</a></h2>
 <p>oVirt's own answer for clients that cannot reach the hypervisor
 network is an HTTP CONNECT proxy — conventionally squid —
@@ -15131,10 +15162,9 @@ sending anything the hypervisor will accept.</p>
 <li><strong>The backend leg is pinned where the engine supplies a
   subject.</strong> Kerbside verifies the hypervisor's certificate
   against the engine CA <em>and</em> pins the certificate subject it
-  discovered from the engine, so a redirected backend
-  connection fails rather than succeeding quietly. A VM the
-  engine reports with no host leaves that subject unset
-  (<code>kerbside/sources/ovirt.py:99-117</code>), and an unset subject
+  discovered from the engine, so a redirected backend connection
+  fails rather than succeeding quietly. A VM the engine reports
+  with no host leaves that subject unset, and an unset subject
   relays the leg unpinned rather than erroring. In an ordinary
   cluster every running VM has a host, so this is the edge
   rather than the case.</li>

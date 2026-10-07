@@ -1709,6 +1709,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/docs-line-references/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Documentation line references
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/eol-distro/" class="md-nav__link">
         
   
@@ -15099,10 +15127,11 @@
 
 
 <h1 id="kerbside-for-openstack">Kerbside for OpenStack<a class="headerlink" href="#kerbside-for-openstack" title="Permanent link">&para;</a></h1>
-<p>Nova's own <code>spice-direct</code> console, answered by a protocol-aware
-proxy: the URL Nova hands the user points at Kerbside, so
-Kerbside is the console endpoint rather than something bolted on
-beside one.</p>
+<p>Nova's <code>spice-direct</code> console type lets OpenStack users open a
+native SPICE client, but leaves the proxy that client connects
+to as someone else's job. Kerbside is that proxy, designed
+alongside <code>spice-direct</code>, so the console URL Nova returns is a
+Kerbside URL.</p>
 <h2 id="value-proposition">Value proposition<a class="headerlink" href="#value-proposition" title="Permanent link">&para;</a></h2>
 <p>Nova 2025.1 (Epoxy) added the <code>spice-direct</code> console type so
 that users can open a native SPICE client instead of the HTML5
@@ -15178,11 +15207,10 @@ audio, and adaptive compression.</p>
 <h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
 <p>Nothing is discovered in advance. There is no OpenStack source
 driver in <code>kerbside/sources/</code>, and the maintenance loop's scrape
-pass skips an entry of this type outright
-(<code>kerbside/main.py:175-178</code>), so the discovery interval that
-governs the oVirt and Shaken Fist sources does not apply here at
-all. A console exists in Kerbside because a user asked Nova for
-one, and not before.</p>
+pass skips an entry of this type outright, so the discovery
+interval that governs the oVirt and Shaken Fist sources does not
+apply here at all. A console exists in Kerbside because a user
+asked Nova for one, and not before.</p>
 <pre class="mermaid"><code>flowchart TD
     user["User&lt;br/&gt;(OpenStack client or portal,&lt;br/&gt;then remote-viewer or ryll)"]
     nova["Nova compute API&lt;br/&gt;(remote-consoles)"]
@@ -15224,10 +15252,10 @@ broken cloud early in <code>sources.yaml</code> takes out console access
 for every cloud listed after it.</p>
 <p>The validation answer carries the instance uuid, the compute
 node's address, and that console's plaintext and TLS ports.
-Kerbside writes them into its console table at that moment
-(<code>kerbside/api.py:665</code>), creating the row if this instance has
-never been asked for before and refreshing it if it has. This is
-the only thing that ever creates an OpenStack console row.</p>
+Kerbside writes them into its console table at that moment,
+creating the row if this instance has never been asked for
+before and refreshing it if it has. This is the only thing that
+ever creates an OpenStack console row.</p>
 <p><strong>The client leg (5, 6).</strong> The <code>.vv</code> file points at
 <code>PUBLIC_FQDN</code> and Kerbside's own ports, carries Kerbside's CA
 and, when <code>PROXY_HOST_SUBJECT</code> is set, Kerbside's own
@@ -15262,7 +15290,7 @@ user.</p>
 removes consoles it can no longer see is scoped to the sources
 it actually enumerated, and an OpenStack entry is skipped rather
 than enumerated, so its consoles are retained indefinitely and
-by design (<code>kerbside/main.py:242-261</code>, and see
+by design (see
 <a href="/components/kerbside/console-sources/#what-happens-when-a-source-fails">console-sources.md</a>).
 A row for an instance that has since been deleted stays listed
 until the cloud is removed from <code>sources.yaml</code> altogether. Nova
