@@ -172,8 +172,8 @@ library or operator tooling that wraps the API, not in the server.
     The `retry_transient_capacity` flag described below is merged to the
     client-python repository's `develop`, but is **not** in any tagged
     release: the latest is v0.8.3, which predates it. Passing it to a
-    `Client` you installed from PyPI raises `TypeError`. This section will name a minimum client version once
-    that release is cut.
+    `Client` you installed from PyPI raises `TypeError`. This section
+    will name a minimum client version once that release is cut.
 
     The server half of the contract described above is live regardless: the
     `Retry-After` header and the `stage` and `transient` body fields are

@@ -426,13 +426,15 @@ below.
 
 ### Findings, ranked
 
-**Every disposition in this table is PROPOSED.** Per the Back brief's
-gate, nothing has been filed and nothing has been declined in writing:
-filing reserves work and may attract an automated fix, and a written
-decline becomes the permanent record. Both are for the management
-session to take to review.
+Every disposition in this table was first written as a proposal. Per
+the Back brief's gate, nothing was filed and nothing was declined in
+writing until the table had been reviewed: filing reserves work and may
+attract an automated fix, and a written decline becomes the permanent
+record. The dispositions below are the ones executed after that review;
+"What the dispositions became" at the end of this Outcome summarises
+them.
 
-| # | Finding | Range(s) | Lens | Severity | Proposed disposition |
+| # | Finding | Range(s) | Lens | Severity | Disposition |
 |---|---|---|---|---|---|
 | 1 | The CI `create_instance()` wrapper decides what is worth waiting out from the exception class, not from the `transient` field phase 4 publishes (`shakenfist/deploy/shakenfist_ci/base.py:391`). Two of `POST /instances`' four 507 branches are `CongestedNetwork` address exhaustion, which carries no marker and which no cpu/memory/disk predicate can see, so the wait is satisfied instantly and the create is replayed to `MAX_CREATE_ATTEMPTS` (44); a `cpu_max_per_instance` refusal instead burns the full 420 s. Either way the failure message blames headroom. This is the boundary phase 4's D35 identified as a defect and fixed on the server *and* the client, on the one half D35 did not look at. Found twice independently. | `5ad9651ee` × `565e36e6e` | code quality + cross-phase | **High** | **Filed** as [#4474](https://github.com/shakenfist/shakenfist/issues/4474), with `automated-fix-attempted`. The code change is one condition, but the failure message and its test carry the value, and a same-day automated patch would add the condition without the diagnosis. |
 | 2 | `RunInnerCadenceTestCase` drives the resources daemon's loop with `clock_step=5` only (`shakenfist/tests/test_daemon_resources.py:605`), so the "no poll this tick" branch -- four of every five real iterations, since `self.idle(1)` runs against `DOMAIN_POLL_INTERVAL_SECONDS = 5` -- is never driven. Dropping `if polled_domains is not None` before `last_domains = polled_domains` (`shakenfist/daemons/resources/main.py:850-851`) survives the **whole** unit suite. In production that publishes a metrics row every 5 s on every node forever: fifteen database round trips per publish, which is the load regression phase 3 exists to avoid. | `03cd7be3a` | test coverage | **High** | **Filed** as [#4475](https://github.com/shakenfist/shakenfist/issues/4475); one issue covers all five mutation survivors, named for this one. |
@@ -448,8 +450,8 @@ session to take to review.
 | 12 | `test_the_sleep_is_clamped_to_the_remaining_deadline` asserts against the real wall clock (`deadline=time.time() + 5`, `assertGreater(slept, 4)`). A >1 s stall makes it fail. Every other time-sensitive test in that class drives a fake clock. | `74d6e129b` | client-python | Low | **Filed** as [client-python#421](https://github.com/shakenfist/client-python/issues/421). |
 | 13 | The refusal `stage` is never read or logged by the client (`apiclient.py:521`, `:559-561`). Reading `transient` rather than re-deriving from `stage` is the right call, but the server publishes `stage` precisely so a caller can say *why*, and one format argument is the difference between a diagnosable and an opaque 60 s pause. | `74d6e129b` | client-python | Low | **Filed** as [client-python#421](https://github.com/shakenfist/client-python/issues/421). |
 | 14 | The stage-exhaustiveness guard excludes any call that *names* `exception_class`, not one that names a non-507 class (`shakenfist/tests/test_capacity_error.py:177`). The skip exists for the single affinity site, which is answered 409. As written it would also skip a future 507-answered subclass, whose stage would fall silently into the non-transient default -- precisely the failure the test exists to prevent and which phase 4's Outcome claims it cannot have. Correct today; weaker than its claim. | `565e36e6e` | code quality | Low | **Fixed here** -- narrow the skip to the affinity class by name. One edit, smaller than the description. |
-| 15 | The forced-reconcile counter's documented diagnostic is unreachable for the case it names. `docs/developer_guide/subsystem_internals.md:220-228` says the check "forces at most once per distinct unguarded set" and then tells an operator that "a count that keeps climbing in an otherwise steady cluster" means check and reconciler disagree -- but under the once-per-condition memory a *stable* disagreement increments once and never again. Only a churning unguarded set makes the counter climb. `docs/operator_guide/database.md:808-810` inherits the reading. | `7cc93750d` | code quality | Low | **Fixed here** -- one paragraph in two files. |
-| 16 | `stage=CAPACITY_GUARD_STAGE` on the preflight exhaustion raise has no reader (`shakenfist/operations/node_inst_netdesc_op.py:289-292`). The only production reader of `.stage` is the create path; this raise happens inside an `except LowResourceException` in a cluster operation and never reaches the API. The comment says "the stage is carried alongside it so no handler has to parse it back out" -- there is no handler. Verified by grepping every `.stage` read. | `565e36e6e` | code quality | Low | **Declined**: harmless, and the field is the right shape for the handler a later phase would add. The comment's claim should lose its present tense, which is a drive-by on #15's edit rather than a finding of its own. |
+| 15 | The forced-reconcile counter's documented diagnostic is unreachable for the case it names. `docs/developer_guide/subsystem_internals.md:220-228` says the check "forces at most once per distinct unguarded set" and then tells an operator that "a count that keeps climbing in an otherwise steady cluster" means check and reconciler disagree -- but under the once-per-condition memory a *stable* disagreement increments once and never again. Only a churning unguarded set makes the counter climb. `docs/operator_guide/database.md:808-810` names the same counter but only states what it counts, so it does not carry the diagnostic and needs no change. | `7cc93750d` | code quality | Low | **Fixed here** -- one paragraph in one file. |
+| 16 | `stage=CAPACITY_GUARD_STAGE` on the preflight exhaustion raise has no reader (`shakenfist/operations/node_inst_netdesc_op.py:289-292`). The only production reader of `.stage` is the create path; this raise happens inside an `except LowResourceException` in a cluster operation and never reaches the API. The comment says "the stage is carried alongside it so no handler has to parse it back out" -- there is no handler. Verified by grepping every `.stage` read. | `565e36e6e` | code quality | Low | **Declined**: harmless, and the field is the right shape for the handler a later phase would add. The comment's claim loses its present tense here, as a drive-by rather than a finding of its own. |
 | 17 | Four verbatim copies of the same nine-line `# raw-create:` justification (`cluster_ci_tests/test_object_names.py:120,137,222,234`). The guard requires a non-empty reason specifically so the allowlist "cannot grow by copy-pasting an existing marker line without writing a new sentence"; the same diff then copy-pasted one paragraph four times. Satisfied in the letter, defeated in the spirit. | `5ad9651ee` | code quality | Low | **Fixed here** -- a short marker on each site plus one shared explanation above the class. |
 | 18 | Admin-scoped capacity data -- node UUIDs and per-node headroom figures from `/admin/resources` -- is written to `instance-waits.jsonl` on every wait and ships into the downloadable CI artifact bundle unconditionally (`base.py:467-520`). The repository is public and the traces are read from inside downloaded bundles, so the audience widens from "holds `system_client` credentials" to "anyone who can read an Actions run". D14 chose the mechanism deliberately but discusses *how* the file reaches the bundle, not *whether* admin-scoped data belongs there. | `5ad9651ee` | security | Low | **Declined**, with the reason written down rather than assumed: the cluster is ephemeral and torn down after the run, and momentary headroom figures and per-run node UUIDs have no standing value. The point of the finding is that this is now a conscious "yes, and that is fine because ephemeral" instead of an implicit one. |
 | 19 | The new Prometheus counter is unpinned in both its name and its increment: renaming `scheduler_capacity_reconcile_forced_total` (`scheduled_tasks.py:284-288`) or deleting the `.inc()` (`main.py:986`) survives the whole unit suite. A metric name is an operator-visible contract, published in two guides, and a dashboard dependency. | `7cc93750d` | test coverage | Low | **Filed** as [#4475](https://github.com/shakenfist/shakenfist/issues/4475). |
@@ -521,8 +523,8 @@ the 600 s ceiling; and seven deliberate mutations all fail. None of it
 is reachable. It is in no tag and no release, two months of releases
 behind, so phase 4's `Retry-After` functional assertion is still dark
 and the only user-visible consequence of the whole client half is an
-operator-guide warning that has been false since ten hours after it was
-written. Phase 4's Future work records the missing version number and
+operator-guide warning that was false from ten hours after it was
+written until this audit corrected it. Phase 4's Future work records the missing version number and
 reads, reasonably, as though that were the whole gap -- it is not; the
 weaker fact was recorded and the stronger one was not. The disposition
 asks for a release, which is the one thing that turns all of this into
@@ -562,7 +564,7 @@ Both halves of the assertion are true. Recorded as a discrepancy.
 
 ```
 $ sed -n '116p' docs/plans/index.md | tail -c 60
- since ten hours after it was written | Complete | 7 of 7 |
+written until this audit corrected it | Complete | 7 of 7 |
 $ python3 tools/check-plan-status.py
 Plan statuses, index arithmetic and phase links agree.
 $ echo $?
@@ -572,14 +574,17 @@ $ echo $?
 **3. The Outcome contains a findings table with one row per finding,
 each carrying a disposition of fixed, filed with a number, or declined
 with a reason.** **Met-with-discrepancy.** The table above has 28 rows,
-one per finding, each with a disposition. None carries an issue number
-and none is declined, because the item contradicts this plan's own Back
-brief: "7h must propose its disposition table and stop for review
-before filing anything or writing a decline." An issue number cannot
-exist before filing, and a decline in writing is the thing the gate
-exists to prevent. Every disposition is marked **PROPOSED**. The item
-should have said "a proposed disposition of fix, file or decline, with
-the issue title rather than a number". Recorded as a discrepancy.
+one per finding, each with a disposition. As 7h left it, none carried
+an issue number and none was declined, because the item contradicts
+this plan's own Back brief: "7h must propose its disposition table and
+stop for review before filing anything or writing a decline." An issue
+number cannot exist before filing, and a decline in writing is the
+thing the gate exists to prevent. The item should have said "a proposed
+disposition of fix, file or decline, with the issue title rather than a
+number". Recorded as a discrepancy. The discrepancy was resolved after
+the gate: the reviewed dispositions were executed, and every row now
+carries a fix, an issue number, or a written decline, so the item as
+written is now also met.
 
 **4. No finding cites `b398cb890`, `a5e4a5e8c` or `48584e589` under a
 code-quality, test-coverage or security lens.** **Met.**
@@ -684,11 +689,11 @@ predicted this ("Expect at least one to be wrong; three phases running
 is a rate, not a coincidence"); three is the rate holding.
 
 **11. `pre-commit run --all-files` passes, run once by the management
-session after the last step.** **Not yet run.** This step did not run
-it, by instruction: pre-commit's stash is repository-wide, and the plan
-makes the hooks the management session's to run centrally. The item is
-correct as written and is the one thing between this Outcome and a
-commit.
+session after the last step.** **Met.** 7h did not run it, by
+instruction: pre-commit's stash is repository-wide, and the plan makes
+the hooks the management session's to run centrally. The management
+session ran it over the tree carrying the first review's corrections to
+this Outcome, and it passed.
 
 ### Discrepancies -- what execution found wrong with this plan
 
@@ -729,9 +734,10 @@ rather than against it.
 **Definition-of-done item 3 contradicts the Back brief.** It requires
 every disposition to be "fixed, filed with a number, or declined with a
 reason", while the Back brief requires 7h to propose and stop before
-filing anything or writing a decline. Both cannot be satisfied; the
-gate wins, so the table carries proposed dispositions and issue titles
-instead of numbers.
+filing anything or writing a decline. Both cannot be satisfied at
+once; the gate wins, so 7h's table carried proposed dispositions and
+issue titles instead of numbers, and the numbers and declines were
+written in only after the review.
 
 **Definition-of-done item 8 assumed there would be failures to
 classify.** There were none in the eight executed ranges, and three
