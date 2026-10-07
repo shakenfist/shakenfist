@@ -94,7 +94,7 @@ poller), media socket binding added 2026-08-21.
 | Cursor hide/show | available | missing (same as above) | available (MVP) |
 | Default arrow fallback cursor | available | n/a — intrinsic (no display) | available |
 | **Audio** | | | |
-| Audio playback (PCM and Opus decoding) | available | partial (`ryll/src/channels/playback.rs:156-292` — `PlaybackChannel` connects and decodes, but spawns a cpal thread that will fail silently if no audio device is present; no headless-safe "discard" path exists) | available (MVP; Opus passthrough preferred, PCM→Opus fallback) |
+| Audio playback (PCM and Opus decoding) | available | partial (`shakenfist-spice-renderer/src/channels/playback.rs` — `PlaybackChannel` connects and decodes, but always spawns a cpal thread; with no audio device present it raises one notification and retries with a backoff of up to 30 s; no headless-safe "discard" path exists) | available (MVP; Opus passthrough preferred, PCM→Opus fallback; the host-side cpal thread still runs, so on a host with no audio device the snapshot's `output_*` fields record retries every 30 s, with notifications suppressed) |
 | Volume control (slider + mute) | available | missing (`ryll/src/app.rs:1843-1856` — `VolumeControl` Arc is wired in but no CLI flag, stdout interface, or control-socket verb exposes it in headless) | missing (out of MVP scope; not listed in PLAN-web-frontend.md MVP) |
 | Audio volume/mute persisted across reconnect | available | n/a — intrinsic (no GUI; VolumeControl is re-created on reconnect anyway) | missing (out of MVP scope) |
 | **Keyboard / Mouse Input** | | | |

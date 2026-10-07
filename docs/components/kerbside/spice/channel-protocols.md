@@ -51,12 +51,13 @@ level:
 | `TCP_KEEPINTVL`  | 15 s |
 | `TCP_KEEPCNT`    | 3 |
 
-Reference: `spice-gtk/src/spice-session.c:2300`,
-`spice-gtk/src/spice-channel.c:2606`. These are kernel-level
-probes; they do not generate SPICE messages and therefore do not
-satisfy the server's rcc check on their own. They only detect a
-half-open connection promptly when the client cannot reach the
-server.
+Reference: `spice_session_channel_open_host()` in spice-gtk's
+`src/spice-session.c`, and `spice_channel_coroutine()` in
+`src/spice-channel.c` for a client-provided socket. These are
+kernel-level probes; they do not generate SPICE messages and
+therefore do not satisfy the server's rcc check on their own.
+They only detect a half-open connection promptly when the client
+cannot reach the server.
 
 When a channel disconnects (whether via the rcc timeout, a TCP
 RST/FIN, or the client sending a `DISCONNECTING` message), the

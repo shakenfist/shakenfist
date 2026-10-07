@@ -1,18 +1,21 @@
 # Kerbside standalone
 
-A fixed list of SPICE targets and nothing behind them: the
-`static` source driver (`kerbside/sources/static.py`) reads its
-console list out of `sources.yaml`, so Kerbside brokers qemu
-directly with no cloud to discover anything from.
+You have SPICE consoles but no cloud that knows about them,
+and you want to hand them to users without handing out routes
+to the machines that host them. Kerbside's `static` source
+driver reads a fixed list of targets from `sources.yaml` and
+fronts them with the same audited, firewalled proxy the cloud
+deployments get.
 
 ## Value proposition
 
-The other three pages put Kerbside in front of a platform that
-already knows where every console of its own is. This one is for
-when there is no such platform: a lab bench, a CI job, a rack of
-appliance VMs no API will ever enumerate. The `static` driver
-is how you get the proxy's session model, its audit trail and
-its SPICE firewall without standing anything else up first.
+The [Shaken Fist](/components/kerbside/use-cases/shakenfist/), [OpenStack](/components/kerbside/use-cases/openstack/) and
+[oVirt](/components/kerbside/use-cases/ovirt/) pages put Kerbside in front of a platform that
+already knows where its consoles are. Here there is none — a lab
+bench, a CI job, a rack of appliance VMs no API will ever
+enumerate — and the `static` driver is how you get the proxy's
+session model, its audit trail and its SPICE firewall without
+standing anything else up first.
 
 - **There is nothing to stand up and nothing to authenticate
   to.** The driver makes no external call at all. There is no
@@ -37,8 +40,8 @@ its SPICE firewall without standing anything else up first.
   letting the removal land, and adding it back. See
   [Status and limitations](#status-and-limitations).
 - **Backend pinning is a field you write by hand, and this is
-  the only deployment where that is true.** All four pages
-  answer the same question — what stops Kerbside's backend
+  the only deployment where that is true.** All four source
+  types answer the same question — what stops Kerbside's backend
   connection being redirected to a host that is not the one it
   meant to reach — and all four answer it differently. oVirt
   learns the certificate subject from the engine during
@@ -102,45 +105,41 @@ flowchart TD
 ```
 
 **The reload (A).** `_parse_sources()` re-opens the sources file
-on every call (`kerbside/main.py:64`, the `open()` at `:90`),
-and the maintenance loop calls it every sixty seconds
-(`kerbside/main.py:349`). The driver is not kept between passes:
-it is constructed fresh from the YAML that pass parsed
-(`kerbside/main.py:174`), so the console list is re-read with
-it. A target that has appeared in the file is added and audited
-`Discovered new console` (`kerbside/main.py:201-206`). A target
-that has been removed from the file is deleted and audited
-`Console no longer available` (`kerbside/main.py:243-261`) — the
-retention rule that keeps an OpenStack cloud's rows indefinitely
-covers only sources the pass did not enumerate, and this source
-is enumerated, so it does not apply. Both directions therefore
-land in a little over a minute — the loop sleeps a second at a
-time and fires once more than sixty have passed
-(`kerbside/main.py:335-354`) — and both leave an audit event you
-can check rather than a claim you have to believe.
+on every call, and the maintenance loop calls it every sixty
+seconds. The driver is not kept between passes: it is
+constructed fresh from the YAML that pass parsed, so the console
+list is re-read with it. A target that has appeared in the file
+is added and audited `Discovered new console`. A target that has
+been removed from the file is deleted and audited
+`Console no longer available` — the retention rule that keeps an OpenStack
+cloud's rows indefinitely covers only sources the pass did not
+enumerate, and this source is enumerated, so it does not apply.
+Both directions therefore land in a little over a minute — the
+loop sleeps a second at a time and fires once more than sixty
+have passed — and both leave an audit event you can check rather
+than a claim you have to believe.
 
 **What the reload does not carry.** A console which already
 exists has its host, address, ports, name and `host_subject`
 reassigned on every pass, but not its SPICE password: that is
-set only when the row is first inserted
-(`kerbside/db.py:303-318`), and the `.vv` handler then
-deliberately leaves the stored value alone for a static source,
-on the grounds that the driver persisted it at enumeration time
-(`kerbside/api.py:512-515`). An edited password is therefore
-parsed, yielded by the driver, passed to the database layer and
-dropped, with no log line, no audit event and no errored source.
-Removing the entry, letting the removal land, and adding it back
-does apply it, because that takes the insert path — at a cost
-worth knowing before you rely on it: the console is deleted on
-the first pass and absent from the inventory, the API and the
-web UI until the second, it comes back as a fresh row with its
-discovery timestamp reset, and rotating a password therefore
-takes two maintenance cycles rather than one. The audit trail
-does survive, which is the one piece of good news here: audit
-events are keyed on the source and the identifier rather than
-on the console row, and nothing deletes them, so re-adding the
-same identifier picks the history back up.
-Tracked as
+set only when the row is first inserted (`add_console()` in
+`kerbside/db.py`), and the `.vv` handler then deliberately
+leaves the stored value alone for a static source, on the
+grounds that the driver persisted it at enumeration time. An
+edited password is therefore parsed, yielded by the driver,
+passed to the database layer and dropped, with no log line, no
+audit event and no errored source. Removing the entry, letting
+the removal land, and adding it back does apply it, because that
+takes the insert path — at a cost worth knowing before you rely
+on it: the console is deleted on the first pass and absent from
+the inventory, the API and the web UI until the second, it comes
+back as a fresh row with its discovery timestamp reset, and
+rotating a password therefore takes two maintenance cycles
+rather than one. The audit trail does survive, which is the one
+piece of good news here: audit events are keyed on the source
+and the identifier rather than on the console row, and nothing
+deletes them, so re-adding the same identifier picks the history
+back up. Tracked as
 [#463](https://github.com/shakenfist/kerbside/issues/463).
 
 **What a bad edit does depends on how it is bad.** Three
@@ -209,13 +208,13 @@ TLS channel configured. Kerbside needs the CA that signed the
 target's certificate, as `ca_cert` on the *source* rather than
 on the target's entry: the daemon reads it for every source type
 and forwards it to the proxy as the backend CA
-(`kerbside/rpc/servicer.py:136`). And `host_subject` on the
-entry pins which certificate is acceptable. The CA is not
-optional decoration on top of the other two — without it the
-protocol crate verifies the target against the public web trust
-store, which an internal certificate will not satisfy, so the
-escalation fails the handshake rather than proceeding
-unverified.
+(`AuthorizeConnection` in `kerbside/rpc/servicer.py`). And
+`host_subject` on the entry pins which certificate is
+acceptable. The CA is not optional decoration on top of the
+other two — without it the protocol crate verifies the target
+against the public web trust store, which an internal
+certificate will not satisfy, so the escalation fails the
+handshake rather than proceeding unverified.
 
 Guests want `qemu-guest-agent` and `spice-vdagent` installed, as
 they would for any SPICE console — they are what give you
@@ -305,17 +304,17 @@ The exception is the demonstration affordance the compose stack
 uses. `kerbside demo token` mints a bearer token straight from
 the signing seed, and it refuses to do so unless *every* source
 configured in the file is `type: static`
-(`kerbside/main.py:474-526`), naming the offending source and
-its type in the refusal and adding "See issue #300 for the
-underlying gap". The reasoning is in the code: a session token
-is not scoped to a source, so it authorises every console of
-every configured source and there is no coherent per-source
-version of the guard. That makes the composability described
-above conditional — add a real cloud beside your static entry
-and the command stops minting, by design, because it stands in
-for authentication in a demonstration rather than being one.
-Past that point, tokens come from the API the way a broker would
-get them.
+(`_demo_sources_or_fail()` in `kerbside/main.py`), naming the
+offending source and its type in the refusal and adding "See
+issue #300 for the underlying gap". The reasoning is in the
+code: a session token is not scoped to a source, so it
+authorises every console of every configured source and there is
+no coherent per-source version of the guard. That makes the
+composability described above conditional — add a real cloud
+beside your static entry and the command stops minting, by
+design, because it stands in for authentication in a
+demonstration rather than being one. Past that point, tokens
+come from the API the way a broker would get them.
 
 ## Status and limitations
 
@@ -331,7 +330,7 @@ Not covered, and worth knowing before you deploy:
 | Limitation | Detail |
 |------------|--------|
 | Nothing checks that the target is alive | There is no liveness check of any kind. An entry in the file is a console whether or not anything is listening on the port, so Kerbside will happily mint a `.vv` for a qemu that exited an hour ago and the user discovers it by the SPICE client failing to connect. Nothing in the console list, the web UI or the API distinguishes a live target from a dead one. This, rather than anything about the file format, is the honest reason the static source is not intended for production use. |
-| A changed SPICE password is never applied | Every other field of an entry which already exists is reassigned on the next pass; the password is not. It is set only when the console row is first inserted (`kerbside/db.py:303-318`), and the `.vv` handler leaves the stored value alone for a static source (`kerbside/api.py:512-515`), so an edit to it is parsed and discarded with no log line, no audit event and no errored source. The file and the database disagree and nothing says so; the first sign is the target refusing the handshake. Remove the entry, let the removal land, and add it back to change one. Tracked as [#463](https://github.com/shakenfist/kerbside/issues/463). |
+| A changed SPICE password is never applied | Every other field of an entry which already exists is reassigned on the next pass; the password is not. It is set only when the console row is first inserted, and the `.vv` handler leaves the stored value alone for a static source, so an edit to it is parsed and discarded with no log line, no audit event and no errored source. The file and the database disagree and nothing says so; the first sign is the target refusing the handshake. Remove the entry, let the removal land, and add it back to change one. Tracked as [#463](https://github.com/shakenfist/kerbside/issues/463). |
 | The inventory is only as good as your editing | There is no discovery, so nothing ever corrects the file. A target rebuilt on a different port, or with a different SPICE password, is simply wrong until somebody edits it, and the wrongness shows up as a failed connection rather than as an errored source. The sixty-second reload makes the fix fast; it does not make it automatic. |
 | Backend TLS needs three things, and is untested through this source | A static entry is plaintext to the target unless you declare a TLS port, unverified unless the source carries a `ca_cert`, and unpinned unless you write a `host_subject`. The CA is the one most easily missed: without it the target is checked against the public web trust store, which an internal certificate will not satisfy, so the escalation fails the handshake. The proxy's enforcement of a pin is exercised both ways in CI — a matching pin accepted, a mismatched one refused — but by `tools/direct-qemu/run-host-subject-checks.sh`, which drives the proxy from a mock control plane rather than from a source; the `direct-qemu` lane's own static entry is plaintext, and the compose demo deliberately leaves all three out. So the enforcement is proven and the path that reaches it *from this source* is not. |
 | Nobody can log in | Interactive login is Keystone-only ([#300](https://github.com/shakenfist/kerbside/issues/300)), which a deployment with no OpenStack in it has nothing to point at, and the session JWT scheme has no revocation or issuance audit ([#301](https://github.com/shakenfist/kerbside/issues/301)). A standalone deployment therefore needs something else to hold credentials and call the API. |

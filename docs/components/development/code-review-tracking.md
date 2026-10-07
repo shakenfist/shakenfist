@@ -765,10 +765,10 @@ a sidecar-shaped file with no `.weaudit` file beside it, and
 sidecar. This is deliberately narrower than it could be: weAudit
 loads every `.vscode/*.weaudit` file and decorates a file as audited
 from its path alone, whatever file or author the entry came from
-(`src/codeMarker.ts:626-628` in trailofbits/vscode-weaudit), so a
+(`isAudited()` in `src/codeMarker.ts` of trailofbits/vscode-weaudit), so a
 `.weaudit` imports file would show ticks in VSCode for files nobody
 read in this clone. Worse, weAudit writes an `auditedFiles` change
-back to `<author>.weaudit` (`codeMarker.ts:559-586`, `:931`), so an
+back to `<author>.weaudit` (`toggleAudited()` and `updateSavedData()`), so an
 imported entry authored by the original reviewer would, once
 un-ticked, be written into that reviewer's own state file in this
 repository, mixing imported reviews into a human's record. weAudit only globs `*.weaudit`, so it never reads the
