@@ -327,6 +327,11 @@ Notes:
   updated to record what the domain actually is, not the state that was
   requested. See [power states](/operator_guide/power_states/) for what
   that means operationally.
+* A 500 from power on or power off does not carry the hypervisor's error,
+  which can name paths on the hypervisor. Its body reads `instance failed
+  to power on, see the instance events for details` (or `... power off
+  ...`), and the error itself is in the instance's `power on failed` or
+  `power off failed` audit event, as `error`.
 
 ??? example "Python API client: create and then delete a simple instance"
 
