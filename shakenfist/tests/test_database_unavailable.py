@@ -868,12 +868,12 @@ class ClusterOperationFetchFailureTestCase(base.ShakenFistTestCase):
 
 
 class StrictInstanceLookupTestCase(base.ShakenFistTestCase):
-    """Phase 1b D3: before the cleaner deletes an unknown domain's disks
-    it must be able to tell a genuine miss apart from a lookup that
-    merely failed. ``get_instance(..., strict=True)`` re-raises what
-    the non-strict path -- kept for every other caller -- quietly turns
-    into None (issue 3373's first half covers the exhausted-outage
-    case already; this covers the non-retryable one)."""
+    """Before the cleaner deletes an unknown domain's disks it must be
+    able to tell a genuine miss apart from a lookup that merely failed.
+    ``get_instance(..., strict=True)`` re-raises what the non-strict path
+    -- kept for every other caller -- quietly turns into None (issue
+    3373's first half covers the exhausted-outage case already; this
+    covers the non-retryable one)."""
 
     INST_UUID = uuid.uuid4()
 

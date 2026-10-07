@@ -140,10 +140,10 @@ class LibvirtConnection():
     def extract_shutoff_reason(self, domain: Any) -> str | None:
         """Return a human readable shutoff reason, or None if not shutoff.
 
-        Display only: nothing branches on this value. See phase 1b's D7
-        in docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md
-        for why an inactive domain is always recorded as "off", whatever
-        this reason says.
+        Display only: nothing branches on this value. An inactive domain
+        is recorded as off whatever this says: a killed qemu is
+        recoverable by a power on, and libvirt may not keep the reason
+        across a libvirtd restart. See docs/operator_guide/power_states.md.
         """
         state, reason = domain.state()
         if state != self.libvirt.VIR_DOMAIN_SHUTOFF:

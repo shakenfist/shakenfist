@@ -63,7 +63,7 @@ class InstancePowerEndpointTestCase(base.ShakenFistTestCase):
 
 
 class InstancePowerOnEndpointTestCase(InstancePowerEndpointTestCase):
-    """A power on which failed answers 500, not 200 with a null body (F4).
+    """A power on which failed answers 500, not 200 with a null body.
     The hypervisor's last error goes in an audit event, not the response,
     because it can name host paths.
     """
@@ -105,7 +105,7 @@ class InstancePowerOnEndpointTestCase(InstancePowerEndpointTestCase):
 
 class InstancePowerOffEndpointTestCase(InstancePowerEndpointTestCase):
     """A power off which left the instance running answers 500, not 200
-    with the instance recorded as off (F5). destroy()'s error goes in an
+    with the instance recorded as off. destroy()'s error goes in an
     audit event, not the response, because it can name host paths.
     """
 
@@ -140,7 +140,7 @@ class InstancePowerOffEndpointTestCase(InstancePowerEndpointTestCase):
 
 class InstancePauseUnpauseEndpointTestCase(InstancePowerEndpointTestCase):
     """Pausing or unpausing a powered off instance answers 409, not the
-    generic 500 a leaked libvirtError would give (F6, F7).
+    generic 500 a leaked libvirtError would give.
     """
 
     def test_pause_of_powered_off_instance_answers_409(self):

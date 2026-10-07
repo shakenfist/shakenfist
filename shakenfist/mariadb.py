@@ -20827,9 +20827,10 @@ def get_instance(
             caught gRPC or MariaDB error as DatabaseUnavailable rather
             than reporting it as a miss. This is for callers which
             delete things when an instance is absent, such as the
-            cleaner (phase 1b D3): today a non-retryable RpcError or
-            OperationalError reads exactly like "no such instance",
-            which is unsafe for a caller about to act on that absence.
+            cleaner before it deletes an unknown domain and its disks:
+            today a non-retryable RpcError or OperationalError reads
+            exactly like "no such instance", which is unsafe for a
+            caller about to act on that absence.
             Issue #3373 may later make this the default and remove the
             keyword.
 

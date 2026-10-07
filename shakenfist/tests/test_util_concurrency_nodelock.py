@@ -9,9 +9,9 @@ from shakenfist.util import concurrency as util_concurrency
 
 
 class NodeLockTimeoutTestCase(base.ShakenFistTestCase):
-    """NodeLock(timeout=...) is a bounded wait (phase 1b's D1). The
-    default, unbounded wait, must keep retrying forever, and a timeout
-    must only fire once it has genuinely elapsed."""
+    """NodeLock(timeout=...) is a bounded wait. The default, unbounded
+    wait, must keep retrying forever, and a timeout must only fire once
+    it has genuinely elapsed."""
 
     @mock.patch('time.sleep')
     @mock.patch('shakenfist.util.concurrency._node_lock_request')
@@ -62,8 +62,7 @@ class NodeLockTimeoutTestCase(base.ShakenFistTestCase):
 
 class GetLockNodeTimeoutTestCase(base.ShakenFistTestCase):
     """get_lock(global_scope=False, ...) must hand node_timeout to
-    NodeLock, and must never hand it the cluster-only timeout keyword
-    (phase 1b's D1)."""
+    NodeLock, and must never hand it the cluster-only timeout keyword."""
 
     def setUp(self):
         super().setUp()
@@ -79,8 +78,9 @@ class GetLockNodeTimeoutTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.baseobject.util_concurrency.NodeLock')
     def test_cluster_timeout_not_passed_to_node_lock(self, mock_nodelock):
         # timeout=120 is sf-queues restore's cluster-lock timeout
-        # (baseobject.py D1). It must not reach NodeLock, which would
-        # start timing out a call that has never timed out before.
+        # (see get_lock() in baseobject.py). It must not reach NodeLock,
+        # which would start timing out a call that has never timed out
+        # before.
         self.obj.get_lock(global_scope=False, timeout=120)
         mock_nodelock.assert_called_once_with(
             f'{self.obj.object_type}-{self.obj.uuid}', timeout=None)

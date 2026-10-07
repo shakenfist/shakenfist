@@ -89,8 +89,7 @@ class FakeLibvirtConnection:
         # domain template: every defined domain, filtered by whether libvirt
         # considers it active. This is why the crashed domain comes back
         # active here even though our hypervisors never produce an active
-        # crashed domain in production (on_crash is restart); see D4 in
-        # docs/plans/PLAN-power-state-correctness-phase-01a-listing.md.
+        # crashed domain in production (on_crash is restart).
 
         # Map domain IDs to (name_key, state, pause_reason) where name_key is
         # used to look up the actual UUID from _test_instance_uuids
@@ -353,7 +352,7 @@ class CleanerTestCase(CleanerBaseTestCase):
     @mock.patch('os.unlink')
     def test_update_power_states_detects_shutoff(
             self, mock_unlink, mock_listdir, mock_time, mock_exists):
-        """A powered off domain's instance is recorded as off (F1).
+        """A powered off domain's instance is recorded as off.
 
         get_active_sf_domains() only lists domains libvirt considers
         active, so the cleaner's second loop lists the inactive ones.
@@ -481,10 +480,8 @@ class CleanerCrashedInstanceTestCase(CleanerTestCase):
 
 
 class CleanerGuardsTestCase(CleanerBaseTestCase):
-    """The guards phase 1b adds before the cleaner acts on a domain.
+    """The guards the cleaner applies before acting on a domain.
 
-    See D2, D3, D4 and D8 in
-    docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md.
     Not a CleanerTestCase subclass, so these run once rather than once per
     subclass.
     """
@@ -533,7 +530,7 @@ class CleanerGuardsTestCase(CleanerBaseTestCase):
             self, mock_unlink, mock_listdir, mock_time, mock_exists,
             mock_execute, mock_delete_files):
         """A domain whose name disagrees with its uuid is neither looked up
-        nor deleted (D4). Neither uuid has an instance, so without the
+        nor deleted. Neither uuid has an instance, so without the
         guard the unknown domain branch would destroy it."""
         name_uuid = str(uuid.uuid4())
         domain_uuid = str(uuid.uuid4())
@@ -599,7 +596,7 @@ class CleanerGuardsTestCase(CleanerBaseTestCase):
             self, mock_unlink, mock_listdir, mock_time, mock_exists,
             mock_execute, mock_delete_files, mock_rmtree):
         """A domain named "sf:" would have the cleaner remove
-        STORAGE_PATH/instances/ itself (S6). The fake's uuid for it is the
+        STORAGE_PATH/instances/ itself. The fake's uuid for it is the
         empty suffix, so only the empty name check stops it."""
         _test_extra_domains.append(FakeLibvirtDomain(
             'sf:', FakeLibvirt.VIR_DOMAIN_RUNNING))
@@ -623,7 +620,7 @@ class CleanerGuardsTestCase(CleanerBaseTestCase):
             mock_execute, mock_kill):
         """A non-retryable database error reads as a miss to from_db()
         (#3373). The strict lookup raises instead, and the running domain
-        and its disks survive (D3)."""
+        and its disks survive."""
         unknown_uuid = self._unknown_running_domain()
         mock_get_instance = self.mock_mariadb._mariadb_get_instance
 
@@ -656,7 +653,7 @@ class CleanerGuardsTestCase(CleanerBaseTestCase):
             self, mock_unlink, mock_listdir, mock_time, mock_exists,
             mock_execute, mock_kill):
         """If the strict lookup finds the instance the first lookup missed,
-        the first lookup was the error, and nothing is deleted (D3)."""
+        the first lookup was the error, and nothing is deleted."""
         inst_uuid = self._create_instances(['running'])['running']
 
         with mock.patch.object(instance.Instance, 'from_db',
@@ -707,7 +704,7 @@ class CleanerGuardsTestCase(CleanerBaseTestCase):
     def test_power_state_written_under_lock(
             self, mock_unlink, mock_listdir, mock_time, mock_exists):
         """A changed power state is written holding the instance's node
-        lock, with a bounded wait (D2)."""
+        lock, with a bounded wait."""
         inst_uuid = self._create_instances(['running'])['running']
 
         written = []
@@ -735,7 +732,7 @@ class CleanerGuardsTestCase(CleanerBaseTestCase):
     @mock.patch('os.unlink')
     def test_lock_timeout_leaves_power_state_unwritten(
             self, mock_unlink, mock_listdir, mock_time, mock_exists):
-        """F13: a busy instance is skipped for this pass, not written
+        """A busy instance is skipped for this pass, not written
         without its lock."""
         inst_uuids = self._create_instances(['running', 'paused'])
         before = {u: self._power_state(u) for u in inst_uuids.values()}
@@ -755,7 +752,7 @@ class CleanerGuardsTestCase(CleanerBaseTestCase):
     @mock.patch('os.unlink')
     def test_stale_reading_not_written(
             self, mock_unlink, mock_listdir, mock_time, mock_exists):
-        """F13: a domain listed as paused, but powered off by the time the
+        """A domain listed as paused, but powered off by the time the
         cleaner holds the lock, is not recorded as paused. The power off
         held the lock, so the reading from the listing is stale."""
         inst_uuid = self._create_instances(['paused'])['paused']
@@ -779,8 +776,8 @@ class CleanerGuardsTestCase(CleanerBaseTestCase):
     def test_agreeing_power_state_takes_no_lock(
             self, mock_unlink, mock_listdir, mock_time, mock_exists):
         """When the database already agrees with libvirt there is nothing
-        to write, so no lock is taken. S14's database load claim rests on
-        this."""
+        to write, so no lock is taken. The steady state must cost no
+        writes."""
         inst_uuids = self._create_instances(['running', 'paused', 'ioerror'])
         for name, state in [('running', 'on'), ('paused', 'paused'),
                             ('ioerror', 'paused')]:
@@ -821,7 +818,7 @@ class CleanerGuardsTestCase(CleanerBaseTestCase):
 
     def test_sweep_keeps_foreign_domain_profile(self):
         """The apparmor sweep lists every defined domain, including ones
-        which are not ours, and keeps their profiles (D8)."""
+        which are not ours, and keeps their profiles."""
         undefined_uuid = str(uuid.uuid4())
         removed = self._run_sweep([
             f'libvirt-{FOREIGN_DOMAIN_UUID}',
@@ -835,7 +832,7 @@ class CleanerGuardsTestCase(CleanerBaseTestCase):
 
     def test_sweep_skipped_when_listing_fails(self):
         """If listing every domain fails, the sweep deletes nothing, rather
-        than treating every old profile as an undefined domain's (S7)."""
+        than treating every old profile as an undefined domain's."""
         undefined_uuid = str(uuid.uuid4())
         with mock.patch(
                 'shakenfist.util.libvirt.LibvirtConnection.get_all_domain_uuids',
@@ -850,8 +847,6 @@ class CleanerGuardsTestCase(CleanerBaseTestCase):
 class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
     """The cleaner's second loop, over powered off domains.
 
-    See brief 5, D2 and D5 to D7 in
-    docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md.
     Not a CleanerTestCase subclass, so these run once rather than once per
     subclass.
     """
@@ -940,7 +935,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
     def test_detected_poweroff(self):
         """A powered off domain's instance is recorded as off, with the
         agent state set and an event carrying libvirt's shutoff reason
-        and the power state it replaced (D7)."""
+        and the power state it replaced."""
         inst_uuid = self._inactive_instance()
 
         add_event = self._run()
@@ -959,7 +954,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
 
     def test_detected_poweroff_reason_is_the_domains(self):
         """The reason is read from the domain, and is display only: a
-        crashed qemu is still off (D7)."""
+        crashed qemu is still off."""
         inst_uuid = self._inactive_instance(
             power_state='paused', reason=FakeLibvirt.VIR_DOMAIN_SHUTOFF_CRASHED)
 
@@ -976,7 +971,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
     def test_detected_poweroff_write_order(self):
         """The power state is written before the agent state, and both
         before the event: the functional tests wait for the event, then
-        read the power state once (D7)."""
+        read the power state once."""
         self._inactive_instance()
 
         calls = mock.Mock()
@@ -991,8 +986,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
             calls.attach_mock(agent, 'agent_state')
             cleaner_st.update_power_states()
 
-        # The autostart clear comes last, as nothing waits on it (phase 2's
-        # D6).
+        # The autostart clear comes last, as nothing waits on it.
         self.assertEqual(
             [mock.call.update_power_state('off'),
              mock.call.agent_state(AGENT_INSTANCE_OFF),
@@ -1005,7 +999,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
     def test_already_off_takes_no_lock(self):
         """When the database already says off and autostart is clear there
         is nothing to write, so no lock is taken, no event added and no
-        libvirt write made (S14, and phase 2's D6)."""
+        libvirt write made."""
         self._inactive_instance(power_state='off', autostart=False)
 
         with mock.patch.object(
@@ -1020,8 +1014,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
 
     def test_detected_poweroff_clears_autostart(self):
         """A guest which powered itself off is recorded as off, and loses
-        its autostart flag so a hypervisor reboot does not start it (phase
-        2's D2 and D6)."""
+        its autostart flag so a hypervisor reboot does not start it."""
         inst_uuid = self._inactive_instance()
 
         add_event = self._run()
@@ -1087,7 +1080,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
 
     def test_already_off_clears_autostart_once(self):
         """A domain powered off before power_off() cleared autostart has it
-        cleared under the lock, with an event, once (phase 2's D2 and D6)."""
+        cleared under the lock, with an event, once."""
         inst_uuid = self._inactive_instance(power_state='off')
 
         add_event = self._run()
@@ -1119,7 +1112,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
 
     def test_already_off_domain_active_inside_lock_keeps_autostart(self):
         """A power on which held the lock started the domain, and set
-        autostart for it. The cleaner must not clear it (phase 2's S8)."""
+        autostart for it. The cleaner must not clear it."""
         inst_uuid = self._inactive_instance(power_state='off')
 
         with mock.patch.object(
@@ -1147,7 +1140,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
     def test_already_off_powered_on_inside_lock_keeps_autostart(self):
         """A power on which finished while the cleaner waited for the lock
         recorded on. The domain the cleaner then reads may still be off, but
-        the flag is the power on's, and stays (phase 2's D6)."""
+        the flag is the power on's, and stays."""
         inst_uuid = self._inactive_instance(power_state='off')
 
         def on_lock(inst_uuid):
@@ -1164,7 +1157,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
     def test_skipped_branches_do_not_touch_autostart(self):
         """Building, deleted and delete-wait instances, and the files
         missing branch, return before either off branch, so autostart is not
-        read or written (phase 2's S9)."""
+        read or written."""
         for state in [instance.Instance.STATE_INITIAL,
                       instance.Instance.STATE_PREFLIGHT,
                       instance.Instance.STATE_CREATING,
@@ -1246,8 +1239,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
             1, len(self._events(add_event, 'detected poweroff')))
 
     def test_instance_being_created_is_skipped(self):
-        """A domain whose instance is still being created is left alone
-        (S2)."""
+        """A domain whose instance is still being created is left alone."""
         inst_uuids = [
             self._inactive_instance(state=state)
             for state in [instance.Instance.STATE_INITIAL,
@@ -1268,7 +1260,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
 
     def test_lock_timeout_is_skipped(self):
         """A busy instance is skipped this pass, in every branch which
-        writes (D2)."""
+        writes."""
         off = self._inactive_instance()
         files_missing = self._inactive_instance()
         self._files_missing(files_missing)
@@ -1296,7 +1288,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
     def test_domain_active_inside_lock_is_skipped(self):
         """A domain listed as powered off but running by the time the
         cleaner holds the lock is not recorded as off: a power on held the
-        lock, so the listing is stale (D2)."""
+        lock, so the listing is stale."""
         inst_uuid = self._inactive_instance()
 
         with mock.patch.object(
@@ -1445,7 +1437,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
     def test_delete_wait_enqueue_schedule(self):
         """A stray delete-wait domain has its delete enqueued on the first,
         sixth and eleventh passes, is given up on at the sixteenth, and is
-        never deleted in place, which would leak its interfaces (S3, D5)."""
+        never deleted in place, which would leak its interfaces."""
         inst_uuid = self._inactive_instance(
             state=instance.Instance.STATE_DELETE_WAIT)
         self._after_grace()
@@ -1499,7 +1491,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
 
     def test_deleted_is_torn_down_without_state_write(self):
         """A deleted instance's lingering domain and files are removed
-        locally, holding its lock, and its state is not written (S4)."""
+        locally, holding its lock, and its state is not written."""
         inst_uuid = self._inactive_instance(
             state=instance.Instance.STATE_DELETED)
         self._after_grace()
@@ -1523,7 +1515,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
 
     def test_files_missing_marks_created_errored(self):
         """An instance whose domain is powered off and whose files are
-        gone moves to its error state, with a message (D6)."""
+        gone moves to its error state, with a message."""
         inst_uuid = self._inactive_instance()
         self._files_missing(inst_uuid)
 
@@ -1541,7 +1533,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
     def test_files_missing_from_error_states_does_nothing(self):
         """An errored instance is not errored again: 'error-error' and
         'created-error-error' are not valid transitions, and would raise
-        on every pass (S8, D6)."""
+        on every pass."""
         inst_uuids = {
             state: self._inactive_instance(state=state)
             for state in [instance.Instance.STATE_ERROR,
@@ -1559,7 +1551,7 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
     def test_unknown_domain_not_removed_when_database_errors(self):
         """A non-retryable database error reads as a miss to from_db()
         (#3373). The strict lookup raises instead, and the powered off
-        domain and its disks survive (D3)."""
+        domain and its disks survive."""
         unknown_uuid = str(uuid.uuid4())
         _test_extra_domains.append(FakeLibvirtDomain(
             f'sf:{unknown_uuid}', FakeLibvirt.VIR_DOMAIN_SHUTOFF))

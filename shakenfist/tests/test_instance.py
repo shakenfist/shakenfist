@@ -876,9 +876,8 @@ ALREADY_RUNNING = FakeLibvirtError(
 
 
 class InstancePowerOnTestCase(InstanceLibvirtTestCase):
-    """power_on() reports a failure rather than returning as if it worked
-    (F4), and the retry loop's bookkeeping follows what really happened
-    (F8).
+    """power_on() reports a failure rather than returning as if it worked,
+    and the retry loop's bookkeeping follows what really happened.
     """
 
     def setUp(self):
@@ -964,7 +963,7 @@ class InstancePowerOnTestCase(InstanceLibvirtTestCase):
             constants.AGENT_NEVER_TALKED, self.inst.agent_state.value)
 
     def test_first_attempt_succeeding_sets_agent_state(self):
-        # F8: this was only reset when the first attempt had failed, so a
+        # This was only reset when the first attempt had failed, so a
         # power on after a power off left agent_state reading 'instance
         # powered off' until sidechannel next connected.
         domain = PowerOnDomain()
@@ -1159,7 +1158,7 @@ class InstancePowerEventTimestampsTestCase(InstanceLibvirtTestCase):
 
     def test_poweroff_failure_records_no_timestamps(self):
         # destroy() raised but the domain stopped anyway, so a 'poweroff'
-        # event is still written (D2). A still running domain writes none,
+        # event is still written. A still running domain writes none,
         # and raises instead.
         domain = ClockedDomain(
             self.clock, active=False, destroy_error=FakeLibvirtError(
@@ -1200,10 +1199,10 @@ class AutostartDomain(FakeDomain):
 
 
 class InstancePowerOffAutostartTestCase(InstanceLibvirtTestCase):
-    """power_off() clears libvirt's autostart flag (D1), so a powered off
+    """power_off() clears libvirt's autostart flag, so a powered off
     instance stays off across a hypervisor reboot. A failure to clear it is
     recorded as an event rather than raised, and the power state and
-    'poweroff' event are still written either way (D5).
+    'poweroff' event are still written either way.
     """
 
     def setUp(self):
@@ -1233,7 +1232,7 @@ class InstancePowerOffAutostartTestCase(InstanceLibvirtTestCase):
     def test_power_off_leaves_autostart_when_destroy_failed(self):
         # Any other destroy() error may leave the domain running, and a
         # running domain must keep its autostart flag: nothing sets it again.
-        # The domain is still active here, so power_off() now raises (F5).
+        # The domain is still active here, so power_off() now raises.
         domain = AutostartDomain(destroy_error=FakeLibvirtError(
             'internal error: something else entirely'))
         self._mock_libvirt(domain)
@@ -1242,7 +1241,7 @@ class InstancePowerOffAutostartTestCase(InstanceLibvirtTestCase):
         self.assertEqual([], domain.autostart_calls)
 
     def test_power_off_failed_on_running_domain_raises_and_records_state(self):
-        # destroy() failed and the domain is still running (F5, D2). The
+        # destroy() failed and the domain is still running. The
         # instance must not be recorded as off: its real state is recorded,
         # autostart and agent_state are left alone, a 'poweroff failed'
         # event carries the error, and the caller is told.
@@ -1363,14 +1362,14 @@ class InstancePowerOffAutostartTestCase(InstanceLibvirtTestCase):
 
 
 class InstancePauseUnpauseTestCase(InstanceLibvirtTestCase):
-    """pause() and unpause() judge success by the domain's own state (F6,
-    F7), following the inactive-domain pattern reboot() uses (issue 3630):
+    """pause() and unpause() judge success by the domain's own state,
+    following the inactive-domain pattern reboot() uses (issue 3630):
 
     * No domain, or an inactive one, raises InvalidLifecycleState (409),
       including the race where the domain stops between the isActive()
       check and the suspend()/resume() call.
     * Already being in the target state succeeds without calling libvirt
-      again, so pausing or unpausing twice both answer 200 (D5).
+      again, so pausing or unpausing twice both answer 200.
     * A domain that never reaches the target state still raises
       InvalidLifecycleState after three attempts.
     """
@@ -1454,8 +1453,8 @@ class InstancePauseUnpauseTestCase(InstanceLibvirtTestCase):
 
     def test_pause_when_stored_value_already_paused_still_succeeds(self):
         # The cleaner may have already written 'paused'. Judging success by
-        # whether update_power_state() changed anything (the F6 bug) would
-        # treat this as "the operation did not take effect" and raise.
+        # whether update_power_state() changed anything would treat this
+        # as "the operation did not take effect" and raise.
         domain = FakeDomain()
         self._mock_libvirt(domain, power_state='paused')
         self.inst.update_power_state('paused')
@@ -1568,7 +1567,7 @@ class InstancePauseUnpauseTestCase(InstanceLibvirtTestCase):
         # itself is still 'on', just before this pause() call starts. The
         # domain is really paused by this call's own suspend(), but
         # update_power_state() sees no change from the database's point of
-        # view and would (F6) report "nothing happened".
+        # view and would report "nothing happened".
         domain = FakeDomain()
         self._mock_libvirt_transition(
             domain, 'suspend_calls', before='on', after='paused')

@@ -1,13 +1,12 @@
 # Copyright 2026 Michael Still and contributors
 """Regression tests for ``NodeInstOp._health_check_kvm_process``.
 
-This method was deleted in commit 216fa31dd on the mistaken belief that
-nothing called it -- see test_operation_task_dispatch.py for the dispatch
-mechanism that calls it by name. It is restored here without its dead
-delete branch: ``inst.power_state`` is a dict, so the old
-``inst.power_state == 'on'`` comparison was always false, and wiring it
-up correctly would error-delete every guest that powered itself off (F3
-in docs/plans/PLAN-power-state-correctness.md). Only the stale-kvm_pid
+This method was deleted on the mistaken belief that nothing called it --
+see test_operation_task_dispatch.py for the dispatch mechanism that calls
+it by name. It is restored here without its dead delete branch:
+``inst.power_state`` is a dict, so the old ``inst.power_state == 'on'``
+comparison was always false, and wiring it up correctly would
+error-delete every guest that powered itself off. Only the stale-kvm_pid
 clearing is live, and these tests pin that down: a missing qemu process
 clears ``kvm_pid`` and never calls ``enqueue_delete_due_error``, even
 when the power state dict says the instance is on.
@@ -75,8 +74,8 @@ class HealthCheckKvmProcessTestCase(base.ShakenFistTestCase):
 
         self.assertIsNone(inst.kvm_pid)
         # The power state dict says "on", but a missing qemu process is a
-        # guest that powered itself off, not an error -- see F3. This must
-        # never enqueue a delete.
+        # guest that powered itself off, not an error. This must never
+        # enqueue a delete.
         inst.enqueue_delete_due_error.assert_not_called()
 
     def test_missing_pid_file_error_clears_kvm_pid_and_does_not_delete(self):

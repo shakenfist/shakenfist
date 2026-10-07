@@ -2505,16 +2505,15 @@ class Instance(dbowo):
                     self._check_domain_stopped_after_failed_destroy(lc, inst, e)
 
             # Autostart is the only thing which restarts this domain after a
-            # hypervisor reboot (S2 in docs/plans/PLAN-power-state-correctness-
-            # phase-02-autostart-restore.md), so clear it to keep a powered
-            # off instance off. A failure is recorded rather than raised (D5):
-            # the domain is off either way, and the cleaner retries the clear.
+            # hypervisor reboot, so clear it to keep a powered off instance
+            # off. A failure is recorded rather than raised: the domain is
+            # off either way, and the cleaner retries the clear.
             #
             # Only a domain which did stop reaches here. If destroy() failed
             # and the domain is still running, it must keep the flag, because
             # nothing ever sets it again on a running domain:
             # _check_domain_stopped_after_failed_destroy() raises in that case
-            # (F5) rather than letting it be recorded as off.
+            # rather than letting it be recorded as off.
             try:
                 inst.setAutostart(0)
             except lc.libvirt.libvirtError as e:
@@ -2528,8 +2527,7 @@ class Instance(dbowo):
 
     def _check_domain_stopped_after_failed_destroy(self, lc, domain, error):
         # destroy() can fail after the domain has stopped, so ask libvirt
-        # whether it is still running before deciding what to record (D2 in
-        # docs/plans/PLAN-power-state-correctness-phase-03-power-api.md).
+        # whether it is still running before deciding what to record.
         # Returns if the domain did stop. Otherwise raises, leaving autostart
         # and agent_state alone, because the instance is not off.
         try:
