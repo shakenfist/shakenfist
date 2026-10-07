@@ -230,7 +230,7 @@ phases 0, 1b and 3 all rely on `create()` failing when power on fails.
 | 1a. Honest libvirt domain listing | [PLAN-power-state-correctness-phase-01a-listing.md](PLAN-power-state-correctness-phase-01a-listing.md) | Complete | `8aa69c5e4` |
 | 1b. The cleaner sees powered off domains | [PLAN-power-state-correctness-phase-01b-inactive-domains.md](PLAN-power-state-correctness-phase-01b-inactive-domains.md) | Complete | `447ed75ae` |
 | 2. Autostart and instance restore | [PLAN-power-state-correctness-phase-02-autostart-restore.md](PLAN-power-state-correctness-phase-02-autostart-restore.md) | Complete | `776dc9e70` |
-| 3. Power operations answer truthfully | [PLAN-power-state-correctness-phase-03-power-api.md](PLAN-power-state-correctness-phase-03-power-api.md) | In progress | — |
+| 3. Power operations answer truthfully | [PLAN-power-state-correctness-phase-03-power-api.md](PLAN-power-state-correctness-phase-03-power-api.md) | Complete | `d3d5f15ca` |
 | 4. Push audit | PLAN-power-state-correctness-phase-04-push-audit.md | Not started | — |
 
 Each phase that changes behaviour lands its functional tests with it,
@@ -448,6 +448,17 @@ has the detail as S1 to S8 and D1 to D8.
 * **`power_on()` and `power_off()` are also called by create and
   delete.** Making them raise must not change either (S4, D1, D2).
 * **Guest CI tests already use node exec**, since phase 2 (S8).
+
+Landed as [#4468](https://github.com/shakenfist/shakenfist/pull/4468).
+Functional run
+[37366539008](https://github.com/shakenfist/shakenfist/actions/runs/37366539008)
+passed the new pause and failed power on tests on a real hypervisor. An
+earlier run found D9: a short pause stranded `agent_state` at "no
+contact", because the sidechannel monitor writes it only when its cached
+view changes. `unpause()` now restarts the instance's monitor, and a
+reply-gap check covers freezes that bypass unpause. Phase 2's `stopped`
+flag in `power_off()` was removed, because every path which did not stop
+the domain now raises before reading it.
 
 ### Phase 4: push audit
 
