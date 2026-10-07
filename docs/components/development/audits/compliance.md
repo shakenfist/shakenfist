@@ -24,7 +24,7 @@ many manual runs came before it. See
 does.
 
 <!-- consistency-audit:begin -->
-*Generated 2026-10-04T20:49:57.259433+00:00 from `scripts/audit-check.py`; do not edit.*
+*Generated 2026-10-07T03:03:29.543621+00:00 from `scripts/audit-check.py`; do not edit.*
 
 ## ci-review-automation
 
@@ -35,18 +35,19 @@ Criterion: [ci-review-automation.md](/components/development/audits/ci-review-au
 | actions | compliant | - |
 | agent-python | non-compliant | shakenfist/agent-python#145 |
 | client-python | non-compliant | shakenfist/client-python#408 |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#78 |
+| client-python-k3s | compliant | - |
 | clingwrap | non-compliant | shakenfist/clingwrap#121 |
 | cloudgood | non-compliant | shakenfist/cloudgood#1 |
 | development | compliant | - |
 | divergulent | non-compliant | shakenfist/divergulent#120 |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | non-compliant | shakenfist/instar#599 |
 | kerbside | compliant | - |
 | kerbside-client | non-compliant | shakenfist/kerbside-client#5 |
 | kerbside-patches | compliant | - |
 | library-utilities | non-compliant | shakenfist/library-utilities#62 |
-| occystrap | non-compliant | shakenfist/occystrap#147 |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | non-compliant | shakenfist/sfui#26 |
@@ -58,14 +59,12 @@ Details for non-compliant projects:
 
 - **agent-python** (Status): pr-re-review.yml: the confirm step is conditional (if: steps.ref.outputs.merged == 'true'), so at least one checkout path goes unconfirmed; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
 - **client-python** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
-- **client-python-k3s** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
 - **clingwrap** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch
 - **cloudgood** (Status): Missing workflows: pr-re-review.yml
 - **divergulent** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
 - **instar** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
 - **kerbside-client** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
 - **library-utilities** (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
-- **occystrap** (Status): pr-re-review.yml: the confirm step is conditional (if: steps.ref.outputs.merged == 'true'), so at least one checkout path goes unconfirmed; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request
 - **sfui** (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py); it is unused, and its workflow holds contents: write on the pull request branch
 - **uncalibrated-sextant** (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main
 
@@ -84,6 +83,7 @@ Criterion: [console-logging.md](/components/development/audits/console-logging/)
 | development | N/A | - |
 | divergulent | N/A | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | N/A | - |
 | kerbside-client | N/A | - |
@@ -112,6 +112,7 @@ Criterion: [default-branch-naming.md](/components/development/audits/default-bra
 | development | N/A | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
@@ -140,6 +141,7 @@ Criterion: [delete-branch-on-merge.md](/components/development/audits/delete-bra
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | non-compliant | shakenfist/kerbside-client#9 |
@@ -173,6 +175,7 @@ Criterion: [dependency-name-normalization.md](/components/development/audits/dep
 | development | N/A | - |
 | divergulent | compliant | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -201,6 +204,7 @@ Criterion: [diagram-format.md](/components/development/audits/diagram-format/)
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
@@ -228,12 +232,13 @@ Criterion: [docs-external-links.md](/components/development/audits/docs-external
 | actions | compliant | - |
 | agent-python | compliant | - |
 | client-python | compliant | - |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#99 |
+| client-python-k3s | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | non-compliant | shakenfist/cloudgood#7 |
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | non-compliant | shakenfist/instar#596 |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -249,10 +254,45 @@ Criterion: [docs-external-links.md](/components/development/audits/docs-external
 
 Details for non-compliant projects:
 
-- **client-python-k3s** (Status): 1 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/plans/PLAN-cumulative-health-signals.md -> library-api-and-collection-phase-03-missing-verbs.md
 - **cloudgood** (Status): 2 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/index.md -> more-fundamentals.md, docs/virtualization-history.md -> more-fundamentals.md
 - **instar** (Status): 1 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/plans/PLAN-differencing-phase-08-tests.md -> docs/plans/PLAN-differencing.md
 - **uncalibrated-sextant** (Status): 67 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute https://github.com/... URLs, which survive the docs site import): docs/plans/PLAN-audit-cleanup-phase-02-structural.md -> ../../src/bootloader.rs, docs/plans/PLAN-audit-cleanup-phase-02-structural.md -> ../../src/renderer/mod.rs, docs/plans/PLAN-audit-cleanup-phase-02-structural.md -> ../../src/scene.rs, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -> ../../Makefile, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -> ../../scripts/screenshot.sh, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -> ../../scripts/verify-release.sh, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -> ../../src/scene.rs, docs/plans/PLAN-audit-cleanup.md -> ../../AGENTS.md, docs/plans/PLAN-audit-cleanup.md -> ../../ARCHITECTURE.md, docs/plans/PLAN-audit-cleanup.md -> ../../PUSH-AUDIT.md (+57 more)
+
+## docs-line-references
+
+Criterion: [docs-line-references.md](/components/development/audits/docs-line-references/)
+
+| Project | Status | Issue |
+|---------|--------|--------|
+| actions | compliant | - |
+| agent-python | compliant | - |
+| client-python | compliant | - |
+| client-python-k3s | compliant | - |
+| clingwrap | compliant | - |
+| cloudgood | compliant | - |
+| development | compliant | - |
+| divergulent | compliant | - |
+| hunkydory | compliant | - |
+| images | N/A | - |
+| instar | non-compliant | shakenfist/instar#636 |
+| kerbside | compliant | - |
+| kerbside-client | compliant | - |
+| kerbside-patches | non-compliant | shakenfist/kerbside-patches#1839 |
+| library-utilities | compliant | - |
+| occystrap | compliant | - |
+| private-ci | N/A | - |
+| ryll | non-compliant | shakenfist/ryll#468 |
+| sfui | compliant | - |
+| shakenfist | non-compliant | shakenfist/shakenfist#4481 |
+| uncalibrated-sextant | compliant | - |
+| visual-digest-rust | compliant | - |
+
+Details for non-compliant projects:
+
+- **instar** (Status): 9 line(s) in the documentation cite code by line number, which goes stale on the next edit to that code (name the function or class instead, or use a GitHub permalink pinned to a commit sha): docs/quirks.md:4463, docs/quirks.md:4465, docs/quirks.md:4573, docs/quirks.md:4574, docs/quirks.md:4596, docs/quirks.md:4597, docs/quirks.md:4700, docs/resize.md:200, docs/resize.md:203
+- **kerbside-patches** (Status): 1 line(s) in the documentation cite code by line number, which goes stale on the next edit to that code (name the function or class instead, or use a GitHub permalink pinned to a commit sha): docs/kolla-ansible-tempest-jobs.md:71
+- **ryll** (Status): 25 line(s) in the documentation cite code by line number, which goes stale on the next edit to that code (name the function or class instead, or use a GitHub permalink pinned to a commit sha): docs/libvirt-spice-recommendations.md:103, docs/libvirt-spice-recommendations.md:255, docs/libvirt-spice-recommendations.md:450, docs/libvirt-spice-recommendations.md:456, docs/multi-mode-parity.md:83, docs/multi-mode-parity.md:84, docs/multi-mode-parity.md:88, docs/multi-mode-parity.md:89, docs/multi-mode-parity.md:90, docs/multi-mode-parity.md:92 (+15 more)
+- **shakenfist** (Status): 5 line(s) in the documentation cite code by line number, which goes stale on the next edit to that code (name the function or class instead, or use a GitHub permalink pinned to a commit sha): docs/operator_guide/agent_operations.md:41, docs/operator_guide/agent_operations.md:48, docs/operator_guide/agent_operations.md:62, docs/operator_guide/agent_operations.md:147, docs/operator_guide/agent_operations.md:160
 
 ## eol-distro
 
@@ -269,6 +309,7 @@ Criterion: [eol-distro.md](/components/development/audits/eol-distro/)
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | compliant | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
@@ -281,6 +322,35 @@ Criterion: [eol-distro.md](/components/development/audits/eol-distro/)
 | shakenfist | compliant | - |
 | uncalibrated-sextant | compliant | - |
 | visual-digest-rust | compliant | - |
+
+## eol-producers
+
+Criterion: [eol-producers.md](/components/development/audits/eol-producers/)
+
+| Project | Status | Issue |
+|---------|--------|--------|
+| actions | N/A | - |
+| agent-python | N/A | - |
+| client-python | N/A | - |
+| client-python-k3s | N/A | - |
+| clingwrap | N/A | - |
+| cloudgood | N/A | - |
+| development | N/A | - |
+| divergulent | N/A | - |
+| hunkydory | N/A | - |
+| images | N/A | - |
+| instar | N/A | - |
+| kerbside | N/A | - |
+| kerbside-client | N/A | - |
+| kerbside-patches | N/A | - |
+| library-utilities | N/A | - |
+| occystrap | N/A | - |
+| private-ci | compliant | - |
+| ryll | N/A | - |
+| sfui | N/A | - |
+| shakenfist | N/A | - |
+| uncalibrated-sextant | N/A | - |
+| visual-digest-rust | N/A | - |
 
 ## expensive-lane-path-filter
 
@@ -297,6 +367,7 @@ Criterion: [expensive-lane-path-filter.md](/components/development/audits/expens
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
@@ -330,6 +401,7 @@ Criterion: [export-repo-config.md](/components/development/audits/export-repo-co
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | non-compliant | shakenfist/kerbside-client#7 |
@@ -364,6 +436,7 @@ Criterion: [fuzz-nightly-reporting.md](/components/development/audits/fuzz-night
 | development | N/A | - |
 | divergulent | N/A | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | N/A | - |
 | kerbside-client | N/A | - |
@@ -392,6 +465,7 @@ Criterion: [github-security.md](/components/development/audits/github-security/)
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | non-compliant | shakenfist/kerbside-client#8 |
@@ -426,6 +500,7 @@ Criterion: [llm-context-lint-ci.md](/components/development/audits/llm-context-l
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -461,6 +536,7 @@ Criterion: [llm-context-lint.md](/components/development/audits/llm-context-lint
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -489,12 +565,13 @@ Criterion: [llm-doc-naming.md](/components/development/audits/llm-doc-naming/)
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
 | kerbside-patches | compliant | - |
 | library-utilities | compliant | - |
-| occystrap | non-compliant | shakenfist/occystrap#144 |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | compliant | - |
@@ -505,7 +582,6 @@ Criterion: [llm-doc-naming.md](/components/development/audits/llm-doc-naming/)
 Details for non-compliant projects:
 
 - **client-python** (Status): 1 agent instruction file is named for a single tool rather than AGENTS.md (CLAUDE.md); AGENTS.md is tracked beside it, so it is a second set of instructions loaded with equal authority: merge what is still true into AGENTS.md and delete the original
-- **occystrap** (Status): 1 agent instruction file is named for a single tool rather than AGENTS.md (CLAUDE.md); AGENTS.md is tracked beside it, so it is a second set of instructions loaded with equal authority: merge what is still true into AGENTS.md and delete the original
 
 ## llm-doc-structure
 
@@ -522,6 +598,7 @@ Criterion: [llm-doc-structure.md](/components/development/audits/llm-doc-structu
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -550,6 +627,7 @@ Criterion: [llm-tooling.md](/components/development/audits/llm-tooling/)
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | non-compliant | shakenfist/kerbside-client#1 |
@@ -582,6 +660,7 @@ Criterion: [merge-group-cancellation.md](/components/development/audits/merge-gr
 | development | N/A | - |
 | divergulent | N/A | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -610,6 +689,7 @@ Criterion: [merge-queue-config.md](/components/development/audits/merge-queue-co
 | development | N/A | - |
 | divergulent | N/A | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -638,6 +718,7 @@ Criterion: [mermaid-lint-ci.md](/components/development/audits/mermaid-lint-ci/)
 | development | compliant | - |
 | divergulent | N/A | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -666,6 +747,7 @@ Criterion: [npm-pin-indirect-dependencies.md](/components/development/audits/npm
 | development | N/A | - |
 | divergulent | N/A | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | N/A | - |
 | kerbside-client | N/A | - |
@@ -694,6 +776,7 @@ Criterion: [npm-undeclared-direct-dependency.md](/components/development/audits/
 | development | N/A | - |
 | divergulent | N/A | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | N/A | - |
 | kerbside-client | N/A | - |
@@ -722,6 +805,7 @@ Criterion: [npm-unused-declared-dependency.md](/components/development/audits/np
 | development | N/A | - |
 | divergulent | N/A | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | N/A | - |
 | kerbside-client | N/A | - |
@@ -750,6 +834,7 @@ Criterion: [pin-indirect-dependencies.md](/components/development/audits/pin-ind
 | development | N/A | - |
 | divergulent | N/A | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -778,6 +863,7 @@ Criterion: [plan-audit-phase.md](/components/development/audits/plan-audit-phase
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -810,6 +896,7 @@ Criterion: [plan-index.md](/components/development/audits/plan-index/)
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -837,12 +924,13 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 | actions | compliant | - |
 | agent-python | compliant | - |
 | client-python | non-compliant | shakenfist/client-python#382 |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#58 |
+| client-python-k3s | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | compliant | - |
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | non-compliant | shakenfist/instar#605 |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
@@ -859,10 +947,9 @@ Criterion: [plan-phase-references.md](/components/development/audits/plan-phase-
 Details for non-compliant projects:
 
 - **client-python** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121
-- **client-python-k3s** (Status): 5 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/collection.md:21, docs/library-api.md:100, docs/library-api.md:126, docs/library-api.md:172, docs/library-api.md:264
 - **instar** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/development.md:1052
 - **kerbside-patches** (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:67
-- **private-ci** (Status): 29 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/dashboard-freshness.md:84, docs/dashboard-freshness.md:132, docs/dashboard-freshness.md:133, docs/dashboard-freshness.md:227, docs/dashboard-freshness.md:258, docs/dashboard-freshness.md:285, docs/dashboard-freshness.md:297, docs/dashboard-freshness.md:300, docs/dashboard-freshness.md:301 (+19 more)
+- **private-ci** (Status): 57 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/dashboard-freshness.md:84, docs/dashboard-freshness.md:132, docs/dashboard-freshness.md:133, docs/dashboard-freshness.md:197, docs/dashboard-freshness.md:241, docs/dashboard-freshness.md:272, docs/dashboard-freshness.md:299, docs/dashboard-freshness.md:311, docs/dashboard-freshness.md:317 (+47 more)
 - **uncalibrated-sextant** (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137, ARCHITECTURE.md:236 (+12 more)
 
 ## plan-source-references
@@ -880,6 +967,7 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | non-compliant | shakenfist/instar#606 |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -896,8 +984,8 @@ Criterion: [plan-source-references.md](/components/development/audits/plan-sourc
 Details for non-compliant projects:
 
 - **client-python** (Status): 2 of 4 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist_client/apiclient.py:185 -> docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md, shakenfist_client/tests/test_client_apiclient.py:2320 -> docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md
-- **instar** (Status): 2 of 269 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): tools/ci/test-check-doc-phrases.sh:43 -> PLAN-differencingflow.md, tools/ci/test-check-doc-phrases.sh:142 -> /docs/plans/PLAN-example.md
-- **shakenfist** (Status): 3 of 426 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist/mariadb.py:3656 -> PLAN-claim-coverage-and-sizing-phase-02b-peak-measurement.md, shakenfist/tests/test_plan_phase_references.py:86 -> docs/plans/PLAN-thing.md, shakenfist/tests/test_plan_phase_references.py:88 -> docs/other/plans/PLAN-deep.md
+- **instar** (Status): 2 of 243 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): tools/ci/test-check-doc-phrases.sh:43 -> PLAN-differencingflow.md, tools/ci/test-check-doc-phrases.sh:142 -> /docs/plans/PLAN-example.md
+- **shakenfist** (Status): 3 of 367 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute https://github.com/... URL for a plan in another repository): shakenfist/mariadb.py:3656 -> PLAN-claim-coverage-and-sizing-phase-02b-peak-measurement.md, shakenfist/tests/test_plan_phase_references.py:86 -> docs/plans/PLAN-thing.md, shakenfist/tests/test_plan_phase_references.py:88 -> docs/other/plans/PLAN-deep.md
 
 ## plan-template
 
@@ -908,31 +996,37 @@ Criterion: [plan-template.md](/components/development/audits/plan-template/)
 | actions | N/A | - |
 | agent-python | N/A | - |
 | client-python | N/A | - |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#66 |
+| client-python-k3s | compliant | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
-| divergulent | compliant | - |
+| divergulent | non-compliant | shakenfist/divergulent#127 |
 | hunkydory | N/A | - |
-| instar | compliant | - |
-| kerbside | compliant | - |
+| images | N/A | - |
+| instar | non-compliant | shakenfist/instar#637 |
+| kerbside | non-compliant | shakenfist/kerbside#532 |
 | kerbside-client | N/A | - |
-| kerbside-patches | compliant | - |
+| kerbside-patches | non-compliant | shakenfist/kerbside-patches#1840 |
 | library-utilities | N/A | - |
-| occystrap | non-compliant | shakenfist/occystrap#142 |
+| occystrap | non-compliant | shakenfist/occystrap#157 |
 | private-ci | non-compliant | shakenfist/private-ci#76 |
-| ryll | compliant | - |
+| ryll | non-compliant | shakenfist/ryll#469 |
 | sfui | N/A | - |
-| shakenfist | compliant | - |
+| shakenfist | non-compliant | shakenfist/shakenfist#4482 |
 | uncalibrated-sextant | non-compliant | shakenfist/uncalibrated-sextant#12 |
 | visual-digest-rust | N/A | - |
 
 Details for non-compliant projects:
 
-- **client-python-k3s** (Status): missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
-- **occystrap** (Status): missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
-- **private-ci** (Status): missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
-- **uncalibrated-sextant** (Status): missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository); missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
+- **divergulent** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)
+- **instar** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)
+- **kerbside** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)
+- **kerbside-patches** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)
+- **occystrap** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)
+- **private-ci** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current); missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
+- **ryll** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)
+- **shakenfist** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)
+- **uncalibrated-sextant** (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current); missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository); missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)
 
 ## push-audit
 
@@ -940,21 +1034,22 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 
 | Project | Status | Issue |
 |---------|--------|--------|
-| actions | N/A | - |
+| actions | compliant | - |
 | agent-python | N/A | - |
 | client-python | N/A | - |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#46 |
+| client-python-k3s | compliant | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | non-compliant | shakenfist/instar#597 |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
 | kerbside-patches | N/A | - |
 | library-utilities | N/A | - |
-| occystrap | non-compliant | shakenfist/occystrap#141 |
+| occystrap | compliant | - |
 | private-ci | N/A | - |
 | ryll | compliant | - |
 | sfui | non-compliant | shakenfist/sfui#15 |
@@ -964,9 +1059,7 @@ Criterion: [push-audit.md](/components/development/audits/push-audit/)
 
 Details for non-compliant projects:
 
-- **client-python-k3s** (Status): missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository); missing shared block plan-references-in-code (copy it verbatim from templates/shared-blocks/plan-references-in-code.md in the development repository)
 - **instar** (Status): missing shared block plan-references-in-code (copy it verbatim from templates/shared-blocks/plan-references-in-code.md in the development repository)
-- **occystrap** (Status): missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository); missing shared block plan-references-in-code (copy it verbatim from templates/shared-blocks/plan-references-in-code.md in the development repository)
 - **sfui** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository); missing shared block plan-references-in-code (copy it verbatim from templates/shared-blocks/plan-references-in-code.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
 - **uncalibrated-sextant** (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block comment-proportion (copy it verbatim from templates/shared-blocks/comment-proportion.md in the development repository); missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository); missing shared block plan-references-in-code (copy it verbatim from templates/shared-blocks/plan-references-in-code.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)
 
@@ -985,6 +1078,7 @@ Criterion: [pyproject-usage.md](/components/development/audits/pyproject-usage/)
 | development | N/A | - |
 | divergulent | compliant | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | compliant | - |
 | kerbside-client | non-compliant | shakenfist/kerbside-client#3 |
@@ -1017,6 +1111,7 @@ Criterion: [python-version.md](/components/development/audits/python-version/)
 | development | N/A | - |
 | divergulent | compliant | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -1045,6 +1140,7 @@ Criterion: [readme-absolute-links.md](/components/development/audits/readme-abso
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
@@ -1077,6 +1173,7 @@ Criterion: [readme-structure.md](/components/development/audits/readme-structure
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
@@ -1105,6 +1202,7 @@ Criterion: [release-process.md](/components/development/audits/release-process/)
 | development | N/A | - |
 | divergulent | compliant | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -1133,6 +1231,7 @@ Criterion: [renovate-lockstep-groups.md](/components/development/audits/renovate
 | development | N/A | - |
 | divergulent | N/A | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | N/A | - |
 | kerbside-client | N/A | - |
@@ -1161,6 +1260,7 @@ Criterion: [renovate.md](/components/development/audits/renovate/)
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | non-compliant | shakenfist/kerbside-client#2 |
@@ -1196,6 +1296,7 @@ Criterion: [reusable-workflow-secrets.md](/components/development/audits/reusabl
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
@@ -1221,9 +1322,10 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 | client-python-k3s | N/A | - |
 | clingwrap | N/A | - |
 | cloudgood | N/A | - |
-| development | non-compliant | shakenfist/development#216 |
+| development | compliant | - |
 | divergulent | N/A | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | non-compliant | shakenfist/kerbside#227 |
 | kerbside-client | non-compliant | shakenfist/kerbside-client#12 |
@@ -1239,11 +1341,10 @@ Criterion: [review-coverage.md](/components/development/audits/review-coverage/)
 
 Details for non-compliant projects:
 
-- **actions** (Status): 128 of 136 in-scope files reviewed at HEAD (4 imported from shakenfist/development); 8 need review (threshold 5)
-- **development** (Status): 117 of 203 in-scope files reviewed at HEAD; 86 need review (threshold 5)
-- **kerbside** (Status): 133 of 252 in-scope files reviewed at HEAD (8 imported from shakenfist/development); 119 need review (threshold 5)
+- **actions** (Status): 130 of 140 in-scope files reviewed at HEAD (4 imported from shakenfist/development); 10 need review (threshold 5)
+- **kerbside** (Status): 137 of 254 in-scope files reviewed at HEAD (4 imported from shakenfist/development); 117 need review (threshold 5)
 - **kerbside-client** (Status): 3 of 15 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 12 need review (threshold 5)
-- **ryll** (Status): 162 of 224 in-scope files reviewed at HEAD (8 imported from shakenfist/development); 62 need review (threshold 5)
+- **ryll** (Status): 215 of 224 in-scope files reviewed at HEAD (2 imported from shakenfist/development); 9 need review (threshold 5)
 - **sfui** (Status): 3 of 52 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 49 need review (threshold 5)
 
 ## review-scope-completeness
@@ -1261,6 +1362,7 @@ Criterion: [review-scope-completeness.md](/components/development/audits/review-
 | development | compliant | - |
 | divergulent | N/A | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
@@ -1289,6 +1391,7 @@ Criterion: [rust-unwrap-lint.md](/components/development/audits/rust-unwrap-lint
 | development | N/A | - |
 | divergulent | N/A | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | N/A | - |
 | kerbside-client | N/A | - |
@@ -1321,6 +1424,7 @@ Criterion: [scheduled-workflow-health.md](/components/development/audits/schedul
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | compliant | - |
@@ -1353,6 +1457,7 @@ Criterion: [scope-coverage.md](/components/development/audits/scope-coverage/)
 | development | compliant | - |
 | divergulent | N/A | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | N/A | - |
 | kerbside-client | N/A | - |
@@ -1381,6 +1486,7 @@ Criterion: [secret-handling.md](/components/development/audits/secret-handling/)
 | development | compliant | - |
 | divergulent | compliant | - |
 | hunkydory | compliant | - |
+| images | N/A | - |
 | instar | compliant | - |
 | kerbside | compliant | - |
 | kerbside-client | non-compliant | shakenfist/kerbside-client#11 |
@@ -1415,6 +1521,7 @@ Criterion: [security-sanitization.md](/components/development/audits/security-sa
 | development | N/A | - |
 | divergulent | N/A | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | N/A | - |
 | kerbside-client | N/A | - |
@@ -1443,6 +1550,7 @@ Criterion: [sfui-vendor.md](/components/development/audits/sfui-vendor/)
 | development | N/A | - |
 | divergulent | N/A | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | non-compliant | shakenfist/kerbside#516 |
 | kerbside-client | N/A | - |
@@ -1477,6 +1585,7 @@ Criterion: [undeclared-direct-dependency.md](/components/development/audits/unde
 | development | N/A | - |
 | divergulent | N/A | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -1499,12 +1608,13 @@ Criterion: [unused-declared-dependency.md](/components/development/audits/unused
 | actions | N/A | - |
 | agent-python | compliant | - |
 | client-python | non-compliant | shakenfist/client-python#383 |
-| client-python-k3s | non-compliant | shakenfist/client-python-k3s#50 |
+| client-python-k3s | compliant | - |
 | clingwrap | compliant | - |
 | cloudgood | N/A | - |
 | development | N/A | - |
 | divergulent | compliant | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -1521,7 +1631,6 @@ Criterion: [unused-declared-dependency.md](/components/development/audits/unused
 Details for non-compliant projects:
 
 - **client-python** (Status): Declared but never imported: chardet (pyproject.toml:23), pyyaml (pyproject.toml:27), requests_toolbelt (pyproject.toml:22). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
-- **client-python-k3s** (Status): Declared but never imported: prettytable (pyproject.toml:57). Remove each, or record why it is installed with a "# not-imported: <name> -- <reason>" comment in the dependencies array
 
 ## version-file-gitignore
 
@@ -1538,6 +1647,7 @@ Criterion: [version-file-gitignore.md](/components/development/audits/version-fi
 | development | N/A | - |
 | divergulent | compliant | - |
 | hunkydory | N/A | - |
+| images | N/A | - |
 | instar | N/A | - |
 | kerbside | compliant | - |
 | kerbside-client | N/A | - |
@@ -1570,6 +1680,7 @@ Criterion: [workflow-standards.md](/components/development/audits/workflow-stand
 | development | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 | divergulent | compliant | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 | hunkydory | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
+| images | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | - |
 | instar | N/A | compliant | compliant | compliant | compliant | compliant | N/A | compliant | N/A | - |
 | kerbside | compliant | compliant | compliant | compliant | compliant | compliant | compliant | compliant | compliant | - |
 | kerbside-client | non-compliant | compliant | compliant | compliant | compliant | non-compliant | N/A | compliant | N/A | shakenfist/kerbside-client#4, shakenfist/kerbside-client#6 |
