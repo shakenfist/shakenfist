@@ -231,7 +231,7 @@ phases 0, 1b and 3 all rely on `create()` failing when power on fails.
 | 1b. The cleaner sees powered off domains | [PLAN-power-state-correctness-phase-01b-inactive-domains.md](PLAN-power-state-correctness-phase-01b-inactive-domains.md) | Complete | `447ed75ae` |
 | 2. Autostart and instance restore | [PLAN-power-state-correctness-phase-02-autostart-restore.md](PLAN-power-state-correctness-phase-02-autostart-restore.md) | Complete | `776dc9e70` |
 | 3. Power operations answer truthfully | [PLAN-power-state-correctness-phase-03-power-api.md](PLAN-power-state-correctness-phase-03-power-api.md) | Complete | `d3d5f15ca` |
-| 4. Push audit | PLAN-power-state-correctness-phase-04-push-audit.md | Not started | — |
+| 4. Push audit | [PLAN-power-state-correctness-phase-04-push-audit.md](PLAN-power-state-correctness-phase-04-push-audit.md) | In progress | — |
 
 Each phase that changes behaviour lands its functional tests with it,
 rather than leaving them to a trailing test phase.
@@ -465,6 +465,17 @@ the domain now raises before reading it.
 Run `PUSH-AUDIT.md` over the accumulated diff of phases 0 to 3, as
 recorded in the `Merged` column. Re-read F9 and record whether it was
 deliberately left alone.
+
+The phase survey added two things to this section; the phase plan has
+the detail as S1 to S5.
+
+* **Two plan-document merges are not phases**, but are audited too:
+  `6c5807018` (#4310, this plan) and `304c6ca51` (#4405, the phase 2
+  plan). The documentation lens reads them (S1).
+* **F9 is no longer a dormant mapping.** Phase 3 made
+  `extract_power_state()` the success oracle for pause and unpause, so
+  re-reading F9 means checking each decision built on it, not only the
+  mapping (S2).
 
 <!-- shared-block: plan-push-audit-phase v3 -->
 Push audit phase (shared block; do not edit -- the canonical
