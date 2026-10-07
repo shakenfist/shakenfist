@@ -15287,6 +15287,72 @@ deletion, and power management.</p>
 <li><a href="https://openapi.shakenfist.com/#/instances/post_instances__instance_ref__unpause">POST /instances/{instance_ref}/unpause</a>: Unpause an instance.</li>
 </ul>
 </details>
+<h3 id="what-each-power-operation-answers">What each power operation answers<a class="headerlink" href="#what-each-power-operation-answers" title="Permanent link">&para;</a></h3>
+<p>A successful call to any of these always answers 200 with a <code>null</code> body.
+Beyond the usual authentication and validation errors, they can answer:</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>406</th>
+<th>409</th>
+<th>500</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Soft reboot</td>
+<td>instance is not <code>created</code></td>
+<td>instance is powered off</td>
+<td>--</td>
+</tr>
+<tr>
+<td>Hard reboot</td>
+<td>instance is not <code>created</code></td>
+<td>instance is powered off</td>
+<td>--</td>
+</tr>
+<tr>
+<td>Power off</td>
+<td>instance is not <code>created</code></td>
+<td>--</td>
+<td><code>destroy()</code> failed on the hypervisor and the domain is still running</td>
+</tr>
+<tr>
+<td>Power on</td>
+<td>instance is not <code>created</code></td>
+<td>instance is paused (unpause it instead), or UEFI boot is unavailable</td>
+<td>every power on attempt failed</td>
+</tr>
+<tr>
+<td>Pause</td>
+<td>instance is not <code>created</code></td>
+<td>instance is powered off, or it never reached <code>paused</code> after three attempts</td>
+<td>--</td>
+</tr>
+<tr>
+<td>Unpause</td>
+<td>instance is not <code>created</code></td>
+<td>instance is powered off, or it never reached <code>on</code> after three attempts</td>
+<td>--</td>
+</tr>
+</tbody>
+</table>
+<p>Notes:</p>
+<ul>
+<li>Pausing an already paused instance, and unpausing an already running one,
+  both succeed without calling libvirt again -- these operations are
+  idempotent.</li>
+<li>Powering on an already running instance also succeeds: it re-sets the
+  libvirt autostart flag and records the instance's power state, which is
+  also how a running instance whose autostart flag was lost gets it set
+  again. Powering on a paused instance is refused rather than silently
+  resuming it.</li>
+<li>When a power on or power off answers 500, the instance's power state is
+  updated to record what the domain actually is, not the state that was
+  requested. See <a href="/operator_guide/power_states/">power states</a> for what
+  that means operationally.</li>
+</ul>
 <details class="example">
 <summary>Python API client: create and then delete a simple instance</summary>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>

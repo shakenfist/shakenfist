@@ -15207,8 +15207,8 @@ support that suspicion. Every finding below was checked against
 <tr>
 <td>F6</td>
 <td><code>instance.py</code> <code>pause()</code>/<code>unpause()</code></td>
-<td>Treat "<code>update_power_state()</code> did not change the stored value" as "the operation failed". libvirt's qemu driver returns success for suspending a paused domain or resuming a running one.</td>
-<td>Pausing twice, or losing a race with the cleaner writing <code>paused</code> first, raises a 409 for an operation which succeeded.</td>
+<td>Treat "<code>update_power_state()</code> did not change the stored value" as "the operation failed". libvirt's qemu driver returns success for suspending a paused domain, but raises "domain is already running" for resuming a running one (phase 3 S1).</td>
+<td>Pausing twice answers 409 and unpausing twice answers 500, and losing a race with the cleaner writing <code>paused</code> first, raises a 409 for an operation which succeeded.</td>
 </tr>
 <tr>
 <td>F7</td>
@@ -15243,7 +15243,7 @@ support that suspicion. Every finding below was checked against
 <tr>
 <td>F12</td>
 <td>the power endpoints</td>
-<td><code>requires_instance_active</code> answers 406 for any state other than <code>created</code>, but none of the four power endpoints declares 406 in its <code>swag_from</code>.</td>
+<td><code>requires_instance_active</code> answers 406 for any state other than <code>created</code>, but none of the six power endpoints (soft and hard reboot, power on and off, pause and unpause) declares 406 in its <code>swag_from</code>. Three non-power endpoints share the gap (<a href="https://github.com/shakenfist/shakenfist/issues/4449">#4449</a>).</td>
 <td>The published API is incomplete.</td>
 </tr>
 <tr>
@@ -15313,16 +15313,19 @@ can rely on them.</p>
    Phase 2 established the <code>libvirt-guests</code> default from the Debian 13
    and Ubuntu 24.04 packages: guests are shut down at host shutdown and
    nothing is started at boot, so autostart alone decides (phase 2 S2).</li>
-<li><strong>What does a failed power on return?</strong> Answered: 507 for port or
-   memory exhaustion, 500 for anything else. client-python maps 409, 500
+<li><strong>What does a failed power on return?</strong> Answered: 500. This first
+   said 507 for port or memory exhaustion, but phase 3 found nothing can
+   detect either (phase 3 S3, D1): port allocation never fails, and
+   memory refusals arrive as unparsed qemu text. client-python maps 409, 500
    and 507 to distinct exceptions and does not retry in <code>_request_url</code>,
    its CLI ignores the response body, and the ansible collection's
    <code>sf_instance</code> module has no power operations, so no client breaks.</li>
 <li><strong>Is <code>power_state</code> the right thing to assert?</strong> It is a cached value
    written by several actors (the power methods and the cleaner), and
    asserting it tests the cache, which is what users read. This plan
-   assumes that is the right target. Open: phase 3 should say so
-   explicitly if it finds otherwise.</li>
+   assumes that is the right target. Answered by phase 3 (D8): yes,
+   because after phase 3 every power operation writes it from the
+   domain's observed state, on success and failure alike.</li>
 <li><strong>Rename <code>get_all_domains()</code>?</strong> Answered: yes. Replace it with
    <code>listAllDomains()</code> using <code>VIR_CONNECT_LIST_DOMAINS_ACTIVE</code> and
    <code>_INACTIVE</code>, which also removes the N+1 lookups and the list-then-look-up
@@ -15411,13 +15414,13 @@ phases 0, 1b and 3 all rely on <code>create()</code> failing when power on fails
 <tr>
 <td>2. Autostart and instance restore</td>
 <td><a href="../PLAN-power-state-correctness-phase-02-autostart-restore/">PLAN-power-state-correctness-phase-02-autostart-restore.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>776dc9e70</code></td>
 </tr>
 <tr>
 <td>3. Power operations answer truthfully</td>
-<td>PLAN-power-state-correctness-phase-03-power-api.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-power-state-correctness-phase-03-power-api/">PLAN-power-state-correctness-phase-03-power-api.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -15572,6 +15575,16 @@ has the detail as S1 to S9 and D1 to D8.</p>
 </ul>
 <p>The restore test is rewritten rather than deleted, because it is the
 only cover the placement reconciliation has in its file (S5).</p>
+<p>Landed as <a href="https://github.com/shakenfist/shakenfist/pull/4437">#4437</a>.
+Functional run
+<a href="https://github.com/shakenfist/shakenfist/actions/runs/37169701355">37169701355</a>
+read the autostart flag on a real hypervisor through power off and power
+on. An earlier run failed every cluster job because step 4 deleted
+<code>_health_check_kvm_process()</code>, which is dispatched by name; it was
+restored without its delete branch, with a test that every dispatched
+task has a handler. Review added one guard: <code>power_off()</code> leaves
+autostart set when <code>destroy()</code> fails for any reason other than "not
+running", which phase 3's section records.</p>
 <h3 id="phase-3-power-operations-answer-truthfully">Phase 3: power operations answer truthfully<a class="headerlink" href="#phase-3-power-operations-answer-truthfully" title="Permanent link">&para;</a></h3>
 <p>F4 to F8 and F12, with their functional tests. <code>power_on()</code> reports
 failure and the endpoint answers 507 or 500 (open question 2);
@@ -15585,7 +15598,7 @@ changed, and raise <code>InvalidLifecycleState</code> for an inactive domain the
 way <code>reboot()</code> does after #3630; <code>_power_on_inner()</code> updates
 <code>power_state</code> on "already running", resumes or refuses a paused domain
 rather than answering success, and undefines stale XML on the generic
-retry path. Declare 406 on the four power endpoints. Resolve or
+retry path. Declare 406 on the six power endpoints. Resolve or
 explicitly exclude <a href="https://github.com/shakenfist/shakenfist/issues/2241">#2241</a>,
 which is about unpause recovering from a crashed guest and overlaps F6
 and F7.</p>
@@ -15594,12 +15607,26 @@ and F7.</p>
 against the code it fixes. Functional tests: pausing a powered off
 instance (409, not 500), pausing twice, and a failed power on. The last
 uses <code>_node_exec</code> from <code>base.py</code>, which needs <code>sudo=True</code>, a node with an
-<code>ip</code>, and SSH access, and which no guest CI test uses yet: move a
+<code>ip</code>, and SSH access, and which phase 2's autostart tests already use: move a
 powered off instance's root disk aside, power on, assert the error and
 <code>power_state != 'on'</code>, and restore the disk before cleanup. It must skip
 visibly through <code>_require_node_exec</code> where node exec is unavailable.
 Any status code change is an API contract change, so update the
 <code>swag_from</code> declarations and <code>docs/</code>. Plan at high effort.</p>
+<p>The phase survey corrected five things in this section. The phase plan
+has the detail as S1 to S8 and D1 to D8.</p>
+<ul>
+<li><strong>Unpausing twice is a 500, not a 409.</strong> libvirt refuses to resume a
+  running domain, though it does accept suspending a paused one (S1).
+  Pause and unpause twice both become successes (D5).</li>
+<li><strong>There are six power endpoints, not four.</strong> The reboot endpoints
+  lack 406 too (S2).</li>
+<li><strong>A failed power on answers 500, not 507.</strong> Nothing distinguishes
+  exhaustion (S3), so open question 2's answer is revised (D1).</li>
+<li><strong><code>power_on()</code> and <code>power_off()</code> are also called by create and
+  delete.</strong> Making them raise must not change either (S4, D1, D2).</li>
+<li><strong>Guest CI tests already use node exec</strong>, since phase 2 (S8).</li>
+</ul>
 <h3 id="phase-4-push-audit">Phase 4: push audit<a class="headerlink" href="#phase-4-push-audit" title="Permanent link">&para;</a></h3>
 <p>Run <code>PUSH-AUDIT.md</code> over the accumulated diff of phases 0 to 3, as
 recorded in the <code>Merged</code> column. Re-read F9 and record whether it was
