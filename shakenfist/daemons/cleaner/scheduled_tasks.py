@@ -204,6 +204,16 @@ def _update_active_domain(lc, inst, instance_uuid, domain, log_ctx):
     error paused domain. The caller holds the instance lock, and domain
     was looked up inside it."""
     state = lc.extract_power_state(domain)
+    if state == 'off':
+        # The domain stopped after the caller saw it active. Writing 'off'
+        # here would skip what the inactive loop does on a detected power
+        # off (agent_state, the event, clearing autostart), and that loop
+        # would then find 'off' already recorded and never do it. Leave
+        # the domain to its next pass instead.
+        log_ctx.debug(
+            'Domain stopped while being inspected, leaving it to the '
+            'inactive domain pass')
+        return
     inst.update_power_state(state)
     if state == 'crashed':
         if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:

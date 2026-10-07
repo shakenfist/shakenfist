@@ -1000,6 +1000,57 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
         # The detected poweroff event is the record; no second event.
         self.assertEqual([], self._events(add_event, 'autostart cleared'))
 
+    def test_domain_stopping_inside_the_active_loop_is_left_to_the_inactive_loop(self):
+        """A domain which stops between the active loop's isActive() check
+        and its state read is not recorded as off by the active loop: that
+        would skip the detected poweroff handling (agent_state, the event,
+        clearing autostart), and the inactive loop, finding off already
+        recorded, would never do it. The next pass's inactive loop does."""
+        inst = self.mock_mariadb.create_instance(
+            'stopping', set_state=instance.Instance.STATE_CREATED)
+        inst_uuid = str(inst.uuid)
+        # Not what the running domain reads, so the active loop takes the
+        # lock to write.
+        inst.update_power_state('paused')
+
+        class StoppingDomain(FakeLibvirtDomain):
+            still_reported_active = False
+
+            def isActive(self):
+                return self.still_reported_active or super().isActive()
+
+        domain = StoppingDomain(
+            f'sf:{inst_uuid}', FakeLibvirt.VIR_DOMAIN_RUNNING,
+            reason=FakeLibvirt.VIR_DOMAIN_SHUTOFF_SHUTDOWN)
+        _test_extra_domains.append(domain)
+
+        def stop_the_domain(locked_uuid):
+            # Stopped after the re-lookup inside the lock saw it active.
+            domain._state = FakeLibvirt.VIR_DOMAIN_SHUTOFF
+            domain.still_reported_active = True
+
+        self.locks.on_lock = stop_the_domain
+        add_event = self._run()
+
+        self.assertEqual('paused', self._power_state(inst_uuid))
+        self.assertEqual([], self._events(add_event, 'detected poweroff'))
+        self.assertEqual([], _test_set_autostart_calls)
+
+        # The next pass sees the domain inactive, and handles it as the
+        # power off it is.
+        self.locks.on_lock = None
+        domain.still_reported_active = False
+        add_event = self._run()
+
+        self.assertEqual('off', self._power_state(inst_uuid))
+        self.assertEqual(AGENT_INSTANCE_OFF, self._agent_state(inst_uuid))
+        self.assertEqual(
+            [mock.call(EVENT_TYPE_AUDIT, 'detected poweroff',
+                       extra={'reason': 'shutdown',
+                              'previous_power_state': 'paused'})],
+            self._events(add_event, 'detected poweroff'))
+        self.assertEqual([(f'sf:{inst_uuid}', 0)], _test_set_autostart_calls)
+
     def test_already_off_clears_autostart_once(self):
         """A domain powered off before power_off() cleared autostart has it
         cleared under the lock, with an event, once (phase 2's D2 and D6)."""
