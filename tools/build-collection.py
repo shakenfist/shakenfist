@@ -5,15 +5,25 @@
 #
 # Derives the Shaken Fist version from setuptools_scm (the same source as
 # util_general.get_version(), so the collection and the server package never
-# drift), rewrites it into the collection's galaxy.yml as a valid semver
-# string, and builds the collection tarball into dist-collection/.
+# drift), rewrites it into a staged copy of the collection's galaxy.yml as a
+# valid semver string, and builds the collection tarball into
+# dist-collection/.
 #
-# Used by the build-collection job in .github/workflows/release.yml. Run from
-# the repository root.
+# The checkout itself is never modified. galaxy.yml is a tracked file, so
+# rewriting it in place left the tree dirty: every later setuptools_scm
+# version, including the server wheel a CI deploy builds next, gained a
+# .dYYYYMMDD suffix, and that rewritten galaxy.yml shipped inside the wheel
+# (package-data takes deploy/**). A second deploy of the same commit then saw
+# different installed files and restarted every daemon.
+#
+# Used by the build-collection job in .github/workflows/release.yml, and by
+# shakenfist/actions' deploy-collection.sh. Run from the repository root.
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 
 from packaging.version import Version
 
@@ -55,11 +65,6 @@ def main():
     raw, semver = collection_version()
     print('Shaken Fist version %s -> collection version %s' % (raw, semver))
 
-    galaxy = COLLECTION_DIR / 'galaxy.yml'
-    text = re.sub(
-        r'(?m)^version:.*$', 'version: %s' % semver, galaxy.read_text())
-    galaxy.write_text(text)
-
     # Use the ansible-galaxy that belongs to the interpreter running us (the
     # build venv), not whatever bare name happens to be on PATH -- running
     # venv/bin/python3 directly does not put the venv on PATH.
@@ -68,9 +73,17 @@ def main():
         galaxy_bin = pathlib.Path('ansible-galaxy')
 
     OUTPUT_DIR.mkdir(exist_ok=True)
-    subprocess.check_call([
-        str(galaxy_bin), 'collection', 'build', str(COLLECTION_DIR),
-        '--output-path', str(OUTPUT_DIR), '--force'])
+    with tempfile.TemporaryDirectory() as tmp:
+        staged = pathlib.Path(tmp) / 'collection'
+        shutil.copytree(COLLECTION_DIR, staged)
+        galaxy = staged / 'galaxy.yml'
+        text = re.sub(
+            r'(?m)^version:.*$', 'version: %s' % semver, galaxy.read_text())
+        galaxy.write_text(text)
+
+        subprocess.check_call([
+            str(galaxy_bin), 'collection', 'build', str(staged),
+            '--output-path', str(OUTPUT_DIR), '--force'])
 
 
 if __name__ == '__main__':
