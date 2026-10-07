@@ -115,9 +115,9 @@ MONITOR_START_INTERVAL = 30
 # here as a gap in replies, so a gap resets the cache and the next ping
 # is an is_system_running request whose reply rewrites the database.
 #
-# unpause() also has this monitor restarted (see
-# Instance._restart_sidechannel_monitor()), which covers a pause of any
-# length. This check is the backstop for when that cannot happen -- the
+# unpause(), and a power on which starts the domain, also have this
+# monitor restarted (see Instance._restart_sidechannel_monitor()), which
+# covers a pause of any length. This check is the backstop for when that cannot happen -- the
 # abort file could not be written, or the guest was frozen and thawed by
 # something other than pause() and unpause(), such as a host stall or a
 # suspend and resume made directly through libvirt.

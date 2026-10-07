@@ -752,6 +752,15 @@ class InstanceLibvirtTestCase(base.ShakenFistTestCase):
             set_state=instance.Instance.STATE_PREFLIGHT)
         self.inst = instance.Instance.from_db(self.instance_uuid)
 
+        # unpause(), and a power on which starts the domain, set the
+        # sidechannel monitor's abort file, so they must never see the real
+        # /run/sf, which a developer's machine may have.
+        self.abort_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.abort_dir)
+        p = mock.patch.object(daemon, 'ABORT_PATH_DIR', self.abort_dir)
+        p.start()
+        self.addCleanup(p.stop)
+
     def _mock_libvirt(self, domain, power_state='on'):
         conn = FakeLibvirtConnection(domain)
         conn.extract_power_state = lambda d: power_state
@@ -984,6 +993,30 @@ class InstancePowerOnTestCase(InstanceLibvirtTestCase):
         # timing, and the connected agent's state is left alone.
         self.assertEqual([None], self._event_extras('poweron'))
         self.assertEqual(constants.AGENT_READY, self.inst.agent_state.value)
+
+    def test_starting_the_domain_restarts_the_sidechannel_monitor(self):
+        # A monitor which handshook with the new guest before agent_state
+        # was reset caches "ready" and only writes on a change, so without
+        # a restart the database would read "no contact" for good.
+        domain = PowerOnDomain()
+        self._mock_power_on(domain)
+
+        self.inst.power_on()
+
+        self.assertEqual(
+            [f'sidechannel-{self.inst.uuid}.abort'],
+            os.listdir(self.abort_dir))
+
+    def test_already_running_leaves_the_sidechannel_monitor_alone(self):
+        # Nothing restarted and agent_state was not reset, so the
+        # monitor's view is current and a restart would only drop a
+        # working connection.
+        domain = PowerOnDomain(create_errors=[ALREADY_RUNNING], state='on')
+        self._mock_power_on(domain)
+
+        self.inst.power_on()
+
+        self.assertEqual([], os.listdir(self.abort_dir))
 
     def test_already_paused_is_refused(self):
         domain = PowerOnDomain(create_errors=[ALREADY_RUNNING], state='paused')
@@ -1346,14 +1379,6 @@ class InstancePauseUnpauseTestCase(InstanceLibvirtTestCase):
         super().setUp()
         p = mock.patch('shakenfist.instance.time.sleep')
         self.mock_sleep = p.start()
-        self.addCleanup(p.stop)
-
-        # unpause() sets the sidechannel monitor's abort file, so it must
-        # never see the real /run/sf, which a developer's machine may have.
-        self.abort_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.abort_dir)
-        p = mock.patch.object(daemon, 'ABORT_PATH_DIR', self.abort_dir)
-        p.start()
         self.addCleanup(p.stop)
 
     def _monitor_abort_path(self):

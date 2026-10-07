@@ -2463,8 +2463,12 @@ class Instance(dbowo):
                 return True
 
             # The domain has just started, so whatever the agent said
-            # before no longer holds.
+            # before no longer holds. A monitor which handshook with the
+            # new guest between create() and this write cached "ready" and
+            # will not write it again, so have it restarted to correct the
+            # "no contact" written here.
             self.agent_state = constants.AGENT_NEVER_TALKED
+            self._restart_sidechannel_monitor('from power on')
             self.add_event(
                 EVENT_TYPE_AUDIT, 'poweron',
                 extra={'libvirt_requested_at': libvirt_requested_at,
@@ -2680,18 +2684,20 @@ class Instance(dbowo):
 
             self.update_power_state('on')
             self.agent_state = constants.AGENT_NEVER_TALKED
-            self._restart_sidechannel_monitor()
+            self._restart_sidechannel_monitor('from unpause')
 
-    def _restart_sidechannel_monitor(self):
-        # The write of AGENT_NEVER_TALKED above is only corrected if the
-        # sidechannel monitor notices the agent's state may have changed,
-        # and it caches that state, writing agent_state only when its
-        # cached view changes. A pause long enough for the sidechannel
-        # daemon to see has already had the monitor torn down, so the
-        # next one starts afresh; a short one leaves the old monitor
-        # running with its cache still at ready, and the database at
-        # "no contact" for good. Setting the monitor's abort file has the
-        # daemon replace it whatever the length of the pause: the monitor
+    def _restart_sidechannel_monitor(self, source):
+        # A write of AGENT_NEVER_TALKED, by unpause() or a power on which
+        # started the domain, is only corrected if the sidechannel monitor
+        # notices the agent's state may have changed, and it caches that
+        # state, writing agent_state only when its cached view changes.
+        # A pause long enough for the sidechannel daemon to see has
+        # already had the monitor torn down, so the next one starts
+        # afresh; a short one leaves the old monitor running with its
+        # cache still at ready, and the database at "no contact" for good.
+        # A power on strands it the same way when a monitor handshook with
+        # the new guest before the write. Setting the monitor's abort file
+        # has the daemon replace it whatever the timing: the monitor
         # exits, is reaped, and its replacement re-handshakes with the
         # agent and writes what it finds.
         #
@@ -2702,14 +2708,15 @@ class Instance(dbowo):
         #
         # This runs on the hypervisor, which is the only place the file
         # means anything. Without /run/sf there is no sidechannel daemon
-        # to tell, and a failure to write is not a failure to unpause: the
-        # guest is running, and the monitor's reply gap check is a
-        # backstop for a pause long enough to show as a gap in replies.
+        # to tell, and a failure to write is not a failure to unpause or
+        # power on: the guest is running, and the monitor's reply gap
+        # check is a backstop for a pause long enough to show as a gap in
+        # replies.
         abort_path = daemon.sidechannel_abort_path(self.uuid)
         if not os.path.isdir(os.path.dirname(abort_path)):
             return
         try:
-            daemon.set_abort_path(abort_path, 'from unpause')
+            daemon.set_abort_path(abort_path, source)
         except OSError as e:
             LOG.with_fields({
                 'instance': self.uuid,
