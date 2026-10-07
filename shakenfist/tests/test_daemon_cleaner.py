@@ -552,6 +552,40 @@ class CleanerGuardsTestCase(CleanerBaseTestCase):
         self.assertEqual([], mock_execute.call_args_list)
         self.assertEqual([], mock_delete_files.call_args_list)
 
+    @mock.patch(
+        'shakenfist.daemons.cleaner.scheduled_tasks.util_concurrency.execute')
+    @mock.patch('os.path.exists', side_effect=fake_exists)
+    @mock.patch('time.time', return_value=7)
+    @mock.patch('os.listdir', return_value=[])
+    @mock.patch('os.unlink')
+    def test_active_domain_failure_skips_only_that_domain(
+            self, mock_unlink, mock_listdir, mock_time, mock_exists,
+            mock_execute):
+        """A failure on one active domain, such as virsh failing to undefine
+        a crashed domain whose instance is being deleted, skips that domain
+        this pass rather than every domain listed after it."""
+        failing = self.mock_mariadb.create_instance(
+            'failing', set_state=instance.Instance.STATE_DELETE_WAIT)
+        _test_extra_domains.append(FakeLibvirtDomain(
+            f'sf:{failing.uuid}', FakeLibvirt.VIR_DOMAIN_CRASHED))
+
+        following = self.mock_mariadb.create_instance(
+            'following', set_state=instance.Instance.STATE_CREATED)
+        # Not what the running domain reads, so this pass writes it.
+        following.update_power_state('paused')
+        _test_extra_domains.append(FakeLibvirtDomain(
+            f'sf:{following.uuid}', FakeLibvirt.VIR_DOMAIN_RUNNING))
+
+        mock_execute.side_effect = exceptions.ProcessExecutionError(
+            exit_code=1, stderr='virsh failed')
+
+        cleaner_st.update_power_states()
+
+        self.assertEqual(
+            [mock.call(f'virsh undefine --nvram "sf:{failing.uuid}"')],
+            mock_execute.call_args_list)
+        self.assertEqual('on', self._power_state(str(following.uuid)))
+
     @mock.patch('shakenfist.daemons.cleaner.scheduled_tasks.shutil.rmtree')
     @mock.patch(
         'shakenfist.daemons.cleaner.scheduled_tasks._delete_instance_files')
@@ -1183,6 +1217,33 @@ class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
             [('lock', detected), ('unlock', detected),
              ('lock', already_off), ('unlock', already_off)],
             self.locks.events)
+
+    def test_virsh_failure_skips_only_that_domain(self):
+        """A failure which is not a libvirt error, such as the virsh
+        fallback for undefining an unknown domain exiting non-zero, skips
+        that domain this pass rather than every domain listed after it."""
+        unknown_uuid = str(uuid.uuid4())
+        _test_extra_domains.append(FakeLibvirtDomain(
+            f'sf:{unknown_uuid}', FakeLibvirt.VIR_DOMAIN_SHUTOFF))
+        detected = self._inactive_instance()
+
+        def undefine(domain):
+            raise FakeLibvirtError('undefine failed')
+
+        self.mock_execute.side_effect = exceptions.ProcessExecutionError(
+            exit_code=1, stderr='virsh failed',
+            cmd=f'virsh undefine --nvram "sf:{unknown_uuid}"')
+        with mock.patch.object(FakeLibvirtDomain, 'undefine', autospec=True,
+                               side_effect=undefine):
+            add_event = self._run()
+
+        self.assertEqual(
+            [mock.call(f'virsh undefine --nvram "sf:{unknown_uuid}"')],
+            self.mock_execute.call_args_list)
+        # The domain after it was still handled.
+        self.assertEqual('off', self._power_state(detected))
+        self.assertEqual(
+            1, len(self._events(add_event, 'detected poweroff')))
 
     def test_instance_being_created_is_skipped(self):
         """A domain whose instance is still being created is left alone

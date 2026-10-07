@@ -504,6 +504,104 @@ def _update_inactive_domain(lc, domain, instance_uuid, pet):
         domain.setAutostart(0)
 
 
+def _per_domain_errors(lc):
+    """The errors which skip one domain for this pass, not every domain after it.
+
+    Each pass reconciles every domain on the node, and the next pass
+    retries, so a failure which is about one domain, or which is
+    transient, must not end the pass for the domains listed after it:
+    a libvirt call on that domain, the virsh fallback for undefining or
+    destroying it (which raises ProcessExecutionError on a non-zero exit),
+    privexec and node lock transport errors, a database outage, and
+    errors from the filesystem or a socket. A programming error is not
+    among them, and still ends the pass loudly.
+    """
+    return (
+        lc.libvirt.libvirtError,
+        exceptions.ProcessExecutionError,
+        exceptions.DatabaseUnavailable,
+        exceptions.MissingPrivExecSocket,
+        exceptions.TruncatedPrivExecResponse,
+        exceptions.UnknownPrivExecReplyException,
+        exceptions.TruncatedNodeLockResponse,
+        exceptions.UnknownNodeLockReplyException,
+        OSError,
+    )
+
+
+def _update_listed_active_domain(lc, domain, instance_uuid, pet, seen):
+    """Reconcile one active Shaken Fist domain with its instance."""
+    log_ctx = LOG.with_fields({'instance': instance_uuid})
+    log_ctx.debug('Instance is running')
+
+    inst = instance.Instance.from_db(instance_uuid)
+    if not inst:
+        if not _instance_confirmed_absent(instance_uuid):
+            return
+
+        # Instance is SF but not in database. Kill to reduce load.
+        if not _delete_with_virsh(instance_uuid, None):
+            _delete_with_kill(instance_uuid, None)
+        return
+
+    # P5: the cleaner records where a libvirt domain
+    # already is, so its placement writes do not enforce
+    # the capacity guard -- a guard cannot refuse reality.
+    inst.place_instance(config.NODE_UUID, enforce=False)
+    seen.append(domain.name())
+
+    db_state = inst.state
+    if db_state.value == dbo.STATE_DELETED:
+        # NOTE(mikal): a delete might be in-flight in the queue.
+        # We only worry about instances which should have gone
+        # away five minutes ago.
+        if time.time() - db_state.update_time < 300:
+            return
+
+        attempts = inst.enforced_deletes_increment()
+        if attempts > 6:
+            # I give up.
+            pass
+
+        elif attempts > 4:
+            _delete_with_kill(instance_uuid, inst)
+
+        elif attempts > 2:
+            _delete_with_virsh(instance_uuid, inst)
+
+        else:
+            inst.delete()
+
+        log_ctx.with_fields({'attempt': attempts}).warning(
+            'Deleting stray instance')
+        return
+
+    # When the database already agrees with libvirt there is
+    # nothing to write, and no lock is taken (S14).
+    if not _active_domain_needs_write(lc, inst, db_state, domain):
+        return
+
+    # Otherwise write under the instance lock, from a domain
+    # looked up again inside it, so that a power operation which
+    # finished while this pass was running is not overwritten by
+    # a stale reading (F13, D2 in
+    # docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md).
+    with _instance_lock(inst, pet) as locked:
+        if not locked:
+            return
+
+        domain = lc.get_domain_from_sf_uuid(instance_uuid)
+        if not domain or not domain.isActive():
+            # The second loop's next pass owns an inactive
+            # domain.
+            log_ctx.debug(
+                'Domain is no longer active, skipping it this pass')
+            return
+
+        _update_active_domain(
+            lc, inst, instance_uuid, domain, log_ctx)
+
+
 @util_general.recorded_method
 def update_power_states(pet_watchdog=None):
     # The cleaner runs this as a scheduled task from outside its idle() loop,
@@ -527,75 +625,12 @@ def update_power_states(pet_watchdog=None):
                 instance_uuid = _sf_instance_uuid(domain)
                 if instance_uuid is None:
                     continue
-                log_ctx = LOG.with_fields({'instance': instance_uuid})
-                log_ctx.debug('Instance is running')
-
-                inst = instance.Instance.from_db(instance_uuid)
-                if not inst:
-                    if not _instance_confirmed_absent(instance_uuid):
-                        continue
-
-                    # Instance is SF but not in database. Kill to reduce load.
-                    if not _delete_with_virsh(instance_uuid, None):
-                        _delete_with_kill(instance_uuid, None)
-                    continue
-
-                # P5: the cleaner records where a libvirt domain
-                # already is, so its placement writes do not enforce
-                # the capacity guard -- a guard cannot refuse reality.
-                inst.place_instance(config.NODE_UUID, enforce=False)
-                seen.append(domain.name())
-
-                db_state = inst.state
-                if db_state.value == dbo.STATE_DELETED:
-                    # NOTE(mikal): a delete might be in-flight in the queue.
-                    # We only worry about instances which should have gone
-                    # away five minutes ago.
-                    if time.time() - db_state.update_time < 300:
-                        continue
-
-                    attempts = inst.enforced_deletes_increment()
-                    if attempts > 6:
-                        # I give up.
-                        pass
-
-                    elif attempts > 4:
-                        _delete_with_kill(instance_uuid, inst)
-
-                    elif attempts > 2:
-                        _delete_with_virsh(instance_uuid, inst)
-
-                    else:
-                        inst.delete()
-
-                    log_ctx.with_fields({'attempt': attempts}).warning(
-                        'Deleting stray instance')
-                    continue
-
-                # When the database already agrees with libvirt there is
-                # nothing to write, and no lock is taken (S14).
-                if not _active_domain_needs_write(lc, inst, db_state, domain):
-                    continue
-
-                # Otherwise write under the instance lock, from a domain
-                # looked up again inside it, so that a power operation which
-                # finished while this pass was running is not overwritten by
-                # a stale reading (F13, D2 in
-                # docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md).
-                with _instance_lock(inst, pet) as locked:
-                    if not locked:
-                        continue
-
-                    domain = lc.get_domain_from_sf_uuid(instance_uuid)
-                    if not domain or not domain.isActive():
-                        # The second loop's next pass owns an inactive
-                        # domain.
-                        log_ctx.debug(
-                            'Domain is no longer active, skipping it this pass')
-                        continue
-
-                    _update_active_domain(
-                        lc, inst, instance_uuid, domain, log_ctx)
+                try:
+                    _update_listed_active_domain(
+                        lc, domain, instance_uuid, pet, seen)
+                except _per_domain_errors(lc) as e:
+                    LOG.with_fields({'instance': instance_uuid}).warning(
+                        f'Failed to update active domain, skipping it this pass: {e}')
 
         except lc.libvirt.libvirtError as e:
             LOG.debug(f'Failed to lookup running domains: {e}')
@@ -613,12 +648,12 @@ def update_power_states(pet_watchdog=None):
                 if domain.name() in seen:
                     continue
 
-                # A libvirt error on one domain, such as a failed
-                # setAutostart(), skips that domain this pass rather than
-                # every domain listed after it.
+                # An error on one domain, such as a failed setAutostart()
+                # or virsh undefine, skips that domain this pass rather
+                # than every domain listed after it.
                 try:
                     _update_inactive_domain(lc, domain, instance_uuid, pet)
-                except lc.libvirt.libvirtError as e:
+                except _per_domain_errors(lc) as e:
                     LOG.with_fields({'instance': instance_uuid}).warning(
                         f'Failed to update inactive domain, skipping it this pass: {e}')
 
