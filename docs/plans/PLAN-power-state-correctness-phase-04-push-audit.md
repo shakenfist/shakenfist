@@ -663,4 +663,198 @@ Two gates:
 
 ## Findings
 
-*(Filled in by step 4i.)*
+The audit found one blocking defect and six findings that were fixed
+here, and it filed three issues for the rest. The blocking defect was in
+phase 1b's own guard: the strict instance lookup did not work over
+gRPC, which is the only path the cleaner uses. So a MariaDB error still
+read as "this instance does not exist" just before the cleaner deleted a
+domain and its disks.
+
+Every lens's result is below, with what it examined. The management
+session checked two findings per agent against `develop` before grading
+them; the checks are recorded under each lens.
+
+### Wave 1 (4b) -- passed
+
+* **pre-commit and tox.** `pre-commit run --all-files` passed all
+  fifteen hooks. tox passed `py3`, `flake8` and `cover`, with 0
+  failures. `test_nested_sweep` passed, so it did not need re-running on
+  its own.
+* **Style greps.** All four style greps were empty for each of D1's five
+  ranges: lines over 120 characters, `print(`, `etcd`, and
+  `get_all_*` without `# nopushdown:`.
+* **Proto freshness and mermaid rendering.** Neither applies. No range
+  touches a proto file, and no range, including the two plan-only
+  merges, adds a mermaid block.
+* **The strict lookup in `mariadb.py`** (`447ed75ae`). It has the
+  three-layer shape, but 4c showed that shape is not compliant in
+  substance (B1).
+* **Style conformance.** It passed. The plan citations it noticed went
+  to 4c.
+
+### Fixed in this phase
+
+| # | Finding | Lens | Commit | Test that fails without the fix |
+|---|---|---|---|---|
+| B1 | **Blocking.** The `GetInstance` servicer called `_direct_get_instance()` without `strict`. A MariaDB `OperationalError` therefore came back as `found=False` with OK status. The cleaner is never a direct MariaDB caller, so its strict lookup returned `None` on a database error. `_instance_confirmed_absent()` then let it destroy and undefine the domain and remove its directory. The servicer now reads strictly, and a failed read answers INTERNAL. | 4c | `1e4368ed4` | `GetInstanceServicerTestCase.test_operational_error_is_internal_not_a_miss` |
+| B2 | `_power_on_inner()` wrote `agent_state` "no contact" after the domain started, but a monitor which had already handshaken kept its cached "ready". That stranded the agent on a running guest, the same class as phase 3's D9. Power on now restarts the monitor, but only when it started the domain. | 4g (G1) | `dfa7846d9` | `InstancePowerOnTestCase.test_starting_the_domain_restarts_the_sidechannel_monitor`, `test_already_running_leaves_the_sidechannel_monitor_alone` |
+| B3 | A domain which stopped between the cleaner's `isActive()` and its state read was written `off` by the active loop. That skipped the detected power off's `agent_state`, event and autostart clear. The active loop now leaves such a domain to the inactive loop. | 4g (G2) | `1a2e99374` | `test_domain_stopping_inside_the_active_loop_is_left_to_the_inactive_loop` |
+| B4 | `unpause()` answered 500 when a `resume()` found the domain already running. It now treats that as success. | 4d | `33cb95f99` | `test_unpause_retry_finding_the_domain_running_succeeds`, `test_unpause_first_resume_finding_the_domain_running_succeeds` |
+| B5 | The cleaner's per-domain guard caught only `libvirtError`, although its comment promised to skip only the failing domain. A failed `virsh` fallback, a database outage or a node lock transport error ended the whole pass. Both loops now skip only the failing domain, for a named set of errors. | 4c (B), 4f (F2) | `5b2b95abd` | `test_virsh_failure_skips_only_that_domain`, `test_active_domain_failure_skips_only_that_domain` |
+| B6 | The plan left about 146 citations (S14, D7, F13, "phase 1b", plan paths, commit hashes) in code, docstrings, test names and assertion messages, against the plan-references-in-code rule. They were replaced by the reasons they stood for. `tools/check-plan-phase-references.py` checks only `docs/`, which is why nothing caught them. | 4c (G) | `6dae09023` | n/a |
+| B7 | Failed power on and power off answered 500 with libvirt's raw error text, which names host disk, nvram and qemu paths. That broke the convention that every other instance endpoint's libvirt failure answers an opaque `server error`. The bodies are now generic, and the detail stays in the owner-readable audit event. Graded low (4f F1); fixed because it was cheap, at the cost of reversing phase 3 D1's "with the last error". | 4f (F1) | `924184994` | `test_failed_power_on_answers_500_and_records_the_error`, `test_failed_power_off_answers_500_and_records_the_error` |
+
+The management session re-ran the fix commits' mutation script, and it
+killed all nine mutations.
+
+### Filed
+
+* [#4485](https://github.com/shakenfist/shakenfist/issues/4485).
+  `agent_state` can read ready while an instance is paused or off. This
+  covers 4g's G3 (an in-flight monitor write landing after a pause or
+  power off), G4 (the monitor constructor overwriting the paused and off
+  values) and G5 (pauses and resumes outside Shaken Fist).
+* [#4486](https://github.com/shakenfist/shakenfist/issues/4486). Delete
+  removes an instance's disks while its domain is still running, after
+  `destroy()` failed twice. This corrects phase 3's Future work entry:
+  that entry says delete undefines the running domain, but `undefine()`
+  is in fact skipped. The issue also carries 4d's finding that the
+  cleaner's "Deleting stray instance" branch, which is what recovers
+  from this, has no tests.
+  * 4e graded this blocking. The management session graded it advisory:
+    the disks belong to an instance the user asked to delete, and the
+    cleaner kills the stray domain within minutes.
+* [#4487](https://github.com/shakenfist/shakenfist/issues/4487).
+  Clean-ups from 4c:
+  * one matcher for "domain is not running";
+  * the copies of pause and unpause;
+  * the two CI node lookups;
+  * `_await_instance_event()`'s dead `message` parameter;
+  * the sidechannel cache explanation, written out three times.
+
+### Recorded, not filed
+
+* **File size.** `instance.py` is 3,312 lines, 226 more than before the
+  plan. Its power operations, about 440 lines, are a seam for a later
+  split. `daemons/sidechannel/main.py` is 2,151 lines. Both are advisory.
+* **Type hints.** The new cleaner and instance helpers have none, and
+  none of these files is in the mypy rollout.
+* **The TODO in `_undefine_domain()`.** It has an answer:
+  `domain.undefineFlags(VIR_DOMAIN_UNDEFINE_NVRAM)` would also remove the
+  virsh fallback.
+* **The cleaner's virsh helpers interpolate `instance_uuid` into a shell
+  command.** That is safe because `_sf_instance_uuid()` accepts only a
+  name whose suffix equals libvirt's own UUID. The helpers themselves
+  accept any string, so validating it inside them would be defence in
+  depth (4f F3).
+* **`sidechannel_abort_path()`.** Every caller passes a process-chosen
+  UUID (4f F4).
+* **Foreign domains.** A domain someone defines by hand, named
+  `sf:<its own uuid>` and with no instance, is treated as ours and
+  deleted (4f F6).
+* **`power_off()` with no domain** writes nothing and answers 200. This
+  predates the plan (4c D).
+* **`subsystem_internals.md`** says no lock is taken when libvirt and
+  the database agree. Crashed and I/O-error-paused domains are
+  exceptions (4e). Advisory.
+
+### Who writes `power_state` and `agent_state` (4g, D3)
+
+The full writers tables and the twelve interleavings are in 4g's report.
+Its conclusions:
+
+* **Sound:**
+  * I1, the cleaner's active loop against each power operation. The
+    F13 fix covers one direction, and the other was never open.
+  * I3, the inactive loop against power on.
+  * I5, the D9 fix.
+  * I8 and I9, create against delete and against the cleaner.
+  * I12, the power operations against each other.
+* **Self-correcting:**
+  * I10, the kvm health check clearing a fresh `kvm_pid`, within one
+    resources daemon pass.
+  * I11, a guest powering off during a power operation, within one
+    cleaner pass.
+* **Defects:**
+  * I2 (B3) and I7 (B2) were fixed here.
+  * I4 and I6 are filed as #4485.
+
+### F9 re-read (4g, D3)
+
+**F9 is deliberately left alone.** Under `libvirt.tmpl`, the only
+reachable state which `extract_power_state()` folds into another is
+`SHUTDOWN`. It is transient: with `on_poweroff=destroy`, libvirt kills
+qemu as soon as it enters it. Every decision built on it either matches
+what libvirt itself answers, or leaves a value which the cleaner's next
+pass corrects. For example, `resume()` of a `SHUTDOWN` domain returns
+success without acting, so `unpause()`'s shortcut answers what libvirt
+would. The other folded states are unreachable:
+
+* the qemu driver never sets `NOSTATE` or `BLOCKED`;
+* there is no panic device, so `CRASHED` cannot happen, and
+  `on_crash=restart` would make it transient anyway;
+* `<pm>` disables S3 and S4, so `PMSUSPENDED` cannot happen.
+
+### What sfcbr's cleaner did (4h, D4) -- nothing yet, so S3 stays open
+
+All six sfcbr hypervisors run `ec82dca6d`, which carries phases 1b and
+2 but not 3. Builds with phase 1b were first deployed between 19:00 and
+22:00 UTC on 2026-10-02, and builds with phase 2 between 2026-10-04
+21:00 and 2026-10-05 09:00 UTC. From 2026-10-03 to 2026-10-07 the
+cleaner logged none of the following, on any host:
+
+* a detected power off;
+* clearing autostart;
+* removing an unknown inactive domain;
+* deleting, enqueueing or abandoning a stray powered off instance;
+* a strict lookup refusal;
+* an active loop destroy.
+
+The logging was visible: a control search for another of the cleaner's
+warnings ("Blob missing from node") found 707 lines, and INFO and
+WARNING both reach Loki. No sfcbr instance is currently powered off and
+undeleted. **The branches have never run there, which is not the same as
+running clean**, so S3 moves to Future work. The same queries need
+re-running after a week or two of the current build. Two details for
+whoever runs them: `program` is not a Loki stream label, so filter with
+`|= "sf-cleaner"`, and exclude `host="maui"`. The management session
+reproduced the zero count and the control.
+
+### Test coverage (4d)
+
+Every promise in the mission has a unit test. Every promise except two
+also has a functional test which would have failed before the change:
+
+* a hypervisor reboot, deferred in phase 2 and proxied by the autostart
+  tests;
+* sf-queues restore, which cannot be exercised safely in a functional
+  run.
+
+Four of the five libvirt facts the phases verified are faithfully
+modelled by the fakes. The fifth, `resume()` of a running domain, was
+untested for unpause, and B4 now tests it. A CI check for fakes is not
+warranted, which answers the master plan's Future work question.
+
+### Documentation (4e)
+
+* **Docs against code.** Apart from the advisory sentence recorded
+  above, every behavioural statement in `power_states.md`, the power
+  section of `instances.md`, and the parts of `subsystem_internals.md`
+  these ranges touched matches `develop`.
+* **Plan-only merges (D2).** Neither `6c5807018` nor `304c6ca51` leaves
+  a stale claim stated as current. `8aa69c5e4`'s edit to
+  `PLAN-transient-capacity-refusals.md` is still true.
+* **Plan statuses.** `tools/check-plan-status.py` passes.
+* **Future work (D5).** The consolidated list is in the master plan.
+
+### Spot checks
+
+| Lens | Checked |
+|---|---|
+| 4b | `test_nested_sweep` passed in the tox log; the strict lookup's three layers |
+| 4c | B1, by reading the servicer and `_direct_get_instance()`; the cleaner's single active loop catch |
+| 4d | The active loop's catch at debug level; no test references "Deleting stray instance" |
+| 4e | `_delete_on_hypervisor()`'s unconditional `rmtree`. Confirmed, but graded advisory, not blocking. |
+| 4f | `suppress_exceptions_to_client` answers `server error`; `_domain_root_disk_path`'s "the API does not expose disk paths". 4f's "cleaner deletions sound" missed B1, and 4c's reading was taken. |
+| 4g | G1's write order in `_power_on_inner()`; G2's unguarded `off` in `_update_active_domain()` |
+| 4h | The searched string is the cleaner's own; a zero count and the control reproduced |
