@@ -63,6 +63,7 @@ The following projects are subject to consistency audits:
 
 - actions
 - agent-python
+- andris
 - client-python
 - client-python-k3s
 - clingwrap
