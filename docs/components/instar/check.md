@@ -124,16 +124,22 @@ previous versions.
 ## Differencing images
 
 A differencing VHD (footer disk type 4) or VHDX (`HasParent` set) holds
-only the sectors that differ from a parent image. instar cannot compose a
-parent yet, so `check` **refuses** such an image instead of validating it:
+only the sectors that differ from a parent image. `check` reads an image
+on its own rather than composing a parent chain into it, so it
+**refuses** such an image instead of validating it:
 
 ```
 $ instar check vhdx-diff-child.vhdx
-check: source is a differencing VHDX image whose parent instar cannot yet
-compose; composition is deferred (see PLAN-differencing.md)
+check: source is a differencing VHDX image, and check reads an image on
+its own rather than composing a parent into it, so the sectors it leaves
+to its parent could not be composed
 $ echo $?
 1
 ```
+
+This is unchanged by `--chain`: a differencing source is refused whether
+or not the chain flag is given, since the refusal happens before any
+chain is walked.
 
 Two things about that are worth knowing if you script against `check`:
 
@@ -147,6 +153,6 @@ Two things about that are worth knowing if you script against `check`:
   message goes to stderr. Every other `check` outcome, including
   corruption, still writes a JSON object.
 
-Validation resumes once parent composition lands; see
-[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) and the
-"VHD/VHDX differencing" section of [quirks.md](/components/instar/quirks/).
+`convert`, `dd`, `compare`, `bench` and `rebase` do compose a
+differencing source against its parent; see the "VHD/VHDX differencing"
+section of [quirks.md](/components/instar/quirks/) for the per-operation record.

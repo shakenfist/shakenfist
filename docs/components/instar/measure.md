@@ -200,17 +200,19 @@ instar measure -O vhdx mydisk.qcow2
 ## Differencing images
 
 A differencing VHD (footer disk type 4) or VHDX (`HasParent` set) stores
-only the sectors that differ from a parent image. instar cannot compose a
-parent yet, so `measure` refuses such a source by name and exits 1 rather than
-reporting a required-size estimate that ignores the parent's data:
+only the sectors that differ from a parent image. `measure` reads an
+image on its own rather than composing a parent chain into it, so it
+refuses such a source by name and exits 1 rather than reporting a
+required-size estimate that ignores the parent's data:
 
 ```
-measure: source is a differencing <VHD|VHDX> image whose parent instar cannot
-yet compose; composition is deferred (see PLAN-differencing.md)
+measure: source is a differencing <VHD|VHDX> image, and measure reads an
+image on its own rather than composing a parent into it, so the sectors
+it leaves to its parent could not be composed
 ```
 
 `instar info` is the exception — it reports the parent as a backing file
-instead of refusing. See the "VHD/VHDX differencing" section of
-[quirks.md](/components/instar/quirks/) for the per-operation record, and
-[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) for the composition
-work that will lift the refusal.
+instead of refusing. `convert`, `dd`, `compare`, `bench` and `rebase` do
+compose a differencing source against its parent; see the "VHD/VHDX
+differencing" section of [quirks.md](/components/instar/quirks/) for the per-operation
+record.

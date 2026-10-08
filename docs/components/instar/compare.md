@@ -38,17 +38,24 @@ Output is byte-for-byte identical with `qemu-img compare`.
 ## Differencing images
 
 A differencing VHD (footer disk type 4) or VHDX (`HasParent` set) stores
-only the sectors that differ from a parent image. instar cannot compose a
-parent yet, so `compare` refuses such a source by name and exits 1 rather than
-reporting a content difference it cannot actually account for:
+only the sectors that differ from a parent image. `compare` composes
+either or both sides against their own parent chain: each image descends
+its own chain independently, so a differencing image on one side is never
+read against the other side's chain by mistake.
+
+If an image's own chain has no parent to read, `compare` still refuses
+it, rather than reporting a content difference it cannot actually
+account for:
 
 ```
-compare: source is a differencing <VHD|VHDX> image whose parent instar cannot
-yet compose; composition is deferred (see PLAN-differencing.md)
+compare: a differencing <VHD|VHDX> image in the chain compare was given
+has no parent behind it, so the sectors it leaves to its parent could
+not be composed
 ```
 
-`instar info` is the exception — it reports the parent as a backing file
-instead of refusing. See the "VHD/VHDX differencing" section of
-[quirks.md](/components/instar/quirks/) for the per-operation record, and
-[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) for the composition
-work that will lift the refusal.
+and exits 1. A parent reference that cannot be resolved — the file is
+missing, or outside the backing file allowlist — is refused the same
+way, during chain discovery.
+
+See the "VHD/VHDX differencing" section of [quirks.md](/components/instar/quirks/) for the
+per-operation record.

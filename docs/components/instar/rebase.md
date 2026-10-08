@@ -146,6 +146,32 @@ verbatim — instar does not canonicalise to absolute paths.
 Detach is signalled by `-b ""`. The backing pointer is zeroed
 and the overlay becomes standalone.
 
+## Differencing images in the backing chain
+
+`rebase` only accepts a qcow2 or vmdk overlay as the image being
+rebased — any other format, VHD and VHDX included, is refused outright
+(`rebase: format '<fmt>' does not support rebase (qcow2 and vmdk
+only)`), so a differencing VHD or VHDX is never the file `rebase` is
+asked to act on.
+
+It can, however, sit further back in that overlay's own backing chain —
+attached with `qemu-img rebase -u`, since `instar create -b` refuses a
+differencing backing file directly. Detaching (`-b ""`) reads the whole
+old chain and copies every sector the overlay does not already own into
+it, so a differencing image behind the overlay is composed against its
+own parent exactly as `convert`, `dd`, `compare` and `bench` compose one:
+each sector comes from whichever image in the chain actually owns it.
+
+If that differencing image's own chain has no parent to read, `rebase`
+refuses the detach with the same typed message the other composing
+operations use:
+
+```
+rebase: a differencing <VHD|VHDX> image in the chain rebase was given
+has no parent behind it, so the sectors it leaves to its parent could
+not be composed
+```
+
 ## Known divergences from `qemu-img rebase`
 
 - **Long-path relocation is rejected.** Long new-backing paths

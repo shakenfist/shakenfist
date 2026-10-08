@@ -74,14 +74,14 @@ erDiagram
 
     sf_token_jtis {
         string jti PK "uuid4 hex, from the token's jti claim"
-        float expiry "epoch seconds, matches the exp claim"
+        double expiry "epoch seconds, matches the exp claim"
     }
 
     sources ||--o{ sf_token_keys: "No FK; sources reloaded from YAML"
     sf_token_keys {
         string source PK "No FK; sources reloaded from YAML"
         text keys_json "Shaken Fist's public_view payload, verbatim JSON"
-        float fetched_at "epoch seconds"
+        double fetched_at "epoch seconds"
     }
 ```
 
@@ -239,7 +239,7 @@ verifies; a jti already present means the token is being replayed.
 | Column | Type | Description |
 |--------|------|-------------|
 | jti | string | Primary key, uuid4 hex from the token's `jti` claim |
-| expiry | float | Token expiration time (epoch seconds, matches the `exp` claim) |
+| expiry | double | Token expiration time (epoch seconds, matches the `exp` claim) |
 
 ### sf_token_keys
 
@@ -251,7 +251,7 @@ except on an unknown-kid cache miss.
 |--------|------|-------------|
 | source | string | Primary key, source name (no FK; sources are reloaded from YAML) |
 | keys_json | text | Shaken Fist's `public_view` key payload, verbatim JSON |
-| fetched_at | float | Time the keys were last fetched (epoch seconds) |
+| fetched_at | double | Time the keys were last fetched (epoch seconds) |
 
 ## Relationships
 

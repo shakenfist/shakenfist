@@ -48,13 +48,13 @@ A differencing VHD (`disk_type == 4`) or differencing VHDX (`HasParent`
 set) has its parent reported as a backing file, in both human
 (`backing file: ...`) and `--output json` (`backing-filename` /
 `full-backing-filename`) forms — the same fields qcow2's backing file
-already uses. `instar info` is the deliberate exception to the refusal
-every other read op (`convert`, `dd`, `compare`, `bench`, `check`,
-`measure`) applies to a differencing source: `info` composes no sector
-data, so it has no wrong answer to give, and it is what a user reaches
-for when the rest of the tool declines to read the image. See the
-"VHD/VHDX differencing" section of [quirks.md](/components/instar/quirks/) for the full
-per-op record.
+already uses. `convert`, `dd`, `compare`, `bench` and `rebase` compose a
+differencing source against its parent; `measure` and `check` still
+refuse one outright, like `map`. `instar info` composes no sector data
+either way, so it has no wrong answer to give regardless of which of
+those applies, and it is what a user reaches for when an operation that
+does refuse declines to read the image. See the "VHD/VHDX differencing"
+section of [quirks.md](/components/instar/quirks/) for the full per-op record.
 
 `backing-filename-format` reports `vpc` or `vhdx` to match the child,
 not the `qcow2` that field defaults to when no backing format is
