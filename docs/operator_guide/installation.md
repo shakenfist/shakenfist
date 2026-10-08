@@ -211,7 +211,7 @@ are:
 | `kerbside_url` | Base URL of an operator-deployed Kerbside VDI console proxy. Optional; empty leaves the proxied-console integration off. See the [VDI console tokens operator guide](vdi_console_tokens.md). |
 | `kerbside_token_duration` | Lifetime in seconds of a minted console token. Defaults to 300. Rendered only when `kerbside_url` is set. |
 | `kerbside_system_key` | The key Kerbside authenticates to Shaken Fist with, minted as the `kerbside` key in the system namespace on every deploy. Optional; requires `kerbside_url`, must differ from `system_key`, and must be at least 16 characters. Treat as a secret. |
-| `kerbside_public_fqdn` | Only to deploy Kerbside onto an optional `kerbside` inventory group. The name SPICE clients use to reach the proxy; also the proxy certificate's CN and DNS SAN. |
+| `kerbside_public_fqdn` | Only to deploy Kerbside onto an optional `kerbside` inventory group. The name SPICE clients use to reach the proxy; also the proxy certificate's CN. An IPv4 or IPv6 address is given an IP SAN, and a name a DNS SAN. |
 | `kerbside_sql_url` | Only with a `kerbside` group. The URL of Kerbside's own MySQL or MariaDB database, for example `mysql://kerbside:PASSWORD@db.example.com/kerbside`. Treat as a secret. |
 | `kerbside_auth_secret_seed` | Only with a `kerbside` group. Seeds Kerbside's token signing. At least 32 characters, and not Kerbside's placeholder `~~unconfigured~~`. Treat as a secret. |
 | `kerbside_package` | Only with a `kerbside` group. Defaults to `kerbside>=0.7.0`; until 0.7.0 is released, set a version or a wheel built from a git checkout. |

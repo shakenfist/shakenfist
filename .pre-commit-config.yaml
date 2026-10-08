@@ -100,7 +100,9 @@ repos:
         language: system
         files: ^(shakenfist|tools)/
         pass_filenames: false
-        types: [python]
+        # jinja for the CI deploy profiles (tools/ci-deploy-profiles/*.j2),
+        # which test_ci_deploy_profiles.py renders and checks.
+        types_or: [python, jinja]
 
   # Namespace-scoping guardrail for from_db_by_ref calls in external_api/
   - repo: local

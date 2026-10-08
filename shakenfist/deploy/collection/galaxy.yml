@@ -2,9 +2,10 @@
 # Ansible Galaxy collection metadata for shakenfist.shakenfist.
 #
 # NOTE: the version below is a placeholder. The release.yml "build-collection"
-# job injects the real Shaken Fist version (from setuptools_scm, the same
-# source as util_general.get_version()) into this file at build time so the
-# collection and the server package never drift.
+# job, through tools/build-collection.py, injects the real Shaken Fist version
+# (from setuptools_scm, the same source as util_general.get_version()) into a
+# staged copy of this file at build time so the collection and the server
+# package never drift. This file itself is never rewritten.
 namespace: shakenfist
 name: shakenfist
 version: 0.0.0

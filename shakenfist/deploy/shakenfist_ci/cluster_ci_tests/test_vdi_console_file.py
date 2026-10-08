@@ -1,17 +1,16 @@
-import configparser
 import json
 import re
 
 from testtools import content
 
-from shakenfist_ci import base
+from shakenfist_ci import vdi
 
 
 UUID_RE = re.compile(
     '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 
 
-class TestVDIConsoleFile(base.BaseNamespacedTestCase):
+class TestVDIConsoleFile(vdi.BaseVDIConsoleTestCase):
     """Fetch the direct-to-hypervisor .vv file and parse its content.
 
     Issue 4009: the file from /instances/<ref>/vdiconsolehelper carried
@@ -38,16 +37,7 @@ class TestVDIConsoleFile(base.BaseNamespacedTestCase):
             'vvfile-%s' % self._uniquifier(), 1, 128, None, minimal_disk,
             None, None, namespace=self.namespace, video=video)
         self._await_instance_create(inst['uuid'])
-
-        vv_text = self.test_client._request_url(
-            'GET', '/instances/%s/vdiconsolehelper' % inst['uuid']).text
-        self.addDetail('vv_file', content.text_content(vv_text))
-
-        # The file must parse as an INI with a [virt-viewer] section.
-        cp = configparser.ConfigParser(delimiters=('=',), interpolation=None)
-        cp.read_string(vv_text)
-        self.assertIn('virt-viewer', cp.sections())
-        return inst, cp['virt-viewer']
+        return inst, self._fetch_direct_vv(inst['uuid'])
 
     def _assert_tls_port_is_pinned(self, vv):
         """A TLS console port must carry a host-subject.

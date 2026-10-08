@@ -1,0 +1,78 @@
+{#-
+  CI ONLY. Every credential in this file is a throwaway value for a
+  disposable merge-queue cluster, committed on purpose, as shakenfist/actions'
+  own ci* defaults are. Never copy one into a real deployment.
+
+  A deploy profile for the debian-13-slim-tier row of the merge matrix
+  (.github/workflows/functional-tests.yml). shakenfist/actions'
+  tools/ci-apply-deploy-profile.py renders it against the topology facts file
+  with StrictUndefined and validates it; that script's docstring is the
+  schema, and docs/consuming.md in that repository is its guide. It turns the
+  row into a cluster with Kerbside on:
+
+    * Kerbside is deployed on sf2, a hypervisor outside the database tier, so
+      it shares a host with instances but not with the first database host.
+    * api_url on the Kerbside host is the primary's sf-api, so Kerbside's
+      fetch of the console token signing key crosses hosts rather than
+      looping back to sf2's own sf-api.
+    * kerbside_url, the console token audience, is sf2's mesh address, and
+      kerbside_public_fqdn is that bare address, which earns the proxy
+      certificate an IP SAN.
+    * Kerbside's database lives on the primary's MariaDB, created here before
+      the deploy.
+    * The cluster is deployed twice, and no sf-* or kerbside-* unit may
+      restart on the second deploy.
+    * The functional tests are told a VDI console proxy is expected.
+
+  kerbside_package is deliberately not set: the role's default, kerbside>=0.7.0
+  from PyPI, keeps Kerbside's installed files, and so its restart hash, the
+  same across the two deploys. kerbside_token_duration is left at its default.
+
+  Every secret is lower-case letters, digits and hyphens only, so none needs
+  escaping in a URL (the password sits in kerbside_sql_url), in kerbside.ini
+  (configparser's % interpolation), in YAML or in a single-quoted SQL string.
+  Keep it that way if one is changed. kerbside_system_key must differ from
+  actions' CI system_key (build-smoke-cluster/action.yml) and be at least 16
+  characters; the seed must be at least 32.
+  shakenfist/tests/test_ci_deploy_profiles.py checks these, and the rest of
+  the profile, offline.
+
+  See docs/plans/PLAN-kerbside-deployer-phase-04-ci.md, D1, D2, D5 and D6.
+-#}
+{%- set kerbside_db_password = 'ci-kerbside-db-password-do-not-use-in-production' -%}
+---
+groups:
+  kerbside:
+    hosts: [sf2]
+    vars:
+      # sf2 is also in allsf, so this reaches its sfrc and shakenfist.json
+      # too, which is harmless: it is how an operator configures a Kerbside
+      # host anyway.
+      api_url: 'http://{{ nodes.primary.mesh_ip }}:13000'
+
+# Set once, here, rather than as group vars of kerbside: kerbside_url and
+# kerbside_system_key must be visible to the Shaken Fist nodes as well, which
+# render KERBSIDE_URL and mint the "kerbside" system key from them.
+extra_vars:
+  kerbside_url: 'http://{{ nodes.sf2.mesh_ip }}:13002'
+  kerbside_public_fqdn: '{{ nodes.sf2.mesh_ip }}'
+  kerbside_system_key: 'ci-kerbside-system-key-do-not-use-in-production'
+  kerbside_auth_secret_seed: 'ci-kerbside-auth-secret-seed-do-not-use-in-production'
+  # mysql:// is SQLAlchemy's mysqlclient driver, Kerbside's own default form;
+  # the kerbside role installs the headers mysqlclient builds against.
+  kerbside_sql_url: 'mysql://kerbside:{{ kerbside_db_password }}@{{ nodes.primary.mesh_ip }}/kerbside'
+
+# Run once with sudo mariadb on the primary, before the first deploy. It is
+# idempotent all the same, as Kerbside's own tools/sf-e2e/deploy-kerbside.sh
+# is, so a rerun of the step cannot fail on it.
+mariadb_sql: |
+  CREATE DATABASE IF NOT EXISTS kerbside;
+  CREATE USER IF NOT EXISTS 'kerbside'@'%' IDENTIFIED BY '{{ kerbside_db_password }}';
+  GRANT ALL PRIVILEGES ON kerbside.* TO 'kerbside'@'%';
+  FLUSH PRIVILEGES;
+
+redeploy_check:
+  units: ['sf-*.service', 'kerbside-*.service']
+
+test_env:
+  SF_CI_EXPECT_VDI_CONSOLE_PROXY: '1'
