@@ -15240,14 +15240,14 @@
 
     sf_token_jtis {
         string jti PK "uuid4 hex, from the token's jti claim"
-        float expiry "epoch seconds, matches the exp claim"
+        double expiry "epoch seconds, matches the exp claim"
     }
 
     sources ||--o{ sf_token_keys: "No FK; sources reloaded from YAML"
     sf_token_keys {
         string source PK "No FK; sources reloaded from YAML"
         text keys_json "Shaken Fist's public_view payload, verbatim JSON"
-        float fetched_at "epoch seconds"
+        double fetched_at "epoch seconds"
     }</code></pre>
 <h2 id="table-descriptions">Table Descriptions<a class="headerlink" href="#table-descriptions" title="Permanent link">&para;</a></h2>
 <h3 id="sources">sources<a class="headerlink" href="#sources" title="Permanent link">&para;</a></h3>
@@ -15623,7 +15623,7 @@ verifies; a jti already present means the token is being replayed.</p>
 </tr>
 <tr>
 <td>expiry</td>
-<td>float</td>
+<td>double</td>
 <td>Token expiration time (epoch seconds, matches the <code>exp</code> claim)</td>
 </tr>
 </tbody>
@@ -15653,7 +15653,7 @@ except on an unknown-kid cache miss.</p>
 </tr>
 <tr>
 <td>fetched_at</td>
-<td>float</td>
+<td>double</td>
 <td>Time the keys were last fetched (epoch seconds)</td>
 </tr>
 </tbody>

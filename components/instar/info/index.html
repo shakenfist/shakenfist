@@ -15030,13 +15030,13 @@ output format profiles.</p>
 set) has its parent reported as a backing file, in both human
 (<code>backing file: ...</code>) and <code>--output json</code> (<code>backing-filename</code> /
 <code>full-backing-filename</code>) forms — the same fields qcow2's backing file
-already uses. <code>instar info</code> is the deliberate exception to the refusal
-every other read op (<code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code>, <code>check</code>,
-<code>measure</code>) applies to a differencing source: <code>info</code> composes no sector
-data, so it has no wrong answer to give, and it is what a user reaches
-for when the rest of the tool declines to read the image. See the
-"VHD/VHDX differencing" section of <a href="/components/instar/quirks/">quirks.md</a> for the full
-per-op record.</p>
+already uses. <code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code> compose a
+differencing source against its parent; <code>measure</code> and <code>check</code> still
+refuse one outright, like <code>map</code>. <code>instar info</code> composes no sector data
+either way, so it has no wrong answer to give regardless of which of
+those applies, and it is what a user reaches for when an operation that
+does refuse declines to read the image. See the "VHD/VHDX differencing"
+section of <a href="/components/instar/quirks/">quirks.md</a> for the full per-op record.</p>
 <p><code>backing-filename-format</code> reports <code>vpc</code> or <code>vhdx</code> to match the child,
 not the <code>qcow2</code> that field defaults to when no backing format is
 recorded. A differencing image records no backing-format field of its

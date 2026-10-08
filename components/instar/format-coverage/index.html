@@ -16840,16 +16840,14 @@ owed.</p>
 <h3 id="vhdvhdx-differencing-parent-composition">VHD/VHDX differencing (parent composition)<a class="headerlink" href="#vhdvhdx-differencing-parent-composition" title="Permanent link">&para;</a></h3>
 <p>A differencing VHD (<code>disk_type == 4</code>) or differencing VHDX (<code>HasParent</code>
 set) is a sub-state of the vhd/vpc and vhdx rows above, not a separate
-format, so it gets no row of its own in the tables. Every op in the
-read-side table that composes sector data — <code>convert</code>, <code>dd</code>, <code>compare</code>,
-<code>bench</code>, <code>check</code>, <code>measure</code> — refuses a differencing source by name
-instead of reading it, because instar cannot yet compose the parent's
-data into the read; composition is future work tracked in
-<a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>. <code>map</code>
-refuses too, with its own older message and error code. <code>info</code> is the
-one exception in the table: it reports the parent as a backing file and
-does not refuse, because it composes no sector data and has no wrong
-answer to give.</p>
+format, so it gets no row of its own in the tables. <code>convert</code>, <code>dd</code>,
+<code>compare</code>, <code>bench</code> and <code>rebase</code> compose such a source against its
+parent, reading whichever image in the chain owns each sector; <code>check</code>
+and <code>measure</code> refuse a differencing source by name instead of reading
+it. <code>map</code> refuses too, with its own older message and error code.
+<code>info</code> is the one exception in the table: it reports the parent as a
+backing file and does not refuse, because it composes no sector data
+and has no wrong answer to give.</p>
 <p>This is a <strong>recorded divergence, and instar is the stricter side</strong>:
 qemu-img 10.0.11 has no such refusal. On a differencing VHD, <code>qemu-img
 convert -O raw</code> exits 0 and silently composes the output as though the

@@ -15535,20 +15535,21 @@ both covered in full in the "VHD/VHDX differencing" section of
   <code>ERROR_PARENT_NAME_TOO_LONG</code>.</li>
 </ul>
 <p>A <strong>differencing VHD or VHDX is refused as a backing file</strong>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>create failed: backing file is a differencing VHD or VHDX whose parent
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>instar cannot yet compose; an overlay on it could not be read back
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>(see PLAN-differencing.md)
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>create failed: backing file is a differencing VHD or VHDX; create does
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>not support stacking a backing file on one
 </code></pre></div>
 <p>This has its own error code (<code>ERROR_BACKING_DIFFERENCING</code>) rather than
 the generic <code>ERROR_BACKING_PARSE_FAILED</code>, because the backing header
-parses perfectly well — the image is valid, just not one instar can read
-through yet. Every read path in instar that composes sector data
-refuses a differencing image because the parent cannot be composed
-yet, so an overlay stacked on one would be a chain that can never be
-read back. Refusing at create time is the only outcome that does not
-hand you a dead image. Their plain dynamic parents are accepted
-normally. See the "VHD/VHDX differencing" section of
-<a href="/components/instar/quirks/">quirks.md</a>.</p>
+parses perfectly well — the image is valid, <code>create</code> simply does not
+support building an overlay on top of one. Their plain dynamic parents
+are accepted normally.</p>
+<p>Note that <code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code> do compose a
+differencing VHD or VHDX against its parent elsewhere in instar, so an
+overlay created outside instar on such a base — with <code>qemu-img rebase -u</code>,
+for example — is readable through those operations today; this refusal is
+<code>create</code>'s own restriction on what it will build, not a statement that
+instar cannot read the result. See the "VHD/VHDX differencing" section
+of <a href="/components/instar/quirks/">quirks.md</a>.</p>
 <h2 id="preallocation-modes">Preallocation modes<a class="headerlink" href="#preallocation-modes" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

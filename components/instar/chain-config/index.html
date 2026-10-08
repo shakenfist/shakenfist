@@ -3973,10 +3973,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#chainconfig-16-bytes-header-device-array" class="md-nav__link">
+  <a href="#chainconfig-16-bytes-header-device-array-segment-array" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ChainConfig (16 bytes header + device array)
+        ChainConfig (16 bytes header + device array + segment array)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chainsegment-8-bytes-per-chain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ChainSegment (8 bytes per chain)
       
     </span>
   </a>
@@ -15128,10 +15139,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#chainconfig-16-bytes-header-device-array" class="md-nav__link">
+  <a href="#chainconfig-16-bytes-header-device-array-segment-array" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ChainConfig (16 bytes header + device array)
+        ChainConfig (16 bytes header + device array + segment array)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chainsegment-8-bytes-per-chain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ChainSegment (8 bytes per chain)
       
     </span>
   </a>
@@ -15391,8 +15413,8 @@ discovers backing chains in the first place, see
 <h2 id="data-structures">Data Structures<a class="headerlink" href="#data-structures" title="Permanent link">&para;</a></h2>
 <p>Both structures are defined in <code>src/shared/src/lib.rs</code> and use <code>#[repr(C)]</code>
 for a stable memory layout.</p>
-<h3 id="chainconfig-16-bytes-header-device-array">ChainConfig (16 bytes header + device array)<a class="headerlink" href="#chainconfig-16-bytes-header-device-array" title="Permanent link">&para;</a></h3>
-<p>Written at <code>CHAIN_CONFIG_ADDR</code> (<code>0x00082000</code>) in guest physical memory.</p>
+<h3 id="chainconfig-16-bytes-header-device-array-segment-array">ChainConfig (16 bytes header + device array + segment array)<a class="headerlink" href="#chainconfig-16-bytes-header-device-array-segment-array" title="Permanent link">&para;</a></h3>
+<p>Written at <code>CHAIN_CONFIG_ADDR</code> (<code>0x000F2000</code>) in guest physical memory.</p>
 <table>
 <thead>
 <tr>
@@ -15416,21 +15438,21 @@ for a stable memory layout.</p>
 <td>4</td>
 <td>u32</td>
 <td><code>device_count</code></td>
-<td>Number of valid entries (1 = no backing files)</td>
+<td>Number of valid device entries (1 = no backing files)</td>
 </tr>
 <tr>
 <td>8</td>
 <td>4</td>
 <td>u32</td>
 <td><code>version</code></td>
-<td>Structure version (currently 1)</td>
+<td>Structure version (currently 3)</td>
 </tr>
 <tr>
 <td>12</td>
 <td>4</td>
 <td>u32</td>
-<td><code>_reserved</code></td>
-<td>Reserved, written as 0</td>
+<td><code>segment_count</code></td>
+<td>Number of valid segment entries; never 0</td>
 </tr>
 <tr>
 <td>16</td>
@@ -15439,11 +15461,74 @@ for a stable memory layout.</p>
 <td><code>devices</code></td>
 <td>Array of up to 16 <code>ChainDeviceInfo</code> entries</td>
 </tr>
+<tr>
+<td>528</td>
+<td>128</td>
+<td></td>
+<td><code>segments</code></td>
+<td>Array of up to 16 <code>ChainSegment</code> entries</td>
+</tr>
+<tr>
+<td>656</td>
+<td>64</td>
+<td></td>
+<td><code>_reserved</code></td>
+<td>Reserved, written as 0</td>
+</tr>
 </tbody>
 </table>
-<p>Total struct size: 528 bytes (16 header + 16 x 32 device entries). The
-memory allocation at <code>CHAIN_CONFIG_ADDR</code> is 1024 bytes
-(<code>CHAIN_CONFIG_MAX_SIZE</code>) to allow for future growth.</p>
+<p>Total struct size: 720 bytes. The memory allocation at
+<code>CHAIN_CONFIG_ADDR</code> is 1024 bytes (<code>CHAIN_CONFIG_MAX_SIZE</code>) to allow
+for future growth.</p>
+<h3 id="chainsegment-8-bytes-per-chain">ChainSegment (8 bytes per chain)<a class="headerlink" href="#chainsegment-8-bytes-per-chain" title="Permanent link">&para;</a></h3>
+<p>Each segment entry starts at offset <code>528 + (segment_index * 8)</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Offset</th>
+<th>Size</th>
+<th>Type</th>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>4</td>
+<td>u32</td>
+<td><code>first</code></td>
+<td>Index in <code>devices</code> of this chain's top image</td>
+</tr>
+<tr>
+<td>4</td>
+<td>4</td>
+<td>u32</td>
+<td><code>count</code></td>
+<td>Number of devices in this chain, including the top</td>
+</tr>
+</tbody>
+</table>
+<p>A segment is exactly the <code>chain_start</code> / <code>chain_len</code> pair the guest
+hands <code>read_chain_virtual_cluster</code>. <code>device_count</code> bounds a flat
+array, so it cannot say how long any one device's chain is: <code>compare
+image1 image2</code> and <code>rebase --backing NEW</code> both attach two unrelated
+chains to one device array. The segments say which devices form a
+chain, and the device behind a given slot is the next slot <em>in that
+slot's own segment</em>.</p>
+<p>The segments must tile <code>[0, device_count)</code> exactly — at least one
+segment, none empty, in ascending order, no gaps, no overlaps. The
+host checks this before it writes the config and
+<code>qcow2::init_chain_states</code> checks it again before walking the device
+array; a config that fails the check is refused rather than
+interpreted. An all-zero segmentation (<code>segment_count == 0</code>) is
+therefore never read as "one chain spanning everything", which is
+what makes an unstated segmentation detectable instead of silently
+composing a differencing child against whatever image happened to
+follow it.</p>
+<p>An external data file device, which the host inserts immediately after
+the image that owns it, belongs to the chain it was inserted into and
+is covered by that chain's segment.</p>
 <h3 id="chaindeviceinfo-32-bytes-per-device">ChainDeviceInfo (32 bytes per device)<a class="headerlink" href="#chaindeviceinfo-32-bytes-per-device" title="Permanent link">&para;</a></h3>
 <p>Each device entry starts at offset <code>16 + (device_index * 32)</code> within the
 chain config.</p>
@@ -15497,8 +15582,8 @@ chain config.</p>
 <td>28</td>
 <td>4</td>
 <td>u32</td>
-<td><code>_reserved</code></td>
-<td>Reserved, written as 0</td>
+<td><code>data_device_idx</code></td>
+<td>Device index holding this device's cluster data; 0 = this device itself</td>
 </tr>
 </tbody>
 </table>
@@ -15688,15 +15773,22 @@ real file size from <code>std::fs::metadata()</code> when the guest reports 0:</
 <code>capacity * sector_size</code> instead would overshoot when the file size
 doesn't evenly divide the sector size.</p>
 <h3 id="3-writing-to-guest-memory">3. Writing to Guest Memory<a class="headerlink" href="#3-writing-to-guest-memory" title="Permanent link">&para;</a></h3>
-<p>The VMM writes the chain config via <code>write_chain_config()</code> in
-<code>src/vmm/src/main.rs</code>. The function:</p>
+<p>An operation whose devices form a single chain writes the config via
+<code>write_chain_config()</code> in <code>src/vmm/src/main.rs</code>. The function:</p>
 <ol>
-<li>Writes the 16-byte header (magic, device_count, version, reserved)
-   at <code>CHAIN_CONFIG_ADDR</code></li>
 <li>Iterates over chain images and writes each 32-byte <code>ChainDeviceInfo</code>
-   at <code>CHAIN_CONFIG_ADDR + 16 + (i * 32)</code></li>
+   at <code>CHAIN_CONFIG_ADDR + 16 + (i * 32)</code>, returning the number of
+   slots it wrote (an external data file costs an extra slot)</li>
+<li>Writes the 16-byte header and a single segment covering every slot
+   written, via <code>write_chain_config_header()</code></li>
 <li>All writes use <code>guest_mem.write_obj()</code> for type-safe memory access</li>
 </ol>
+<p><code>compare</code> and <code>rebase</code> attach two unrelated chains, so they call
+<code>write_chain_device_entries()</code> once per chain and then
+<code>write_chain_config_header()</code> with one segment per chain. Both take
+the segment bounds from the slot counts the entry writer reports,
+rather than from the chains themselves, so a segment can never name a
+slot the guest was not given.</p>
 <h2 id="guest-side-access">Guest-Side Access<a class="headerlink" href="#guest-side-access" title="Permanent link">&para;</a></h2>
 <p>Operations read the chain config in one of two ways:</p>
 <h3 id="direct-memory-cast">Direct Memory Cast<a class="headerlink" href="#direct-memory-cast" title="Permanent link">&para;</a></h3>
@@ -15717,32 +15809,74 @@ which returns a <code>ConfigResult</code> with a pointer and length:</p>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h3>
-<p><code>ChainConfig::is_valid()</code> checks that <code>magic == 0x4348414E</code> and
+<p><code>ChainConfig::is_valid()</code> checks that <code>magic == 0x4348414E</code>, that
+<code>version</code> is the one this build was compiled against, and that
 <code>device_count &gt; 0</code>. Operations should always validate before accessing
 device entries.</p>
+<p>The version check is the skew defence. Operation binaries are separate
+files the host loads at run time (and <code>INSTAR_BIN_DIR</code> can point at
+another build entirely), so a guest compiled against one layout can be
+handed a config written in another; without the check, a field at an
+offset the guest reads as something else is a silent misparse rather
+than a refusal. The core binary's own validity check at
+<code>CHAIN_CONFIG_ADDR</code> stays deliberately magic-only: if it tightened,
+the operation could not see the config in order to report why it
+refused.</p>
+<p><code>ChainConfig::segment_of(dev_idx)</code> returns the segment covering a
+device, and <code>ChainConfig::segmentation_covers(device_count)</code> is the
+tiling check described above. <code>ChainConfig::single_chain(n)</code> builds a
+config for the common case of one chain over <code>n</code> devices.</p>
 <h2 id="per-operation-usage">Per-Operation Usage<a class="headerlink" href="#per-operation-usage" title="Permanent link">&para;</a></h2>
+<p>The <code>Segments</code> column is how many <code>ChainSegment</code> entries the host writes.
+One segment means every device is behind the one before it; two means the
+operation attached two unrelated chains, and the guest must not treat the
+first device of the second as a parent of the last device of the first.</p>
 <table>
 <thead>
 <tr>
 <th>Operation</th>
+<th>Segments</th>
 <th>How it uses chain config</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>convert</strong></td>
-<td>Reads each device's format to select the appropriate chain reader (QCOW2 cluster lookup, VMDK grain lookup, or raw sector read). Walks the chain to flatten backing files into a standalone output image.</td>
+<td><strong>convert</strong> / <strong>dd</strong></td>
+<td>1</td>
+<td>Reads each device's format to select the appropriate chain reader (QCOW2 cluster lookup, VMDK grain lookup, VHD or VHDX BAT lookup, or raw sector read). Walks the chain to flatten backing files into a standalone output image. <code>dd</code> shares convert's guest binary and so its chain handling.</td>
 </tr>
 <tr>
 <td><strong>compare</strong></td>
-<td>Reads format for both comparison sides. For QCOW2/VMDK images, walks the backing chain to resolve unallocated clusters/grains before comparing virtual content. Supports multi-level chains on both sides.</td>
+<td>2</td>
+<td>Reads format for both comparison sides, one segment each. Walks each side's own backing chain to resolve unallocated clusters, grains or blocks before comparing virtual content. Supports multi-level chains on both sides.</td>
+</tr>
+<tr>
+<td><strong>rebase</strong></td>
+<td>1 or 2</td>
+<td>A detach (<code>-b ''</code>) attaches the old chain's parents only, so one segment. A rebase onto a new backing (<code>-b NEW</code>) attaches the old chain and the new one, which are unrelated, so two. The overlay itself is the output device, not an input.</td>
+</tr>
+<tr>
+<td><strong>bench</strong></td>
+<td>1</td>
+<td>Reads the source's chain so a benchmarked read resolves through it rather than against the top image alone.</td>
+</tr>
+<tr>
+<td><strong>commit</strong></td>
+<td>1</td>
+<td>Attaches the backing chain's parents behind the overlay; the backing being committed into is the output device.</td>
 </tr>
 <tr>
 <td><strong>check --chain</strong></td>
+<td>1</td>
 <td>Validates each backing image's format consistency, virtual size, and header integrity (QCOW2 magic, version, table bounds). Reports chain errors separately from primary image errors.</td>
 </tr>
 </tbody>
 </table>
+<p>The chain walkers that <code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code>
+share also compose a differencing VHD or VHDX member against its parent,
+descending for the sectors the member's bitmap leaves to the parent.
+<code>map</code>, <code>measure</code> and <code>check</code> read an image on its own and refuse a
+differencing source by name instead.</p>
 <h2 id="format-specific-notes">Format-Specific Notes<a class="headerlink" href="#format-specific-notes" title="Permanent link">&para;</a></h2>
 <h3 id="qcow2">QCOW2<a class="headerlink" href="#qcow2" title="Permanent link">&para;</a></h3>
 <p>The guest info operation computes <code>actual_size</code> from the QCOW2 header
@@ -15761,11 +15895,12 @@ aligned to the sector size boundary.</p>
 the chain reader will need <code>actual_size</code> to locate the footer correctly.</p>
 <h2 id="constants-reference">Constants Reference<a class="headerlink" href="#constants-reference" title="Permanent link">&para;</a></h2>
 <p>All constants are defined in <code>src/shared/src/lib.rs</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>CHAIN_CONFIG_ADDR      = 0x00082000
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>CHAIN_CONFIG_ADDR      = 0x000F2000
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>CHAIN_CONFIG_MAX_SIZE  = 1024 bytes
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>MAX_CHAIN_DEVICES      = 16
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>ChainConfig::MAGIC     = 0x4348414E ("CHAN")
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>ChainConfig::VERSION   = 1
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>MAX_CHAIN_SEGMENTS     = 16
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>ChainConfig::MAGIC     = 0x4348414E ("CHAN")
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>ChainConfig::VERSION   = 3
 </code></pre></div>
 
 

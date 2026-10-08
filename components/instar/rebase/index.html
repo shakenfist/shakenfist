@@ -3887,6 +3887,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#differencing-images-in-the-backing-chain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differencing images in the backing chain
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#known-divergences-from-qemu-img-rebase" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15037,6 +15048,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#differencing-images-in-the-backing-chain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differencing images in the backing chain
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#known-divergences-from-qemu-img-rebase" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15247,6 +15269,26 @@ The path is stored in the qcow2 header (or the vmdk descriptor)
 verbatim — instar does not canonicalise to absolute paths.</p>
 <p>Detach is signalled by <code>-b ""</code>. The backing pointer is zeroed
 and the overlay becomes standalone.</p>
+<h2 id="differencing-images-in-the-backing-chain">Differencing images in the backing chain<a class="headerlink" href="#differencing-images-in-the-backing-chain" title="Permanent link">&para;</a></h2>
+<p><code>rebase</code> only accepts a qcow2 or vmdk overlay as the image being
+rebased — any other format, VHD and VHDX included, is refused outright
+(<code>rebase: format '&lt;fmt&gt;' does not support rebase (qcow2 and vmdk
+only)</code>), so a differencing VHD or VHDX is never the file <code>rebase</code> is
+asked to act on.</p>
+<p>It can, however, sit further back in that overlay's own backing chain —
+attached with <code>qemu-img rebase -u</code>, since <code>instar create -b</code> refuses a
+differencing backing file directly. Detaching (<code>-b ""</code>) reads the whole
+old chain and copies every sector the overlay does not already own into
+it, so a differencing image behind the overlay is composed against its
+own parent exactly as <code>convert</code>, <code>dd</code>, <code>compare</code> and <code>bench</code> compose one:
+each sector comes from whichever image in the chain actually owns it.</p>
+<p>If that differencing image's own chain has no parent to read, <code>rebase</code>
+refuses the detach with the same typed message the other composing
+operations use:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>rebase: a differencing &lt;VHD|VHDX&gt; image in the chain rebase was given
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>has no parent behind it, so the sectors it leaves to its parent could
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>not be composed
+</code></pre></div>
 <h2 id="known-divergences-from-qemu-img-rebase">Known divergences from <code>qemu-img rebase</code><a class="headerlink" href="#known-divergences-from-qemu-img-rebase" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Long-path relocation is rejected.</strong> Long new-backing paths
@@ -15424,19 +15466,19 @@ master plan</a>:</p>
 </ul>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>Unsafe rebase to a new backing in the same directory:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>instar rebase -u -b new-backing.qcow2 disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>instar rebase -u -b new-backing.qcow2 disk.qcow2
 </code></pre></div>
 <p>Safe rebase to a new backing of the same virtual size:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>instar rebase -b new-backing.qcow2 -F qcow2 disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar rebase -b new-backing.qcow2 -F qcow2 disk.qcow2
 </code></pre></div>
 <p>Detach the overlay (zero its backing pointer):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar rebase -u -b "" disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar rebase -u -b "" disk.qcow2
 </code></pre></div>
 <p>JSON output for scripting:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar rebase -u -b new-backing.qcow2 --output=json disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar rebase -u -b new-backing.qcow2 --output=json disk.qcow2
 </code></pre></div>
 <p>Auto-detect the overlay format from the file's magic bytes:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar rebase -u -b new-backing.qcow2 disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar rebase -u -b new-backing.qcow2 disk.qcow2
 </code></pre></div>
 
 

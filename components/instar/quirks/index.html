@@ -26785,21 +26785,31 @@ oracle pair used above):</p>
 <a id="__codelineno-19-16" name="__codelineno-19-16" href="#__codelineno-19-16"></a>$ echo $?
 <a id="__codelineno-19-17" name="__codelineno-19-17" href="#__codelineno-19-17"></a>0
 </code></pre></div>
-<p><code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code>, <code>check</code> and <code>measure</code> all refuse both
-formats this way, exiting 1 and leaving no output file. <code>check</code>'s exit
-code for a differencing image moves from 2 (corrupt) to 1 (refused) as
-part of this — it is not corrupt, it is unsupported, and 2 would say
-otherwise. <code>map</code> keeps its own, older refusal (<code>map: source has a
-backing/parent reference; chain composition is deferred (see
-PLAN-map.md)</code>, guest error code 3); its VHD wording predates commit
-<code>10ab838</code>, and its VHDX arm was added by that commit using the same
-message rather than migrated onto the new channel, because it already
-worked and was already tested. <strong>instar is now the stricter side of this divergence,
-not the matching one</strong>: qemu-img 10.0.11 still does exactly what the
-"Observed Behavior" above shows — silently misreading a differencing VHD
-and generically failing to open a differencing VHDX — and has not
-changed. Composition (making both tools agree, correctly) is future work
-tracked in <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>.</p>
+<p><code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code>, <code>check</code> and <code>measure</code> all refused both
+formats this way at the time of this record, exiting 1 and leaving no
+output file. <code>check</code>'s exit code for a differencing image moved from 2
+(corrupt) to 1 (refused) as part of this — it is not corrupt, it is
+unsupported, and 2 would say otherwise. <code>map</code> kept its own, older refusal
+(<code>map: source has a backing/parent reference; chain composition is
+deferred (see PLAN-map.md)</code>, guest error code 3); its VHD wording
+predates commit <code>10ab838</code>, and its VHDX arm was added by that commit
+using the same message rather than migrated onto the new channel,
+because it already worked and was already tested.</p>
+<p>A later phase lifted this refusal for five of those six operations.
+Re-run today against the same fixture, with its parent present:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>$ instar convert -O raw vhd-diff-child-aligned.vhd out.raw
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>$ echo $?
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>0
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>$ ls -la out.raw
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>-rw-r--r-- 1 user user 16777216 ... out.raw
+</code></pre></div>
+<p><code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code> now compose such a
+source against its parent instead of refusing it; <code>map</code>, <code>measure</code> and
+<code>check</code> still refuse, each with its own current message — see "The
+composition rollout" below for the current wording and the per-op
+record. qemu-img's own behaviour has not changed: 10.0.11 still does
+exactly what the "Observed Behavior" above shows — silently misreading a
+differencing VHD and generically failing to open a differencing VHDX.</p>
 <h3 id="per-op-behaviour-inside-instar">Per-op behaviour inside instar<a class="headerlink" href="#per-op-behaviour-inside-instar" title="Permanent link">&para;</a></h3>
 <p><strong>Classification: closes an Unsafe Quirk</strong> (see above — tracked as issue</p>
 <h1 id="547-fixed-as-of-commit-10ab838">547; fixed as of commit <code>10ab838</code>)<a class="headerlink" href="#547-fixed-as-of-commit-10ab838" title="Permanent link">&para;</a></h1>
@@ -26937,45 +26947,112 @@ with no output file left behind:</p>
 </tr>
 </tbody>
 </table>
-<p>The refusal sentence (for every row marked with it) is:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>&lt;op&gt;: source is a differencing &lt;VHD|VHDX&gt; image whose parent instar cannot
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>yet compose; composition is deferred (see PLAN-differencing.md)
+<p>The refusal sentence (for every row marked with it) was, at the time of
+this record:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>&lt;op&gt;: source is a differencing &lt;VHD|VHDX&gt; image whose parent instar cannot
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>yet compose; composition is deferred (see PLAN-differencing.md)
 </code></pre></div>
-<p>VHD is where the fix matters most, because VHD was the format actually at
+<p>VHD is where the fix mattered most, because VHD was the format actually at
 risk of silent data corruption — VHDX already failed on every op before
 that commit, just for the wrong reason and with the wrong message.</p>
+<h3 id="the-composition-rollout-convert-dd-compare-bench-and-rebase">The composition rollout: convert, dd, compare, bench and rebase<a class="headerlink" href="#the-composition-rollout-convert-dd-compare-bench-and-rebase" title="Permanent link">&para;</a></h3>
+<p>A later phase taught the operations that read through the guest chain
+walker to compose a differencing source against its parent instead of
+refusing it, using the per-sector composition the VHD and VHDX format
+crates had already gained. <code>info</code>, <code>create -b</code>, <code>map</code>, <code>measure</code> and
+<code>check</code> are unaffected by this rollout.</p>
+<table>
+<thead>
+<tr>
+<th>Op</th>
+<th>Differencing source with its parent present</th>
+<th>Differencing source with no parent in its own chain</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>convert</td>
+<td>Succeeds, rc 0; output is byte-identical to the chain flattened by hand</td>
+<td>Refuses, rc 1, no output file</td>
+</tr>
+<tr>
+<td>dd</td>
+<td>Succeeds, rc 0 (shares convert's guest binary)</td>
+<td>Refuses, rc 1, same sentence as convert</td>
+</tr>
+<tr>
+<td>compare</td>
+<td>Succeeds, rc 0, each side composed against its own chain</td>
+<td>Refuses, rc 1, same sentence as convert</td>
+</tr>
+<tr>
+<td>bench</td>
+<td>Succeeds, rc 0; a benchmarked read of a parent-owned sector is served from the parent, not skipped or zero-filled</td>
+<td>Refuses, rc 1, same sentence as convert</td>
+</tr>
+<tr>
+<td>rebase</td>
+<td>Composes a differencing source only if one sits in the backing chain being read (never as the overlay itself — <code>rebase</code> already refuses any overlay that is not qcow2 or vmdk)</td>
+<td>Refuses, rc 1, same sentence as convert</td>
+</tr>
+</tbody>
+</table>
+<p>The refusal sentence these five now use when their own chain has no
+parent to read (measured against the built binary):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>&lt;op&gt;: a differencing &lt;VHD|VHDX&gt; image in the chain &lt;op&gt; was given has no
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>parent behind it, so the sectors it leaves to its parent could not be
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>composed
+</code></pre></div>
+<p><code>map</code>, <code>measure</code> and <code>check</code> go on refusing every differencing source
+unconditionally, each with its own current message naming its own
+operation:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>measure: source is a differencing &lt;VHD|VHDX&gt; image, and measure reads an
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>image on its own rather than composing a parent into it, so the sectors
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>it leaves to its parent could not be composed
+</code></pre></div>
+<p>(<code>check</code> renders the same shape with <code>check</code> in place of <code>measure</code>; <code>map</code>
+keeps its own sentence, <code>map: source has a backing/parent reference; map
+reads an image on its own rather than composing a parent into it</code>.)
+<code>create -b</code> still refuses a differencing VHD or VHDX as a backing file
+outright, with <code>create: ... backing file is a differencing VHD or VHDX;
+create does not support stacking a backing file on one</code> — see
+<a href="/components/instar/create/">create.md</a>.</p>
+<p>See <a href="/components/instar/convert/">convert.md</a>, <a href="/components/instar/dd/">dd.md</a>, <a href="/components/instar/compare/">compare.md</a>,
+<a href="/components/instar/bench/">bench.md</a> and <a href="/components/instar/rebase/">rebase.md</a> for the per-operation
+record, and <a href="/components/instar/measure/">measure.md</a>, <a href="/components/instar/check/">check.md</a> and
+<a href="/components/instar/map/">map.md</a> for the operations that still refuse.</p>
 <h3 id="libvhdi-for-contrast">libvhdi, for contrast<a class="headerlink" href="#libvhdi-for-contrast" title="Permanent link">&para;</a></h3>
 <p><strong>Classification: Not applicable</strong> (describes a third-party tool, not
 instar)</p>
 <h4 id="observed-behavior_54">Observed Behavior<a class="headerlink" href="#observed-behavior_54" title="Permanent link">&para;</a></h4>
 <p>libvhdi refuses to read a differencing child with no parent attached:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>$ python3 compose.py out.raw fat-differential.vhd
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>media_size=4194304 disk_type=4
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>parent_identifier=5fa21a55-f394-aa4d-9958-1951a67d5540
-<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>parent_filename=C:\Projects\dfvfs\test_data\fat-parent.vhd
-<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>Traceback (most recent call last):
-<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>  ...
-<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>OSError: pyvhdi_file_seek_offset: unable to seek offset.
-<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>libvhdi_internal_file_seek_offset: invalid file - missing parent file.
-<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>libvhdi_file_seek_offset: unable to seek offset.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>$ python3 compose.py out.raw fat-differential.vhd
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>media_size=4194304 disk_type=4
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>parent_identifier=5fa21a55-f394-aa4d-9958-1951a67d5540
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a>parent_filename=C:\Projects\dfvfs\test_data\fat-parent.vhd
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>Traceback (most recent call last):
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>  ...
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a>OSError: pyvhdi_file_seek_offset: unable to seek offset.
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>libvhdi_internal_file_seek_offset: invalid file - missing parent file.
+<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a>libvhdi_file_seek_offset: unable to seek offset.
 </code></pre></div>
 <p>And it enforces the parent identifier when a parent <em>is</em> attached — the
 wrong one is rejected rather than silently composed against:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>$ python3 compose.py out.raw fat-differential.vhd ntfs-parent.vhd
-<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>Traceback (most recent call last):
-<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>  ...
-<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>OSError: pyvhdi_file_set_parent: unable to set parent file.
-<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>libvhdi_file_set_parent_file: mismatch in identifier.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>$ python3 compose.py out.raw fat-differential.vhd ntfs-parent.vhd
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>Traceback (most recent call last):
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>  ...
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>OSError: pyvhdi_file_set_parent: unable to set parent file.
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>libvhdi_file_set_parent_file: mismatch in identifier.
 </code></pre></div>
 <p>The correct parent composes cleanly and produces the byte-exact,
 MBR-bearing image shown above:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>$ python3 compose.py out.raw fat-differential.vhd fat-parent.vhd
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>media_size=4194304 disk_type=4
-<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>parent_identifier=5fa21a55-f394-aa4d-9958-1951a67d5540
-<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>parent_filename=C:\Projects\dfvfs\test_data\fat-parent.vhd
-<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>wrote 4194304 bytes to out.raw
-<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>$ echo $?
-<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>0
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>$ python3 compose.py out.raw fat-differential.vhd fat-parent.vhd
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>media_size=4194304 disk_type=4
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>parent_identifier=5fa21a55-f394-aa4d-9958-1951a67d5540
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>parent_filename=C:\Projects\dfvfs\test_data\fat-parent.vhd
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>wrote 4194304 bytes to out.raw
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>$ echo $?
+<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a>0
 </code></pre></div>
 <h4 id="why-this-matters_44">Why This Matters<a class="headerlink" href="#why-this-matters_44" title="Permanent link">&para;</a></h4>
 <p>libvhdi's stance — refuse when there is no parent to compose against,
@@ -26992,16 +27069,18 @@ not code instar ships. No instar behaviour changes as a result of this
 subsection; it exists to give the two rows above something to be compared
 against.</p>
 <h3 id="known-limitations-of-the-refusal">Known limitations of the refusal<a class="headerlink" href="#known-limitations-of-the-refusal" title="Permanent link">&para;</a></h3>
-<p>Three things surfaced while implementing the refusal that are recorded
+<p>Three things surfaced while implementing the refusal that were recorded
 rather than fixed, because none of them was that change's job to close:</p>
 <ol>
-<li><strong><code>instar info --chain</code> reports a one-image chain for a differencing VHD
-   or VHDX.</strong> <code>discover_backing_chain</code> (<code>src/vmm/src/main.rs:2416</code>)
-   deliberately stops at a VHD or VHDX parent instead of walking it, because
-   nothing in instar can compose that parent yet and walking it would only
-   change which failure a user sees. The composition work in
-   <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> lifts this per
-   operation as it lands. See <a href="/components/instar/chain-discovery/#known-limitations">chain-discovery.md</a>.</li>
+<li><strong>RESOLVED.</strong> <code>instar info --chain</code> reported a one-image chain for a
+   differencing VHD or VHDX, because <code>discover_backing_chain</code> deliberately
+   stopped at such a parent instead of walking it. A later phase gave the
+   walk a per-call capability instead: <code>info --chain</code>'s reporting walk now
+   resolves a differencing parent unconditionally, and five operations —
+   <code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code> — resolve one too, to
+   compose its sectors into their own read. See
+   <a href="/components/instar/chain-discovery/#known-limitations">chain-discovery.md</a> for the
+   current policy.</li>
 <li><strong><code>instar info</code> prints an unresolvable "actual path" for a parent
    recorded in Windows convention — in either format.</strong> The host's
    "actual path" resolution treats any string that is not POSIX-absolute

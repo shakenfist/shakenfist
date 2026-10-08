@@ -15365,17 +15365,19 @@ names the divergence category.</p>
 </code></pre></div>
 <h2 id="differencing-images">Differencing images<a class="headerlink" href="#differencing-images" title="Permanent link">&para;</a></h2>
 <p>A differencing VHD (footer disk type 4) or VHDX (<code>HasParent</code> set) stores
-only the sectors that differ from a parent image. instar cannot compose a
-parent yet, so <code>measure</code> refuses such a source by name and exits 1 rather than
-reporting a required-size estimate that ignores the parent's data:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>measure: source is a differencing &lt;VHD|VHDX&gt; image whose parent instar cannot
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>yet compose; composition is deferred (see PLAN-differencing.md)
+only the sectors that differ from a parent image. <code>measure</code> reads an
+image on its own rather than composing a parent chain into it, so it
+refuses such a source by name and exits 1 rather than reporting a
+required-size estimate that ignores the parent's data:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>measure: source is a differencing &lt;VHD|VHDX&gt; image, and measure reads an
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>image on its own rather than composing a parent into it, so the sectors
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>it leaves to its parent could not be composed
 </code></pre></div>
 <p><code>instar info</code> is the exception — it reports the parent as a backing file
-instead of refusing. See the "VHD/VHDX differencing" section of
-<a href="/components/instar/quirks/">quirks.md</a> for the per-operation record, and
-<a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> for the composition
-work that will lift the refusal.</p>
+instead of refusing. <code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code> do
+compose a differencing source against its parent; see the "VHD/VHDX
+differencing" section of <a href="/components/instar/quirks/">quirks.md</a> for the per-operation
+record.</p>
 
 
 

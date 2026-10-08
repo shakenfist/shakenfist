@@ -15274,6 +15274,33 @@ selection by sequence number, dirty log detection, region table 1 and 2
 CRC-32C validation with cross-consistency check, GUID-based metadata
 parsing, BAT entry validation (offset bounds, 1MB alignment, overlap
 detection, state validation), and fragmentation tracking.</p>
+<p>Reads apply a narrower version of the same overlap rule, on every VHDX
+image rather than only under <code>check</code> — "reads" meaning the guest chain
+walker, <code>block_lookup</code> and <code>sector_bitmap_lookup</code>, which is what
+<code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code> use. <code>map</code> and
+<code>measure</code> walk the BAT through <code>classify_vhdx_bat_entry</code> instead and
+apply no overlap test, so they still report a block this rule refuses
+(issue #634). A payload block, or a
+differencing child's sector-bitmap block, is refused when its byte
+range overlaps any entry in the region table — the BAT region, the
+metadata region, or anything else the writer declared, recognised by
+instar or not. A conforming writer never places payload on top of the
+structures the image declares, so this costs a well-formed image
+nothing; a malformed one is refused rather than read.</p>
+<p>"Any entry" is any of the first eight, which is the same cap the region
+scan itself uses; SPEC(VHDX) permits up to 2047 entries, and an image
+declaring more has only its first eight checked. That cap is not
+somewhere an image can hide a region instar relies on, because the same
+scan is what locates the BAT and the metadata region: declare either
+past the eighth entry and the image does not open at all. What a longer
+table can keep out of the overlap test is an unrecognised region, whose
+bytes instar never reads as structure. A BAT entry
+naming file offset 0 is refused separately, because the file
+identifier that lives there is fixed structure rather than a region
+table entry and so overlaps nothing. A region entry whose
+<code>offset + length</code> overflows 64 bits counts as overlapping every block,
+which makes the whole image unreadable: an image that cannot say where
+its own regions end cannot be used to bound anything.</p>
 <h2 id="luks">luks<a class="headerlink" href="#luks" title="Permanent link">&para;</a></h2>
 <p>LUKS encrypted containers (v1 and v2). The info operation parses:
 - Version, cipher name, cipher mode, hash algorithm
