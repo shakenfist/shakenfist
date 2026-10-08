@@ -4538,21 +4538,35 @@ $ echo $?
 0
 ```
 
-`convert`, `dd`, `compare`, `bench`, `check` and `measure` all refuse both
-formats this way, exiting 1 and leaving no output file. `check`'s exit
-code for a differencing image moves from 2 (corrupt) to 1 (refused) as
-part of this — it is not corrupt, it is unsupported, and 2 would say
-otherwise. `map` keeps its own, older refusal (`map: source has a
-backing/parent reference; chain composition is deferred (see
-PLAN-map.md)`, guest error code 3); its VHD wording predates commit
-`10ab838`, and its VHDX arm was added by that commit using the same
-message rather than migrated onto the new channel, because it already
-worked and was already tested. **instar is now the stricter side of this divergence,
-not the matching one**: qemu-img 10.0.11 still does exactly what the
-"Observed Behavior" above shows — silently misreading a differencing VHD
-and generically failing to open a differencing VHDX — and has not
-changed. Composition (making both tools agree, correctly) is future work
-tracked in [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/).
+`convert`, `dd`, `compare`, `bench`, `check` and `measure` all refused both
+formats this way at the time of this record, exiting 1 and leaving no
+output file. `check`'s exit code for a differencing image moved from 2
+(corrupt) to 1 (refused) as part of this — it is not corrupt, it is
+unsupported, and 2 would say otherwise. `map` kept its own, older refusal
+(`map: source has a backing/parent reference; chain composition is
+deferred (see PLAN-map.md)`, guest error code 3); its VHD wording
+predates commit `10ab838`, and its VHDX arm was added by that commit
+using the same message rather than migrated onto the new channel,
+because it already worked and was already tested.
+
+A later phase lifted this refusal for five of those six operations.
+Re-run today against the same fixture, with its parent present:
+
+```
+$ instar convert -O raw vhd-diff-child-aligned.vhd out.raw
+$ echo $?
+0
+$ ls -la out.raw
+-rw-r--r-- 1 user user 16777216 ... out.raw
+```
+
+`convert`, `dd`, `compare`, `bench` and `rebase` now compose such a
+source against its parent instead of refusing it; `map`, `measure` and
+`check` still refuse, each with its own current message — see "The
+composition rollout" below for the current wording and the per-op
+record. qemu-img's own behaviour has not changed: 10.0.11 still does
+exactly what the "Observed Behavior" above shows — silently misreading a
+differencing VHD and generically failing to open a differencing VHDX.
 
 ### Per-op behaviour inside instar
 
@@ -4617,16 +4631,65 @@ with no output file left behind:
 | measure | **Newly refuses**, rc 1, no longer reports a required-size estimate | Refuses, rc 1, now with the named sentence instead of `"measure: source image is unsupported format"` |
 | create `-b` | **Newly refuses**, rc 1: `"create failed: backing file is a differencing VHD or VHDX whose parent instar cannot yet compose; an overlay on it could not be read back (see PLAN-differencing.md)"` — the VHD arm never had a guard | **Newly refuses** with the same message; the old blanket `VhdxState::init` rejection used to do this implicitly, so this restores it with a reason attached rather than a generic parse failure |
 
-The refusal sentence (for every row marked with it) is:
+The refusal sentence (for every row marked with it) was, at the time of
+this record:
 
 ```
 <op>: source is a differencing <VHD|VHDX> image whose parent instar cannot
 yet compose; composition is deferred (see PLAN-differencing.md)
 ```
 
-VHD is where the fix matters most, because VHD was the format actually at
+VHD is where the fix mattered most, because VHD was the format actually at
 risk of silent data corruption — VHDX already failed on every op before
 that commit, just for the wrong reason and with the wrong message.
+
+### The composition rollout: convert, dd, compare, bench and rebase
+
+A later phase taught the operations that read through the guest chain
+walker to compose a differencing source against its parent instead of
+refusing it, using the per-sector composition the VHD and VHDX format
+crates had already gained. `info`, `create -b`, `map`, `measure` and
+`check` are unaffected by this rollout.
+
+| Op | Differencing source with its parent present | Differencing source with no parent in its own chain |
+|----|-----------------------------------------------|-------------------------------------------------------|
+| convert | Succeeds, rc 0; output is byte-identical to the chain flattened by hand | Refuses, rc 1, no output file |
+| dd | Succeeds, rc 0 (shares convert's guest binary) | Refuses, rc 1, same sentence as convert |
+| compare | Succeeds, rc 0, each side composed against its own chain | Refuses, rc 1, same sentence as convert |
+| bench | Succeeds, rc 0; a benchmarked read of a parent-owned sector is served from the parent, not skipped or zero-filled | Refuses, rc 1, same sentence as convert |
+| rebase | Composes a differencing source only if one sits in the backing chain being read (never as the overlay itself — `rebase` already refuses any overlay that is not qcow2 or vmdk) | Refuses, rc 1, same sentence as convert |
+
+The refusal sentence these five now use when their own chain has no
+parent to read (measured against the built binary):
+
+```
+<op>: a differencing <VHD|VHDX> image in the chain <op> was given has no
+parent behind it, so the sectors it leaves to its parent could not be
+composed
+```
+
+`map`, `measure` and `check` go on refusing every differencing source
+unconditionally, each with its own current message naming its own
+operation:
+
+```
+measure: source is a differencing <VHD|VHDX> image, and measure reads an
+image on its own rather than composing a parent into it, so the sectors
+it leaves to its parent could not be composed
+```
+
+(`check` renders the same shape with `check` in place of `measure`; `map`
+keeps its own sentence, `map: source has a backing/parent reference; map
+reads an image on its own rather than composing a parent into it`.)
+`create -b` still refuses a differencing VHD or VHDX as a backing file
+outright, with `create: ... backing file is a differencing VHD or VHDX;
+create does not support stacking a backing file on one` — see
+[create.md](/components/instar/create/).
+
+See [convert.md](/components/instar/convert/), [dd.md](/components/instar/dd/), [compare.md](/components/instar/compare/),
+[bench.md](/components/instar/bench/) and [rebase.md](/components/instar/rebase/) for the per-operation
+record, and [measure.md](/components/instar/measure/), [check.md](/components/instar/check/) and
+[map.md](/components/instar/map/) for the operations that still refuse.
 
 ### libvhdi, for contrast
 
@@ -4693,16 +4756,18 @@ against.
 
 ### Known limitations of the refusal
 
-Three things surfaced while implementing the refusal that are recorded
+Three things surfaced while implementing the refusal that were recorded
 rather than fixed, because none of them was that change's job to close:
 
-1. **`instar info --chain` reports a one-image chain for a differencing VHD
-   or VHDX.** `discover_backing_chain` (`src/vmm/src/main.rs:2416`)
-   deliberately stops at a VHD or VHDX parent instead of walking it, because
-   nothing in instar can compose that parent yet and walking it would only
-   change which failure a user sees. The composition work in
-   [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) lifts this per
-   operation as it lands. See [chain-discovery.md](/components/instar/chain-discovery/#known-limitations).
+1. **RESOLVED.** `instar info --chain` reported a one-image chain for a
+   differencing VHD or VHDX, because `discover_backing_chain` deliberately
+   stopped at such a parent instead of walking it. A later phase gave the
+   walk a per-call capability instead: `info --chain`'s reporting walk now
+   resolves a differencing parent unconditionally, and five operations —
+   `convert`, `dd`, `compare`, `bench` and `rebase` — resolve one too, to
+   compose its sectors into their own read. See
+   [chain-discovery.md](/components/instar/chain-discovery/#known-limitations) for the
+   current policy.
 2. **`instar info` prints an unresolvable "actual path" for a parent
    recorded in Windows convention — in either format.** The host's
    "actual path" resolution treats any string that is not POSIX-absolute

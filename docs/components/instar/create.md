@@ -308,21 +308,23 @@ both covered in full in the "VHD/VHDX differencing" section of
 A **differencing VHD or VHDX is refused as a backing file**:
 
 ```
-create failed: backing file is a differencing VHD or VHDX whose parent
-instar cannot yet compose; an overlay on it could not be read back
-(see PLAN-differencing.md)
+create failed: backing file is a differencing VHD or VHDX; create does
+not support stacking a backing file on one
 ```
 
 This has its own error code (`ERROR_BACKING_DIFFERENCING`) rather than
 the generic `ERROR_BACKING_PARSE_FAILED`, because the backing header
-parses perfectly well — the image is valid, just not one instar can read
-through yet. Every read path in instar that composes sector data
-refuses a differencing image because the parent cannot be composed
-yet, so an overlay stacked on one would be a chain that can never be
-read back. Refusing at create time is the only outcome that does not
-hand you a dead image. Their plain dynamic parents are accepted
-normally. See the "VHD/VHDX differencing" section of
-[quirks.md](/components/instar/quirks/).
+parses perfectly well — the image is valid, `create` simply does not
+support building an overlay on top of one. Their plain dynamic parents
+are accepted normally.
+
+Note that `convert`, `dd`, `compare`, `bench` and `rebase` do compose a
+differencing VHD or VHDX against its parent elsewhere in instar, so an
+overlay created outside instar on such a base — with `qemu-img rebase -u`,
+for example — is readable through those operations today; this refusal is
+`create`'s own restriction on what it will build, not a statement that
+instar cannot read the result. See the "VHD/VHDX differencing" section
+of [quirks.md](/components/instar/quirks/).
 
 ## Preallocation modes
 

@@ -91,18 +91,27 @@ The default can also be set via `convert.sparse` in the config file.
 ## Differencing images
 
 A differencing VHD (footer disk type 4) or VHDX (`HasParent` set) stores
-only the sectors that differ from a parent image. instar cannot compose a
-parent yet, so `convert` refuses such a source by name and exits 1 rather than
-writing an output composed as though the parent's sectors were
-zero. No output file is left behind:
+only the sectors that differ from a parent image. `convert` composes such
+a source against its parent: it reads the parent's own backing chain
+(following relative references beside the source, rejecting anything
+outside the allowlist) and serves each sector from whichever image in the
+chain actually owns it, so the output is byte-identical to the chain
+flattened by hand.
+
+If the source's own chain has no parent to read — a differencing image
+with an empty or absent parent reference — `convert` still refuses it,
+rather than composing from nothing:
 
 ```
-convert: source is a differencing <VHD|VHDX> image whose parent instar cannot
-yet compose; composition is deferred (see PLAN-differencing.md)
+convert: a differencing <VHD|VHDX> image in the chain convert was given
+has no parent behind it, so the sectors it leaves to its parent could
+not be composed
 ```
 
-`instar info` is the exception — it reports the parent as a backing file
-instead of refusing. See the "VHD/VHDX differencing" section of
-[quirks.md](/components/instar/quirks/) for the per-operation record, and
-[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) for the composition
-work that will lift the refusal.
+and exits 1 with no output file left behind. If the chain names a parent
+that cannot be resolved — the file is missing, or outside the backing
+file allowlist — discovery fails before any guest device is attached and
+`convert` reports that instead, again leaving no output file.
+
+See the "VHD/VHDX differencing" section of [quirks.md](/components/instar/quirks/) for the
+per-operation record.

@@ -448,11 +448,13 @@ provides a modular architecture with:
  A `Fixed` vpc target refuses a backing reference outright
  (`BackingFileUnsupported`) because a differencing VHD is
  Dynamic-only — a fixed VHD has neither a BAT nor a dynamic
- header to hold the locators. instar emits these children but
- does not read them back: the ops that compose sector data
- refuse a differencing source, and composition is deferred and
- tracked in
- [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/). The host CLI
+ header to hold the locators. `convert`, `dd`, `compare`, `bench`
+ and `rebase` read these children back, composing each sector
+ from whichever image in the chain owns it; `create -b` itself
+ refuses to build a new overlay on a differencing backing file,
+ and `map`, `measure` and `check` still refuse a differencing
+ source outright — see the "VHD/VHDX differencing" section of
+ [quirks.md](/components/instar/quirks/) for the per-op record. The host CLI
  (`run_create` in `src/vmm/src/main.rs`, wired) handles
  the raw target entirely host-side via open + ftruncate +
  optional posix_fallocate; for every other format it opens the
@@ -583,10 +585,9 @@ provides a modular architecture with:
  `VhdxState::init`; vmdk multi-extent layouts fail the
  binary-header parse naturally), and dispatches to the matching
  per-format `<Format>State::map_extents` walker from the
- PLAN-map work. Refusing a differencing source is uniform
- policy across the ops that compose sector data, not a `map`
- quirk: composition is deferred and tracked in
- [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/). What is
+ PLAN-map work. `map` refuses a differencing source outright, like
+ `measure` and `check`; `convert`, `dd`, `compare`, `bench` and
+ `rebase` compose one against its parent instead. What is
  particular to `map` is the signalling — it reports the refusal
  through its own `MapResult::ERROR_HAS_BACKING` code, where the
  other ops raise `shared::DifferencingRefusal` on the call

@@ -212,7 +212,7 @@ Out of scope, and deliberately left to their own work:
    the operator: **both, in that order.** The plan refuses first
    and composes last. Phase 4 turns the silent parent-ignoring
    read into a typed refusal, which closes the wrong-data hole
-   immediately and holds while the emitters land; phases 11 to 16
+   immediately and holds while the emitters land; phases 11 to 17
    then implement real chain composition for VHD and VHDX, the way
    instar already composes qcow2 backing chains -- the host
    attaches each chain member as its own virtio device and the
@@ -369,11 +369,12 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 | 10. Documentation | [PLAN-differencing-phase-10-docs.md](/components/instar/plans/PLAN-differencing-phase-10-docs/) | Complete | `036252f` (#598) |
 | 11. Composition: host chain discovery and `info --chain` | [PLAN-differencing-phase-11-chain-host.md](/components/instar/plans/PLAN-differencing-phase-11-chain-host/) | Complete | `c66f8b2` (#603) |
 | 12. Composition: guest VHD sector-bitmap read path | [PLAN-differencing-phase-12-vhd-compose.md](/components/instar/plans/PLAN-differencing-phase-12-vhd-compose/) | Complete | `b4ae7fc` (#615) |
-| 13. Composition: guest VHDX sector-bitmap read path | [PLAN-differencing-phase-13-vhdx-compose.md](/components/instar/plans/PLAN-differencing-phase-13-vhdx-compose/) | In progress | |
-| 14. Composition: per-op rollout, replacing phase 4's refusals | PLAN-differencing-phase-14-op-rollout.md | Not started | |
-| 15. Composition: integration tests and fuzz | PLAN-differencing-phase-15-compose-tests.md | Not started | |
-| 16. Composition: documentation | PLAN-differencing-phase-16-compose-docs.md | Not started | |
-| 17. Push audit: `PUSH-AUDIT.md` over every phase above | PLAN-differencing-phase-17-push-audit.md | Not started | |
+| 13. Composition: guest VHDX sector-bitmap read path | [PLAN-differencing-phase-13-vhdx-compose.md](/components/instar/plans/PLAN-differencing-phase-13-vhdx-compose/) | Complete | `d677823c` (#624) |
+| 14. Composition: rollout across the chain-walker operations | [PLAN-differencing-phase-14-op-rollout.md](/components/instar/plans/PLAN-differencing-phase-14-op-rollout/) | In progress | |
+| 15. Composition: chain support for `map`, `measure` and `check` | PLAN-differencing-phase-15-single-image-ops.md | Not started | |
+| 16. Composition: integration tests and fuzz | PLAN-differencing-phase-16-compose-tests.md | Not started | |
+| 17. Composition: documentation | PLAN-differencing-phase-17-compose-docs.md | Not started | |
+| 18. Push audit: `PUSH-AUDIT.md` over every phase above | PLAN-differencing-phase-18-push-audit.md | Not started | |
 
 ### Sequencing rationale
 
@@ -444,7 +445,7 @@ covering vpc and vhdx together, so phase 8's brief no longer needs
 to and phase 7 gets a failing test if it removes either guard too
 early.
 
-Phases 8 and 15 both build fixtures with partially populated
+Phases 8 and 16 both build fixtures with partially populated
 blocks, and both must account for a libvhdi defect step 1a found
 and did not fix:
 `libvhdi_block_descriptor_read_sector_bitmap_data` decodes the
@@ -456,12 +457,12 @@ deterministically with a probe that predicted seven wrong sectors
 and got exactly those seven. VHD fixtures must therefore keep
 parent-owned and child-owned sectors out of the same bitmap byte,
 or carry expected output that accounts for the bug; discovering
-it in phase 15 instead would look exactly like an instar bug. The
+it in phase 16 instead would look exactly like an instar bug. The
 VHDX branch of the same function is correct, and `instar create`
 output is unaffected because a freshly created child has a wholly
 unallocated BAT and no sector bitmaps at all.
 
-Phases 11 to 16 are the composition work, and they come last
+Phases 11 to 17 are the composition work, and they come last
 because they are the only part that can be built on everything
 else: composition needs the locator parsing from phase 3 to find
 a parent, the emitters from phases 5 and 6 to generate chains to
@@ -527,15 +528,41 @@ rather than left as one phase to be split later, the way
   bounds. What relaxing the refusal per operation actually needs
   is filed as issue #614, and it is a phase 14 precondition, not
   solved by phases 12 or 13 alone.
-* **Phase 14, rollout.** Turning the refusals into composition
-  across `convert`, `compare`, `dd`, `bench`, `map`, `measure`
-  and `check`. Mechanical once 11 to 13 land, but it is the
-  phase that changes what users see, and it wants its own review
-  rather than being tacked onto a guest phase. Needs issue #614
-  settled first: per-operation composition means lifting
-  `init_chain_states`'s refusal, and phase 12 found that doing so
-  safely requires knowing a device's own chain boundary, which
-  `device_count` alone does not give it.
+* **Phase 14, rollout across the chain-walker operations.**
+  Turning the refusals into composition for the operations that
+  already read through the guest chain walker: `convert`, `compare`,
+  `bench`, `rebase`, and `dd` by inheritance. **Rescoped by phase
+  14's survey on 2026-10-05**, which falsified most of what this
+  bullet said. It is not "mechanical", and the seven operations it
+  named were the wrong seven:
+
+  - `rebase` reads through `init_chain_states`
+    (`src/operations/rebase/src/main.rs:1201`) and was not named.
+    Lifting the refusal changes it whether the phase plans for it
+    or not, so it is in scope.
+  - `dd` is not a separate operation. `run_dd`
+    (`src/vmm/src/main.rs:14629`) ends in `execute_convert`, so it
+    needs the host half and no guest work.
+  - `map` and `measure` hold no `ChainConfig` at all and `check`
+    only validates members independently, so for those three
+    "composition" means building chain support rather than lifting
+    a refusal. They are phase 15.
+  - The refusal is four independent families, not the single `if`
+    the phase 12 bullet promised: `init_chain_states` serves
+    `convert`, `compare`, `bench` and `rebase`, while `measure`
+    (`:422`, `:441`), `check` (`:1593`, `:1996`) and `map`
+    (`:463`, `:531`) each refuse in their own code.
+  - The host gate is per caller *kind*, not per operation.
+    `src/vmm/src/main.rs:3047` refuses to resolve a differencing
+    parent for every `ChainUse::Compose` caller, and the comment
+    justifying it rests on "nothing in instar can compose a VHD or
+    VHDX chain yet" -- a premise phase 14 makes false for five
+    operations and leaves true for three.
+
+  Needs issue #614 settled first: per-operation composition means
+  lifting `init_chain_states`'s refusal, and phase 12 found that
+  doing so safely requires knowing a device's own chain boundary,
+  which `device_count` alone does not give it.
 
   It also needs issue #623 settled first, and for the same kind of
   reason. Phase 13 found that a differencing VHDX pads its BAT out
@@ -549,8 +576,34 @@ rather than left as one phase to be split later, the way
   whenever that region is sized exactly -- a silent read failure on
   our own output, which is the worst shape this gap could take.
   Treat both issues as gates on phase 14's first step rather than as
-  work the phase can absorb.
-* **Phase 15, tests and fuzz.** Cross-validation against the
+  work the phase can absorb. **Phase 14's survey added one
+  correction here too**: #623 reaches five consumers, not just the
+  writer -- `create` twice, `measure`, `resize` and `convert` --
+  so fixing it changes `measure`'s predicted size and `resize`'s
+  target layout as well as the bytes instar writes.
+
+  Phase 14 also takes issue #625, the VHDX walker accepting a block
+  offset that overlaps the BAT or metadata region. Phase 13 filed it
+  and left it, because while every read entry point refuses a
+  differencing source the path is reachable only from crate tests.
+  Phase 14 is the change that makes it reachable from a user command
+  on an untrusted image, so it is the phase that should close it.
+
+* **Phase 15, chain support for the single-image operations.**
+  `map`, `measure` and `check`, split out of phase 14 by its survey.
+  These are not refusal lifts: `map` and `measure` have no chain
+  notion at all, and `check`'s `validate_chain` walks a chain's
+  members to validate each independently rather than to compose a
+  read. `map`'s own chain composition is additionally deferred to
+  `PLAN-map.md` (`src/shared/src/lib.rs:833`), so phase 15 must
+  settle which plan owns it before it starts. `commit` is a
+  composing caller on the host (`src/vmm/src/main.rs:7265`) whose
+  guest op reads through its own `backing_chain_first` /
+  `backing_chain_count` slots rather than `init_chain_states`; it is
+  neither refused today nor lifted by phase 14, and phase 15 should
+  decide whether that is correct or merely untested.
+
+* **Phase 16, tests and fuzz.** Cross-validation against the
   phase 1 oracle for chains instar wrote and chains it did not,
   plus coverage fuzzing of the compose path. Phase 13 left it one
   specific gap to close: every multi-group and partial-group VHDX
@@ -564,12 +617,12 @@ rather than left as one phase to be split later, the way
   *parsers*; composing a chain is new surface, and a malicious
   child pointing at a well-formed parent is a different input
   space from a malformed locator table.
-* **Phase 16, documentation.** Separate because phase 10 will
+* **Phase 17, documentation.** Separate because phase 10 will
   have documented a refusal that phase 14 removes: at minimum
   `docs/chain-discovery.md`, `docs/chain-config.md` and the
   read-side rows and divergence notes of
   `docs/format-coverage.md`. Both chain pages already exist (209
-  and 210 lines, describing qcow2 chain discovery), so phase 16
+  and 210 lines, describing qcow2 chain discovery), so phase 17
   extends them rather than authoring them; phase 10's survey
   confirmed this on 2026-09-26. Phase 11 takes two pieces of this
   early, because they stop being true the moment it lands rather
@@ -578,7 +631,7 @@ rather than left as one phase to be split later, the way
   one of whose two stated reasons was already falsified by
   `vhdx::posix_relative_path` before phase 11 began, and
   `docs/info.md`'s claim that `--chain` stops at one image. The
-  compose-side rows stay with phase 16.
+  compose-side rows stay with phase 17.
 
 Two specifics phases 12 and 13 must confront, both already
 visible in the crates:
@@ -738,7 +791,7 @@ We will know this plan has been implemented because:
   reference: it read `:1922` until 2026-09-26, which is a line
   about vhdx parent `virtual_size` recovery. The claim had drifted
   392 lines.)
-* The push audit in phase 17 has run `PUSH-AUDIT.md` over the
+* The push audit in phase 18 has run `PUSH-AUDIT.md` over the
   union of the merged ranges, and its findings are resolved or
   declined in writing.
 

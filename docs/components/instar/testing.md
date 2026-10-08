@@ -1557,9 +1557,9 @@ deliberately broken emitter is not guarding what its name says it
 guards. See [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) for the
 path being guarded.
 
-There are **62 cases**, in two groups.
+There are **91 cases**, in five groups.
 
-Twenty-six cover the writer. Fourteen mutate a library crate
+Twenty-seven cover the writer. Fifteen mutate a library crate
 (`create`, `vhd`, `vhdx`) and are caught by a Rust unit or round-trip
 test; twelve are caught by a Python integration test through the real
 binary. Ten of those twelve mutate the `create` guest operation, which
@@ -1569,11 +1569,79 @@ crate but break something only an external parser can see. Going
 through the real binary means `make instar` before the test and again
 after the source is restored.
 
-The other **36 reader cases** cover the reader — the VHD and VHDX arms of
+The other **47 reader cases** cover the reader — the VHD and VHDX arms of
 `read_chain_virtual_cluster`, the sector-bitmap helpers in the `vhd`
-and `vhdx` crates, and the differencing refusals in
-`init_chain_states`. Most of them name a test in the `qcow2`
-crate and run it with the full input-format feature list, because the
+and `vhdx` crates, and the per-chain judgement in `init_chain_states`
+that decides whether a differencing child composes or is refused.
+Eight of them are on that judgement alone, four per format: widening
+it back to an unconditional refusal, removing it, deriving it from the
+device-array bound instead of the chain segmentation, and naming the
+wrong format in the refusal it raises.
+
+Five more cover the one thing only `compare` does: packing two
+independent backing chains into the single device array the guest
+walks, with one `ChainSegment` per chain and image2's first device
+derived by adding the two chain lengths. Two mutate the host's
+segmentation, collapsing both chains into one segment and giving each
+segment the other chain's length. One reads image2 from image1's chain
+start. One asks "is there a parent behind me" with a device's array
+index instead of its offset within its own chain, which is identical
+for the chain that begins at index 0 and wrong for the other. The
+fifth reverts `init_chain_states`' per-chain judgement to the
+array-bound form the segmentation replaced — the same clause two of
+the reader cases mutate, caught here as a wrong verdict on the command
+line rather than inside the crate, because that is the form issue #614
+was reported in.
+
+All five are caught by `TestDifferencingCompareTwoChains` in
+`tests/test_differencing.py`, through the real binary: the host half is
+unreachable from a guest unit test, and the wrong answers are verdicts
+rather than errors — "identical", or a difference at an offset other
+than the one that was altered — so an integration test that reads the
+verdict is what has to notice. None of them can be caught by a
+single-chain test.
+
+The remaining **six cover `bench` and `rebase`**, the two operations
+that read through the shared chain walker with no guest code of their
+own to mutate. One reverts `run_bench`'s own host-side discovery call
+to `DifferencingComposition::Unsupported`, caught by the test that
+reads to the end of a chain's full declared virtual size. The other
+five are `rebase`'s: its Cargo.toml never gaining the `vhd-input` /
+`vhdx-input` features, its own chain reader's format allowlist
+narrowed back to qcow2/raw, `compressed_buf` pointed back at
+`CHAIN_CACHES` — aliasing the first chain device's own L1/BAT cache
+slot, which a differencing VHD chunk's mixed-ownership arm genuinely
+writes through, corrupting the cached sector mid-lookup, the actual
+defect this pass of cases found — the new
+`differencing_refusal_error` call site in `run_rebase_guest` removed,
+so a differencing refusal in the chain renders the pre-existing
+generic "the overlay's header could not be parsed" instead of naming
+the format, and the second of two chains losing its `ChainSegment`,
+which only a rebase given a real `-b` target rather than a detach can
+reach. All six run through the real binary, caught by
+`TestDifferencingBenchComposes` and `TestDifferencingRebaseThroughChain`
+in `tests/test_differencing.py`.
+
+The final **six guard `map`, `measure` and `check`**, which read
+through none of the machinery above: each reads its source on its own
+and declines a differencing one outright, so composing it is not a
+guest change those operations can inherit. Each has one case per
+format — a VHD arm testing the footer's disk type, a VHDX arm testing
+the metadata's `has_parent` flag — and every case disables its guard
+with an added `&& false` rather than deleting it, so the mutation is a
+one-line, easily reviewed change to a condition that already compiles.
+All six run through the real binary and are caught by the existing
+refusal test for that operation in `tests/test_differencing.py`
+(`TestDifferencingMapStillRefuses`, and `TestDifferencingRefusal`'s
+`measure` and `check` tests), which already iterates every differencing
+fixture rather than one. These six exist so that a later change lifting
+one of these three operations' refusals — the way this phase lifted
+`convert`, `dd`, `compare`, `bench` and `rebase` — cannot happen by
+accident: removing a guard here must fail a named test before it can
+land.
+
+Most of the reader cases name a test in the `qcow2` crate and run it
+with the full input-format feature list, because the
 arms are behind `vhd-input` and `vhdx-input` and a run without those
 compiles the mutation away and reports a pass nobody earned. Several
 also break a unit test in the `vhd` or `vhdx` crate, which is
@@ -1626,7 +1694,9 @@ figure invites the reader to assume a run has hung. Expect a spread,
 which is cargo and docker layer caching. The writer cases are
 dominated by the 24 `make instar` rebuilds their integration tests
 need; the reader cases need no rebuild but each recompiles the
-`qcow2` crate in release with the full feature list.
+`qcow2` crate in release with the full feature list. The five compare
+cases are integration cases too, so they add ten more rebuilds: four
+of them together measured 1m51s on a warm tree.
 
 Both devcontainer images must already exist, because
 `tools/cargo-in-container.sh` and the integration cases run them

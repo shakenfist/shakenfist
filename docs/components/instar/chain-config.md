@@ -14,21 +14,55 @@ discovers backing chains in the first place, see
 Both structures are defined in `src/shared/src/lib.rs` and use `#[repr(C)]`
 for a stable memory layout.
 
-### ChainConfig (16 bytes header + device array)
+### ChainConfig (16 bytes header + device array + segment array)
 
-Written at `CHAIN_CONFIG_ADDR` (`0x00082000`) in guest physical memory.
+Written at `CHAIN_CONFIG_ADDR` (`0x000F2000`) in guest physical memory.
 
 | Offset | Size | Type | Field | Description |
 |--------|------|------|-------|-------------|
 | 0 | 4 | u32 | `magic` | `0x4348414E` ("CHAN") |
-| 4 | 4 | u32 | `device_count` | Number of valid entries (1 = no backing files) |
-| 8 | 4 | u32 | `version` | Structure version (currently 1) |
-| 12 | 4 | u32 | `_reserved` | Reserved, written as 0 |
+| 4 | 4 | u32 | `device_count` | Number of valid device entries (1 = no backing files) |
+| 8 | 4 | u32 | `version` | Structure version (currently 3) |
+| 12 | 4 | u32 | `segment_count` | Number of valid segment entries; never 0 |
 | 16 | 512 | | `devices` | Array of up to 16 `ChainDeviceInfo` entries |
+| 528 | 128 | | `segments` | Array of up to 16 `ChainSegment` entries |
+| 656 | 64 | | `_reserved` | Reserved, written as 0 |
 
-Total struct size: 528 bytes (16 header + 16 x 32 device entries). The
-memory allocation at `CHAIN_CONFIG_ADDR` is 1024 bytes
-(`CHAIN_CONFIG_MAX_SIZE`) to allow for future growth.
+Total struct size: 720 bytes. The memory allocation at
+`CHAIN_CONFIG_ADDR` is 1024 bytes (`CHAIN_CONFIG_MAX_SIZE`) to allow
+for future growth.
+
+### ChainSegment (8 bytes per chain)
+
+Each segment entry starts at offset `528 + (segment_index * 8)`.
+
+| Offset | Size | Type | Field | Description |
+|--------|------|------|-------|-------------|
+| 0 | 4 | u32 | `first` | Index in `devices` of this chain's top image |
+| 4 | 4 | u32 | `count` | Number of devices in this chain, including the top |
+
+A segment is exactly the `chain_start` / `chain_len` pair the guest
+hands `read_chain_virtual_cluster`. `device_count` bounds a flat
+array, so it cannot say how long any one device's chain is: `compare
+image1 image2` and `rebase --backing NEW` both attach two unrelated
+chains to one device array. The segments say which devices form a
+chain, and the device behind a given slot is the next slot *in that
+slot's own segment*.
+
+The segments must tile `[0, device_count)` exactly — at least one
+segment, none empty, in ascending order, no gaps, no overlaps. The
+host checks this before it writes the config and
+`qcow2::init_chain_states` checks it again before walking the device
+array; a config that fails the check is refused rather than
+interpreted. An all-zero segmentation (`segment_count == 0`) is
+therefore never read as "one chain spanning everything", which is
+what makes an unstated segmentation detectable instead of silently
+composing a differencing child against whatever image happened to
+follow it.
+
+An external data file device, which the host inserts immediately after
+the image that owns it, belongs to the chain it was inserted into and
+is covered by that chain's segment.
 
 ### ChainDeviceInfo (32 bytes per device)
 
@@ -42,7 +76,7 @@ chain config.
 | 8 | 8 | u64 | `virtual_size` | Virtual size in bytes |
 | 16 | 8 | u64 | `actual_size` | Real file size in bytes (see note below) |
 | 24 | 4 | u32 | `cluster_size` | Cluster/grain size in bytes (0 for raw) |
-| 28 | 4 | u32 | `_reserved` | Reserved, written as 0 |
+| 28 | 4 | u32 | `data_device_idx` | Device index holding this device's cluster data; 0 = this device itself |
 
 ### Device Indexing
 
@@ -122,14 +156,22 @@ doesn't evenly divide the sector size.
 
 ### 3. Writing to Guest Memory
 
-The VMM writes the chain config via `write_chain_config()` in
-`src/vmm/src/main.rs`. The function:
+An operation whose devices form a single chain writes the config via
+`write_chain_config()` in `src/vmm/src/main.rs`. The function:
 
-1. Writes the 16-byte header (magic, device_count, version, reserved)
-   at `CHAIN_CONFIG_ADDR`
-2. Iterates over chain images and writes each 32-byte `ChainDeviceInfo`
-   at `CHAIN_CONFIG_ADDR + 16 + (i * 32)`
+1. Iterates over chain images and writes each 32-byte `ChainDeviceInfo`
+   at `CHAIN_CONFIG_ADDR + 16 + (i * 32)`, returning the number of
+   slots it wrote (an external data file costs an extra slot)
+2. Writes the 16-byte header and a single segment covering every slot
+   written, via `write_chain_config_header()`
 3. All writes use `guest_mem.write_obj()` for type-safe memory access
+
+`compare` and `rebase` attach two unrelated chains, so they call
+`write_chain_device_entries()` once per chain and then
+`write_chain_config_header()` with one segment per chain. Both take
+the segment bounds from the slot counts the entry writer reports,
+rather than from the chains themselves, so a segment can never name a
+slot the guest was not given.
 
 ## Guest-Side Access
 
@@ -162,17 +204,47 @@ if !chain_result.ptr.is_null() && chain_result.len > 0 {
 
 ### Validation
 
-`ChainConfig::is_valid()` checks that `magic == 0x4348414E` and
+`ChainConfig::is_valid()` checks that `magic == 0x4348414E`, that
+`version` is the one this build was compiled against, and that
 `device_count > 0`. Operations should always validate before accessing
 device entries.
 
+The version check is the skew defence. Operation binaries are separate
+files the host loads at run time (and `INSTAR_BIN_DIR` can point at
+another build entirely), so a guest compiled against one layout can be
+handed a config written in another; without the check, a field at an
+offset the guest reads as something else is a silent misparse rather
+than a refusal. The core binary's own validity check at
+`CHAIN_CONFIG_ADDR` stays deliberately magic-only: if it tightened,
+the operation could not see the config in order to report why it
+refused.
+
+`ChainConfig::segment_of(dev_idx)` returns the segment covering a
+device, and `ChainConfig::segmentation_covers(device_count)` is the
+tiling check described above. `ChainConfig::single_chain(n)` builds a
+config for the common case of one chain over `n` devices.
+
 ## Per-Operation Usage
 
-| Operation | How it uses chain config |
-|-----------|------------------------|
-| **convert** | Reads each device's format to select the appropriate chain reader (QCOW2 cluster lookup, VMDK grain lookup, or raw sector read). Walks the chain to flatten backing files into a standalone output image. |
-| **compare** | Reads format for both comparison sides. For QCOW2/VMDK images, walks the backing chain to resolve unallocated clusters/grains before comparing virtual content. Supports multi-level chains on both sides. |
-| **check --chain** | Validates each backing image's format consistency, virtual size, and header integrity (QCOW2 magic, version, table bounds). Reports chain errors separately from primary image errors. |
+The `Segments` column is how many `ChainSegment` entries the host writes.
+One segment means every device is behind the one before it; two means the
+operation attached two unrelated chains, and the guest must not treat the
+first device of the second as a parent of the last device of the first.
+
+| Operation | Segments | How it uses chain config |
+|-----------|----------|------------------------|
+| **convert** / **dd** | 1 | Reads each device's format to select the appropriate chain reader (QCOW2 cluster lookup, VMDK grain lookup, VHD or VHDX BAT lookup, or raw sector read). Walks the chain to flatten backing files into a standalone output image. `dd` shares convert's guest binary and so its chain handling. |
+| **compare** | 2 | Reads format for both comparison sides, one segment each. Walks each side's own backing chain to resolve unallocated clusters, grains or blocks before comparing virtual content. Supports multi-level chains on both sides. |
+| **rebase** | 1 or 2 | A detach (`-b ''`) attaches the old chain's parents only, so one segment. A rebase onto a new backing (`-b NEW`) attaches the old chain and the new one, which are unrelated, so two. The overlay itself is the output device, not an input. |
+| **bench** | 1 | Reads the source's chain so a benchmarked read resolves through it rather than against the top image alone. |
+| **commit** | 1 | Attaches the backing chain's parents behind the overlay; the backing being committed into is the output device. |
+| **check --chain** | 1 | Validates each backing image's format consistency, virtual size, and header integrity (QCOW2 magic, version, table bounds). Reports chain errors separately from primary image errors. |
+
+The chain walkers that `convert`, `dd`, `compare`, `bench` and `rebase`
+share also compose a differencing VHD or VHDX member against its parent,
+descending for the sectors the member's bitmap leaves to the parent.
+`map`, `measure` and `check` read an image on its own and refuse a
+differencing source by name instead.
 
 ## Format-Specific Notes
 
@@ -202,9 +274,10 @@ the chain reader will need `actual_size` to locate the footer correctly.
 All constants are defined in `src/shared/src/lib.rs`:
 
 ```
-CHAIN_CONFIG_ADDR      = 0x00082000
+CHAIN_CONFIG_ADDR      = 0x000F2000
 CHAIN_CONFIG_MAX_SIZE  = 1024 bytes
 MAX_CHAIN_DEVICES      = 16
+MAX_CHAIN_SEGMENTS     = 16
 ChainConfig::MAGIC     = 0x4348414E ("CHAN")
-ChainConfig::VERSION   = 1
+ChainConfig::VERSION   = 3
 ```

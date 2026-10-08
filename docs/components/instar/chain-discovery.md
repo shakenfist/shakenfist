@@ -177,14 +177,16 @@ Chain discovery works with any format that supports backing files:
 | QCOW1  | ✓ Yes | ✓ Yes |
 | Raw    | No | No |
 | VMDK   | ✓ Yes (descriptor parentFileNameHint) | ✓ Yes |
-| VHD    | ✓ Yes, via `info --chain`'s reporting walk only | Not yet |
-| VHDX   | ✓ Yes, via `info --chain`'s reporting walk only | Not yet |
+| VHD    | ✓ Yes | ✓ Yes (`convert`, `dd`, `compare`, `bench`, `rebase`) |
+| VHDX   | ✓ Yes | ✓ Yes (`convert`, `dd`, `compare`, `bench`, `rebase`) |
 
-VHD and VHDX are split across two columns because, uniquely among these
-formats, their two columns now disagree: `instar info --chain` resolves
-and lists a differencing VHD or VHDX parent, but no operation can yet
-compose one into sector data. See "Known limitations" below for what
-that means for every other caller.
+Chain discovery resolves a differencing VHD or VHDX parent for `instar
+info --chain` and for the five operations listed, each of which composes
+the parent's sectors into its own read. `commit` and `check` discover
+the same chain but never resolve a differencing parent in it — they
+record the reference without following it, because neither composes
+sector data from one. `map` and `measure` do not use chain discovery at
+all. See "Known limitations" below for the detail.
 
 ## Comparison with qemu-img
 
@@ -214,35 +216,60 @@ validating paths before following them.
 
 The chain discovery infrastructure is used by the following operations:
 
-- **`instar info --chain`** - Discover and display the full backing chain
+- **`instar info --chain`** - Discover and display the full backing chain,
+  resolving a differencing VHD or VHDX parent as well as a qcow2 or vmdk one.
 - **`instar check --chain`** - Validate entire backing chains for consistency.
   Each backing image is loaded as a separate virtio-block device in the KVM
   guest and checked for format consistency, non-zero virtual size, and QCOW2
   header integrity. Chain errors are reported separately from primary image
-  errors.
+  errors. A differencing VHD or VHDX parent in the chain is recorded but not
+  resolved — `check` refuses a differencing source outright, so it has
+  nothing to validate through one.
+- **`instar commit`** - Discovers the backing chain to merge an overlay into
+  its parent. A differencing VHD or VHDX parent is recorded but not
+  resolved, for the same reason as `check`.
 - **`instar compare`** - Automatically discovers backing chains for both images
-  being compared. All chain images are loaded as separate virtio-block devices
-  in the KVM guest. Unallocated QCOW2 clusters are resolved by walking the
-  backing chain, so overlay images compare correctly against their flattened
-  equivalents. Supports multi-level chains (e.g., top -> mid -> base) and
-  chains on both sides of the comparison.
-- **`instar convert`** - Discovers backing chains for the input image and loads
-  all chain images as separate virtio-block devices for flattening. The guest
-  walks the chain to resolve unallocated clusters, producing a standalone
-  output image with no backing dependencies.
+  being compared, resolving a differencing VHD or VHDX parent in either
+  chain as well as a qcow2 or vmdk one. All chain images are loaded as
+  separate virtio-block devices in the KVM guest. Unallocated clusters are
+  resolved by walking the backing chain, so overlay images compare correctly
+  against their flattened equivalents. Supports multi-level chains (e.g.,
+  top -> mid -> base) and chains on both sides of the comparison.
+- **`instar convert`** / **`instar dd`** - Discover the backing chain for the
+  input image, resolving a differencing VHD or VHDX parent as well as a
+  qcow2 or vmdk one, and load all chain images as separate virtio-block
+  devices for flattening. The guest walks the chain to resolve unallocated
+  or parent-owned sectors, producing a standalone output image with no
+  backing dependencies.
+- **`instar bench`** / **`instar rebase`** - Also resolve a differencing VHD
+  or VHDX parent in the chain they read, so the sectors the top image
+  leaves to its parent are served from the parent rather than silently
+  skipped. A rebase detach covers the whole virtual size; a benchmark
+  covers only the offsets it was asked to read.
 
 ## Known limitations
 
-### A differencing VHD or VHDX parent is walked only by `info --chain`
+### A differencing VHD or VHDX parent is resolved only by the operations that read it
 
-`discover_backing_chain` takes a policy. A *composing* caller —
-`convert`, `dd`, `compare`, `bench`, `check`, `commit` and `rebase` —
-stops at a VHD (`disk_type == 4`) or VHDX (`HasParent` set) parent
-exactly as before, recording the parent reference (so `instar info` can
-still report it) without resolving or opening it. Only the *reporting*
-walk behind `instar info --chain` resolves the parent — through the same
-allowlist and depth-limit checks described above for a qcow2 backing
-file — and continues the listing into it:
+`discover_backing_chain` takes two things that together decide what it
+does with a VHD (`disk_type == 4`) or VHDX (`HasParent` set) parent: what
+the caller will do with the chain (report it, or compose sector data from
+it), and, for a composing caller, whether that specific operation can
+read a differencing parent at all. An operation that will read the
+parent's sectors — `convert`, `dd`, `compare`, `bench` and `rebase` —
+resolves it through the same allowlist and depth-limit checks described
+above for a qcow2 backing file. An operation that discovers the chain but
+will not read a differencing parent — `check` and `commit`, each of which
+refuses or does not reach such a source — records the reference (so
+`instar info` can still report it) without resolving or opening it. This
+split exists so that a refusal is never contingent on whether the parent
+file happens to exist: an operation that cannot compose a differencing
+source refuses it before the parent's presence or absence could change
+the answer, rather than resolving it just to throw the result away. The
+*reporting* walk behind `instar info --chain` resolves the parent
+unconditionally, whatever the checked-out image's own operation could do
+with one, because it has no refusal to make contingent on the parent's
+presence — and continues the listing into it:
 
 ```
 $ instar info --chain vhd-diff-child-aligned.vhd
@@ -323,31 +350,39 @@ would be a worse regression than the one-image listing it replaces.
 Contrast qcow2 and VMDK: `info --chain` on either with a missing backing
 file still exits non-zero, deliberately, because those formats compose
 today — a listing that quietly stopped short would disagree with what
-the very next `convert` of the same image does. VHD and VHDX have no
-such disagreement to protect, because nothing composes them yet.
+the very next `convert` of the same image does. VHD and VHDX now carry
+the same disagreement to protect for five operations, and `info --chain`
+resolves their parent unconditionally regardless.
 
-This is discovery, not composition: nothing in instar can read the
-*data* of a VHD or VHDX parent, only the header fields that name it, and
-no composing caller resolves one. A composing operation must never
-resolve a parent it will not go on to read — if it did, the same
-differencing image would give a typed refusal when its parent happened
-to sit beside it and a path error when it did not, and a refusal that
-depends on a file instar is not going to read is not a refusal. That is
-exactly why `info --chain` walks and nothing else does.
+This is no longer "discovery, not composition" for every caller: `convert`,
+`dd`, `compare`, `bench` and `rebase` read a resolved VHD or VHDX
+parent's sector data, exactly like any other chain member. The invariant
+that survives is the one the differencing work established at the
+outset: an operation must never resolve a parent it will not go on to
+read. An
+operation that cannot compose a differencing source refuses it before the
+parent's presence or absence could change the answer — resolving the
+parent only to discard the result would make the same differencing image
+give a typed refusal when its parent happened to sit beside it and a path
+error when it did not, and a refusal that depends on a file the operation
+is not going to read is not a refusal. That is why `check` and `commit`
+still record the reference without resolving it, and why `instar info
+--chain`, which has no refusal to protect, resolves unconditionally.
 
-Two different lists appear in this document and in the changelog, and
-they are not the same set. The *composing callers* — the operations that
-call `discover_backing_chain` with the composing policy — are `convert`,
-`dd`, `compare`, `bench`, `check`, `commit` and `rebase`. The operations
-that *refuse a differencing source* are `convert`, `dd`, `compare`,
-`bench`, `check`, `measure` and `map`. The overlap is not total in either
-direction: `measure` and `map` refuse without walking a chain, and
-`commit` and `rebase` reject a VHD or VHDX source before any parent is
-considered, because neither operation supports those formats at all
-(`commit` and `rebase` are qcow2 and VMDK only) — so their refusal is not
-a differencing refusal and would stand even for a VHD with no parent. See
-the "VHD/VHDX differencing" section of [quirks.md](/components/instar/quirks/) for the
-full per-op record. The composition work
-in [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) lifts each
-operation's restriction as real chain composition lands, one operation
-at a time.
+Three lists worth keeping distinct, because they are not the same set.
+The operations that *resolve* a differencing parent — composing sector
+data from it — are `convert`, `dd`, `compare`, `bench` and `rebase`, plus
+`info --chain`'s reporting walk, which resolves one without composing
+anything. The operations that discover a chain but never resolve a
+differencing parent in it are `check` and `commit`. The operations that
+refuse *every* differencing source outright are `measure` and `map`,
+neither of which uses chain discovery at all; `check` also refuses one,
+through its own guest-side check rather than through chain discovery, so
+it refuses regardless of whether `--chain` walked anything. `commit` and
+`rebase` separately reject a VHD or VHDX source before any parent is
+considered, for an unrelated reason: neither operation supports those
+formats as the file being acted on at all (`commit` and `rebase` are
+qcow2 and VMDK only) — so that refusal is not a differencing refusal and
+would stand even for a VHD with no parent. See the "VHD/VHDX
+differencing" section of [quirks.md](/components/instar/quirks/) for the full per-op
+record.
