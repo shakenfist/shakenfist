@@ -5016,8 +5016,12 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         """Get Instance static values from MariaDB."""
         try:
             self.monitor.counters['get_instance'].inc()
+            # strict, so that a MariaDB error raises into the INTERNAL
+            # reply below rather than answering found=False. A miss is
+            # what the cleaner deletes an unknown domain's disks on, so a
+            # failed read must never look like one.
             data = mariadb._direct_get_instance(
-                UUID(request.uuid))
+                UUID(request.uuid), strict=True)
             if data is None:
                 return database_pb2.GetInstanceReply(
                     found=False)

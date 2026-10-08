@@ -2,11 +2,10 @@
 """Unit tests for ``BaseTestCase._assert_power_state()``.
 
 The helper reads ``system_client.get_instance()['power_state']`` exactly
-once and fails without waiting or retrying (D1 in
-docs/plans/PLAN-power-state-correctness-phase-00-assertions.md explains
-why a wait would hide real faults rather than avoid flakes). These tests
-exercise that contract directly, unbound from the rest of the functional
-suite.
+once and fails without waiting or retrying: a wait would let a later
+writer such as the cleaner correct a wrong value first, and pass a call
+that returned without recording what it did. These tests exercise that
+contract directly, unbound from the rest of the functional suite.
 
 ``shakenfist_ci/base.py`` is loaded by path, with ``shakenfist_client``
 and ``prettytable`` stubbed out, because neither is a test dependency of
@@ -159,27 +158,6 @@ class AssertPowerStateTestCase(test_base.ShakenFistTestCase):
         self.assertIn('after unpause', message)
         self.harness._log_instance_events.assert_called_once_with('uuid1')
 
-    def test_stale_on_when_off_expected_does_not_mention_f13(self):
-        # F13 (the cleaner stale-write race) was fixed in phase 1b step 4,
-        # which made this failure message's F13 hint stale; it was removed
-        # in phase 1b step 6.
-        self.system_client.get_instance.return_value = {'power_state': 'on'}
-
-        exc = self.assertRaises(
-            AssertionError, self.harness._assert_power_state,
-            'uuid1', 'off', 'after power off')
-
-        self.assertNotIn('F13', str(exc))
-
-    def test_off_when_on_expected_does_not_mention_f13(self):
-        self.system_client.get_instance.return_value = {'power_state': 'off'}
-
-        exc = self.assertRaises(
-            AssertionError, self.harness._assert_power_state,
-            'uuid1', 'on', 'after power on')
-
-        self.assertNotIn('F13', str(exc))
-
     def test_never_sleeps(self):
         self.system_client.get_instance.return_value = {'power_state': 'paused'}
 
@@ -248,12 +226,10 @@ class _DomainAutostartHarness(ci_base.BaseTestCase):
 class DomainAutostartTestCase(test_base.ShakenFistTestCase):
     """Unit tests for ``BaseTestCase._domain_autostart()``.
 
-    Phase 2 reads libvirt's autostart flag with ``virsh dominfo`` on the
-    instance's hypervisor (D7 in
-    docs/plans/PLAN-power-state-correctness-phase-02-autostart-restore.md).
+    The flag is read with ``virsh dominfo`` on the instance's hypervisor.
     These tests exercise the parsing without a real cluster, the same way
-    phase 1b's AssertPowerStateTestCase above and
-    _detected_poweroff_reason's tests exercise their helpers.
+    AssertPowerStateTestCase above and _detected_poweroff_reason's tests
+    exercise their helpers.
     """
 
     def setUp(self):
@@ -332,7 +308,7 @@ DOMBLKLIST_SHARED_PATH = (
 class DomainRootDiskPathTestCase(test_base.ShakenFistTestCase):
     """Unit tests for ``BaseTestCase._domain_root_disk_path()``.
 
-    Phase 3's failed power on test moves the path this returns aside as
+    test_lifecycle_power_on_failure moves the path this returns aside as
     root, so these tests pin both the parsing and the refusal to return a
     path outside the instance's own directory.
     """

@@ -100,8 +100,7 @@ def restore_instances():
     # Instances are deliberately not restored here. libvirt keeps a running
     # domain running across a restart of sf-queues or libvirtd -- there is
     # nothing to do. After a hypervisor reboot, a domain's libvirt autostart
-    # flag decides whether it starts, not this function. See
-    # docs/plans/PLAN-power-state-correctness.md F2 and F10.
+    # flag decides whether it starts, not this function.
     #
     # What this function still does is collect this node's instances so
     # their networks can be restored, and so their placements can be

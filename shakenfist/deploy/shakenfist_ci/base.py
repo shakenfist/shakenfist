@@ -836,10 +836,8 @@ class BaseTestCase(testtools.TestCase):
         Reads libvirt's autostart flag with ``virsh dominfo`` on node,
         the hypervisor the domain is defined on. That flag is what
         decides whether the domain starts again after the hypervisor
-        reboots (phase 2's D1/D7 in
-        docs/plans/PLAN-power-state-correctness-phase-02-autostart-restore.md):
-        power on sets it, and power off or the cleaner detecting a
-        powered off guest clears it. Returns True for 'enable' and False
+        reboots: power on sets it, and power off or the cleaner detecting
+        a powered off guest clears it. Returns True for 'enable' and False
         for 'disable'; fails the test, with the command's output
         attached, if the ``Autostart:`` line is missing or has some
         other value.
@@ -906,9 +904,10 @@ class BaseTestCase(testtools.TestCase):
 
         Every power transition this harness drives is written synchronously
         by the call under test before it returns, so the correct value is
-        already there on the first read. See D1 in
-        docs/plans/PLAN-power-state-correctness-phase-00-assertions.md for
-        why this does not poll or sleep.
+        already there on the first read. It does not poll: a wait would
+        let a later writer such as the cleaner correct a wrong value
+        first, and pass a call that returned without recording what it
+        did.
         """
         observed = self.system_client.get_instance(instance_uuid).get('power_state')
         if observed == expected:
@@ -1299,14 +1298,10 @@ class BaseTestCase(testtools.TestCase):
 
         # Once created, we shouldn't need more than another 5 minutes for boot.
         #
-        # An event's human-readable label -- what add_event()'s callers pass
-        # as "message", e.g. "detected poweroff" -- is carried in the events
-        # API response's 'message' field. There is no 'operation' field
-        # (shakenfist.schema.event.EventReadRow has none), so matching on it
-        # raised KeyError on the first event seen after "after" -- this
-        # method had no caller until phase 1b's test_lifecycle_guest_poweroff
-        # (see docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md,
-        # S13), so nothing had exercised it against the real schema before.
+        # Events carry their label in 'message' -- what add_event()'s callers
+        # pass as "message", e.g. "detected poweroff". There is no 'operation'
+        # field (shakenfist.schema.event.EventReadRow has none), so matching
+        # on it raises KeyError on the first event seen after "after".
         start_time = time.time()
         while time.time() - start_time < 5 * 60:
             for event in self.system_client.get_instance_events(instance_uuid):

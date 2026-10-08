@@ -54,7 +54,7 @@ class FakeInstance:
 
 
 class RestoreDoesNotTouchTheHypervisorTestCase(base.ShakenFistTestCase):
-    """Guards against the instance restore loop (F2) coming back.
+    """Guards against the instance restore loop coming back.
 
     That loop was a no-op: ``inst.power_state`` is a dict, so ``not in
     started`` was always true, and ``Instance.create_on_hypervisor()`` does

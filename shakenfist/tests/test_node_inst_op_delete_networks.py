@@ -161,8 +161,7 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
             _apply_delete_on_hypervisor.assert_called_once()
 
     def test_failed_power_off_does_not_abandon_the_delete(self):
-        # power_off() raises when destroy() leaves the domain running (D2
-        # in docs/plans/PLAN-power-state-correctness-phase-03-power-api.md).
+        # power_off() raises when destroy() leaves the domain running.
         # Delete behaved the same before that, so it must carry on: the
         # instance is still deleted and its networks still cleaned up.
         inst = FakeInstance()

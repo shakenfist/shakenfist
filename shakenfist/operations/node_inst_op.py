@@ -186,9 +186,8 @@ class NodeInstOp(BaseClusterOperation):
         # This deliberately only clears a stale kvm_pid and does not
         # delete or error the instance when qemu is gone. A missing qemu
         # process is just a guest that powered itself off, which the
-        # cleaner already records as such (see F3 in
-        # docs/plans/PLAN-power-state-correctness.md) -- error-deleting it
-        # here would be wrong.
+        # cleaner already records as such -- error-deleting it here would
+        # be wrong.
         pid = inst.kvm_pid
         if pid:
             try:

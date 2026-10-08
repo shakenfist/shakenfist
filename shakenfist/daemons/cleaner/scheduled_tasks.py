@@ -104,8 +104,6 @@ def _sf_instance_uuid(domain):
     command lines, so a domain named "sf:" (which would rmtree the whole
     instances directory) or "sf:garbage" must never get that far. A
     mismatched domain is skipped entirely: no lookup, no delete, no virsh.
-    See S6 and D4 in
-    docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md.
     """
     domain_name = domain.name()
     if not domain_name.startswith('sf:'):
@@ -128,8 +126,7 @@ def _instance_confirmed_absent(instance_uuid):
     Instance.from_db() reports a non-retryable database error as a miss
     (issue #3373), and the callers of this delete a domain and its disks
     on a miss. So before deleting, look again with a lookup which raises
-    on any error instead. See S5 and D3 in
-    docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md.
+    on any error instead.
     """
     log_ctx = LOG.with_fields({'instance': instance_uuid})
     try:
@@ -158,8 +155,7 @@ def _instance_lock(inst, pet):
     which case the caller skips the instance for this pass and the next
     pass retries. Every other writer of a domain's power state holds this
     lock, so a caller which re-reads the domain inside it cannot observe
-    a power on, power off or delete half done. See S2 and D2 in
-    docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md.
+    a power on, power off or delete half done.
     """
     # A holder killed by the systemd watchdog would strand the lock until
     # sf-nodelock restarts, so pet before taking it.
@@ -181,10 +177,9 @@ def _instance_lock(inst, pet):
 def _active_domain_needs_write(lc, inst, db_state, domain):
     """Whether this pass's reading of an active domain calls for a write.
 
-    When it does not, the caller takes no lock: that is the steady state,
-    and S14 in
-    docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md
-    relies on it costing the database nothing extra.
+    When it does not, the caller takes no lock and writes nothing. That is
+    the steady state for every running instance on every pass, so it must
+    cost nothing beyond the reads the pass already makes.
     """
     state = lc.extract_power_state(domain)
     if state != inst.power_state.get('power_state'):
@@ -204,6 +199,16 @@ def _update_active_domain(lc, inst, instance_uuid, domain, log_ctx):
     error paused domain. The caller holds the instance lock, and domain
     was looked up inside it."""
     state = lc.extract_power_state(domain)
+    if state == 'off':
+        # The domain stopped after the caller saw it active. Writing 'off'
+        # here would skip what the inactive loop does on a detected power
+        # off (agent_state, the event, clearing autostart), and that loop
+        # would then find 'off' already recorded and never do it. Leave
+        # the domain to its next pass instead.
+        log_ctx.debug(
+            'Domain stopped while being inspected, leaving it to the '
+            'inactive domain pass')
+        return
     inst.update_power_state(state)
     if state == 'crashed':
         if inst.state.value in [dbo.STATE_DELETE_WAIT, dbo.STATE_DELETED]:
@@ -267,8 +272,7 @@ def _update_active_domain(lc, inst, instance_uuid, domain, log_ctx):
 
 
 # Instance states whose domain is still being built. Creates hold the
-# instance lock, so the cleaner could not observe one half done anyway
-# (S2 in docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md),
+# instance lock, so the cleaner could not observe one half done anyway,
 # but skipping them costs nothing.
 _BUILDING_STATES = {
     dbo.STATE_INITIAL, instance.Instance.STATE_PREFLIGHT, dbo.STATE_CREATING
@@ -276,8 +280,9 @@ _BUILDING_STATES = {
 
 # A delete-wait instance with a stray powered off domain has its delete
 # enqueued again on these counts of its enforced deletes counter, which
-# goes up once a pass (about a minute apart), and is given up on at the
-# last. See D5.
+# goes up once a pass (about a minute apart), so each queued delete gets
+# about five minutes to run before the next is enqueued, and is given up
+# on at the last.
 _STRAY_DELETE_ENQUEUE_ATTEMPTS = (1, 6, 11)
 _STRAY_DELETE_ABANDON_ATTEMPT = 16
 
@@ -313,7 +318,7 @@ def _enqueue_stray_delete(inst, log_ctx):
 
     The queued delete also removes the instance's interfaces and cleans up
     networks no longer used on this node, which a delete done in place
-    would skip and leak (S3 and D5). The caller holds the instance lock.
+    would skip and leak. The caller holds the instance lock.
     """
     attempts = inst.enforced_deletes_increment()
     log_ctx = log_ctx.with_fields({'attempt': attempts})
@@ -340,8 +345,7 @@ def _clear_autostart_of_powered_off(lc, domain, inst, instance_uuid, pet, log_ct
     are found here. The flag is read without the lock, so the steady state
     takes no lock and makes no write. It is cleared holding the lock, on a
     domain looked up again inside it, and only while the power state still
-    reads off, so that a concurrent power on is never undone. See D2 and D6
-    in docs/plans/PLAN-power-state-correctness-phase-02-autostart-restore.md.
+    reads off, so that a concurrent power on is never undone.
     A libvirtError is left to the caller, and the next pass retries.
     """
     if not domain.autostart():
@@ -368,7 +372,7 @@ def _update_inactive_domain(lc, domain, instance_uuid, pet):
     """Reconcile one inactive Shaken Fist domain with its instance.
 
     Every write, delete and enqueued delete below happens holding the
-    instance lock, from a state and a domain read again inside it (D2).
+    instance lock, from a state and a domain read again inside it.
     """
     log_ctx = LOG.with_fields({'instance': instance_uuid})
     log_ctx.debug('Inspecting inactive instance')
@@ -411,7 +415,7 @@ def _update_inactive_domain(lc, domain, instance_uuid, pet):
                 # The global half of the delete has run, and a queued
                 # delete would return early, so tear down the local half
                 # here. The state is already deleted, and is not written
-                # again (S4).
+                # again: writing deleted over deleted would be a no-op.
                 log_ctx.warning('Deleting stray powered off instance')
                 _delete_instance_files(instance_uuid)
                 _undefine_domain(lc, domain, instance_uuid)
@@ -420,7 +424,7 @@ def _update_inactive_domain(lc, domain, instance_uuid, pet):
                 _enqueue_stray_delete(inst, log_ctx)
         return
 
-    # P5 again: ground truth, not a scheduling decision, so the guard is
+    # Ground truth, not a scheduling decision, so the guard is
     # not enforced.
     inst.place_instance(config.NODE_UUID, enforce=False)
 
@@ -428,7 +432,7 @@ def _update_inactive_domain(lc, domain, instance_uuid, pet):
         # If we're inactive and our files aren't on disk, we have a
         # problem. Record it once: the domain lingers, so every pass sees
         # it, and '<state>-error-error' (or 'error-error') is not a valid
-        # transition (S8, D6).
+        # transition.
         if (not db_state.value or
                 db_state.value in instance.Instance.ERROR_STATES):
             log_ctx.debug('Instance files missing, already errored')
@@ -455,7 +459,8 @@ def _update_inactive_domain(lc, domain, instance_uuid, pet):
         return
 
     # When the database already says off there is no power state to write,
-    # and no lock is taken (S14), unless the domain still has autostart set.
+    # so the steady state costs no lock and no write, unless the domain
+    # still has autostart set.
     if inst.power_state.get('power_state') == 'off':
         _clear_autostart_of_powered_off(lc, domain, inst, instance_uuid, pet, log_ctx)
         return
@@ -474,7 +479,7 @@ def _update_inactive_domain(lc, domain, instance_uuid, pet):
             return
 
         # The order is load-bearing: callers wait for the event, then read
-        # the power state once (D7). The shutoff reason is display only: a
+        # the power state once. The shutoff reason is display only: a
         # powered off domain is off, whatever the reason.
         log_ctx.with_fields({'previous_power_state': previous}).info(
             'Detected power off')
@@ -489,9 +494,105 @@ def _update_inactive_domain(lc, domain, instance_uuid, pet):
 
         # Autostart means "should be running", and this instance is now off,
         # so a hypervisor reboot must not start it. Nothing waits on this, so
-        # it goes after the event. See D2 and D6 in
-        # docs/plans/PLAN-power-state-correctness-phase-02-autostart-restore.md.
+        # it goes after the event.
         domain.setAutostart(0)
+
+
+def _per_domain_errors(lc):
+    """The errors which skip one domain for this pass, not every domain after it.
+
+    Each pass reconciles every domain on the node, and the next pass
+    retries, so a failure which is about one domain, or which is
+    transient, must not end the pass for the domains listed after it:
+    a libvirt call on that domain, the virsh fallback for undefining or
+    destroying it (which raises ProcessExecutionError on a non-zero exit),
+    privexec and node lock transport errors, a database outage, and
+    errors from the filesystem or a socket. A programming error is not
+    among them, and still ends the pass loudly.
+    """
+    return (
+        lc.libvirt.libvirtError,
+        exceptions.ProcessExecutionError,
+        exceptions.DatabaseUnavailable,
+        exceptions.MissingPrivExecSocket,
+        exceptions.TruncatedPrivExecResponse,
+        exceptions.UnknownPrivExecReplyException,
+        exceptions.TruncatedNodeLockResponse,
+        exceptions.UnknownNodeLockReplyException,
+        OSError,
+    )
+
+
+def _update_listed_active_domain(lc, domain, instance_uuid, pet, seen):
+    """Reconcile one active Shaken Fist domain with its instance."""
+    log_ctx = LOG.with_fields({'instance': instance_uuid})
+    log_ctx.debug('Instance is running')
+
+    inst = instance.Instance.from_db(instance_uuid)
+    if not inst:
+        if not _instance_confirmed_absent(instance_uuid):
+            return
+
+        # Instance is SF but not in database. Kill to reduce load.
+        if not _delete_with_virsh(instance_uuid, None):
+            _delete_with_kill(instance_uuid, None)
+        return
+
+    # The cleaner records where a libvirt domain
+    # already is, so its placement writes do not enforce
+    # the capacity guard -- a guard cannot refuse reality.
+    inst.place_instance(config.NODE_UUID, enforce=False)
+    seen.append(domain.name())
+
+    db_state = inst.state
+    if db_state.value == dbo.STATE_DELETED:
+        # NOTE(mikal): a delete might be in-flight in the queue.
+        # We only worry about instances which should have gone
+        # away five minutes ago.
+        if time.time() - db_state.update_time < 300:
+            return
+
+        attempts = inst.enforced_deletes_increment()
+        if attempts > 6:
+            # I give up.
+            pass
+
+        elif attempts > 4:
+            _delete_with_kill(instance_uuid, inst)
+
+        elif attempts > 2:
+            _delete_with_virsh(instance_uuid, inst)
+
+        else:
+            inst.delete()
+
+        log_ctx.with_fields({'attempt': attempts}).warning(
+            'Deleting stray instance')
+        return
+
+    # When the database already agrees with libvirt there is
+    # nothing to write, so the steady state costs no lock and no write.
+    if not _active_domain_needs_write(lc, inst, db_state, domain):
+        return
+
+    # Otherwise write under the instance lock, from a domain
+    # looked up again inside it, so that a power operation which
+    # finished while this pass was running is not overwritten by
+    # a stale reading: the domain is re-read under the instance lock.
+    with _instance_lock(inst, pet) as locked:
+        if not locked:
+            return
+
+        domain = lc.get_domain_from_sf_uuid(instance_uuid)
+        if not domain or not domain.isActive():
+            # The second loop's next pass owns an inactive
+            # domain.
+            log_ctx.debug(
+                'Domain is no longer active, skipping it this pass')
+            return
+
+        _update_active_domain(
+            lc, inst, instance_uuid, domain, log_ctx)
 
 
 @util_general.recorded_method
@@ -517,75 +618,12 @@ def update_power_states(pet_watchdog=None):
                 instance_uuid = _sf_instance_uuid(domain)
                 if instance_uuid is None:
                     continue
-                log_ctx = LOG.with_fields({'instance': instance_uuid})
-                log_ctx.debug('Instance is running')
-
-                inst = instance.Instance.from_db(instance_uuid)
-                if not inst:
-                    if not _instance_confirmed_absent(instance_uuid):
-                        continue
-
-                    # Instance is SF but not in database. Kill to reduce load.
-                    if not _delete_with_virsh(instance_uuid, None):
-                        _delete_with_kill(instance_uuid, None)
-                    continue
-
-                # P5: the cleaner records where a libvirt domain
-                # already is, so its placement writes do not enforce
-                # the capacity guard -- a guard cannot refuse reality.
-                inst.place_instance(config.NODE_UUID, enforce=False)
-                seen.append(domain.name())
-
-                db_state = inst.state
-                if db_state.value == dbo.STATE_DELETED:
-                    # NOTE(mikal): a delete might be in-flight in the queue.
-                    # We only worry about instances which should have gone
-                    # away five minutes ago.
-                    if time.time() - db_state.update_time < 300:
-                        continue
-
-                    attempts = inst.enforced_deletes_increment()
-                    if attempts > 6:
-                        # I give up.
-                        pass
-
-                    elif attempts > 4:
-                        _delete_with_kill(instance_uuid, inst)
-
-                    elif attempts > 2:
-                        _delete_with_virsh(instance_uuid, inst)
-
-                    else:
-                        inst.delete()
-
-                    log_ctx.with_fields({'attempt': attempts}).warning(
-                        'Deleting stray instance')
-                    continue
-
-                # When the database already agrees with libvirt there is
-                # nothing to write, and no lock is taken (S14).
-                if not _active_domain_needs_write(lc, inst, db_state, domain):
-                    continue
-
-                # Otherwise write under the instance lock, from a domain
-                # looked up again inside it, so that a power operation which
-                # finished while this pass was running is not overwritten by
-                # a stale reading (F13, D2 in
-                # docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md).
-                with _instance_lock(inst, pet) as locked:
-                    if not locked:
-                        continue
-
-                    domain = lc.get_domain_from_sf_uuid(instance_uuid)
-                    if not domain or not domain.isActive():
-                        # The second loop's next pass owns an inactive
-                        # domain.
-                        log_ctx.debug(
-                            'Domain is no longer active, skipping it this pass')
-                        continue
-
-                    _update_active_domain(
-                        lc, inst, instance_uuid, domain, log_ctx)
+                try:
+                    _update_listed_active_domain(
+                        lc, domain, instance_uuid, pet, seen)
+                except _per_domain_errors(lc) as e:
+                    LOG.with_fields({'instance': instance_uuid}).warning(
+                        f'Failed to update active domain, skipping it this pass: {e}')
 
         except lc.libvirt.libvirtError as e:
             LOG.debug(f'Failed to lookup running domains: {e}')
@@ -603,12 +641,12 @@ def update_power_states(pet_watchdog=None):
                 if domain.name() in seen:
                     continue
 
-                # A libvirt error on one domain, such as a failed
-                # setAutostart(), skips that domain this pass rather than
-                # every domain listed after it.
+                # An error on one domain, such as a failed setAutostart()
+                # or virsh undefine, skips that domain this pass rather
+                # than every domain listed after it.
                 try:
                     _update_inactive_domain(lc, domain, instance_uuid, pet)
-                except lc.libvirt.libvirtError as e:
+                except _per_domain_errors(lc) as e:
                     LOG.with_fields({'instance': instance_uuid}).warning(
                         f'Failed to update inactive domain, skipping it this pass: {e}')
 
@@ -622,8 +660,7 @@ def update_power_states(pet_watchdog=None):
         # (non-SF) ones. SF _does_ however set the libvirt UUID to match the
         # SF UUID in libvirt.tmpl. The list is fetched here rather than built
         # by the loops above, and if it cannot be fetched the sweep is skipped:
-        # an empty list would make every old profile look deletable (S7 and D8
-        # in docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md).
+        # an empty list would make every old profile look deletable.
         try:
             all_libvirt_uuids = lc.get_all_domain_uuids()
         except lc.libvirt.libvirtError as e:

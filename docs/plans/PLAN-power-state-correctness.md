@@ -81,7 +81,7 @@ support that suspicion. Every finding below was checked against
 | F6 | `instance.py` `pause()`/`unpause()` | Treat "`update_power_state()` did not change the stored value" as "the operation failed". libvirt's qemu driver returns success for suspending a paused domain, but raises "domain is already running" for resuming a running one (phase 3 S1). | Pausing twice answers 409 and unpausing twice answers 500, and losing a race with the cleaner writing `paused` first, raises a 409 for an operation which succeeded. |
 | F7 | `instance.py` `pause()`/`unpause()` | Guard on "no domain" only; our domains are persistent, so a powered off instance has an *inactive* domain and `suspend()` raises a raw libvirtError. | 500 instead of the documented 409 -- the defect class #3630 fixed for `reboot()` alone. |
 | F8 | `instance.py` `_power_on_inner()` | "domain is already running" returns `True` without updating `power_state`; the generic start-error path reallocates ports without undefining the domain, so the retry reuses stale XML; `agent_state = AGENT_NEVER_TALKED` is set only when the *first* attempt failed. | Powering on a *paused* instance answers success and leaves it paused. The retry loop's bookkeeping cannot be trusted. |
-| F9 | `util/libvirt.py` `extract_power_state()` | `SHUTDOWN` and `NOSTATE` map to `on`, `PMSUSPENDED` to `paused`; `extract_power_state_pretty()` raises `KeyError` on an unknown enum. | Low: PM suspend is disabled in `libvirt.tmpl`, `SHUTDOWN` is transient. Recorded so the audit phase can confirm it was considered. |
+| F9 | `util/libvirt.py` `extract_power_state()` | `SHUTDOWN` and `NOSTATE` map to `on`, `PMSUSPENDED` to `paused`; `extract_power_state_pretty()` raises `KeyError` on an unknown enum. | Low: PM suspend is disabled in `libvirt.tmpl`, `SHUTDOWN` is transient. Phase 4 re-read it and left it deliberately: `SHUTDOWN` is the only reachable folded state, and every decision built on it matches libvirt's own answer or is corrected by the next cleaner pass. |
 | F10 | `instance.py` `_power_on_inner()`, `power_off()` | `setAutostart(1)` is called on every power on and nothing ever clears it; `power_off()` only calls `destroy()`. | After a hypervisor reboot libvirtd starts every instance ever powered on, including those the user powered off, and the database says `off` until the cleaner rewrites it. It also means sf-queues restore (F2) has no job: a restart of sf-queues or libvirtd leaves domains running, and autostart covers a reboot. Nothing in the deployer configures `libvirt-guests`, so the distribution default applies. |
 | F11 | `daemons/cleaner/scheduled_tasks.py` ~lines 246-266 | The second loop's `delete-wait` branch rmtree's files, undefines the domain and sets `state = deleted` by hand, bypassing `_delete_globally()`. `_instance_delete` then returns early because the instance is already deleted (`node_inst_op.py:193`). | Dead today (F1). Once F1 is fixed, a powered off instance left in `delete-wait` for five minutes by a queue backlog leaks its ports, placement, references and agent operations. |
 | F12 | the power endpoints | `requires_instance_active` answers 406 for any state other than `created`, but none of the six power endpoints (soft and hard reboot, power on and off, pause and unpause) declares 406 in its `swag_from`. Three non-power endpoints share the gap ([#4449](https://github.com/shakenfist/shakenfist/issues/4449)). | The published API is incomplete. |
@@ -230,8 +230,8 @@ phases 0, 1b and 3 all rely on `create()` failing when power on fails.
 | 1a. Honest libvirt domain listing | [PLAN-power-state-correctness-phase-01a-listing.md](PLAN-power-state-correctness-phase-01a-listing.md) | Complete | `8aa69c5e4` |
 | 1b. The cleaner sees powered off domains | [PLAN-power-state-correctness-phase-01b-inactive-domains.md](PLAN-power-state-correctness-phase-01b-inactive-domains.md) | Complete | `447ed75ae` |
 | 2. Autostart and instance restore | [PLAN-power-state-correctness-phase-02-autostart-restore.md](PLAN-power-state-correctness-phase-02-autostart-restore.md) | Complete | `776dc9e70` |
-| 3. Power operations answer truthfully | [PLAN-power-state-correctness-phase-03-power-api.md](PLAN-power-state-correctness-phase-03-power-api.md) | In progress | — |
-| 4. Push audit | PLAN-power-state-correctness-phase-04-push-audit.md | Not started | — |
+| 3. Power operations answer truthfully | [PLAN-power-state-correctness-phase-03-power-api.md](PLAN-power-state-correctness-phase-03-power-api.md) | Complete | `d3d5f15ca` |
+| 4. Push audit | [PLAN-power-state-correctness-phase-04-push-audit.md](PLAN-power-state-correctness-phase-04-push-audit.md) | Complete | — |
 
 Each phase that changes behaviour lands its functional tests with it,
 rather than leaving them to a trailing test phase.
@@ -449,11 +449,33 @@ has the detail as S1 to S8 and D1 to D8.
   delete.** Making them raise must not change either (S4, D1, D2).
 * **Guest CI tests already use node exec**, since phase 2 (S8).
 
+Landed as [#4468](https://github.com/shakenfist/shakenfist/pull/4468).
+Functional run
+[37366539008](https://github.com/shakenfist/shakenfist/actions/runs/37366539008)
+passed the new pause and failed power on tests on a real hypervisor. An
+earlier run found D9: a short pause stranded `agent_state` at "no
+contact", because the sidechannel monitor writes it only when its cached
+view changes. `unpause()` now restarts the instance's monitor, and a
+reply-gap check covers freezes that bypass unpause. Phase 2's `stopped`
+flag in `power_off()` was removed, because every path which did not stop
+the domain now raises before reading it.
+
 ### Phase 4: push audit
 
 Run `PUSH-AUDIT.md` over the accumulated diff of phases 0 to 3, as
 recorded in the `Merged` column. Re-read F9 and record whether it was
 deliberately left alone.
+
+The phase survey added two things to this section; the phase plan has
+the detail as S1 to S5.
+
+* **Two plan-document merges are not phases**, but are audited too:
+  `6c5807018` (#4310, this plan) and `304c6ca51` (#4405, the phase 2
+  plan). The documentation lens reads them (S1).
+* **F9 is no longer a dormant mapping.** Phase 3 made
+  `extract_power_state()` the success oracle for pause and unpause, so
+  re-reading F9 means checking each decision built on it, not only the
+  mapping (S2).
 
 <!-- shared-block: plan-push-audit-phase v3 -->
 Push audit phase (shared block; do not edit -- the canonical
@@ -848,18 +870,70 @@ We should list obvious extensions, known issues, unrelated bugs we
 encountered, and anything else we should one day do but have
 chosen to defer to here, so that we do not forget them.
 
-- F9, the mapping of libvirt's rarer states, unless phase 4 decides
-  otherwise.
-- A CI check that no unit-test fake returns inactive domains from an
-  active-domain listing, if phase 1a's rewrite shows the mistake is easy
-  to reintroduce.
-- An API-only way to make instance creation fail on demand, so the
-  failed-create path can be tested functionally without node exec. A
-  garbage UEFI `nvram_template` might make qemu refuse the domain; that
-  is unverified and needs a spike.
+Consolidated by phase 4 from this plan and its phase plans, each
+checked against `develop`.
+
+Live defects, each filed:
+
+- [#4486](https://github.com/shakenfist/shakenfist/issues/4486): delete
+  removes an instance's disks while its domain is still running, after
+  `destroy()` failed twice. This replaces phase 3's entry, which said
+  delete undefines the running domain.
+- [#4485](https://github.com/shakenfist/shakenfist/issues/4485):
+  `agent_state` can read ready while an instance is paused or off,
+  through sidechannel monitor writes which race the power methods.
+
+Still to observe:
+
+- **S3, what the cleaner's inactive domain branches do in production.**
+  They had not fired once on sfcbr by 2026-10-07. Re-run phase 4's 4h
+  queries after a week or two on a build carrying phases 1b to 3.
+
+Known limitations:
+
+- [#3373](https://github.com/shakenfist/shakenfist/issues/3373)'s
+  remainder: make every non-retryable lookup error raise, then delete
+  the `strict` keyword.
+- Stray domains of instances whose delete ended in state `error` are
+  recorded `off`, not deleted (phase 1b D9).
+- Inactive domains of errored instances keep autostart (phase 2 S9).
+- Whether libvirt keeps an inactive domain's shutoff reason across a
+  libvirtd restart is untested.
+- The cleaner's `crashed` branch has no re-entry guard. It is
+  unreachable while `on_crash` is `restart`.
+- Domains with a managed save image cannot be undefined without
+  `VIR_DOMAIN_UNDEFINE_MANAGED_SAVE`. They are only reachable if an
+  operator changes the libvirt-guests default.
+- `NodeLock` has no recovery when its holder dies.
+- Three non-power endpoints do not declare 406
+  ([#4449](https://github.com/shakenfist/shakenfist/issues/4449)).
+- Unpause does not recover a crashed guest
+  ([#2241](https://github.com/shakenfist/shakenfist/issues/2241)).
 - Whether `instances_total` in the resources daemon should count
-  defined-but-inactive domains (open question 4). This plan keeps
+  defined but inactive domains (open question 4). This plan keeps
   today's semantics.
+
+Extensions:
+
+- A node lifecycle test which reboots a hypervisor with one running and
+  one powered off instance, and checks which comes back.
+- An API-only way to make instance creation fail on demand, so that the
+  failed-create path can be tested without node exec. A garbage UEFI
+  `nvram_template` might work, but that needs a spike.
+- A memory exhaustion signal for power on, belonging with the placement
+  ledger.
+- Clean-ups ([#4487](https://github.com/shakenfist/shakenfist/issues/4487)):
+  - one matcher for libvirt's "domain is not running";
+  - fewer copies of pause and unpause;
+  - one CI node lookup;
+  - the dead `message` parameter of `_await_instance_event()`.
+- `_await_image_event()` in `shakenfist_ci/base.py` matches an
+  `operation` field which events do not have, and has no callers.
+  Delete it or fix it.
+- Splitting `instance.py`'s power operations into their own module.
+
+Resolved: F9 was re-read and deliberately left alone. A CI check for
+unit test fakes was judged unwarranted (phase 4, 4d).
 
 ### Bugs fixed during this work
 
@@ -874,6 +948,19 @@ while planning it.
   string, fixed by
   [#4309](https://github.com/shakenfist/shakenfist/pull/4309) before this
   plan's phases started. It is what prompted the plan.
+- Found and fixed by the phase 4 push audit:
+  - The database daemon's `GetInstance` ignored `strict`, so a MariaDB
+    error read as "not found" to the cleaner's guard against deleting a
+    real instance.
+  - Power on stranded `agent_state` at "no contact" when the agent
+    monitor had already handshaken.
+  - The cleaner's active loop could record `off` itself, skipping the
+    detected power off.
+  - Unpause answered 500 when libvirt said the domain was already
+    running.
+  - One failing domain ended the cleaner's whole pass.
+  - Failed power on and power off returned libvirt's error text,
+    including host paths.
 
 Related issues:
 

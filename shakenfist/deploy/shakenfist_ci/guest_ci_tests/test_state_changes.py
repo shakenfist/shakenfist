@@ -187,14 +187,12 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
 
     def test_lifecycle_power_off_clears_autostart(self):
-        # F10/D1: libvirt's autostart flag says whether a domain should be
+        # Libvirt's autostart flag says whether a domain should be
         # running, and is what starts it again after a hypervisor reboot.
         # Power on sets it, power off clears it. Node exec is unproven in
         # the Guests suite, so this skips loudly rather than silently when
         # it cannot run commands on the instance's hypervisor -- see
-        # _require_node_exec()'s docstring. See
-        # docs/plans/PLAN-power-state-correctness-phase-02-autostart-restore.md,
-        # D1 and D7.
+        # _require_node_exec()'s docstring.
         inst = self._start_target('autostart')
         node = self._node_by_uuid(inst['node'])
         self._require_node_exec(node)
@@ -203,7 +201,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             self._domain_autostart(node, inst['uuid']),
             'Autostart should be enabled after create')
 
-        # D3: every SF daemon, including the cleaner, is ordered after
+        # Every SF daemon, including the cleaner, is ordered after
         # libvirt-guests.service, so that systemd stops the cleaner before
         # libvirt-guests shuts guests down at host shutdown. Without that
         # ordering, a reboot could have the cleaner record every guest as
@@ -213,9 +211,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             node, ['systemctl', 'show', '-p', 'After', 'sf-cleaner.service'])
         self.assertIn(
             'libvirt-guests.service', stdout,
-            'sf-cleaner.service should be ordered After libvirt-guests.service '
-            '(D3 in '
-            'docs/plans/PLAN-power-state-correctness-phase-02-autostart-restore.md), '
+            'sf-cleaner.service should be ordered After libvirt-guests.service, '
             'got: %s' % stdout)
 
         self.test_client.power_off_instance(inst['uuid'])
@@ -269,20 +265,18 @@ class TestStateChanges(base.BaseNamespacedTestCase):
 
     def test_lifecycle_pause_semantics(self):
         # One instance covers every pause/unpause edge the power API
-        # defines (D3 and D5 in
-        # docs/plans/PLAN-power-state-correctness-phase-03-power-api.md),
-        # rather than one each, to keep the Guests suite's capacity
-        # footprint down (functional run 37285857342 ran the suite out of
-        # cpus headroom with four pause/power-on tests each starting their
-        # own instance).
+        # defines, rather than one each, to keep the Guests suite's
+        # capacity footprint down (functional run 37285857342 ran the
+        # suite out of cpus headroom with four pause/power-on tests each
+        # starting their own instance).
         #
-        # Part 1: pause is idempotent (D5), power on of a paused instance
-        # is refused (D3) and leaves it paused, and unpause is idempotent
-        # (D5) and leaves the instance usable again. The final unpause and
-        # ready-wait is also the regression check for the sidechannel fix
-        # in df54e28f4: a short pause left the agent monitor's cache
-        # stale, stranding agent_state at "no contact" rather than
-        # recovering to ready.
+        # Part 1: pause is idempotent, power on of a paused instance is
+        # refused and leaves it paused, and unpause is idempotent and
+        # leaves the instance usable again. The final unpause and
+        # ready-wait is also the regression check for the unpause monitor
+        # restart: a short pause left the agent monitor's cache stale,
+        # stranding agent_state at "no contact" rather than recovering to
+        # ready.
         inst = self._start_target('pausesemantics')
         ip = self.test_client.get_instance_interfaces(inst['uuid'])[0]['ipv4']
 
@@ -318,9 +312,9 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             self._assert_power_state(
                 inst['uuid'], 'on', 'after second unpause')
 
-            # Regression check for df54e28f4: a pause this short must not
-            # strand agent_state, so the instance must still come back
-            # ready.
+            # Regression check for the unpause monitor restart: a pause
+            # this short must not strand agent_state, so the instance
+            # must still come back ready.
             self._await_instance_ready(inst['uuid'])
             self._test_ping(inst['uuid'], self.net['uuid'], ip, True)
 
@@ -359,13 +353,12 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self._assert_power_state(inst['uuid'], 'off', 'after rejected unpause')
 
     def test_lifecycle_power_on_failure(self):
-        # D1: a power on which fails on the hypervisor answers 500 rather
+        # A power on which fails on the hypervisor answers 500 rather
         # than success, and does not record the instance as on. A missing
         # root disk makes every start attempt fail. Node exec is unproven in
         # the Guests suite, so this skips loudly rather than silently when
         # it cannot run commands on the instance's hypervisor -- see
-        # _require_node_exec()'s docstring. See
-        # docs/plans/PLAN-power-state-correctness-phase-03-power-api.md.
+        # _require_node_exec()'s docstring.
         inst = self._start_target('poweronfail')
         node = self._node_by_uuid(inst['node'])
         self._require_node_exec(node)
@@ -428,7 +421,8 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         """Return the libvirt shutoff reason on a 'detected poweroff' event.
 
         _await_power_off() only returns the matching event's timestamp,
-        which is all D7's write-order guarantee needs. Reading the reason
+        which is all the cleaner's write order (power state, then agent
+        state, then the event) needs. Reading the reason
         out of extra means re-reading the instance's events for the same
         event. The event's human-readable label -- 'detected poweroff' --
         is carried in the events API response's 'message' field: there is
@@ -453,8 +447,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         # A guest which powers itself off (as opposed to being destroyed by
         # our power_off() API) is only ever noticed by the cleaner's second
         # loop, on its next pass -- there is no synchronous write the API
-        # can wait on. See phase 1b's D7 and S11 in
-        # docs/plans/PLAN-power-state-correctness-phase-01b-inactive-domains.md.
+        # can wait on.
         inst = self._start_target('guestpoweroff')
         last_boot = inst['agent_system_boot_time']
         self.assertNotIn(last_boot, [None, 0])
@@ -468,7 +461,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
 
         self._await_power_off(inst['uuid'], after=after)
         # A single read is valid here: the cleaner writes power_state before
-        # it writes agent_state or the event (D7), and _await_power_off()
+        # it writes agent_state or the event, and _await_power_off()
         # above already waited for the event.
         self._assert_power_state(inst['uuid'], 'off', 'after guest power off')
 
@@ -524,24 +517,23 @@ class TestStateChanges(base.BaseNamespacedTestCase):
             'A killed qemu should leave the instance in state created, '
             'not change it')
 
-        # D7 deliberately does not verify this against a real hypervisor
-        # before now: mapping CRASHED to 'crashed' was unverified survey
-        # text, not a decision anything branches on. Do not weaken this
-        # assertion to make a flaky run pass -- if libvirt reports a
-        # different reason here, D7 and docs/operator_guide/power_states.md
-        # need to be revisited, not this test.
+        # This test deliberately does not verify the reason against a real
+        # hypervisor before now: mapping CRASHED to 'crashed' was
+        # unverified survey text, and nothing branches on this reason. Do
+        # not weaken this assertion to make a flaky run pass -- if libvirt
+        # reports a different reason here,
+        # docs/operator_guide/power_states.md needs to be revisited, not
+        # this test.
         self.assertEqual(
             'crashed', self._detected_poweroff_reason(inst['uuid'], after),
             "A killed qemu should record libvirt's shutoff reason as "
             "'crashed'")
 
-        # D2: the cleaner clears autostart on an inactive domain it finds
+        # The cleaner clears autostart on an inactive domain it finds
         # off, in the same locked block as the 'detected poweroff' event it
-        # has already written (D6), so one pass should be enough. Poll
+        # has already written, so one pass should be enough. Poll
         # anyway, since _await_power_off() above only waited for the event,
         # not for the autostart clear that follows it in the same block.
-        # See docs/plans/PLAN-power-state-correctness-phase-02-autostart-restore.md,
-        # D2 and D6.
         deadline = time.time() + 120
         autostart = self._domain_autostart(node, inst['uuid'])
         while autostart and time.time() < deadline:
@@ -550,7 +542,7 @@ class TestStateChanges(base.BaseNamespacedTestCase):
         self.assertFalse(
             autostart,
             'Autostart was not cleared within 120s of the cleaner detecting '
-            'the killed qemu as a power off (D2)')
+            'the killed qemu as a power off')
 
 
 class TestDetectReboot(base.BaseNamespacedTestCase):

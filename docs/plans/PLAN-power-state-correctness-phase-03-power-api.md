@@ -654,4 +654,7 @@ after clients have seen them. Steps 2 and 4 are unaffected by either.
 * Delete undefines a domain whose `destroy()` failed, which turns a
   running persistent domain transient and leaves it running. This is
   pre-existing, found by this survey (S4), and unchanged here.
+  Phase 4 corrected this: the undefine is skipped, because
+  `power_off()` now raises, but the disks are still removed. Tracked as
+  [#4486](https://github.com/shakenfist/shakenfist/issues/4486).
 * Automatic recovery of a crashed guest on unpause (#2241, D7).

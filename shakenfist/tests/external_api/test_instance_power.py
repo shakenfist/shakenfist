@@ -63,8 +63,9 @@ class InstancePowerEndpointTestCase(base.ShakenFistTestCase):
 
 
 class InstancePowerOnEndpointTestCase(InstancePowerEndpointTestCase):
-    """A power on which failed answers 500 with the hypervisor's last error,
-    not 200 with a null body (F4).
+    """A power on which failed answers 500, not 200 with a null body.
+    The hypervisor's last error goes in an audit event, not the response,
+    because it can name host paths.
     """
 
     def _power_on(self, **power_on_kwargs):
@@ -78,18 +79,21 @@ class InstancePowerOnEndpointTestCase(InstancePowerEndpointTestCase):
         self.assertEqual(200, resp.status_code, resp.get_json())
         self.assertIsNone(resp.get_json())
 
-    def test_failed_power_on_answers_500_with_the_error(self):
+    def test_failed_power_on_answers_500_and_records_the_error(self):
+        error = ('unhandled instance start error: Cannot access storage file '
+                 '/srv/shakenfist/instances/abc/vda')
         resp = self._power_on(side_effect=exceptions.InstancePowerOnFailed(
-            'unhandled instance start error: no disk'))
+            error))
 
         self.assertEqual(500, resp.status_code)
         self.assertEqual(
-            'instance failed to power on: unhandled instance start error: '
-            'no disk', resp.get_json()['error'])
+            'instance failed to power on, see the instance events for '
+            'details', resp.get_json()['error'])
+        self.assertNotIn('/srv/shakenfist', resp.get_data(as_text=True))
         eventlog.add_event_multi.assert_any_call(
             EVENT_TYPE_AUDIT, [('instance', UUID(self.instance_uuid))],
             'power on failed', duration=None,
-            extra={'error': 'unhandled instance start error: no disk'},
+            extra={'error': error},
             suppress_event_logging=False, log_as_error=False)
 
     def test_paused_instance_answers_409(self):
@@ -100,8 +104,9 @@ class InstancePowerOnEndpointTestCase(InstancePowerEndpointTestCase):
 
 
 class InstancePowerOffEndpointTestCase(InstancePowerEndpointTestCase):
-    """A power off which left the instance running answers 500 with
-    destroy()'s error, not 200 with the instance recorded as off (F5).
+    """A power off which left the instance running answers 500, not 200
+    with the instance recorded as off. destroy()'s error goes in an
+    audit event, not the response, because it can name host paths.
     """
 
     def _power_off(self, **power_off_kwargs):
@@ -115,24 +120,27 @@ class InstancePowerOffEndpointTestCase(InstancePowerEndpointTestCase):
         self.assertEqual(200, resp.status_code, resp.get_json())
         self.assertIsNone(resp.get_json())
 
-    def test_failed_power_off_answers_500_with_the_error(self):
+    def test_failed_power_off_answers_500_and_records_the_error(self):
+        error = ('internal error: process /usr/bin/qemu-system-x86_64 '
+                 'did not exit')
         resp = self._power_off(side_effect=exceptions.InstancePowerOffFailed(
-            'internal error: something else entirely'))
+            error))
 
         self.assertEqual(500, resp.status_code)
         self.assertEqual(
-            'instance failed to power off: internal error: something else '
-            'entirely', resp.get_json()['error'])
+            'instance failed to power off, see the instance events for '
+            'details', resp.get_json()['error'])
+        self.assertNotIn('qemu-system', resp.get_data(as_text=True))
         eventlog.add_event_multi.assert_any_call(
             EVENT_TYPE_AUDIT, [('instance', UUID(self.instance_uuid))],
             'power off failed', duration=None,
-            extra={'error': 'internal error: something else entirely'},
+            extra={'error': error},
             suppress_event_logging=False, log_as_error=False)
 
 
 class InstancePauseUnpauseEndpointTestCase(InstancePowerEndpointTestCase):
     """Pausing or unpausing a powered off instance answers 409, not the
-    generic 500 a leaked libvirtError would give (F6, F7).
+    generic 500 a leaked libvirtError would give.
     """
 
     def test_pause_of_powered_off_instance_answers_409(self):

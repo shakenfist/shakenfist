@@ -2463,8 +2463,12 @@ class Instance(dbowo):
                 return True
 
             # The domain has just started, so whatever the agent said
-            # before no longer holds.
+            # before no longer holds. A monitor which handshook with the
+            # new guest between create() and this write cached "ready" and
+            # will not write it again, so have it restarted to correct the
+            # "no contact" written here.
             self.agent_state = constants.AGENT_NEVER_TALKED
+            self._restart_sidechannel_monitor('from power on')
             self.add_event(
                 EVENT_TYPE_AUDIT, 'poweron',
                 extra={'libvirt_requested_at': libvirt_requested_at,
@@ -2501,16 +2505,15 @@ class Instance(dbowo):
                     self._check_domain_stopped_after_failed_destroy(lc, inst, e)
 
             # Autostart is the only thing which restarts this domain after a
-            # hypervisor reboot (S2 in docs/plans/PLAN-power-state-correctness-
-            # phase-02-autostart-restore.md), so clear it to keep a powered
-            # off instance off. A failure is recorded rather than raised (D5):
-            # the domain is off either way, and the cleaner retries the clear.
+            # hypervisor reboot, so clear it to keep a powered off instance
+            # off. A failure is recorded rather than raised: the domain is
+            # off either way, and the cleaner retries the clear.
             #
             # Only a domain which did stop reaches here. If destroy() failed
             # and the domain is still running, it must keep the flag, because
             # nothing ever sets it again on a running domain:
             # _check_domain_stopped_after_failed_destroy() raises in that case
-            # (F5) rather than letting it be recorded as off.
+            # rather than letting it be recorded as off.
             try:
                 inst.setAutostart(0)
             except lc.libvirt.libvirtError as e:
@@ -2524,8 +2527,7 @@ class Instance(dbowo):
 
     def _check_domain_stopped_after_failed_destroy(self, lc, domain, error):
         # destroy() can fail after the domain has stopped, so ask libvirt
-        # whether it is still running before deciding what to record (D2 in
-        # docs/plans/PLAN-power-state-correctness-phase-03-power-api.md).
+        # whether it is still running before deciding what to record.
         # Returns if the domain did stop. Otherwise raises, leaving autostart
         # and agent_state alone, because the instance is not off.
         try:
@@ -2650,16 +2652,7 @@ class Instance(dbowo):
                 return
 
             attempts = 1
-            try:
-                inst.resume()
-            except lc.libvirt.libvirtError as e:
-                # The domain can shut off between the isActive() check above
-                # and the resume attempt.
-                if 'domain is not running' in str(e):
-                    raise exceptions.InvalidLifecycleState(
-                        'you cannot unpause a powered off instance') from e
-                raise
-            self.add_event(EVENT_TYPE_AUDIT, 'unpause', extra={'attempt': attempts})
+            self._resume_for_unpause(lc, inst, attempts)
 
             while lc.extract_power_state(inst) != 'on':
                 if attempts > 2:
@@ -2669,29 +2662,47 @@ class Instance(dbowo):
 
                 time.sleep(1)
                 attempts += 1
-                try:
-                    inst.resume()
-                except lc.libvirt.libvirtError as e:
-                    if 'domain is not running' in str(e):
-                        raise exceptions.InvalidLifecycleState(
-                            'you cannot unpause a powered off instance') from e
-                    raise
-                self.add_event(EVENT_TYPE_AUDIT, 'unpause', extra={'attempt': attempts})
+                self._resume_for_unpause(lc, inst, attempts)
 
             self.update_power_state('on')
             self.agent_state = constants.AGENT_NEVER_TALKED
-            self._restart_sidechannel_monitor()
+            self._restart_sidechannel_monitor('from unpause')
 
-    def _restart_sidechannel_monitor(self):
-        # The write of AGENT_NEVER_TALKED above is only corrected if the
-        # sidechannel monitor notices the agent's state may have changed,
-        # and it caches that state, writing agent_state only when its
-        # cached view changes. A pause long enough for the sidechannel
-        # daemon to see has already had the monitor torn down, so the
-        # next one starts afresh; a short one leaves the old monitor
-        # running with its cache still at ready, and the database at
-        # "no contact" for good. Setting the monitor's abort file has the
-        # daemon replace it whatever the length of the pause: the monitor
+    def _resume_for_unpause(self, lc, inst, attempt):
+        """Ask libvirt to resume a paused domain, for unpause().
+
+        A domain which is already running is the state unpause() wants, so
+        libvirt refusing to resume it is not an error: the state read
+        before this call can race a resume which landed after it, from an
+        earlier attempt or from another caller, and raising would answer
+        an error for an unpause which happened. The caller's next state
+        read sees the domain running.
+        """
+        try:
+            inst.resume()
+        except lc.libvirt.libvirtError as e:
+            # The domain can shut off between the isActive() check in
+            # unpause() and the resume attempt.
+            if 'domain is not running' in str(e):
+                raise exceptions.InvalidLifecycleState(
+                    'you cannot unpause a powered off instance') from e
+            if 'domain is already running' in str(e):
+                return
+            raise
+        self.add_event(EVENT_TYPE_AUDIT, 'unpause', extra={'attempt': attempt})
+
+    def _restart_sidechannel_monitor(self, source):
+        # A write of AGENT_NEVER_TALKED, by unpause() or a power on which
+        # started the domain, is only corrected if the sidechannel monitor
+        # notices the agent's state may have changed, and it caches that
+        # state, writing agent_state only when its cached view changes.
+        # A pause long enough for the sidechannel daemon to see has
+        # already had the monitor torn down, so the next one starts
+        # afresh; a short one leaves the old monitor running with its
+        # cache still at ready, and the database at "no contact" for good.
+        # A power on strands it the same way when a monitor handshook with
+        # the new guest before the write. Setting the monitor's abort file
+        # has the daemon replace it whatever the timing: the monitor
         # exits, is reaped, and its replacement re-handshakes with the
         # agent and writes what it finds.
         #
@@ -2702,14 +2713,15 @@ class Instance(dbowo):
         #
         # This runs on the hypervisor, which is the only place the file
         # means anything. Without /run/sf there is no sidechannel daemon
-        # to tell, and a failure to write is not a failure to unpause: the
-        # guest is running, and the monitor's reply gap check is a
-        # backstop for a pause long enough to show as a gap in replies.
+        # to tell, and a failure to write is not a failure to unpause or
+        # power on: the guest is running, and the monitor's reply gap
+        # check is a backstop for a pause long enough to show as a gap in
+        # replies.
         abort_path = daemon.sidechannel_abort_path(self.uuid)
         if not os.path.isdir(os.path.dirname(abort_path)):
             return
         try:
-            daemon.set_abort_path(abort_path, 'from unpause')
+            daemon.set_abort_path(abort_path, source)
         except OSError as e:
             LOG.with_fields({
                 'instance': self.uuid,
