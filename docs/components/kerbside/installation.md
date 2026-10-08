@@ -414,3 +414,21 @@ If you ran v0.6.0 or earlier:
 The credentials being rotated are management plane accounts on the
 cloud Kerbside proxies for, so they are worth treating as a real
 exposure rather than a formality.
+
+### Upgrading past admin-only direct consoles
+
+Earlier releases let any logged in user download a direct `.vv` file
+for any console from the consoles page's Direct button. That file
+points the client straight at the hypervisor with the hypervisor's own
+SPICE ticket, so it bypasses the proxy's firewall, session tracking and
+termination entirely.
+
+Direct console access is now restricted to members of the Keystone
+group named by `KEYSTONE_ADMIN_GROUP`, which defaults to empty. After
+upgrading, nobody can use direct access until you set it. If you rely on
+direct `.vv` files, create or choose a Keystone group for the users who
+should have them and set `KEYSTONE_ADMIN_GROUP` to its name; everyone
+else keeps using the proxied download. Membership is read at login, so
+a user gains or loses direct access when their current session expires
+(`API_TOKEN_DURATION`) and they log in again. See
+[the configuration reference](/components/kerbside/configuration/#keystone-settings).

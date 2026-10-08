@@ -42,6 +42,7 @@ These settings configure Keystone integration for OpenStack deployments.
 | KEYSTONE_SERVICE_AUTH_PROJECT | String (default "admin") | The project the service account resides in. |
 | KEYSTONE_SERVICE_AUTH_PROJECT_DOMAIN_ID | String (default "default") | The project domain the service account resides in. |
 | KEYSTONE_ACCESS_GROUP | String (default "kerbside") | The Keystone group that users wishing to access the VDI proxy administrative interface or REST API must be a member of. |
+| KEYSTONE_ADMIN_GROUP | String (default empty) | The Keystone group whose members are Kerbside administrators. Only administrators may fetch a direct console file from `/console/direct/<source>/<uuid>/console.vv`, which points the client at the hypervisor with the hypervisor's own SPICE ticket and so bypasses the proxy's firewall, session tracking and termination; everyone else receives a 403, and is not shown the Direct button. Empty means nobody is an administrator. Before this setting existed every logged in user could fetch a direct file, so a deployment that relies on direct access must set it when upgrading. Membership is checked at login and carried in the session, so removing a user from the group takes effect only when their current session expires (`API_TOKEN_DURATION`) and they log in again; until then they can still fetch direct files. Issued and refused direct requests are recorded in the console's audit events. A configured group that does not exist in Keystone is logged as an error and makes nobody an administrator. |
 
 ## Network Settings
 

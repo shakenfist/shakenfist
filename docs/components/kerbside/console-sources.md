@@ -52,6 +52,18 @@ The one exception is a source removed from `sources.yaml` altogether. It is
 deleted along with its consoles, because nothing will ever scrape it again
 and its consoles would otherwise be orphaned.
 
+That exception is why a `sources.yaml` which cannot be used at all changes
+nothing. If the file is missing, unreadable or not valid YAML, if it is not
+a list, or if any entry is not a mapping or lacks a `source` or `type` key,
+the pass logs why and stops before touching the database: every source and
+console stays as the last pass which loaded the file left them, and the
+next pass, a minute later, tries again. Reconciling against such a file
+would read it as "no sources" and delete the lot. An empty file is refused
+the same way, since a truncated file is the likelier cause; a deployment
+which really has no sources says so with `[]`. The YAML error is logged by
+problem, line and column only -- never the offending line itself, which in
+this file may well hold a password.
+
 Erroring still marks the source as errored in the administrative interface,
 which is where a persistent failure should be diagnosed from. Retaining
 consoles is not the same as reporting the source as healthy.
@@ -224,10 +236,11 @@ mapping entirely from an inline `consoles:` list in the sources.yaml
 entry.  No external API calls are made and no control plane is needed.
 
 The list is re-read at startup and once per 60-second maintenance
-cycle, so adding or removing an entry takes effect without a restart.
-Editing the `ticket` of an entry which already exists does not: it is
-discarded rather than applied (issue #463), and changing one means
-removing the entry, letting the removal land, and adding it back.
+cycle, so adding, removing or editing an entry takes effect without a
+restart. An edited entry is applied in place, and logged and audit
+logged as `Console configuration changed` with the names of the fields
+that changed -- `ticket` among them when the password was rotated, but
+never its value.
 
 It is intended for CI pipelines that boot a QEMU guest directly and
 need kerbside to front it — the direct-qemu CI workflow uses this
@@ -248,13 +261,13 @@ The following options are used to configure a static console source
 | source | The name of the source (used as an identifier) |
 | type | The type of the source: `static` |
 | ca_cert | PEM CA certificate used to verify the target's TLS certificate when the proxy escalates to the secure port.  Required for any console in this source which declares a `secure_port`; without it the target is verified against the public web trust store, which an internal certificate will not satisfy |
-| consoles | A list of console entry dicts (see fields below) |
+| consoles | A list of console entry dicts (see fields below). Required: a source with no `consoles` key, or a misspelled one, is marked errored and keeps the consoles it had published. Write `consoles: []` for a source with no consoles, which deletes any it had |
 
 Each entry in the `consoles` list requires the following fields:
 
 | Field | Description |
 |-------|-------------|
-| uuid | Unique identifier for this console (must be globally unique) |
+| uuid | Identifier for this console, unique within this source; another source may use the same one without the two colliding |
 | name | Human-readable display name |
 | hypervisor | Hostname of the hypervisor (used if hypervisor_ip is empty) |
 | hypervisor_ip | IP address of the hypervisor |
@@ -267,6 +280,17 @@ Optional fields (default to null):
 |-------|-------------|
 | secure_port | SPICE TLS port (if QEMU exposes one) |
 | host_subject | TLS host subject for certificate verification. Enforced: when set, the proxy refuses hypervisors whose certificate subject does not match (exact attribute count/order/type). |
+
+Kerbside reads every unquoted number in `sources.yaml` exactly as it is
+written. A text field such as `ticket: 012345` is the text `012345`, not
+the octal number 5349 that YAML 1.1 would make of it, and the same holds
+for spellings like `0x1F`, `1_000` and `12:34`. A port may be quoted or
+not, as long as it is a whole number from 1 to 65535. Any other type -- a
+list, a mapping, a boolean, a port that is not one -- marks the source
+errored, and it keeps the consoles it had published. The same
+rule applies to the fields every source shares (`source`, `type`, `url`,
+`username`, `password` and the like), except that a bad one refuses the
+whole file and keeps the last configuration that loaded.
 
 **Example sources.yaml entry for a static source:**
 
