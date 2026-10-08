@@ -284,8 +284,9 @@ class NodeInstNetdescOp(BaseClusterOperation):
                 # Every candidate was refused by the capacity guard,
                 # which is the same fact the create path publishes as
                 # the capacity_guard stage. The message is unchanged;
-                # the stage is carried alongside it so no handler has
-                # to parse it back out (D30).
+                # the stage is carried alongside it so that a future
+                # handler need not parse it back out (D30). Nothing
+                # reads it today: this raise never reaches the API.
                 raise LowResourceException(
                     'No node had capacity for this instance, '
                     f'{len(denials)} candidates refused it',

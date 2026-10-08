@@ -506,7 +506,8 @@ for the full readings.
   and the caller must error the operation out. All three waits phase 2
   actually measured (190.5 s, 160.4 s, 140.6 s) are longer than that
   entire budget, so "the machinery exists" is true but would give up
-  before the shortest recorded wait had cleared. A queue needs its own
+  before the shortest wait phase 2 measured had cleared. A queue needs
+  its own
   schedule; the re-enqueue is not the hard part.
 * The IPAM concern is confirmed and is structural rather than
   incidental. `_netdesc_allocate_address()` reserves the address and is
@@ -587,8 +588,8 @@ spelling above is the one to write.
 | 3. Publish metrics when the running-domain set changes | [PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md](PLAN-transient-capacity-refusals-phase-03-metrics-on-change.md) | Complete | `03cd7be3a` (#4200) |
 | 4. `Retry-After` and a machine-readable transient refusal, with an opt-in client retry | [PLAN-transient-capacity-refusals-phase-04-retry-after.md](PLAN-transient-capacity-refusals-phase-04-retry-after.md) | Complete | `565e36e6e` (#4241), client-python `74d6e129b` (client-python#399) |
 | 5. Decide on server-side queued placement from the phase 2 data | [PLAN-transient-capacity-refusals-phase-05-queue-decision.md](PLAN-transient-capacity-refusals-phase-05-queue-decision.md) | Complete | `b398cb890` (#4362), `a5e4a5e8c` (#4390), `48584e589` (#4406) |
-| 6. Documentation and close-out | [PLAN-transient-capacity-refusals-phase-06-docs.md](PLAN-transient-capacity-refusals-phase-06-docs.md) | Complete | — |
-| 7. Push audit | PLAN-transient-capacity-refusals-phase-07-push-audit.md | Not started | — |
+| 6. Documentation and close-out | [PLAN-transient-capacity-refusals-phase-06-docs.md](PLAN-transient-capacity-refusals-phase-06-docs.md) | Complete | `c08196b19` (#4448) |
+| 7. Push audit | [PLAN-transient-capacity-refusals-phase-07-push-audit.md](PLAN-transient-capacity-refusals-phase-07-push-audit.md) | Complete | — |
 
 The `Merged` column records what put each phase on `develop`: the
 merge commit of its pull request, or an explicit `first..last`
@@ -961,18 +962,30 @@ request, and the plan is not complete until each is resolved or
 declined in writing here. If the audit finds nothing, that is
 recorded in one sentence.
 
-Phase 2 may land partly outside this repository: its suite wrapper
-touches the CI harness. Where it does, its row names the
-repository, and that half is audited against that repository's
-default branch as part of the pull request that lands it, with this
-phase citing that audit rather than re-running it.
+One phase landed partly outside this repository, and it is phase 4
+rather than phase 2 as this section first guessed: phase 2's suite
+wrapper touches the CI harness, but that harness lives here
+(`shakenfist/deploy/shakenfist_ci/`), so both of phase 2's merges are
+in-repository. Phase 4's opt-in client retry is the half that landed
+elsewhere, as `client-python` `74d6e129b` (client-python#399).
 
-Phase 5 is a different situation needing a different response. It
-is a decision phase which may produce no code at all, and if it
-closes as Abandoned there is nothing here for the audit to read.
-That is recorded as such -- an audit which says what it had no
-diff to scope over is a result; one which reports a clean run over
-an empty range is not.
+This section originally said that half is audited against that
+repository's default branch as part of the pull request that lands
+it, and cited here rather than re-run. Phase 7's survey found there
+is no such audit and none can be cited: `client-python` carries no
+`PUSH-AUDIT.md`. That range is therefore audited from here, which
+phase 7 records as D53 and flags as its most arguable decision.
+
+Phase 5 is a different situation needing a different response. It is
+a decision phase, and it produced no code at all: each of its three
+merges touches only its own plan document. It closed **Complete**
+rather than Abandoned -- what was abandoned is the queue, which is
+open question 8's answer rather than a phase status -- so the reason
+the audit has nothing to read there is that the phase shipped a
+decision, not that the phase was abandoned. Those three ranges get
+the documentation lens only. An audit which says what it had no diff
+to scope over is a result; one which reports a clean run over an
+empty range is not.
 
 ## Agent guidance
 
@@ -1267,7 +1280,19 @@ chosen to defer to here, so that we do not forget them.
   compared against.
 
 - **Make the metrics-drop test's rise attributable to its own
-  instance.**
+  instance.** Resolved, by a change outside this plan: `e7d8aaa36`
+  ("Attribute cpu_measured publishes by time", issue 4214) replaced
+  the count-based rise/drop pair described below with a
+  `domains_enumerated_at >= libvirt_returned_at` timestamp
+  comparison, so `_await_cpu_measured` and the threshold arithmetic
+  are both gone from the tree and the fix prescribed below has
+  nowhere to apply. The replacement carries its own, weaker false
+  pass and names it honestly in place -- with publish-on-change
+  broken each wait would still pass perhaps a third of the time --
+  and the compensating control it points at, the
+  `_should_publish_metrics` unit tests, is sound under mutation
+  (phase 7 confirmed three separate mutations of it all fail). The
+  original finding, for the record:
   `test_cluster_resources_measured_drops_after_delete`
   (`cluster_ci_tests/test_nodes.py`) waits for a node's
   `cpu_measured` to rise before it takes the baseline it later

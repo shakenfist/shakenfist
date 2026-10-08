@@ -528,8 +528,10 @@ open, labelled `automated-fix-attempted`.
 The second window's numbers, as posted to
 [#3772](https://github.com/shakenfist/shakenfist/issues/3772#issuecomment-5977267873):
 39 ancestry-qualifying `merge_group` runs (2026-09-27 -- 2026-10-02),
-95 instrumented bundle-units, census 92 `empty` / 3 `read` / 2
-`absent` -- 2.1% unknown against the first window's 92.3%. Three
+97 instrumented bundle-units, of which 95 qualify for D37's
+denominator (92 `empty` + 3 `read`) and 2 are unknown (`absent`) and
+counted in addition -- 2/95, so 2.1% unknown against the first
+window's 92.3%. Three
 capacity waits, at 41%, 55% and 69% of the 420 s deadline, longest
 290.83 s, two of the three longer after the reshape than in the first
 window. The `Debian 12/13 tier` pass rate across three real windows,
