@@ -83,9 +83,9 @@ class PlanPhaseReferenceFixtureTestCase(base.ShakenFistTestCase):
         # Plan documents legitimately discuss their own phases, including
         # the plans synchronised in under docs/components/.
         with tempfile.TemporaryDirectory() as tmp:
-            self._write(tmp, 'docs/plans/PLAN-thing.md',
+            self._write(tmp, 'docs/plans/PLAN-thing.md',  # audit-ok: plan-reference
                         'Phase 1 lands the schema.\n')
-            self._write(tmp, 'docs/other/plans/PLAN-deep.md',
+            self._write(tmp, 'docs/other/plans/PLAN-deep.md',  # audit-ok: plan-reference
                         'Phase 2 lands the rest.\n')
             self.assertEqual([], checker.problems(root_dir=tmp))
 

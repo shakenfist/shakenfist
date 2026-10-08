@@ -3635,26 +3635,27 @@ NAMESPACE_CLAIMS_PEAK_COLUMNS = (
 def _get_namespace_claims_table() -> sa.Table:
     """Get or create the namespace_claims table definition.
 
-    One of the three scheduler-reservations capacity tables (see
-    docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md).
-    One row per capacity claim: the claiming namespace (indexed, because
-    phase 3 admission looks claims up by namespace; the column matches
-    the namespaces table's name primary key), the claimed limits, the
-    materialised usage counters, their high-water mark, the claim's
-    coverage state, and its expiry. Written by the reconciler (phase 2),
-    by the guarded-UPDATE admission path (phase 3) and by the claim CRUD
-    RPCs (phase 4), and it doubles as the static values table for the
-    NamespaceClaim object.
+    One of the three scheduler capacity tables. One row per capacity
+    claim: the claiming namespace (indexed, because admission looks
+    claims up by namespace; the column matches the namespaces table's
+    name primary key), the claimed limits, the materialised usage
+    counters, their high-water mark, the claim's coverage state, and its
+    expiry. Written by the reconciler, by the guarded-UPDATE admission
+    path and by the claim CRUD RPCs, and it doubles as the static values
+    table for the NamespaceClaim object.
 
     ``peak_used_*`` is the largest drawdown this claim has ever held,
     and it only ever goes up: the admission drawdown raises it, the
     reconciler raises it, and the release path deliberately does not
     touch it. That is what makes it answer a question ``used_*`` cannot
     -- what a namespace actually consumed, asked after it has deleted
-    the instances. See docs/developer_guide/subsystem_internals.md,
-    "The peak high-water mark"; the design is decision D2 of
-    PLAN-claim-coverage-and-sizing-phase-02b-peak-measurement.md in the
-    shakenfist/private-ci repository.
+    the instances. It is a high-water mark maintained inside the
+    admitting transaction rather than a sampler polling ``used_*``,
+    because a sampler cannot see anything shorter-lived than its
+    period, and measuring from outside the transaction it can observe
+    a state no admission ever committed. See
+    docs/developer_guide/subsystem_internals.md, "The peak high-water
+    mark".
 
     ``expires_at`` and ``updated_at`` follow the cluster_locks TIMESTAMP
     idiom: server-side timestamps so the expiry sweep compares against
