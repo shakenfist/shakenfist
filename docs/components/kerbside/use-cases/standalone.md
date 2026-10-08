@@ -1,8 +1,9 @@
 # Kerbside standalone
 
-You have SPICE consoles but no cloud that knows about them,
-and you want to hand them to users without handing out routes
-to the machines that host them. Kerbside's `static` source
+Let's assume you have SPICE consoles on machines hand built
+outside of a cloud, and you want to hand them to users
+without handing out routes to the machines that host them.
+Kerbside's `static` source
 driver reads a fixed list of targets from `sources.yaml` and
 fronts them with the same audited, firewalled proxy the cloud
 deployments get.
@@ -10,7 +11,7 @@ deployments get.
 ## Value proposition
 
 The [Shaken Fist](/components/kerbside/use-cases/shakenfist/), [OpenStack](/components/kerbside/use-cases/openstack/) and
-[oVirt](/components/kerbside/use-cases/ovirt/) pages put Kerbside in front of a platform that
+[oVirt](/components/kerbside/use-cases/ovirt/) console sources put Kerbside in front of a platform that
 already knows where its consoles are. Here there is none — a lab
 bench, a CI job, a rack of appliance VMs no API will ever
 enumerate — and the `static` driver is how you get the proxy's
@@ -29,36 +30,13 @@ standing anything else up first.
 - **The console list reloads every sixty seconds, in both
   directions.** The maintenance loop re-reads `sources.yaml` and
   rebuilds the driver from it, so a target added to the file
-  becomes a console in a little over a minute — audited as
+  becomes a console in a little over a minute — audit logged as
   `Discovered new console` — and a target removed from the file
-  stops being one, audited as `Console no longer available`. No
+  stops being one, audit logged as `Console no longer available`. No
   restart is needed, and neither direction has to be taken on
-  trust: both leave a record. It is a live inventory you edit
-  with a text editor, with one exception: a changed SPICE
-  password for a target already in the list is discarded rather
-  than applied, and changing one means removing the entry,
-  letting the removal land, and adding it back. See
-  [Status and limitations](#status-and-limitations).
-- **Backend pinning is a field you write by hand, and this is
-  the only deployment where that is true.** All four source
-  types answer the same question — what stops Kerbside's backend
-  connection being redirected to a host that is not the one it
-  meant to reach — and all four answer it differently. oVirt
-  learns the certificate subject from the engine during
-  discovery. Shaken Fist learns it from the cluster's node map.
-  OpenStack cannot learn it at all, because Nova's token
-  validation response carries no certificate subject, so that
-  leg is relayed without host-subject enforcement. Here there is
-  no platform to learn from, and the answer is that the operator
-  writes `host_subject` into the target's entry. That is more
-  work and a better guarantee where you write one: the pin is
-  exactly the value you chose, and the proxy refuses a backend
-  whose subject does not match it. It is also the only one of
-  the four that can be left out by accident — the field is
-  optional, an omitted `host_subject` leaves the leg unpinned
-  rather than erroring, and the pin is only reached at all on a
-  leg that escalated to TLS. See
-  [Status and limitations](#status-and-limitations).
+  trust: both leave a record. Editing an entry that is already
+  there is applied the same way, and audit logged as `Console
+  configuration changed` with the fields the edit touched.
 - **The SPICE firewall is on by default.** Kerbside terminates
   the client's connection, drives the SPICE link handshake
   itself, and classifies every framed message against a
@@ -76,7 +54,7 @@ standing anything else up first.
   everything else. One thing comes with that; see
   [User interaction model](#user-interaction-model).
 
-Users get the SPICE features a serial console or an HTML5
+In return, users get the SPICE features a serial console or an HTML5
 wrapper cannot offer: high-resolution and multi-monitor
 desktops, USB passthrough, audio, and adaptive compression.
 
@@ -106,11 +84,9 @@ flowchart TD
 
 **The reload (A).** `_parse_sources()` re-opens the sources file
 on every call, and the maintenance loop calls it every sixty
-seconds. The driver is not kept between passes: it is
-constructed fresh from the YAML that pass parsed, so the console
-list is re-read with it. A target that has appeared in the file
-is added and audited `Discovered new console`. A target that has
-been removed from the file is deleted and audited
+seconds. A target that has appeared in the file
+is added and audit logged as `Discovered new console`. A target that has
+been removed from the file is deleted and audit logged as
 `Console no longer available` — the retention rule that keeps an OpenStack
 cloud's rows indefinitely covers only sources the pass did not
 enumerate, and this source is enumerated, so it does not apply.
@@ -119,52 +95,34 @@ loop sleeps a second at a time and fires once more than sixty
 have passed — and both leave an audit event you can check rather
 than a claim you have to believe.
 
-**What the reload does not carry.** A console which already
-exists has its host, address, ports, name and `host_subject`
-reassigned on every pass, but not its SPICE password: that is
-set only when the row is first inserted (`add_console()` in
-`kerbside/db.py`), and the `.vv` handler then deliberately
-leaves the stored value alone for a static source, on the
-grounds that the driver persisted it at enumeration time. An
-edited password is therefore parsed, yielded by the driver,
-passed to the database layer and dropped, with no log line, no
-audit event and no errored source. Removing the entry, letting
-the removal land, and adding it back does apply it, because that
-takes the insert path — at a cost worth knowing before you rely
-on it: the console is deleted on the first pass and absent from
-the inventory, the API and the web UI until the second, it comes
-back as a fresh row with its discovery timestamp reset, and
-rotating a password therefore takes two maintenance cycles
-rather than one. The audit trail does survive, which is the one
-piece of good news here: audit events are keyed on the source
-and the identifier rather than on the console row, and nothing
-deletes them, so re-adding the same identifier picks the history
-back up. Tracked as
-[#463](https://github.com/shakenfist/kerbside/issues/463).
+**Edits to an existing entry.** A console which already exists
+has its host, address, ports, name, `host_subject` and SPICE
+password reassigned on every pass, so an edit lands in the same
+little over a minute as an addition, in place: the console keeps
+its row and its discovery timestamp. An edit is audit logged as
+`Console configuration changed` with the names of the fields that
+changed — `insecure_port`, say, or `ticket` for a rotated password,
+whose value never appears — so an edit leaves the same kind of
+record as adding or removing a target. A pass which finds an entry
+unchanged records nothing. The proxy reads the password
+from the database each time it authorises a connection, so the
+change of password on qemu and the edit to the file should land
+close together: in between, one of the two disagrees.
 
-**What a bad edit does depends on how it is bad.** Three
-outcomes, and only one of them is the safe one. A console entry
-which is malformed — not a dict, or missing a required field —
-marks the whole source errored for that pass, so the source is
-never enumerated, falls under the same retention rule as an
-unreachable cloud, and what was already published stays
-published rather than being deleted by a typo. That is the
-fail-closed case, and it is the one to expect from a mistake
-*inside* an entry. Deleting or misspelling the key that holds
-the entries is not caught: the list is read with a default, so
-it comes back empty, nothing validates an empty list, the source
-is enumerated successfully with nothing in it, and every
-console it had published is deleted
-([#464](https://github.com/shakenfist/kerbside/issues/464)). And
-a YAML syntax error anywhere in the file is worse still, because
-the parse happens outside the per-source error handling and the
-maintenance loop does not guard the call: the daemon exits, and
-restarts into the same failure until the file is repaired
-([#465](https://github.com/shakenfist/kerbside/issues/465)). The
-rule of thumb until those are fixed is that the blast radius of
-an edit grows as the mistake moves outward — inside an entry it
-is contained, at the key above them it costs that source's
-inventory, and at the file's syntax it costs the daemon.
+**What a bad edit does depends on how it is bad.** A console
+entry which is malformed — not a dict, or missing a required
+field — marks the whole source errored for that pass, and so
+does deleting or misspelling the `consoles` key that holds the
+entries. Either way the source is never enumerated, falls under
+the same retention rule as an unreachable cloud, and what was
+already published stays published rather than being deleted by
+a typo. Only an explicit `consoles: []` says the source has no
+consoles, and that does delete what it had. A mistake in the
+file as a whole — a YAML syntax error, an emptied file, an entry
+with no `source` name — is refused whole: the pass logs where the
+problem is and changes nothing, so every source keeps what it had
+published until the file is repaired. Either way a mistake costs
+at most freshness, never the published inventory or the daemon.
 
 **Nothing is fetched per request.** oVirt acquires a short-lived
 credential from the engine for every `.vv` file, and OpenStack
@@ -330,12 +288,11 @@ Not covered, and worth knowing before you deploy:
 | Limitation | Detail |
 |------------|--------|
 | Nothing checks that the target is alive | There is no liveness check of any kind. An entry in the file is a console whether or not anything is listening on the port, so Kerbside will happily mint a `.vv` for a qemu that exited an hour ago and the user discovers it by the SPICE client failing to connect. Nothing in the console list, the web UI or the API distinguishes a live target from a dead one. This, rather than anything about the file format, is the honest reason the static source is not intended for production use. |
-| A changed SPICE password is never applied | Every other field of an entry which already exists is reassigned on the next pass; the password is not. It is set only when the console row is first inserted, and the `.vv` handler leaves the stored value alone for a static source, so an edit to it is parsed and discarded with no log line, no audit event and no errored source. The file and the database disagree and nothing says so; the first sign is the target refusing the handshake. Remove the entry, let the removal land, and add it back to change one. Tracked as [#463](https://github.com/shakenfist/kerbside/issues/463). |
 | The inventory is only as good as your editing | There is no discovery, so nothing ever corrects the file. A target rebuilt on a different port, or with a different SPICE password, is simply wrong until somebody edits it, and the wrongness shows up as a failed connection rather than as an errored source. The sixty-second reload makes the fix fast; it does not make it automatic. |
 | Backend TLS needs three things, and is untested through this source | A static entry is plaintext to the target unless you declare a TLS port, unverified unless the source carries a `ca_cert`, and unpinned unless you write a `host_subject`. The CA is the one most easily missed: without it the target is checked against the public web trust store, which an internal certificate will not satisfy, so the escalation fails the handshake. The proxy's enforcement of a pin is exercised both ways in CI — a matching pin accepted, a mismatched one refused — but by `tools/direct-qemu/run-host-subject-checks.sh`, which drives the proxy from a mock control plane rather than from a source; the `direct-qemu` lane's own static entry is plaintext, and the compose demo deliberately leaves all three out. So the enforcement is proven and the path that reaches it *from this source* is not. |
 | Nobody can log in | Interactive login is Keystone-only ([#300](https://github.com/shakenfist/kerbside/issues/300)), which a deployment with no OpenStack in it has nothing to point at, and the session JWT scheme has no revocation or issuance audit ([#301](https://github.com/shakenfist/kerbside/issues/301)). A standalone deployment therefore needs something else to hold credentials and call the API. |
 | Duplicate identifiers are tolerated | Two entries in one source sharing an identifier produce a warning and the last definition wins. Nothing errors and nothing is marked unhealthy, so a copy-paste mistake silently publishes one target and hides another. |
-| A bad edit is contained, unless it is not | Validation is per source rather than per entry, so one entry missing a required field marks the whole source errored and its published list is retained rather than refreshed — a stale list beside an errored source, not an empty one. Two edits escape that: removing or misspelling the key holding the entries enumerates the source successfully with nothing in it and deletes every console it had ([#464](https://github.com/shakenfist/kerbside/issues/464)), and a YAML syntax error exits the daemon into a restart loop because the parse is outside the per-source error handling ([#465](https://github.com/shakenfist/kerbside/issues/465)). |
+| A bad edit freezes, rather than empties, the inventory | Validation is per source rather than per entry, so one entry missing a required field, or a missing or misspelled `consoles` key, marks the whole source errored and its published list is retained rather than refreshed — a stale list beside an errored source, not an empty one. A file which cannot be used at all, such as one with a YAML syntax error, freezes every source the same way until it is repaired. The first shows as an errored source in the administrative interface; the second marks nothing errored and is visible only in the daemon log. |
 | The SPICE passwords are in the file | Each target's SPICE password is written in `sources.yaml` in the clear, as the cloud sources' credentials are — but here there is one per target rather than one per platform, so the file grows in sensitivity with the fleet. File permissions are the whole of the protection. |
 | Scale is untested | The demo and the CI lane each declare a single target. Every pass re-parses the file and re-records every entry, and nothing bounds how that behaves at hundreds of them. No lane covers it. |
 

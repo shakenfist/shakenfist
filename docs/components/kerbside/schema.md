@@ -24,8 +24,8 @@ erDiagram
 
     sources ||--o{ consoles : "sources provide consoles"
     consoles {
+        string source PK, FK
         string uuid PK
-        string source FK
         datetime discovered
         string hypervisor
         string hypervisor_ip
@@ -41,7 +41,7 @@ erDiagram
     consoletokens {
         string token PK
         string session_id
-        string uuid FK
+        string uuid FK "with source, to consoles"
         string source FK
         integer created "epoch seconds"
         integer expires "epoch seconds"
@@ -137,8 +137,8 @@ Virtual machine consoles discovered from sources.
 
 | Column | Type | Description |
 |--------|------|-------------|
-| uuid | string | Primary key, VM UUID |
-| source | string | Foreign key to sources.name |
+| source | string | Primary key with uuid; foreign key to sources.name |
+| uuid | string | Primary key with source; VM UUID |
 | discovered | datetime | When the console was first discovered |
 | hypervisor | string | Hypervisor hostname |
 | hypervisor_ip | string | Hypervisor IP address |
@@ -147,6 +147,14 @@ Virtual machine consoles discovered from sources.
 | name | string | VM display name |
 | host_subject | string | Expected TLS certificate subject |
 | ticket | string | SPICE ticket for authentication |
+
+A console is identified by its source and its identifier together, as
+it is everywhere else a console is named: in `consoletokens`, in
+`auditevents` and in the maintenance pass. An identifier is only unique
+within the source that published it -- a static source's identifiers
+are whatever the operator wrote -- so two sources publishing the same
+one have two rows, and every lookup, update and removal names both
+columns ([issue #468](https://github.com/shakenfist/kerbside/issues/468)).
 
 `ticket` is the password the SPICE server on the hypervisor will accept
 for this console, and it gets the same treatment as a source's
@@ -194,7 +202,7 @@ Time-limited access tokens for console connections.
 |--------|------|-------------|
 | token | string | Primary key, 48-character access token |
 | session_id | string | 12-character session identifier |
-| uuid | string | Foreign key to consoles.uuid |
+| uuid | string | With source, foreign key to consoles (source, uuid) |
 | source | string | Foreign key to sources.name |
 | created | integer | Token creation time (epoch seconds) |
 | expires | integer | Token expiration time (epoch seconds) |
@@ -257,7 +265,8 @@ except on an unknown-kid cache miss.
 
 - **sources → consoles**: One source provides many consoles
 - **sources → consoletokens**: Tokens reference a source for validation
-- **consoles → consoletokens**: Tokens grant access to a specific console
+- **consoles → consoletokens**: Tokens grant access to a specific console,
+  referenced by (source, uuid); removing a console deletes its tokens
 - **consoletokens → proxychannels**: Active channels reference their auth token
 - **consoles → auditevents**: Audit events record console access (no FK to
   preserve audit history when consoles are deleted)

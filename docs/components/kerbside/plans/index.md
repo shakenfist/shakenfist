@@ -31,6 +31,7 @@ repo root. For pre-push audits of our own work see
 
 | Date | Plan | Intent | Status |
 |------|------|--------|--------|
+| 2026-10-08 | [Restrict direct console access to admins](/components/kerbside/plans/PLAN-direct-console-admin/) | Gate `/console/direct` on a Keystone admin group claim and audit it (issue #134) | Complete |
 
 The previous standalone plan, [Use case documentation](/components/kerbside/plans/PLAN-use-case-docs/), was promoted to a master plan on
 2026-09-18.

@@ -91,16 +91,16 @@ follow, and both are in the limitations table: every configured
 cloud is asked to validate tokens minted by the others, and a
 cloud that fails to answer stops the exchange for the rest.
 
-**A console's source travels with it, mostly.** Each console
-carries the source it came from, and that source is part of how
-Kerbside talks about it: console tokens and audit events are
-looked up by source and identifier together, and the maintenance
-pass keys its own bookkeeping on the pair. The console row
-itself is not keyed that way — `add_console()`, `get_console()`
-and `remove_console()` all filter on the identifier alone.
-Identifiers are generated per cloud and nothing coordinates them
-between clouds, so see the limitations table before assuming two
-sources can never collide.
+**A console's source travels with it.** Each console carries the
+source it came from, and that source is part of its identity:
+the console row, console tokens and audit events are all keyed
+on source and identifier together, and the maintenance pass
+keys its own bookkeeping on the pair. Identifiers are generated
+per cloud and nothing coordinates them between clouds, so two
+sources can publish the same one — a hand-written static entry
+is the likely way — and they are simply two consoles. A token
+issued for one is looked up under its own source and cannot
+reach the other.
 
 ## How to set it up
 
@@ -161,7 +161,6 @@ Not covered, and worth knowing before you deploy:
 | Nothing in CI runs two sources at once | Each lane writes a single-source `sources.yaml` and says so itself: `tools/ovirt-e2e/gen-sources.py` emits "exactly one ``type: ovirt`` source", `tools/sf-e2e/deploy-kerbside.sh` writes "sources.yaml with one type: shakenfist source", and the heredoc in `tools/direct-qemu/lane-up.sh` declares one static entry. Aggregation itself is therefore untested end to end: every property on this page is read out of code which is only ever exercised one source at a time. |
 | Configured OpenStack clouds share a trust domain | A presented token is offered to each OpenStack entry in turn until one accepts it, so every configured cloud is asked to validate tokens minted by the others, and any of them can claim a token it recognises. Nothing scopes the exchange to one cloud. This suits several clouds under one operator; it is not a boundary between clouds in separate trust domains. |
 | One broken cloud degrades the others | Only a clean "not mine" moves the exchange on to the next cloud: a `NotFoundException` or an empty validation result. Every other failure ends the whole request rather than stepping over that cloud — an SSL failure talking to its Keystone returns a 500 immediately, and anything else, such as bad credentials or an unreachable Keystone, is caught by the enclosing handler and returns a 500 too. Either way the clouds after it in the file are never asked, and their users cannot get a console either. |
-| Two sources publishing one identifier are one console | The console row is keyed on the identifier alone. `add_console()` looks the row up by identifier without the source, so a second source publishing the same identifier overwrites the first's address, ports and recorded certificate subject while the row keeps the source it was first inserted under, and `remove_console()` deletes by identifier alone, so one source retiring a console can remove another's. Cloud-generated uuids make this unlikely between two real clouds; a hand-written static entry, or an identifier that followed a VM to its new home during a migration, is where it bites. |
 | Discovery is serial across the sources | The maintenance pass walks the configured sources in file order and does each one's discovery inline, with nothing running two sources concurrently. A platform which is slow to answer therefore delays every source after it in the file, and stretches the cycle for all of them. No lane has ever had two sources to run, so the behaviour at a fleet's worth of them is uncharacterised. |
 | Authentication does not aggregate | The console list is one list, but the ways in are still one per platform, and Kerbside's own interactive login is Keystone-only ([#300](https://github.com/shakenfist/kerbside/issues/300)). An estate of oVirt, Shaken Fist and static sources has no Keystone to log into, so it is driven by an API client holding a token something else minted. |
 
