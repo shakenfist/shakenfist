@@ -16,7 +16,7 @@ discrepancies, the source code in `config.py` is authoritative.
 | SOURCES_PATH | String (default ./sources.yaml) | The path the console sources file (sources.yaml) resides at. |
 | SQL_URL | String | The SQLAlchemy SQL connection URL for the VDI proxy database. |
 | CONSOLE_TOKEN_DURATION | Integer (default 1) | The number of minutes a console access token should be valid for. |
-| AUTH_SECRET_SEED | String (no default) | A random string used to hash the signatures on JWT authentication tokens. Knowledge of this string is required to sign a JWT. |
+| AUTH_SECRET_SEED | String (must be set) | A random string used as the signing key for JWT authentication tokens; anyone who knows it can forge a token for any user. Generate one with `openssl rand -hex 32`. The built-in default is the sentinel `~~unconfigured~~`, and the API refuses to start while the value is that sentinel or blank. |
 | API_TOKEN_DURATION | Integer (default 60) | The number of minutes that a JWT is valid for after being issued. Importantly, Keystone credentials are only validated on JWT creation, so it is possible for a JWT to outlive the Keystone user access token it encapsulates. |
 
 ## TLS Settings

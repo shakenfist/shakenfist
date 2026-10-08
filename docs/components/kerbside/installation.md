@@ -150,7 +150,7 @@ which documents every setting Kerbside has:
 | Setting | What it is |
 |---|---|
 | `sql_url` | The database, as a SQLAlchemy URL |
-| `auth_secret_seed` | The seed session tokens are signed with; generate a fresh one per deployment |
+| `auth_secret_seed` | The seed session tokens are signed with; generate a fresh one per deployment with `openssl rand -hex 32`. The API refuses to start until it is set |
 | `sources_path` | Where `sources.yaml` lives |
 | `public_fqdn` | The name clients should reach this Kerbside by |
 | `cacert_path` | The CA clients verify the proxy against |
@@ -347,6 +347,27 @@ the same, and two references apply throughout:
 `kerbside db upgrade` is the whole of a normal upgrade — see
 [What a running Kerbside needs](#what-a-running-kerbside-needs). This
 section records the upgrades which need something from you as well.
+
+### Upgrading past the unconfigured signing seed guard
+
+In Kerbside v0.6.0 and earlier, `auth_secret_seed` defaulted to the
+sentinel `~~unconfigured~~` and nothing rejected it. A deployment that
+never set it signed session tokens with a constant published in the
+Kerbside source tree, so anyone could forge a token for any user
+(issue #131). The API now refuses to start while the seed is that
+sentinel or blank.
+
+If your deployment never set it, the upgrade will look like a failed
+boot: gunicorn reports `Worker failed to boot` and exits, and the log
+carries `Refusing to start: AUTH_SECRET_SEED is unset`. Generate a
+seed with `openssl rand -hex 32`, set it as `auth_secret_seed` in
+`/etc/kerbside/kerbside.ini` or as `KERBSIDE_AUTH_SECRET_SEED`, and
+start the API again. Kolla-Ansible deployments built from
+kerbside-patches are not affected: they render the seed from
+`passwords.yml`, which `kolla-genpwd` fills.
+
+Setting the seed invalidates every token signed with the old one,
+forged or not, so users will need to log in again.
 
 ### Upgrading past the source credential disclosure
 
