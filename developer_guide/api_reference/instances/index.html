@@ -15380,6 +15380,11 @@ Beyond the usual authentication and validation errors, they can answer:</p>
   updated to record what the domain actually is, not the state that was
   requested. See <a href="/operator_guide/power_states/">power states</a> for what
   that means operationally.</li>
+<li>A 500 from power on or power off does not carry the hypervisor's error,
+  which can name paths on the hypervisor. Its body reads <code>instance failed
+  to power on, see the instance events for details</code> (or <code>... power off
+  ...</code>), and the error itself is in the instance's <code>power on failed</code> or
+  <code>power off failed</code> audit event, as <code>error</code>.</li>
 </ul>
 <details class="example">
 <summary>Python API client: create and then delete a simple instance</summary>

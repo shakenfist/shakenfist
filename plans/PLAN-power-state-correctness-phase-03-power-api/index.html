@@ -15855,7 +15855,10 @@ after clients have seen them. Steps 2 and 4 are unaffected by either.</p>
   with the placement ledger, not in qemu's error text (D1).</li>
 <li>Delete undefines a domain whose <code>destroy()</code> failed, which turns a
   running persistent domain transient and leaves it running. This is
-  pre-existing, found by this survey (S4), and unchanged here.</li>
+  pre-existing, found by this survey (S4), and unchanged here.
+  Phase 4 corrected this: the undefine is skipped, because
+  <code>power_off()</code> now raises, but the disks are still removed. Tracked as
+  <a href="https://github.com/shakenfist/shakenfist/issues/4486">#4486</a>.</li>
 <li>Automatic recovery of a crashed guest on unpause (#2241, D7).</li>
 </ul>
 

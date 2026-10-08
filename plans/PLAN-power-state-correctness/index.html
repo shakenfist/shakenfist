@@ -15254,7 +15254,7 @@ support that suspicion. Every finding below was checked against
 <td>F9</td>
 <td><code>util/libvirt.py</code> <code>extract_power_state()</code></td>
 <td><code>SHUTDOWN</code> and <code>NOSTATE</code> map to <code>on</code>, <code>PMSUSPENDED</code> to <code>paused</code>; <code>extract_power_state_pretty()</code> raises <code>KeyError</code> on an unknown enum.</td>
-<td>Low: PM suspend is disabled in <code>libvirt.tmpl</code>, <code>SHUTDOWN</code> is transient. Recorded so the audit phase can confirm it was considered.</td>
+<td>Low: PM suspend is disabled in <code>libvirt.tmpl</code>, <code>SHUTDOWN</code> is transient. Phase 4 re-read it and left it deliberately: <code>SHUTDOWN</code> is the only reachable folded state, and every decision built on it matches libvirt's own answer or is corrected by the next cleaner pass.</td>
 </tr>
 <tr>
 <td>F10</td>
@@ -15448,13 +15448,13 @@ phases 0, 1b and 3 all rely on <code>create()</code> failing when power on fails
 <tr>
 <td>3. Power operations answer truthfully</td>
 <td><a href="../PLAN-power-state-correctness-phase-03-power-api/">PLAN-power-state-correctness-phase-03-power-api.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>d3d5f15ca</code></td>
 </tr>
 <tr>
 <td>4. Push audit</td>
-<td>PLAN-power-state-correctness-phase-04-push-audit.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-power-state-correctness-phase-04-push-audit/">PLAN-power-state-correctness-phase-04-push-audit.md</a></td>
+<td>Complete</td>
 <td>—</td>
 </tr>
 </tbody>
@@ -15655,10 +15655,31 @@ has the detail as S1 to S8 and D1 to D8.</p>
   delete.</strong> Making them raise must not change either (S4, D1, D2).</li>
 <li><strong>Guest CI tests already use node exec</strong>, since phase 2 (S8).</li>
 </ul>
+<p>Landed as <a href="https://github.com/shakenfist/shakenfist/pull/4468">#4468</a>.
+Functional run
+<a href="https://github.com/shakenfist/shakenfist/actions/runs/37366539008">37366539008</a>
+passed the new pause and failed power on tests on a real hypervisor. An
+earlier run found D9: a short pause stranded <code>agent_state</code> at "no
+contact", because the sidechannel monitor writes it only when its cached
+view changes. <code>unpause()</code> now restarts the instance's monitor, and a
+reply-gap check covers freezes that bypass unpause. Phase 2's <code>stopped</code>
+flag in <code>power_off()</code> was removed, because every path which did not stop
+the domain now raises before reading it.</p>
 <h3 id="phase-4-push-audit">Phase 4: push audit<a class="headerlink" href="#phase-4-push-audit" title="Permanent link">&para;</a></h3>
 <p>Run <code>PUSH-AUDIT.md</code> over the accumulated diff of phases 0 to 3, as
 recorded in the <code>Merged</code> column. Re-read F9 and record whether it was
 deliberately left alone.</p>
+<p>The phase survey added two things to this section; the phase plan has
+the detail as S1 to S5.</p>
+<ul>
+<li><strong>Two plan-document merges are not phases</strong>, but are audited too:
+  <code>6c5807018</code> (#4310, this plan) and <code>304c6ca51</code> (#4405, the phase 2
+  plan). The documentation lens reads them (S1).</li>
+<li><strong>F9 is no longer a dormant mapping.</strong> Phase 3 made
+  <code>extract_power_state()</code> the success oracle for pause and unpause, so
+  re-reading F9 means checking each decision built on it, not only the
+  mapping (S2).</li>
+</ul>
 <!-- shared-block: plan-push-audit-phase v3 -->
 <p>Push audit phase (shared block; do not edit -- the canonical
 copy lives in shakenfist/development at
@@ -16046,20 +16067,69 @@ canonical copy lives in shakenfist/development at
 <p>We should list obvious extensions, known issues, unrelated bugs we
 encountered, and anything else we should one day do but have
 chosen to defer to here, so that we do not forget them.</p>
+<p>Consolidated by phase 4 from this plan and its phase plans, each
+checked against <code>develop</code>.</p>
+<p>Live defects, each filed:</p>
 <ul>
-<li>F9, the mapping of libvirt's rarer states, unless phase 4 decides
-  otherwise.</li>
-<li>A CI check that no unit-test fake returns inactive domains from an
-  active-domain listing, if phase 1a's rewrite shows the mistake is easy
-  to reintroduce.</li>
-<li>An API-only way to make instance creation fail on demand, so the
-  failed-create path can be tested functionally without node exec. A
-  garbage UEFI <code>nvram_template</code> might make qemu refuse the domain; that
-  is unverified and needs a spike.</li>
+<li><a href="https://github.com/shakenfist/shakenfist/issues/4486">#4486</a>: delete
+  removes an instance's disks while its domain is still running, after
+  <code>destroy()</code> failed twice. This replaces phase 3's entry, which said
+  delete undefines the running domain.</li>
+<li><a href="https://github.com/shakenfist/shakenfist/issues/4485">#4485</a>:
+  <code>agent_state</code> can read ready while an instance is paused or off,
+  through sidechannel monitor writes which race the power methods.</li>
+</ul>
+<p>Still to observe:</p>
+<ul>
+<li><strong>S3, what the cleaner's inactive domain branches do in production.</strong>
+  They had not fired once on sfcbr by 2026-10-07. Re-run phase 4's 4h
+  queries after a week or two on a build carrying phases 1b to 3.</li>
+</ul>
+<p>Known limitations:</p>
+<ul>
+<li><a href="https://github.com/shakenfist/shakenfist/issues/3373">#3373</a>'s
+  remainder: make every non-retryable lookup error raise, then delete
+  the <code>strict</code> keyword.</li>
+<li>Stray domains of instances whose delete ended in state <code>error</code> are
+  recorded <code>off</code>, not deleted (phase 1b D9).</li>
+<li>Inactive domains of errored instances keep autostart (phase 2 S9).</li>
+<li>Whether libvirt keeps an inactive domain's shutoff reason across a
+  libvirtd restart is untested.</li>
+<li>The cleaner's <code>crashed</code> branch has no re-entry guard. It is
+  unreachable while <code>on_crash</code> is <code>restart</code>.</li>
+<li>Domains with a managed save image cannot be undefined without
+  <code>VIR_DOMAIN_UNDEFINE_MANAGED_SAVE</code>. They are only reachable if an
+  operator changes the libvirt-guests default.</li>
+<li><code>NodeLock</code> has no recovery when its holder dies.</li>
+<li>Three non-power endpoints do not declare 406
+  (<a href="https://github.com/shakenfist/shakenfist/issues/4449">#4449</a>).</li>
+<li>Unpause does not recover a crashed guest
+  (<a href="https://github.com/shakenfist/shakenfist/issues/2241">#2241</a>).</li>
 <li>Whether <code>instances_total</code> in the resources daemon should count
-  defined-but-inactive domains (open question 4). This plan keeps
+  defined but inactive domains (open question 4). This plan keeps
   today's semantics.</li>
 </ul>
+<p>Extensions:</p>
+<ul>
+<li>A node lifecycle test which reboots a hypervisor with one running and
+  one powered off instance, and checks which comes back.</li>
+<li>An API-only way to make instance creation fail on demand, so that the
+  failed-create path can be tested without node exec. A garbage UEFI
+  <code>nvram_template</code> might work, but that needs a spike.</li>
+<li>A memory exhaustion signal for power on, belonging with the placement
+  ledger.</li>
+<li>Clean-ups (<a href="https://github.com/shakenfist/shakenfist/issues/4487">#4487</a>):</li>
+<li>one matcher for libvirt's "domain is not running";</li>
+<li>fewer copies of pause and unpause;</li>
+<li>one CI node lookup;</li>
+<li>the dead <code>message</code> parameter of <code>_await_instance_event()</code>.</li>
+<li><code>_await_image_event()</code> in <code>shakenfist_ci/base.py</code> matches an
+  <code>operation</code> field which events do not have, and has no callers.
+  Delete it or fix it.</li>
+<li>Splitting <code>instance.py</code>'s power operations into their own module.</li>
+</ul>
+<p>Resolved: F9 was re-read and deliberately left alone. A CI check for
+unit test fakes was judged unwarranted (phase 4, 4d).</p>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>This section should list any bugs we encounter during development
 that we fixed. You should also scan the project's issue tracker,
@@ -16072,6 +16142,19 @@ while planning it.</p>
   string, fixed by
   <a href="https://github.com/shakenfist/shakenfist/pull/4309">#4309</a> before this
   plan's phases started. It is what prompted the plan.</li>
+<li>Found and fixed by the phase 4 push audit:</li>
+<li>The database daemon's <code>GetInstance</code> ignored <code>strict</code>, so a MariaDB
+    error read as "not found" to the cleaner's guard against deleting a
+    real instance.</li>
+<li>Power on stranded <code>agent_state</code> at "no contact" when the agent
+    monitor had already handshaken.</li>
+<li>The cleaner's active loop could record <code>off</code> itself, skipping the
+    detected power off.</li>
+<li>Unpause answered 500 when libvirt said the domain was already
+    running.</li>
+<li>One failing domain ended the cleaner's whole pass.</li>
+<li>Failed power on and power off returned libvirt's error text,
+    including host paths.</li>
 </ul>
 <p>Related issues:</p>
 <ul>
