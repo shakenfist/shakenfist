@@ -15125,8 +15125,8 @@ discrepancies, the source code in <code>config.py</code> is authoritative.</p>
 </tr>
 <tr>
 <td>AUTH_SECRET_SEED</td>
-<td>String (no default)</td>
-<td>A random string used to hash the signatures on JWT authentication tokens. Knowledge of this string is required to sign a JWT.</td>
+<td>String (must be set)</td>
+<td>A random string used as the signing key for JWT authentication tokens; anyone who knows it can forge a token for any user. Generate one with <code>openssl rand -hex 32</code>. The built-in default is the sentinel <code>~~unconfigured~~</code>, and the API refuses to start while the value is that sentinel or blank.</td>
 </tr>
 <tr>
 <td>API_TOKEN_DURATION</td>
