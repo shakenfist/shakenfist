@@ -38,14 +38,14 @@ of which the caller may set explicitly per request. If they do not,
 the server applies a default.
 
 - **`AGENT_OPERATION_DEFAULT_DEADLINE`** (default 600 seconds,
-  `shakenfist/config.py:240`) is a wall-clock budget. It is counted
+  `shakenfist/config.py`) is a wall-clock budget. It is counted
   from the moment the API server received the request, not from when
   the agent picked the work up -- so time spent queued behind another
   operation on the same instance, and any preflight work such as
   fetching a blob onto the hypervisor, both count against it before
   the operation ever executes.
 - **`AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT`** (default 30 seconds,
-  `shakenfist/config.py:259`) is how long a transfer may go without
+  `shakenfist/config.py`) is how long a transfer may go without
   making forward progress. It applies only to the commands that can
   report progress at all -- the transfers behind `agent/get` and
   `agent/put` -- and never to `agent/execute`: nothing an executed
@@ -59,7 +59,7 @@ reference linked above for the full three-way distinction between
 omitted, zero and a positive value.
 
 Both parameters are bounded by **`AGENT_OPERATION_MAX_DEADLINE`**
-(default 86400 seconds -- one day, `shakenfist/config.py:320`), an
+(default 86400 seconds -- one day, `shakenfist/config.py`), an
 operator ceiling published as their `maximum` in the API specification
 and refused with a 400 above it. The same ceiling is the backstop for
 an operation whose caller disabled both budgets at once, which every
@@ -144,7 +144,7 @@ hold:
   used up cannot -- there is no time left for a further attempt to
   deliver anything in, so it goes straight to `expired` instead.
 - **The attempt cap has not been reached.** Bounded by
-  `AGENT_OPERATION_MAX_ATTEMPTS` (default 3, `shakenfist/config.py:303`)
+  `AGENT_OPERATION_MAX_ATTEMPTS` (default 3, `shakenfist/config.py`)
   -- the number of times an operation may be dispatched to the agent
   in total, counting the first attempt plus retries. Once that many
   attempts have been made, the operation is retired instead of tried
@@ -157,7 +157,7 @@ where an executor simply went away with nothing else to blame it on.
 
 Separately, a **node-local reaper**
 (`Monitor.reap_instance_executors()`,
-`shakenfist/daemons/sidechannel/main.py:1559`) runs on every dispatch
+`shakenfist/daemons/sidechannel/main.py`) runs on every dispatch
 pass and resolves operations that the queue itself cannot tell are
 stuck. Nothing in the queue can distinguish a live executor from a
 dead one, but the node the instance is placed on can, because the
