@@ -844,6 +844,66 @@ class CleanerGuardsTestCase(CleanerBaseTestCase):
         self.assertEqual([], removed)
 
 
+class CleanerLibvirtLogsTestCase(CleanerBaseTestCase):
+    """clear_old_libvirt_logs() sweeps the logs of hard-deleted instances.
+
+    Not a CleanerTestCase subclass, so these run once rather than once per
+    subclass.
+    """
+
+    def _run_sweep(self, log_entries):
+        """Run one pass over the given log directory entries, and return
+        the paths it unlinked."""
+        with mock.patch('os.path.exists', return_value=True), \
+                mock.patch('os.listdir', return_value=log_entries), \
+                mock.patch('os.unlink') as mock_unlink:
+            cleaner_st.clear_old_libvirt_logs()
+        return [c[0][0] for c in mock_unlink.call_args_list]
+
+    def test_live_instance_log_survives(self):
+        """A live instance's log survives the sweep. The database UUIDs
+        must be compared as strings, matching what is parsed from the file
+        name: comparing uuid.UUID objects against that string recognised
+        no instance at all, and deleted every log on the hypervisor
+        (#4488)."""
+        inst_uuid = self._create_instances(['running'])['running']
+        stale_uuid = str(uuid.uuid4())
+
+        removed = self._run_sweep([
+            f'sf:{inst_uuid}.log',
+            f'sf:{stale_uuid}.log',
+            'apache2.log'])
+
+        self.assertEqual(
+            [os.path.join(cleaner_st.config.LIBVIRT_LOG_PATH,
+                          f'sf:{stale_uuid}.log')],
+            removed)
+
+    def test_sweep_does_not_read_each_instance(self):
+        """The sweep needs the UUID listing only, not one GetInstance per
+        instance row per node per pass (#4488)."""
+        inst_uuid = self._create_instances(['running'])['running']
+
+        with mock.patch.object(instance.Instance, 'from_db') as mock_from_db:
+            removed = self._run_sweep([f'sf:{inst_uuid}.log'])
+
+        self.assertFalse(mock_from_db.called)
+        self.assertEqual([], removed)
+
+    def test_sweep_skipped_when_listing_fails(self):
+        """get_all_instance_uuids() returns an empty list on a database
+        error, which the sweep cannot tell from a cluster with no
+        instances. Either way, treating every log as deletable is the
+        wrong answer, so the pass is skipped."""
+        inst_uuid = self._create_instances(['running'])['running']
+
+        with mock.patch('shakenfist.mariadb.get_all_instance_uuids',
+                        return_value=[]):
+            removed = self._run_sweep([f'sf:{inst_uuid}.log'])
+
+        self.assertEqual([], removed)
+
+
 class CleanerInactiveDomainTestCase(CleanerBaseTestCase):
     """The cleaner's second loop, over powered off domains.
 
