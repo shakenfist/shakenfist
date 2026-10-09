@@ -8671,6 +8671,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-direct-console-admin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Restrict /console/direct to admin users (issue #134)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-proxy-dev-releases/" class="md-nav__link">
         
   
@@ -15131,6 +15159,17 @@ successful pass.</p>
 <p>The one exception is a source removed from <code>sources.yaml</code> altogether. It is
 deleted along with its consoles, because nothing will ever scrape it again
 and its consoles would otherwise be orphaned.</p>
+<p>That exception is why a <code>sources.yaml</code> which cannot be used at all changes
+nothing. If the file is missing, unreadable or not valid YAML, if it is not
+a list, or if any entry is not a mapping or lacks a <code>source</code> or <code>type</code> key,
+the pass logs why and stops before touching the database: every source and
+console stays as the last pass which loaded the file left them, and the
+next pass, a minute later, tries again. Reconciling against such a file
+would read it as "no sources" and delete the lot. An empty file is refused
+the same way, since a truncated file is the likelier cause; a deployment
+which really has no sources says so with <code>[]</code>. The YAML error is logged by
+problem, line and column only -- never the offending line itself, which in
+this file may well hold a password.</p>
 <p>Erroring still marks the source as errored in the administrative interface,
 which is where a persistent failure should be diagnosed from. Retaining
 consoles is not the same as reporting the source as healthy.</p>
@@ -15372,10 +15411,11 @@ for configuration details.</p>
 mapping entirely from an inline <code>consoles:</code> list in the sources.yaml
 entry.  No external API calls are made and no control plane is needed.</p>
 <p>The list is re-read at startup and once per 60-second maintenance
-cycle, so adding or removing an entry takes effect without a restart.
-Editing the <code>ticket</code> of an entry which already exists does not: it is
-discarded rather than applied (issue #463), and changing one means
-removing the entry, letting the removal land, and adding it back.</p>
+cycle, so adding, removing or editing an entry takes effect without a
+restart. An edited entry is applied in place, and logged and audit
+logged as <code>Console configuration changed</code> with the names of the fields
+that changed -- <code>ticket</code> among them when the password was rotated, but
+never its value.</p>
 <p>It is intended for CI pipelines that boot a QEMU guest directly and
 need kerbside to front it — the direct-qemu CI workflow uses this
 driver — and for ad-hoc debugging against a hand-rolled QEMU.  The
@@ -15409,7 +15449,7 @@ by failing to connect.</p>
 </tr>
 <tr>
 <td>consoles</td>
-<td>A list of console entry dicts (see fields below)</td>
+<td>A list of console entry dicts (see fields below). Required: a source with no <code>consoles</code> key, or a misspelled one, is marked errored and keeps the consoles it had published. Write <code>consoles: []</code> for a source with no consoles, which deletes any it had</td>
 </tr>
 </tbody>
 </table>
@@ -15424,7 +15464,7 @@ by failing to connect.</p>
 <tbody>
 <tr>
 <td>uuid</td>
-<td>Unique identifier for this console (must be globally unique)</td>
+<td>Identifier for this console, unique within this source; another source may use the same one without the two colliding</td>
 </tr>
 <tr>
 <td>name</td>
@@ -15467,6 +15507,16 @@ by failing to connect.</p>
 </tr>
 </tbody>
 </table>
+<p>Kerbside reads every unquoted number in <code>sources.yaml</code> exactly as it is
+written. A text field such as <code>ticket: 012345</code> is the text <code>012345</code>, not
+the octal number 5349 that YAML 1.1 would make of it, and the same holds
+for spellings like <code>0x1F</code>, <code>1_000</code> and <code>12:34</code>. A port may be quoted or
+not, as long as it is a whole number from 1 to 65535. Any other type -- a
+list, a mapping, a boolean, a port that is not one -- marks the source
+errored, and it keeps the consoles it had published. The same
+rule applies to the fields every source shares (<code>source</code>, <code>type</code>, <code>url</code>,
+<code>username</code>, <code>password</code> and the like), except that a bad one refuses the
+whole file and keeps the last configuration that loaded.</p>
 <p><strong>Example sources.yaml entry for a static source:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ci-direct-qemu</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">static</span>

@@ -8676,6 +8676,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-direct-console-admin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Restrict /console/direct to admin users (issue #134)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-proxy-dev-releases/" class="md-nav__link">
         
   
@@ -15217,6 +15245,11 @@ discrepancies, the source code in <code>config.py</code> is authoritative.</p>
 <td>KEYSTONE_ACCESS_GROUP</td>
 <td>String (default "kerbside")</td>
 <td>The Keystone group that users wishing to access the VDI proxy administrative interface or REST API must be a member of.</td>
+</tr>
+<tr>
+<td>KEYSTONE_ADMIN_GROUP</td>
+<td>String (default empty)</td>
+<td>The Keystone group whose members are Kerbside administrators. Only administrators may fetch a direct console file from <code>/console/direct/&lt;source&gt;/&lt;uuid&gt;/console.vv</code>, which points the client at the hypervisor with the hypervisor's own SPICE ticket and so bypasses the proxy's firewall, session tracking and termination; everyone else receives a 403, and is not shown the Direct button. Empty means nobody is an administrator. Before this setting existed every logged in user could fetch a direct file, so a deployment that relies on direct access must set it when upgrading. Membership is checked at login and carried in the session, so removing a user from the group takes effect only when their current session expires (<code>API_TOKEN_DURATION</code>) and they log in again; until then they can still fetch direct files. Issued and refused direct requests are recorded in the console's audit events. A configured group that does not exist in Keystone is logged as an error and makes nobody an administrator.</td>
 </tr>
 </tbody>
 </table>

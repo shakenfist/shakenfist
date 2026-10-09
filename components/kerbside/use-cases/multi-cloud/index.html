@@ -8530,6 +8530,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../plans/PLAN-direct-console-admin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Restrict /console/direct to admin users (issue #134)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../plans/PLAN-proxy-dev-releases/" class="md-nav__link">
         
   
@@ -15111,16 +15139,16 @@ falls through to a 404 when none of them does. Two consequences
 follow, and both are in the limitations table: every configured
 cloud is asked to validate tokens minted by the others, and a
 cloud that fails to answer stops the exchange for the rest.</p>
-<p><strong>A console's source travels with it, mostly.</strong> Each console
-carries the source it came from, and that source is part of how
-Kerbside talks about it: console tokens and audit events are
-looked up by source and identifier together, and the maintenance
-pass keys its own bookkeeping on the pair. The console row
-itself is not keyed that way — <code>add_console()</code>, <code>get_console()</code>
-and <code>remove_console()</code> all filter on the identifier alone.
-Identifiers are generated per cloud and nothing coordinates them
-between clouds, so see the limitations table before assuming two
-sources can never collide.</p>
+<p><strong>A console's source travels with it.</strong> Each console carries the
+source it came from, and that source is part of its identity:
+the console row, console tokens and audit events are all keyed
+on source and identifier together, and the maintenance pass
+keys its own bookkeeping on the pair. Identifiers are generated
+per cloud and nothing coordinates them between clouds, so two
+sources can publish the same one — a hand-written static entry
+is the likely way — and they are simply two consoles. A token
+issued for one is looked up under its own source and cannot
+reach the other.</p>
 <h2 id="how-to-set-it-up">How to set it up<a class="headerlink" href="#how-to-set-it-up" title="Permanent link">&para;</a></h2>
 <p>There is nothing to enable. <code>sources.yaml</code> already holds a
 list, so a second cloud is a second entry in it and a third is
@@ -15184,10 +15212,6 @@ lanes the sibling pages describe.</p>
 <tr>
 <td>One broken cloud degrades the others</td>
 <td>Only a clean "not mine" moves the exchange on to the next cloud: a <code>NotFoundException</code> or an empty validation result. Every other failure ends the whole request rather than stepping over that cloud — an SSL failure talking to its Keystone returns a 500 immediately, and anything else, such as bad credentials or an unreachable Keystone, is caught by the enclosing handler and returns a 500 too. Either way the clouds after it in the file are never asked, and their users cannot get a console either.</td>
-</tr>
-<tr>
-<td>Two sources publishing one identifier are one console</td>
-<td>The console row is keyed on the identifier alone. <code>add_console()</code> looks the row up by identifier without the source, so a second source publishing the same identifier overwrites the first's address, ports and recorded certificate subject while the row keeps the source it was first inserted under, and <code>remove_console()</code> deletes by identifier alone, so one source retiring a console can remove another's. Cloud-generated uuids make this unlikely between two real clouds; a hand-written static entry, or an identifier that followed a VM to its new home during a migration, is where it bites.</td>
 </tr>
 <tr>
 <td>Discovery is serial across the sources</td>

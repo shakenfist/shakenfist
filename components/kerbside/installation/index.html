@@ -7036,6 +7036,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#upgrading-past-admin-only-direct-consoles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading past admin-only direct consoles
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -8679,6 +8690,34 @@
     
   
     RDP out: a transcoding gateway for SPICE consoles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-direct-console-admin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Restrict /console/direct to admin users (issue #134)
   
 
     
@@ -15110,6 +15149,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#upgrading-past-admin-only-direct-consoles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading past admin-only direct consoles
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -15544,6 +15594,21 @@ exposure.</p>
 <p>The credentials being rotated are management plane accounts on the
 cloud Kerbside proxies for, so they are worth treating as a real
 exposure rather than a formality.</p>
+<h3 id="upgrading-past-admin-only-direct-consoles">Upgrading past admin-only direct consoles<a class="headerlink" href="#upgrading-past-admin-only-direct-consoles" title="Permanent link">&para;</a></h3>
+<p>Earlier releases let any logged in user download a direct <code>.vv</code> file
+for any console from the consoles page's Direct button. That file
+points the client straight at the hypervisor with the hypervisor's own
+SPICE ticket, so it bypasses the proxy's firewall, session tracking and
+termination entirely.</p>
+<p>Direct console access is now restricted to members of the Keystone
+group named by <code>KEYSTONE_ADMIN_GROUP</code>, which defaults to empty. After
+upgrading, nobody can use direct access until you set it. If you rely on
+direct <code>.vv</code> files, create or choose a Keystone group for the users who
+should have them and set <code>KEYSTONE_ADMIN_GROUP</code> to its name; everyone
+else keeps using the proxied download. Membership is read at login, so
+a user gains or loses direct access when their current session expires
+(<code>API_TOKEN_DURATION</code>) and they log in again. See
+<a href="/components/kerbside/configuration/#keystone-settings">the configuration reference</a>.</p>
 
 
 

@@ -8715,6 +8715,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plans/PLAN-direct-console-admin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Restrict /console/direct to admin users (issue #134)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plans/PLAN-proxy-dev-releases/" class="md-nav__link">
         
   
@@ -15190,8 +15218,8 @@
 
     sources ||--o{ consoles : "sources provide consoles"
     consoles {
+        string source PK, FK
         string uuid PK
-        string source FK
         datetime discovered
         string hypervisor
         string hypervisor_ip
@@ -15207,7 +15235,7 @@
     consoletokens {
         string token PK
         string session_id
-        string uuid FK
+        string uuid FK "with source, to consoles"
         string source FK
         integer created "epoch seconds"
         integer expires "epoch seconds"
@@ -15363,14 +15391,14 @@ could plausibly have gone the other way:</p>
 </thead>
 <tbody>
 <tr>
-<td>uuid</td>
-<td>string</td>
-<td>Primary key, VM UUID</td>
-</tr>
-<tr>
 <td>source</td>
 <td>string</td>
-<td>Foreign key to sources.name</td>
+<td>Primary key with uuid; foreign key to sources.name</td>
+</tr>
+<tr>
+<td>uuid</td>
+<td>string</td>
+<td>Primary key with source; VM UUID</td>
 </tr>
 <tr>
 <td>discovered</td>
@@ -15414,6 +15442,13 @@ could plausibly have gone the other way:</p>
 </tr>
 </tbody>
 </table>
+<p>A console is identified by its source and its identifier together, as
+it is everywhere else a console is named: in <code>consoletokens</code>, in
+<code>auditevents</code> and in the maintenance pass. An identifier is only unique
+within the source that published it -- a static source's identifiers
+are whatever the operator wrote -- so two sources publishing the same
+one have two rows, and every lookup, update and removal names both
+columns (<a href="https://github.com/shakenfist/kerbside/issues/468">issue #468</a>).</p>
 <p><code>ticket</code> is the password the SPICE server on the hypervisor will accept
 for this console, and it gets the same treatment as a source's
 <code>password</code>. <code>db.get_console()</code> and <code>db.get_consoles()</code> return only the
@@ -15473,7 +15508,7 @@ allowlist that protects everything else.</p>
 <tr>
 <td>uuid</td>
 <td>string</td>
-<td>Foreign key to consoles.uuid</td>
+<td>With source, foreign key to consoles (source, uuid)</td>
 </tr>
 <tr>
 <td>source</td>
@@ -15662,7 +15697,8 @@ except on an unknown-kid cache miss.</p>
 <ul>
 <li><strong>sources → consoles</strong>: One source provides many consoles</li>
 <li><strong>sources → consoletokens</strong>: Tokens reference a source for validation</li>
-<li><strong>consoles → consoletokens</strong>: Tokens grant access to a specific console</li>
+<li><strong>consoles → consoletokens</strong>: Tokens grant access to a specific console,
+  referenced by (source, uuid); removing a console deletes its tokens</li>
 <li><strong>consoletokens → proxychannels</strong>: Active channels reference their auth token</li>
 <li><strong>consoles → auditevents</strong>: Audit events record console access (no FK to
   preserve audit history when consoles are deleted)</li>
