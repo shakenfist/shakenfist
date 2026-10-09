@@ -700,10 +700,16 @@ def clear_old_libvirt_logs():
         return
 
     # Collect all valid instance UUIDs (that is, instances that have not
-    # been hard deleted).
-    all_instances = []
-    for i in instance.all_instances():
-        all_instances.append(i.uuid)
+    # been hard deleted), as strings to match the UUID parsed from the log
+    # file name below. A failed listing is returned as an empty list, which
+    # this sweep cannot tell from a cluster with no instances, and either
+    # would make every log look deletable -- including those of running
+    # instances -- so skip the pass instead.
+    all_instances = set(mariadb.get_all_instance_uuids())
+    if not all_instances:
+        LOG.warning('Instance listing empty or failed, skipping libvirt '
+                    'log sweep')
+        return
 
     # Now delete all libvirt log files which look like a SF instance, but
     # where the instance doesn't exist.
@@ -715,7 +721,7 @@ def clear_old_libvirt_logs():
         if uuid in all_instances:
             continue
 
-        LOG.debug(f'Removing stale libvirt log {ent}')
+        LOG.info(f'Removing stale libvirt log {ent}')
         os.unlink(os.path.join(config.LIBVIRT_LOG_PATH, ent))
 
 
