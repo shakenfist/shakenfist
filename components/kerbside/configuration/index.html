@@ -15214,7 +15214,7 @@ discrepancies, the source code in <code>config.py</code> is authoritative.</p>
 <tr>
 <td>KEYSTONE_AUTH_VERIFY</td>
 <td>Boolean or String (default True)</td>
-<td>Whether to verify TLS sessions to Keystone. False to disable verification; True to verify using system CA bundle; or a path to a specific CA certificate or bundle.</td>
+<td>Whether to verify TLS sessions to Keystone, covering both the user's login and the service account's group check. False to disable verification; True to verify using system CA bundle; or a path to a specific CA certificate or bundle. True and false are case-insensitive; an empty value is a configuration error rather than silently disabling verification.</td>
 </tr>
 <tr>
 <td>KEYSTONE_SERVICE_AUTH_USER</td>
