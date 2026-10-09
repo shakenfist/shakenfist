@@ -15084,14 +15084,14 @@ of which the caller may set explicitly per request. If they do not,
 the server applies a default.</p>
 <ul>
 <li><strong><code>AGENT_OPERATION_DEFAULT_DEADLINE</code></strong> (default 600 seconds,
-  <code>shakenfist/config.py:240</code>) is a wall-clock budget. It is counted
+  <code>shakenfist/config.py</code>) is a wall-clock budget. It is counted
   from the moment the API server received the request, not from when
   the agent picked the work up -- so time spent queued behind another
   operation on the same instance, and any preflight work such as
   fetching a blob onto the hypervisor, both count against it before
   the operation ever executes.</li>
 <li><strong><code>AGENT_OPERATION_DEFAULT_PROGRESS_TIMEOUT</code></strong> (default 30 seconds,
-  <code>shakenfist/config.py:259</code>) is how long a transfer may go without
+  <code>shakenfist/config.py</code>) is how long a transfer may go without
   making forward progress. It applies only to the commands that can
   report progress at all -- the transfers behind <code>agent/get</code> and
   <code>agent/put</code> -- and never to <code>agent/execute</code>: nothing an executed
@@ -15104,7 +15104,7 @@ omitting the parameter takes the default instead. See the API
 reference linked above for the full three-way distinction between
 omitted, zero and a positive value.</p>
 <p>Both parameters are bounded by <strong><code>AGENT_OPERATION_MAX_DEADLINE</code></strong>
-(default 86400 seconds -- one day, <code>shakenfist/config.py:320</code>), an
+(default 86400 seconds -- one day, <code>shakenfist/config.py</code>), an
 operator ceiling published as their <code>maximum</code> in the API specification
 and refused with a 400 above it. The same ceiling is the backstop for
 an operation whose caller disabled both budgets at once, which every
@@ -15182,7 +15182,7 @@ hold:</p>
   used up cannot -- there is no time left for a further attempt to
   deliver anything in, so it goes straight to <code>expired</code> instead.</li>
 <li><strong>The attempt cap has not been reached.</strong> Bounded by
-  <code>AGENT_OPERATION_MAX_ATTEMPTS</code> (default 3, <code>shakenfist/config.py:303</code>)
+  <code>AGENT_OPERATION_MAX_ATTEMPTS</code> (default 3, <code>shakenfist/config.py</code>)
   -- the number of times an operation may be dispatched to the agent
   in total, counting the first attempt plus retries. Once that many
   attempts have been made, the operation is retired instead of tried
@@ -15194,7 +15194,7 @@ terminal state instead: <code>expired</code> for a stall that cannot be retried
 where an executor simply went away with nothing else to blame it on.</p>
 <p>Separately, a <strong>node-local reaper</strong>
 (<code>Monitor.reap_instance_executors()</code>,
-<code>shakenfist/daemons/sidechannel/main.py:1559</code>) runs on every dispatch
+<code>shakenfist/daemons/sidechannel/main.py</code>) runs on every dispatch
 pass and resolves operations that the queue itself cannot tell are
 stuck. Nothing in the queue can distinguish a live executor from a
 dead one, but the node the instance is placed on can, because the
