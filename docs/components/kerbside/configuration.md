@@ -35,7 +35,7 @@ These settings configure Keystone integration for OpenStack deployments.
 | Configuration Option | Type | Description |
 |---------------------|------|-------------|
 | KEYSTONE_AUTH_URL | String (no default) | The URL including scheme and port that is to be used to authenticate the Keystone service account for the proxy, and subsequently all proxy user authentications. |
-| KEYSTONE_AUTH_VERIFY | Boolean or String (default True) | Whether to verify TLS sessions to Keystone. False to disable verification; True to verify using system CA bundle; or a path to a specific CA certificate or bundle. |
+| KEYSTONE_AUTH_VERIFY | Boolean or String (default True) | Whether to verify TLS sessions to Keystone, covering both the user's login and the service account's group check. False to disable verification; True to verify using system CA bundle; or a path to a specific CA certificate or bundle. True and false are case-insensitive; an empty value is a configuration error rather than silently disabling verification. |
 | KEYSTONE_SERVICE_AUTH_USER | String (no default) | The service account username. |
 | KEYSTONE_SERVICE_AUTH_PASSWORD | String (no default) | The password for the service account. |
 | KEYSTONE_SERVICE_AUTH_USER_DOMAIN_ID | String (default "default") | The domain the service account resides in. |
