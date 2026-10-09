@@ -565,7 +565,7 @@ spelling above is the one to write.
 | 2. Shaken Fist side: signing key, Kerbside credential, token duration, shadow guard | [PLAN-kerbside-deployer-phase-02-sf-side.md](PLAN-kerbside-deployer-phase-02-sf-side.md) | Complete | `80292df08` (#4442) |
 | 3. A `kerbside` role and the `kerbside` group in `site.yml` | [PLAN-kerbside-deployer-phase-03-kerbside-role.md](PLAN-kerbside-deployer-phase-03-kerbside-role.md) | Complete | `b85005f0e` (#4465) |
 | 4. A merge-queue lane with the feature on | [PLAN-kerbside-deployer-phase-04-ci.md](PLAN-kerbside-deployer-phase-04-ci.md) | In progress | — |
-| 5. Kerbside's sf-e2e lane deploys through the collection | PLAN-kerbside-deployer-phase-05-kerbside-lane.md | Proposed | — |
+| 5. The `kerbside` role moves into Kerbside, and Kerbside's sf-e2e lane deploys through it | PLAN-kerbside-deployer-phase-05-role-to-kerbside.md | Proposed | — |
 | 6. Documentation and close-out | PLAN-kerbside-deployer-phase-06-docs.md | Proposed | — |
 | 7. Push audit | PLAN-kerbside-deployer-phase-07-push-audit.md | Proposed | — |
 
@@ -582,9 +582,11 @@ Ordering:
   credential it writes into `sources.yaml`.
 - Phase 4 needs phase 3, and an operator push to
   `shakenfist/actions`.
-- Phase 5 needs phase 4. It moves Kerbside's lane onto a deploy
-  path SF's merge queue already proves, rather than onto one only
-  Kerbside exercises.
+- Phase 5 needs phase 4, and a Kerbside release that includes
+  kerbside#533. It moves the role to Kerbside only once SF's merge
+  queue proves the role works, so the move changes the role's home
+  and not its behaviour. Phase 4's lane then keeps proving the
+  integration from SF's side.
 - Phase 6 is the last implementation phase, and phase 7 audits
   them all.
 
@@ -808,24 +810,95 @@ is enqueued. Kerbside 0.7.0 must also be on PyPI by then, because phase
 Planned at high effort: it crosses repositories, and it changes what
 the slowest merge row deploys.
 
-### Phase 5 -- Kerbside's lane deploys through the collection
+### Phase 5 -- The `kerbside` role moves into Kerbside
 
-Kerbside's `sf-e2e-functional.yml` stops running
-`deploy-kerbside-on-shakenfist`. Instead it deploys the smoke
-cluster with a `kerbside` group and the PR's proxy wheel as
-`kerbside_proxy_package`, then runs its existing drivers
-unchanged. The composite action and Kerbside's
-`tools/sf-e2e/{provision-sf.sh,deploy-kerbside.sh,gen-sources.py}`
-are then retired, or reduced to whatever the drivers still need.
+*Amended 2026-10-10.* This phase was originally "Kerbside's lane
+deploys through the collection": Kerbside's sf-e2e lane would have
+reached into SF's collection for the role. Kerbside's
+[deployment options plan](https://github.com/shakenfist/kerbside/issues/546)
+(`docs/plans/PLAN-deployment-options.md` in Kerbside) reframes
+Kerbside as a "front door" that can sit in front of several
+clouds and is deployed independently of any one of them. A role
+that lives in SF's collection and writes exactly one `type:
+shakenfist` source is in the wrong repository for that framing.
+Iterating on the role in Kerbside's CI is also faster than in
+SF's. Kerbside's plan records its Ansible documentation phase as
+blocked on this phase.
 
-The lane stops testing a deploy shape no real operator would use.
-It also becomes an early warning for collection changes that
-break Kerbside.
+The role moves to the Kerbside repository as an Ansible
+collection. Its systemd units and helper scripts move with it,
+which settles open question 2's long-term answer.
 
-Planned at medium-high effort. The drivers are untouched, but the
-lane is currently failing nightly (kerbside#482), and that must be
-understood before it is moved. Otherwise the move will be blamed
-for it.
+What stays in SF's `site.yml`:
+
+- the `kerbside` group;
+- the certificate plays (`internal_ca`);
+- the validate play and the shadow guard;
+- the node role's credential and key minting.
+
+The role already reads no inventory group names and no other
+host's facts, which is the seam the move needs.
+
+In scope:
+
+- **Sources become a list.** `templates/sources.yaml` stops
+  hard-coding one Shaken Fist source and renders a
+  `kerbside_sources` list variable. SF's `site.yml` computes its
+  own entry (name, `api_url`, the `system` credential, the CA) and
+  passes it. An operator can append others (oVirt, OpenStack,
+  static). The role validates every entry, not just SF's. The
+  data-not-strings rendering and its quoting guarantees carry over
+  unchanged.
+- **The cross-repository dependency.** SF's collection, or SF's
+  `site.yml` users, depend on Kerbside's collection. The phase
+  plan designs and verifies all of the following:
+  - how the dependency is declared and resolved: Galaxy, a git
+    source in `requirements.yml`, or what CI builds from a
+    checkout;
+  - whether it is hard (`galaxy.yml` `dependencies`) or soft (a
+    `requirements.yml` needed only when the `kerbside` group is
+    non-empty);
+  - Kerbside's collection release step;
+  - how SF's merge lane pins a version.
+
+  It is expected to prefer a soft dependency, so that a cluster
+  without Kerbside does not install it. Whatever it chooses, it
+  must check each claim about `ansible-galaxy` against the
+  installed version rather than the documentation.
+- **SF-side tests that reach into the role** follow it or are
+  replaced:
+  - `test_kerbside_host_subject.py` pins
+    `files/kerbside-host-subject.py` to `node.py`'s subject
+    rendering, and a cross-repository pin needs a new shape;
+  - `test_ci_deploy_profiles.py` checks profiles against the
+    role's argument specs;
+  - `tools/ci-test-kerbside-role.sh` runs the role itself.
+- **Kerbside's sf-e2e lane exercises the role directly.**
+  `sf-e2e-functional.yml` stops running
+  `deploy-kerbside-on-shakenfist`. It deploys the smoke cluster
+  with a `kerbside` group, the PR's role and the PR's proxy wheel,
+  then runs its existing drivers unchanged. The composite action
+  and Kerbside's
+  `tools/sf-e2e/{provision-sf.sh,deploy-kerbside.sh,gen-sources.py}`
+  are then retired, or reduced to whatever the drivers still need.
+  The lane stops testing a deploy shape no real operator would
+  use, and becomes the early warning for role changes. Phase 4's
+  slim-tier row keeps proving the integration from SF's side
+  against a released version of the role.
+
+Out of scope: any non-SF source in CI. A second source type only
+needs the list variable to accept it. Testing one is Kerbside's
+deployment options plan's business.
+
+Most of the work lands in the Kerbside repository. The `Merged`
+cell records both sides.
+
+Planned at high effort. The phase crosses two repositories and a
+release boundary, and the dependency mechanism is cheap to propose
+and expensive to redo, so its shape is a back-brief gate. The lane
+was failing nightly (kerbside#482); phase 4's survey found it
+green, and the phase confirms that before moving the lane, so the
+move is not blamed for an old failure.
 
 ### Phase 6 -- Documentation and close-out
 
@@ -954,11 +1027,9 @@ codebase, can be planned at medium effort.
 
 !!! note "In this project"
 
-    Phases 1, 2, 3 and 4 are planned at high effort, for the
-    reasons given in each phase's section. Phase 5 is planned at
-    medium-high effort, because the lane's existing nightly
-    failure has to be understood first. Phase 6 is planned at
-    medium effort.
+    Phases 1 to 5 are planned at high effort, for the reasons
+    given in each phase's section. Phase 6 is planned at medium
+    effort.
 
 ### Step-level guidance
 
@@ -1188,8 +1259,9 @@ chosen to defer to here, so that we do not forget them.
   API behind a private CA needs that CA in the Kerbside host's
   system trust store. The deployer could install it, but the
   right fix is in Kerbside.
-- **Ship the systemd units from Kerbside**, and switch the
-  collection to them (open question 2).
+- ~~**Ship the systemd units from Kerbside**, and switch the
+  collection to them (open question 2).~~ Taken into phase 5,
+  which moves the whole role, units included, to Kerbside.
 - **Automated signing-key rotation**, carried over from the
   tokens plan.
 - **More than one Kerbside host, tested**, behind a TCP
