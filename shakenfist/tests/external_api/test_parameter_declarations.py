@@ -146,6 +146,37 @@ def _namespace_description_node(fn):
     return None
 
 
+def _declared_response_codes(fn):
+    """The status codes a handler's swagger_helper declares, or None
+    where the responses list cannot be read statically.
+
+    None rather than an empty set, for the same reason every source in
+    declarations.py reports unreadable input: "cannot read this" must
+    not wear the same face as "declares nothing", or a declaration
+    rewritten into a computed form would silently escape the audit.
+    """
+    for dec in fn.decorator_list:
+        if not (isinstance(dec, ast.Call)
+                and 'swagger_helper' in ast.unparse(dec)):
+            continue
+        call = dec.args[0] if dec.args else None
+        if not (isinstance(call, ast.Call) and len(call.args) >= 4
+                and isinstance(call.args[3], ast.List)):
+            return None
+        codes = set()
+        for item in call.args[3].elts:
+            # swagger_helper() destructures exactly (code, description,
+            # sample), so any other shape is malformed.
+            if not (isinstance(item, ast.Tuple) and len(item.elts) == 3):
+                return None
+            code = declarations.literal(item.elts[0])
+            if code is None:
+                return None
+            codes.add(code)
+        return codes
+    return None
+
+
 def _endpoints():
     """Yield (class name, method name, method node) per handler."""
     for _, _, cls, fn in declarations.handlers():
@@ -735,6 +766,48 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
             'these handlers are missing from the published API: %s. '
             'Declare them, or add them to UNDOCUMENTED_BY_DESIGN with a '
             'reason.' % ', '.join(undocumented))
+
+    def test_instance_active_handlers_declare_406(self):
+        """Every handler behind requires_instance_active declares the
+        406 the decorator answers.
+
+        The decorator refuses any instance not in state `created` with
+        a 406 before the handler runs, so the code is part of every
+        such endpoint's contract whether or not the declaration says
+        so. The six power endpoints gained the declaration in phase 3
+        of PLAN-power-state-correctness (F12), which scoped the three
+        agent and screenshot endpoints out to issue 4449; this holds
+        the whole class closed, so the next endpoint to adopt the
+        decorator cannot reopen it.
+
+        The count is pinned, like the ref decorator pairing above,
+        because a walk which silently stopped finding the decorator
+        would otherwise pass by examining nothing.
+        """
+        checked = 0
+        for cls, method, fn in _endpoints():
+            if 'requires_instance_active' not in [
+                    _bare_decorator_name(dec) for dec in fn.decorator_list]:
+                continue
+            codes = _declared_response_codes(fn)
+            self.assertIsNotNone(
+                codes,
+                '%s.%s has a responses list this audit cannot read '
+                'statically, so whether it declares the 406 cannot be '
+                'checked' % (cls, method))
+            self.assertIn(
+                406, codes,
+                '%s.%s is behind requires_instance_active, which answers '
+                '406 for any instance not in state created, but does not '
+                'declare 406; add (406, \'Instance is not ready.\', None) '
+                'to its responses' % (cls, method))
+            checked += 1
+
+        self.assertEqual(
+            13, checked,
+            'expected 13 handlers behind requires_instance_active, found '
+            '%d. If the count changed on purpose, update it here.'
+            % checked)
 
 
 class DerivationTestCase(base.ShakenFistTestCase):
