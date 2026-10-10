@@ -147,6 +147,7 @@ nav:
                 - "Audit: Python version and type hints": components/development/audits/python-version.md
                 - "Audit: README absolute links": components/development/audits/readme-absolute-links.md
                 - "Audit: README structure": components/development/audits/readme-structure.md
+                - "Audit: Release artifacts exclude docs/plans": components/development/audits/release-artifacts-exclude-plans.md
                 - "Audit: Release process": components/development/audits/release-process.md
                 - "Audit: Renovate for dependency bumps": components/development/audits/renovate.md
                 - "Audit: Renovate groups for lockstep dependency families": components/development/audits/renovate-lockstep-groups.md

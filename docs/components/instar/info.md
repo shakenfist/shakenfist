@@ -42,6 +42,18 @@ instar info --qemu-version 10.0 image.qcow2
 See [output-formats.md](/components/instar/output-formats/) for detailed documentation on
 output format profiles.
 
+## VHDX sizes
+
+A VHDX's virtual size and block size (reported as the cluster size)
+are read from the File Parameters and Virtual Disk Size metadata
+items, which `info` finds by GUID in the metadata table. SPEC(VHDX)
+2.6.1.2 gives metadata items no fixed order or position, so `info`
+never assumes one. If the metadata cannot be parsed (a missing
+required item, an item outside the file, or a block size that is not
+a power of two between 1 MiB and 256 MiB), `info` reports the file's
+size as the virtual size and no cluster size, rather than a value it
+could not trust.
+
 ## Differencing images
 
 A differencing VHD (`disk_type == 4`) or differencing VHDX (`HasParent`
