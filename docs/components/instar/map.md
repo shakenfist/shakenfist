@@ -160,7 +160,10 @@ BAT walk, skipping interleaved sector-bitmap entries by the
 `chunk_ratio`. Per payload BAT entry:
 
 - `PAYLOAD_BLOCK_FULLY_PRESENT`: `Data` with the block's file
-  offset.
+  offset, refused instead if the offset is zero (the file identifier
+  and headers live there) or the block's byte range overlaps any
+  region the image's own region table declares, such as the BAT or
+  metadata region. See "Malformed block tables" below.
 - `PAYLOAD_BLOCK_PARTIALLY_PRESENT`: treated as `Data` (per-sector
   bitmap walk is future work; see below).
 - `PAYLOAD_BLOCK_ZERO` / `PAYLOAD_BLOCK_UNMAPPED`: `Hole`.
@@ -170,6 +173,34 @@ BAT walk, skipping interleaved sector-bitmap entries by the
 Single fully-allocated extent covering the virtual size. The no_std
 raw parser cannot call `SEEK_HOLE` from inside the guest, so on-disk
 sparseness is not reflected (see below).
+
+## Malformed block tables
+
+`map`'s VHDX walk refuses a payload block whose BAT entry names a
+byte range that is the image's own structure, rather than reporting
+it as `Data`: file offset zero, where the file identifier and
+headers live, or a range overlapping any region the image's region
+table declares (the BAT region, the metadata region, or one this
+build does not recognise). This is the same test the guest chain
+walker already applies when reading such a block for `convert`,
+`dd`, `compare`, `bench` and `rebase`; `map`'s own whole-BAT walk did
+not apply it until recently, so it could report a block one of those
+operations already refused to read:
+
+```
+map: source block table names a block inside the image's own
+structure (at file offset zero, or overlapping a region the image
+declares); the format is recognised, the image is malformed
+```
+
+Exit 1, the same as any other refused source. The format is
+recognised and the image parsed far enough to walk its BAT, so the
+message deliberately does not say "unrecognised" — that would send a
+user hunting a format problem that is not there. A block declared
+immediately past the last region in the table is unaffected and
+still maps normally. See
+[docs/format-internals.md § vhdx](/components/instar/format-internals/#vhdx) for the
+predicate both the readers and this walk share.
 
 ## Known divergences from qemu-img
 
@@ -208,7 +239,8 @@ rationale and the future-work pointer.
   stripped. See
   [docs/quirks.md § qcow2 compressed clusters report `compressed: false`](/components/instar/quirks/#qcow2-compressed-clusters-report-compressed-false).
 - **Backing-chain `depth` is always 0 in v1** — instar refuses
-  sources with a backing pointer; qemu-img walks the chain. See
+  sources with a backing pointer; qemu-img walks the chain. Tracked
+  as [#641](https://github.com/shakenfist/instar/issues/641). See
   [docs/quirks.md § Backing-chain `depth` is always 0 in v1](/components/instar/quirks/#backing-chain-depth-is-always-0-in-v1).
 - **`--image-opts` is rejected** — qemu-img's descriptor-based
   source specification (`map --image-opts driver=qcow2,...`) is

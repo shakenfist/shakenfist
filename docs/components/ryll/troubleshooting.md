@@ -784,7 +784,7 @@ probe reported a stall on healthy guests (issue #429).
 | `agent_stall_count` | Starvation episodes that lasted long enough to raise the notification. Cumulative. |
 | `agent_request_count` | `VD_AGENT_MONITORS_CONFIG` messages sent (one per window resize or display change). |
 | `agent_reply_count` | `VD_AGENT_REPLY` messages received. Stays at zero on QXL guests, where the agent never sees `MONITORS_CONFIG`; that is normal. |
-| `agent_reply_error_count` | Replies with a non-zero error code. Should be zero. |
+| `agent_reply_error_count` | Replies whose error code is not `VD_AGENT_SUCCESS` (1). Should be zero. |
 | `last_agent_reply_ts_secs` | Session-relative seconds of the most recent REPLY. |
 | `last_agent_reply_lag_us` | Microseconds between the most recent matched send and its REPLY, where replies arrive at all. |
 | `recent_agent_reply_lag_us` | Ring of the last 16 reply lags, in microseconds. |

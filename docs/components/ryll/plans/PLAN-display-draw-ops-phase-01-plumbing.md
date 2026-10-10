@@ -75,7 +75,7 @@ By the end of this phase:
 
 ## Current state
 
-* [shakenfist-spice-protocol/src/messages.rs:255](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs#L255)
+* [shakenfist-spice-protocol/src/messages.rs:255](https://github.com/shakenfist/ryll/blob/4d5f9e98f31bb58d4e69759054df381145cc9e51/shakenfist-spice-protocol/src/messages.rs#L255)
   defines `DrawCopyBase` — the generic
   `SpiceMsgDisplayBase` (surface_id, box, clip). Misnamed;
   every draw op uses it. Rename to `DrawBase`.
@@ -482,7 +482,7 @@ test covers:
   `!= 0` (non-null) cases.
 
 Reuse the existing `DrawCopyBase` test block
-[messages.rs:639-720](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs#L639)
+[messages.rs:639-720](https://github.com/shakenfist/ryll/blob/4d5f9e98f31bb58d4e69759054df381145cc9e51/shakenfist-spice-protocol/src/messages.rs#L639)
 as a style reference (manual byte construction, explicit
 expected values, `expect()` on the parse, `assert_eq!`
 on fields).

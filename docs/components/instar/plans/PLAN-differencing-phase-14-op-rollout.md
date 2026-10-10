@@ -411,9 +411,15 @@ cannot resolve the sector bitmaps of images instar itself wrote.
   own operation. Falsifiable: a test asserts the message text, not
   just the exit code.
 * No user-visible string contains `PLAN-`. Falsifiable:
-  `grep -rn 'PLAN-[a-z0-9-]*\.md' --include=*.rs src/ | grep -v '^\s*//'`
+  `grep -rn 'PLAN-[a-z0-9-]*\.md' --include=*.rs src/ | sed 's/^[^:]*:[0-9]*://' | grep -v '^[[:space:]]*//'`
   returns nothing from `format!`, `println!`, `eprintln!` or a
-  `&str` constant. **14e found this is eight strings, not the one
+  `&str` constant. **The command is corrected here.** As first
+  written it piped straight into `grep -v '^\s*//'`, and `grep -rn`
+  prefixes every line with `path:lineno:`, so the filter could never
+  match and the criterion could never pass -- it would have reported
+  every comment in the tree as a violation. Phase 15's completion
+  check found it; stripping the prefix first, the criterion passes
+  with zero hits. **14e found this is eight strings, not the one
   F6 scoped it to**: the differencing read refusal (removed in
   14e), `map`'s refusal citing `PLAN-map.md`
   (`src/vmm/src/main.rs:16138`), `create`'s differencing-backing

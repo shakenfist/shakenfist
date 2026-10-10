@@ -113,7 +113,7 @@ stay warn-once-deferred).
 
 ## Current state
 
-* [shakenfist-spice-protocol/src/messages.rs](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs)
+* [shakenfist-spice-protocol/src/messages.rs](https://github.com/shakenfist/ryll/blob/4d5f9e98f31bb58d4e69759054df381145cc9e51/shakenfist-spice-protocol/src/messages.rs)
   has `SpiceTransparent::read` and
   `SpiceAlphaBlend::read` from phase 1.
 * [ryll/src/channels/display.rs](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs)

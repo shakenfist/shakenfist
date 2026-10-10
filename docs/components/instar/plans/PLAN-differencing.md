@@ -370,8 +370,8 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 | 11. Composition: host chain discovery and `info --chain` | [PLAN-differencing-phase-11-chain-host.md](/components/instar/plans/PLAN-differencing-phase-11-chain-host/) | Complete | `c66f8b2` (#603) |
 | 12. Composition: guest VHD sector-bitmap read path | [PLAN-differencing-phase-12-vhd-compose.md](/components/instar/plans/PLAN-differencing-phase-12-vhd-compose/) | Complete | `b4ae7fc` (#615) |
 | 13. Composition: guest VHDX sector-bitmap read path | [PLAN-differencing-phase-13-vhdx-compose.md](/components/instar/plans/PLAN-differencing-phase-13-vhdx-compose/) | Complete | `d677823c` (#624) |
-| 14. Composition: rollout across the chain-walker operations | [PLAN-differencing-phase-14-op-rollout.md](/components/instar/plans/PLAN-differencing-phase-14-op-rollout/) | In progress | |
-| 15. Composition: chain support for `map`, `measure` and `check` | PLAN-differencing-phase-15-single-image-ops.md | Not started | |
+| 14. Composition: rollout across the chain-walker operations | [PLAN-differencing-phase-14-op-rollout.md](/components/instar/plans/PLAN-differencing-phase-14-op-rollout/) | Complete | `7fef1321` (#630) |
+| 15. Consistency for the non-composing operations | [PLAN-differencing-phase-15-op-consistency.md](/components/instar/plans/PLAN-differencing-phase-15-op-consistency/) | In progress | |
 | 16. Composition: integration tests and fuzz | PLAN-differencing-phase-16-compose-tests.md | Not started | |
 | 17. Composition: documentation | PLAN-differencing-phase-17-compose-docs.md | Not started | |
 | 18. Push audit: `PUSH-AUDIT.md` over every phase above | PLAN-differencing-phase-18-push-audit.md | Not started | |
@@ -589,19 +589,48 @@ rather than left as one phase to be split later, the way
   Phase 14 is the change that makes it reachable from a user command
   on an untrusted image, so it is the phase that should close it.
 
-* **Phase 15, chain support for the single-image operations.**
-  `map`, `measure` and `check`, split out of phase 14 by its survey.
-  These are not refusal lifts: `map` and `measure` have no chain
-  notion at all, and `check`'s `validate_chain` walks a chain's
-  members to validate each independently rather than to compose a
-  read. `map`'s own chain composition is additionally deferred to
-  `PLAN-map.md` (`src/shared/src/lib.rs:833`), so phase 15 must
-  settle which plan owns it before it starts. `commit` is a
-  composing caller on the host (`src/vmm/src/main.rs:7265`) whose
-  guest op reads through its own `backing_chain_first` /
-  `backing_chain_count` slots rather than `init_chain_states`; it is
-  neither refused today nor lifted by phase 14, and phase 15 should
-  decide whether that is correct or merely untested.
+* **Phase 15, consistency for the non-composing operations.**
+  Rescoped by its own survey, and no longer the chain-support phase
+  this section first described. What holds from that description:
+  `map` and `measure` have no chain notion at all -- neither host
+  discovers a chain and neither guest op consumes a `ChainConfig` --
+  and `check`'s `validate_chain` walks a chain's members to validate
+  each independently rather than to compose a read.
+
+  What does not hold is that phase 15 should build the composition.
+  Measured against qemu-img 10.0.13, `qemu-img check` does not walk
+  the chain at all, so `check` needs no composition to reach parity;
+  while `qemu-img map` and `qemu-img measure` both do compose, for
+  every format, which makes their gap qcow2-chain parity work rather
+  than anything differencing introduced. `map` has refused a backing
+  pointer since `eb6e23f`, before this plan began, as phase 4's
+  survey already recorded. Both were deferred by `PLAN-map.md` and
+  `PLAN-measure.md`, which are now `Status: Complete`, so the
+  "which plan owns it" question this section posed had no answer:
+  neither candidate owner is open. They leave this plan as issues
+  #641 and #642, to be taken together by whichever plan picks them
+  up, since both need multi-device plumbing in an op that has none.
+
+  `commit`'s disposition was settled by phase 14 rather than left to
+  phase 15: `run_commit` passes `DifferencingComposition::Unsupported`
+  because its guest op ignores the ancestor slots the host fills in,
+  so resolving a differencing parent could only turn a working
+  command into a path error. It is correct and untested, and phase 15
+  supplies the test. The `src/vmm/src/main.rs:7265` reference above
+  has drifted and now points inside `run_rebase`.
+
+  What phase 15 does own is the boundary phase 14 left behind. The
+  composing readers now refuse a VHDX payload block overlapping a
+  declared region (#625) and `map` and `measure` do not apply that
+  test, so the three operations disagree about what a valid block is
+  (#634); `check` and `bench` attach a chain without the
+  `MAX_CHAIN_DEVICES` guard the other five have (#633); and the
+  comments justifying the `check` and `measure` refusals say instar
+  cannot read a differencing image, which five operations now do.
+  Those refusals stay -- these two report on one image, so a clean
+  verdict or an allocation figure would present a partial view as a
+  whole one -- with the lift question filed as #643 rather than
+  settled by a phase scoped to consistency.
 
 * **Phase 16, tests and fuzz.** Cross-validation against the
   phase 1 oracle for chains instar wrote and chains it did not,
