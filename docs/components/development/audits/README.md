@@ -201,6 +201,7 @@ attached rather than quietly disappearing from the table.
 | [python-version.md](/components/development/audits/python-version/) | Python version targeting and type hints |
 | [pyproject-usage.md](/components/development/audits/pyproject-usage/) | Python projects use pyproject.toml |
 | [version-file-gitignore.md](/components/development/audits/version-file-gitignore/) | Generated version files are gitignored |
+| [release-artifacts-exclude-plans.md](/components/development/audits/release-artifacts-exclude-plans/) | Release artifacts built from the repository root do not ship docs/plans |
 | [rust-unwrap-lint.md](/components/development/audits/rust-unwrap-lint/) | Rust projects lint against production unwrap() |
 | [readme-absolute-links.md](/components/development/audits/readme-absolute-links/) | Top-level README.md links are absolute |
 | [docs-external-links.md](/components/development/audits/docs-external-links/) | Links out of docs/ resolve inside docs/, or else are absolute |

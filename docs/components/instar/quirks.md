@@ -4791,12 +4791,12 @@ rather than fixed, because none of them was that change's job to close:
    directory. Path normalisation belongs with the composition work in
    [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/). See
    [info.md](/components/instar/info/#known-limitations).
-3. **`instar resize` still accepts a differencing VHDX.** This is a write
-   path, predates the differencing work, and `resize` never called
-   `VhdxState::init`, so the read-side refusal neither caused it nor fixes
-   it. Tracked as
-   [issue #565](https://github.com/shakenfist/instar/issues/565); see
-   [resize.md](/components/instar/resize/#known-limitations).
+3. **`instar resize` accepted a differencing VHDX** (fixed). This was a
+   write path, predated the differencing work, and `resize` never called
+   `VhdxState::init`, so the read-side refusal neither caused it nor fixed
+   it. `resize` now reads the image's HasParent flag and refuses it as it
+   refuses a differencing VHD
+   ([issue #565](https://github.com/shakenfist/instar/issues/565)).
 
 ## Future Additions
 
