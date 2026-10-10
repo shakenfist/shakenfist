@@ -143,7 +143,7 @@ fields.
 The agent round-trip stats track vdagent-mediated requests that
 expect a `VD_AGENT_REPLY` (today: `VD_AGENT_MONITORS_CONFIG`):
 `agent_request_count`, `agent_reply_count`,
-`agent_reply_error_count` (replies with a non-zero error field),
+`agent_reply_error_count` (replies whose error field is not `VD_AGENT_SUCCESS`, 1),
 `last_agent_reply_ts_secs`, `last_agent_reply_lag_us`, a bounded
 `recent_agent_reply_lag_us` ring, and
 `outstanding_agent_request_count`. That last one is not a stall

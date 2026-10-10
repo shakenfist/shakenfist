@@ -137,7 +137,10 @@ qemu-img's:
   allocated bytes slightly differently. Likely a compressed-cluster or
   extended-L2 subcluster edge case under investigation.
 - **QCOW2 sources with backing chains**: instar reports the top layer's
-  allocations only. qemu-img consults the chain.
+  allocations only. qemu-img consults the chain. Tracked as
+  [#642](https://github.com/shakenfist/instar/issues/642); the same
+  plumbing closes this for a VHD or VHDX chain, whichever format the
+  chain is in.
 - **VHDX sources**: instar treats every BAT block as fully allocated.
   qemu-img returns the actual block-state distribution.
 - **VMDK multi-extent source layouts**: instar's extent map propagation
@@ -148,6 +151,34 @@ qemu-img's:
 The canonical list of test cases skipped due to these divergences is
 `KNOWN_SOURCE_SCANNER_DIVERGENCES` in `tests/test_measure.py`. Each entry
 names the divergence category.
+
+## Malformed block tables
+
+`measure`'s VHDX allocation scan refuses a payload block whose BAT entry
+names a byte range that is the image's own structure, rather than
+counting it as allocated: file offset zero, where the file identifier
+and headers live, or a range overlapping any region the image's region
+table declares. This is the same test the guest chain walker already
+applies when reading such a block for `convert`, `dd`, `compare`,
+`bench` and `rebase`; `measure`'s own whole-BAT scan did not apply it
+until recently, so it could count a block one of those operations
+already refused to read:
+
+```
+measure: source block table names a block inside the image's own
+structure (at file offset zero, or overlapping a region the image
+declares); the format is recognised, the image is malformed
+```
+
+Exit 1, the same as any other refused source.
+
+The format is recognised and the image parsed far enough to walk its
+BAT, so the message deliberately does not say "unsupported format" —
+that would send a user hunting a format problem that is not there. A
+block declared immediately past the last region in the table is
+unaffected and still measures normally. See
+[docs/format-internals.md § vhdx](/components/instar/format-internals/#vhdx) for the
+predicate both the readers and this scan share.
 
 ## Future work
 
@@ -216,3 +247,10 @@ instead of refusing. `convert`, `dd`, `compare`, `bench` and `rebase` do
 compose a differencing source against its parent; see the "VHD/VHDX
 differencing" section of [quirks.md](/components/instar/quirks/) for the per-operation
 record.
+
+This refusal is deliberate, not merely unimplemented: `measure` reports
+on one image, and a differencing child's own blocks are almost always
+intact while the required size they describe only covers part of the
+image. Whether that should change anyway is tracked as
+[#643](https://github.com/shakenfist/instar/issues/643), open and not
+settled either way.

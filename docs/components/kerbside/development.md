@@ -525,6 +525,29 @@ a configurable number of seconds after the first authorization
 (`MOCK_GRPC_TERMINATE_AFTER`), standing in for the API/DB leg so the
 harness exercises the proxy-side cancellation path live.
 
+## What ships in the Python wheel
+
+`pyproject.toml` declares the wheel's contents explicitly:
+`[tool.setuptools.packages.find]` picks up every directory under
+`kerbside/`, with or without an `__init__.py`, and
+`[tool.setuptools.package-data]` lists the non-Python file types that
+ship (templates, static assets, `alembic.ini` and so on). A file with a
+new extension needs adding to that list.
+
+Do not rely on a file being tracked in git to make it ship.
+setuptools_scm's git file finder adds every tracked file beneath a
+package directory, but only when git metadata is present, so a build
+from a container context without `.git` or a vendored copy would
+silently lose anything not declared (issue #326). `tools/check-wheel.py`,
+run in CI, builds the wheel both with and without git metadata and fails
+if the two differ. Run it locally after changing the layout:
+
+```bash
+python3 -m venv /tmp/wheelcheck
+/tmp/wheelcheck/bin/pip install build
+/tmp/wheelcheck/bin/python tools/check-wheel.py
+```
+
 ## Dependency pinning
 
 Indirect (transitive) dependencies are pinned in `pyproject.toml`
