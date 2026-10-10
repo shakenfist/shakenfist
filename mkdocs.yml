@@ -172,6 +172,7 @@ nav:
                 - "Plan: stestr / testtools version pin": components/development/plans/PLAN-stestr-testtools.md
                 - "Plan: the image supply chain, from end-of-life migration to production that reports its own failures": components/development/plans/PLAN-image-supply-chain.md
                 - "Plan: the size of a review unit": components/development/plans/PLAN-review-unit-size.md
+                - "Renovate cadence": components/development/plans/PLAN-renovate-cadence.md
                 - "Review coverage steady state": components/development/plans/PLAN-review-coverage.md
                 - "Review import": components/development/plans/PLAN-review-import.md
                 - "Shaken Fist Project Consistency Plan": components/development/plans/PLAN-consistency.md

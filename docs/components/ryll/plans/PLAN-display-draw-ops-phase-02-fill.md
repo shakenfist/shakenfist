@@ -89,7 +89,7 @@ By the end of this phase:
   a stub; `DRAW_FILL` falls into the `_ =>
   log_unknown(...)` arm at
   [ryll/src/channels/display.rs:654](https://github.com/shakenfist/ryll/blob/develop/ryll/src/channels/display.rs#L654).
-* [shakenfist-spice-protocol/src/messages.rs](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs)
+* [shakenfist-spice-protocol/src/messages.rs](https://github.com/shakenfist/ryll/blob/4d5f9e98f31bb58d4e69759054df381145cc9e51/shakenfist-spice-protocol/src/messages.rs)
   has the `DrawBase`, `SpiceFill`, `SpiceBrush`,
   `SpiceQMask` parsers from phase 1.
 * [shakenfist-spice-protocol/src/constants.rs:189](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/constants.rs#L189)

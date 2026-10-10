@@ -82,7 +82,7 @@ By the end of this phase:
 
 ## Current state
 
-* [shakenfist-spice-protocol/src/messages.rs](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs)
+* [shakenfist-spice-protocol/src/messages.rs](https://github.com/shakenfist/ryll/blob/4d5f9e98f31bb58d4e69759054df381145cc9e51/shakenfist-spice-protocol/src/messages.rs)
   has `SpiceBlackness` (with `SpiceWhiteness` and
   `SpiceInvers` as type aliases) from phase 1. 13 bytes,
   one `SpiceQMask` field.

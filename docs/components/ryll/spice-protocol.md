@@ -190,6 +190,31 @@ still recorded on `MainSnapshot` as passive diagnostics, next to the token
 and queue fields; the "Guest agent diagnostics" section in
 [troubleshooting.md](/components/ryll/troubleshooting/) explains each one.
 
+## Server role
+
+The protocol crate serves both ends of the wire: ryll uses it as a client,
+and the kerbside SPICE proxy uses its link handshake to speak to clients as
+a server. The message types a server sends or receives therefore have both
+a reader and a writer, whichever direction ryll itself needs: the common
+and main channel messages, the vdagent messages, the cursor and inputs
+channels, and the display channel's surfaces, monitors config, streams and
+`DRAW_COPY`. They implement `WireType` (or `ClipboardWireType`), and each
+is tested against itself and against hand-written bytes laid out from
+spice.proto. The other draw operations (`SpiceFill`, `SpiceOpaque`,
+`SpiceTransparent`, `SpiceAlphaBlend`, `SpiceBlackness` and the brushes)
+still have readers only, since only a client parses them.
+
+`DRAW_COPY` is the one message whose layout is not a flat sequence of
+fields. Its image and mask are reached through offsets, which are measured
+from the start of the message body (the mini header is excluded) and are
+zero for a null pointer. The writer lays out the fixed fields first, then
+the source image, then the mask, as spice-server does. `DrawCopy` stores
+its images already demarshalled rather than as raw offsets, and the reader
+and the writer share one layout function, so a value read from any accepted
+layout writes out in the canonical one and reads back unchanged. Image
+types the crate does not model are carried as an opaque payload bounded by
+the next pointee.
+
 ## Image Types and Compression
 
 SPICE uses several image types for display updates. The type is
@@ -250,10 +275,16 @@ tracked per display channel and included in bug reports for performance analysis
   `compressed_size` (u32 LE), then zlib-compressed GLZ data.
 - **LZ4**: NO `data_size` prefix. Data starts immediately with a
   1-byte `top_down` flag, 1-byte `spice_format`, then per-row
-  LZ4 blocks each with a 4-byte big-endian size prefix.
-- **Pixmap**: preceded by an 18-byte `BitmapData` header (format u8,
-  flags u8, x u32, y u32, stride u32, palette_addr u32), then raw pixel
-  rows. Only 32-bit formats (BGRX=8, RGBA=9) are supported. The
+  LZ4 blocks each with a 4-byte big-endian size prefix. See the note
+  under the LZ4 description below: this disagrees with the reference
+  implementation.
+- **Pixmap**: preceded by a `BitmapData` header (format u8, flags u8,
+  x u32, y u32, stride u32), then the palette reference, then raw pixel
+  rows. The palette reference is a 4-byte `palette_addr` normally,
+  making the header 18 bytes. When `PAL_FROM_CACHE` is set in the flags
+  it is instead a u64 palette id, making the header 22 bytes
+  (spice.proto:549-554). ryll draws only 32-bit bitmaps, which carry no
+  palette. Only 32-bit formats (BGRX=8, RGBA=9) are supported. The
   `top_down` flag (bit 2 of flags) controls row ordering.
 - **JPEG**: preceded by a 4-byte `data_size` (u32 LE), then a standard
   JPEG stream. Decoded via the `image` crate and converted to RGBA.
@@ -309,6 +340,17 @@ current image. No cross-frame dependencies.
 **ZLIB_GLZ_RGB** — GLZ data compressed with zlib for additional
 bandwidth savings. Common for incremental updates from QEMU/KVM
 through kerbside.
+
+> **Known discrepancy, under investigation in
+> [shakenfist/ryll#475](https://github.com/shakenfist/ryll/issues/475).**
+> The LZ4 description here and below is what ryll does today, and it
+> disagrees with spice-server and spice-common: spice.proto:612-613 makes
+> the LZ4 image a `BinaryData`, which spice.proto:558-561 defines with a
+> `data_size` prefix before the payload, the reference uses streaming
+> LZ4 over multi-line chunks rather than independent per-row blocks, and
+> the `SPICE_BITMAP_FMT` values differ from the ones listed below
+> (see spice-common's `enums.h`). Do not treat this section as the
+> specification.
 
 **LZ4** — Fast per-row compression. Each row is individually
 LZ4-compressed with a big-endian size prefix. The `spice_format`

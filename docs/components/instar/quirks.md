@@ -4691,6 +4691,48 @@ See [convert.md](/components/instar/convert/), [dd.md](/components/instar/dd/), 
 record, and [measure.md](/components/instar/measure/), [check.md](/components/instar/check/) and
 [map.md](/components/instar/map/) for the operations that still refuse.
 
+### The five-compose, three-report boundary is deliberate
+
+Five operations compose a differencing source and three report on one
+image outright. That split is this project's chosen end state for the
+operations above, not a gap still to close — each side has its own
+reason, and the reason is different for every operation on the
+"report" side rather than one blanket limitation:
+
+- **`convert`, `dd`, `compare`, `bench` and `rebase` compose a
+  differencing source against its parent.** Each reads through the
+  guest chain walker, which now resolves a differencing parent and
+  serves the sectors it owns, so each has something correct to do
+  with one instead of a reason to refuse it.
+- **`check` and `measure` report on one image rather than composing a
+  chain into it.** A clean verdict, or a required-size estimate that
+  counts only the child's own blocks, would present that partial view
+  as though it covered the whole image — which is exactly the wrong
+  answer these two operations exist to avoid giving. Whether that
+  should change anyway, given that both can now read a differencing
+  image's own structure correctly, is tracked as
+  [#643](https://github.com/shakenfist/instar/issues/643), open and
+  not settled either way.
+- **`map` refuses any backing pointer at all, for every format, not
+  only VHD and VHDX differencing.** That posture predates this work
+  entirely — see "Backing-chain `depth` is always 0 in v1" above —
+  and composing one is qcow2-chain parity work the differencing plan
+  does not own, tracked as
+  [#641](https://github.com/shakenfist/instar/issues/641). `measure`'s
+  own qcow2-chain gap is the same shape, tracked as
+  [#642](https://github.com/shakenfist/instar/issues/642).
+- **`commit` never reaches a differencing ancestor at all.** It
+  refuses any overlay that is not qcow2 or vmdk, so a differencing VHD
+  or VHDX can only ever sit further back in the overlay's own backing
+  chain — never as the overlay itself. The guest op that performs the
+  write reads only the overlay and the backing device it is committed
+  into; it never reads the backing's own ancestors, so there is no
+  chain position from which it could compose or refuse a differencing
+  grandparent. The host's chain discovery call for `commit` is
+  deliberately told it cannot resolve one
+  (`DifferencingComposition::Unsupported`), which records that absence
+  rather than causing it.
+
 ### libvhdi, for contrast
 
 **Classification: Not applicable** (describes a third-party tool, not

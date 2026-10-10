@@ -99,6 +99,14 @@ For VHDX images, check validates:
   "Differencing images" below
 - BAT entries: block offsets within file bounds, 1MB alignment,
   overlap detection, state validation
+- A payload block naming file offset zero, or a byte range
+  overlapping any region the image's own region table declares (the
+  BAT region, the metadata region, or one this build does not
+  recognise), is counted as a corruption rather than validated as
+  data — the same test `convert`, `dd`, `compare`, `bench` and
+  `rebase` already apply when reading such a block, applied here
+  against `check`'s own parsed region table so the two agree. See
+  "Malformed block tables" below.
 - Fragmentation tracking (non-sequential block allocation)
 
 ## Chain validation
@@ -156,3 +164,39 @@ Two things about that are worth knowing if you script against `check`:
 `convert`, `dd`, `compare`, `bench` and `rebase` do compose a
 differencing source against its parent; see the "VHD/VHDX differencing"
 section of [quirks.md](/components/instar/quirks/) for the per-operation record.
+
+This refusal is deliberate, not merely unimplemented: `check` validates
+one image's structure, and a differencing child's own structure is
+almost always intact while the image as a whole is unusable without
+its parent — a clean verdict would describe a partial view as though
+it were the whole image. Whether that should change anyway is tracked
+as [#643](https://github.com/shakenfist/instar/issues/643), open and
+not settled either way.
+
+## Malformed block tables
+
+Separately from the differencing refusal above, `check` counts a
+*non*-differencing VHDX as corrupt when its BAT names a payload block
+that is the image's own structure: file offset zero, where the file
+identifier and headers live, or a byte range overlapping any region
+the image's region table declares. Before this, `check`'s own BAT and
+region-table validation never cross-checked a block's offset against
+the regions it had just parsed, so such a block claimed an
+overlap-bitmap slot nothing else held and the image came back clean:
+
+```
+$ instar check malformed.vhdx
+1 errors were found on the image.
+$ echo $?
+2
+```
+
+(`--verbose` additionally traces `"[GUEST] check: VHDX block inside a
+declared region"`, or `"[GUEST] check: VHDX block at file offset
+zero"` for the other ground; the default output above only ever
+reports the count.) This is unchanged by `--chain`. The same two
+conditions are what `map` and `measure` refuse outright rather than
+count, and what `convert`, `dd`, `compare`, `bench` and `rebase`
+already refused to read before `check` gained this check — see
+[docs/map.md § Malformed block tables](/components/instar/map/#malformed-block-tables)
+and [docs/measure.md § Malformed block tables](/components/instar/measure/#malformed-block-tables).
