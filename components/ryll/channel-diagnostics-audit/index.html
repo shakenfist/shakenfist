@@ -3360,6 +3360,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-renovate-cadence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renovate cadence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -15529,7 +15557,7 @@ fields.</p>
 <p>The agent round-trip stats track vdagent-mediated requests that
 expect a <code>VD_AGENT_REPLY</code> (today: <code>VD_AGENT_MONITORS_CONFIG</code>):
 <code>agent_request_count</code>, <code>agent_reply_count</code>,
-<code>agent_reply_error_count</code> (replies with a non-zero error field),
+<code>agent_reply_error_count</code> (replies whose error field is not <code>VD_AGENT_SUCCESS</code>, 1),
 <code>last_agent_reply_ts_secs</code>, <code>last_agent_reply_lag_us</code>, a bounded
 <code>recent_agent_reply_lag_us</code> ring, and
 <code>outstanding_agent_request_count</code>. That last one is not a stall

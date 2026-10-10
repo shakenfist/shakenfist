@@ -3360,6 +3360,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-renovate-cadence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renovate cadence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -3928,6 +3956,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#malformed-block-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Malformed block tables
+      
+    </span>
+  </a>
   
 </li>
       
@@ -15239,6 +15278,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#malformed-block-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Malformed block tables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#known-divergences-from-qemu-img" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15473,7 +15523,10 @@ multi-extent sources are refused host-side (see below).</p>
 <code>chunk_ratio</code>. Per payload BAT entry:</p>
 <ul>
 <li><code>PAYLOAD_BLOCK_FULLY_PRESENT</code>: <code>Data</code> with the block's file
-  offset.</li>
+  offset, refused instead if the offset is zero (the file identifier
+  and headers live there) or the block's byte range overlaps any
+  region the image's own region table declares, such as the BAT or
+  metadata region. See "Malformed block tables" below.</li>
 <li><code>PAYLOAD_BLOCK_PARTIALLY_PRESENT</code>: treated as <code>Data</code> (per-sector
   bitmap walk is future work; see below).</li>
 <li><code>PAYLOAD_BLOCK_ZERO</code> / <code>PAYLOAD_BLOCK_UNMAPPED</code>: <code>Hole</code>.</li>
@@ -15482,6 +15535,29 @@ multi-extent sources are refused host-side (see below).</p>
 <p>Single fully-allocated extent covering the virtual size. The no_std
 raw parser cannot call <code>SEEK_HOLE</code> from inside the guest, so on-disk
 sparseness is not reflected (see below).</p>
+<h2 id="malformed-block-tables">Malformed block tables<a class="headerlink" href="#malformed-block-tables" title="Permanent link">&para;</a></h2>
+<p><code>map</code>'s VHDX walk refuses a payload block whose BAT entry names a
+byte range that is the image's own structure, rather than reporting
+it as <code>Data</code>: file offset zero, where the file identifier and
+headers live, or a range overlapping any region the image's region
+table declares (the BAT region, the metadata region, or one this
+build does not recognise). This is the same test the guest chain
+walker already applies when reading such a block for <code>convert</code>,
+<code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code>; <code>map</code>'s own whole-BAT walk did
+not apply it until recently, so it could report a block one of those
+operations already refused to read:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>map: source block table names a block inside the image's own
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>structure (at file offset zero, or overlapping a region the image
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>declares); the format is recognised, the image is malformed
+</code></pre></div>
+<p>Exit 1, the same as any other refused source. The format is
+recognised and the image parsed far enough to walk its BAT, so the
+message deliberately does not say "unrecognised" — that would send a
+user hunting a format problem that is not there. A block declared
+immediately past the last region in the table is unaffected and
+still maps normally. See
+<a href="/components/instar/format-internals/#vhdx">docs/format-internals.md § vhdx</a> for the
+predicate both the readers and this walk share.</p>
 <h2 id="known-divergences-from-qemu-img">Known divergences from qemu-img<a class="headerlink" href="#known-divergences-from-qemu-img" title="Permanent link">&para;</a></h2>
 <p>Each entry is documented in <a href="/components/instar/quirks/">quirks.md</a> with the
 rationale and the future-work pointer.</p>
@@ -15518,7 +15594,8 @@ rationale and the future-work pointer.</p>
   stripped. See
   <a href="/components/instar/quirks/#qcow2-compressed-clusters-report-compressed-false">docs/quirks.md § qcow2 compressed clusters report <code>compressed: false</code></a>.</li>
 <li><strong>Backing-chain <code>depth</code> is always 0 in v1</strong> — instar refuses
-  sources with a backing pointer; qemu-img walks the chain. See
+  sources with a backing pointer; qemu-img walks the chain. Tracked
+  as <a href="https://github.com/shakenfist/instar/issues/641">#641</a>. See
   <a href="/components/instar/quirks/#backing-chain-depth-is-always-0-in-v1">docs/quirks.md § Backing-chain <code>depth</code> is always 0 in v1</a>.</li>
 <li><strong><code>--image-opts</code> is rejected</strong> — qemu-img's descriptor-based
   source specification (<code>map --image-opts driver=qcow2,...</code>) is
@@ -15562,19 +15639,19 @@ sources for the same VHD-unallocated reason.</p>
 </ul>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>Default human output:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>instar map disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>instar map disk.qcow2
 </code></pre></div>
 <p>JSON for scripting:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>instar map --output=json disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar map --output=json disk.qcow2
 </code></pre></div>
 <p>Window slice — emit only the extents covering bytes <code>[1 MiB, 5 MiB)</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar map --start-offset=1M --max-length=4M disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar map --start-offset=1M --max-length=4M disk.qcow2
 </code></pre></div>
 <p>Format hint (skip auto-detection):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar map -f vmdk disk.vmdk
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar map -f vmdk disk.vmdk
 </code></pre></div>
 <p>Stream into <code>jq</code> to extract just the data extents:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar map --output=json disk.qcow2 | jq '.[] | select(.data == true)'
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar map --output=json disk.qcow2 | jq '.[] | select(.data == true)'
 </code></pre></div>
 
 

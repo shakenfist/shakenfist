@@ -3354,6 +3354,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/plans/PLAN-renovate-cadence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renovate cadence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -15431,9 +15459,15 @@ cannot resolve the sector bitmaps of images instar itself wrote.</p>
   own operation. Falsifiable: a test asserts the message text, not
   just the exit code.</li>
 <li>No user-visible string contains <code>PLAN-</code>. Falsifiable:
-  <code>grep -rn 'PLAN-[a-z0-9-]*\.md' --include=*.rs src/ | grep -v '^\s*//'</code>
+  <code>grep -rn 'PLAN-[a-z0-9-]*\.md' --include=*.rs src/ | sed 's/^[^:]*:[0-9]*://' | grep -v '^[[:space:]]*//'</code>
   returns nothing from <code>format!</code>, <code>println!</code>, <code>eprintln!</code> or a
-  <code>&amp;str</code> constant. <strong>14e found this is eight strings, not the one
+  <code>&amp;str</code> constant. <strong>The command is corrected here.</strong> As first
+  written it piped straight into <code>grep -v '^\s*//'</code>, and <code>grep -rn</code>
+  prefixes every line with <code>path:lineno:</code>, so the filter could never
+  match and the criterion could never pass -- it would have reported
+  every comment in the tree as a violation. Phase 15's completion
+  check found it; stripping the prefix first, the criterion passes
+  with zero hits. <strong>14e found this is eight strings, not the one
   F6 scoped it to</strong>: the differencing read refusal (removed in
   14e), <code>map</code>'s refusal citing <code>PLAN-map.md</code>
   (<code>src/vmm/src/main.rs:16138</code>), <code>create</code>'s differencing-backing

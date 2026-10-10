@@ -3360,6 +3360,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-renovate-cadence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renovate cadence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -3930,6 +3958,17 @@
     <span class="md-ellipsis">
       
         Known divergences from qemu-img
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#malformed-block-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Malformed block tables
       
     </span>
   </a>
@@ -15193,6 +15232,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#malformed-block-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Malformed block tables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#future-work" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15377,7 +15427,10 @@ qemu-img's:</p>
   allocated bytes slightly differently. Likely a compressed-cluster or
   extended-L2 subcluster edge case under investigation.</li>
 <li><strong>QCOW2 sources with backing chains</strong>: instar reports the top layer's
-  allocations only. qemu-img consults the chain.</li>
+  allocations only. qemu-img consults the chain. Tracked as
+  <a href="https://github.com/shakenfist/instar/issues/642">#642</a>; the same
+  plumbing closes this for a VHD or VHDX chain, whichever format the
+  chain is in.</li>
 <li><strong>VHDX sources</strong>: instar treats every BAT block as fully allocated.
   qemu-img returns the actual block-state distribution.</li>
 <li><strong>VMDK multi-extent source layouts</strong>: instar's extent map propagation
@@ -15388,6 +15441,28 @@ qemu-img's:</p>
 <p>The canonical list of test cases skipped due to these divergences is
 <code>KNOWN_SOURCE_SCANNER_DIVERGENCES</code> in <code>tests/test_measure.py</code>. Each entry
 names the divergence category.</p>
+<h2 id="malformed-block-tables">Malformed block tables<a class="headerlink" href="#malformed-block-tables" title="Permanent link">&para;</a></h2>
+<p><code>measure</code>'s VHDX allocation scan refuses a payload block whose BAT entry
+names a byte range that is the image's own structure, rather than
+counting it as allocated: file offset zero, where the file identifier
+and headers live, or a range overlapping any region the image's region
+table declares. This is the same test the guest chain walker already
+applies when reading such a block for <code>convert</code>, <code>dd</code>, <code>compare</code>,
+<code>bench</code> and <code>rebase</code>; <code>measure</code>'s own whole-BAT scan did not apply it
+until recently, so it could count a block one of those operations
+already refused to read:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>measure: source block table names a block inside the image's own
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>structure (at file offset zero, or overlapping a region the image
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>declares); the format is recognised, the image is malformed
+</code></pre></div>
+<p>Exit 1, the same as any other refused source.</p>
+<p>The format is recognised and the image parsed far enough to walk its
+BAT, so the message deliberately does not say "unsupported format" —
+that would send a user hunting a format problem that is not there. A
+block declared immediately past the last region in the table is
+unaffected and still measures normally. See
+<a href="/components/instar/format-internals/#vhdx">docs/format-internals.md § vhdx</a> for the
+predicate both the readers and this scan share.</p>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
 <li>SEEK_HOLE detection in the raw scanner.</li>
@@ -15405,19 +15480,19 @@ names the divergence category.</p>
 <code>src/crates/measure/src/lib.rs</code>.</p>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>Predict size for a 1 GiB hypothetical qcow2 with the default cluster size:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>instar measure --size 1G -O qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>instar measure --size 1G -O qcow2
 </code></pre></div>
 <p>Same but with a 4 KiB cluster size:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>instar measure --size 1G -O qcow2 -o cluster_size=4k
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar measure --size 1G -O qcow2 -o cluster_size=4k
 </code></pre></div>
 <p>Predict size for converting a qcow2 image to raw:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar measure -O raw mydisk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar measure -O raw mydisk.qcow2
 </code></pre></div>
 <p>JSON output for scripting:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar measure -O qcow2 --output=json mydisk.vmdk
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar measure -O qcow2 --output=json mydisk.vmdk
 </code></pre></div>
 <p>Predict an instar-only target (qemu-img cannot do this):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar measure -O vhdx mydisk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar measure -O vhdx mydisk.qcow2
 </code></pre></div>
 <h2 id="differencing-images">Differencing images<a class="headerlink" href="#differencing-images" title="Permanent link">&para;</a></h2>
 <p>A differencing VHD (footer disk type 4) or VHDX (<code>HasParent</code> set) stores
@@ -15425,15 +15500,21 @@ only the sectors that differ from a parent image. <code>measure</code> reads an
 image on its own rather than composing a parent chain into it, so it
 refuses such a source by name and exits 1 rather than reporting a
 required-size estimate that ignores the parent's data:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>measure: source is a differencing &lt;VHD|VHDX&gt; image, and measure reads an
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>image on its own rather than composing a parent into it, so the sectors
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>it leaves to its parent could not be composed
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>measure: source is a differencing &lt;VHD|VHDX&gt; image, and measure reads an
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>image on its own rather than composing a parent into it, so the sectors
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>it leaves to its parent could not be composed
 </code></pre></div>
 <p><code>instar info</code> is the exception — it reports the parent as a backing file
 instead of refusing. <code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code> do
 compose a differencing source against its parent; see the "VHD/VHDX
 differencing" section of <a href="/components/instar/quirks/">quirks.md</a> for the per-operation
 record.</p>
+<p>This refusal is deliberate, not merely unimplemented: <code>measure</code> reports
+on one image, and a differencing child's own blocks are almost always
+intact while the required size they describe only covers part of the
+image. Whether that should change anyway is tracked as
+<a href="https://github.com/shakenfist/instar/issues/643">#643</a>, open and not
+settled either way.</p>
 
 
 

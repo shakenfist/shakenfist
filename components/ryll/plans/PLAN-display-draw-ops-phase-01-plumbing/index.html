@@ -3354,6 +3354,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/plans/PLAN-renovate-cadence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renovate cadence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -15312,7 +15340,7 @@ surface helpers exist but nothing calls them yet.</p>
 </ul>
 <h2 id="current-state">Current state<a class="headerlink" href="#current-state" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs#L255">shakenfist-spice-protocol/src/messages.rs:255</a>
+<li><a href="https://github.com/shakenfist/ryll/blob/4d5f9e98f31bb58d4e69759054df381145cc9e51/shakenfist-spice-protocol/src/messages.rs#L255">shakenfist-spice-protocol/src/messages.rs:255</a>
   defines <code>DrawCopyBase</code> — the generic
   <code>SpiceMsgDisplayBase</code> (surface_id, box, clip). Misnamed;
   every draw op uses it. Rename to <code>DrawBase</code>.</li>
@@ -15853,7 +15881,7 @@ test covers:</p>
   <code>!= 0</code> (non-null) cases.</li>
 </ul>
 <p>Reuse the existing <code>DrawCopyBase</code> test block
-<a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-protocol/src/messages.rs#L639">messages.rs:639-720</a>
+<a href="https://github.com/shakenfist/ryll/blob/4d5f9e98f31bb58d4e69759054df381145cc9e51/shakenfist-spice-protocol/src/messages.rs#L639">messages.rs:639-720</a>
 as a style reference (manual byte construction, explicit
 expected values, <code>expect()</code> on the parse, <code>assert_eq!</code>
 on fields).</p>

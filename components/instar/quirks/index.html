@@ -3360,6 +3360,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-renovate-cadence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renovate cadence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -27077,6 +27105,47 @@ create does not support stacking a backing file on one</code> — see
 <a href="/components/instar/bench/">bench.md</a> and <a href="/components/instar/rebase/">rebase.md</a> for the per-operation
 record, and <a href="/components/instar/measure/">measure.md</a>, <a href="/components/instar/check/">check.md</a> and
 <a href="/components/instar/map/">map.md</a> for the operations that still refuse.</p>
+<h3 id="the-five-compose-three-report-boundary-is-deliberate">The five-compose, three-report boundary is deliberate<a class="headerlink" href="#the-five-compose-three-report-boundary-is-deliberate" title="Permanent link">&para;</a></h3>
+<p>Five operations compose a differencing source and three report on one
+image outright. That split is this project's chosen end state for the
+operations above, not a gap still to close — each side has its own
+reason, and the reason is different for every operation on the
+"report" side rather than one blanket limitation:</p>
+<ul>
+<li><strong><code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code> compose a
+  differencing source against its parent.</strong> Each reads through the
+  guest chain walker, which now resolves a differencing parent and
+  serves the sectors it owns, so each has something correct to do
+  with one instead of a reason to refuse it.</li>
+<li><strong><code>check</code> and <code>measure</code> report on one image rather than composing a
+  chain into it.</strong> A clean verdict, or a required-size estimate that
+  counts only the child's own blocks, would present that partial view
+  as though it covered the whole image — which is exactly the wrong
+  answer these two operations exist to avoid giving. Whether that
+  should change anyway, given that both can now read a differencing
+  image's own structure correctly, is tracked as
+  <a href="https://github.com/shakenfist/instar/issues/643">#643</a>, open and
+  not settled either way.</li>
+<li><strong><code>map</code> refuses any backing pointer at all, for every format, not
+  only VHD and VHDX differencing.</strong> That posture predates this work
+  entirely — see "Backing-chain <code>depth</code> is always 0 in v1" above —
+  and composing one is qcow2-chain parity work the differencing plan
+  does not own, tracked as
+  <a href="https://github.com/shakenfist/instar/issues/641">#641</a>. <code>measure</code>'s
+  own qcow2-chain gap is the same shape, tracked as
+  <a href="https://github.com/shakenfist/instar/issues/642">#642</a>.</li>
+<li><strong><code>commit</code> never reaches a differencing ancestor at all.</strong> It
+  refuses any overlay that is not qcow2 or vmdk, so a differencing VHD
+  or VHDX can only ever sit further back in the overlay's own backing
+  chain — never as the overlay itself. The guest op that performs the
+  write reads only the overlay and the backing device it is committed
+  into; it never reads the backing's own ancestors, so there is no
+  chain position from which it could compose or refuse a differencing
+  grandparent. The host's chain discovery call for <code>commit</code> is
+  deliberately told it cannot resolve one
+  (<code>DifferencingComposition::Unsupported</code>), which records that absence
+  rather than causing it.</li>
+</ul>
 <h3 id="libvhdi-for-contrast">libvhdi, for contrast<a class="headerlink" href="#libvhdi-for-contrast" title="Permanent link">&para;</a></h3>
 <p><strong>Classification: Not applicable</strong> (describes a third-party tool, not
 instar)</p>

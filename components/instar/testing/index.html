@@ -3360,6 +3360,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-renovate-cadence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renovate cadence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -17922,7 +17950,7 @@ requires one named test to notice; a test that still passes against a
 deliberately broken emitter is not guarding what its name says it
 guards. See <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> for the
 path being guarded.</p>
-<p>There are <strong>91 cases</strong>, in five groups.</p>
+<p>There are <strong>102 cases</strong>, in seven groups.</p>
 <p>Twenty-seven cover the writer. Fifteen mutate a library crate
 (<code>create</code>, <code>vhd</code>, <code>vhdx</code>) and are caught by a Rust unit or round-trip
 test; twelve are caught by a Python integration test through the real
@@ -17981,15 +18009,29 @@ which only a rebase given a real <code>-b</code> target rather than a detach can
 reach. All six run through the real binary, caught by
 <code>TestDifferencingBenchComposes</code> and <code>TestDifferencingRebaseThroughChain</code>
 in <code>tests/test_differencing.py</code>.</p>
-<p>The final <strong>six guard <code>map</code>, <code>measure</code> and <code>check</code></strong>, which read
-through none of the machinery above: each reads its source on its own
-and declines a differencing one outright, so composing it is not a
-guest change those operations can inherit. Each has one case per
-format — a VHD arm testing the footer's disk type, a VHDX arm testing
-the metadata's <code>has_parent</code> flag — and every case disables its guard
-with an added <code>&amp;&amp; false</code> rather than deleting it, so the mutation is a
-one-line, easily reviewed change to a condition that already compiles.
-All six run through the real binary and are caught by the existing
+<p><strong>One case covers <code>commit</code></strong>, which reads through no shared chain
+walker at all — its guest reads only the overlay and the backing it is
+committed into, and the host never lets a differencing parent further
+back in the backing's own chain reach it. The case reverts the
+direction the other six go: <code>run_commit</code>'s own discovery call is
+correct at <code>Unsupported</code>, and the mutation flips it to <code>Supported</code>, so
+the host tries to resolve a differencing ancestor's own parent instead
+of leaving it unresolved. The fixture that notices has that parent
+missing on purpose — <code>TestDifferencingCommitDoesNotOpenTheAncestor</code>
+builds a qcow2 overlay over a qcow2 backing whose own backing is a real
+differencing VHD or VHDX with its own parent absent — so the mutated
+walk fails during host-side chain discovery, before KVM is even opened,
+where the unmutated walk never tried to resolve that file at all.</p>
+<p><strong>14 cases guard <code>map</code>, <code>measure</code> and <code>check</code></strong>, which read through
+none of the machinery above: each reads its source on its own and
+declines a differencing one outright, so composing it is not a guest
+change those operations can inherit. <strong>6 refusal cases</strong> are the first
+of them, one per operation per format — a VHD arm testing the footer's
+disk type, a VHDX arm testing the metadata's <code>has_parent</code> flag — and
+every case disables its guard with an added <code>&amp;&amp; false</code> rather than
+deleting it, so the mutation is a one-line, easily reviewed change to a
+condition that already compiles. All six run through the real binary
+and are caught by the existing
 refusal test for that operation in <code>tests/test_differencing.py</code>
 (<code>TestDifferencingMapStillRefuses</code>, and <code>TestDifferencingRefusal</code>'s
 <code>measure</code> and <code>check</code> tests), which already iterates every differencing
@@ -17998,6 +18040,76 @@ one of these three operations' refusals — the way this phase lifted
 <code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code> — cannot happen by
 accident: removing a guard here must fail a named test before it can
 land.</p>
+<p>The other eight guard the one place these operations were not merely
+non-composing but were answering differently from the readers. <code>map</code>
+and <code>measure</code> never call <code>block_lookup</code>: each walks the whole BAT once,
+through <code>VhdxState::map_extents</code> and <code>VhdxState::scan_allocation</code>
+respectively. <code>block_lookup</code> refuses a present payload block on two
+independent grounds — a file offset of zero, which is where the
+headers live, and a byte range overlapping a region the image declares
+— and until both reached both walks, <code>map</code> reported such a block as
+data living at that offset and <code>measure</code> counted its bytes, while
+<code>convert</code> refused to read it.</p>
+<p>That is two cases per walk, one per guard, because neither guard
+subsumes the other: in the fixture geometry a block at offset zero ends
+exactly where the first declared region begins, so it touches without
+overlapping and the overlap test does not catch it, while a block
+inside a region has a perfectly non-zero offset. One case per walk
+would have let either guard be deleted silently. All four are
+<code>rust_case</code> rather than <code>integration_case</code> because the walks are crate
+functions a unit test can drive directly, and because the fixture is a
+hand-patched BAT entry no image in <code>instar-testdata</code> carries. Each
+reverts one call site only, so the verdict names the walk and the guard
+that was lost.</p>
+<p>A fifth is on the shared walk rather than on either guard, and exists
+because those four cannot cover it. A refusal case cannot see a
+miscount: disabling the sector-bitmap skip in
+<code>for_each_payload_bat_entry</code> -- the arithmetic both the scanner and
+the allocation counter go through -- leaves all four passing, because
+a walk whose payload bookkeeping has drifted still reaches the
+malformed entry and still refuses it. What a drift changes is where
+the walk stops, since the "all payload blocks seen" cap then arrives
+one slot early per chunk group. So this case is caught by a count
+taken from a <strong>well-formed</strong> two-group image with a block declared
+either side of the group boundary, which reports one block instead of
+two under the mutation. It is the only case in this group whose
+fixture is not malformed.</p>
+<p>The last three are <code>check</code>'s, which was the fourth answer to the same
+question and for a long time gave none: it builds no <code>VhdxState</code> and
+runs its own file identifier, header CRC-32C, region table 1+2
+cross-validation, metadata and BAT validation, so neither reader guard
+reached it. Measured at the CLI before it had them, an image whose
+first payload BAT entry was repointed at the metadata region, at the
+BAT region or at file offset zero was refused by <code>convert</code>, <code>map</code> and
+<code>measure</code> and reported by <code>check</code> as "No errors were found on the
+image." with exit 0. Two of the three cases are one per guard, for the
+reason above. The third is the one no "inside a region" case can
+catch: an overlap test degraded into a high-water mark refuses every
+block below the highest region's end, which leaves every malformed
+case passing, and only a region declared <em>after</em> the blocks --
+which SPEC(VHDX) permits -- tells the two apart. All three are
+<code>integration_case</code>, because the arm lives in a <code>no_std</code> guest binary
+with no test harness to drive it and the only observable verdict is
+the real command's exit code.</p>
+<p>The last group is <strong>2 device-count cases</strong>, guarding <code>bench</code> and
+<code>check</code>'s own chain-device-count check (issue #633). Every other
+operation that attaches a backing
+chain -- <code>convert</code>/<code>dd</code>, <code>commit</code>, <code>rebase</code>, <code>compare</code> -- refuses one
+whose device count exceeds <code>MAX_CHAIN_DEVICES</code> (16) before KVM opens;
+<code>bench</code> and <code>check</code> did not, and reaching <code>DeviceSet::add_device</code> with
+the device set already past that budget trips its own defensive
+<code>assert!</code>, panicking with KVM and the VM already created rather than
+failing cleanly. A plain backing chain cannot exercise this: a 17-image
+chain is already refused by <code>discover_backing_chain</code>'s own, unrelated
+<code>security.max_chain_depth</code> control (also defaulting to 16) before
+either operation's code runs. The fixture has to make the chain's
+<em>device</em> count exceed 16 while its <em>image</em> count does not, which a
+qcow2 top image carrying an external data file (<code>-o data_file=</code>) does:
+it contributes two devices for one backing-pointer hop. Both cases
+disable the guard with <code>if false</code> and are caught, through the real
+binary, by <code>TestAdversarialChainDeviceCount</code> in <code>tests/test_adversarial.py</code>
+-- the same test module that builds the fixture, since no static
+<code>instar-testdata</code> image has this shape.</p>
 <p>Most of the reader cases name a test in the <code>qcow2</code> crate and run it
 with the full input-format feature list, because the
 arms are behind <code>vhd-input</code> and <code>vhdx-input</code> and a run without those
@@ -18094,6 +18206,47 @@ trusted.</p>
 </tbody>
 </table>
 <p>None of them needs docker, a venv, testdata or a build.</p>
+<p><code>tools/check-no-capability-claims.py</code> is a related but separate tool,
+not one of the three above: it fails, naming the line, if anything in
+the tree says instar cannot read or compose a differencing image — a
+claim that was true when earlier phases wrote it and became false once
+five operations learned to compose one. It is not wired into
+<code>pre-commit</code> or CI; a contributor gets it only by running it, the same
+as this harness.</p>
+<p>It reads whole paragraphs — runs of non-blank lines, flattened —
+across <code>src/**/*.rs</code>, <code>tests/**/*.py</code> and top-level <code>docs/*.md</code>, so
+Rust comments and block comments, Python docstrings, assertion
+messages and Markdown prose all fall out of one pass. That breadth is
+not incidental. A line-granular grep missed a claim in
+<code>src/shared/src/lib.rs</code> that wrapped mid-phrase, and a
+comment-granular version of the script then missed a second one in a
+<code>tests/</code> assertion message, which is why it reads string literals and
+prose rather than comments alone. Expect it to flag a docs page or a
+test message, not only a <code>//</code> comment.</p>
+<p>Two trees are excluded on purpose: <code>docs/plans/</code> records what was true
+when each phase was planned and prescribes the sweeps that made it
+false, and <code>CHANGELOG.md</code> entries were true for the release they
+describe. Editing either to satisfy the script would falsify a record.
+The pattern is anchored on what a claim says instar cannot act <em>on</em>
+rather than on the verb, because that is what decides whether the
+claim is false. An unscoped claim naming a differencing image or a
+parent as the thing instar cannot read or compose is flagged; a scoped
+one that happens to use the same words is not — "a chain instar cannot
+compose", said of a differencing image whose own parent is itself
+differencing, is still true and stays clean, as does a statement about
+any unsupported source. The script's own docstring and <code>--self-test</code>
+carry the specimens; this page deliberately does not spell the flagged
+form out, because a page containing it verbatim is indistinguishable,
+to anyone skimming, from a page making the claim — and the checker
+reads this page too.</p>
+<p><code>--self-test</code> pins ten checks: nine claim forms it must flag or clear,
+each one that actually appeared in this repository, and one that the
+scan reads files at all from a working directory other than the
+repository root. That last one exists because the script globbed
+relative to the current directory and reported a clean tree, exit 0,
+having read nothing, whenever it was run from anywhere else. It now
+resolves the repository from its own path and refuses to report a
+clean tree on a scan that matched almost no files.</p>
 <p><code>--self-test</code> exists because the classifier is the one part of the
 harness nothing else checks — everything else is checked <em>by</em> it — and
 it shipped misreading <code>FAILED (errors=1)</code> as a caught mutation, which

@@ -3360,6 +3360,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-renovate-cadence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renovate cadence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -7116,6 +7144,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-ships-in-the-python-wheel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What ships in the Python wheel
+      
+    </span>
+  </a>
   
 </li>
       
@@ -15361,6 +15400,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#what-ships-in-the-python-wheel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What ships in the Python wheel
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#dependency-pinning" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15835,6 +15885,24 @@ gRPC server's <code>ProxyControl</code> stream emits a one-shot <code>TerminateS
 a configurable number of seconds after the first authorization
 (<code>MOCK_GRPC_TERMINATE_AFTER</code>), standing in for the API/DB leg so the
 harness exercises the proxy-side cancellation path live.</p>
+<h2 id="what-ships-in-the-python-wheel">What ships in the Python wheel<a class="headerlink" href="#what-ships-in-the-python-wheel" title="Permanent link">&para;</a></h2>
+<p><code>pyproject.toml</code> declares the wheel's contents explicitly:
+<code>[tool.setuptools.packages.find]</code> picks up every directory under
+<code>kerbside/</code>, with or without an <code>__init__.py</code>, and
+<code>[tool.setuptools.package-data]</code> lists the non-Python file types that
+ship (templates, static assets, <code>alembic.ini</code> and so on). A file with a
+new extension needs adding to that list.</p>
+<p>Do not rely on a file being tracked in git to make it ship.
+setuptools_scm's git file finder adds every tracked file beneath a
+package directory, but only when git metadata is present, so a build
+from a container context without <code>.git</code> or a vendored copy would
+silently lose anything not declared (issue #326). <code>tools/check-wheel.py</code>,
+run in CI, builds the wheel both with and without git metadata and fails
+if the two differ. Run it locally after changing the layout:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>/tmp/wheelcheck
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>/tmp/wheelcheck/bin/pip<span class="w"> </span>install<span class="w"> </span>build
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>/tmp/wheelcheck/bin/python<span class="w"> </span>tools/check-wheel.py
+</code></pre></div>
 <h2 id="dependency-pinning">Dependency pinning<a class="headerlink" href="#dependency-pinning" title="Permanent link">&para;</a></h2>
 <p>Indirect (transitive) dependencies are pinned in <code>pyproject.toml</code>
 between the <code># START_OF_INDIRECT_DEPS</code> and <code># END_OF_INDIRECT_DEPS</code>
@@ -15949,8 +16017,8 @@ most when developing are:</p>
 </ul>
 <h2 id="debugging">Debugging<a class="headerlink" href="#debugging" title="Permanent link">&para;</a></h2>
 <p>Active sessions:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">proxychannels</span><span class="p">;</span>
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">consoletokens</span><span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">expires</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">NOW</span><span class="p">();</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">proxychannels</span><span class="p">;</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">consoletokens</span><span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">expires</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">NOW</span><span class="p">();</span>
 </code></pre></div>
 <p>The daemon supervises the Rust proxy as a single child process (one
 tokio task per connection, not a worker process per connection), so

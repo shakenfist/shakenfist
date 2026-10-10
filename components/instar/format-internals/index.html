@@ -3360,6 +3360,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-renovate-cadence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renovate cadence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -15329,15 +15357,19 @@ signature check, dual header CRC-32C validation with active header
 selection by sequence number, dirty log detection, region table 1 and 2
 CRC-32C validation with cross-consistency check, GUID-based metadata
 parsing, BAT entry validation (offset bounds, 1MB alignment, overlap
-detection, state validation), and fragmentation tracking.</p>
-<p>Reads apply a narrower version of the same overlap rule, on every VHDX
-image rather than only under <code>check</code> — "reads" meaning the guest chain
-walker, <code>block_lookup</code> and <code>sector_bitmap_lookup</code>, which is what
-<code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code> use. <code>map</code> and
-<code>measure</code> walk the BAT through <code>classify_vhdx_bat_entry</code> instead and
-apply no overlap test, so they still report a block this rule refuses
-(issue #634). A payload block, or a
-differencing child's sector-bitmap block, is refused when its byte
+detection, state validation), and fragmentation tracking. A payload
+block whose BAT entry names a byte range inside the image's own
+declared regions, or file offset zero, is counted as a corruption
+rather than validated as ordinary data — <code>check</code> tests this against
+the same region table it parses for itself, independently of the
+reads' version of the rule below.</p>
+<p>Reads apply the same overlap rule, on every VHDX image rather than
+only under <code>check</code> — "reads" meaning the guest chain walker,
+<code>block_lookup</code> and <code>sector_bitmap_lookup</code>, which is what <code>convert</code>,
+<code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code> use, and <code>map</code> and <code>measure</code>'s
+own whole-BAT walks, <code>map_extents</code> and <code>scan_allocation</code>, which apply
+the identical predicate rather than a narrower one. A payload block, or
+a differencing child's sector-bitmap block, is refused when its byte
 range overlaps any entry in the region table — the BAT region, the
 metadata region, or anything else the writer declared, recognised by
 instar or not. A conforming writer never places payload on top of the

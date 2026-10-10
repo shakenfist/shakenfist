@@ -3360,6 +3360,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-renovate-cadence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Renovate cadence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-review-coverage/" class="md-nav__link">
         
   
@@ -4087,6 +4115,17 @@
     <span class="md-ellipsis">
       
         Differencing images
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#malformed-block-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Malformed block tables
       
     </span>
   </a>
@@ -15081,6 +15120,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#malformed-block-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Malformed block tables
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -15193,6 +15243,14 @@ and flat-in-backing-chain via parentFileNameHint), check validates:</p>
   "Differencing images" below</li>
 <li>BAT entries: block offsets within file bounds, 1MB alignment,
   overlap detection, state validation</li>
+<li>A payload block naming file offset zero, or a byte range
+  overlapping any region the image's own region table declares (the
+  BAT region, the metadata region, or one this build does not
+  recognise), is counted as a corruption rather than validated as
+  data — the same test <code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and
+  <code>rebase</code> already apply when reading such a block, applied here
+  against <code>check</code>'s own parsed region table so the two agree. See
+  "Malformed block tables" below.</li>
 <li>Fragmentation tracking (non-sequential block allocation)</li>
 </ul>
 <h2 id="chain-validation">Chain validation<a class="headerlink" href="#chain-validation" title="Permanent link">&para;</a></h2>
@@ -15242,6 +15300,36 @@ chain is walked.</p>
 <p><code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code> do compose a
 differencing source against its parent; see the "VHD/VHDX differencing"
 section of <a href="/components/instar/quirks/">quirks.md</a> for the per-operation record.</p>
+<p>This refusal is deliberate, not merely unimplemented: <code>check</code> validates
+one image's structure, and a differencing child's own structure is
+almost always intact while the image as a whole is unusable without
+its parent — a clean verdict would describe a partial view as though
+it were the whole image. Whether that should change anyway is tracked
+as <a href="https://github.com/shakenfist/instar/issues/643">#643</a>, open and
+not settled either way.</p>
+<h2 id="malformed-block-tables">Malformed block tables<a class="headerlink" href="#malformed-block-tables" title="Permanent link">&para;</a></h2>
+<p>Separately from the differencing refusal above, <code>check</code> counts a
+<em>non</em>-differencing VHDX as corrupt when its BAT names a payload block
+that is the image's own structure: file offset zero, where the file
+identifier and headers live, or a byte range overlapping any region
+the image's region table declares. Before this, <code>check</code>'s own BAT and
+region-table validation never cross-checked a block's offset against
+the regions it had just parsed, so such a block claimed an
+overlap-bitmap slot nothing else held and the image came back clean:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>$ instar check malformed.vhdx
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>1 errors were found on the image.
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>$ echo $?
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>2
+</code></pre></div>
+<p>(<code>--verbose</code> additionally traces <code>"[GUEST] check: VHDX block inside a
+declared region"</code>, or <code>"[GUEST] check: VHDX block at file offset
+zero"</code> for the other ground; the default output above only ever
+reports the count.) This is unchanged by <code>--chain</code>. The same two
+conditions are what <code>map</code> and <code>measure</code> refuse outright rather than
+count, and what <code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code>
+already refused to read before <code>check</code> gained this check — see
+<a href="/components/instar/map/#malformed-block-tables">docs/map.md § Malformed block tables</a>
+and <a href="/components/instar/measure/#malformed-block-tables">docs/measure.md § Malformed block tables</a>.</p>
 
 
 
