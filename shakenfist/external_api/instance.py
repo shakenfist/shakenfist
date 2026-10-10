@@ -2348,7 +2348,8 @@ class InstanceAgentGetEndpoint(api_base.Resource):
         ],
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
          (400, 'No agent connection to instance, or an invalid timing parameter.', None),
-         (404, 'Instance not found.', None)]))
+         (404, 'Instance not found.', None),
+         (406, 'Instance is not ready.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.requires_instance_active
@@ -2410,7 +2411,8 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
         [(200, 'An agent operation.', api_agentoperation.agentoperation_get_example),
          (400, 'No agent connection to instance, an invalid timing parameter, or a '
           'progress_timeout_seconds, which this call does not accept.', None),
-         (404, 'Instance not found.', None)]))
+         (404, 'Instance not found.', None),
+         (406, 'Instance is not ready.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.requires_instance_active
@@ -2462,7 +2464,8 @@ class InstanceScreenshotEndpoint(api_base.Resource):
              api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False)
         ],
         [(200, 'The UUID of a blob containing the screenshot.', None),
-         (404, 'Instance not found.', None)]))
+         (404, 'Instance not found.', None),
+         (406, 'Instance is not ready.', None)]))
     @api_base.arg_is_instance_ref
     @api_base.requires_instance_ownership
     @api_base.redirect_instance_request
