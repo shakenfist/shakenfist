@@ -2635,6 +2635,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../audits/release-artifacts-exclude-plans/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Release artifacts exclude docs/plans
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../audits/release-process/" class="md-nav__link">
         
   
@@ -14975,8 +15003,8 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <tr>
 <td>2026-09-13</td>
 <td><a href="/components/development/plans/PLAN-image-supply-chain/">Image supply chain</a></td>
-<td>Close the end-of-life migration and the five silent image-production failures behind it, in an order that does not break CI, and stop the audit being blind to the producers. Phases 1 to 5 are complete: detection, artifact verification, the gnome unblock, a consumer sweep that cleared both the runner-label half in thirteen repositories and the guest-image half the criterion cannot see, and the retirement of the producers themselves -- which grew an <code>ubuntu:18.04</code> removal the section had not enumerated, and whose twelve confirming checks found one check that names a command this environment will not run. Phase 6 is in progress: the <code>eol-producers</code> criterion (#222), the scope that runs it against <code>private-ci</code> and brings <code>images</code> in under <code>eol-distro</code> alone (#226), and the <code>images</code> comment and issue have landed, and only its confirming checks remain. Phase 7 remains. What each phase found is in the plan</td>
-<td>In progress</td>
+<td>Close the end-of-life migration and the five silent image-production failures behind it, in an order that does not break CI, and stop the audit being blind to the producers. All seven phases have landed, the sixth adding the <code>eol-producers</code> criterion that closed the audit's blind spot. The seventh, the push audit, read forty-three landings in seventeen repositories rather than the eleven in four it was scoped for, and found the record it audits from holding branch commits instead of merge commits, eight plan references in code, a deployment host in a public README, and a phase 4 mitigation whose check could not fail. What each phase found is in the plan</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>2026-09-20</td>

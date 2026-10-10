@@ -2633,6 +2633,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/release-artifacts-exclude-plans/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Release artifacts exclude docs/plans
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/release-process/" class="md-nav__link">
         
   
@@ -27132,12 +27160,12 @@ rather than fixed, because none of them was that change's job to close:</p>
    directory. Path normalisation belongs with the composition work in
    <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>. See
    <a href="/components/instar/info/#known-limitations">info.md</a>.</li>
-<li><strong><code>instar resize</code> still accepts a differencing VHDX.</strong> This is a write
-   path, predates the differencing work, and <code>resize</code> never called
-   <code>VhdxState::init</code>, so the read-side refusal neither caused it nor fixes
-   it. Tracked as
-   <a href="https://github.com/shakenfist/instar/issues/565">issue #565</a>; see
-   <a href="/components/instar/resize/#known-limitations">resize.md</a>.</li>
+<li><strong><code>instar resize</code> accepted a differencing VHDX</strong> (fixed). This was a
+   write path, predated the differencing work, and <code>resize</code> never called
+   <code>VhdxState::init</code>, so the read-side refusal neither caused it nor fixed
+   it. <code>resize</code> now reads the image's HasParent flag and refuses it as it
+   refuses a differencing VHD
+   (<a href="https://github.com/shakenfist/instar/issues/565">issue #565</a>).</li>
 </ol>
 <h2 id="future-additions">Future Additions<a class="headerlink" href="#future-additions" title="Permanent link">&para;</a></h2>
 <p>Additional quirks will be documented here as they are discovered during
