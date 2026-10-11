@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7743,6 +7799,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13210,6 +13322,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15458,6 +15598,33 @@ as the input image are allowed.</p>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>instar<span class="w"> </span>info<span class="w"> </span>--chain<span class="w"> </span>malicious.qcow2
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># Error: Backing file '/etc/passwd' is outside allowed paths: ["/path/to/images"]</span>
 </code></pre></div>
+<p>A reference is checked in this order:</p>
+<ol>
+<li>Its spelling is normalised (<code>.</code> and <code>..</code> components are resolved
+   lexically) and compared with the allowlist before anything on disk is
+   looked at. A relative <code>../</code> escape is "outside allowed paths" whether
+   or not its target exists. A relative reference is joined to the
+   image's directory with its symlinks resolved. <code>$IMAGE_DIR</code> matches
+   that resolved directory and also the directory as you spelled it on
+   the command line, unless your spelling contains <code>..</code>, so absolute
+   references written through a symlinked image directory still work.</li>
+<li>The reference as written is then resolved one component at a time,
+   so symlinks are followed and a <code>..</code> after a symlink applies to the
+   link's target, just as the kernel and qemu-img apply it. Any step
+   that would leave the allowlist, whether through a link or a <code>..</code>, is
+   refused as outside before the path it leads to is looked at, and the
+   error names the reference as spelled and normalised, never the
+   link's target.</li>
+<li>An absolute reference outside the allowlist is never probed. Instar
+   instead tries the file of the same name beside the image, for images
+   built on another host, and announces it on stderr:
+   <code>instar: using '&lt;name&gt;' beside the image in place of '&lt;reference&gt;'</code>.
+   The same line appears when an absolute reference inside the allowlist
+   is missing and the fallback is used. If there is no such file, the
+   result is "outside allowed paths", even if the absolute path does not
+   exist. <code>instar commit</code> never uses the fallback for the file it writes
+   into; see <a href="/components/instar/commit/#-b-resolution">Commit</a>.</li>
+</ol>
 <h3 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h3>
 <p>The allowlist can be configured via the config file:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># ~/.config/instar/config</span>
@@ -15607,8 +15774,9 @@ validating paths before following them.</p>
   resolved — <code>check</code> refuses a differencing source outright, so it has
   nothing to validate through one.</li>
 <li><strong><code>instar commit</code></strong> - Discovers the backing chain to merge an overlay into
-  its parent. A differencing VHD or VHDX parent is recorded but not
-  resolved, for the same reason as <code>check</code>.</li>
+  its parent, and resolves the overlay's recorded parent, the image it
+  writes into, through the same path validation. A differencing VHD or VHDX
+  parent is recorded but not resolved, for the same reason as <code>check</code>.</li>
 <li><strong><code>instar compare</code></strong> - Automatically discovers backing chains for both images
   being compared, resolving a differencing VHD or VHDX parent in either
   chain as well as a qcow2 or vmdk one. All chain images are loaded as
@@ -15680,17 +15848,14 @@ Windows-absolute-path reason, never a "not found" one. A relative VHDX
 locator does not have this problem: it arrives already rendered into
 POSIX convention (<code>vhdx-diff-parent.vhdx</code>, not <code>.\vhdx-diff-parent.vhdx</code>)
 before the host ever sees it, and resolves like any other relative name.</p>
-<p>One caveat about the reasons themselves. For an <em>absolute</em> reference,
-resolution probes the filesystem before the allowlist is consulted, so
-"was not found" and "is outside the backing file allowlist" distinguish
-whether an attacker-chosen absolute host path exists. Only existence
-leaks, never content, and the allowlist still rejects — no path outside
-it is ever opened. A qcow2 chain naming an absolute backing file has
-always drawn the same distinction; what is new is that <code>info --chain</code>
-now prints it while exiting 0, so it no longer takes a failing command
-to carry the answer. If you run <code>instar info --chain</code> over untrusted
-images in a service and return its stderr to whoever supplied them,
-that is the line to withhold. Tracked as
+<p>Resolving a reference answers only from filesystem state inside the
+allowlist. Whether a path outside it exists changes neither the result
+nor the message, so the reasons above reveal nothing about the rest of
+the host and are safe to return to whoever supplied the image. The
+trade-off is that a reference spelled outside the allowlist which would
+only reach it through a symlink outside the allowlist is refused (or
+takes the same-name fallback described under Path Validation), because
+proving otherwise would mean probing outside the allowlist. See
 <a href="https://github.com/shakenfist/instar/issues/611">issue #611</a>.</p>
 <p>The fail-soft covers <em>resolving</em> the parent reference, and nothing
 beyond it. Once a parent resolves, it is read like any other chain

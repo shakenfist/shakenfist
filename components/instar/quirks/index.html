@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -11485,6 +11541,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
         
   
@@ -16919,6 +17031,34 @@
     
   
     Image decoder hardening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
   
 
     
@@ -26801,9 +26941,9 @@ with no diagnostic.</p>
 <h4 id="instar-behavior-before-commit-10ab838">instar Behavior (before commit <code>10ab838</code>)<a class="headerlink" href="#instar-behavior-before-commit-10ab838" title="Permanent link">&para;</a></h4>
 <p>instar matched the asymmetry exactly, and the reason was visible in the two
 format crates' state-init functions. <code>VhdState::init</code>
-(<code>src/crates/vhd/src/lib.rs:578</code>) accepted <code>DISK_TYPE_DIFFERENCING</code> (<code>4</code>)
+(in <code>src/crates/vhd/src/lib.rs</code>) accepted <code>DISK_TYPE_DIFFERENCING</code> (<code>4</code>)
 into the state it built; <code>VhdxState::init</code>
-(<code>src/crates/vhdx/src/lib.rs:842</code>) rejected any image with <code>has_parent</code> set,
+(in <code>src/crates/vhdx/src/lib.rs</code>) rejected any image with <code>has_parent</code> set,
 returning <code>None</code> before any op-specific code ran. Every instar op that read
 a VHDX through <code>VhdxState::init</code> therefore failed immediately and
 generically on a differencing VHDX, while every op that read a VHD through
@@ -26919,13 +27059,13 @@ choice on top of it.</p>
 </tr>
 <tr>
 <td>map</td>
-<td><strong>Refuses</strong>, rc 1: <code>"map: source has a backing/parent reference; chain composition is deferred (see PLAN-map.md)"</code> (<code>src/operations/map/src/main.rs:459-462</code>)</td>
+<td><strong>Refuses</strong>, rc 1: <code>"map: source has a backing/parent reference; chain composition is deferred (see PLAN-map.md)"</code> (the <code>DISK_TYPE_DIFFERENCING</code> check in the <code>ImageFormat::Vhd</code> arm of <code>_start()</code> in <code>src/operations/map/src/main.rs</code> returns <code>MapResult::ERROR_HAS_BACKING</code>, and the host's <code>map_error_message()</code> in <code>src/vmm/src/main.rs</code> renders it; that message now ends "map reads an image on its own rather than composing a parent into it")</td>
 <td>Refuses, rc 1: <code>"map: source format unrecognised"</code> — a generic message, because <code>VhdxState::init</code> already returned <code>None</code> before map's own differencing check ever runs</td>
 </tr>
 <tr>
 <td>check</td>
 <td><strong>Does not refuse.</strong> rc 0, <code>"No errors were found on the image."</code> — validates the child as an ordinary dynamic disk</td>
-<td><strong>Refuses</strong>, rc 2: <code>"1 errors were found on the image."</code> (debug trace: <code>"check: VHDX differencing disk unsupported"</code>, <code>src/operations/check/src/main.rs:1555</code>)</td>
+<td><strong>Refuses</strong>, rc 2: <code>"1 errors were found on the image."</code> (debug trace before <code>10ab838</code>: <code>"check: VHDX differencing disk unsupported"</code>, from <code>check_vhdx()</code> in <code>src/operations/check/src/main.rs</code>; today <code>check_vhdx()</code> calls <code>refuse_differencing()</code>, which traces <code>"check: differencing source refused"</code>)</td>
 </tr>
 <tr>
 <td>convert</td>
@@ -26966,12 +27106,14 @@ five separate policy decisions. VHD is the format actually at risk of
 silent data corruption today, since it is the only one of the two accepted
 into any op's state at all.</p>
 <h4 id="instar-behavior-before-commit-10ab838_1">instar Behavior (before commit <code>10ab838</code>)<a class="headerlink" href="#instar-behavior-before-commit-10ab838_1" title="Permanent link">&para;</a></h4>
-<p><code>map</code>'s VHD-specific refusal (<code>src/operations/map/src/main.rs:459-462</code>) and
-<code>check</code>'s VHDX-specific refusal (<code>src/operations/check/src/main.rs:1555</code>)
-were the only two op-level, differencing-aware checks that existed; every
-other op's VHDX failure was an accident of <code>VhdxState::init</code>'s blanket
-rejection rather than a deliberate per-op decision, and every other op's
-VHD behaviour was the silent misread described above.</p>
+<p><code>map</code>'s VHD-specific refusal (the <code>DISK_TYPE_DIFFERENCING</code> check in the
+<code>ImageFormat::Vhd</code> arm of <code>_start()</code> in <code>src/operations/map/src/main.rs</code>)
+and <code>check</code>'s VHDX-specific refusal (in <code>check_vhdx()</code> in
+<code>src/operations/check/src/main.rs</code>) were the only two
+op-level, differencing-aware checks that existed; every other op's VHDX
+failure was an accident of <code>VhdxState::init</code>'s blanket rejection rather
+than a deliberate per-op decision, and every other op's VHD behaviour was
+the silent misread described above.</p>
 <h4 id="instar-behavior-since-commit-10ab838_1">instar Behavior (since commit <code>10ab838</code>)<a class="headerlink" href="#instar-behavior-since-commit-10ab838_1" title="Permanent link">&para;</a></h4>
 <p>Every op in the table above now refuses both formats by name, exiting 1
 with no output file left behind:</p>

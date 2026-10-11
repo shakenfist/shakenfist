@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7520,6 +7576,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
         
   
@@ -11747,6 +11859,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Server role">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#encoding-images-server-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encoding images (server role)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -13258,6 +13387,34 @@
     
   
     Image decoder hardening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
   
 
     
@@ -15341,6 +15498,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Server role">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#encoding-images-server-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encoding images (server role)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15747,6 +15921,24 @@ and the writer share one layout function, so a value read from any accepted
 layout writes out in the canonical one and reads back unchanged. Image
 types the crate does not model are carried as an opaque payload bounded by
 the next pointee.</p>
+<h3 id="encoding-images-server-role">Encoding images (server role)<a class="headerlink" href="#encoding-images-server-role" title="Permanent link">&para;</a></h3>
+<p>A server that sends image data can build the <code>BinaryData</code> bodies with the
+compression crate's <code>encode</code> feature, which is not on by default. It has
+two encoders, <code>encode_spice_lz4</code> and <code>encode_spice_jpeg</code>, and both take a
+<code>Bgrx</code>: a borrowed 32-bit B,G,R,X image with a row stride, such as an X11
+ZPixmap at depth 24. Each returns the body of a <code>BinaryData</code> (the bytes
+after <code>data_size</code>), to be wrapped as <code>ImagePayload::Lz4</code> or
+<code>ImagePayload::Jpeg</code>. The LZ4 body follows the framing described under
+<a href="#wire-format-differences">Wire format differences</a>.</p>
+<ul>
+<li>The encoded result can be larger than the raw pixels. As spice-server
+  does, send an uncompressed BITMAP instead when it is.</li>
+<li>Send LZ4 only to a client that advertises the LZ4 display capability
+  (cap 5).</li>
+<li>A JPEG's dimensions must equal the image descriptor's; spice-common
+  asserts it. <code>encode_spice_jpeg</code> encodes exactly the <code>Bgrx</code> dimensions,
+  so describe the image with the same width and height.</li>
+</ul>
 <h2 id="image-types-and-compression">Image Types and Compression<a class="headerlink" href="#image-types-and-compression" title="Permanent link">&para;</a></h2>
 <p>SPICE uses several image types for display updates. The type is
 specified in the <code>ImageDescriptor</code> that precedes each image's data.
@@ -15798,7 +15990,7 @@ Values from <code>spice-protocol/spice/enums.h</code>:</p>
 <tr>
 <td style="text-align: right;">105</td>
 <td>Jpeg</td>
-<td>Supported (via the <code>image</code> crate)</td>
+<td>Supported (per-platform JPEG decoder)</td>
 </tr>
 <tr>
 <td style="text-align: right;">106</td>
@@ -15818,7 +16010,7 @@ Values from <code>spice-protocol/spice/enums.h</code>:</p>
 <tr>
 <td style="text-align: right;">109</td>
 <td>LZ4</td>
-<td>Supported (per-row compressed)</td>
+<td>Supported (dependent LZ4 blocks)</td>
 </tr>
 </tbody>
 </table>
@@ -15855,21 +16047,24 @@ tracked per display channel and included in bug reports for performance analysis
   then the LZ/GLZ stream with its own big-endian header.</li>
 <li><strong>ZLIB_GLZ_RGB</strong>: preceded by <code>glz_data_size</code> (u32 LE) +
   <code>compressed_size</code> (u32 LE), then zlib-compressed GLZ data.</li>
-<li><strong>LZ4</strong>: NO <code>data_size</code> prefix. Data starts immediately with a
-  1-byte <code>top_down</code> flag, 1-byte <code>spice_format</code>, then per-row
-  LZ4 blocks each with a 4-byte big-endian size prefix. See the note
-  under the LZ4 description below: this disagrees with the reference
-  implementation.</li>
+<li><strong>LZ4</strong>: preceded by a 4-byte <code>data_size</code> (u32 LE), as a
+  <code>BinaryData</code> (the <code>LZ4</code> case of spice.proto's <code>Image</code>). Its data
+  starts with a 1-byte top-down flag and a 1-byte
+  <code>SPICE_BITMAP_FMT_*</code> value, then one or more LZ4 blocks, each with a
+  4-byte big-endian length prefix.</li>
 <li><strong>Pixmap</strong>: preceded by a <code>BitmapData</code> header (format u8, flags u8,
   x u32, y u32, stride u32), then the palette reference, then raw pixel
   rows. The palette reference is a 4-byte <code>palette_addr</code> normally,
   making the header 18 bytes. When <code>PAL_FROM_CACHE</code> is set in the flags
   it is instead a u64 palette id, making the header 22 bytes
-  (spice.proto:549-554). ryll draws only 32-bit bitmaps, which carry no
-  palette. Only 32-bit formats (BGRX=8, RGBA=9) are supported. The
-  <code>top_down</code> flag (bit 2 of flags) controls row ordering.</li>
+  (the <code>pal</code> switch in spice.proto's <code>BitmapData</code>). ryll draws only
+  32-bit bitmaps, which carry no palette. Only 32-bit formats (BGRX=8,
+  RGBA=9) are supported. The <code>top_down</code> flag (bit 2 of flags) controls
+  row ordering.</li>
 <li><strong>JPEG</strong>: preceded by a 4-byte <code>data_size</code> (u32 LE), then a standard
-  JPEG stream. Decoded via the <code>image</code> crate and converted to RGBA.</li>
+  JPEG stream. Decoded by the per-platform JPEG decoder that
+  <code>best_for_platform()</code> in the compression crate's <code>jpeg</code> module
+  selects (see "JPEG decoder selection" above), which returns RGBA.</li>
 <li><strong>FromCache</strong> and <strong>FromCacheLossless</strong>: no data at all after the
   descriptor; <code>image_id</code> names a previously cached decompressed image.
   spice-server marshals a draw's source image after its fixed fields
@@ -15917,31 +16112,45 @@ current image. No cross-frame dependencies.</p>
 <p><strong>ZLIB_GLZ_RGB</strong> — GLZ data compressed with zlib for additional
 bandwidth savings. Common for incremental updates from QEMU/KVM
 through kerbside.</p>
-<blockquote>
-<p><strong>Known discrepancy, under investigation in
-<a href="https://github.com/shakenfist/ryll/issues/475">shakenfist/ryll#475</a>.</strong>
-The LZ4 description here and below is what ryll does today, and it
-disagrees with spice-server and spice-common: spice.proto:612-613 makes
-the LZ4 image a <code>BinaryData</code>, which spice.proto:558-561 defines with a
-<code>data_size</code> prefix before the payload, the reference uses streaming
-LZ4 over multi-line chunks rather than independent per-row blocks, and
-the <code>SPICE_BITMAP_FMT</code> values differ from the ones listed below
-(see spice-common's <code>enums.h</code>). Do not treat this section as the
-specification.</p>
-</blockquote>
-<p><strong>LZ4</strong> — Fast per-row compression. Each row is individually
-LZ4-compressed with a big-endian size prefix. The <code>spice_format</code>
-byte indicates the pixel format (4=BGRX, 6=BGRA, 3=BGR).</p>
-<p>Decoding is all-or-nothing: a payload that ends mid-image — a
-truncated row header, a row length running past the buffer, or a
-row LZ4 chunk that fails to decompress — is rejected outright and
-the frame is dropped. It is not painted. An earlier implementation
-returned the rows it had managed to decode with the remainder left
-as zeros, which rendered as a partial image above a black band and
-gave the caller no way to tell a short frame from a genuinely dark
-one. Since a client cannot distinguish a server bug from a hostile
-server truncating deliberately, the safe reading of a partial
-image is that it is not an image.</p>
+<p><strong>LZ4</strong> — Fast byte-oriented compression, which spice-server sends
+only to a client whose <code>PREFERRED_COMPRESSION</code> asks for exactly LZ4.
+The image is a <code>BinaryData</code> (the <code>LZ4</code> case of spice.proto's
+<code>Image</code>), so a 4-byte little-endian <code>data_size</code> follows the
+descriptor. Its data is:</p>
+<ul>
+<li>a top-down byte: 1 when the first decoded row is the top row, 0
+  when it is the bottom row (ryll treats any nonzero value as 1);</li>
+<li>a <code>SPICE_BITMAP_FMT_*</code> byte (the <code>SpiceBitmapFmt</code> enum in
+  spice-protocol's <code>enums.h</code>): 6 is 16-bit x555, a little-endian u16
+  per pixel; 7 is 24-bit B,G,R; 8 is 32-bit B,G,R,X; and 9 is
+  B,G,R,A. ryll refuses any other value;</li>
+<li>one or more blocks, each a <strong>big-endian</strong> u32 length followed by
+  one raw LZ4 block, with no frame header and no checksum.</li>
+</ul>
+<p>The blocks are not independent. spice-common decodes them in order
+with one LZ4 stream decoder into one buffer, so a block may refer
+back into the output of the blocks before it, up to LZ4's 64 KiB
+window. ryll decodes each block with the preceding output as its
+dictionary into one buffer of <code>height</code> rows of <code>width</code> pixels, with
+no row padding, and then converts it to RGBA. Alpha is kept only for
+format 9; the 16-bit format widens each 5-bit channel to 8 bits by
+repeating its top bits. The framing was confirmed against captures
+of spice-server 0.15.2: every LZ4 image decoded this way matched the
+guest's screen exactly. The fixtures and the capture method are in
+<a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-compression/tests/fixtures/lz4/README.md">the compression crate's test
+fixtures</a>.</p>
+<p>Decoding is all-or-nothing, and stricter than spice-common in two
+places: the blocks must decode to exactly the image's size, and a
+block length that runs past the data is refused. A payload with no
+blocks, a truncated block or length, an unknown format, or a block
+that fails to decompress is rejected outright and the frame is
+dropped. It is not painted. An earlier implementation returned the
+rows it had managed to decode with the remainder left as zeros,
+which rendered as a partial image above a black band and gave the
+caller no way to tell a short frame from a genuinely dark one. Since
+a client cannot distinguish a server bug from a hostile server
+truncating deliberately, the safe reading of a partial image is that
+it is not an image.</p>
 <p><strong>QUIC</strong> -- SPICE's proprietary image codec based on the SFALIC
 algorithm (Simple Fast Adaptive Lossless Image Compression). Not
 to be confused with the IETF QUIC network protocol. Each colour

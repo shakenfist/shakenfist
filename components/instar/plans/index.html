@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7562,6 +7618,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13029,6 +13141,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15208,6 +15348,13 @@ at the repo root).</p>
 <td>Emit differencing VHD (<code>disk_type=4</code> + parent locator table) and differencing VHDX (<code>HasParent</code> + parent locator metadata item) from <code>create -b</code>, add parent-locator parsing to the vhd and vhdx crates, and close the silent parent-ignoring read of differencing children. An instar-only capability: qemu-img creates neither and reads both as though the parent did not exist, so the plan establishes an external oracle first</td>
 <td>In progress</td>
 <td><a href="/components/instar/plans/PLAN-differencing-phase-01-pin/">1: pin + oracle</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-02-fixtures/">2: fixtures</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-03-parse/">3: parse</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-04-read-policy/">4: read policy</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-05-vhd-emitter/">5: vhd emitter</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-06-vhdx-emitter/">6: vhdx emitter</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-07-guest-host/">7: guest + host</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-08-tests/">8: tests</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-09-fuzz/">9: fuzz</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-10-docs/">10: docs</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-11-chain-host/">11: chain host</a> ✓, <a href="/components/instar/plans/PLAN-differencing-phase-12-vhd-compose/">12: vhd compose</a> ✓ (narrower than the master plan implied -- the survey found the guest chain walker already built and already carrying a VHD arm, an unallocated BAT entry already descending to the parent, and the same function's extended-L2 subcluster path already demonstrating bitmap-driven run coalescing with backing-chain recursion, so the phase is a sector-bitmap reader and one arm's allocated-block case; execution found the planned conditional lift of the phase 4 refusal unsafe (<code>device_count</code> spans multiple chains -- issue #614), so the refusal stayed unconditional and a chain-boundary guard was added to the reader instead, verified at crate level because no host path builds a composing VHD chain until phase 14), <a href="/components/instar/plans/PLAN-differencing-phase-13-vhdx-compose/">13: vhdx compose</a> ✓ (execution found two defects the survey did not: <code>VhdxState::init</code> sized a differencing image's BAT by the dynamic rule, leaving every sector-bitmap entry unreachable for any block count that is not an exact multiple of <code>chunk_ratio</code> -- including the project's own 16 MiB fixture -- fixed by a separate padded bound that leaves the whole-BAT walks behind <code>info</code> and <code>map</code> alone and left the writer half as issue #623; and <code>sector_bitmap_lookup</code> carried two guards where there was one, the <code>SB_BLOCK_NOT_PRESENT</code> branch being unkillable because <code>!= SB_BLOCK_PRESENT</code> subsumed it, found by putting the mutation harness's reader cases in the tree and running them. The chain walker now also refuses a BAT entry naming file offset zero, where the file identifier and headers live; the wider overlap case is issue #625. The in-tree mutation harness grew from 26 writer cases to 62, and its case counts are now derived from the script rather than written in prose, after hand-maintained counts drifted three review rounds running), <a href="/components/instar/plans/PLAN-differencing-phase-14-op-rollout/">14: op rollout</a> ✓ (rescoped by its own survey, which found the master plan's seven-operation list wrong in four ways -- <code>rebase</code> reads through <code>init_chain_states</code> and was unnamed, <code>dd</code> is <code>convert</code> with different operands rather than an operation, and <code>map</code>, <code>measure</code> and <code>check</code> hold no chain notion at all, so composing in them is new plumbing and not a refusal lift; the refusal is four independent families rather than the single <code>if</code> the phase 12 bullet promised, and the host gate at <code>src/vmm/src/main.rs:3047</code> is per caller kind where the rollout is per operation. Issues #623 and #614 are its first two steps, as the master plan requires, and it also takes #625 because lifting the refusal is what makes that bound reachable from a user command), <a href="/components/instar/plans/PLAN-differencing-phase-15-op-consistency/">15: op consistency</a> (in progress; rescoped by its own survey from the chain-support phase the master plan described -- measurement against qemu-img 10.0.13 found <code>check</code> does not walk the chain at all, so it needs no composition to reach parity, while <code>map</code> and <code>measure</code> compose for every format, making their gap qcow2-chain parity work that <code>PLAN-map.md</code> and <code>PLAN-measure.md</code> both deferred before reaching Complete; those leave this plan as issues #641 and #642. What phase 15 keeps is the boundary phase 14 left: the VHDX region-overlap test reaching <code>map</code> and <code>measure</code> (#634), the missing chain-depth guard in <code>check</code> and <code>bench</code> (#633), a test for the <code>commit</code> disposition phase 14 decided but did not test, and correcting the refusal justifications that five composing operations falsified -- the refusals themselves stay, with the lift question filed as #643), 16: compose tests, 17: compose docs, 18: push audit</td>
+</tr>
+<tr>
+<td>2026-10-08</td>
+<td><a href="/components/instar/plans/PLAN-611-backing-path-oracle/">Backing-path resolution oracle</a></td>
+<td>Make backing-reference resolution answer only from filesystem state inside the allowlist, so an image can no longer learn whether a host path exists from the refusal reason (absolute and relative references, and symlink targets; issue #611)</td>
+<td>Complete</td>
+<td>(no phase files; single change)</td>
 </tr>
 </tbody>
 </table>

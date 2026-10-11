@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7500,6 +7556,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13199,6 +13311,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15492,7 +15632,7 @@ libraries at build time, but doesn't actually use them at runtime. This means:</
 <li>The binary still needs the .so files present (or use <code>LD_LIBRARY_PATH</code> tricks)</li>
 </ul>
 <h2 id="cargo-features">Cargo Features<a class="headerlink" href="#cargo-features" title="Permanent link">&para;</a></h2>
-<p>Ryll uses a Cargo feature to control optional functionality:</p>
+<p>Ryll uses Cargo features to control optional functionality:</p>
 <table>
 <thead>
 <tr>
@@ -15503,15 +15643,28 @@ libraries at build time, but doesn't actually use them at runtime. This means:</
 </thead>
 <tbody>
 <tr>
+<td><code>gui</code></td>
+<td>Yes</td>
+<td>The egui/eframe display, host clipboard (<code>arboard</code>) and native file picker (<code>rfd</code>). Without it ryll needs <code>--headless</code> or <code>--web</code>.</td>
+</tr>
+<tr>
+<td><code>audio</code></td>
+<td>Yes</td>
+<td>The cpal/opus playback pipeline. Without it the playback channel is skipped.</td>
+</tr>
+<tr>
 <td><code>capture</code></td>
 <td>Yes</td>
 <td>Protocol capture (<code>--capture</code> flag, pcap + video). Requires <code>openh264</code>, <code>mp4</code>, <code>pcap-file</code>, <code>etherparse</code>.</td>
 </tr>
 </tbody>
 </table>
-<p>To build without capture support (e.g. for Windows):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>--no-default-features
+<p>To build without capture support (e.g. for Windows), turn the
+defaults off and add the other two back:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>cargo<span class="w"> </span>build<span class="w"> </span>--release<span class="w"> </span>-p<span class="w"> </span>ryll<span class="w"> </span>--no-default-features<span class="w"> </span>--features<span class="w"> </span>ryll/gui,ryll/audio
 </code></pre></div>
+<p><code>--no-default-features</code> on its own is the slim headless build: no
+GUI, audio or capture.</p>
 <h2 id="maximising-portability">Maximising Portability<a class="headerlink" href="#maximising-portability" title="Permanent link">&para;</a></h2>
 <p>If you need to distribute binaries widely:</p>
 <ol>
@@ -15536,7 +15689,7 @@ backends — no X11 or OpenGL needed. Install Xcode Command Line Tools:</p>
 <h2 id="windows">Windows<a class="headerlink" href="#windows" title="Permanent link">&para;</a></h2>
 <p>Ryll builds on Windows with MSVC. eframe uses Direct3D and WinAPI. Install
 Visual Studio Build Tools, then:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">cargo</span> <span class="n">build</span> <span class="p">-</span><span class="n">-release</span> <span class="p">-</span><span class="n">-no-default-features</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">cargo</span> <span class="n">build</span> <span class="p">-</span><span class="n">-release</span> <span class="n">-p</span> <span class="n">ryll</span> <span class="p">-</span><span class="n">-no-default-features</span> <span class="p">-</span><span class="n">-features</span> <span class="n">ryll</span><span class="p">/</span><span class="n">gui</span><span class="p">,</span><span class="n">ryll</span><span class="p">/</span><span class="n">audio</span>
 </code></pre></div>
 <p>The <code>--capture</code> flag is not available on Windows builds.</p>
 <h2 id="practical-workflow">Practical Workflow<a class="headerlink" href="#practical-workflow" title="Permanent link">&para;</a></h2>

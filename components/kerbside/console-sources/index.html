@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7643,6 +7699,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13110,6 +13222,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15335,6 +15475,14 @@ creates the key lazily. That case is logged at info level; a genuine failure
 such as an unreachable or unauthenticated cluster is logged as a warning.
 Kerbside refetches the keys on every maintenance pass, so nothing needs to be
 restarted once the key is created.</p>
+<p>Each SPICE instance is matched to its hypervisor through the cluster's node
+list, by node UUID. An instance whose node is missing from that list is
+skipped with a warning; one or two during node churn are expected. If <strong>none</strong>
+of the SPICE instances match a node, the scrape fails instead: the source is
+marked errored and keeps the consoles it had, rather than reporting zero
+consoles and deleting them all. That pattern means Kerbside and the cluster
+disagree about how nodes are identified, usually after a Shaken Fist API
+change, and the error names the node references it could not resolve.</p>
 <h2 id="ovirt">oVirt<a class="headerlink" href="#ovirt" title="Permanent link">&para;</a></h2>
 <p>The following options are used to configure an oVirt console source
 (<code>type: ovirt</code>).</p>

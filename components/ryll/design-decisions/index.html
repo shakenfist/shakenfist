@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7500,6 +7556,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -12979,6 +13091,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -14970,19 +15110,28 @@ produced.</p>
    ensuring capture sessions are finalized.</p>
 </li>
 <li>
-<p><strong>Unbuffered capture I/O on dedicated tasks</strong> - Pcap and MP4 writers in
+<p><strong>Unbuffered capture I/O on dedicated threads</strong> - Pcap and MP4 writers in
    <code>capture.rs</code> write directly to <code>File</code> (no <code>BufWriter</code>), so written bytes are
    always on disk and survive SIGINT without explicit flush. Both writers run
-   on <strong>dedicated tokio tasks</strong> (<code>pcap_writer_task</code>, <code>video_writer_task</code>); the
-   channel handlers and the egui frame loop enqueue via non-blocking <code>try_send</code>
-   so slow disk cannot back-pressure the SPICE socket or stall the GUI. Queue
-   caps <code>PCAP_QUEUE_CAPACITY = 1024</code> and <code>VIDEO_QUEUE_CAPACITY = 8</code>; drops are
-   counted in per-channel <code>writer_dropped_count</code> (channels) and
-   <code>AppSnapshot::video_drop_count</code> (video). MP4 finalisation runs on the
-   encoder task after the sender drops, so a bug report assembled within
-   milliseconds of <code>CaptureSession::close()</code> may see an unfinalised MP4. That
-   was accepted deliberately: finalising synchronously would have blocked the
-   caller on the encoder draining. See
+   on <strong>dedicated OS threads</strong> owned by <code>CaptureSession</code> (<code>pcap_writer_loop</code>,
+   <code>video_writer_loop</code>); the channel handlers and the egui frame loop enqueue
+   via non-blocking <code>try_send</code> so slow disk cannot back-pressure the SPICE
+   socket or stall the GUI. They are threads, not tokio tasks, because the
+   session is created before any runtime exists and, in GUI mode, outlives
+   each per-connection runtime; running them as tasks made <code>--capture</code> panic
+   at startup (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/399" title="GitHub Issue: shakenfist/ryll #399">ryll#399</a>). Queue caps <code>PCAP_QUEUE_CAPACITY = 1024</code>
+   and <code>VIDEO_QUEUE_CAPACITY = 8</code>; drops are counted in per-channel
+   <code>writer_dropped_count</code> (channels) and <code>AppSnapshot::video_drop_count</code>
+   (video). MP4 finalisation runs on the encoder thread after the sender
+   drops, so a bug report assembled within milliseconds of
+   <code>CaptureSession::close()</code> may see an unfinalised MP4. That was accepted
+   deliberately: finalising synchronously would have blocked the caller (the
+   egui update loop among them) on the encoder draining. The exit paths in
+   <code>main</code> call <code>CaptureSession::close_and_wait</code>, which waits up to five
+   seconds for both threads to exit, so the MP4 is complete after a clean
+   exit even though a detached GUI connection thread may still hold a
+   reference to the session; a wedged writer costs the MP4 rather than
+   hanging exit. See
    <a href="/components/ryll/plans/PLAN-video-keeping-up/"><code>PLAN-video-keeping-up.md</code></a> for the
    trade-off.</p>
 </li>

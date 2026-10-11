@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -8070,6 +8126,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13537,6 +13649,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16644,11 +16784,15 @@ The host-side path allowlist (<code>vmm/chain.rs</code>) rejects external
 data files outside allowed directories when <code>--chain</code> or convert
 is used. The file is never opened.</p>
 <p><strong>CVE-2015-5163 (backing file traversal):</strong> The host-side
-<code>resolve_backing_path()</code> function canonicalises all paths (resolving
-<code>../</code> and symlinks) before checking against the allowlist. Paths
-with embedded null bytes are handled by Rust's <code>CStr</code>/<code>Path</code> types
-which stop at the first null. Both relative traversal and null-byte
-bypass variants are tested.</p>
+<code>resolve_backing_path()</code> function normalises each reference's
+spelling and checks it against the allowlist before touching the
+filesystem, then resolves the reference as written one component
+at a time, following symlinks and applying <code>..</code> as the kernel does,
+and refusing any step that leaves the allowlist. No image-chosen
+path outside the allowlist is probed.
+Paths with embedded null bytes are handled by Rust's <code>CStr</code>/<code>Path</code>
+types which stop at the first null. Both relative traversal and
+null-byte bypass variants are tested.</p>
 <p><strong>CVE-2022-47951 (VMDK descriptor):</strong> Text-only VMDK descriptors
 (no binary magic) are rejected as "unknown format". Binary VMDKs
 with embedded descriptors are parsed inside the KVM guest, which

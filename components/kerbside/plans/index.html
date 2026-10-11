@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7573,6 +7629,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13040,6 +13152,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15132,6 +15272,13 @@ repo root. For pre-push audits of our own work see
 <td>A statement of direction, not a schedule: let users on networks that allow only outbound RDP reach Kerbside consoles with a stock RDP client. A per-session gateway terminates the SPICE session with Ryll and serves RDP with IronRDP, as an opt-in fallback that keeps SPICE relay the default. Depends on SPICE session performance phase 3 (the display transcoding spike)</td>
 <td>Proposed</td>
 <td>phase 1 to phase 7 (not yet planned)</td>
+</tr>
+<tr>
+<td>2026-10-10</td>
+<td><a href="/components/kerbside/plans/PLAN-deployment-options/">Deployment options</a></td>
+<td>A <code>docs/deployment/</code> section, one page per deployment mechanism (by hand, Kolla-Ansible, containers, the ansible role), with a table in <code>docs/index.md</code> of which sources each mechanism configures and what CI proves, so that how Kerbside is deployed stops being indexed by which cloud it fronts (#546). Written as Kolla-Ansible moves from actively upstreamed to maintained by rebase, and on the view that a front-door Kerbside deployed independently of any one cloud is the default worth documenting. Documentation only: the image, the role move and upstream Kolla work are filed or recorded against the plans that own them</td>
+<td>In progress</td>
+<td><a href="/components/kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/">phase 1</a> (in progress -- survey, matrix and scaffolding. The survey corrected three master-plan claims at source: the Kolla merge lane passed in all 32 of the last 40 merge runs that started it, with no failures, rather than being flaky, so it stays in the merge queue; the Shaken Fist role is about 2000 lines, not 1000; and the role move, now accepted as shakenfist PLAN-kerbside-deployer phase 5, needs a Kerbside release after v0.6.0. It also found that a new docs directory needs an <code>order.yml</code> for site navigation, and that the TLS claim guard's scope literal is copied into its mutation tool, so the two have to change together)</td>
 </tr>
 </tbody>
 </table>

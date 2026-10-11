@@ -2357,6 +2357,34 @@
   
   
     <li class="md-nav__item">
+      <a href="plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="plan-index/" class="md-nav__link">
         
   
@@ -3183,6 +3211,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7623,6 +7679,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13090,6 +13202,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15207,13 +15347,15 @@ which is why the tables were moved to one page in the first place.</p>
   producer definitions <code>eol-producers</code> checks against the end-of-life
   table, so that applies too. It plans like the rest of the fleet too,
   so the four criteria that report a defect in a plan as written
-  apply. The two that do not are <code>plan-audit-phase</code>, because the plans
-  written there before it adopted the template track progress as
-  checkpoint sections rather than as a phase table and enabling it
-  would file an issue for a retrofit nobody has decided to do, and
+  apply. The three that do not are <code>plan-audit-phase</code>, because the
+  plans written there before it adopted the template track progress
+  as checkpoint sections rather than as a phase table and enabling it
+  would file an issue for a retrofit nobody has decided to do;
   <code>push-audit</code>, which has no <code>PUSH-AUDIT.md</code> to read until that
-  changes. It is not expected to grow a <code>pyproject.toml</code>, a renovate
-  config, release workflows, or a <code>develop</code> branch.</p>
+  changes; and <code>plan-history-in-source</code>, which comes in with
+  <code>push-audit</code>, since that runbook carries the rule it measures. It is
+  not expected to grow a <code>pyproject.toml</code>, a renovate config,
+  release workflows, or a <code>develop</code> branch.</p>
 </li>
 <li>
 <p>images is audited for the <code>eol-distro</code> check, and nothing else. It
@@ -15450,6 +15592,10 @@ attached rather than quietly disappearing from the table.</p>
 <tr>
 <td><a href="/components/development/audits/plan-source-references/">plan-source-references.md</a></td>
 <td>Plan references in source and configuration still resolve</td>
+</tr>
+<tr>
+<td><a href="/components/development/audits/plan-history-in-source/">plan-history-in-source.md</a></td>
+<td>Source and configuration give the reason for the code, not the plan phase, decision or step that produced it</td>
 </tr>
 <tr>
 <td><a href="/components/development/audits/plan-index/">plan-index.md</a></td>

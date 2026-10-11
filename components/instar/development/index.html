@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7782,6 +7838,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13249,6 +13361,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16392,7 +16532,7 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 <li><code>tools/ci/check-fuzz-targets.sh</code> - Fails if the three places a fuzz target has to be registered by hand disagree: the <code>.rs</code> file under <code>src/fuzz/fuzz_targets/</code>, the <code>[[bin]]</code> stanza in <code>src/fuzz/Cargo.toml</code>, and the <code>TARGETS=(...)</code> array in <code>coverage-fuzz.yml</code>. A target absent from that array is never fuzzed in CI at all, silently, while its row in <code>docs/testing.md</code> keeps claiming it is. <code>FAST_TIER</code> in <code>fuzz-tier.sh</code> is checked as a subset, since an unlisted target legitimately defaults to the deep tier</li>
 <li><code>tools/ci/count-fuzz-targets.sh</code> - The number of <code>[[bin]]</code> targets in <code>src/fuzz/Cargo.toml</code>, so <code>coverage-fuzz.yml</code> derives the count instead of restating it</li>
 <li><code>tools/ci/test-check-fuzz-targets.sh</code> - Tests for the registration guard, against a synthetic four-target tree; the <code>ci-tooling</code> CI job runs it</li>
-<li><code>tools/ci/check-doc-phrases.sh</code> - Fails if any tracked file contains a plan filename mangled by a bad automated replace that spliced the word "work" into it; phase 9 fixed seven of these in <code>docs/testing.md</code> and a further 17 had spread before anything checked. It decides by rejoining the text either side of " work" and asking whether that names a file in <code>docs/plans/</code>, so it catches a splice at any offset and cannot false-positive on a real English continuation like "PLAN-differencing workflow", which rejoins to nothing. <code>docs/plans/</code> and <code>tools/ci/</code> are exempt: the plan pages quote corrupted phrases verbatim as examples when describing the bug, and this guard's own tests build fixtures carrying the pattern on purpose</li>
+<li><code>tools/ci/check-doc-phrases.sh</code> - Fails if any tracked file contains a plan filename mangled by a bad automated replace that spliced the word "work" into it; seven of these in <code>docs/testing.md</code> were repaired by hand, and a further 17 had spread to other pages before anything checked. It decides by rejoining the text either side of " work" and asking whether that names a file in <code>docs/plans/</code>, so it catches a splice at any offset and cannot false-positive on a real English continuation like "PLAN-differencing workflow", which rejoins to nothing. <code>docs/plans/</code> and <code>tools/ci/</code> are exempt: the plan pages quote corrupted phrases verbatim as examples when describing the bug, and this guard's own tests build fixtures carrying the pattern on purpose</li>
 <li><code>tools/ci/test-check-doc-phrases.sh</code> - Tests for that guard, including that it does not false-positive on legitimate strings like "the PLAN-map work" or "PLAN-differencing workflow"; the <code>ci-tooling</code> CI job runs it</li>
 <li><code>tools/fuzz-coverage.sh</code> - Per-function coverage for one fuzz target, via <code>make fuzz-coverage</code> (see "Coverage-Guided Fuzzing" in <code>docs/testing.md</code>). Calls <code>llvm-cov</code> directly because <code>cargo cov</code> panics on cargo-fuzz 0.12</li>
 <li><code>tools/ci/test_extract_fuzz_corpus.py</code> - Tests the corpus seed builders in <code>scripts/extract-fuzz-corpus.py</code>: that a fixture carrying a hostile locator offset cannot abort the nightly seeding run, and that the defect it carries survives the reshape. Run with <code>python3 -m unittest</code>; the <code>ci-tooling</code> CI job does</li>

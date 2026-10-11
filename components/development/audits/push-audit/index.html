@@ -2357,6 +2357,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plan-index/" class="md-nav__link">
         
   
@@ -3194,6 +3222,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7634,6 +7690,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13101,6 +13213,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15237,8 +15377,19 @@ references across thirteen repositories, and "phase" has enough
 ordinary meanings that a mechanical check wants the first repository
 sweep to show what its false positives look like before it files
 issues. The fix for a non-compliant repository is a verbatim copy of
-<code>templates/shared-blocks/plan-references-in-code.md</code>; the backlog
-the block describes is swept separately.</p>
+<code>templates/shared-blocks/plan-references-in-code.md</code>. The backlog
+the block describes -- references already in the code -- is
+measured by the <a href="/components/development/audits/plan-history-in-source/">plan-history-in-source</a>
+audit, which reports the numbered shapes the block forbids wherever
+they sit in a repository's source.</p>
+<p>Judgement alone reliably misses some, so this repository's wave-1
+sweep also carries a report-only grep for added lines that look like
+plan references (<code>phase 5</code>, <code>decision 3</code>, <code>step 2a</code>, <code>PLAN-foo.md</code>),
+excluding markdown and <code>docs/**/plans/**</code>, and hands its hits to the
+reviewer.
+An adopting repository's runbook should carry the equivalent grep,
+adapted to its languages: the comment syntax and file extensions
+differ, and so do the paths where a plan may legitimately be cited.</p>
 <p><strong><code>source-file-size</code> became a required block on 2026-09-20</strong>, and the
 repositories that do not yet embed it are non-compliant on the
 generated compliance page from that date rather than from any change

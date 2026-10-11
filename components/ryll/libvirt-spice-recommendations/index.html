@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7500,6 +7556,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13254,6 +13366,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15558,8 +15698,8 @@ intermittency investigation, linked from
 </table>
 <p>Two distinct mechanisms are at work above the cliff.</p>
 <p><em>The server's stream-detection heuristic stops matching.</em> Per
-<code>spice/server/display-channel.cpp:1057-1078</code>, the QXL guest driver
-issues qualitatively different draw ops at higher resolutions
+<code>drawable_can_stream()</code> in <code>spice/server/display-channel.cpp</code>, the QXL
+guest driver issues qualitatively different draw ops at higher resolutions
 (tiled copies, alpha-blends, pre-compressed images) that fail the
 heuristic's <code>QXL_DRAW_COPY + QXL_EFFECT_OPAQUE + SPICE_ROPD_OP_PUT
 + SPICE_IMAGE_TYPE_BITMAP</code> filter. Frames that fail the filter fall
@@ -15643,9 +15783,12 @@ RGBA) and is slow to decode (~80 ms for a 2048×1152 frame on Apple
 Silicon).</p>
 <p><code>auto_lz</code> switches the server's default to plain LZ, which is much
 faster to decode (~10–20 ms for the same payload) at the cost of a
-slightly worse compression ratio. Combined with ryll's advertised
-<code>LZ4_COMPRESSION</code> capability, the server will pick LZ4 — even faster — for any frames that benefit
-from it.</p>
+slightly worse compression ratio. This does not make the server use
+LZ4: spice-server's <code>auto_glz</code> and <code>auto_lz</code> modes never choose it.
+It sends LZ4 images only to a client whose preferred compression is
+exactly LZ4 (ryll: <code>--preferred-compression lz4</code>) and which advertises
+the LZ4 display capability, and never to a client on a Unix socket,
+which gets no image compression at all.</p>
 <p>If you actually need glz (e.g. you are bandwidth-constrained over a
 WAN link), keep <code>auto_glz</code> but at least drop the
 <code>zlib-glz-wan-compression=always</code> override mentioned below.</p>
@@ -15686,8 +15829,8 @@ For sustained video playback with <code>streaming-video=filter</code>, the serve
 prefer H.264 when available, which is typically more bandwidth-efficient than
 MJPEG and results in cheaper sustained-video transmission.</p>
 <p><strong>H.264 needs GStreamer plugins on the hypervisor.</strong> spice-server's H.264
-encoder is implemented through GStreamer
-(<code>spice/server/gstreamer-encoder.c:1135</code>); without the GStreamer H.264
+encoder is implemented through GStreamer (<code>create_pipeline()</code> in
+<code>spice/server/gstreamer-encoder.c</code>); without the GStreamer H.264
 plugin packages installed, the server can only encode MJPEG even when
 the client advertises <code>CODEC_H264</code>. On Debian/Ubuntu:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>gstreamer1.0-plugins-bad<span class="w"> </span>gstreamer1.0-vaapi
@@ -15872,18 +16015,17 @@ trickier than it looks:</p>
 <p><strong><code>SPICE_DEBUG_LEVEL</code> is not a real env var.</strong> Grepping
   spice-server, spice-common, and spice-gtk turns up no
   <code>g_getenv("SPICE_DEBUG_LEVEL")</code> anywhere. The spice log
-  macros at
-  <code>/srv/src-reference/spice/spice-common/common/log.h:62-72</code>
-  just call <code>g_log</code> with <code>G_LOG_DOMAIN="Spice"</code>. The actual
-  threshold knob is GLib's <code>G_MESSAGES_DEBUG</code>.</p>
+  macros (<code>spice_info()</code>, <code>spice_debug()</code> and friends in
+  spice-common's <code>common/log.h</code>) just call <code>g_log</code> with
+  <code>G_LOG_DOMAIN="Spice"</code>. The actual threshold knob is GLib's
+  <code>G_MESSAGES_DEBUG</code>.</p>
 </li>
 <li>
 <p><strong>Setting <code>G_MESSAGES_DEBUG</code> in libvirtd's systemd unit
-  doesn't reach qemu.</strong> <code>virCommandAddEnvPassCommon</code> at
-  <code>/srv/src-reference/libvirt/libvirt/src/util/vircommand.c:1446</code>
-  whitelists exactly nine env vars (LC_ALL, LD_*, PATH, HOME,
-  USER, LOGNAME, TMPDIR). Anything else set in libvirtd's
-  environment is scrubbed before the qemu child fork.</p>
+  doesn't reach qemu.</strong> <code>virCommandAddEnvPassCommon()</code> in libvirt's
+  <code>src/util/vircommand.c</code> whitelists exactly nine env vars (LC_ALL,
+  LD_*, PATH, HOME, USER, LOGNAME, TMPDIR). Anything else set in
+  libvirtd's environment is scrubbed before the qemu child fork.</p>
 </li>
 </ul>
 <p>The canonical libvirt path: add the env var per-domain via

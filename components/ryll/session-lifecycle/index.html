@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7500,6 +7556,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13127,6 +13239,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15226,16 +15366,21 @@ a clean shutdown instead of killing the process immediately.</p>
 to <code>File</code> without <code>BufWriter</code>. This means every packet is persisted to disk
 immediately, so pcap data is never lost if the process is interrupted by
 SIGINT or any other signal.</p>
-<p>These writes happen on a dedicated <code>pcap_writer_task</code>, fed
-by a bounded mpsc from the channel handlers. The hot path on each channel
+<p>These writes happen on a dedicated pcap writer thread, fed
+by a bounded channel from the channel handlers. The hot path on each channel
 is a non-blocking <code>try_send</code>; queue-full means the packet is dropped and
 the per-channel <code>writer_dropped_count</code> counter is bumped. Slow disk no
 longer back-pressures the SPICE socket.</p>
 <p>The MP4 video writer also uses unbuffered <code>File</code> I/O. The encoder runs
-on a dedicated <code>video_writer_task</code> and the egui frame loop enqueues
-frames via <code>try_send</code>. MP4 finalisation (<code>write_end</code> for the moov atom)
-runs on the task after the sender drops; under SIGINT or abrupt
-shutdown the MP4 may be left unfinalised. See
+on a dedicated thread and the egui frame loop enqueues frames via
+<code>try_send</code>. MP4 finalisation (<code>write_end</code> for the moov atom) runs on
+that thread after the sender drops. Every exit path in <code>main</code> (GUI,
+headless and web) calls <code>CaptureSession::close_and_wait</code>, which blocks
+until both writer threads have drained, so a clean exit (window close
+or SIGINT) leaves a playable MP4. The wait gives up after five seconds,
+so a wedged encoder or a stalled disk cannot stop the process exiting,
+at the cost of that MP4. A process that dies without returning through
+<code>main</code> (SIGKILL, a crash) can also leave it unfinalised. See
 <a href="/components/ryll/troubleshooting/">the troubleshooting guide</a> for the trade-off.</p>
 <h2 id="reconnection">Reconnection<a class="headerlink" href="#reconnection" title="Permanent link">&para;</a></h2>
 <p>When the SPICE main channel closes or any secondary channel

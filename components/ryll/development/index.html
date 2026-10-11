@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7500,6 +7556,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13232,6 +13344,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15451,9 +15591,11 @@ first: <code>fetch</code> is <code>--locked</code> and every compile is <code>--
 without it the next build stops with "the lock file needs to be
 updated". The cache lives in <code>.cargo-cache</code>;
 override <code>CARGO_CACHE</code> to move it (for example to a location a CI
-runner keeps between jobs). <code>make clean</code> removes the cache only
-when it sits inside the checkout, so a shared out-of-tree cache
-survives.</p>
+runner keeps between jobs). <code>make clean</code> removes the build output,
+including the fuzz crate's separate <code>target/</code>, and removes the
+cache only when it sits inside the checkout, so a shared
+out-of-tree cache survives. Fuzzing corpora and crash artifacts
+are kept.</p>
 <h2 id="building-with-a-local-rust-installation">Building with a local Rust installation<a class="headerlink" href="#building-with-a-local-rust-installation" title="Permanent link">&para;</a></h2>
 <p>If you have Rust installed locally with the required dependencies:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>cargo<span class="w"> </span>build<span class="w"> </span>--release
@@ -15680,13 +15822,23 @@ dependency.</p>
 <li><strong>tokio-rustls</strong> - TLS support</li>
 <li><strong>clap</strong> - CLI parsing</li>
 <li><strong>rsa/sha1</strong> - Authentication encryption</li>
-<li><strong>image</strong> - JPEG decoding (via the <code>image</code> crate with jpeg feature)</li>
+<li><strong>jpeg-decoder/mozjpeg</strong> - JPEG decoding in
+  <code>shakenfist-spice-compression</code>, as two of the backends that
+  <code>best_for_platform()</code> in its <code>jpeg</code> module chooses between (ImageIO,
+  WIC, VA-API, libjpeg-turbo via <code>mozjpeg</code>, then pure-Rust
+  <code>jpeg-decoder</code>); see <a href="/components/ryll/spice-protocol/">the SPICE protocol notes</a></li>
+<li><strong>image</strong> - PNG encoding of control-socket screenshots</li>
 <li><strong>cpal</strong> - Cross-platform audio output</li>
 <li><strong>rtrb</strong> - Lock-free ring buffer for audio sample passing</li>
 <li><strong>opus-decoder</strong> - Pure-Rust Opus audio decoding</li>
 <li><strong>openh264</strong> - H.264 encoding in <code>shakenfist-spice-renderer</code>
   (the encoder pipeline). Capture mode in ryll consumes it
   transitively via the renderer.</li>
+<li><strong>jpeg-encoder</strong> - JPEG encoding behind the <code>encode</code> feature of
+  <code>shakenfist-spice-compression</code></li>
+<li><strong>lz4_flex</strong> - LZ4 image decode and encode in
+  <code>shakenfist-spice-compression</code>, plus usbredir and webdav
+  compression in <code>shakenfist-spice-renderer</code></li>
 <li><strong>nusb</strong> - USB device access (pure Rust, no libusb)</li>
 <li><strong>dav-server</strong> - WebDAV server (RFC 4918, LocalFs backend)</li>
 <li><strong>hyper</strong> - HTTP/1.1 framing for WebDAV byte-stream transport</li>

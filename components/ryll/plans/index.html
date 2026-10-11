@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7500,6 +7556,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13051,6 +13163,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15312,6 +15452,13 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 <td>Give every image decoder one shared size limit and fix the decoder half of the July hardening cluster (#171-#177, #182): QUIC run overruns, unbounded LZ/GLZ/LZ4/zlib/cursor allocations, and pixmap, FromCache and blit bounds panics.</td>
 <td>In progress</td>
 <td>1. Decoder hardening (inline), 2. Push audit (inline)</td>
+</tr>
+<tr>
+<td>2026-10-10</td>
+<td><a href="/components/ryll/plans/PLAN-app-split/">Splitting app.rs</a></td>
+<td>Break the 6,400-line <code>ryll/src/app.rs</code> into an <code>app/</code> module directory along its existing seams, share the draw-op dispatch it duplicates with web mode's <code>SurfaceMirror</code>, group panel state into sub-structs, and enable <code>clippy::too_many_lines</code> so the next god function is visible</td>
+<td>In progress</td>
+<td><a href="/components/ryll/plans/PLAN-app-split-phase-01-reuse/">1. Reuse</a>, 2. Pure state, 3. Events, 4. Panels, 5. Sub-structs, 6. Lint, 7. Push audit</td>
 </tr>
 </tbody>
 </table>

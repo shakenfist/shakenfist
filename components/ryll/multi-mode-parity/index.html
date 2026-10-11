@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7500,6 +7556,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13060,6 +13172,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15164,6 +15304,11 @@ sweep; control-socket cells refreshed 2026-08-23 (web mode gained
 the socket, its <code>status</code> and event rows, and the shared digest
 poller), media socket binding added 2026-08-21.</p>
 <h2 id="parity-matrix">Parity matrix<a class="headerlink" href="#parity-matrix" title="Permanent link">&para;</a></h2>
+<p>Headless cells name two functions. The renderer's <code>run_headless()</code>,
+in <code>shakenfist-spice-renderer/src/session.rs</code>, runs the session and its
+event loop. Ryll's <code>run_headless()</code>, in <code>ryll/src/main.rs</code>, builds the
+notification store and registers the <code>--pedantic</code> and gap observers
+around it.</p>
 <table>
 <thead>
 <tr>
@@ -15249,13 +15394,13 @@ poller), media socket binding added 2026-08-21.</p>
 <tr>
 <td>Display framebuffer (render SPICE draw ops)</td>
 <td>available</td>
-<td>partial (<code>ryll/src/app.rs:3513-3516</code> — headless counts frames but never paints continuously; with <code>--control-socket</code>, a <code>SurfaceMirror</code> renders draw ops on demand for the <code>screenshot</code> verb, instantiated on first use)</td>
+<td>partial (the renderer's <code>run_headless()</code> counts <code>ImageReady</code> events but never paints continuously; with <code>--control-socket</code>, a <code>SurfaceMirror</code> renders draw ops on demand for the <code>screenshot</code> verb, instantiated on first use)</td>
 <td>available (single monitor, MVP)</td>
 </tr>
 <tr>
 <td>Multi-monitor (<code>--monitors N</code>)</td>
 <td>available</td>
-<td>partial (<code>ryll/src/app.rs:3513-3516</code> — channel connects but frames are silently dropped; surfaces are never created in headless)</td>
+<td>partial (the renderer's <code>run_headless()</code> — channel connects but frames are silently dropped; surfaces are never created in headless)</td>
 <td>missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope)</td>
 </tr>
 <tr>
@@ -15279,19 +15424,19 @@ poller), media socket binding added 2026-08-21.</p>
 <tr>
 <td>Window auto-resize to surface size</td>
 <td>available</td>
-<td>n/a — intrinsic (no window; resize channel exists but resize_tx is never connected to a window, <code>ryll/src/app.rs:3391</code>)</td>
+<td>n/a — intrinsic (no window; resize channel exists but <code>_resize_tx</code> in the renderer's <code>run_headless()</code> is never connected to a window)</td>
 <td>n/a — intrinsic (browser viewport is user-controlled)</td>
 </tr>
 <tr>
 <td>Obey guest size hints toggle (<code>--no-obey-guest-size</code> / hamburger toggle)</td>
 <td>available</td>
-<td>n/a — intrinsic (no window; flag accepted in headless for CLI symmetry but ignored, <code>ryll/src/main.rs:195</code>)</td>
+<td>n/a — intrinsic (no window; flag accepted in headless for CLI symmetry but ignored, <code>_obey_guest_size</code> in ryll's <code>run_headless()</code>)</td>
 <td>missing (out of MVP scope; the web frontend's "guest fits browser viewport" inverse is planned)</td>
 </tr>
 <tr>
 <td>Guest resolution follows viewport (<code>VDAgentMonitorsConfig</code>)</td>
 <td>available</td>
-<td>missing (<code>ryll/src/app.rs:3391</code> — <code>_resize_tx</code> is created but never used to drive resize logic in headless)</td>
+<td>missing (the renderer's <code>run_headless()</code> — <code>_resize_tx</code> is created but never used to drive resize logic in headless)</td>
 <td>available</td>
 </tr>
 <tr>
@@ -15303,7 +15448,7 @@ poller), media socket binding added 2026-08-21.</p>
 <tr>
 <td>Server cursor rendering (SET/INIT)</td>
 <td>available</td>
-<td>missing (<code>ryll/src/app.rs:3563</code> — <code>CursorChannel</code> runs, events arrive, but headless event loop has no handler for <code>CursorImage</code>/<code>CursorPos</code> events)</td>
+<td>missing (the renderer's <code>run_headless()</code> — <code>CursorChannel</code> runs, events arrive, but its event loop has no handler for <code>CursorImage</code>/<code>CursorPos</code> events)</td>
 <td>available (datachannel CSS overlay; the host cursor is only hidden once a real SPICE shape has arrived, so a guest that never sends one leaves the browser's own pointer visible rather than none at all)</td>
 </tr>
 <tr>
@@ -15339,7 +15484,7 @@ poller), media socket binding added 2026-08-21.</p>
 <tr>
 <td>Volume control (slider + mute)</td>
 <td>available</td>
-<td>missing (<code>ryll/src/app.rs:1843-1856</code> — <code>VolumeControl</code> Arc is wired in but no CLI flag, stdout interface, or control-socket verb exposes it in headless)</td>
+<td>missing (the renderer's <code>run_headless()</code> — a <code>VolumeControl</code> is passed to <code>run_connection()</code> but no CLI flag, stdout interface, or control-socket verb exposes it in headless)</td>
 <td>missing (out of MVP scope; not listed in PLAN-web-frontend.md MVP)</td>
 </tr>
 <tr>
@@ -15379,9 +15524,15 @@ poller), media socket binding added 2026-08-21.</p>
 <td>available (browser table is in logical form; ryll converts via <code>make_scancode</code>)</td>
 </tr>
 <tr>
+<td>macOS Cmd chords (Cmd+Q, Cmd+W, ...)</td>
+<td>available (treated as host shortcuts: the chord key is withheld from the guest, press and release; Cmd is not mapped to the guest's Super key)</td>
+<td>n/a — intrinsic (no keyboard)</td>
+<td>available, by a different policy (Cmd is forwarded as the guest's Super key — <code>MetaLeft</code>/<code>MetaRight</code> are in the browser scancode table — so the guest sees a Super chord rather than a bare letter)</td>
+</tr>
+<tr>
 <td>Modifier state tracking (Ctrl/Shift/Alt)</td>
 <td>available</td>
-<td>partial (<code>ryll/src/channels/inputs.rs:77-82</code> — tracked internally but only used by paste state machine; cadence does not restore modifiers)</td>
+<td>partial (<code>InputsChannel</code> in <code>shakenfist-spice-renderer/src/channels/inputs.rs</code> — tracked internally but only used by the paste state machine; cadence does not restore modifiers)</td>
 <td>available (MVP)</td>
 </tr>
 <tr>
@@ -15428,14 +15579,14 @@ poller), media socket binding added 2026-08-21.</p>
 </tr>
 <tr>
 <td>Paste-as-keystrokes (vdagent auto-disable)</td>
-<td>available (<code>ryll/src/app.rs:1077-1078</code>)</td>
+<td>available (<code>RyllApp::trigger_paste()</code> in <code>ryll/src/app.rs</code>)</td>
 <td>available (vdagent state logged from the session's <code>SessionState</code> watch; <code>enable_paste</code> flag passed through)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
 <td>Paste character validation / error dialog</td>
 <td>available</td>
-<td>partial (<code>ryll/src/app.rs:3553-3556</code> — PasteFailed logged and causes non-zero exit; control-socket clients get a <code>paste_failed</code> event; no interactive dialog)</td>
+<td>partial (the renderer's <code>run_headless()</code> — <code>PasteFailed</code> logged and causes non-zero exit; control-socket clients get a <code>paste_failed</code> event; no interactive dialog)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
@@ -15459,7 +15610,7 @@ poller), media socket binding added 2026-08-21.</p>
 <tr>
 <td>Connect physical USB device (Linux only)</td>
 <td>available</td>
-<td>missing (<code>ryll/src/app.rs:3389</code> — <code>usb_tx</code> is created but <code>usb_rx</code> is never sent a ConnectPhysical command in headless; no CLI flag for physical devices)</td>
+<td>missing (the renderer's <code>run_headless()</code> — <code>_usb_tx</code> is created but <code>usb_rx</code> is never sent a ConnectPhysical command in headless; no CLI flag for physical devices)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
@@ -15483,7 +15634,7 @@ poller), media socket binding added 2026-08-21.</p>
 <tr>
 <td>USB error reporting (bug report integration)</td>
 <td>available</td>
-<td>partial (<code>ryll/src/app.rs:3527-3534</code> — errors logged; no zip written unless <code>--pedantic</code>)</td>
+<td>partial (the renderer's <code>run_headless()</code> — errors logged; no zip written unless <code>--pedantic</code>)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
@@ -15531,19 +15682,19 @@ poller), media socket binding added 2026-08-21.</p>
 <tr>
 <td>FPS tracking (sliding window from DisplayMark)</td>
 <td>available</td>
-<td>partial (<code>ryll/src/app.rs:3516</code> — frame count incremented but FPS not computed; only raw count printed every 10 s)</td>
+<td>partial (the renderer's <code>run_headless()</code> — frame count incremented but FPS not computed; only raw count printed every 10 s)</td>
 <td>missing (out of MVP scope; no stats panel in browser MVP)</td>
 </tr>
 <tr>
 <td>Bandwidth sparkline (rolling bytes/sec graph)</td>
 <td>available</td>
-<td>missing (<code>ryll/src/app.rs:3392-3394</code> — <code>byte_counter</code> wired in but never sampled or reported in headless)</td>
+<td>missing (the renderer's <code>run_headless()</code> — <code>byte_counter</code> wired in but never sampled or reported in headless)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
 <td>Latency sparkline (inter-PING interval graph)</td>
 <td>available</td>
-<td>partial (no graph; raw latency samples are reachable as control-socket <code>latency</code> events, and bytes_in/bytes_out are tracked, <code>ryll/src/app.rs:3518-3521</code>)</td>
+<td>partial (no graph; raw latency samples are reachable as control-socket <code>latency</code> events, and bytes_in/bytes_out are tracked from <code>Statistics</code> events in the renderer's <code>run_headless()</code>)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
@@ -15554,7 +15705,7 @@ poller), media socket binding added 2026-08-21.</p>
 </tr>
 <tr>
 <td><code>--latency-file</code> latency measurements export</td>
-<td>missing (<code>ryll/src/config.rs:65</code> — flag declared but never read or acted upon anywhere in the codebase)</td>
+<td>missing (<code>Args::latency_file</code> in <code>ryll/src/config.rs</code> — flag declared but never read or acted upon anywhere in the codebase)</td>
 <td>missing (same — flag is declared but unused; control-socket <code>latency</code> events are the working alternative)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
@@ -15579,7 +15730,7 @@ poller), media socket binding added 2026-08-21.</p>
 <tr>
 <td>Protocol gap counter (<code>Gaps: N</code> status bar)</td>
 <td>available</td>
-<td>missing (<code>ryll/src/app.rs:3563</code> — gap observer registered; warn_once fires; but headless event loop has no handler to surface the count)</td>
+<td>missing (ryll's <code>run_headless()</code> — gap observer registered; warn_once fires; but the renderer's event loop has no handler to surface the count)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
@@ -15591,7 +15742,7 @@ poller), media socket binding added 2026-08-21.</p>
 <tr>
 <td><code>--pedantic</code> mode (auto bug-report per gap)</td>
 <td>available</td>
-<td>available (partial: <code>ryll/src/app.rs:3419</code> — app_snapshot is an empty default, so pedantic zips omit surface/bandwidth/latency data)</td>
+<td>available (partial: ryll's <code>run_headless()</code> — <code>app_snapshot</code> is an empty default, so pedantic zips omit surface/bandwidth/latency data)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
@@ -15615,7 +15766,7 @@ poller), media socket binding added 2026-08-21.</p>
 <tr>
 <td>Bug report zip assembly (metadata, pcap, screenshot, metrics)</td>
 <td>available</td>
-<td>partial (<code>ryll/src/app.rs:3419</code> — <code>--pedantic</code> zips have empty app_snapshot; no interactive zip generation in headless)</td>
+<td>partial (ryll's <code>run_headless()</code> — <code>--pedantic</code> zips have an empty <code>app_snapshot</code>; no interactive zip generation in headless)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
@@ -15687,7 +15838,7 @@ poller), media socket binding added 2026-08-21.</p>
 <tr>
 <td>In-app notifications panel (bell / Menu bell)</td>
 <td>available</td>
-<td>missing (<code>ryll/src/app.rs:3400-3402</code> — store exists and is populated, but no bell or side panel in headless; no stdout drain)</td>
+<td>missing (ryll's <code>run_headless()</code> — store exists and is populated, but no bell or side panel in headless; no stdout drain)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
@@ -15699,7 +15850,7 @@ poller), media socket binding added 2026-08-21.</p>
 <tr>
 <td>Gap observer notification feed</td>
 <td>available</td>
-<td>partial (registered in headless at <code>ryll/src/app.rs:3431</code>; notifications accumulate in store but are never printed to stdout)</td>
+<td>partial (registered by <code>register_gap_notification_observer()</code> in ryll's <code>run_headless()</code>; notifications accumulate in store but are never printed to stdout)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>

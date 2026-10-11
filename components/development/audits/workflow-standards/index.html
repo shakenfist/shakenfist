@@ -2357,6 +2357,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../plan-index/" class="md-nav__link">
         
   
@@ -3293,6 +3321,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7733,6 +7789,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13200,6 +13312,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15395,8 +15535,12 @@ confuse: a <code>static</code> job must name <strong>no</strong> size because th
 advertises none, and a <code>vm</code> job must name <strong>one</strong> because the conductor
 otherwise picks for it.</p>
 <ul>
-<li>Sizes are <code>xs</code>, <code>s</code>, <code>m</code>, <code>l</code>, <code>xl</code>, and the <code>m-bigdisk</code> /
-  <code>xl-bigdisk</code> variants. Every <code>vm</code> <code>runs-on</code> must name one.</li>
+<li>Sizes are <code>xs</code>, <code>s</code>, <code>m</code>, <code>l</code>, <code>xl</code>, the <code>m-bigdisk</code> /
+  <code>xl-bigdisk</code> variants, and the <code>s-cloud</code> / <code>s-cluster</code> variants.
+  <code>s-cloud</code> and <code>s-cluster</code> have the same footprint as <code>s</code> (2 vCPU,
+  4096 MB) and are for jobs which build a nested test cloud from a
+  small runner: <code>s-cloud</code> for a cloud on one node, <code>s-cluster</code> for a
+  multi-node cluster. Every <code>vm</code> <code>runs-on</code> must name one.</li>
 <li>The conductor matches the size out of the labels, and falls back to
   the first entry in its <code>CI_SIZES</code> table when it finds none -- <code>xs</code>,
   one vCPU and 2048 MB. An omitted size is therefore a silent downgrade

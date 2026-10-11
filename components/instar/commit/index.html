@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3080,6 +3108,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/plans/PLAN-scope-coverage/" class="md-nav__link">
         
   
@@ -3755,6 +3811,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="-b resolution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overlays-whose-parent-is-in-another-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overlays whose parent is in another directory
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -7637,6 +7710,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13104,6 +13233,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15063,6 +15220,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="-b resolution">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overlays-whose-parent-is-in-another-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overlays whose parent is in another directory
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15188,13 +15362,51 @@ forward compatibility).</p>
 the overlay's recorded backing-file pointer and uses that.
 Relative paths in the recorded pointer resolve against the
 overlay's parent directory.</p>
+<p>The recorded pointer is image data, so it is validated against
+<code>backing-path-allowlist</code> (<code>$IMAGE_DIR</code> by default) exactly as
+every other chain operation validates a backing reference; see
+<a href="/components/instar/chain-discovery/#path-validation">Chain discovery</a>. A
+pointer outside the allowlist is refused before anything is
+opened, with the same message whether or not the file it names
+exists, so an overlay cannot choose which host file a commit
+writes into.</p>
+<p>Unlike a read, commit never substitutes a file of the same name
+beside the overlay for a recorded absolute pointer that cannot be
+used as written (see step 3 of
+<a href="/components/instar/chain-discovery/#path-validation">path validation</a>). That
+file is only a namesake of the parent, and committing into it
+would change an unrelated image, so instar refuses instead and
+says to pass <code>-b BASE</code> naming the file to commit into.</p>
 <p>When <code>-b BASE</code> is supplied, the host resolves it relative to
-the overlay's parent directory and compares the resolved path
-to the overlay's recorded backing-file pointer. If they don't
-match, instar refuses with <code>commit through an intermediate
-layer is not yet supported (the overlay's immediate parent is
-X)</code> — intermediate-image commit is deferred to a future
-release (see Future work).</p>
+the overlay's parent directory and checks that it names the
+overlay's recorded parent. A recorded pointer spelled exactly
+as the supplied path, either as given or with its symlinks
+resolved, and with no <code>..</code> in either, matches without the
+pointer being looked at, so it need not be inside the
+allowlist: the operator has named the file. Otherwise the
+pointer is resolved through the allowlist as a read resolves
+it, including the same-name fallback, since the file written is
+the one <code>-b</code> names. If they don't match, instar refuses with
+<code>commit through an intermediate layer is not yet supported (the
+overlay's immediate parent is X)</code>, where <code>X</code> is the pointer as
+the overlay records it — intermediate-image commit is deferred
+to a future release (see Future work). If the recorded pointer
+cannot be resolved, for example because it is outside the
+allowlist and spelled differently from <code>-b</code>, instar refuses with
+<code>the overlay's recorded parent 'X' could not be resolved</code>.</p>
+<h3 id="overlays-whose-parent-is-in-another-directory">Overlays whose parent is in another directory<a class="headerlink" href="#overlays-whose-parent-is-in-another-directory" title="Permanent link">&para;</a></h3>
+<p>The default allowlist is <code>$IMAGE_DIR</code>, the overlay's own
+directory, so an overlay in <code>/vms/overlays/</code> recording
+<code>/vms/bases/base.qcow2</code> is refused by <code>instar commit
+/vms/overlays/top.qcow2</code>, which 0.3.0 and earlier committed
+into. Either name the parent explicitly:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>instar<span class="w"> </span>commit<span class="w"> </span>-b<span class="w"> </span>/vms/bases/base.qcow2<span class="w"> </span>/vms/overlays/top.qcow2
+</code></pre></div>
+<p>or add the directory to the allowlist in the
+<a href="/components/instar/configuration/">configuration file</a>, keeping <code>$IMAGE_DIR</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[security]</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">backing-path-allowlist</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"$IMAGE_DIR"</span><span class="p">,</span><span class="w"> </span><span class="s2">"/vms/bases"</span><span class="p">]</span>
+</code></pre></div>
 <p>This matches <code>qemu-img commit</code>'s implicit <code>-b</code> behaviour and
 makes the explicit-<code>-b</code> form a self-documenting safety
 assertion.</p>
@@ -15246,19 +15458,19 @@ cases all pass an explicit <code>-b base.vmdk</code>; once the info-side
 gap lifts, the implicit form will work too.</p>
 <h2 id="output-format">Output format<a class="headerlink" href="#output-format" title="Permanent link">&para;</a></h2>
 <p>Human (default):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Image committed.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Image committed.
 </code></pre></div>
 <p>(matches <code>qemu-img commit</code> byte-for-byte.) JSON
 (<code>--output=json</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">"overlay"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/path/to/overlay.qcow2"</span><span class="p">,</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">"overlay_format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"qcow2"</span><span class="p">,</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">"backing"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/path/to/base.qcow2"</span><span class="p">,</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">"backing_format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"qcow2"</span><span class="p">,</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">"clusters_committed"</span><span class="p">:</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">"bytes_committed"</span><span class="p">:</span><span class="w"> </span><span class="mi">1048576</span><span class="p">,</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="nt">"overlay_clusters_cleared"</span><span class="p">:</span><span class="w"> </span><span class="mi">16</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">"overlay"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/path/to/overlay.qcow2"</span><span class="p">,</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">"overlay_format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"qcow2"</span><span class="p">,</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">"backing"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/path/to/base.qcow2"</span><span class="p">,</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">"backing_format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"qcow2"</span><span class="p">,</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">"clusters_committed"</span><span class="p">:</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="nt">"bytes_committed"</span><span class="p">:</span><span class="w"> </span><span class="mi">1048576</span><span class="p">,</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span><span class="nt">"overlay_clusters_cleared"</span><span class="p">:</span><span class="w"> </span><span class="mi">16</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="p">}</span>
 </code></pre></div>
 <p><code>-q</code> suppresses both forms on success and prints only errors.</p>
 <h2 id="atomicity-guarantees">Atomicity guarantees<a class="headerlink" href="#atomicity-guarantees" title="Permanent link">&para;</a></h2>
@@ -15470,24 +15682,24 @@ master plan</a>:</p>
 </ul>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>Implicit <code>-b</code> (commit into the overlay's recorded parent):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>instar commit overlay.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>instar commit overlay.qcow2
 </code></pre></div>
 <p>Explicit <code>-b</code> (must match the overlay's recorded parent):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>instar commit -b base.qcow2 overlay.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar commit -b base.qcow2 overlay.qcow2
 </code></pre></div>
 <p>JSON output for scripting:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>instar commit --output=json overlay.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar commit --output=json overlay.qcow2
 </code></pre></div>
 <p>Quiet mode (suppresses the success line):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar commit -q overlay.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar commit -q overlay.qcow2
 </code></pre></div>
 <p>Vmdk commit (must use explicit <code>-b</code> until the implicit-<code>-b</code>
 gap lifts):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar commit -b base.vmdk overlay.vmdk
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar commit -b base.vmdk overlay.vmdk
 </code></pre></div>
 <p>Auto-detect the overlay format from the file's magic bytes
 (works for qcow2 and vmdk monolithicSparse):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar commit overlay.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>instar commit overlay.qcow2
 </code></pre></div>
 
 

@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -6920,6 +6976,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#deployment-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#operator-documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7820,6 +7887,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13287,6 +13410,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ryll/plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15311,6 +15462,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#deployment-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#operator-documentation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15675,6 +15837,50 @@ against a local qemu SPICE server via the static source, so it is the
 end-to-end exercise of the standalone scenario. See
 <a href="/components/kerbside/direct-qemu-harness/">direct-qemu-harness.md</a> for the lane and its
 standalone mock-control-plane sibling, <code>verify-rust-proxy.sh</code>.</p>
+<h3 id="deployment-options">Deployment Options<a class="headerlink" href="#deployment-options" title="Permanent link">&para;</a></h3>
+<p>The use cases say what Kerbside sits in front of; this section says how
+it is installed and run. The default worth reaching for is a Kerbside
+deployed in front of the clouds rather than by one of them, because
+<a href="/components/kerbside/use-cases/multi-cloud/">multi-cloud aggregation</a> and
+<a href="/components/kerbside/use-cases/placement/">placement</a> both assume one.</p>
+<table>
+<thead>
+<tr>
+<th>Mechanism</th>
+<th>Description</th>
+<th>Sources it configures</th>
+<th>Tested in Kerbside CI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>By hand: pip, venv and systemd</td>
+<td>The package installed into a venv, with the REST API (gunicorn) and the daemon run as services; the pieces are listed in <a href="/components/kerbside/installation/">installation.md</a></td>
+<td>Any</td>
+<td>Every lane, but by CI scripts rather than as a documented procedure</td>
+</tr>
+<tr>
+<td>Ansible role</td>
+<td>The <code>kerbside</code> role in Shaken Fist's ansible collection, on co-located or dedicated hosts, with a bring-your-own-Kerbside path for a Kerbside it does not deploy</td>
+<td>Shaken Fist only today; any, if the planned move of the role into Kerbside lands</td>
+<td><code>sf-e2e</code>, smoke tier and nightly, through <code>tools/sf-e2e/deploy-kerbside.sh</code> rather than the role</td>
+</tr>
+<tr>
+<td>Kolla-Ansible (kerbside-patches)</td>
+<td>Kerbside as a Kolla control-plane service, from patches carried in kerbside-patches while upstream review is open and maintained by rebase</td>
+<td>OpenStack</td>
+<td><code>openstack_matrix</code>, merge tier</td>
+</tr>
+<tr>
+<td>Containers</td>
+<td>The <code>demo/</code> compose stack today, with no first-party image yet, so no production compose or Kubernetes support</td>
+<td>Static (the compose demo)</td>
+<td><code>demo-compose</code>, advisory, path-filtered</td>
+</tr>
+</tbody>
+</table>
+<p>Mechanisms whose name is not a link are planned rather than written; see
+<a href="/components/kerbside/plans/PLAN-deployment-options/">plans/PLAN-deployment-options.md</a>.</p>
 <h3 id="operator-documentation">Operator Documentation<a class="headerlink" href="#operator-documentation" title="Permanent link">&para;</a></h3>
 <p>Guides for deploying and configuring Kerbside:</p>
 <ul>

@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7500,6 +7556,62 @@
     
   
     Convert the kerbside admin UI to sfui
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
   
 
     
@@ -13359,6 +13471,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15796,6 +15936,11 @@ configuration section below.</p>
 <td>Cap the shared SPICE GLZ decompression dictionary at N MiB. The dictionary holds decoded RGBA entries that the server attached <code>IMAGE_FLAGS_CACHE_ME</code> to on Glz / ZlibGlz payloads so cross-frame back-references resolve; without a cap, full-frame ZlibGlzRgb workloads (observed in sessions 003a and 004d-g) grew the dictionary at roughly 30 MiB/s and drove a multi-GiB RSS runaway before the cap existed. An LRU evicts oldest entries when the cap is exceeded. Same trade-off shape as <code>--image-cache-cap-mib</code>: lower it on small-RAM hosts, raise it for sustained GLZ-heavy workloads to keep more cross-frame references hot. Must be at least 1</td>
 </tr>
 <tr>
+<td><code>--preferred-compression &lt;MODE&gt;</code></td>
+<td><code>auto-glz</code></td>
+<td>Image compression to ask spice-server for in the display channel's <code>PREFERRED_COMPRESSION</code> message. One of <code>off</code>, <code>auto-glz</code>, <code>auto-lz</code>, <code>quic</code>, <code>glz</code>, <code>lz</code>, <code>lz4</code>. Exists for diagnostics: spice-server only sends LZ4 images to a client that asks for exactly <code>lz4</code>, so use that to capture them. <code>auto-glz</code> is the default for a measured reason: asking for <code>auto-lz</code> made the server stop using GLZ entirely (GLZ dictionary entries 23 to 0, bytes received up 25% in session 006), and for UI-heavy workloads the shared GLZ dictionary is the win while <code>auto-glz</code> still lets the server choose QUIC for photographic content</td>
+</tr>
+<tr>
 <td><code>--pedantic</code></td>
 <td>false</td>
 <td>Write a bug-report zip to <code>./ryll-pedantic-reports/</code> (or <code>--pedantic-dir</code>) the first time each distinct protocol gap is detected</td>
@@ -15990,7 +16135,7 @@ the standard virt-viewer format used by <code>remote-viewer</code> and other SPI
 <tr>
 <td><code>host-subject</code></td>
 <td>No</td>
-<td>Server certificate subject; enforced -- the connection fails if the server's certificate subject does not match, and a malformed value is rejected at startup</td>
+<td>Server certificate subject; enforced -- the connection fails if the server's certificate subject does not match, and a malformed value is rejected at startup. Without it, a <code>ca</code> connection whose certificate name does not match is trusted on the CA alone, and ryll warns (see <a href="/components/ryll/troubleshooting/#warning-certificate-accepted-on-the-ca-alone">troubleshooting</a>)</td>
 </tr>
 <tr>
 <td><code>proxy</code></td>
@@ -16138,6 +16283,10 @@ by ryll and not forwarded to the guest VM.</p>
 </thead>
 <tbody>
 <tr>
+<td>F8</td>
+<td>Save the current display as PNG(s) via a native file dialog</td>
+</tr>
+<tr>
 <td>F11</td>
 <td>Toggle the live traffic viewer side panel</td>
 </tr>
@@ -16151,6 +16300,24 @@ by ryll and not forwarded to the guest VM.</p>
 </tr>
 </tbody>
 </table>
+<p>On macOS, Cmd chords belong to the host: a key pressed while Cmd is
+held (Cmd+Q, Cmd+W, Cmd+C and so on) is not forwarded to the guest,
+and neither is its release. ryll does not map Cmd to the guest's
+Super / Windows key, so there is currently no way to send a Super
+chord to the guest from the macOS GUI. A key that was already held
+when Cmd went down is still released in the guest normally.</p>
+<p>On Linux and Windows, Ctrl+C, Ctrl+X and Ctrl+V go to the guest like
+any other Ctrl chord, so Ctrl+C interrupts a program in a guest
+terminal. They do not copy, cut or paste on the host, and Ctrl+V does
+not type the host clipboard (Ctrl+Alt+V does that, when
+paste-as-keystrokes is enabled, and is never forwarded to the guest,
+even when the host clipboard is empty). The GUI toolkit reports these chords
+by what they mean rather than by key, so ryll sends the key in its
+US-QWERTY position: on a layout that moves C, X or V (Dvorak, for
+example) the guest gets the key at that position instead. On Windows,
+Shift+Delete and Shift+Insert reach the guest as themselves, but
+Ctrl+Insert reaches it as Ctrl+C and Ctrl+Shift+Delete as
+Ctrl+Shift+X, because ryll cannot tell them apart from those.</p>
 <h2 id="environment-variables">Environment Variables<a class="headerlink" href="#environment-variables" title="Permanent link">&para;</a></h2>
 <p>Currently, ryll does not use environment variables for configuration. All
 settings are provided via command-line arguments or .vv files.</p>

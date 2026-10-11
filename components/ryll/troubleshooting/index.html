@@ -2353,6 +2353,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/plan-history-in-source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Plan history in source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/plan-index/" class="md-nav__link">
         
   
@@ -3060,6 +3088,34 @@
     
   
     Consistency audits v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/PLAN-plan-references-in-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plan references in code
   
 
     
@@ -7520,6 +7576,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment options phase 1: survey, matrix and scaffolding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier/" class="md-nav__link">
         
   
@@ -11712,6 +11824,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#warning-certificate-accepted-on-the-ca-alone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warning: certificate accepted on the CA alone
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#session-drops-when-pasting-large-text-into-the-guest" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13652,6 +13775,34 @@
     
   
     Image decoder hardening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-app-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Splitting app.rs
   
 
     
@@ -15672,6 +15823,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#warning-certificate-accepted-on-the-ca-alone" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warning: certificate accepted on the CA alone
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#session-drops-when-pasting-large-text-into-the-guest" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16360,6 +16522,26 @@ insecure port.</p>
    a backend reached by IP). With neither, the public roots apply
    and the certificate's name must match the host connected to,
    because the name is then all that identifies the backend.</p>
+<h3 id="warning-certificate-accepted-on-the-ca-alone">Warning: certificate accepted on the CA alone<a class="headerlink" href="#warning-certificate-accepted-on-the-ca-alone" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom:</strong> A warning in the log, and in the GUI's notifications
+panel, once per connection:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>TLS: certificate accepted on the CA alone: its name does not match the server and ...
+</code></pre></div></p>
+<p><strong>Cause:</strong> The connection uses a <code>ca=</code> field, the server's certificate
+does not carry the name ryll dialled (usual for a SPICE backend
+reached by IP), and no <code>host-subject</code> is set. The CA is then the only
+identity check: any certificate that CA has issued, to any host in
+the same PKI, would have been accepted. A compromised host inside the
+cluster could answer for this one. Shaken Fist produces exactly this
+shape unless the operator has configured a certificate subject.</p>
+<p>The connection still proceeds. Refusing it would break every
+deployment that publishes no subject, so ryll warns instead.</p>
+<p><strong>Solution:</strong> Pin the server's identity with <code>host-subject</code> in the
+.vv file, set to the server certificate's full subject (see
+<a href="/components/ryll/configuration/#supported-fields">Configuration</a>). For Shaken Fist,
+set <code>spice_server_cert_subject</code> so the subject is published in the
+.vv file. A pinned connection does not warn, and fails if the
+certificate's subject does not match.</p>
 <h3 id="session-drops-when-pasting-large-text-into-the-guest">Session drops when pasting large text into the guest<a class="headerlink" href="#session-drops-when-pasting-large-text-into-the-guest" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong> Every channel disconnects at once, without a TLS
 <code>close_notify</code>, just after a paste in the guest. The log's last main-channel
@@ -16382,7 +16564,7 @@ before pasting into the guest.</p>
 - Decompression errors (check verbose output)</p>
 <p><strong>Solutions:</strong>
 1. Enable verbose logging:
-   <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>-v
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>-v
 </code></pre></div>
 2. Check that the VM has a display configured
 3. Look for decompression errors in the log</p>
@@ -16611,62 +16793,62 @@ packet" or an assertion failure in <code>redirect.c</code>.</p>
 <h2 id="build-issues">Build Issues<a class="headerlink" href="#build-issues" title="Permanent link">&para;</a></h2>
 <h3 id="missing-graphics-libraries">Missing graphics libraries<a class="headerlink" href="#missing-graphics-libraries" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>error: failed to run custom build command for `eframe`
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>error: failed to run custom build command for `eframe`
 </code></pre></div></p>
 <p><strong>Cause:</strong> Missing X11/OpenGL development libraries.</p>
 <p><strong>Solution:</strong> Install required dependencies:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span>libxcb-render0-dev<span class="w"> </span>libxcb-shape0-dev<span class="w"> </span>libxcb-xfixes0-dev<span class="w"> </span>libxcb1-dev<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span>libx11-dev<span class="w"> </span>libxkbcommon-dev<span class="w"> </span>libgl1-mesa-dev<span class="w"> </span>libegl1-mesa-dev<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span>libwayland-dev<span class="w"> </span>libssl-dev<span class="w"> </span>pkg-config
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">    </span>libxcb-render0-dev<span class="w"> </span>libxcb-shape0-dev<span class="w"> </span>libxcb-xfixes0-dev<span class="w"> </span>libxcb1-dev<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span>libx11-dev<span class="w"> </span>libxkbcommon-dev<span class="w"> </span>libgl1-mesa-dev<span class="w"> </span>libegl1-mesa-dev<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span>libwayland-dev<span class="w"> </span>libssl-dev<span class="w"> </span>pkg-config
 </code></pre></div></p>
 <p>Or use the devcontainer:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>make<span class="w"> </span>build
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>make<span class="w"> </span>build
 </code></pre></div></p>
 <h3 id="binary-wont-run-on-another-machine">Binary won't run on another machine<a class="headerlink" href="#binary-wont-run-on-another-machine" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>error while loading shared libraries: libxcb.so.1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>error while loading shared libraries: libxcb.so.1
 </code></pre></div></p>
 <p><strong>Cause:</strong> Target machine is missing required libraries.</p>
 <p><strong>Solution:</strong> See <a href="/components/ryll/portability/">portability.md</a> for details on binary
 compatibility.</p>
 <h2 id="debugging-tips">Debugging Tips<a class="headerlink" href="#debugging-tips" title="Permanent link">&para;</a></h2>
 <h3 id="enable-verbose-logging">Enable verbose logging<a class="headerlink" href="#enable-verbose-logging" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>-v<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tee<span class="w"> </span>debug.log
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>-v<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tee<span class="w"> </span>debug.log
 </code></pre></div>
 <h3 id="check-what-channels-connected">Check what channels connected<a class="headerlink" href="#check-what-channels-connected" title="Permanent link">&para;</a></h3>
 <p>Look for lines like:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>INFO Connected to main channel successfully
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>INFO Connected to display channel successfully
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>INFO Connected to inputs channel successfully
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>INFO Connected to cursor channel successfully
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>INFO Connected to main channel successfully
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>INFO Connected to display channel successfully
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>INFO Connected to inputs channel successfully
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>INFO Connected to cursor channel successfully
 </code></pre></div></p>
 <h3 id="replay-draw_copy-regions">Replay draw_copy regions<a class="headerlink" href="#replay-draw_copy-regions" title="Permanent link">&para;</a></h3>
 <p>The <code>scripts/replay_draw_copy.py</code> script parses verbose ryll logs
 and generates an HTML animation showing where each <code>draw_copy</code>
 operation landed on the surface. This is useful for diagnosing
 rendering issues like misplaced tiles or missing regions.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>-v<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tee<span class="w"> </span>debug.log
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>python3<span class="w"> </span>scripts/replay_draw_copy.py<span class="w"> </span>debug.log<span class="w"> </span>-o<span class="w"> </span>replay.html
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="c1"># Open replay.html in a browser — use Play/Step to animate</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>-v<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tee<span class="w"> </span>debug.log
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>python3<span class="w"> </span>scripts/replay_draw_copy.py<span class="w"> </span>debug.log<span class="w"> </span>-o<span class="w"> </span>replay.html
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="c1"># Open replay.html in a browser — use Play/Step to animate</span>
 </code></pre></div>
 <h3 id="monitor-network-traffic">Monitor network traffic<a class="headerlink" href="#monitor-network-traffic" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># See SPICE traffic (unencrypted only)</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>tcpdump<span class="w"> </span>-i<span class="w"> </span>any<span class="w"> </span>port<span class="w"> </span><span class="m">5900</span><span class="w"> </span>-w<span class="w"> </span>spice.pcap
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># See SPICE traffic (unencrypted only)</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>tcpdump<span class="w"> </span>-i<span class="w"> </span>any<span class="w"> </span>port<span class="w"> </span><span class="m">5900</span><span class="w"> </span>-w<span class="w"> </span>spice.pcap
 </code></pre></div>
 <h3 id="inspect-a-capture-pcap">Inspect a <code>--capture</code> pcap<a class="headerlink" href="#inspect-a-capture-pcap" title="Permanent link">&para;</a></h3>
 <p><code>ryll --capture &lt;dir&gt;</code> writes one pcap per channel plus a
 video of the primary surface. <code>tools/pcap-inspect.py</code>
 parses those pcaps without needing tshark or scapy:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># What SPICE message types fired during the session?</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>tools/pcap-inspect.py<span class="w"> </span>opcodes<span class="w"> </span>&lt;dir&gt;/display.pcap
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="c1"># Which image codecs dominate the DRAW_COPY traffic?</span>
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>tools/pcap-inspect.py<span class="w"> </span>draw-copy<span class="w"> </span>&lt;dir&gt;/display.pcap
-<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>
-<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="c1"># What did the server send in the last 5 seconds of the</span>
-<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="c1"># capture, right after the artefact appeared?</span>
-<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>tools/pcap-inspect.py<span class="w"> </span>timeline<span class="w"> </span>&lt;dir&gt;/display.pcap<span class="w"> </span>--since-last<span class="w"> </span><span class="m">5</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># What SPICE message types fired during the session?</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>tools/pcap-inspect.py<span class="w"> </span>opcodes<span class="w"> </span>&lt;dir&gt;/display.pcap
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1"># Which image codecs dominate the DRAW_COPY traffic?</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>tools/pcap-inspect.py<span class="w"> </span>draw-copy<span class="w"> </span>&lt;dir&gt;/display.pcap
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="c1"># What did the server send in the last 5 seconds of the</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="c1"># capture, right after the artefact appeared?</span>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>tools/pcap-inspect.py<span class="w"> </span>timeline<span class="w"> </span>&lt;dir&gt;/display.pcap<span class="w"> </span>--since-last<span class="w"> </span><span class="m">5</span>
 </code></pre></div>
 <p>Handy when the user reports a visual artefact that's too
 fast to screenshot: capture with <code>--capture</code>, reproduce,
@@ -16674,7 +16856,7 @@ then use the pcap to narrow the window before diving into
 source.</p>
 <h3 id="test-with-headless-mode-first">Test with headless mode first<a class="headerlink" href="#test-with-headless-mode-first" title="Permanent link">&para;</a></h3>
 <p>Headless mode eliminates GUI-related issues:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless<span class="w"> </span>-v
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless<span class="w"> </span>-v
 </code></pre></div></p>
 <p>If headless works but GUI doesn't, the issue is in the rendering layer.</p>
 <h2 id="bug-reports">Bug Reports<a class="headerlink" href="#bug-reports" title="Permanent link">&para;</a></h2>
@@ -16706,22 +16888,22 @@ selection mode</strong>: drag a rectangle over the area of corruption.
 A red overlay shows your selection.  Press <strong>Escape</strong> to skip and
 capture without highlighting a specific region.</p>
 <h3 id="what-the-zip-file-contains">What the zip file contains<a class="headerlink" href="#what-the-zip-file-contains" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>ryll-bugreport-YYYY-MM-DDTHH-MM-SSZ.zip
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>├── metadata.json         — report type, description, ryll
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>│                           version, platform, target,
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>│                           timestamp (submit), triggered_at
-<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>│                           (dialog-open), submitted uptime
-<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>│                           and triggered uptime
-<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>├── session.json          — FPS, bandwidth, surfaces, uptime
-<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>├── channel-state.json    — snapshot of the affected channel
-<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>├── traffic.pcap          — recent protocol traffic (pcap format)
-<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>├── screenshot.png        — full display surface captured at the
-<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>│                           moment the dialog opened (Display
-<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a>│                           reports only)
-<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>├── screenshot-region.png — crop of the submit-time surface at
-<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>│                           the selected region (Display reports
-<a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a>│                           only, when a region was drawn)
-<a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a>└── runtime-metrics.json  — process and per-thread CPU / RSS
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>ryll-bugreport-YYYY-MM-DDTHH-MM-SSZ.zip
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>├── metadata.json         — report type, description, ryll
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>│                           version, platform, target,
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>│                           timestamp (submit), triggered_at
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>│                           (dialog-open), submitted uptime
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>│                           and triggered uptime
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>├── session.json          — FPS, bandwidth, surfaces, uptime
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>├── channel-state.json    — snapshot of the affected channel
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>├── traffic.pcap          — recent protocol traffic (pcap format)
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>├── screenshot.png        — full display surface captured at the
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>│                           moment the dialog opened (Display
+<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>│                           reports only)
+<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a>├── screenshot-region.png — crop of the submit-time surface at
+<a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a>│                           the selected region (Display reports
+<a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a>│                           only, when a region was drawn)
+<a id="__codelineno-19-16" name="__codelineno-19-16" href="#__codelineno-19-16"></a>└── runtime-metrics.json  — process and per-thread CPU / RSS
 </code></pre></div>
 <p><strong>Mac-specific verification.</strong> If you are debugging the
 runtime-metrics output specifically on a Mac, see
@@ -16778,17 +16960,17 @@ session. They come from the master plan
   stopped consuming server messages for that long, which
   applies SPICE-level backpressure on the server.</li>
 <li><code>writer_dropped_count</code> — number of pcap-capture packets the
-  dedicated writer task's bounded queue rejected because it
+  dedicated writer thread's bounded queue rejected because it
   was full. Zero unless <code>--capture</code> is active. A non-zero
   value implicates disk speed (or anything else slowing the
-  writer task) rather than decode CPU or socket-read pacing;
+  writer thread) rather than decode CPU or socket-read pacing;
   the rest of the SPICE pipeline keeps running because the
   enqueue is non-blocking.</li>
 </ul>
 <p>In <code>session.json</code> (a sibling artefact in the same zip):</p>
 <ul>
 <li><code>video_drop_count</code> — number of display frames dropped
-  because the H.264 encoder task's queue was full when the
+  because the H.264 encoder thread's queue was full when the
   egui frame loop tried to enqueue. Zero unless <code>--capture</code>
   is active. A non-zero value implicates encoder CPU (or MP4
   write speed) rather than the SPICE pipeline; the egui frame
@@ -16808,12 +16990,17 @@ session. They come from the master plan
   <code>mean</code> is biased by batch size.</li>
 </ul>
 <p><strong>MP4 finalisation trade-off.</strong> The MP4 moov atom is written
-by the encoder task after the sender drops, not synchronously by <code>CaptureSession::close()</code>.
-In practice the encoder task finalises within milliseconds of
+by the encoder thread after the sender drops, not synchronously by <code>CaptureSession::close()</code>.
+In practice the encoder thread finalises within milliseconds of
 close, but a bug report assembled in a very short window
-after a disconnect — or in the SIGINT abrupt-shutdown path —
-may see an unfinalised (unplayable) <code>display.mp4</code>. The pcap
-files and the rest of the report are unaffected.</p>
+after a disconnect may see an unfinalised (unplayable)
+<code>display.mp4</code>. On a clean exit (window close or SIGINT) ryll
+waits up to five seconds for the encoder thread before the
+process exits, so the capture directory's own <code>display.mp4</code> is
+complete unless ryll was killed or crashed, or the encoder was
+wedged (the log then says the writer threads were still
+running). The pcap files and the rest of the report are
+unaffected.</p>
 <p>To read the report:</p>
 <ol>
 <li><code>unzip ryll-bugreport-*.zip</code> and open <code>channel-state.json</code>.</li>
@@ -17026,12 +17213,12 @@ regardless of whether you noticed a problem in real time.</p>
   channel state and traffic at the moment before the fault.</li>
 </ul>
 <h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Fire a snapshot every 30 seconds, keep the last 20 zips (~30 MiB at typical sizes)</span>
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>ryll<span class="w"> </span>--file<span class="w"> </span>connection.vv<span class="w"> </span>--auto-snapshot-interval<span class="w"> </span><span class="m">30</span>
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
-<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># Custom cap and output directory</span>
-<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>ryll<span class="w"> </span>--file<span class="w"> </span>connection.vv<span class="w"> </span>--auto-snapshot-interval<span class="w"> </span><span class="m">60</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">     </span>--auto-snapshot-cap<span class="w"> </span><span class="m">10</span><span class="w"> </span>--bug-report-dir<span class="w"> </span>/tmp/session-debug
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1"># Fire a snapshot every 30 seconds, keep the last 20 zips (~30 MiB at typical sizes)</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>ryll<span class="w"> </span>--file<span class="w"> </span>connection.vv<span class="w"> </span>--auto-snapshot-interval<span class="w"> </span><span class="m">30</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="c1"># Custom cap and output directory</span>
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>ryll<span class="w"> </span>--file<span class="w"> </span>connection.vv<span class="w"> </span>--auto-snapshot-interval<span class="w"> </span><span class="m">60</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="w">     </span>--auto-snapshot-cap<span class="w"> </span><span class="m">10</span><span class="w"> </span>--bug-report-dir<span class="w"> </span>/tmp/session-debug
 </code></pre></div>
 <p>At session start, an <code>Info</code> notification confirms auto-snapshot mode is enabled
 with the interval, cap, and target path. The status bar shows
@@ -17040,7 +17227,7 @@ seconds. No per-snapshot notifications are sent so the panel doesn't spam.</p>
 <h3 id="finding-and-reading-auto-snapshot-files">Finding and reading auto-snapshot files<a class="headerlink" href="#finding-and-reading-auto-snapshot-files" title="Permanent link">&para;</a></h3>
 <p>Snapshots are written to <code>&lt;bug-report-dir&gt;/auto-snapshots/</code> with filenames that
 encode the UTC timestamp and session uptime:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>ryll-auto-snapshot-2026-05-18T20-37-42Z-T+47.3s.zip
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>ryll-auto-snapshot-2026-05-18T20-37-42Z-T+47.3s.zip
 </code></pre></div>
 <p>Each zip is a complete bug-report artefact containing:
 - <strong><code>channel-state.json</code></strong> — all channels merged with full diagnostics (playback
