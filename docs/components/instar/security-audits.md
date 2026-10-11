@@ -261,11 +261,15 @@ data files outside allowed directories when `--chain` or convert
 is used. The file is never opened.
 
 **CVE-2015-5163 (backing file traversal):** The host-side
-`resolve_backing_path()` function canonicalises all paths (resolving
-`../` and symlinks) before checking against the allowlist. Paths
-with embedded null bytes are handled by Rust's `CStr`/`Path` types
-which stop at the first null. Both relative traversal and null-byte
-bypass variants are tested.
+`resolve_backing_path()` function normalises each reference's
+spelling and checks it against the allowlist before touching the
+filesystem, then resolves the reference as written one component
+at a time, following symlinks and applying `..` as the kernel does,
+and refusing any step that leaves the allowlist. No image-chosen
+path outside the allowlist is probed.
+Paths with embedded null bytes are handled by Rust's `CStr`/`Path`
+types which stop at the first null. Both relative traversal and
+null-byte bypass variants are tested.
 
 **CVE-2022-47951 (VMDK descriptor):** Text-only VMDK descriptors
 (no binary magic) are rejected as "unknown format". Binary VMDKs

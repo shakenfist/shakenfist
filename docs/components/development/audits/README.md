@@ -95,13 +95,15 @@ Two projects are in scope for part of the audit only:
   producer definitions `eol-producers` checks against the end-of-life
   table, so that applies too. It plans like the rest of the fleet too,
   so the four criteria that report a defect in a plan as written
-  apply. The two that do not are `plan-audit-phase`, because the plans
-  written there before it adopted the template track progress as
-  checkpoint sections rather than as a phase table and enabling it
-  would file an issue for a retrofit nobody has decided to do, and
+  apply. The three that do not are `plan-audit-phase`, because the
+  plans written there before it adopted the template track progress
+  as checkpoint sections rather than as a phase table and enabling it
+  would file an issue for a retrofit nobody has decided to do;
   `push-audit`, which has no `PUSH-AUDIT.md` to read until that
-  changes. It is not expected to grow a `pyproject.toml`, a renovate
-  config, release workflows, or a `develop` branch.
+  changes; and `plan-history-in-source`, which comes in with
+  `push-audit`, since that runbook carries the rule it measures. It is
+  not expected to grow a `pyproject.toml`, a renovate config,
+  release workflows, or a `develop` branch.
 
 - images is audited for the `eol-distro` check, and nothing else. It
   is built fresh every night and the fleet's CI boots on its output,
@@ -211,6 +213,7 @@ attached rather than quietly disappearing from the table.
 | [docs-line-references.md](/components/development/audits/docs-line-references/) | Documentation names code by symbol, not by line number |
 | [mermaid-lint-ci.md](/components/development/audits/mermaid-lint-ci/) | Repositories with mermaid diagrams render them in CI, so a broken one fails the build |
 | [plan-source-references.md](/components/development/audits/plan-source-references/) | Plan references in source and configuration still resolve |
+| [plan-history-in-source.md](/components/development/audits/plan-history-in-source/) | Source and configuration give the reason for the code, not the plan phase, decision or step that produced it |
 | [plan-index.md](/components/development/audits/plan-index/) | docs/plans/index.md layout, date ordering, plan coverage and the status vocabulary |
 | [plan-audit-phase.md](/components/development/audits/plan-audit-phase/) | Master plans end with a phase that runs PUSH-AUDIT.md over the whole plan's work |
 | [push-audit.md](/components/development/audits/push-audit/) | PUSH-AUDIT.md naming, versioned shared blocks, and an AGENTS.md reference to it |

@@ -244,6 +244,10 @@ menu with "Ctrl+Alt+V" shortcut text. The entry is disabled (greyed
 out) when vdagent is connected, with a tooltip explaining to use
 normal Ctrl+V. The Ctrl+Alt+V shortcut is detected before
 `handle_input()` to prevent the V keypress from reaching the guest.
+Off macOS egui-winit reports that press as `Event::Paste`, not as a
+key press, so `paste_shortcut_pressed()` in `ryll/src/input_egui.rs`
+accepts either. Once the paste starts, `HeldKeys::withhold_paste_release()`
+keeps the V release that follows from reaching the guest too.
 Pre-validation via `translate_paste()` catches unrepresentable
 characters and shows an error dialog listing up to three sample
 codepoints. The clipboard is read via `arboard::Clipboard` (lazily

@@ -109,17 +109,23 @@ libraries at build time, but doesn't actually use them at runtime. This means:
 
 ## Cargo Features
 
-Ryll uses a Cargo feature to control optional functionality:
+Ryll uses Cargo features to control optional functionality:
 
 | Feature | Default | Description |
 |---------|---------|-------------|
+| `gui` | Yes | The egui/eframe display, host clipboard (`arboard`) and native file picker (`rfd`). Without it ryll needs `--headless` or `--web`. |
+| `audio` | Yes | The cpal/opus playback pipeline. Without it the playback channel is skipped. |
 | `capture` | Yes | Protocol capture (`--capture` flag, pcap + video). Requires `openh264`, `mp4`, `pcap-file`, `etherparse`. |
 
-To build without capture support (e.g. for Windows):
+To build without capture support (e.g. for Windows), turn the
+defaults off and add the other two back:
 
 ```bash
-cargo build --release --no-default-features
+cargo build --release -p ryll --no-default-features --features ryll/gui,ryll/audio
 ```
+
+`--no-default-features` on its own is the slim headless build: no
+GUI, audio or capture.
 
 ## Maximising Portability
 
@@ -149,7 +155,7 @@ Ryll builds on Windows with MSVC. eframe uses Direct3D and WinAPI. Install
 Visual Studio Build Tools, then:
 
 ```powershell
-cargo build --release --no-default-features
+cargo build --release -p ryll --no-default-features --features ryll/gui,ryll/audio
 ```
 
 The `--capture` flag is not available on Windows builds.

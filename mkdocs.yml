@@ -137,6 +137,7 @@ nav:
                 - "Audit: npm imports satisfied only by a transitive dependency": components/development/audits/npm-undeclared-direct-dependency.md
                 - "Audit: Pinning indirect dependencies": components/development/audits/pin-indirect-dependencies.md
                 - "Audit: Pinning indirect npm dependencies": components/development/audits/npm-pin-indirect-dependencies.md
+                - "Audit: Plan history in source": components/development/audits/plan-history-in-source.md
                 - "Audit: Plan index": components/development/audits/plan-index.md
                 - "Audit: Plan phase references": components/development/audits/plan-phase-references.md
                 - "Audit: Plan references in source": components/development/audits/plan-source-references.md
@@ -162,6 +163,7 @@ nav:
             - Plans:
                 - "Plans index": components/development/plans/index.md
                 - "Consistency audits v2": components/development/plans/PLAN-consistency-audits-v2.md
+                - "Plan references in code": components/development/plans/PLAN-plan-references-in-code.md
                 - "Plan: a `scope-coverage` audit, reconciling the audit lists against the organisation": components/development/plans/PLAN-scope-coverage.md
                 - "Plan: an `llm-doc-structure` consistency audit for AGENTS.md and ARCHITECTURE.md": components/development/plans/PLAN-llm-doc-structure.md
                 - "Plan: give the pre-push audit a trigger": components/development/plans/PLAN-push-audit-phase.md
@@ -309,6 +311,8 @@ nav:
                 - "Consistency audit phase 4: review scope and session scaffolding": components/kerbside/plans/PLAN-consistency-audit-phase-04-review-coverage.md
                 - "Consistency audit phase 5: diagram discipline and mermaid linting": components/kerbside/plans/PLAN-consistency-audit-phase-05-diagram-discipline.md
                 - "Convert the kerbside admin UI to sfui": components/kerbside/plans/PLAN-sfui-conversion.md
+                - "Deployment options": components/kerbside/plans/PLAN-deployment-options.md
+                - "Deployment options phase 1: survey, matrix and scaffolding": components/kerbside/plans/PLAN-deployment-options-phase-01-survey-and-scaffolding.md
                 - "Host subject phase 1: subject pinning in shakenfist-spice-protocol": components/kerbside/plans/PLAN-host-subject-phase-01-ryll-verifier.md
                 - "Host subject phase 2: kerbside adoption, CI proof, docs": components/kerbside/plans/PLAN-host-subject-phase-02-kerbside-adoption.md
                 - "Kerbside VDI tokens phase 5: the `/sf-console.vv` exchange endpoint": components/kerbside/plans/PLAN-kerbside-vdi-tokens-phase-05-exchange.md
@@ -498,6 +502,7 @@ nav:
                 - "Two-stage CI": components/ryll/plans/PLAN-two-stage-ci.md
                 - "Main-channel event drops": components/ryll/plans/PLAN-main-event-drops.md
                 - "Image decoder hardening": components/ryll/plans/PLAN-decoder-hardening.md
+                - "Splitting app.rs": components/ryll/plans/PLAN-app-split.md
     - Features: features.md
     - Glossary: glossary.md
     - Release notes:

@@ -77,9 +77,11 @@ exempts the whole file, prose included, so prefer the per-line form.
 A repository with no plan references outside markdown is N/A.
 
 This audit composes with `plan-phase-references`, which governs what
-documentation prose may cite, and `plan-index`, which governs whether a
-plan is registered. This one governs only whether a pointer written in
-code still lands on a file.
+documentation prose may cite, `plan-history-in-source`, which reads
+the same files for the phase, decision and step numbers code should
+not cite at all, and `plan-index`, which governs whether a plan is
+registered. This one governs only whether a pointer written in code
+still lands on a file.
 
 ## Template
 

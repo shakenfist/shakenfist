@@ -103,15 +103,26 @@ The control socket is a **Unix-domain stream socket** (type
 `--control-socket <path>` flag. This flag needs `--headless` or
 `--web`; Ryll rejects it in GUI mode at launch.
 
-On startup, Ryll:
+On startup, before it connects to the SPICE server, Ryll:
 
-1. Unlinks any existing file at the path (so a stale socket from a
-   previous run does not block startup).
+1. Unlinks any existing socket at the path (so a stale socket from a
+   previous run does not block startup). Any other kind of file at
+   the path is left alone, and is an error.
 2. Creates a new socket file and calls `bind()`.
-3. Sets the file mode to **0600** (owner read/write only) before
-   calling `listen()`. File permissions are the sole access-control
-   mechanism; protect the path accordingly.
-4. Begins accepting connections.
+3. Sets the file mode to **0600** (owner read/write only). A socket
+   that is bound but not yet listening refuses every connection, so
+   there is no moment at which anyone but the owner can connect,
+   whatever the process umask. File permissions are the sole
+   access-control mechanism; protect the path accordingly.
+4. Calls `listen()` and begins accepting connections.
+
+If any of these steps fails, Ryll exits non-zero with an error naming
+the path, without connecting. Common causes are a path longer than
+`sockaddr_un` allows (108 bytes on Linux, 104 on macOS), a directory
+that does not exist or is not writable, and a regular file at the
+path. A client waiting for the socket to appear can therefore also
+watch for Ryll exiting, rather than waiting for a socket that will
+never appear.
 
 When the SPICE session ends (normally or on error), Ryll closes the
 listening socket and unlinks the socket file.
@@ -1114,9 +1125,10 @@ how ryll implements it, and is not binding on other implementations.
 
 The control socket is exposed by headless and web mode via the
 `--control-socket <path>` CLI flag; the GUI rejects it at launch.
-Both modes spawn the same server through
-`shakenfist_spice_renderer::spawn_control_socket`, so the two cannot
-drift apart.
+Both modes bind the socket with `control::Server::bind` before they
+connect, so a bind failure stops the launch, and then spawn the bound
+server through `shakenfist_spice_renderer::spawn_control_socket`, so
+the two cannot drift apart.
 
 Web mode's socket carries disproportionate weight: web mode is the one
 mode with its own browser-side scancode table, so the scenario tests
@@ -1133,11 +1145,18 @@ growing separate implementations.
 |------|------|
 | `mod.rs` | Public re-exports: `Server`, `StatusProvider` |
 | `protocol.rs` | Wire-level types: `Request`, `Response`, `Event`, verb params and result structs, serialisation helpers |
-| `server.rs` | `Server::run` — the tokio task that binds the socket, accepts one client at a time, and dispatches verbs |
+| `server.rs` | `Server::bind`, which binds the socket at startup, and `Server::run`, the tokio task that accepts one client at a time and dispatches verbs |
 
-**Runtime shape.** `Server::run` binds a `tokio::net::UnixListener`
-at the supplied path with file mode `0600` (owner read/write only).
-File permissions are the sole access-control mechanism; no
+**Runtime shape.** `Server::bind` binds a Unix socket at the
+supplied path, sets its file mode to `0600` (owner read/write only),
+and only then listens. It uses `socket2` for this because
+`std::os::unix::net::UnixListener::bind` binds and listens in one
+call, which would leave the socket connectable with the umask's mode
+until a later `chmod`. It needs no tokio runtime, so web mode binds
+before its runtime starts. `Server::run` hands the listener to tokio.
+The socket file is unlinked when the `Server` is dropped, so a server
+that is bound but never run, or whose task is aborted, does not leave
+it behind. File permissions are the sole access-control mechanism; no
 authentication is performed on the wire. Exactly one client is
 accepted at a time; a second connection attempt while a client is
 active receives a `{"ok": false, "error": {"code": "busy", ...}}`

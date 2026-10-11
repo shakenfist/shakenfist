@@ -112,6 +112,32 @@ Error: TLS handshake with <host>:<port>: invalid peer certificate: UnknownIssuer
    and the certificate's name must match the host connected to,
    because the name is then all that identifies the backend.
 
+### Warning: certificate accepted on the CA alone
+
+**Symptom:** A warning in the log, and in the GUI's notifications
+panel, once per connection:
+```
+TLS: certificate accepted on the CA alone: its name does not match the server and ...
+```
+
+**Cause:** The connection uses a `ca=` field, the server's certificate
+does not carry the name ryll dialled (usual for a SPICE backend
+reached by IP), and no `host-subject` is set. The CA is then the only
+identity check: any certificate that CA has issued, to any host in
+the same PKI, would have been accepted. A compromised host inside the
+cluster could answer for this one. Shaken Fist produces exactly this
+shape unless the operator has configured a certificate subject.
+
+The connection still proceeds. Refusing it would break every
+deployment that publishes no subject, so ryll warns instead.
+
+**Solution:** Pin the server's identity with `host-subject` in the
+.vv file, set to the server certificate's full subject (see
+[Configuration](/components/ryll/configuration/#supported-fields)). For Shaken Fist,
+set `spice_server_cert_subject` so the subject is published in the
+.vv file. A pinned connection does not warn, and fails if the
+certificate's subject does not match.
+
 ### Session drops when pasting large text into the guest
 
 **Symptom:** Every channel disconnects at once, without a TLS
@@ -607,17 +633,17 @@ session. They come from the master plan
   stopped consuming server messages for that long, which
   applies SPICE-level backpressure on the server.
 - `writer_dropped_count` — number of pcap-capture packets the
-  dedicated writer task's bounded queue rejected because it
+  dedicated writer thread's bounded queue rejected because it
   was full. Zero unless `--capture` is active. A non-zero
   value implicates disk speed (or anything else slowing the
-  writer task) rather than decode CPU or socket-read pacing;
+  writer thread) rather than decode CPU or socket-read pacing;
   the rest of the SPICE pipeline keeps running because the
   enqueue is non-blocking.
 
 In `session.json` (a sibling artefact in the same zip):
 
 - `video_drop_count` — number of display frames dropped
-  because the H.264 encoder task's queue was full when the
+  because the H.264 encoder thread's queue was full when the
   egui frame loop tried to enqueue. Zero unless `--capture`
   is active. A non-zero value implicates encoder CPU (or MP4
   write speed) rather than the SPICE pipeline; the egui frame
@@ -637,12 +663,17 @@ In `session.json` (a sibling artefact in the same zip):
   `mean` is biased by batch size.
 
 **MP4 finalisation trade-off.** The MP4 moov atom is written
-by the encoder task after the sender drops, not synchronously by `CaptureSession::close()`.
-In practice the encoder task finalises within milliseconds of
+by the encoder thread after the sender drops, not synchronously by `CaptureSession::close()`.
+In practice the encoder thread finalises within milliseconds of
 close, but a bug report assembled in a very short window
-after a disconnect — or in the SIGINT abrupt-shutdown path —
-may see an unfinalised (unplayable) `display.mp4`. The pcap
-files and the rest of the report are unaffected.
+after a disconnect may see an unfinalised (unplayable)
+`display.mp4`. On a clean exit (window close or SIGINT) ryll
+waits up to five seconds for the encoder thread before the
+process exits, so the capture directory's own `display.mp4` is
+complete unless ryll was killed or crashed, or the encoder was
+wedged (the log then says the writer threads were still
+running). The pcap files and the rest of the report are
+unaffected.
 
 To read the report:
 

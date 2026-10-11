@@ -51,6 +51,7 @@ configuration section below.
 | `--auto-snapshot-cap <N>` | 20 | Maximum number of auto-snapshot zips to keep on disk; oldest are pruned when capacity is exceeded. A 512 MiB budget for the same directory is enforced alongside it, so the cap you set is an upper bound rather than a promise — a busy session whose zips approach the 50 MiB traffic-ring budget will keep fewer than N |
 | `--image-cache-cap-mib <N>` | 256 | Cap the SPICE display image cache at N MiB. The cache holds decoded RGBA frames flagged with CACHE_ME by the server; an LRU evicts oldest entries when the cap is exceeded. Default is enough for typical desktop sessions, but increase it for heavy CACHE_ME workloads (sustained video) or lower it on small-RAM hosts. Must be at least 1 |
 | `--glz-dictionary-cap-mib <N>` | 256 | Cap the shared SPICE GLZ decompression dictionary at N MiB. The dictionary holds decoded RGBA entries that the server attached `IMAGE_FLAGS_CACHE_ME` to on Glz / ZlibGlz payloads so cross-frame back-references resolve; without a cap, full-frame ZlibGlzRgb workloads (observed in sessions 003a and 004d-g) grew the dictionary at roughly 30 MiB/s and drove a multi-GiB RSS runaway before the cap existed. An LRU evicts oldest entries when the cap is exceeded. Same trade-off shape as `--image-cache-cap-mib`: lower it on small-RAM hosts, raise it for sustained GLZ-heavy workloads to keep more cross-frame references hot. Must be at least 1 |
+| `--preferred-compression <MODE>` | `auto-glz` | Image compression to ask spice-server for in the display channel's `PREFERRED_COMPRESSION` message. One of `off`, `auto-glz`, `auto-lz`, `quic`, `glz`, `lz`, `lz4`. Exists for diagnostics: spice-server only sends LZ4 images to a client that asks for exactly `lz4`, so use that to capture them. `auto-glz` is the default for a measured reason: asking for `auto-lz` made the server stop using GLZ entirely (GLZ dictionary entries 23 to 0, bytes received up 25% in session 006), and for UI-heavy workloads the shared GLZ dictionary is the win while `auto-glz` still lets the server choose QUIC for photographic content |
 | `--pedantic` | false | Write a bug-report zip to `./ryll-pedantic-reports/` (or `--pedantic-dir`) the first time each distinct protocol gap is detected |
 | `--pedantic-dir <DIR>` | none | Output directory for pedantic bug reports |
 
@@ -159,7 +160,7 @@ port=5900
 | `tls-port` | No* | SPICE TLS port for secure connections |
 | `password` | No | SPICE password for authentication |
 | `ca` | No | Inline PEM CA certificate for TLS verification. When present it is the only trust anchor for the connection -- the public CA roots are not trusted as well |
-| `host-subject` | No | Server certificate subject; enforced -- the connection fails if the server's certificate subject does not match, and a malformed value is rejected at startup |
+| `host-subject` | No | Server certificate subject; enforced -- the connection fails if the server's certificate subject does not match, and a malformed value is rejected at startup. Without it, a `ca` connection whose certificate name does not match is trusted on the CA alone, and ryll warns (see [troubleshooting](/components/ryll/troubleshooting/#warning-certificate-accepted-on-the-ca-alone)) |
 | `proxy` | No | HTTP CONNECT proxy to tunnel the connection through (e.g. Proxmox VE's `spiceproxy`); see [HTTP CONNECT proxy](#http-connect-proxy) below |
 
 ### Ticket lifecycle keys
@@ -317,9 +318,30 @@ by ryll and not forwarded to the guest VM.
 
 | Shortcut | Action |
 |----------|--------|
+| F8 | Save the current display as PNG(s) via a native file dialog |
 | F11 | Toggle the live traffic viewer side panel |
 | F12 | Open / close the bug report dialog |
 | Escape | Close the bug report dialog, or skip region selection |
+
+On macOS, Cmd chords belong to the host: a key pressed while Cmd is
+held (Cmd+Q, Cmd+W, Cmd+C and so on) is not forwarded to the guest,
+and neither is its release. ryll does not map Cmd to the guest's
+Super / Windows key, so there is currently no way to send a Super
+chord to the guest from the macOS GUI. A key that was already held
+when Cmd went down is still released in the guest normally.
+
+On Linux and Windows, Ctrl+C, Ctrl+X and Ctrl+V go to the guest like
+any other Ctrl chord, so Ctrl+C interrupts a program in a guest
+terminal. They do not copy, cut or paste on the host, and Ctrl+V does
+not type the host clipboard (Ctrl+Alt+V does that, when
+paste-as-keystrokes is enabled, and is never forwarded to the guest,
+even when the host clipboard is empty). The GUI toolkit reports these chords
+by what they mean rather than by key, so ryll sends the key in its
+US-QWERTY position: on a layout that moves C, X or V (Dvorak, for
+example) the guest gets the key at that position instead. On Windows,
+Shift+Delete and Shift+Insert reach the guest as themselves, but
+Ctrl+Insert reaches it as Ctrl+C and Ctrl+Shift+Delete as
+Ctrl+Shift+X, because ryll cannot tell them apart from those.
 
 ## Environment Variables
 

@@ -100,8 +100,8 @@ intermittency investigation, linked from
 Two distinct mechanisms are at work above the cliff.
 
 *The server's stream-detection heuristic stops matching.* Per
-`spice/server/display-channel.cpp:1057-1078`, the QXL guest driver
-issues qualitatively different draw ops at higher resolutions
+`drawable_can_stream()` in `spice/server/display-channel.cpp`, the QXL
+guest driver issues qualitatively different draw ops at higher resolutions
 (tiled copies, alpha-blends, pre-compressed images) that fail the
 heuristic's `QXL_DRAW_COPY + QXL_EFFECT_OPAQUE + SPICE_ROPD_OP_PUT
 + SPICE_IMAGE_TYPE_BITMAP` filter. Frames that fail the filter fall
@@ -198,9 +198,12 @@ Silicon).
 
 `auto_lz` switches the server's default to plain LZ, which is much
 faster to decode (~10–20 ms for the same payload) at the cost of a
-slightly worse compression ratio. Combined with ryll's advertised
-`LZ4_COMPRESSION` capability, the server will pick LZ4 — even faster — for any frames that benefit
-from it.
+slightly worse compression ratio. This does not make the server use
+LZ4: spice-server's `auto_glz` and `auto_lz` modes never choose it.
+It sends LZ4 images only to a client whose preferred compression is
+exactly LZ4 (ryll: `--preferred-compression lz4`) and which advertises
+the LZ4 display capability, and never to a client on a Unix socket,
+which gets no image compression at all.
 
 If you actually need glz (e.g. you are bandwidth-constrained over a
 WAN link), keep `auto_glz` but at least drop the
@@ -251,8 +254,8 @@ prefer H.264 when available, which is typically more bandwidth-efficient than
 MJPEG and results in cheaper sustained-video transmission.
 
 **H.264 needs GStreamer plugins on the hypervisor.** spice-server's H.264
-encoder is implemented through GStreamer
-(`spice/server/gstreamer-encoder.c:1135`); without the GStreamer H.264
+encoder is implemented through GStreamer (`create_pipeline()` in
+`spice/server/gstreamer-encoder.c`); without the GStreamer H.264
 plugin packages installed, the server can only encode MJPEG even when
 the client advertises `CODEC_H264`. On Debian/Ubuntu:
 
@@ -446,17 +449,16 @@ trickier than it looks:
 - **`SPICE_DEBUG_LEVEL` is not a real env var.** Grepping
   spice-server, spice-common, and spice-gtk turns up no
   `g_getenv("SPICE_DEBUG_LEVEL")` anywhere. The spice log
-  macros at
-  `/srv/src-reference/spice/spice-common/common/log.h:62-72`
-  just call `g_log` with `G_LOG_DOMAIN="Spice"`. The actual
-  threshold knob is GLib's `G_MESSAGES_DEBUG`.
+  macros (`spice_info()`, `spice_debug()` and friends in
+  spice-common's `common/log.h`) just call `g_log` with
+  `G_LOG_DOMAIN="Spice"`. The actual threshold knob is GLib's
+  `G_MESSAGES_DEBUG`.
 
 - **Setting `G_MESSAGES_DEBUG` in libvirtd's systemd unit
-  doesn't reach qemu.** `virCommandAddEnvPassCommon` at
-  `/srv/src-reference/libvirt/libvirt/src/util/vircommand.c:1446`
-  whitelists exactly nine env vars (LC_ALL, LD_*, PATH, HOME,
-  USER, LOGNAME, TMPDIR). Anything else set in libvirtd's
-  environment is scrubbed before the qemu child fork.
+  doesn't reach qemu.** `virCommandAddEnvPassCommon()` in libvirt's
+  `src/util/vircommand.c` whitelists exactly nine env vars (LC_ALL,
+  LD_*, PATH, HOME, USER, LOGNAME, TMPDIR). Anything else set in
+  libvirtd's environment is scrubbed before the qemu child fork.
 
 The canonical libvirt path: add the env var per-domain via
 `<qemu:env>` in the libvirt namespaced commandline extension:

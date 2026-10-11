@@ -890,7 +890,7 @@ these image types (values from `spice-protocol/spice/enums.h`):
 | 106   | FROM_CACHE_LOSSLESS | Lossless cached image reference |
 | 107   | ZLIB_GLZ_RGB        | Zlib-compressed GLZ data |
 | 108   | JPEG_ALPHA          | JPEG with alpha channel |
-| 109   | LZ4                 | LZ4 per-row compression |
+| 109   | LZ4                 | LZ4 blocks that may refer back to earlier blocks |
 
 ## Raster Operations (ROP)
 

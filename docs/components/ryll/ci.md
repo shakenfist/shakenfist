@@ -49,12 +49,21 @@ The **merge tier** runs on `merge_group` and gates `Can merge`:
 |-----|--------|--------------|
 | `Build (Linux aarch64)` | `ubuntu-24.04-arm` | Build, test, `--web` smokes, `.deb`, `.rpm` |
 | `Build (macOS aarch64)` | `macos-latest` | Build, test, tarball |
-| `Build (Windows x86_64)` | `windows-latest` | Build, test, zip (`--no-default-features`) |
-| `Build (Windows aarch64)` | `windows-11-arm` | Build, test, zip (`--no-default-features`) |
+| `Build (Windows x86_64)` | `windows-latest` | Build, test, zip (no `capture`) |
+| `Build (Windows aarch64)` | `windows-11-arm` | Build, test, zip (no `capture`) |
 
 In practice the smoke tier finishes in about ten minutes, paced
 by the Linux build, and the merge tier in about fifteen, paced
 by the Windows x86_64 build.
+
+Each merge-tier leg is capped at 60 minutes, roughly three times
+the slowest normal leg, and the release workflow's copy of the
+matrix carries the same cap. Without one, a hung test runs to
+GitHub's six-hour job ceiling, which is also the queue's
+`check_response_timeout_minutes`, so the pull request is evicted
+with no verdict at all. One hung test in the web signalling suite
+did exactly that six times
+([#330](https://github.com/shakenfist/ryll/issues/330)).
 
 Fuzzing is not a tier. It runs nightly from `fuzz.yml`; see
 [the nightly fuzz lane](#the-nightly-fuzz-lane) below.
