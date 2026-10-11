@@ -156,6 +156,15 @@ such as an unreachable or unauthenticated cluster is logged as a warning.
 Kerbside refetches the keys on every maintenance pass, so nothing needs to be
 restarted once the key is created.
 
+Each SPICE instance is matched to its hypervisor through the cluster's node
+list, by node UUID. An instance whose node is missing from that list is
+skipped with a warning; one or two during node churn are expected. If **none**
+of the SPICE instances match a node, the scrape fails instead: the source is
+marked errored and keeps the consoles it had, rather than reporting zero
+consoles and deleting them all. That pattern means Kerbside and the cluster
+disagree about how nodes are identified, usually after a Shaken Fist API
+change, and the error names the node references it could not resolve.
+
 ## oVirt
 
 The following options are used to configure an oVirt console source

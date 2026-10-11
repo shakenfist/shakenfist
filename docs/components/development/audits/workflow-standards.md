@@ -59,8 +59,12 @@ confuse: a `static` job must name **no** size because the static pool
 advertises none, and a `vm` job must name **one** because the conductor
 otherwise picks for it.
 
-* Sizes are `xs`, `s`, `m`, `l`, `xl`, and the `m-bigdisk` /
-  `xl-bigdisk` variants. Every `vm` `runs-on` must name one.
+* Sizes are `xs`, `s`, `m`, `l`, `xl`, the `m-bigdisk` /
+  `xl-bigdisk` variants, and the `s-cloud` / `s-cluster` variants.
+  `s-cloud` and `s-cluster` have the same footprint as `s` (2 vCPU,
+  4096 MB) and are for jobs which build a nested test cloud from a
+  small runner: `s-cloud` for a cloud on one node, `s-cluster` for a
+  multi-node cluster. Every `vm` `runs-on` must name one.
 * The conductor matches the size out of the labels, and falls back to
   the first entry in its `CI_SIZES` table when it finds none -- `xs`,
   one vCPU and 2048 MB. An omitted size is therefore a silent downgrade

@@ -47,9 +47,11 @@ first: `fetch` is `--locked` and every compile is `--frozen`, so
 without it the next build stops with "the lock file needs to be
 updated". The cache lives in `.cargo-cache`;
 override `CARGO_CACHE` to move it (for example to a location a CI
-runner keeps between jobs). `make clean` removes the cache only
-when it sits inside the checkout, so a shared out-of-tree cache
-survives.
+runner keeps between jobs). `make clean` removes the build output,
+including the fuzz crate's separate `target/`, and removes the
+cache only when it sits inside the checkout, so a shared
+out-of-tree cache survives. Fuzzing corpora and crash artifacts
+are kept.
 
 ## Building with a local Rust installation
 
@@ -316,13 +318,23 @@ dependency.
 - **tokio-rustls** - TLS support
 - **clap** - CLI parsing
 - **rsa/sha1** - Authentication encryption
-- **image** - JPEG decoding (via the `image` crate with jpeg feature)
+- **jpeg-decoder/mozjpeg** - JPEG decoding in
+  `shakenfist-spice-compression`, as two of the backends that
+  `best_for_platform()` in its `jpeg` module chooses between (ImageIO,
+  WIC, VA-API, libjpeg-turbo via `mozjpeg`, then pure-Rust
+  `jpeg-decoder`); see [the SPICE protocol notes](/components/ryll/spice-protocol/)
+- **image** - PNG encoding of control-socket screenshots
 - **cpal** - Cross-platform audio output
 - **rtrb** - Lock-free ring buffer for audio sample passing
 - **opus-decoder** - Pure-Rust Opus audio decoding
 - **openh264** - H.264 encoding in `shakenfist-spice-renderer`
   (the encoder pipeline). Capture mode in ryll consumes it
   transitively via the renderer.
+- **jpeg-encoder** - JPEG encoding behind the `encode` feature of
+  `shakenfist-spice-compression`
+- **lz4_flex** - LZ4 image decode and encode in
+  `shakenfist-spice-compression`, plus usbredir and webdav
+  compression in `shakenfist-spice-renderer`
 - **nusb** - USB device access (pure Rust, no libusb)
 - **dav-server** - WebDAV server (RFC 4918, LocalFs backend)
 - **hyper** - HTTP/1.1 framing for WebDAV byte-stream transport

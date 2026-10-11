@@ -46,13 +46,60 @@ the overlay's recorded backing-file pointer and uses that.
 Relative paths in the recorded pointer resolve against the
 overlay's parent directory.
 
+The recorded pointer is image data, so it is validated against
+`backing-path-allowlist` (`$IMAGE_DIR` by default) exactly as
+every other chain operation validates a backing reference; see
+[Chain discovery](/components/instar/chain-discovery/#path-validation). A
+pointer outside the allowlist is refused before anything is
+opened, with the same message whether or not the file it names
+exists, so an overlay cannot choose which host file a commit
+writes into.
+
+Unlike a read, commit never substitutes a file of the same name
+beside the overlay for a recorded absolute pointer that cannot be
+used as written (see step 3 of
+[path validation](/components/instar/chain-discovery/#path-validation)). That
+file is only a namesake of the parent, and committing into it
+would change an unrelated image, so instar refuses instead and
+says to pass `-b BASE` naming the file to commit into.
+
 When `-b BASE` is supplied, the host resolves it relative to
-the overlay's parent directory and compares the resolved path
-to the overlay's recorded backing-file pointer. If they don't
-match, instar refuses with `commit through an intermediate
-layer is not yet supported (the overlay's immediate parent is
-X)` — intermediate-image commit is deferred to a future
-release (see Future work).
+the overlay's parent directory and checks that it names the
+overlay's recorded parent. A recorded pointer spelled exactly
+as the supplied path, either as given or with its symlinks
+resolved, and with no `..` in either, matches without the
+pointer being looked at, so it need not be inside the
+allowlist: the operator has named the file. Otherwise the
+pointer is resolved through the allowlist as a read resolves
+it, including the same-name fallback, since the file written is
+the one `-b` names. If they don't match, instar refuses with
+`commit through an intermediate layer is not yet supported (the
+overlay's immediate parent is X)`, where `X` is the pointer as
+the overlay records it — intermediate-image commit is deferred
+to a future release (see Future work). If the recorded pointer
+cannot be resolved, for example because it is outside the
+allowlist and spelled differently from `-b`, instar refuses with
+`the overlay's recorded parent 'X' could not be resolved`.
+
+### Overlays whose parent is in another directory
+
+The default allowlist is `$IMAGE_DIR`, the overlay's own
+directory, so an overlay in `/vms/overlays/` recording
+`/vms/bases/base.qcow2` is refused by `instar commit
+/vms/overlays/top.qcow2`, which 0.3.0 and earlier committed
+into. Either name the parent explicitly:
+
+```shell
+instar commit -b /vms/bases/base.qcow2 /vms/overlays/top.qcow2
+```
+
+or add the directory to the allowlist in the
+[configuration file](/components/instar/configuration/), keeping `$IMAGE_DIR`:
+
+```toml
+[security]
+backing-path-allowlist = ["$IMAGE_DIR", "/vms/bases"]
+```
 
 This matches `qemu-img commit`'s implicit `-b` behaviour and
 makes the explicit-`-b` form a self-documenting safety

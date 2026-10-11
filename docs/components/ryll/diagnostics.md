@@ -333,19 +333,26 @@ surface (surface 0). Frames are emitted on MARK boundaries
 with real timestamps for variable-rate playback.
 
 Implementation: `capture::VideoWriter` is owned exclusively by
-a dedicated tokio `video_writer_task` spawned in
-`CaptureSession::new`. The
+a dedicated OS thread (`ryll-capture-video`, running
+`video_writer_loop`) started in `CaptureSession::new`. The
 egui call site (`CaptureSession::frame`) is a non-blocking
-`try_send` into a bounded mpsc (cap `VIDEO_QUEUE_CAPACITY = 8`)
+`try_send` into a bounded channel (cap `VIDEO_QUEUE_CAPACITY = 8`)
 that returns `bool`; `false` signals the encoder queue was
 full and the frame was dropped. The drop counter lands in
-`AppSnapshot::video_drop_count`. The encoder task lazy-inits
+`AppSnapshot::video_drop_count`. The encoder thread lazy-inits
 `VideoWriter` from the first surface-0 frame, encodes RGBA →
 YUV420 → H.264 via `openh264`, and muxes into MP4 via the
-`mp4` crate. On sender drop the task drains, calls
+`mp4` crate. On sender drop the thread drains, calls
 `VideoWriter::close()` to write the MP4 moov atom, then
-exits. Pcap follows the same pattern via `pcap_writer_task`
-with cap `PCAP_QUEUE_CAPACITY = 1024`.
+exits. Pcap follows the same pattern on `ryll-capture-pcap`
+(`pcap_writer_loop`) with cap `PCAP_QUEUE_CAPACITY = 1024`.
+
+The writers are threads rather than tokio tasks on purpose.
+`main()` creates the `CaptureSession` before any tokio runtime
+exists, and in GUI mode one session outlives every
+per-connection runtime (each reconnect builds a new one), so
+the writers cannot belong to a runtime. Their work is blocking
+file I/O and encoding in any case.
 
 The capture session is `Arc<CaptureSession>` shared across all
 channels and the app. When `--capture` is not specified, the
@@ -353,12 +360,21 @@ field is `None` and all capture code paths are skipped. The
 `CaptureSession` uses an `AtomicBool` guard to ensure `close()`
 is idempotent -- it may be called both explicitly during
 shutdown and again from the `Drop` implementation. `close()`
-is **synchronous** and drops both writer senders without
-awaiting drain; the tokio tasks finalise (pcap flush is a
-no-op since pcap I/O is unbuffered; MP4 writes the moov atom)
-on the runtime. This means MP4 finalisation is no longer
-synchronous with `close()` — a bug report assembled within
-milliseconds of close may see an unfinalised MP4. The
+does not block: it drops both writer senders and returns, and
+the writer threads finish on their own (pcap flush is a no-op
+since pcap I/O is unbuffered; MP4 writes the moov atom).
+`close_and_wait()` also waits for both threads to exit; the
+exit paths in `main` call it so the MP4 is finalised before
+the process exits, even while a detached GUI connection
+thread still holds a clone of the session. The wait gives up
+with a warning after five seconds, so a wedged encoder or a
+stalled disk leaves an unfinalised MP4 rather than a process
+that will not exit. The egui update path only ever calls the
+non-blocking `close()`. Separately, `Drop` waits the same way,
+so the MP4 is also finalised once the last
+`Arc<CaptureSession>` is gone. MP4 finalisation is still not
+synchronous with `close()` itself — a bug report assembled
+within milliseconds of close may see an unfinalised MP4. The
 [troubleshooting guide](/components/ryll/troubleshooting/) records the
 trade-off rationale.
 

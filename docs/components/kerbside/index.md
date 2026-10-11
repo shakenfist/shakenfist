@@ -131,6 +131,24 @@ end-to-end exercise of the standalone scenario. See
 [direct-qemu-harness.md](/components/kerbside/direct-qemu-harness/) for the lane and its
 standalone mock-control-plane sibling, `verify-rust-proxy.sh`.
 
+### Deployment Options
+
+The use cases say what Kerbside sits in front of; this section says how
+it is installed and run. The default worth reaching for is a Kerbside
+deployed in front of the clouds rather than by one of them, because
+[multi-cloud aggregation](/components/kerbside/use-cases/multi-cloud/) and
+[placement](/components/kerbside/use-cases/placement/) both assume one.
+
+| Mechanism | Description | Sources it configures | Tested in Kerbside CI |
+|-----------|-------------|-----------------------|-----------------------|
+| By hand: pip, venv and systemd | The package installed into a venv, with the REST API (gunicorn) and the daemon run as services; the pieces are listed in [installation.md](/components/kerbside/installation/) | Any | Every lane, but by CI scripts rather than as a documented procedure |
+| Ansible role | The `kerbside` role in Shaken Fist's ansible collection, on co-located or dedicated hosts, with a bring-your-own-Kerbside path for a Kerbside it does not deploy | Shaken Fist only today; any, if the planned move of the role into Kerbside lands | `sf-e2e`, smoke tier and nightly, through `tools/sf-e2e/deploy-kerbside.sh` rather than the role |
+| Kolla-Ansible (kerbside-patches) | Kerbside as a Kolla control-plane service, from patches carried in kerbside-patches while upstream review is open and maintained by rebase | OpenStack | `openstack_matrix`, merge tier |
+| Containers | The `demo/` compose stack today, with no first-party image yet, so no production compose or Kubernetes support | Static (the compose demo) | `demo-compose`, advisory, path-filtered |
+
+Mechanisms whose name is not a link are planned rather than written; see
+[plans/PLAN-deployment-options.md](/components/kerbside/plans/PLAN-deployment-options/).
+
 ### Operator Documentation
 
 Guides for deploying and configuring Kerbside:

@@ -22,10 +22,10 @@ fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 
 // Only when the window is drawn:
 fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-    // For each surface, get texture and draw
-    for surface in &mut self.surfaces {
-        let texture = surface.texture(ui.ctx());  // Upload pixels to GPU
-        ui.image(texture, size);              // Draw texture
+    // For each mirrored surface, fetch its cached texture and draw
+    for (key, surface) in &mut self.surfaces.surfaces {
+        let texture = self.textures.texture(ui.ctx(), *key, surface);  // Upload pixels if dirty
+        ui.image(texture, size);                                        // Draw texture
     }
 }
 ```
@@ -43,7 +43,9 @@ texture is re-uploaded each frame when dirty.
 Each pass's `process_events` drains the `ChannelEvent`
 channel and dispatches image / fill / copy-bits /
 invert / chroma / alpha events into the corresponding
-`DisplaySurface` helper. See the [draw-op coverage
+`DisplaySurface` helper. All three modes apply these draw ops through
+`SurfaceMirror::apply_event`; the GUI reacts to the `DrawOutcome` it
+returns for auto-fit, frame counting and texture invalidation. See the [draw-op coverage
 table](/components/ryll/spice-protocol/#draw-op-coverage) for the full
 mapping from opcode to event to surface method.
 

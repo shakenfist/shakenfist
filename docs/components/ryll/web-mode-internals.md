@@ -59,6 +59,14 @@ executor). The task loop:
 - Handles `EncoderControl::RequestKeyframe` by setting a
   `keyframe_pending` flag consumed on the next encode.
 - Handles `EncoderControl::Stop` by breaking the loop.
+- Stops when the output channel's receiver has been dropped,
+  checked at the top of every tick rather than discovered by a
+  failed send. On a static screen there may be no further send,
+  and a blocking-pool task that never returns also stops its
+  runtime from shutting down, because dropping a runtime waits
+  for its blocking tasks. That is how a test that left its
+  encoder running hung CI for six hours at a time
+  ([#330](https://github.com/shakenfist/ryll/issues/330)).
 - Rebuilds the encoder when the frame's *rounded* size stops
   matching the encoder's, and forces an IDR so the decoder gets
   fresh SPS/PPS. This is how a mid-session guest resize is

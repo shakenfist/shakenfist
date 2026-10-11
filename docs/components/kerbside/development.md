@@ -124,7 +124,10 @@ with one is listed in the order it gives, under the titles it gives:
 build on each other in reading order. **A new page in either
 directory must be added to its `order.yml`**; one that is not is
 still published, and links to it still resolve, but it is missing
-from the site navigation.
+from the site navigation. `docs/deployment/`, once it exists, carries
+one too and is under the same rule: each deployment page is added to
+it as it lands, and it lists only pages that exist, because the sync
+prints a warning for an entry whose page is missing.
 
 Do not add an `order.yml` at the root of `docs/` without reading
 the sync script first. There it is an allowlist: a root page it does

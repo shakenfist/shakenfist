@@ -6,6 +6,16 @@ take priority over INI file settings. That path is hardcoded as `INI_PATH` in
 `kerbside/config.py`; there is no setting which relocates it. See
 `etc/kerbside.conf.example` for a complete configuration example.
 
+INI values are read literally, with no `configparser` interpolation, so a value
+is written the same way in the INI file as in the environment. A
+percent-encoded database password such as `p%40ss` is written as-is; `%%` is
+read as two percent signs. Releases before this change had interpolation
+enabled and required `%%`, so an INI file written for them must have its
+doubled percent signs collapsed when upgrading. If the file fails to parse,
+every Kerbside process that loads configuration prints the parse error to
+stderr and exits with status 1, so a supervisor such as systemd records a
+failed start.
+
 **Note**: This documentation should match `kerbside/config.py`. If you find
 discrepancies, the source code in `config.py` is authoritative.
 
