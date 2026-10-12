@@ -15137,15 +15137,18 @@ produced.</p>
 </li>
 <li>
 <p><strong>Display channel capabilities</strong> - Ryll advertises COMPOSITE,
-   MONITORS_CONFIG, SIZED_STREAM, A8_SURFACE, plus seven more added by the
-   stream-caps-and-flap plan: STREAM_REPORT (4), LZ4_COMPRESSION (5),
-   PREF_COMPRESSION (6), MULTI_CODEC (8), CODEC_MJPEG (9), CODEC_H264 (11),
-   and PREF_VIDEO_CODEC_TYPE (12). Without COMPOSITE, the guest QXL driver
+   MONITORS_CONFIG, SIZED_STREAM, A8_SURFACE, plus STREAM_REPORT (4),
+   LZ4_COMPRESSION (5), PREF_COMPRESSION (6), MULTI_CODEC (8),
+   CODEC_MJPEG (9) and PREF_VIDEO_CODEC_TYPE (12). CODEC_H264 (11) is
+   deliberately not advertised for now, because H.264 streams from
+   spice-server do not yet decode in ryll
+   (<a href="https://github.com/shakenfist/ryll/issues/398">#398</a>).
+   Without COMPOSITE, the guest QXL driver
    falls back to a slow software rendering path that sends only raw Pixmap
    data via <code>draw_copy</code>, making keyboard input appear to have no effect
    because the client is overwhelmed with uncompressed frames. The newer
    caps cover stream-report feedback to the server's encoder, LZ4-compressed
-   images, multi-codec video (H.264 plus the legacy MJPEG fallback), and
+   images, multi-codec video negotiation (currently MJPEG only), and
    per-codec / per-compression preference messages sent at link-up. See
    the "Display Channel Capabilities" table in <a href="/components/ryll/spice-protocol/">spice-protocol.md</a>
    for the full

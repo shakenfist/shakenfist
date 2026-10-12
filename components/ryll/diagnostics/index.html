@@ -15769,9 +15769,35 @@ closes and the app enters <strong>region selection mode</strong>:</p>
 <li>The user drags a rectangle; a translucent red overlay shows
    the selection.</li>
 <li>On mouse release, the report is generated with the region
-   coordinates in the metadata.</li>
+   coordinates in the metadata. A click without a drag stays in
+   region selection and says so in a notification.</li>
 <li>Pressing Escape skips selection and generates without a region.</li>
 </ol>
+<p>The dialog says, while Display is selected, that Capture will ask
+for a region, and entering region selection also posts a
+notification, because a user who misses the banner otherwise sees
+a window that ignores the guest and appears stuck.</p>
+<p>Every way out of region selection writes the report, and the log
+records which one it was (<code>app: region selection completed</code>,
+<code>skipped with Escape</code>, <code>abandoned by a reconnect</code>, <code>abandoned by a
+lost connection</code> or <code>abandoned by the window closing</code>), next to
+<code>app: bug report waiting for region selection</code> on the way in. A
+reconnect or a lost connection clears the surface being selected
+from, and closing the window ends the session, so each writes the
+report without a region rather than dropping it. Closing the
+window also writes a report still waiting for its runtime metrics
+sample, after at most a second past the end of its sample window.</p>
+<p>Only one report is captured at a time. Pressing Capture on a
+Display report while an earlier report is still sampling its
+metrics (the two seconds after its Capture) does not enter region
+selection: the report is refused at once with "A bug report is
+already being captured", so a selection never ends with a report
+that cannot be written.</p>
+<p>While a selection is in progress, <strong>Menu → Report</strong> and <strong>Menu →
+Screenshot</strong> are disabled, as F12 and F8 are, and the USB and
+connection error dialogs' report buttons are refused with a
+notification: opening a second report would replace the pending
+one's trigger snapshot.</p>
 <h3 id="trigger-time-snapshot">Trigger-time snapshot<a class="headerlink" href="#trigger-time-snapshot" title="Permanent link">&para;</a></h3>
 <p>On dialog open, <code>RyllApp::begin_trigger_snapshot</code> clones the
 largest surface's RGBA and spawns a named <code>std::thread</code>
@@ -15833,7 +15859,9 @@ pcap file never triggers a length-overflow panic.</p>
 <h3 id="display-capture-video">Display capture (video)<a class="headerlink" href="#display-capture-video" title="Permanent link">&para;</a></h3>
 <p><code>display.mp4</code> contains an H.264 encoded video of the primary
 surface (surface 0). Frames are emitted on MARK boundaries
-with real timestamps for variable-rate playback.</p>
+with real timestamps for variable-rate playback. Only the GUI
+records it: frames come from the egui frame loop, and headless
+mode, which paints no surface, writes the pcaps alone.</p>
 <p>Implementation: <code>capture::VideoWriter</code> is owned exclusively by
 a dedicated OS thread (<code>ryll-capture-video</code>, running
 <code>video_writer_loop</code>) started in <code>CaptureSession::new</code>. The

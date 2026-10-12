@@ -15510,7 +15510,9 @@ for how each subsystem works internally see
 <li><code>main.pcap</code>, <code>display.pcap</code>, <code>cursor.pcap</code>, <code>inputs.pcap</code>, <code>usbredir.pcap</code>,
   <code>webdav.pcap</code> — per-channel pcap files with fake TCP/IP headers, openable
   in Wireshark</li>
-<li><code>display.mp4</code> — H.264 video of the display surface at real timing</li>
+<li><code>display.mp4</code> — H.264 video of the display surface at real timing
+  (GUI mode only: a <code>--headless</code> capture writes the pcaps and
+  <code>metadata.json</code> but no video)</li>
 </ul>
 <p>See <a href="https://github.com/shakenfist/ryll/blob/develop/STYLEGUIDE.md">STYLEGUIDE.md</a>
 for capture conventions.</p>

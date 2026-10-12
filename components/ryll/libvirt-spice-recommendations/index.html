@@ -11639,6 +11639,34 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#h264-from-spice-server-is-currently-disabled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        H.264 from spice-server is currently disabled
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="H.264 from spice-server is currently disabled">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#opting-back-in-with-experimental-h264" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Opting back in with --experimental-h264
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#tls-channels" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15440,6 +15468,34 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#h264-from-spice-server-is-currently-disabled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        H.264 from spice-server is currently disabled
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="H.264 from spice-server is currently disabled">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#opting-back-in-with-experimental-h264" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Opting back in with --experimental-h264
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#tls-channels" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15620,11 +15676,12 @@ fallback from 1600×1200 up. Increasing VRAM does not fix it.</p>
 <code>streaming-video=filter</code> rather than <code>all</code> or <code>off</code>.</p>
 </div>
 <div class="admonition info">
-<p class="admonition-title">Two packages are prerequisites</p>
+<p class="admonition-title">One package is a prerequisite</p>
 <p>Install <code>spice-vdagent</code> in the guest for clipboard, absolute
-pointer, and dynamic monitor configuration. Install
-<code>gstreamer1.0-plugins-bad</code> and <code>gstreamer1.0-vaapi</code> on the
-hypervisor if you want H.264 streams to be available at all.</p>
+pointer, and dynamic monitor configuration. The GStreamer H.264
+plugins on the hypervisor are not needed by ryll for now: by
+default it does not accept H.264 streams from spice-server (see
+<a href="#h264-from-spice-server-is-currently-disabled">H.264 from spice-server is currently disabled</a>).</p>
 </div>
 <p>The rest of this document explains why.</p>
 <h2 id="video-device">Video device<a class="headerlink" href="#video-device" title="Permanent link">&para;</a></h2>
@@ -15824,23 +15881,45 @@ extremes are wrong for typical desktop workloads:</p>
   for everything else. This is the right answer for almost every
   workload.</li>
 </ul>
-<p>Ryll decodes both MJPEG and H.264 streams client-side.
-For sustained video playback with <code>streaming-video=filter</code>, the server will
-prefer H.264 when available, which is typically more bandwidth-efficient than
-MJPEG and results in cheaper sustained-video transmission.</p>
-<p><strong>H.264 needs GStreamer plugins on the hypervisor.</strong> spice-server's H.264
-encoder is implemented through GStreamer (<code>create_pipeline()</code> in
-<code>spice/server/gstreamer-encoder.c</code>); without the GStreamer H.264
-plugin packages installed, the server can only encode MJPEG even when
-the client advertises <code>CODEC_H264</code>. On Debian/Ubuntu:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>gstreamer1.0-plugins-bad<span class="w"> </span>gstreamer1.0-vaapi
-</code></pre></div>
-<p>On Fedora/RHEL, the corresponding <code>gstreamer1-plugins-bad-free-extras</code>
-and <code>gstreamer1-vaapi</code> packages. This is a <em>necessary</em> condition for
-H.264, not a sufficient one — the streaming heuristic still has to fire
-in the first place (see the QXL resolution-cliff discussion above).
+<p>Ryll currently receives every video stream from spice-server as MJPEG.
 If <code>streaming-video=filter</code> chooses not to stream a region at all, no
-codec — H.264 or MJPEG — gets exercised.</p>
+codec gets exercised and the region arrives as ordinary image updates
+instead (see the QXL resolution-cliff discussion above).</p>
+<h3 id="h264-from-spice-server-is-currently-disabled">H.264 from spice-server is currently disabled<a class="headerlink" href="#h264-from-spice-server-is-currently-disabled" title="Permanent link">&para;</a></h3>
+<p>H.264 streams produced by spice-server's GStreamer encoder do not decode
+in ryll yet: openh264 never sees the stream's parameter sets, so a video
+region streamed as H.264 stays black or stale. This is tracked in
+<a href="https://github.com/shakenfist/ryll/issues/398">shakenfist/ryll#398</a>.
+Until it is fixed, ryll does not advertise the <code>CODEC_H264</code> display
+capability and asks only for MJPEG in its <code>PREFERRED_VIDEO_CODEC_TYPE</code>
+message, so the server never picks H.264 for ryll. Dropping H.264 from
+the preference alone would not be enough, because spice-server uses that
+list only to reorder its own codec list, and still chooses any codec the
+client has the capability for.</p>
+<p>Installing the GStreamer H.264 plugins on the hypervisor
+(<code>gstreamer1.0-plugins-bad</code> and <code>gstreamer1.0-vaapi</code> on Debian/Ubuntu,
+<code>gstreamer1-plugins-bad-free-extras</code> and <code>gstreamer1-vaapi</code> on
+Fedora/RHEL) is therefore harmless but has no effect on ryll sessions
+by default. Other SPICE clients connected to the same guest may still
+use them. Those plugins are a <em>necessary</em> (not sufficient) condition
+for H.264 whenever ryll does ask for it: without them spice-server can
+only encode MJPEG, and the streaming heuristic still has to fire in the
+first place.</p>
+<h4 id="opting-back-in-with-experimental-h264">Opting back in with <code>--experimental-h264</code><a class="headerlink" href="#opting-back-in-with-experimental-h264" title="Permanent link">&para;</a></h4>
+<p>To work on #398, or to try H.264 anyway, start ryll with
+<code>--experimental-h264</code>. It works the same in GUI, <code>--headless</code> and
+<code>--web</code> modes. With it, each display channel advertises <code>CODEC_H264</code>
+again and asks for H.264 ahead of MJPEG, which is what ryll did before
+H.264 was disabled; ryll logs a warning at startup saying H.264 from
+spice-server is enabled and experimental. Expect the failure described
+above: on a hypervisor with the GStreamer H.264 plugins, video regions
+streamed as H.264 are likely to go black or stale, and the bug report's
+<code>h264_decode_failed_count</code> climbs. The display channel's
+<code>channel-state.json</code> records <code>experimental_h264</code>, so a bug report shows
+whether H.264 was on offer at all. The flag is off by default and will
+go away once #398 is fixed and H.264 is advertised again by default.</p>
+<p>This only concerns video <em>from</em> spice-server. Ryll's web mode encodes
+its own H.264 to send to the browser over WebRTC, which is unaffected.</p>
 <p>The server's <code>CACHE_ME</code> flag on every video frame drives client-side cache
 pressure on both the renderer's image cache and the GLZ decompression
 dictionary — tuning <code>streaming-video</code> to <code>filter</code> (or away from <code>all</code>)
@@ -15851,14 +15930,14 @@ reduces how often video frames hit either cache. See
 (<code>--glz-dictionary-cap-mib</code>) in the troubleshooting guide for the
 client-side cache-cap tuning that complements these server-side settings.</p>
 <h3 id="tls-channels">TLS channels<a class="headerlink" href="#tls-channels" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">name=</span><span class="s">'main'</span><span class="w"> </span><span class="na">mode=</span><span class="s">'secure'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">name=</span><span class="s">'display'</span><span class="w"> </span><span class="na">mode=</span><span class="s">'secure'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">name=</span><span class="s">'inputs'</span><span class="w"> </span><span class="na">mode=</span><span class="s">'secure'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">name=</span><span class="s">'cursor'</span><span class="w"> </span><span class="na">mode=</span><span class="s">'secure'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">name=</span><span class="s">'playback'</span><span class="w"> </span><span class="na">mode=</span><span class="s">'secure'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">name=</span><span class="s">'record'</span><span class="w"> </span><span class="na">mode=</span><span class="s">'secure'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">name=</span><span class="s">'smartcard'</span><span class="w"> </span><span class="na">mode=</span><span class="s">'secure'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">name=</span><span class="s">'usbredir'</span><span class="w"> </span><span class="na">mode=</span><span class="s">'secure'</span><span class="nt">/&gt;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">name=</span><span class="s">'main'</span><span class="w"> </span><span class="na">mode=</span><span class="s">'secure'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">name=</span><span class="s">'display'</span><span class="w"> </span><span class="na">mode=</span><span class="s">'secure'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">name=</span><span class="s">'inputs'</span><span class="w"> </span><span class="na">mode=</span><span class="s">'secure'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">name=</span><span class="s">'cursor'</span><span class="w"> </span><span class="na">mode=</span><span class="s">'secure'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">name=</span><span class="s">'playback'</span><span class="w"> </span><span class="na">mode=</span><span class="s">'secure'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">name=</span><span class="s">'record'</span><span class="w"> </span><span class="na">mode=</span><span class="s">'secure'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">name=</span><span class="s">'smartcard'</span><span class="w"> </span><span class="na">mode=</span><span class="s">'secure'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">name=</span><span class="s">'usbredir'</span><span class="w"> </span><span class="na">mode=</span><span class="s">'secure'</span><span class="nt">/&gt;</span>
 </code></pre></div>
 <p>Force-secure all SPICE channels. The 2010s-vintage <code>mode='any'</code>
 default lets the client pick plaintext for "non-sensitive" channels
@@ -15868,9 +15947,9 @@ can sniff the display can shoulder-surf the session.</p>
 time and a negligible per-frame cost after. Always use TLS unless
 you are doing protocol bring-up against a debug server.</p>
 <h2 id="vd-agent-clipboard-mouse-mode-monitors-config">VD agent (clipboard, mouse mode, monitors config)<a class="headerlink" href="#vd-agent-clipboard-mouse-mode-monitors-config" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">type=</span><span class="s">'spicevmc'</span><span class="nt">&gt;</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">&lt;target</span><span class="w"> </span><span class="na">type=</span><span class="s">'virtio'</span><span class="w"> </span><span class="na">name=</span><span class="s">'com.redhat.spice.0'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nt">&lt;/channel&gt;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">&lt;channel</span><span class="w"> </span><span class="na">type=</span><span class="s">'spicevmc'</span><span class="nt">&gt;</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">&lt;target</span><span class="w"> </span><span class="na">type=</span><span class="s">'virtio'</span><span class="w"> </span><span class="na">name=</span><span class="s">'com.redhat.spice.0'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nt">&lt;/channel&gt;</span>
 </code></pre></div>
 <p><code>spicevmc</code> over a <code>virtserialport</code> named <code>com.redhat.spice.0</code> is the
 channel that carries <code>VD_AGENT_*</code> messages. Install <code>spice-vdagent</code>
@@ -15891,14 +15970,14 @@ A zero <code>agent_reply_count</code> is not a symptom on its own: with a QXL
 display, spice-server handles monitors config itself and the agent
 never replies to it.</p>
 <h2 id="usb-redirection-optional">USB redirection (optional)<a class="headerlink" href="#usb-redirection-optional" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">&lt;redirdev</span><span class="w"> </span><span class="na">bus=</span><span class="s">'usb'</span><span class="w"> </span><span class="na">type=</span><span class="s">'spicevmc'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nt">&lt;redirdev</span><span class="w"> </span><span class="na">bus=</span><span class="s">'usb'</span><span class="w"> </span><span class="na">type=</span><span class="s">'spicevmc'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nt">&lt;redirdev</span><span class="w"> </span><span class="na">bus=</span><span class="s">'usb'</span><span class="w"> </span><span class="na">type=</span><span class="s">'spicevmc'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="nt">&lt;controller</span><span class="w"> </span><span class="na">type=</span><span class="s">'usb'</span><span class="w"> </span><span class="na">index=</span><span class="s">'0'</span><span class="w"> </span><span class="na">model=</span><span class="s">'ich9-ehci1'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="nt">&lt;controller</span><span class="w"> </span><span class="na">type=</span><span class="s">'usb'</span><span class="w"> </span><span class="na">index=</span><span class="s">'0'</span><span class="w"> </span><span class="na">model=</span><span class="s">'ich9-uhci1'</span><span class="nt">&gt;</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">&lt;master</span><span class="w"> </span><span class="na">startport=</span><span class="s">'0'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="nt">&lt;/controller&gt;</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="nt">&lt;controller</span><span class="w"> </span><span class="na">type=</span><span class="s">'usb'</span><span class="w"> </span><span class="na">index=</span><span class="s">'0'</span><span class="w"> </span><span class="na">model=</span><span class="s">'nec-xhci'</span><span class="nt">/&gt;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">&lt;redirdev</span><span class="w"> </span><span class="na">bus=</span><span class="s">'usb'</span><span class="w"> </span><span class="na">type=</span><span class="s">'spicevmc'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nt">&lt;redirdev</span><span class="w"> </span><span class="na">bus=</span><span class="s">'usb'</span><span class="w"> </span><span class="na">type=</span><span class="s">'spicevmc'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nt">&lt;redirdev</span><span class="w"> </span><span class="na">bus=</span><span class="s">'usb'</span><span class="w"> </span><span class="na">type=</span><span class="s">'spicevmc'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="nt">&lt;controller</span><span class="w"> </span><span class="na">type=</span><span class="s">'usb'</span><span class="w"> </span><span class="na">index=</span><span class="s">'0'</span><span class="w"> </span><span class="na">model=</span><span class="s">'ich9-ehci1'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="nt">&lt;controller</span><span class="w"> </span><span class="na">type=</span><span class="s">'usb'</span><span class="w"> </span><span class="na">index=</span><span class="s">'0'</span><span class="w"> </span><span class="na">model=</span><span class="s">'ich9-uhci1'</span><span class="nt">&gt;</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nt">&lt;master</span><span class="w"> </span><span class="na">startport=</span><span class="s">'0'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="nt">&lt;/controller&gt;</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="nt">&lt;controller</span><span class="w"> </span><span class="na">type=</span><span class="s">'usb'</span><span class="w"> </span><span class="na">index=</span><span class="s">'0'</span><span class="w"> </span><span class="na">model=</span><span class="s">'nec-xhci'</span><span class="nt">/&gt;</span>
 </code></pre></div>
 <p>USB redirection works fine with ryll (we ship a usbredir channel
 handler), but each <code>&lt;redirdev&gt;</code> adds a <code>usbredir</code> channel that has
@@ -15909,8 +15988,8 @@ deployment policy forbids USB passthrough.</p>
 <p>The xHCI (<code>nec-xhci</code>) controller is required for USB 3 devices. EHCI
 (<code>ich9-ehci1</code>) plus the three UHCI companions cover USB 2.</p>
 <h2 id="audio-optional">Audio (optional)<a class="headerlink" href="#audio-optional" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">&lt;audio</span><span class="w"> </span><span class="na">id=</span><span class="s">'1'</span><span class="w"> </span><span class="na">type=</span><span class="s">'spice'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">&lt;sound</span><span class="w"> </span><span class="na">model=</span><span class="s">'ich9'</span><span class="nt">/&gt;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">&lt;audio</span><span class="w"> </span><span class="na">id=</span><span class="s">'1'</span><span class="w"> </span><span class="na">type=</span><span class="s">'spice'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nt">&lt;sound</span><span class="w"> </span><span class="na">model=</span><span class="s">'ich9'</span><span class="nt">/&gt;</span>
 </code></pre></div>
 <p><code>audio type='spice'</code> routes guest audio over the SPICE playback /
 record channels. We ship handlers for both. If audio isn't needed in
@@ -15936,16 +16015,16 @@ through SPICE:</p>
 <h2 id="what-the-spice-flag-looks-like-on-the-qemu-command-line">What the <code>-spice</code> flag looks like on the QEMU command line<a class="headerlink" href="#what-the-spice-flag-looks-like-on-the-qemu-command-line" title="Permanent link">&para;</a></h2>
 <p>If you are testing without libvirt, the equivalent QEMU flags for the
 recommended block above:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>-spice port=5930,tls-port=5931,addr=0.0.0.0,\
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>       disable-ticketing=on,\
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>       x509-dir=/etc/pki/libvirt-spice,\
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>       tls-channel=default,\
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>       image-compression=auto_lz,\
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>       jpeg-wan-compression=auto,\
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>       zlib-glz-wan-compression=auto,\
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>       playback-compression=on,\
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>       streaming-video=filter,\
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>       seamless-migration=on
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>-spice port=5930,tls-port=5931,addr=0.0.0.0,\
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>       disable-ticketing=on,\
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>       x509-dir=/etc/pki/libvirt-spice,\
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>       tls-channel=default,\
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>       image-compression=auto_lz,\
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>       jpeg-wan-compression=auto,\
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>       zlib-glz-wan-compression=auto,\
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>       playback-compression=on,\
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>       streaming-video=filter,\
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>       seamless-migration=on
 </code></pre></div>
 <p>(Substitute appropriate ports, x509 path, and ticketing policy for
 your deployment.)</p>
@@ -16030,12 +16109,12 @@ trickier than it looks:</p>
 </ul>
 <p>The canonical libvirt path: add the env var per-domain via
 <code>&lt;qemu:env&gt;</code> in the libvirt namespaced commandline extension:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">&lt;domain</span><span class="w"> </span><span class="na">xmlns:qemu=</span><span class="s">'http://libvirt.org/schemas/domain/qemu/1.0'</span><span class="w"> </span><span class="err">...</span><span class="nt">&gt;</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span>...
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">&lt;qemu:commandline&gt;</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">&lt;qemu:env</span><span class="w"> </span><span class="na">name=</span><span class="s">'G_MESSAGES_DEBUG'</span><span class="w"> </span><span class="na">value=</span><span class="s">'Spice'</span><span class="nt">/&gt;</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span><span class="nt">&lt;/qemu:commandline&gt;</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="nt">&lt;/domain&gt;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">&lt;domain</span><span class="w"> </span><span class="na">xmlns:qemu=</span><span class="s">'http://libvirt.org/schemas/domain/qemu/1.0'</span><span class="w"> </span><span class="err">...</span><span class="nt">&gt;</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span>...
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">&lt;qemu:commandline&gt;</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="nt">&lt;qemu:env</span><span class="w"> </span><span class="na">name=</span><span class="s">'G_MESSAGES_DEBUG'</span><span class="w"> </span><span class="na">value=</span><span class="s">'Spice'</span><span class="nt">/&gt;</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span><span class="nt">&lt;/qemu:commandline&gt;</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="nt">&lt;/domain&gt;</span>
 </code></pre></div>
 <p>After <code>virsh edit</code> and a VM restart,
 <code>/var/log/libvirt/qemu/&lt;domain&gt;.log</code> will gain <code>Spice-DEBUG:</code>
@@ -16083,7 +16162,7 @@ and what they would have to hand-roll if they wanted to bypass it.</p>
 <p>The Shaken Fist videospec accepts <code>model</code>, <code>memory</code>, and <code>vdi</code>
 fields, which the libvirt template
 (<code>shakenfist/deploy/templates/libvirt.tmpl:199</code>) substitutes as:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">&lt;model</span><span class="w"> </span><span class="na">type=</span><span class="s">'{{video_model}}'</span><span class="w"> </span><span class="na">vram=</span><span class="s">'{{video_memory}}'</span><span class="w"> </span><span class="na">heads=</span><span class="s">'1'</span><span class="w"> </span><span class="na">primary=</span><span class="s">'yes'</span><span class="nt">/&gt;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">&lt;model</span><span class="w"> </span><span class="na">type=</span><span class="s">'{{video_model}}'</span><span class="w"> </span><span class="na">vram=</span><span class="s">'{{video_memory}}'</span><span class="w"> </span><span class="na">heads=</span><span class="s">'1'</span><span class="w"> </span><span class="na">primary=</span><span class="s">'yes'</span><span class="nt">/&gt;</span>
 </code></pre></div>
 <p>There is no <code>&lt;acceleration accel3d='...'/&gt;</code> child element in the
 template and no field in the API to populate one. That means

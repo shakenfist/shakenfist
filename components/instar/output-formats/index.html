@@ -4621,6 +4621,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#text-read-from-an-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Text Read From an Image
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#testing-and-validation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15419,6 +15430,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#text-read-from-an-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Text Read From an Image
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#testing-and-validation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15739,6 +15761,44 @@ and parsing the version string. It then selects the appropriate output profile.<
 <a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Virtual size: </span><span class="si">{</span><span class="n">info</span><span class="p">[</span><span class="s1">'virtual-size'</span><span class="p">]</span><span class="si">}</span><span class="s2"> bytes"</span><span class="p">)</span>
 <a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Actual size: </span><span class="si">{</span><span class="n">info</span><span class="p">[</span><span class="s1">'actual-size'</span><span class="p">]</span><span class="si">}</span><span class="s2"> bytes"</span><span class="p">)</span>
 </code></pre></div>
+<h2 id="text-read-from-an-image">Text Read From an Image<a class="headerlink" href="#text-read-from-an-image" title="Permanent link">&para;</a></h2>
+<p>Many values instar prints come out of the image rather than from instar
+itself: a backing file name, an external data file path, a VMDK create
+type or extent file name, a snapshot ID or tag, and the paths instar
+resolves from them. The guest that reports them is parsing an untrusted
+image, so instar treats every string it reports as attacker controlled.</p>
+<p><strong>Human output</strong> escapes the characters that could act on a terminal
+rather than be displayed by it: the C0 control range (ESC, newline,
+carriage return and the rest), DEL, the C1 range, and the Unicode
+bidirectional formatting characters (U+061C, U+200E, U+200F,
+U+202A-U+202E and U+2066-U+2069). They are written the way Rust's
+<code>escape_debug</code> writes them -- <code>\n</code>, <code>\r</code>, <code>\t</code>, and <code>\u{1b}</code> for the
+rest -- so a hostile name can neither send escape sequences to your
+terminal nor start a forged line of output:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>$ instar info overlay.qcow2
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>...
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>backing file: p\u{1b}[2J\nNo errors were found on the image. (actual path: /images/p\u{1b}[2J\nNo errors were found on the image.)
+</code></pre></div>
+<p>Backslashes and quotes are left alone, so a Windows or UNC parent path
+prints exactly as it is stored. A name that contains the literal text
+<code>\u{1b}</code> therefore reads the same as one that contains ESC; neither
+reaches the terminal as a control character. This is a deliberate
+divergence from qemu-img, which prints these strings raw. It only shows
+for a name that contains one of the characters above, so the output for
+every ordinary image is byte-identical to qemu-img's.</p>
+<p>The same rule applies to <code>info --chain</code>, <code>snapshot -l</code>, <code>check</code>, the
+stderr notices about a backing reference, and every guest message and
+debug line printed with <code>--verbose</code>: the logger escapes each record as a
+whole, so this holds for lines added later too. Error messages that end a command
+are printed with the same escaping by the Rust runtime.</p>
+<p><strong>JSON output</strong> always carries the exact value, so a script reading
+<code>backing-filename</code> gets the bytes the image holds. Strings are escaped
+as JSON requires, and DEL, the C1 range and the bidi characters are
+also written as <code>\uXXXX</code>, so a JSON document viewed on a terminal is as
+safe as the human form. Every string field is escaped, including ones
+such as <code>format</code> and <code>create-type</code> that instar used to interpolate
+directly; a VMDK create type ending in a backslash used to produce a
+document that did not parse.</p>
 <h2 id="testing-and-validation">Testing and Validation<a class="headerlink" href="#testing-and-validation" title="Permanent link">&para;</a></h2>
 <p>The <a href="https://github.com/shakenfist/instar-testdata">instar-testdata</a> repository
 contains baseline outputs for multiple qemu-img versions and output formats.
@@ -15749,15 +15809,15 @@ This enables:</p>
 <li><strong>Drift detection</strong>: CI jobs that compare instar output against stored baselines</li>
 </ol>
 <h3 id="baseline-structure">Baseline Structure<a class="headerlink" href="#baseline-structure" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar-testdata/expected-outputs/
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  qemu-img-human/
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    raw/&lt;version&gt;/          # Raw captured outputs per version
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    profiles/&lt;profile&gt;/     # Deduplicated profile outputs
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    version-map.json        # Version to profile mapping
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>  qemu-img-json/
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    raw/&lt;version&gt;/
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    profiles/&lt;profile&gt;/
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>    version-map.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar-testdata/expected-outputs/
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  qemu-img-human/
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    raw/&lt;version&gt;/          # Raw captured outputs per version
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    profiles/&lt;profile&gt;/     # Deduplicated profile outputs
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    version-map.json        # Version to profile mapping
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>  qemu-img-json/
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    raw/&lt;version&gt;/
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    profiles/&lt;profile&gt;/
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    version-map.json
 </code></pre></div>
 <p>Each output format is processed independently, allowing for different profile
 groupings if the formats diverge in future qemu releases.</p>
@@ -15782,16 +15842,16 @@ directly. The addition improves transparency for debugging and scripting.</p>
 <li><strong>Version detection</strong>: Use <code>--qemu-version</code> for consistent output across systems</li>
 </ol>
 <p>Example robust JSON parsing:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">info</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="c1"># Handle both old and new versions</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="k">if</span> <span class="s1">'children'</span> <span class="ow">in</span> <span class="n">info</span><span class="p">:</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">file_info</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span>
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>        <span class="p">(</span><span class="n">c</span><span class="p">[</span><span class="s1">'info'</span><span class="p">]</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">info</span><span class="p">[</span><span class="s1">'children'</span><span class="p">]</span> <span class="k">if</span> <span class="n">c</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'file'</span><span class="p">),</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>        <span class="kc">None</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="p">)</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>    <span class="k">if</span> <span class="n">file_info</span><span class="p">:</span>
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"File length: </span><span class="si">{</span><span class="n">file_info</span><span class="p">[</span><span class="s1">'virtual-size'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">info</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="c1"># Handle both old and new versions</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="k">if</span> <span class="s1">'children'</span> <span class="ow">in</span> <span class="n">info</span><span class="p">:</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="n">file_info</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>        <span class="p">(</span><span class="n">c</span><span class="p">[</span><span class="s1">'info'</span><span class="p">]</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">info</span><span class="p">[</span><span class="s1">'children'</span><span class="p">]</span> <span class="k">if</span> <span class="n">c</span><span class="p">[</span><span class="s1">'name'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'file'</span><span class="p">),</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>        <span class="kc">None</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="p">)</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    <span class="k">if</span> <span class="n">file_info</span><span class="p">:</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"File length: </span><span class="si">{</span><span class="n">file_info</span><span class="p">[</span><span class="s1">'virtual-size'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </code></pre></div>
 
 

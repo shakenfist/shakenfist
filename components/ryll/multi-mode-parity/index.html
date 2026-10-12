@@ -15422,6 +15422,12 @@ around it.</p>
 <td>available</td>
 </tr>
 <tr>
+<td>Opt in to H.264 from spice-server (<code>--experimental-h264</code>)</td>
+<td>available</td>
+<td>available</td>
+<td>available (affects only the SPICE side; the WebRTC encoder is unchanged) — temporary: remove once <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/398" title="GitHub Issue: shakenfist/ryll #398">ryll#398</a> makes H.264 decode and it is advertised by default again</td>
+</tr>
+<tr>
 <td>Window auto-resize to surface size</td>
 <td>available</td>
 <td>n/a — intrinsic (no window; resize channel exists but <code>_resize_tx</code> in the renderer's <code>run_headless()</code> is never connected to a window)</td>
@@ -15928,7 +15934,7 @@ around it.</p>
 <tr>
 <td>Display video capture (<code>display.mp4</code> via openh264)</td>
 <td>available</td>
-<td>available (capture session is passed through and VideoWriter fires on DisplayMark events even in headless)</td>
+<td>missing (only the GUI's frame loop calls <code>CaptureSink::frame</code>; headless keeps no continuously-painted surface to encode, so <code>--capture</code> writes the pcaps but no <code>display.mp4</code>)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>

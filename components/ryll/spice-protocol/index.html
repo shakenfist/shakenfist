@@ -11840,6 +11840,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#guest-agent-message-reassembly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guest agent message reassembly
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -11956,6 +11967,17 @@
     <span class="md-ellipsis">
       
         Draw-op coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clip-rectangles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clip rectangles
       
     </span>
   </a>
@@ -15479,6 +15501,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#guest-agent-message-reassembly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guest agent message reassembly
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -15595,6 +15628,17 @@
     <span class="md-ellipsis">
       
         Draw-op coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clip-rectangles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clip rectangles
       
     </span>
   </a>
@@ -15899,6 +15943,43 @@ never sees it and never sends <code>VD_AGENT_REPLY</code>. Reply counts and lags
 still recorded on <code>MainSnapshot</code> as passive diagnostics, next to the token
 and queue fields; the "Guest agent diagnostics" section in
 <a href="/components/ryll/troubleshooting/">troubleshooting.md</a> explains each one.</p>
+<h4 id="guest-agent-message-reassembly">Guest agent message reassembly<a class="headerlink" href="#guest-agent-message-reassembly" title="Permanent link">&para;</a></h4>
+<p>The other direction is split the same way. A guest agent message is a
+20-byte <code>VDAgentMessage</code> header followed by <code>size</code> bytes of body, and
+spice-server forwards guest agent data in <code>AGENT_DATA</code> messages of at most
+<code>VD_AGENT_MAX_DATA_SIZE</code> (2048) bytes. A guest clipboard copy larger than
+about 2 KB therefore arrives as several <code>AGENT_DATA</code>s, and only the first
+carries the header. The main channel feeds every <code>AGENT_DATA</code> body to an
+<code>AgentReassembler</code> (<code>messages::agent_stream</code> in the protocol crate), which
+hands back each message once all of its bytes are in.</p>
+<p>The reassembler treats the bodies as one byte stream, as spice-gtk does: a
+header may be split between two <code>AGENT_DATA</code>s, and one <code>AGENT_DATA</code> may
+carry the end of one message and the start of the next. spice-server never
+does either, because its own filter (<code>agent-msg-filter.c</code>) starts every
+message on an <code>AGENT_DATA</code> boundary, but other servers may. Because the
+server is untrusted, the reassembler also differs from spice-gtk in three
+ways:</p>
+<ul>
+<li><strong>Size cap.</strong> A message whose header declares a body over
+  <code>MAX_AGENT_MESSAGE_SIZE</code> is not buffered. That cap is spice-gtk's default
+  <code>max-clipboard</code> (100 MiB) plus 4 KiB for the clipboard headers in front
+  of the data, so any clipboard spice-gtk accepts, ryll accepts too. The
+  oversized message's bytes are counted off and dropped as they arrive, as
+  spice-server's filter discards a message it will not forward, so the
+  message after it is still found. ryll logs the drop once per session
+  (<code>main:agent_data:oversized</code>).</li>
+<li><strong>No allocation from the header alone.</strong> A message's buffer grows as its
+  bytes arrive, so a header claiming a large body costs nothing until the
+  data behind it does.</li>
+<li><strong>Protocol check.</strong> A header whose <code>protocol</code> is not <code>VD_AGENT_PROTOCOL</code>
+  means the stream is out of step; spice-server forwards nothing else. The
+  rest of that <code>AGENT_DATA</code> is dropped and reassembly restarts at the next
+  one, where spice-server starts a message (<code>main:agent_data:bad_protocol</code>).</li>
+</ul>
+<p>A message cut short when the agent goes away must not be completed by the
+next agent's data, so <code>AGENT_DISCONNECTED</code>, <code>AGENT_CONNECTED</code> and
+<code>AGENT_CONNECTED_TOKENS</code> all reset the reassembler. A reconnect builds a new
+main channel, and with it a new reassembler.</p>
 <h2 id="server-role">Server role<a class="headerlink" href="#server-role" title="Permanent link">&para;</a></h2>
 <p>The protocol crate serves both ends of the wire: ryll uses it as a client,
 and the kerbside SPICE proxy uses its link handshake to speak to clients as
@@ -16027,8 +16108,13 @@ of codec — the per-codec logic lives in the impl, not the dispatch.</p>
   that omit the Huffman tables after the first. The backend selection is
   described below.
 - <code>3</code> (H.264): decoded via <code>H264VideoDecoder</code> using the openh264 software
-  decoder; H.264 is typically more bandwidth-efficient than MJPEG for
-  sustained video playback.</p>
+  decoder. H.264 is typically more bandwidth-efficient than MJPEG for
+  sustained video playback, but H.264 from spice-server's GStreamer
+  encoder does not decode yet
+  (<a href="https://github.com/shakenfist/ryll/issues/398">#398</a>), so ryll
+  currently neither advertises <code>CODEC_H264</code> nor lists H.264 in its
+  codec preference, and the server never streams it H.264. The decoder
+  is kept for when that is fixed.</p>
 <p><strong>JPEG decoder selection</strong> (used by <code>MJpegVideoDecoder</code>) runs once per
 display channel at startup and selects the fastest available backend:
 - <strong>macOS</strong>: ImageIO (uses Apple Silicon's dedicated media block when available)
@@ -16249,7 +16335,7 @@ important:</p>
 <tr>
 <td>CODEC_H264</td>
 <td style="text-align: right;">11</td>
-<td>H.264 video codec for streaming</td>
+<td>H.264 video codec for streaming. Not currently advertised: see <a href="https://github.com/shakenfist/ryll/issues/398">#398</a></td>
 </tr>
 <tr>
 <td>PREF_VIDEO_CODEC_TYPE</td>
@@ -16384,6 +16470,33 @@ convention) so the fallback is visible exactly once per
 session. The <code>--pedantic</code> mode and always-visible
 <code>Gaps: N</code> status-bar counter surface these the moment
 they happen. See the pedantic-mode entry below.</p>
+<h3 id="clip-rectangles">Clip rectangles<a class="headerlink" href="#clip-rectangles" title="Permanent link">&para;</a></h3>
+<p>A draw's <code>RECTS</code> clip is a list of rectangles whose union is
+the area the draw may touch. The message size is the only
+bound on the count, and the rectangles may overlap, repeat
+or reach outside the destination. <code>DRAW_COPY</code>, <code>DRAW_BLEND</code>,
+<code>DRAW_FILL</code>, <code>DRAW_BLACKNESS</code>, <code>DRAW_WHITENESS</code>,
+<code>DRAW_INVERS</code> and <code>COPY_BITS</code> reduce the clip the way
+spice-common's canvas does (<code>canvas_clip_pixman()</code> builds a
+pixman region and intersects it with the destination): each
+rectangle is clamped to the destination, empty and duplicate
+ones are dropped, and their union is taken as disjoint
+rectangles. A draw therefore touches each destination pixel
+at most once however many rectangles the server sends, so a
+hostile server can no longer turn one message into millions
+of full-size copies, and an overlap is not inverted twice. A
+<code>RECTS</code> clip with no rectangles, or none that meet the
+destination, draws nothing.</p>
+<p>Neither spice-common nor spice-gtk caps the count, so ryll
+sets its own: a clip that needs more than 1024 rectangles
+(<code>MAX_CLIP_RECTS</code>), as distinct rectangles or in its union,
+is refused. The draw is skipped and a <code>warn_once!</code> fires
+under <code>display:decode_failure:&lt;op&gt;:clip_too_complex</code>. A real
+clip is the visible part of a drawable after others have
+covered it, usually a handful of rectangles. The code is in
+<a href="https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-renderer/src/display/clip.rs"><code>display/clip.rs</code></a>.</p>
+<p><code>DRAW_OPAQUE</code>, <code>DRAW_TRANSPARENT</code> and <code>DRAW_ALPHA_BLEND</code>
+ignore the clip and draw the whole destination.</p>
 <h3 id="colour-byte-order-convention">Colour byte-order convention<a class="headerlink" href="#colour-byte-order-convention" title="Permanent link">&para;</a></h3>
 <p>All SPICE colour fields (brush colours, chroma keys, etc.)
 are BGRX on the wire: a <code>u32</code> read little-endian gives

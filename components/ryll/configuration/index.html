@@ -16032,6 +16032,11 @@ window. The operator guide, including reverse-proxy and TLS setup, is
 <td>none</td>
 <td>Write latency measurements to CSV file</td>
 </tr>
+<tr>
+<td><code>--experimental-h264</code></td>
+<td>false</td>
+<td>Experimental: let spice-server stream video to ryll as H.264, by advertising the display channel's <code>CODEC_H264</code> capability and asking for H.264 ahead of MJPEG. Off by default because H.264 from spice-server does not decode yet (<a href="https://github.com/shakenfist/ryll/issues/398">#398</a>); video regions streamed as H.264 are likely to go black or stale. For work on that bug; see <a href="/components/ryll/libvirt-spice-recommendations/#h264-from-spice-server-is-currently-disabled">H.264 from spice-server is currently disabled</a></td>
+</tr>
 </tbody>
 </table>
 <h3 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h3>

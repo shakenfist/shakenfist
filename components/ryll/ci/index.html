@@ -15650,7 +15650,7 @@ enqueue</code> status check:</p>
 <tr>
 <td><code>Lint</code></td>
 <td>self-hosted <code>l</code></td>
-<td><code>make lint</code> (rustfmt + clippy)</td>
+<td><code>make lint</code> (rustfmt + clippy) and <code>make package-check</code> (every crate packaged and built from its tarball, as <code>cargo publish</code> would)</td>
 </tr>
 <tr>
 <td><code>Cross-check Windows</code></td>
@@ -16287,6 +16287,10 @@ lands, so a push-triggered run would only repeat it.</p>
 <td>Run <code>manual-build.yml</code> (Actions → Manual build) and pick the platforms</td>
 </tr>
 <tr>
+<td>PyPI wheels for a branch</td>
+<td>Run <code>manual-build.yml</code> with the opt-in <code>wheel-x86_64</code> and <code>wheel-aarch64</code> platforms; it builds them exactly as <code>release.yml</code> does</td>
+</tr>
+<tr>
 <td>Release binaries</td>
 <td><code>release.yml</code>, triggered by a <code>v*</code> tag — see <a href="/components/ryll/releasing/">releasing.md</a></td>
 </tr>
@@ -16476,9 +16480,9 @@ compiles. To contain that, the Makefile splits the build in two:</p>
   <code>Cargo.lock</code> but compiles nothing, so no build script runs. It
   is the only build step allowed network access.</li>
 <li>the targets that compile the workspace — <code>build</code>,
-  <code>build-tokio-console</code>, <code>release</code>, <code>check-windows</code>, <code>test</code>, <code>lint</code>
-  and <code>lint-fix</code> — then run in the devcontainer with <code>--network
-  none</code> and the cargo cache mounted read-only. A malicious build
+  <code>build-tokio-console</code>, <code>release</code>, <code>check-windows</code>, <code>test</code>, <code>lint</code>,
+  <code>lint-fix</code> and <code>package-check</code> — then run in the devcontainer with
+  <code>--network none</code> and the cargo cache mounted read-only. A malicious build
   script cannot reach a C2 or exfiltrate secrets (its download call
   fails and the build aborts loudly), and it cannot poison the
   cache for the rest of the job.</li>
@@ -16503,19 +16507,34 @@ lanes they serve are real: <code>fuzz</code> runs nightly and
   part of its verify step and genuinely needs the network to
   upload. This one cannot be isolated.</li>
 </ul>
+<p><code>package-check</code> builds what <code>publish-crates</code> would, offline, so a
+crate that cannot publish fails in pull request CI rather than
+mid-release. It needs one writable directory the read-only cache
+cannot give it: <code>cargo package --workspace</code> unpacks the workspace's
+own packaged crates into <code>$CARGO_HOME/registry/src</code>, and when that is
+read-only cargo fails with a misleading "no hash listed for
+<crate>". <code>tools/package-check-verify.sh</code> therefore runs cargo
+against a throwaway <code>CARGO_HOME</code> inside the container, with the
+shared registry linked in read-only and only <code>registry/src</code> itself
+writable.</p>
 <p>(<code>fuzz-fmt-check</code> and <code>fuzz-fmt</code> also run networked, but they
 only run <code>cargo fmt</code> and compile nothing. So do <code>deb</code>, <code>rpm</code> and
 the <code>web-smoke</code> targets, which repackage or run the binary
 <code>release</code> already produced.)</p>
-<p>Outside the Makefile entirely: release's <code>build-ryll-wheels</code> job
-runs <code>tools/build-ryll-wheel.sh</code>, which builds ryll with maturin
-inside <code>quay.io/pypa/manylinux_2_28_*</code> rather than the
-devcontainer, with network and without <code>--frozen</code>. That is a
-shipped artifact — it is what <code>pip install ryll</code> gets — so it is
-the most significant gap here. Closing it needs the same
-fetch/compile split inside the manylinux image, tracked in
-<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/305" title="GitHub Issue: shakenfist/ryll #305">ryll#305</a>; until then the wheel is built on the same
-terms as before this change.</p>
+<p>Outside the Makefile but under the same split: release's
+<code>build-ryll-wheels</code> job runs <code>tools/build-ryll-wheel.sh</code>, which
+builds ryll with maturin in an image derived from
+<code>quay.io/pypa/manylinux_2_28_*</code> (<code>.devcontainer/wheel/Dockerfile</code>)
+rather than the devcontainer. That image carries the toolchain and
+maturin, so nothing needs downloading at compile time. The script
+runs <code>cargo fetch --locked</code> in it with the network up, then the
+<code>maturin build --frozen</code> with <code>--network none</code> and the cache
+mounted read-only, as the invoking user. That matters most for the
+wheel, because it is a shipped artifact: it is what <code>pip install
+ryll</code> gets. No pull request CI builds it: release.yml builds it
+on a tag, and manual-build.yml's opt-in <code>wheel-x86_64</code> and
+<code>wheel-aarch64</code> platforms build it the same way on any branch, so
+a change to the wheel build can be exercised before a release.</p>
 <p>Because those jobs write the cargo cache with the network up,
 they save it under their own <code>actions/cache</code> key prefix
 (<code>fuzz-cargo-cache</code>, <code>publish-cargo-cache</code>) rather than the shared

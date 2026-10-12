@@ -15487,6 +15487,12 @@ user's machine at install; catastrophic UX and unusable in CI.</p>
    overpromise. Proven: on a clean <code>ubuntu:22.04</code> (glibc 2.35), <code>pip
    install ryll-0.1.5-py3-none-manylinux_2_28_x86_64.whl</code> then <code>ryll
    --version</code> prints <code>ryll 0.1.5</code> and exits 0.</li>
+</ol>
+<p><strong>Superseded:</strong> the tag is only partly honest. The glibc floor
+   holds, but <code>libasound.so.2</code> is outside the manylinux policy, so the
+   tag is asserted rather than earned; see
+   <a href="/components/ryll/releasing/#the-pypi-wheels-platform-tag">the PyPI wheel's platform tag</a>.</p>
+<ol>
 <li><strong>Runtime system libraries.</strong> ryll is a Linux GUI app, so the binary
    needs <code>libxcb1</code>, <code>libwayland-client0</code>, <code>libxkbcommon0</code>, <code>libasound2</code>,
    <code>libopus0</code>, <code>libgl1</code> present to run its GUI — pip cannot install
@@ -15549,7 +15555,10 @@ user's machine at install; catastrophic UX and unusable in CI.</p>
   wheel that already contains the binary; <code>ryll --version</code> works with no
   network and no compile step.</li>
 <li>The wheel's <code>manylinux_2_28</code> tag is honest (glibc floor 2.28; only
-  <code>libasound.so.2</code> beyond the standard set in <code>DT_NEEDED</code>).</li>
+  <code>libasound.so.2</code> beyond the standard set in <code>DT_NEEDED</code>).
+  <strong>Superseded:</strong> <code>libasound.so.2</code> is itself outside the policy, so
+  the tag is asserted; see
+  <a href="/components/ryll/releasing/#the-pypi-wheels-platform-tag">the PyPI wheel's platform tag</a>.</li>
 <li>A missing runtime GUI library is the user's to install (documented);
   phase 4 falls back to <code>remote-viewer</code>.</li>
 <li>CI publishes the <code>ryll</code> wheels after the approved, Sigstore-signed

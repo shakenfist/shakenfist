@@ -3302,6 +3302,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#plan-history-in-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        plan-history-in-source
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#plan-index" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3394,6 +3405,17 @@
     <span class="md-ellipsis">
       
         readme-structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#release-artifacts-exclude-plans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        release-artifacts-exclude-plans
       
     </span>
   </a>
@@ -15978,6 +16000,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#plan-history-in-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        plan-history-in-source
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#plan-index" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16070,6 +16103,17 @@
     <span class="md-ellipsis">
       
         readme-structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#release-artifacts-exclude-plans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        release-artifacts-exclude-plans
       
     </span>
   </a>
@@ -16306,7 +16350,7 @@ many manual runs came before it. See
 <a href="/components/development/consistency-audits/">../consistency-audits.md</a> for what a run
 does.</p>
 <!-- consistency-audit:begin -->
-<p><em>Generated 2026-10-07T03:03:29.543621+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
+<p><em>Generated 2026-10-11T21:20:15.489528+00:00 from <code>scripts/audit-check.py</code>; do not edit.</em></p>
 <h2 id="ci-review-automation">ci-review-automation<a class="headerlink" href="#ci-review-automation" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/ci-review-automation/">ci-review-automation.md</a></p>
 <table>
@@ -16327,6 +16371,11 @@ does.</p>
 <td>agent-python</td>
 <td>non-compliant</td>
 <td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/agent-python/issues/145" title="GitHub Issue: shakenfist/agent-python #145">agent-python#145</a></td>
+</tr>
+<tr>
+<td>andris</td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>client-python</td>
@@ -16370,8 +16419,8 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/599" title="GitHub Issue: shakenfist/instar #599">instar#599</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside</td>
@@ -16437,7 +16486,6 @@ does.</p>
 <li><strong>clingwrap</strong> (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py, tools/review-schema.json); it is unused, and its workflow holds contents: write on the pull request branch</li>
 <li><strong>cloudgood</strong> (Status): Missing workflows: pr-re-review.yml</li>
 <li><strong>divergulent</strong> (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request</li>
-<li><strong>instar</strong> (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request</li>
 <li><strong>kerbside-client</strong> (Status): Missing pr-re-review.yml; Missing pr-retest.yml; No workflow uses shared action review-pr-with-claude@main</li>
 <li><strong>library-utilities</strong> (Status): pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request</li>
 <li><strong>sfui</strong> (Status): pr-re-review.yml does not use shakenfist/actions/pr-bot-trigger@main, so it hand-rolls the trigger handling and does not inherit the action's fork pull request guard; pr-re-review.yml does not confirm that the tree it checked out is the commit it resolved, so a push between the two is reviewed with no warning; pr-retest.yml: job trigger-retest does not export pr-bot-trigger's same-repo output, so the job that needs it cannot require a same-repository pull request; the retired comment addresser is still deployed (.github/workflows/pr-address-comments.yml, tools/address-comments-with-claude.sh, tools/render-review.py); it is unused, and its workflow holds contents: write on the pull request branch</li>
@@ -16462,6 +16510,11 @@ does.</p>
 <tr>
 <td>agent-python</td>
 <td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
+<td>N/A</td>
 <td>-</td>
 </tr>
 <tr>
@@ -16588,6 +16641,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>compliant</td>
 <td>-</td>
@@ -16707,6 +16765,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>compliant</td>
 <td>-</td>
 </tr>
@@ -16839,6 +16902,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>compliant</td>
 <td>-</td>
@@ -16958,6 +17026,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>compliant</td>
 <td>-</td>
 </tr>
@@ -17090,6 +17163,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>compliant</td>
 <td>-</td>
@@ -17131,8 +17209,8 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/596" title="GitHub Issue: shakenfist/instar #596">instar#596</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside</td>
@@ -17194,7 +17272,6 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>cloudgood</strong> (Status): 2 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute <a href="https://github.com/">https://github.com/</a>... URLs, which survive the docs site import): docs/index.md -&gt; more-fundamentals.md, docs/virtualization-history.md -&gt; more-fundamentals.md</li>
-<li><strong>instar</strong> (Status): 1 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute <a href="https://github.com/">https://github.com/</a>... URLs, which survive the docs site import): docs/plans/PLAN-differencing-phase-08-tests.md -&gt; docs/plans/PLAN-differencing.md</li>
 <li><strong>uncalibrated-sextant</strong> (Status): 67 relative link(s) in docs/ that do not resolve to a file inside docs/ (use absolute <a href="https://github.com/">https://github.com/</a>... URLs, which survive the docs site import): docs/plans/PLAN-audit-cleanup-phase-02-structural.md -&gt; ../../src/bootloader.rs, docs/plans/PLAN-audit-cleanup-phase-02-structural.md -&gt; ../../src/renderer/mod.rs, docs/plans/PLAN-audit-cleanup-phase-02-structural.md -&gt; ../../src/scene.rs, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -&gt; ../../Makefile, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -&gt; ../../scripts/screenshot.sh, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -&gt; ../../scripts/verify-release.sh, docs/plans/PLAN-audit-cleanup-phase-03-tests.md -&gt; ../../src/scene.rs, docs/plans/PLAN-audit-cleanup.md -&gt; ../../AGENTS.md, docs/plans/PLAN-audit-cleanup.md -&gt; ../../ARCHITECTURE.md, docs/plans/PLAN-audit-cleanup.md -&gt; ../../PUSH-AUDIT.md (+57 more)</li>
 </ul>
 <h2 id="docs-line-references">docs-line-references<a class="headerlink" href="#docs-line-references" title="Permanent link">&para;</a></h2>
@@ -17215,6 +17292,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>compliant</td>
 <td>-</td>
 </tr>
@@ -17260,8 +17342,8 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/636" title="GitHub Issue: shakenfist/instar #636">instar#636</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside</td>
@@ -17295,8 +17377,8 @@ does.</p>
 </tr>
 <tr>
 <td>ryll</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/468" title="GitHub Issue: shakenfist/ryll #468">ryll#468</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>sfui</td>
@@ -17305,8 +17387,8 @@ does.</p>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4481" title="GitHub Issue: shakenfist/shakenfist #4481">shakenfist#4481</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>uncalibrated-sextant</td>
@@ -17322,10 +17404,7 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>instar</strong> (Status): 9 line(s) in the documentation cite code by line number, which goes stale on the next edit to that code (name the function or class instead, or use a GitHub permalink pinned to a commit sha): docs/quirks.md:4463, docs/quirks.md:4465, docs/quirks.md:4573, docs/quirks.md:4574, docs/quirks.md:4596, docs/quirks.md:4597, docs/quirks.md:4700, docs/resize.md:200, docs/resize.md:203</li>
 <li><strong>kerbside-patches</strong> (Status): 1 line(s) in the documentation cite code by line number, which goes stale on the next edit to that code (name the function or class instead, or use a GitHub permalink pinned to a commit sha): docs/kolla-ansible-tempest-jobs.md:71</li>
-<li><strong>ryll</strong> (Status): 25 line(s) in the documentation cite code by line number, which goes stale on the next edit to that code (name the function or class instead, or use a GitHub permalink pinned to a commit sha): docs/libvirt-spice-recommendations.md:103, docs/libvirt-spice-recommendations.md:255, docs/libvirt-spice-recommendations.md:450, docs/libvirt-spice-recommendations.md:456, docs/multi-mode-parity.md:83, docs/multi-mode-parity.md:84, docs/multi-mode-parity.md:88, docs/multi-mode-parity.md:89, docs/multi-mode-parity.md:90, docs/multi-mode-parity.md:92 (+15 more)</li>
-<li><strong>shakenfist</strong> (Status): 5 line(s) in the documentation cite code by line number, which goes stale on the next edit to that code (name the function or class instead, or use a GitHub permalink pinned to a commit sha): docs/operator_guide/agent_operations.md:41, docs/operator_guide/agent_operations.md:48, docs/operator_guide/agent_operations.md:62, docs/operator_guide/agent_operations.md:147, docs/operator_guide/agent_operations.md:160</li>
 </ul>
 <h2 id="eol-distro">eol-distro<a class="headerlink" href="#eol-distro" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/eol-distro/">eol-distro.md</a></p>
@@ -17345,6 +17424,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>compliant</td>
 <td>-</td>
 </tr>
@@ -17472,6 +17556,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>N/A</td>
 <td>-</td>
@@ -17591,6 +17680,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>compliant</td>
 <td>-</td>
 </tr>
@@ -17719,6 +17813,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>compliant</td>
 <td>-</td>
 </tr>
@@ -17852,6 +17951,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>N/A</td>
 <td>-</td>
@@ -17971,6 +18075,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>compliant</td>
 <td>-</td>
 </tr>
@@ -18100,6 +18209,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>compliant</td>
 <td>-</td>
 </tr>
@@ -18234,6 +18348,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>compliant</td>
 <td>-</td>
@@ -18353,6 +18472,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>compliant</td>
 <td>-</td>
 </tr>
@@ -18484,6 +18608,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>compliant</td>
 <td>-</td>
@@ -18603,6 +18732,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>compliant</td>
 <td>-</td>
 </tr>
@@ -18734,6 +18868,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>N/A</td>
 <td>-</td>
@@ -18857,6 +18996,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>N/A</td>
 <td>-</td>
@@ -18976,6 +19120,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>N/A</td>
 <td>-</td>
 </tr>
@@ -19103,6 +19252,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>N/A</td>
 <td>-</td>
@@ -19222,6 +19376,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>N/A</td>
 <td>-</td>
 </tr>
@@ -19349,6 +19508,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>N/A</td>
 <td>-</td>
@@ -19468,6 +19632,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>N/A</td>
 <td>-</td>
 </tr>
@@ -19595,6 +19764,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>compliant</td>
 <td>-</td>
@@ -19700,6 +19874,149 @@ does.</p>
 <ul>
 <li><strong>uncalibrated-sextant</strong> (Status): 5 of 5 incomplete master plan(s) do not end with a phase running PUSH-AUDIT.md, which the plan-push-audit-phase shared block requires; each is named with the fix it needs: PLAN-locked-bootloader.md (no push audit phase; phase 3 is "3. Iteration, documentation, inventory closeout"), PLAN-display-mode-keystrokes.md (no push audit phase; phase 3 is "3. Iteration against ryll display-mode-ui, documentation,..."), PLAN-audit-cleanup.md (no push audit phase; phase 3 is "3. Test coverage and release verification"), PLAN-visual-digest.md (no push audit phase; phase 3 is "3. Repaint integration, format spec, closeout"), PLAN-continuous-digest.md (no push audit phase; phase 3 is "3. Docs, decoder coordination, closeout"); 2 plan(s) with no phases this check can read, not judged: PLAN-language-probes.md, PLAN-headless-readback-bug.md</li>
 </ul>
+<h2 id="plan-history-in-source">plan-history-in-source<a class="headerlink" href="#plan-history-in-source" title="Permanent link">&para;</a></h2>
+<p>Criterion: <a href="/components/development/audits/plan-history-in-source/">plan-history-in-source.md</a></p>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Status</th>
+<th>Issue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>actions</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/153" title="GitHub Issue: shakenfist/actions #153">actions#153</a></td>
+</tr>
+<tr>
+<td>agent-python</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>client-python</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/425" title="GitHub Issue: shakenfist/client-python #425">client-python#425</a></td>
+</tr>
+<tr>
+<td>client-python-k3s</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python-k3s/issues/139" title="GitHub Issue: shakenfist/client-python-k3s #139">client-python-k3s#139</a></td>
+</tr>
+<tr>
+<td>clingwrap</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>cloudgood</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>development</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>divergulent</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/divergulent/issues/129" title="GitHub Issue: shakenfist/divergulent #129">divergulent#129</a></td>
+</tr>
+<tr>
+<td>hunkydory</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/hunkydory/issues/72" title="GitHub Issue: shakenfist/hunkydory #72">hunkydory#72</a></td>
+</tr>
+<tr>
+<td>images</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>instar</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/655" title="GitHub Issue: shakenfist/instar #655">instar#655</a></td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/558" title="GitHub Issue: shakenfist/kerbside #558">kerbside#558</a></td>
+</tr>
+<tr>
+<td>kerbside-client</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>kerbside-patches</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside-patches/issues/1877" title="GitHub Issue: shakenfist/kerbside-patches #1877">kerbside-patches#1877</a></td>
+</tr>
+<tr>
+<td>library-utilities</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>occystrap</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>private-ci</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>ryll</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/515" title="GitHub Issue: shakenfist/ryll #515">ryll#515</a></td>
+</tr>
+<tr>
+<td>sfui</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4512" title="GitHub Issue: shakenfist/shakenfist #4512">shakenfist#4512</a></td>
+</tr>
+<tr>
+<td>uncalibrated-sextant</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/uncalibrated-sextant/issues/22" title="GitHub Issue: shakenfist/uncalibrated-sextant #22">uncalibrated-sextant#22</a></td>
+</tr>
+<tr>
+<td>visual-digest-rust</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/visual-digest-rust/issues/42" title="GitHub Issue: shakenfist/visual-digest-rust #42">visual-digest-rust#42</a></td>
+</tr>
+</tbody>
+</table>
+<p>Details for non-compliant projects:</p>
+<ul>
+<li><strong>actions</strong> (Status): 9 plan history reference(s) in source, in 4 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
+<li><strong>client-python</strong> (Status): 20 plan history reference(s) in source, in 4 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
+<li><strong>client-python-k3s</strong> (Status): 63 plan history reference(s) in source, in 14 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
+<li><strong>divergulent</strong> (Status): 251 plan history reference(s) in source, in 47 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
+<li><strong>hunkydory</strong> (Status): 4 plan history reference(s) in source, in 4 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
+<li><strong>instar</strong> (Status): 1078 plan history reference(s) in source, in 124 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
+<li><strong>kerbside</strong> (Status): 19 plan history reference(s) in source, in 10 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
+<li><strong>kerbside-patches</strong> (Status): 7 plan history reference(s) in source, in 4 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
+<li><strong>ryll</strong> (Status): 9 plan history reference(s) in source, in 8 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
+<li><strong>shakenfist</strong> (Status): 626 plan history reference(s) in source, in 159 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
+<li><strong>uncalibrated-sextant</strong> (Status): 21 plan history reference(s) in source, in 5 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
+<li><strong>visual-digest-rust</strong> (Status): 9 plan history reference(s) in source, in 6 file(s) (write the reason the code is this way instead of citing the plan step that produced it)</li>
+</ul>
 <h2 id="plan-index">plan-index<a class="headerlink" href="#plan-index" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/plan-index/">plan-index.md</a></p>
 <table>
@@ -19719,6 +20036,11 @@ does.</p>
 <tr>
 <td>agent-python</td>
 <td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
+<td>compliant</td>
 <td>-</td>
 </tr>
 <tr>
@@ -19850,6 +20172,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>non-compliant</td>
 <td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/382" title="GitHub Issue: shakenfist/client-python #382">client-python#382</a></td>
@@ -19891,8 +20218,8 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/605" title="GitHub Issue: shakenfist/instar #605">instar#605</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside</td>
@@ -19954,9 +20281,8 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>client-python</strong> (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:121</li>
-<li><strong>instar</strong> (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/development.md:1052</li>
 <li><strong>kerbside-patches</strong> (Status): 1 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): ARCHITECTURE.md:67</li>
-<li><strong>private-ci</strong> (Status): 57 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/dashboard-freshness.md:84, docs/dashboard-freshness.md:132, docs/dashboard-freshness.md:133, docs/dashboard-freshness.md:197, docs/dashboard-freshness.md:241, docs/dashboard-freshness.md:272, docs/dashboard-freshness.md:299, docs/dashboard-freshness.md:311, docs/dashboard-freshness.md:317 (+47 more)</li>
+<li><strong>private-ci</strong> (Status): 64 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): docs/action-items-order.md:19, docs/capacity-claims.md:114, docs/capacity-claims.md:117, docs/capacity-claims.md:129, docs/dashboard-freshness.md:84, docs/dashboard-freshness.md:132, docs/dashboard-freshness.md:133, docs/dashboard-freshness.md:197, docs/dashboard-freshness.md:241, docs/dashboard-freshness.md:272 (+54 more)</li>
 <li><strong>uncalibrated-sextant</strong> (Status): 22 plan phase reference(s) in documentation (describe the current behaviour, or link the master plan in docs/plans/ instead of citing a phase number): AGENTS.md:104, AGENTS.md:126, AGENTS.md:145, ARCHITECTURE.md:3, ARCHITECTURE.md:10, ARCHITECTURE.md:16, ARCHITECTURE.md:29, ARCHITECTURE.md:44, ARCHITECTURE.md:137, ARCHITECTURE.md:236 (+12 more)</li>
 </ul>
 <h2 id="plan-source-references">plan-source-references<a class="headerlink" href="#plan-source-references" title="Permanent link">&para;</a></h2>
@@ -19977,6 +20303,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>N/A</td>
 <td>-</td>
 </tr>
@@ -20002,7 +20333,7 @@ does.</p>
 </tr>
 <tr>
 <td>development</td>
-<td>compliant</td>
+<td>N/A</td>
 <td>-</td>
 </tr>
 <tr>
@@ -20022,8 +20353,8 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/606" title="GitHub Issue: shakenfist/instar #606">instar#606</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside</td>
@@ -20052,8 +20383,8 @@ does.</p>
 </tr>
 <tr>
 <td>private-ci</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/139" title="GitHub Issue: shakenfist/private-ci #139">private-ci#139</a></td>
 </tr>
 <tr>
 <td>ryll</td>
@@ -20067,8 +20398,8 @@ does.</p>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4397" title="GitHub Issue: shakenfist/shakenfist #4397">shakenfist#4397</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>uncalibrated-sextant</td>
@@ -20084,9 +20415,8 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>client-python</strong> (Status): 2 of 4 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository): shakenfist_client/apiclient.py:185 -&gt; docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md, shakenfist_client/tests/test_client_apiclient.py:2320 -&gt; docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md</li>
-<li><strong>instar</strong> (Status): 2 of 243 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository): tools/ci/test-check-doc-phrases.sh:43 -&gt; PLAN-differencingflow.md, tools/ci/test-check-doc-phrases.sh:142 -&gt; /docs/plans/PLAN-example.md</li>
-<li><strong>shakenfist</strong> (Status): 3 of 367 plan reference(s) in source or configuration do not resolve (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository): shakenfist/mariadb.py:3656 -&gt; PLAN-claim-coverage-and-sizing-phase-02b-peak-measurement.md, shakenfist/tests/test_plan_phase_references.py:86 -&gt; docs/plans/PLAN-thing.md, shakenfist/tests/test_plan_phase_references.py:88 -&gt; docs/other/plans/PLAN-deep.md</li>
+<li><strong>client-python</strong> (Status): 2 of 4 plan reference(s) in source or configuration do not resolve, in 2 file(s) (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository)</li>
+<li><strong>private-ci</strong> (Status): 5 of 95 plan reference(s) in source or configuration do not resolve, in 2 file(s) (update the path, or use an absolute <a href="https://github.com/">https://github.com/</a>... URL for a plan in another repository)</li>
 </ul>
 <h2 id="plan-template">plan-template<a class="headerlink" href="#plan-template" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/plan-template/">plan-template.md</a></p>
@@ -20107,6 +20437,11 @@ does.</p>
 <tr>
 <td>agent-python</td>
 <td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
+<td>compliant</td>
 <td>-</td>
 </tr>
 <tr>
@@ -20151,13 +20486,13 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/637" title="GitHub Issue: shakenfist/instar #637">instar#637</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/532" title="GitHub Issue: shakenfist/kerbside #532">kerbside#532</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside-client</td>
@@ -20186,8 +20521,8 @@ does.</p>
 </tr>
 <tr>
 <td>ryll</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/469" title="GitHub Issue: shakenfist/ryll #469">ryll#469</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>sfui</td>
@@ -20196,8 +20531,8 @@ does.</p>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4482" title="GitHub Issue: shakenfist/shakenfist #4482">shakenfist#4482</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>uncalibrated-sextant</td>
@@ -20214,13 +20549,9 @@ does.</p>
 <p>Details for non-compliant projects:</p>
 <ul>
 <li><strong>divergulent</strong> (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)</li>
-<li><strong>instar</strong> (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)</li>
-<li><strong>kerbside</strong> (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)</li>
 <li><strong>kerbside-patches</strong> (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)</li>
 <li><strong>occystrap</strong> (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)</li>
 <li><strong>private-ci</strong> (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current); missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)</li>
-<li><strong>ryll</strong> (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)</li>
-<li><strong>shakenfist</strong> (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current)</li>
 <li><strong>uncalibrated-sextant</strong> (Status): shared block plan-file-conventions is stale (v1 embedded, v2 current); missing shared block plan-status-vocabulary (copy it verbatim from templates/shared-blocks/plan-status-vocabulary.md in the development repository); missing shared block plan-push-audit-phase (copy it verbatim from templates/shared-blocks/plan-push-audit-phase.md in the development repository); missing shared block plan-phase-landing (copy it verbatim from templates/shared-blocks/plan-phase-landing.md in the development repository)</li>
 </ul>
 <h2 id="push-audit">push-audit<a class="headerlink" href="#push-audit" title="Permanent link">&para;</a></h2>
@@ -20242,6 +20573,11 @@ does.</p>
 <tr>
 <td>agent-python</td>
 <td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
+<td>compliant</td>
 <td>-</td>
 </tr>
 <tr>
@@ -20286,8 +20622,8 @@ does.</p>
 </tr>
 <tr>
 <td>instar</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/597" title="GitHub Issue: shakenfist/instar #597">instar#597</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>kerbside</td>
@@ -20348,7 +20684,6 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>instar</strong> (Status): missing shared block plan-references-in-code (copy it verbatim from templates/shared-blocks/plan-references-in-code.md in the development repository)</li>
 <li><strong>sfui</strong> (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository); missing shared block plan-references-in-code (copy it verbatim from templates/shared-blocks/plan-references-in-code.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)</li>
 <li><strong>uncalibrated-sextant</strong> (Status): missing shared block llm-doc-discipline (copy it verbatim from templates/shared-blocks/llm-doc-discipline.md in the development repository); missing shared block diagram-discipline (copy it verbatim from templates/shared-blocks/diagram-discipline.md in the development repository); missing shared block comment-proportion (copy it verbatim from templates/shared-blocks/comment-proportion.md in the development repository); missing shared block source-file-size (copy it verbatim from templates/shared-blocks/source-file-size.md in the development repository); missing shared block plan-references-in-code (copy it verbatim from templates/shared-blocks/plan-references-in-code.md in the development repository); missing shared block plan-phase-references (copy it verbatim from templates/shared-blocks/plan-phase-references.md in the development repository); missing shared block path-traversal-review (copy it verbatim from templates/shared-blocks/path-traversal-review.md in the development repository); missing shared block python-version-discipline (copy it verbatim from templates/shared-blocks/python-version-discipline.md in the development repository); missing shared block functional-test-coverage (copy it verbatim from templates/shared-blocks/functional-test-coverage.md in the development repository); AGENTS.md does not reference PUSH-AUDIT.md (an audit nothing points at does not get run)</li>
 </ul>
@@ -20371,6 +20706,11 @@ does.</p>
 <tr>
 <td>agent-python</td>
 <td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
+<td>N/A</td>
 <td>-</td>
 </tr>
 <tr>
@@ -20501,6 +20841,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>compliant</td>
 <td>-</td>
@@ -20620,6 +20965,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>compliant</td>
 <td>-</td>
 </tr>
@@ -20751,6 +21101,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>compliant</td>
 <td>-</td>
@@ -20852,6 +21207,143 @@ does.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="release-artifacts-exclude-plans">release-artifacts-exclude-plans<a class="headerlink" href="#release-artifacts-exclude-plans" title="Permanent link">&para;</a></h2>
+<p>Criterion: <a href="/components/development/audits/release-artifacts-exclude-plans/">release-artifacts-exclude-plans.md</a></p>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Status</th>
+<th>Issue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>actions</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>agent-python</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>client-python</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/426" title="GitHub Issue: shakenfist/client-python #426">client-python#426</a></td>
+</tr>
+<tr>
+<td>client-python-k3s</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>clingwrap</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>cloudgood</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>development</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>divergulent</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/divergulent/issues/130" title="GitHub Issue: shakenfist/divergulent #130">divergulent#130</a></td>
+</tr>
+<tr>
+<td>hunkydory</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>images</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>instar</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>kerbside</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/559" title="GitHub Issue: shakenfist/kerbside #559">kerbside#559</a></td>
+</tr>
+<tr>
+<td>kerbside-client</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>kerbside-patches</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>library-utilities</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/library-utilities/issues/70" title="GitHub Issue: shakenfist/library-utilities #70">library-utilities#70</a></td>
+</tr>
+<tr>
+<td>occystrap</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/occystrap/issues/159" title="GitHub Issue: shakenfist/occystrap #159">occystrap#159</a></td>
+</tr>
+<tr>
+<td>private-ci</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>ryll</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>sfui</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>shakenfist</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4513" title="GitHub Issue: shakenfist/shakenfist #4513">shakenfist#4513</a></td>
+</tr>
+<tr>
+<td>uncalibrated-sextant</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>visual-digest-rust</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<p>Details for non-compliant projects:</p>
+<ul>
+<li><strong>client-python</strong> (Status): 1 release artifact(s) would ship docs/plans/, which is working history rather than source; exclude it with the mechanism each finding names</li>
+<li><strong>divergulent</strong> (Status): 1 release artifact(s) would ship docs/plans/, which is working history rather than source; exclude it with the mechanism each finding names</li>
+<li><strong>kerbside</strong> (Status): 1 release artifact(s) would ship docs/plans/, which is working history rather than source; exclude it with the mechanism each finding names</li>
+<li><strong>library-utilities</strong> (Status): 1 release artifact(s) would ship docs/plans/, which is working history rather than source; exclude it with the mechanism each finding names</li>
+<li><strong>occystrap</strong> (Status): 1 release artifact(s) would ship docs/plans/, which is working history rather than source; exclude it with the mechanism each finding names</li>
+<li><strong>shakenfist</strong> (Status): 1 release artifact(s) would ship docs/plans/, which is working history rather than source; exclude it with the mechanism each finding names</li>
+</ul>
 <h2 id="release-process">release-process<a class="headerlink" href="#release-process" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/release-process/">release-process.md</a></p>
 <table>
@@ -20871,6 +21363,11 @@ does.</p>
 <tr>
 <td>agent-python</td>
 <td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
+<td>N/A</td>
 <td>-</td>
 </tr>
 <tr>
@@ -20997,6 +21494,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>N/A</td>
 <td>-</td>
@@ -21116,6 +21618,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>compliant</td>
 <td>-</td>
 </tr>
@@ -21250,6 +21757,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>compliant</td>
 <td>-</td>
@@ -21364,11 +21876,16 @@ does.</p>
 <tbody>
 <tr>
 <td>actions</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/138" title="GitHub Issue: shakenfist/actions #138">actions#138</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>N/A</td>
 <td>-</td>
 </tr>
@@ -21394,8 +21911,8 @@ does.</p>
 </tr>
 <tr>
 <td>development</td>
-<td>compliant</td>
-<td>-</td>
+<td>non-compliant</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/247" title="GitHub Issue: shakenfist/development #247">development#247</a></td>
 </tr>
 <tr>
 <td>divergulent</td>
@@ -21476,10 +21993,10 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>actions</strong> (Status): 130 of 140 in-scope files reviewed at HEAD (4 imported from shakenfist/development); 10 need review (threshold 5)</li>
-<li><strong>kerbside</strong> (Status): 137 of 254 in-scope files reviewed at HEAD (4 imported from shakenfist/development); 117 need review (threshold 5)</li>
+<li><strong>development</strong> (Status): 180 of 207 in-scope files reviewed at HEAD; 27 need review (threshold 5)</li>
+<li><strong>kerbside</strong> (Status): 128 of 258 in-scope files reviewed at HEAD (5 imported from shakenfist/development); 130 need review (threshold 5)</li>
 <li><strong>kerbside-client</strong> (Status): 3 of 15 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 12 need review (threshold 5)</li>
-<li><strong>ryll</strong> (Status): 215 of 224 in-scope files reviewed at HEAD (2 imported from shakenfist/development); 9 need review (threshold 5)</li>
+<li><strong>ryll</strong> (Status): 155 of 238 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 83 need review (threshold 5)</li>
 <li><strong>sfui</strong> (Status): 3 of 52 in-scope files reviewed at HEAD (3 imported from shakenfist/development); 49 need review (threshold 5)</li>
 </ul>
 <h2 id="review-scope-completeness">review-scope-completeness<a class="headerlink" href="#review-scope-completeness" title="Permanent link">&para;</a></h2>
@@ -21500,6 +22017,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>N/A</td>
 <td>-</td>
 </tr>
@@ -21624,6 +22146,11 @@ does.</p>
 <tr>
 <td>agent-python</td>
 <td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
+<td>compliant</td>
 <td>-</td>
 </tr>
 <tr>
@@ -21754,6 +22281,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>compliant</td>
 <td>-</td>
@@ -21840,8 +22372,8 @@ does.</p>
 </tr>
 <tr>
 <td>shakenfist</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4369" title="GitHub Issue: shakenfist/shakenfist #4369">shakenfist#4369</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>uncalibrated-sextant</td>
@@ -21855,10 +22387,6 @@ does.</p>
 </tr>
 </tbody>
 </table>
-<p>Details for non-compliant projects:</p>
-<ul>
-<li><strong>shakenfist</strong> (Status): 1 workflow(s) that fire unattended have failed on develop at least 3 times and never once succeeded, so whatever they are meant to do has never happened. The usual cause is an installation that was not finished -- a missing secret, or an organisation secret not granted to this repository -- and the reason is in the log of the linked run</li>
-</ul>
 <h2 id="scope-coverage">scope-coverage<a class="headerlink" href="#scope-coverage" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/scope-coverage/">scope-coverage.md</a></p>
 <table>
@@ -21877,6 +22405,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>N/A</td>
 <td>-</td>
 </tr>
@@ -22000,6 +22533,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>compliant</td>
 <td>-</td>
 </tr>
@@ -22133,6 +22671,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>N/A</td>
 <td>-</td>
@@ -22256,6 +22799,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>N/A</td>
 <td>-</td>
@@ -22303,7 +22851,7 @@ does.</p>
 <tr>
 <td>kerbside</td>
 <td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/516" title="GitHub Issue: shakenfist/kerbside #516">kerbside#516</a></td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/560" title="GitHub Issue: shakenfist/kerbside #560">kerbside#560</a></td>
 </tr>
 <tr>
 <td>kerbside-client</td>
@@ -22332,8 +22880,8 @@ does.</p>
 </tr>
 <tr>
 <td>ryll</td>
-<td>non-compliant</td>
-<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/438" title="GitHub Issue: shakenfist/ryll #438">ryll#438</a></td>
+<td>compliant</td>
+<td>-</td>
 </tr>
 <tr>
 <td>sfui</td>
@@ -22359,9 +22907,8 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>kerbside</strong> (Status): kerbside/api/static/sfui: 5 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
-<li><strong>private-ci</strong> (Status): conductor/static/sfui: 12 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
-<li><strong>ryll</strong> (Status): ryll/src/web/assets/sfui: 5 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
+<li><strong>kerbside</strong> (Status): kerbside/api/static/sfui: 2 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
+<li><strong>private-ci</strong> (Status): conductor/static/sfui: 14 commit(s) behind canonical; re-run tools/vendor.sh from an up to date sfui checkout</li>
 </ul>
 <h2 id="undeclared-direct-dependency">undeclared-direct-dependency<a class="headerlink" href="#undeclared-direct-dependency" title="Permanent link">&para;</a></h2>
 <p>Criterion: <a href="/components/development/audits/undeclared-direct-dependency/">undeclared-direct-dependency.md</a></p>
@@ -22381,6 +22928,11 @@ does.</p>
 </tr>
 <tr>
 <td>agent-python</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
 <td>N/A</td>
 <td>-</td>
 </tr>
@@ -22508,6 +23060,11 @@ does.</p>
 <td>-</td>
 </tr>
 <tr>
+<td>andris</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
 <td>client-python</td>
 <td>non-compliant</td>
 <td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/383" title="GitHub Issue: shakenfist/client-python #383">client-python#383</a></td>
@@ -22632,6 +23189,11 @@ does.</p>
 <tr>
 <td>agent-python</td>
 <td>compliant</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
+<td>N/A</td>
 <td>-</td>
 </tr>
 <tr>
@@ -22775,6 +23337,19 @@ does.</p>
 <tr>
 <td>agent-python</td>
 <td>compliant</td>
+<td>compliant</td>
+<td>compliant</td>
+<td>compliant</td>
+<td>compliant</td>
+<td>compliant</td>
+<td>N/A</td>
+<td>compliant</td>
+<td>N/A</td>
+<td>-</td>
+</tr>
+<tr>
+<td>andris</td>
+<td>N/A</td>
 <td>compliant</td>
 <td>compliant</td>
 <td>compliant</td>
@@ -23049,8 +23624,8 @@ does.</p>
 </table>
 <p>Details for non-compliant projects:</p>
 <ul>
-<li><strong>client-python</strong> (VM size): 3 "vm" runner job(s) naming no size: code-formatting.yml:19 (self-hosted, vm), functional-tests.yml:23 (self-hosted, vm), supply-chain.yml:81 (self-hosted, vm). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason</li>
-<li><strong>clingwrap</strong> (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:22 (self-hosted, vm, debian-13). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl, or m-bigdisk/xl-bigdisk when the job needs the disk); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason</li>
+<li><strong>client-python</strong> (VM size): 3 "vm" runner job(s) naming no size: code-formatting.yml:19 (self-hosted, vm), functional-tests.yml:23 (self-hosted, vm), supply-chain.yml:81 (self-hosted, vm). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl; m-bigdisk/xl-bigdisk when the job needs the disk; s-cloud/s-cluster when it builds a nested cloud or cluster); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason</li>
+<li><strong>clingwrap</strong> (VM size): 1 "vm" runner job(s) naming no size: functional-tests.yml:22 (self-hosted, vm, debian-13). The conductor takes the runner size from the labels and falls back to the first CI_SIZES entry -- "xs", one vCPU and 2048 MB -- when it finds none, so an omitted size is a silent downgrade to the smallest runner rather than a free choice. Add the size the job actually wants (xs/s/m/l/xl; m-bigdisk/xl-bigdisk when the job needs the disk; s-cloud/s-cluster when it builds a nested cloud or cluster); "xs" is a valid answer stated explicitly. A job which genuinely cannot name one marks the line "audit-ok: vm-runner-size" with the reason</li>
 <li><strong>kerbside-client</strong> (flake8wrap): Missing shellcheck disable=SC2086 directive</li>
 <li><strong>kerbside-client</strong> (Linting): Missing .pre-commit-config.yaml</li>
 <li><strong>uncalibrated-sextant</strong> (Runners): 1 unmarked GitHub-hosted runner reference(s): pre-commit.yml:10 (ubuntu-latest). Move to a self-hosted runner, or mark deliberate exceptions with an "audit-ok: github-hosted-runner" comment</li>

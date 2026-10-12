@@ -15318,8 +15318,13 @@ package was renamed <code>libasound2t64</code> as part of the 64-bit <code>time_
 transition, so install <code>libasound2t64</code> in place of <code>libasound2</code> there.</p>
 <p>If one is missing, ryll fails to start with a dynamic-loader or
 GUI-initialisation error naming the library; install the packages above
-to resolve it. <code>remote-viewer</code> is the fallback whenever ryll can't be
-installed or run on a given platform.</p>
+to resolve it. pip does not check for them: the wheel's <code>manylinux_2_28</code>
+tag promises the glibc floor, not these libraries, so <code>pip install</code>
+succeeds on a host without them. ALSA is linked directly, so without
+<code>libasound2</code> ryll does not start at all, even with <code>--headless</code>; see
+<a href="/components/ryll/releasing/#the-pypi-wheels-platform-tag">the PyPI wheel's platform tag</a>.
+<code>remote-viewer</code> is the fallback whenever ryll can't be installed or run
+on a given platform.</p>
 <p>See <a href="/components/ryll/plans/PLAN-pip-distribution/">plans/PLAN-pip-distribution.md</a>
 for the full design rationale.</p>
 <h2 id="building-from-source">Building from source<a class="headerlink" href="#building-from-source" title="Permanent link">&para;</a></h2>
