@@ -15350,7 +15350,7 @@ rather than through a modal.</p>
 global <code>AtomicBool</code> flag (<code>SHUTDOWN_REQUESTED</code>). This allows Ctrl+C to trigger
 a clean shutdown instead of killing the process immediately.</p>
 <ul>
-<li><strong>GUI mode</strong>: <code>RyllApp::logic</code> in <code>app.rs</code> checks the flag on every pass
+<li><strong>GUI mode</strong>: <code>RyllApp::logic</code> in <code>ryll/src/app/</code> checks the flag on every pass
   and calls <code>ctx.send_viewport_cmd(ViewportCommand::Close)</code> when set, which
   lets eframe run its normal teardown path and finalize the capture session.
   eframe calls <code>logic</code> even while the window is hidden, so Ctrl+C works on a
@@ -15387,7 +15387,7 @@ at the cost of that MP4. A process that dies without returning through
 reports an unrecoverable error, ryll surfaces a "Disconnected"
 dialog with two buttons: Close and Reconnect. The Reconnect
 path is implemented in
-<code>RyllApp::reconnect</code> (<code>ryll/src/app.rs</code>) and is a user gesture
+<code>RyllApp::reconnect</code> (<code>ryll/src/app/</code>) and is a user gesture
 — ryll never auto-reconnects.</p>
 <h3 id="what-is-recreated">What is recreated<a class="headerlink" href="#what-is-recreated" title="Permanent link">&para;</a></h3>
 <p>Every reconnect allocates a fresh copy of the per-session
@@ -15472,7 +15472,8 @@ the runtime drop to release the underlying sockets.</p>
 <p>When a critical channel (Main, Display, Inputs) goes down
 mid-session, ryll attempts to recover transparently rather
 than presenting a modal immediately. The <code>ReconnectState</code>
-enum on <code>RyllApp</code> (<code>ryll/src/app.rs</code>) drives the flow:</p>
+enum (<code>ryll/src/app/reconnect.rs</code>), held by <code>RyllApp</code>, drives
+the flow:</p>
 <ul>
 <li><code>Idle</code> — connected normally, or never disconnected.</li>
 <li><code>Pending { attempt, next_at, latest_error }</code> — retry

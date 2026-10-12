@@ -15984,7 +15984,9 @@ with web mode).</p>
    Python) and fit as a per-language rule in the same audit. The
    operator decides whether to open that plan; this plan's phase 6
    is the ryll pilot of the function-length half either way.</li>
-<li><strong><code>git blame</code> continuity.</strong> Splitting a file breaks naive
+<li><strong>Answered in phase 2 (finding 6): no <code>.git-blame-ignore-revs</code>
+   is needed, provided rename and move commits stay pure.</strong>
+   Original question: <code>git blame</code> continuity. Splitting a file breaks naive
    <code>git blame</code>. Mitigation: phases 2-4 make pure-move commits (no
    edits beyond <code>use</code>, <code>mod</code> and <code>pub(super)</code>) so
    <code>git blame -C -C</code> follows the lines, and record those commits
@@ -16005,13 +16007,13 @@ with web mode).</p>
 <tr>
 <td>1. Reuse survey and shared draw dispatch</td>
 <td><a href="/components/ryll/plans/PLAN-app-split-phase-01-reuse/">PLAN-app-split-phase-01-reuse.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>acc7a12 (#483)</td>
 </tr>
 <tr>
 <td>2. Module directory and pure state</td>
-<td>PLAN-app-split-phase-02-pure-state.md</td>
-<td>Not started</td>
+<td><a href="/components/ryll/plans/PLAN-app-split-phase-02-pure-state/">PLAN-app-split-phase-02-pure-state.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -16066,8 +16068,9 @@ if the shape of the pipeline description changes.</p>
 code that has no dependency on egui or on <code>RyllApp</code>'s fields:</p>
 <ul>
 <li><code>app/reconnect.rs</code> -- <code>ReconnectState</code>, <code>ReconnectPolicy</code>,
-  <code>ModalVariant</code>, <code>modal_variant_notification</code>, and their tests
-  (or the renderer crate, per open question 2).</li>
+  <code>ModalVariant</code>, <code>modal_variant_notification</code>,
+  <code>format_expiry_local</code>, and their tests (phase 1 confirmed this
+  stays in ryll).</li>
 <li><code>app/stats.rs</code> -- <code>Statistics</code>, <code>BandwidthTracker</code>,
   <code>LatencyTracker</code>, <code>push_with_cap</code>, <code>recent_lag_stats</code>.</li>
 <li><code>app/resize.rs</code> -- <code>compute_auto_resize</code>,
@@ -16078,7 +16081,9 @@ code that has no dependency on egui or on <code>RyllApp</code>'s fields:</p>
   <code>classify_session_initialized</code>.</li>
 </ul>
 <p>Pure moves only; each file carries its own <code>#[cfg(test)] mod
-tests</code>. Expected reduction in <code>mod.rs</code>: roughly 1,500 lines.</p>
+tests</code>. Expected reduction in <code>mod.rs</code>: roughly 1,500 lines.
+<code>event_drops_need_notice</code> and <code>EVENT_DROP_NOTICE</code> are also pure
+but serve <code>process_events</code>, so they move with it in phase 3.</p>
 <h3 id="phase-3-events-and-bug-report-flow">Phase 3: Events and bug-report flow<a class="headerlink" href="#phase-3-events-and-bug-report-flow" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>app/events.rs</code> -- <code>process_events</code>, with each arm group

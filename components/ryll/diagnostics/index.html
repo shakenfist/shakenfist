@@ -15493,11 +15493,11 @@ a directory.</p>
   the server's send cadence and the client's receive turnaround;
   spikes indicate a network or server stall. Sparkline mirrors the
   bandwidth one (60-sample rolling history, amber bars). Implemented
-  via <code>LatencyTracker</code> in <code>app.rs</code>.</li>
+  via <code>LatencyTracker</code> in <code>ryll/src/app/stats.rs</code>.</li>
 <li><strong>Bandwidth sparkline</strong>: A rolling 60-sample history of bytes/sec is
   displayed in the status bar as a small bar chart. Channel read loops
   increment a shared <code>AtomicU64</code> byte counter; the <code>BandwidthTracker</code>
-  in <code>app.rs</code> samples it once per second and renders the sparkline.</li>
+  in <code>ryll/src/app/stats.rs</code> samples it once per second and renders the sparkline.</li>
 <li><strong>Runtime metrics in bug reports</strong>: each bug-report ZIP includes a
   <code>runtime-metrics.json</code> file with process and per-thread CPU%, RSS,
   and VmSize sampled over a 2-second window. On <strong>Linux</strong> the data
