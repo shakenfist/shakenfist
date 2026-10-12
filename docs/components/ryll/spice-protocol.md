@@ -190,6 +190,46 @@ still recorded on `MainSnapshot` as passive diagnostics, next to the token
 and queue fields; the "Guest agent diagnostics" section in
 [troubleshooting.md](/components/ryll/troubleshooting/) explains each one.
 
+#### Guest agent message reassembly
+
+The other direction is split the same way. A guest agent message is a
+20-byte `VDAgentMessage` header followed by `size` bytes of body, and
+spice-server forwards guest agent data in `AGENT_DATA` messages of at most
+`VD_AGENT_MAX_DATA_SIZE` (2048) bytes. A guest clipboard copy larger than
+about 2 KB therefore arrives as several `AGENT_DATA`s, and only the first
+carries the header. The main channel feeds every `AGENT_DATA` body to an
+`AgentReassembler` (`messages::agent_stream` in the protocol crate), which
+hands back each message once all of its bytes are in.
+
+The reassembler treats the bodies as one byte stream, as spice-gtk does: a
+header may be split between two `AGENT_DATA`s, and one `AGENT_DATA` may
+carry the end of one message and the start of the next. spice-server never
+does either, because its own filter (`agent-msg-filter.c`) starts every
+message on an `AGENT_DATA` boundary, but other servers may. Because the
+server is untrusted, the reassembler also differs from spice-gtk in three
+ways:
+
+- **Size cap.** A message whose header declares a body over
+  `MAX_AGENT_MESSAGE_SIZE` is not buffered. That cap is spice-gtk's default
+  `max-clipboard` (100 MiB) plus 4 KiB for the clipboard headers in front
+  of the data, so any clipboard spice-gtk accepts, ryll accepts too. The
+  oversized message's bytes are counted off and dropped as they arrive, as
+  spice-server's filter discards a message it will not forward, so the
+  message after it is still found. ryll logs the drop once per session
+  (`main:agent_data:oversized`).
+- **No allocation from the header alone.** A message's buffer grows as its
+  bytes arrive, so a header claiming a large body costs nothing until the
+  data behind it does.
+- **Protocol check.** A header whose `protocol` is not `VD_AGENT_PROTOCOL`
+  means the stream is out of step; spice-server forwards nothing else. The
+  rest of that `AGENT_DATA` is dropped and reassembly restarts at the next
+  one, where spice-server starts a message (`main:agent_data:bad_protocol`).
+
+A message cut short when the agent goes away must not be completed by the
+next agent's data, so `AGENT_DISCONNECTED`, `AGENT_CONNECTED` and
+`AGENT_CONNECTED_TOKENS` all reset the reassembler. A reconnect builds a new
+main channel, and with it a new reassembler.
+
 ## Server role
 
 The protocol crate serves both ends of the wire: ryll uses it as a client,
@@ -269,8 +309,13 @@ Currently supported codec types:
   that omit the Huffman tables after the first. The backend selection is
   described below.
 - `3` (H.264): decoded via `H264VideoDecoder` using the openh264 software
-  decoder; H.264 is typically more bandwidth-efficient than MJPEG for
-  sustained video playback.
+  decoder. H.264 is typically more bandwidth-efficient than MJPEG for
+  sustained video playback, but H.264 from spice-server's GStreamer
+  encoder does not decode yet
+  ([#398](https://github.com/shakenfist/ryll/issues/398)), so ryll
+  currently neither advertises `CODEC_H264` nor lists H.264 in its
+  codec preference, and the server never streams it H.264. The decoder
+  is kept for when that is fixed.
 
 **JPEG decoder selection** (used by `MJpegVideoDecoder`) runs once per
 display channel at startup and selects the fastest available backend:
@@ -462,7 +507,7 @@ important:
 | PREF_COMPRESSION | 6 | Client preference messaging for image compression algorithm |
 | MULTI_CODEC | 8 | Multiple video codec support in streaming |
 | CODEC_MJPEG | 9 | MJPEG video codec for streaming |
-| CODEC_H264 | 11 | H.264 video codec for streaming |
+| CODEC_H264 | 11 | H.264 video codec for streaming. Not currently advertised: see [#398](https://github.com/shakenfist/ryll/issues/398) |
 | PREF_VIDEO_CODEC_TYPE | 12 | Client preference messaging for video codec selection |
 
 Without **COMPOSITE**, the guest QXL driver falls back to a slow
@@ -516,6 +561,37 @@ convention) so the fallback is visible exactly once per
 session. The `--pedantic` mode and always-visible
 `Gaps: N` status-bar counter surface these the moment
 they happen. See the pedantic-mode entry below.
+
+### Clip rectangles
+
+A draw's `RECTS` clip is a list of rectangles whose union is
+the area the draw may touch. The message size is the only
+bound on the count, and the rectangles may overlap, repeat
+or reach outside the destination. `DRAW_COPY`, `DRAW_BLEND`,
+`DRAW_FILL`, `DRAW_BLACKNESS`, `DRAW_WHITENESS`,
+`DRAW_INVERS` and `COPY_BITS` reduce the clip the way
+spice-common's canvas does (`canvas_clip_pixman()` builds a
+pixman region and intersects it with the destination): each
+rectangle is clamped to the destination, empty and duplicate
+ones are dropped, and their union is taken as disjoint
+rectangles. A draw therefore touches each destination pixel
+at most once however many rectangles the server sends, so a
+hostile server can no longer turn one message into millions
+of full-size copies, and an overlap is not inverted twice. A
+`RECTS` clip with no rectangles, or none that meet the
+destination, draws nothing.
+
+Neither spice-common nor spice-gtk caps the count, so ryll
+sets its own: a clip that needs more than 1024 rectangles
+(`MAX_CLIP_RECTS`), as distinct rectangles or in its union,
+is refused. The draw is skipped and a `warn_once!` fires
+under `display:decode_failure:<op>:clip_too_complex`. A real
+clip is the visible part of a drawable after others have
+covered it, usually a handful of rectangles. The code is in
+[`display/clip.rs`](https://github.com/shakenfist/ryll/blob/develop/shakenfist-spice-renderer/src/display/clip.rs).
+
+`DRAW_OPAQUE`, `DRAW_TRANSPARENT` and `DRAW_ALPHA_BLEND`
+ignore the clip and draw the whole destination.
 
 ### Colour byte-order convention
 

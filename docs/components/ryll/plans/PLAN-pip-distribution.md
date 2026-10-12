@@ -104,6 +104,12 @@ user's machine at install; catastrophic UX and unusable in CI.
    overpromise. Proven: on a clean `ubuntu:22.04` (glibc 2.35), `pip
    install ryll-0.1.5-py3-none-manylinux_2_28_x86_64.whl` then `ryll
    --version` prints `ryll 0.1.5` and exits 0.
+
+   **Superseded:** the tag is only partly honest. The glibc floor
+   holds, but `libasound.so.2` is outside the manylinux policy, so the
+   tag is asserted rather than earned; see
+   [the PyPI wheel's platform tag](/components/ryll/releasing/#the-pypi-wheels-platform-tag).
+
 5. **Runtime system libraries.** ryll is a Linux GUI app, so the binary
    needs `libxcb1`, `libwayland-client0`, `libxkbcommon0`, `libasound2`,
    `libopus0`, `libgl1` present to run its GUI — pip cannot install
@@ -145,6 +151,9 @@ Implemented in the `ryll-wt-vdi-tokens` worktree (branch
   network and no compile step.
 * The wheel's `manylinux_2_28` tag is honest (glibc floor 2.28; only
   `libasound.so.2` beyond the standard set in `DT_NEEDED`).
+  **Superseded:** `libasound.so.2` is itself outside the policy, so
+  the tag is asserted; see
+  [the PyPI wheel's platform tag](/components/ryll/releasing/#the-pypi-wheels-platform-tag).
 * A missing runtime GUI library is the user's to install (documented);
   phase 4 falls back to `remote-viewer`.
 * CI publishes the `ryll` wheels after the approved, Sigstore-signed

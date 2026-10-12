@@ -212,6 +212,52 @@ print(f"Virtual size: {info['virtual-size']} bytes")
 print(f"Actual size: {info['actual-size']} bytes")
 ```
 
+## Text Read From an Image
+
+Many values instar prints come out of the image rather than from instar
+itself: a backing file name, an external data file path, a VMDK create
+type or extent file name, a snapshot ID or tag, and the paths instar
+resolves from them. The guest that reports them is parsing an untrusted
+image, so instar treats every string it reports as attacker controlled.
+
+**Human output** escapes the characters that could act on a terminal
+rather than be displayed by it: the C0 control range (ESC, newline,
+carriage return and the rest), DEL, the C1 range, and the Unicode
+bidirectional formatting characters (U+061C, U+200E, U+200F,
+U+202A-U+202E and U+2066-U+2069). They are written the way Rust's
+`escape_debug` writes them -- `\n`, `\r`, `\t`, and `\u{1b}` for the
+rest -- so a hostile name can neither send escape sequences to your
+terminal nor start a forged line of output:
+
+```
+$ instar info overlay.qcow2
+...
+backing file: p\u{1b}[2J\nNo errors were found on the image. (actual path: /images/p\u{1b}[2J\nNo errors were found on the image.)
+```
+
+Backslashes and quotes are left alone, so a Windows or UNC parent path
+prints exactly as it is stored. A name that contains the literal text
+`\u{1b}` therefore reads the same as one that contains ESC; neither
+reaches the terminal as a control character. This is a deliberate
+divergence from qemu-img, which prints these strings raw. It only shows
+for a name that contains one of the characters above, so the output for
+every ordinary image is byte-identical to qemu-img's.
+
+The same rule applies to `info --chain`, `snapshot -l`, `check`, the
+stderr notices about a backing reference, and every guest message and
+debug line printed with `--verbose`: the logger escapes each record as a
+whole, so this holds for lines added later too. Error messages that end a command
+are printed with the same escaping by the Rust runtime.
+
+**JSON output** always carries the exact value, so a script reading
+`backing-filename` gets the bytes the image holds. Strings are escaped
+as JSON requires, and DEL, the C1 range and the bidi characters are
+also written as `\uXXXX`, so a JSON document viewed on a terminal is as
+safe as the human form. Every string field is escaped, including ones
+such as `format` and `create-type` that instar used to interpolate
+directly; a VMDK create type ending in a backslash used to produce a
+document that did not parse.
+
 ## Testing and Validation
 
 The [instar-testdata](https://github.com/shakenfist/instar-testdata) repository

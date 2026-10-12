@@ -80,6 +80,8 @@ This writes:
   `webdav.pcap` — per-channel pcap files with fake TCP/IP headers, openable
   in Wireshark
 - `display.mp4` — H.264 video of the display surface at real timing
+  (GUI mode only: a `--headless` capture writes the pcaps and
+  `metadata.json` but no video)
 
 See [STYLEGUIDE.md](https://github.com/shakenfist/ryll/blob/develop/STYLEGUIDE.md)
 for capture conventions.
