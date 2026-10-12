@@ -52,7 +52,10 @@ exempt because it is always-on, shared, and its jobs are seconds long;
 GitHub-hosted runners are exempt because there is no fleet runner to
 starve. A `runs-on:` expression is resolved against the matrix it
 reads, so `runs-on: ${{ matrix.runner }}` over self-hosted label lists
-is in scope. (The sibling `expensive-lane-path-filter` audit uses the
+is in scope, and so is a job bound to a runner of its own
+(`bound-<image>`, `bound-<size>` and a `bind-` token; see
+`workflow-standards.md`), which holds an ephemeral VM like any other.
+(The sibling `expensive-lane-path-filter` audit uses the
 narrower `vm` label, which is right for its question; instar's
 ephemeral runners are `[self-hosted, debian-12, xl]` with no `vm`
 label and an abandoned merge group holds one just as firmly.)

@@ -91,6 +91,26 @@ otherwise picks for it.
   one today, and the sibling runner checks share the blind spot; this
   is recorded so the coverage claim is honest rather than assumed.
 
+* A job may instead **bind itself to a runner started for it alone**:
+  `[self-hosted, bound-debian-13, bound-s, "bind-${{ github.run_id }}-${{ github.run_attempt }}-<slug>"]`.
+  This form names no `vm`, plain image or plain size, so that no
+  unbound job can take the bound runner. It satisfies this rule when it
+  names `self-hosted`, exactly one `bind-` element, exactly one
+  `bound-<image>` and exactly one `bound-<size>` with a size from the
+  list above, and nothing else. The `bind-` element is always an
+  expression including `${{ github.run_id }}` and
+  `${{ github.run_attempt }}`, so that every run and every re-run binds
+  its own runners, and needs no marker. A `bound-${{ ... }}` element
+  beside a literal `bound-<size>` is read as the image; a `bound-<size>` that is itself an
+  expression is treated like any other expression size, and is the
+  only bound finding the marker excuses. Any `bound-` or `bind-`
+  element without the full form is a finding: `bound-` with no `bind-`,
+  `bind-` with no `bound-` labels, a missing image or size, two sizes,
+  an unknown bound size, or any other label alongside them -- `vm`, a
+  plain image or size, or an expression that could evaluate to one. See
+  "Binding a job to its runner" in shakenfist/private-ci
+  `docs/capacity-claims.md`.
+
 The two failures look nothing alike, which is why this needs its own
 check. An over-labelled `static` job is never scheduled and someone
 notices within one run. An under-labelled `vm` job runs perfectly well

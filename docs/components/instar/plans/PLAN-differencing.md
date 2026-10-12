@@ -371,8 +371,8 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 | 12. Composition: guest VHD sector-bitmap read path | [PLAN-differencing-phase-12-vhd-compose.md](/components/instar/plans/PLAN-differencing-phase-12-vhd-compose/) | Complete | `b4ae7fc` (#615) |
 | 13. Composition: guest VHDX sector-bitmap read path | [PLAN-differencing-phase-13-vhdx-compose.md](/components/instar/plans/PLAN-differencing-phase-13-vhdx-compose/) | Complete | `d677823c` (#624) |
 | 14. Composition: rollout across the chain-walker operations | [PLAN-differencing-phase-14-op-rollout.md](/components/instar/plans/PLAN-differencing-phase-14-op-rollout/) | Complete | `7fef1321` (#630) |
-| 15. Consistency for the non-composing operations | [PLAN-differencing-phase-15-op-consistency.md](/components/instar/plans/PLAN-differencing-phase-15-op-consistency/) | In progress | |
-| 16. Composition: integration tests and fuzz | PLAN-differencing-phase-16-compose-tests.md | Not started | |
+| 15. Consistency for the non-composing operations | [PLAN-differencing-phase-15-op-consistency.md](/components/instar/plans/PLAN-differencing-phase-15-op-consistency/) | Complete | `f14554cf` (#646) |
+| 16. Composition: integration tests and fuzz | [PLAN-differencing-phase-16-compose-tests.md](/components/instar/plans/PLAN-differencing-phase-16-compose-tests/) | In progress | |
 | 17. Composition: documentation | PLAN-differencing-phase-17-compose-docs.md | Not started | |
 | 18. Push audit: `PUSH-AUDIT.md` over every phase above | PLAN-differencing-phase-18-push-audit.md | Not started | |
 
@@ -640,12 +640,46 @@ rather than left as one phase to be split later, the way
   is 4096. At 4096-byte sectors it is 32768, so the padded BAT bound
   and the chunk-group stride are arithmetic nothing drives at the
   larger geometry. Its harness drives
-  the `python3-libvhdi` binding with an explicit `set_parent()`
-  rather than a CLI export, and its VHD fixtures are subject to
+  the `python3-libvhdi` binding with an explicit `set_parent()`,
+  and its VHD fixtures are subject to
   the sector-bitmap caveat above. Phase 9 fuzzes the locator
   *parsers*; composing a chain is new surface, and a malicious
   child pointing at a well-formed parent is a different input
   space from a malformed locator table.
+
+  **Three corrections from phase 16's survey on 2026-10-11.** The
+  binding is the right route but not for the reason stated: this
+  bullet originally contrasted it with "a CLI export", and there is
+  no such tool to contrast it with. Debian 13's `libvhdi-utils`
+  20240509-2+b1 ships `vhdiinfo` and `vhdimount` and nothing else --
+  measured by extracting the package. The real alternative is a FUSE
+  mount. `python3-libvhdi` is a separate package and is not in the
+  devcontainer, which installs `libvhdi-utils` alone
+  (`src/.devcontainer/Dockerfile:39`).
+
+  The 4K gap cannot be closed by an integration fixture at all, and
+  phase 16 therefore closes it at crate level. `chunk_ratio` is
+  `2^23 * logical_sector_size / block_size`, so reaching a second
+  chunk group at 4096-byte sectors needs 65536 payload blocks -- a
+  64 GiB virtual disk with a 512 KiB BAT, where a crate fixture
+  declares that size and materialises only the blocks it lists. And
+  nothing authors a 4K-logical-sector VHDX at any size: `qemu-img
+  create -f vhdx -o help` on 10.0.13 offers `block_size`,
+  `block_state_zero`, `log_size`, `size` and `subformat`, and
+  `instar create`'s vhdx `-o` parser takes `block_size` and nothing
+  sector-shaped. One 4K case does now exist, added by phase 15's
+  second review round, and it is single-group with a single block.
+
+  The oracle was measured against the project's own goldens before
+  phase 16 was planned, because everything in the phase rests on it.
+  Driving `set_parent()` over the three real chains in
+  `instar-testdata`, libvhdi agrees with `vhd-diff-aligned-composed`
+  and `vhdx-diff-composed` over all 16 MiB, and disagrees with
+  `vhd-diff-mixed-composed` in exactly one sector -- sector 2, where
+  it returns zeros and the golden holds the parent's pattern. That is
+  the unmasked-shift defect described above, and its shape is worth
+  recording: the symptom is zeros, not the child's data, because the
+  child never wrote the sector it is being read from.
 * **Phase 17, documentation.** Separate because phase 10 will
   have documented a refusal that phase 14 removes: at minimum
   `docs/chain-discovery.md`, `docs/chain-config.md` and the
