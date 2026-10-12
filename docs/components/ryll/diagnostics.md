@@ -24,11 +24,11 @@ Ryll tracks:
   the server's send cadence and the client's receive turnaround;
   spikes indicate a network or server stall. Sparkline mirrors the
   bandwidth one (60-sample rolling history, amber bars). Implemented
-  via `LatencyTracker` in `app.rs`.
+  via `LatencyTracker` in `ryll/src/app/stats.rs`.
 - **Bandwidth sparkline**: A rolling 60-sample history of bytes/sec is
   displayed in the status bar as a small bar chart. Channel read loops
   increment a shared `AtomicU64` byte counter; the `BandwidthTracker`
-  in `app.rs` samples it once per second and renders the sparkline.
+  in `ryll/src/app/stats.rs` samples it once per second and renders the sparkline.
 - **Runtime metrics in bug reports**: each bug-report ZIP includes a
   `runtime-metrics.json` file with process and per-thread CPU%, RSS,
   and VmSize sampled over a 2-second window. On **Linux** the data

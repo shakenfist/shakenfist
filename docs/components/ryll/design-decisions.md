@@ -29,7 +29,7 @@ produced.
    predictable input→display latency measurements.
 
 5. **Graceful Ctrl+C shutdown** - A SIGINT handler in `main.rs` sets a global
-   `SHUTDOWN_REQUESTED` AtomicBool. The eframe update loop (`app.rs`) and the
+   `SHUTDOWN_REQUESTED` AtomicBool. The eframe update loop (`ryll/src/app/`) and the
    headless tokio select loop both poll this flag and shut down cleanly,
    ensuring capture sessions are finalized.
 
@@ -149,7 +149,7 @@ produced.
     mode (absolute positioning) via `MOUSE_MODE_REQUEST` if the server
     supports it. If the server remains in server mode (e.g. no SPICE agent),
     ryll sends relative `MOUSE_MOTION` messages instead of absolute
-    `MOUSE_POSITION`. The mode is checked on every pointer move in app.rs.
+    `MOUSE_POSITION`. The mode is checked on every pointer move in `ryll/src/app/`.
 
 17. **Event-driven egui repaints via `repaint_notify`** - egui only repaints
     when something asks it to. Channel handlers run on the tokio runtime
@@ -188,7 +188,7 @@ produced.
     conversion lives exclusively in the channel handler (before event
     emission) so surface helpers trust their inputs are already RGBA.
     Concretely: `FillRect.colour`, `ImageReadyChroma.chroma_rgba`, and
-    every `ImageReady*.pixels` buffer reach `app.rs` pre-converted.
+    every `ImageReady*.pixels` buffer reach `ryll/src/app/` pre-converted.
     The idiom at the channel site is `[(c>>16)&0xff, (c>>8)&0xff,
     c&0xff, 0xff]` for a wire `u32` colour. Do NOT add BGRX handling
     inside `DisplaySurface` — surfaces are RGBA-only.
@@ -261,7 +261,7 @@ produced.
 
 23. **Auto-reconnect: pure state-machine transition, side effects
     at the call site** - The `ReconnectState` enum on `RyllApp`
-    (`ryll/src/app.rs`) replaces the old `show_disconnect_dialog`
+    (`ryll/src/app/`) replaces the old `show_disconnect_dialog`
     boolean. `Idle` / `Pending { attempt, next_at, latest_error }` /
     `Modal(ModalVariant)`. The transition function
     `ReconnectState::on_disconnect()` is pure — it takes the current
@@ -273,7 +273,7 @@ produced.
     logging clock-skew warnings — live at the call site in
     `RyllApp::handle_critical_disconnect`, never inside the
     transition function. This keeps the state machine unit-testable
-    (see `app.rs::tests::reconnect_*` and `ticket_*` tests) without
+    (see the `reconnect_*` and `ticket_*` tests in `ryll/src/app/reconnect.rs`) without
     building a full `RyllApp`. When extending: pure transitions add
     branches to `on_disconnect`; side effects go in the handler. The
     `awaiting_reconnect_outcome` flag on `RyllApp` is the gate that

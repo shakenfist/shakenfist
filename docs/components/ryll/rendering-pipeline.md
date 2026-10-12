@@ -139,7 +139,7 @@ Three short-circuits keep the loop stable:
   user had just dragged the window.
 
 Both decision helpers are pure functions and are
-unit-tested in `ryll/src/app.rs`'s `tests` module.
+unit-tested in `ryll/src/app/resize.rs`'s `tests` module.
 
 The auto-fit can be turned off with the
 `Obey guest size hints` checkbox in the hamburger menu
