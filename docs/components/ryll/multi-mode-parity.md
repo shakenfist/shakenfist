@@ -118,7 +118,7 @@ around it.
 | Paste-as-keystrokes (runtime trigger via Ctrl+Alt+V) | available | available (via the control socket `paste` verb; Ctrl+Alt+V itself is GUI-only) | missing (out of MVP scope) |
 | Paste-as-keystrokes (headless `--paste-text`) | n/a — intrinsic (GUI reads clipboard; `--paste-text` is headless-only per README) | available | missing (out of MVP scope) |
 | Paste-as-keystrokes (inter-character delay `--paste-char-delay-ms`) | available | available (also settable per-request via the control socket `paste` verb's `char_delay_ms`) | missing (out of MVP scope) |
-| Paste-as-keystrokes (vdagent auto-disable) | available (`RyllApp::trigger_paste()` in `ryll/src/app.rs`) | available (vdagent state logged from the session's `SessionState` watch; `enable_paste` flag passed through) | missing (out of MVP scope) |
+| Paste-as-keystrokes (vdagent auto-disable) | available (`RyllApp::trigger_paste()` in `ryll/src/app/`) | available (vdagent state logged from the session's `SessionState` watch; `enable_paste` flag passed through) | missing (out of MVP scope) |
 | Paste character validation / error dialog | available | partial (the renderer's `run_headless()` — `PasteFailed` logged and causes non-zero exit; control-socket clients get a `paste_failed` event; no interactive dialog) | missing (out of MVP scope) |
 | **USB Redirection** | | | |
 | USB redirection channel (protocol layer) | available | available (`--usb-disk`, `--usb-disk-ro` CLI flags work in headless) | missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope) |

@@ -191,7 +191,9 @@ with web mode).
    Python) and fit as a per-language rule in the same audit. The
    operator decides whether to open that plan; this plan's phase 6
    is the ryll pilot of the function-length half either way.
-4. **`git blame` continuity.** Splitting a file breaks naive
+4. **Answered in phase 2 (finding 6): no `.git-blame-ignore-revs`
+   is needed, provided rename and move commits stay pure.**
+   Original question: `git blame` continuity. Splitting a file breaks naive
    `git blame`. Mitigation: phases 2-4 make pure-move commits (no
    edits beyond `use`, `mod` and `pub(super)`) so
    `git blame -C -C` follows the lines, and record those commits
@@ -202,8 +204,8 @@ with web mode).
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 1. Reuse survey and shared draw dispatch | [PLAN-app-split-phase-01-reuse.md](/components/ryll/plans/PLAN-app-split-phase-01-reuse/) | In progress | |
-| 2. Module directory and pure state | PLAN-app-split-phase-02-pure-state.md | Not started | |
+| 1. Reuse survey and shared draw dispatch | [PLAN-app-split-phase-01-reuse.md](/components/ryll/plans/PLAN-app-split-phase-01-reuse/) | Complete | acc7a12 (#483) |
+| 2. Module directory and pure state | [PLAN-app-split-phase-02-pure-state.md](/components/ryll/plans/PLAN-app-split-phase-02-pure-state/) | In progress | |
 | 3. Events and bug-report flow | PLAN-app-split-phase-03-events.md | Not started | |
 | 4. Split `ui` into per-panel files | PLAN-app-split-phase-04-panels.md | Not started | |
 | 5. Panel state sub-structs | PLAN-app-split-phase-05-substructs.md | Not started | |
@@ -235,8 +237,9 @@ if the shape of the pipeline description changes.
 code that has no dependency on egui or on `RyllApp`'s fields:
 
 * `app/reconnect.rs` -- `ReconnectState`, `ReconnectPolicy`,
-  `ModalVariant`, `modal_variant_notification`, and their tests
-  (or the renderer crate, per open question 2).
+  `ModalVariant`, `modal_variant_notification`,
+  `format_expiry_local`, and their tests (phase 1 confirmed this
+  stays in ryll).
 * `app/stats.rs` -- `Statistics`, `BandwidthTracker`,
   `LatencyTracker`, `push_with_cap`, `recent_lag_stats`.
 * `app/resize.rs` -- `compute_auto_resize`,
@@ -248,6 +251,8 @@ code that has no dependency on egui or on `RyllApp`'s fields:
 
 Pure moves only; each file carries its own `#[cfg(test)] mod
 tests`. Expected reduction in `mod.rs`: roughly 1,500 lines.
+`event_drops_need_notice` and `EVENT_DROP_NOTICE` are also pure
+but serve `process_events`, so they move with it in phase 3.
 
 ### Phase 3: Events and bug-report flow
 

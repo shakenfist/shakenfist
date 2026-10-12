@@ -13,7 +13,7 @@ Ryll installs a SIGINT handler (via `libc::signal`) in `main.rs` that sets a
 global `AtomicBool` flag (`SHUTDOWN_REQUESTED`). This allows Ctrl+C to trigger
 a clean shutdown instead of killing the process immediately.
 
-- **GUI mode**: `RyllApp::logic` in `app.rs` checks the flag on every pass
+- **GUI mode**: `RyllApp::logic` in `ryll/src/app/` checks the flag on every pass
   and calls `ctx.send_viewport_cmd(ViewportCommand::Close)` when set, which
   lets eframe run its normal teardown path and finalize the capture session.
   eframe calls `logic` even while the window is hidden, so Ctrl+C works on a
@@ -55,7 +55,7 @@ When the SPICE main channel closes or any secondary channel
 reports an unrecoverable error, ryll surfaces a "Disconnected"
 dialog with two buttons: Close and Reconnect. The Reconnect
 path is implemented in
-`RyllApp::reconnect` (`ryll/src/app.rs`) and is a user gesture
+`RyllApp::reconnect` (`ryll/src/app/`) and is a user gesture
 — ryll never auto-reconnects.
 
 ### What is recreated
@@ -151,7 +151,8 @@ the runtime drop to release the underlying sockets.
 When a critical channel (Main, Display, Inputs) goes down
 mid-session, ryll attempts to recover transparently rather
 than presenting a modal immediately. The `ReconnectState`
-enum on `RyllApp` (`ryll/src/app.rs`) drives the flow:
+enum (`ryll/src/app/reconnect.rs`), held by `RyllApp`, drives
+the flow:
 
 - `Idle` — connected normally, or never disconnected.
 - `Pending { attempt, next_at, latest_error }` — retry
