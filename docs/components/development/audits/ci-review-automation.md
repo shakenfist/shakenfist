@@ -12,10 +12,15 @@ workflow files alone, so a reviewer confirms it instead.
 * Both developer workflows are present: `pr-re-review.yml`, which
   triggers another review, and `pr-retest.yml`, which re-runs the
   functional tests.
-* Some workflow reaches Claude Code through the shared action
+* An automatic reviewer reaches Claude Code through the shared action
   `shakenfist/actions/review-pr-with-claude@main`, rather than a
-  per-project script. Calling the reusable workflow below satisfies
-  this, because that is how the reusable workflow reaches it.
+  per-project script: some workflow other than the two developer
+  workflows either calls
+  `shakenfist/actions/.github/workflows/pr-auto-review.yml@main`, which
+  reaches the action itself, or uses the action directly, on a line
+  that is not a comment.
+  `pr-re-review.yml` does not count. It uses the action too, so while
+  it counted, a repository with no automatic reviewer at all passed.
 * `pr-re-review.yml` reaches `shakenfist/actions/pr-bot-trigger@main`
   rather than open-coding the phrase match, permission lookup, reaction
   and refusal reply.
@@ -36,7 +41,8 @@ workflow files alone, so a reviewer confirms it instead.
   the project's test jobs in its `needs:`. Hand-written
   `automated_reviewer` jobs are superseded; migrating deletes the
   project's `check-bot-commit` job too. A compliant hand-written job
-  still passes, because only the shared action above is measured.
+  that uses the shared action still passes, because only the
+  measurement above is made.
 * The calling job sets `pull-requests: write` and `issues: write`.
 * The automatic review does not pass `force`, and runs on
   same-repository pull requests only.

@@ -247,8 +247,38 @@ closes and the app enters **region selection mode**:
 3. The user drags a rectangle; a translucent red overlay shows
    the selection.
 4. On mouse release, the report is generated with the region
-   coordinates in the metadata.
+   coordinates in the metadata. A click without a drag stays in
+   region selection and says so in a notification.
 5. Pressing Escape skips selection and generates without a region.
+
+The dialog says, while Display is selected, that Capture will ask
+for a region, and entering region selection also posts a
+notification, because a user who misses the banner otherwise sees
+a window that ignores the guest and appears stuck.
+
+Every way out of region selection writes the report, and the log
+records which one it was (`app: region selection completed`,
+`skipped with Escape`, `abandoned by a reconnect`, `abandoned by a
+lost connection` or `abandoned by the window closing`), next to
+`app: bug report waiting for region selection` on the way in. A
+reconnect or a lost connection clears the surface being selected
+from, and closing the window ends the session, so each writes the
+report without a region rather than dropping it. Closing the
+window also writes a report still waiting for its runtime metrics
+sample, after at most a second past the end of its sample window.
+
+Only one report is captured at a time. Pressing Capture on a
+Display report while an earlier report is still sampling its
+metrics (the two seconds after its Capture) does not enter region
+selection: the report is refused at once with "A bug report is
+already being captured", so a selection never ends with a report
+that cannot be written.
+
+While a selection is in progress, **Menu → Report** and **Menu →
+Screenshot** are disabled, as F12 and F8 are, and the USB and
+connection error dialogs' report buttons are refused with a
+notification: opening a second report would replace the pending
+one's trigger snapshot.
 
 ### Trigger-time snapshot
 
@@ -330,7 +360,9 @@ pcap file never triggers a length-overflow panic.
 
 `display.mp4` contains an H.264 encoded video of the primary
 surface (surface 0). Frames are emitted on MARK boundaries
-with real timestamps for variable-rate playback.
+with real timestamps for variable-rate playback. Only the GUI
+records it: frames come from the egui frame loop, and headless
+mode, which paints no surface, writes the pcaps alone.
 
 Implementation: `capture::VideoWriter` is owned exclusively by
 a dedicated OS thread (`ryll-capture-video`, running

@@ -33,7 +33,7 @@ enqueue` status check:
 
 | Job | Runner | What it does |
 |-----|--------|--------------|
-| `Lint` | self-hosted `l` | `make lint` (rustfmt + clippy) |
+| `Lint` | self-hosted `l` | `make lint` (rustfmt + clippy) and `make package-check` (every crate packaged and built from its tarball, as `cargo publish` would) |
 | `Cross-check Windows` | self-hosted `l` | `make check-windows` |
 | `Build (Linux x86_64)` | self-hosted `l` | `make release`, both `--web` smoke tests, `make test`, `.deb` and `.rpm` |
 | `cargo audit` | self-hosted `s` | RustSec advisory check |
@@ -671,6 +671,7 @@ lands, so a push-triggered run would only repeat it.
 | Binaries for a pull request | The `Build (Linux x86_64)` job's artifacts on the pull request's CI run (`.deb` and `.rpm`, 30-day retention) |
 | Binaries for a `develop` SHA | The `merge_group` CI run that landed it — all four platform builds attach their artifacts there |
 | Binaries for an arbitrary branch | Run `manual-build.yml` (Actions → Manual build) and pick the platforms |
+| PyPI wheels for a branch | Run `manual-build.yml` with the opt-in `wheel-x86_64` and `wheel-aarch64` platforms; it builds them exactly as `release.yml` does |
 | Release binaries | `release.yml`, triggered by a `v*` tag — see [releasing.md](/components/ryll/releasing/) |
 
 ## Branch protection and the bot
@@ -843,9 +844,9 @@ compiles. To contain that, the Makefile splits the build in two:
   `Cargo.lock` but compiles nothing, so no build script runs. It
   is the only build step allowed network access.
 - the targets that compile the workspace — `build`,
-  `build-tokio-console`, `release`, `check-windows`, `test`, `lint`
-  and `lint-fix` — then run in the devcontainer with `--network
-  none` and the cargo cache mounted read-only. A malicious build
+  `build-tokio-console`, `release`, `check-windows`, `test`, `lint`,
+  `lint-fix` and `package-check` — then run in the devcontainer with
+  `--network none` and the cargo cache mounted read-only. A malicious build
   script cannot reach a C2 or exfiltrate secrets (its download call
   fails and the build aborts loudly), and it cannot poison the
   cache for the rest of the job.
@@ -871,20 +872,36 @@ lanes they serve are real: `fuzz` runs nightly and
   part of its verify step and genuinely needs the network to
   upload. This one cannot be isolated.
 
+`package-check` builds what `publish-crates` would, offline, so a
+crate that cannot publish fails in pull request CI rather than
+mid-release. It needs one writable directory the read-only cache
+cannot give it: `cargo package --workspace` unpacks the workspace's
+own packaged crates into `$CARGO_HOME/registry/src`, and when that is
+read-only cargo fails with a misleading "no hash listed for
+<crate>". `tools/package-check-verify.sh` therefore runs cargo
+against a throwaway `CARGO_HOME` inside the container, with the
+shared registry linked in read-only and only `registry/src` itself
+writable.
+
 (`fuzz-fmt-check` and `fuzz-fmt` also run networked, but they
 only run `cargo fmt` and compile nothing. So do `deb`, `rpm` and
 the `web-smoke` targets, which repackage or run the binary
 `release` already produced.)
 
-Outside the Makefile entirely: release's `build-ryll-wheels` job
-runs `tools/build-ryll-wheel.sh`, which builds ryll with maturin
-inside `quay.io/pypa/manylinux_2_28_*` rather than the
-devcontainer, with network and without `--frozen`. That is a
-shipped artifact — it is what `pip install ryll` gets — so it is
-the most significant gap here. Closing it needs the same
-fetch/compile split inside the manylinux image, tracked in
-shakenfist/ryll#305; until then the wheel is built on the same
-terms as before this change.
+Outside the Makefile but under the same split: release's
+`build-ryll-wheels` job runs `tools/build-ryll-wheel.sh`, which
+builds ryll with maturin in an image derived from
+`quay.io/pypa/manylinux_2_28_*` (`.devcontainer/wheel/Dockerfile`)
+rather than the devcontainer. That image carries the toolchain and
+maturin, so nothing needs downloading at compile time. The script
+runs `cargo fetch --locked` in it with the network up, then the
+`maturin build --frozen` with `--network none` and the cache
+mounted read-only, as the invoking user. That matters most for the
+wheel, because it is a shipped artifact: it is what `pip install
+ryll` gets. No pull request CI builds it: release.yml builds it
+on a tag, and manual-build.yml's opt-in `wheel-x86_64` and
+`wheel-aarch64` platforms build it the same way on any branch, so
+a change to the wheel build can be exercised before a release.
 
 Because those jobs write the cargo cache with the network up,
 they save it under their own `actions/cache` key prefix

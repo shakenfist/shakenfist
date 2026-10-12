@@ -91,6 +91,7 @@ around it.
 | Full draw-op coverage (FILL, COPY, BLEND, etc.) | available | partial (same as display framebuffer — channel runs but output is discarded outside the control-socket mirror) | available (inherited from shared framebuffer) |
 | SPICE streaming / MJPEG | available | partial (decoded messages counted as frames, not rendered) | available (inherited) |
 | Display capabilities advertisement (COMPOSITE, MONITORS_CONFIG, etc.) | available | available | available |
+| Opt in to H.264 from spice-server (`--experimental-h264`) | available | available | available (affects only the SPICE side; the WebRTC encoder is unchanged) — temporary: remove once ryll#398 makes H.264 decode and it is advertised by default again |
 | Window auto-resize to surface size | available | n/a — intrinsic (no window; resize channel exists but `_resize_tx` in the renderer's `run_headless()` is never connected to a window) | n/a — intrinsic (browser viewport is user-controlled) |
 | Obey guest size hints toggle (`--no-obey-guest-size` / hamburger toggle) | available | n/a — intrinsic (no window; flag accepted in headless for CLI symmetry but ignored, `_obey_guest_size` in ryll's `run_headless()`) | missing (out of MVP scope; the web frontend's "guest fits browser viewport" inverse is planned) |
 | Guest resolution follows viewport (`VDAgentMonitorsConfig`) | available | missing (the renderer's `run_headless()` — `_resize_tx` is created but never used to drive resize logic in headless) | available |
@@ -175,7 +176,7 @@ around it.
 | Open side panels survive reconnect | available | n/a — intrinsic (no GUI) | n/a — intrinsic (no side panels in web MVP) |
 | **Capture Mode** | | | |
 | Protocol pcap capture (`--capture`) | available | available | missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope "Recording / capture") |
-| Display video capture (`display.mp4` via openh264) | available | available (capture session is passed through and VideoWriter fires on DisplayMark events even in headless) | missing (out of MVP scope) |
+| Display video capture (`display.mp4` via openh264) | available | missing (only the GUI's frame loop calls `CaptureSink::frame`; headless keeps no continuously-painted surface to encode, so `--capture` writes the pcaps but no `display.mp4`) | missing (out of MVP scope) |
 | Session metadata (`metadata.json`) | available | available | missing (out of MVP scope) |
 | **Diagnostics / Verbose Logging** | | | |
 | Verbose logging to stderr (`-v`) | available | available | available (stdout logging works regardless of mode) |

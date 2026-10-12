@@ -79,6 +79,7 @@ window. The operator guide, including reverse-proxy and TLS setup, is
 | `--capture <DIR>` | none | Write pcap + video capture to directory |
 | `-v, --verbose` | false | Enable debug-level logging |
 | `--latency-file <PATH>` | none | Write latency measurements to CSV file |
+| `--experimental-h264` | false | Experimental: let spice-server stream video to ryll as H.264, by advertising the display channel's `CODEC_H264` capability and asking for H.264 ahead of MJPEG. Off by default because H.264 from spice-server does not decode yet ([#398](https://github.com/shakenfist/ryll/issues/398)); video regions streamed as H.264 are likely to go black or stale. For work on that bug; see [H.264 from spice-server is currently disabled](/components/ryll/libvirt-spice-recommendations/#h264-from-spice-server-is-currently-disabled) |
 
 ### Examples
 
