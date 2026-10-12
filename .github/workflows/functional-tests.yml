@@ -621,7 +621,15 @@ jobs:
     # this job drives a full ansible deploy from the runner. Measured
     # demand is ~2.5-2.7 GB against 1927 MB usable and no swap. See
     # shakenfist/shakenfist#3696.
-    runs-on: [self-hosted, vm, debian-13, s]
+    #
+    # The size is s-cluster rather than s: the same footprint as s (the
+    # runner is still an orchestrator), but a pending pool of its own
+    # for jobs that build a multi-node cluster, so this job does not set
+    # the capacity claim of every lint runner on s. This builds the
+    # five-node slim-primary topology, which smoke-cluster.yml also
+    # routes to s-cluster. See shakenfist/private-ci
+    # docs/capacity-claims.md, "Cloud-building jobs".
+    runs-on: [self-hosted, vm, debian-13, s-cluster]
     # The deploy and test steps below are capped at 90 and 60 minutes;
     # this is the backstop for the setup and teardown around them, and
     # is still far short of GitHub's six hour default.

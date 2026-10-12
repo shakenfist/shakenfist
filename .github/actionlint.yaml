@@ -13,4 +13,6 @@ self-hosted-runner:
     - ubuntu-24-04
     - xs
     - s
+    - s-cloud
+    - s-cluster
     - m
