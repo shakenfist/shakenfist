@@ -12,12 +12,14 @@
 # diagram, which is why this exists as its own lane.
 #
 # Rendering is what mermaid-cli does, and rendering needs a browser, so
-# this runs in the upstream container rather than installing a
-# chromium and a node toolchain onto a runner. There is no lighter
-# path worth taking: mermaid's own parse() under plain node throws
-# "DOMPurify.addHook is not a function" for flowchart and
-# stateDiagram-v2 -- the two most common types here -- so a DOM-free
-# checker reports false failures on exactly the diagrams that matter.
+# this runs in the upstream container rather than installing
+# chromium onto a runner. A DOM-free checker is still ruled out:
+# mermaid's own parse() under plain node throws "DOMPurify.addHook is
+# not a function" for flowchart and stateDiagram-v2 -- the two most
+# common types here -- so it reports false failures on exactly the
+# diagrams that matter. Supplying a DOM with jsdom is no longer ruled
+# out now that the static runners carry node, but nobody has tried it;
+# see templates/mermaid-lint/README.md in shakenfist/development.
 #
 # Usage:
 #   tools/mermaid-lint.sh            # every tracked markdown file
@@ -73,19 +75,23 @@ else
     # contain diagrams that are not ours to fix.
     cd "${repo_root}"
 
-    # Repository-local exclusions, one path per line, '#' comments and
-    # blank lines ignored. Optional: a repository with nothing to exclude
-    # does not carry the file, which is why a missing one is silence
-    # rather than an error.
+    # Repository-local exclusions, one path per line, whole-line '#'
+    # comments and blank lines ignored. Optional: a repository with
+    # nothing to exclude does not carry the file, which is why a
+    # missing one is silence rather than an error.
     #
-    # Each line is read as a literal path and turned into a git pathspec,
-    # not passed through as one. A repository writing ':(exclude)x' or a
-    # glob here would otherwise get a pathspec meaning something other
-    # than it reads, and an exclusion that quietly matches nothing leaves
-    # the tree linted while the file says it is not -- the shape of
-    # fail-open this script exists to prevent. A directory name excludes
-    # everything beneath it, the same way naming one to git ls-files
-    # includes everything beneath it.
+    # Each line is turned into a ':(exclude,literal)' pathspec, so it
+    # is the path it reads as and nothing else. Without the literal
+    # magic a line saying ':(exclude)docs' would be a pathspec rather
+    # than a path, and would fail open in exactly the direction this
+    # file is dangerous: an only-negative pathspec makes git list the
+    # whole tree, so the match check below passes, and the exclusion
+    # becomes ':(exclude):(exclude)docs', which excludes nothing. A
+    # glob is the same shape -- 'docs/*.md' crosses a '/' -- and
+    # neither is supported. Under ':(literal)' both name no tracked
+    # file and stop the run, which is the loud half of the same rule.
+    # A directory name still excludes everything beneath it, the same
+    # way naming one to git ls-files includes everything beneath it.
     #
     # The workflow's path filter is the other half and does not read this
     # file -- GitHub Actions has no way to. A repository that adds a line
@@ -96,14 +102,14 @@ else
     # path the workflow skips but the script still lints fails somebody
     # else's pull request over a diagram they did not write.
     #
-    # A line that matches no tracked file is an error rather than a
-    # no-op, and what is excluded is printed before the run rather
-    # than left implicit. Both for the same reason: an exclusion is a
-    # statement about what was not looked at, and the way this
-    # mechanism fails is silently. A misspelled path excludes nothing
-    # and reads, in a green run, exactly like one that excluded a
-    # tree -- so the run says what it dropped, and a name that drops
-    # nothing stops the run instead of being believed.
+    # A line that drops no tracked markdown file is an error rather
+    # than a no-op, and what is excluded is printed before the run
+    # rather than left implicit. Both for the same reason: an
+    # exclusion is a statement about what was not looked at, and the
+    # way this mechanism fails is silently. A misspelled path excludes
+    # nothing and reads, in a green run, exactly like one that
+    # excluded a tree -- so the run says what it dropped, and a name
+    # that drops nothing stops the run instead of being believed.
     #
     # That is deliberately stricter than the REVIEWS.md pathspec built
     # in above, which a repository keeps whether or not the file
@@ -112,10 +118,17 @@ else
     # -- an imported one -- so an anticipatory line does not belong in
     # it; add it when the tree lands.
     repo_excludes=()
-    exclude_file="${repo_root}/tools/mermaid-lint-exclude"
-    if [ -f "${exclude_file}" ]; then
+    exclude_file='tools/mermaid-lint-exclude'
+    # Tracked, not merely present, because everything else this script
+    # trusts comes from the index. An untracked copy would narrow one
+    # developer's run while CI -- which only ever has tracked content
+    # -- reads the whole tree, so the two disagree about what was
+    # looked at. Ignoring it silently would be the same fault in the
+    # other direction, so a file that is there but not added stops the
+    # run and says which it is.
+    if git ls-files --error-unmatch -- ":(literal)${exclude_file}" \
+            > /dev/null 2>&1; then
         while IFS= read -r line || [ -n "${line}" ]; do
-            line="${line%%#*}"
             # Leading and trailing whitespace, so that an indented or
             # trailing-space line names the path it appears to name.
             # [:space:] covers the carriage return too, so a file
@@ -124,15 +137,56 @@ else
             line="${line#"${line%%[![:space:]]*}"}"
             line="${line%"${line##*[![:space:]]}"}"
             [ -n "${line}" ] || continue
-            # -- so that a path beginning with a dash is a path.
-            if [ -z "$(git ls-files -- "${line}")" ]; then
-                echo "mermaid-lint: excludes nothing tracked: ${line}" \
-                    "(tools/mermaid-lint-exclude)" >&2
+            # A comment is a whole line, tested after the trim so that
+            # an indented one still counts. Truncating at a '#'
+            # anywhere would turn 'docs#x' -- a path git allows -- into
+            # 'docs', which is tracked, so the checks below pass and
+            # the entire documentation tree goes unlinted behind a
+            # green run, from a line naming one directory.
+            case "${line}" in '#'*) continue ;; esac
+            # Into a file with the status checked, rather than through
+            # a command substitution, for the reason the candidate
+            # listing below gives: git refusing the line outright -- an
+            # absolute path, or one escaping the repository -- must not
+            # read as a path that matched nothing. Same outcome, but a
+            # different fault with a different fix, and the message
+            # someone reads in CI output is this one rather than git's.
+            # '--' so that a path beginning with a dash is a path.
+            if ! git ls-files -z -- ":(literal)${line}" \
+                    > "${workdir}/exclude-match"; then
+                echo "mermaid-lint: not a usable path: ${line}" \
+                    "(${exclude_file})" >&2
                 exit 1
             fi
-            repo_excludes+=(":(exclude)${line}")
-            echo "mermaid-lint: excluding ${line} (tools/mermaid-lint-exclude)"
-        done < "${exclude_file}"
+            mapfile -d '' -t matched < "${workdir}/exclude-match"
+            if [ ${#matched[@]} -eq 0 ]; then
+                echo "mermaid-lint: excludes nothing tracked: ${line}" \
+                    "(${exclude_file})" >&2
+                exit 1
+            fi
+            # Markdown, and not merely something tracked. The list
+            # this subtracts from holds markdown alone, so a line
+            # naming a tree of tracked images matches the index while
+            # dropping no candidate -- the same exclusion-that-excludes
+            # -nothing the check above exists to refuse, one step in.
+            excludes_markdown=''
+            for matched_path in "${matched[@]}"; do
+                case "${matched_path}" in
+                    *.md) excludes_markdown=1 ; break ;;
+                esac
+            done
+            if [ -z "${excludes_markdown}" ]; then
+                echo "mermaid-lint: excludes no tracked markdown:" \
+                    "${line} (${exclude_file})" >&2
+                exit 1
+            fi
+            repo_excludes+=(":(exclude,literal)${line}")
+            echo "mermaid-lint: excluding ${line} (${exclude_file})"
+        done < "${repo_root}/${exclude_file}"
+    elif [ -f "${repo_root}/${exclude_file}" ]; then
+        echo "mermaid-lint: ${exclude_file} is present but not tracked;" \
+            "git add it, or remove it" >&2
+        exit 1
     fi
 
     # NUL-delimited, because git C-quotes a path it cannot print
