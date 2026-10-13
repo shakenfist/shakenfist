@@ -16079,6 +16079,46 @@ already recorded alone, ends with a warning banner on stderr saying
 so and pointing at <code>--no-verify</code>, and still exits zero, so that a
 CI job on a runner without gitsign neither fails nor marks anything
 reviewed. It still removes entries, which needs no verification.</p>
+<p><strong>Verifying an imported entry by hand.</strong> Checking one imported
+mark without running <code>review-tracking.py</code> takes four steps. Run
+<code>git fetch</code> in both clones first: a stale clone of this repository
+may not have the commit yet, and step 4 compares against
+<code>origin/&lt;default branch&gt;</code>.</p>
+<ol>
+<li>Read the entry from the target repository's
+   <code>.vscode/imports.weaudit-shas.json</code> on its default branch. You
+   need the target <code>path</code> and <code>sha</code>, plus <code>imported.reviewer</code>,
+   <code>imported.path</code> (the source path here) and <code>imported.commit</code>.</li>
+<li>In a clone of this repository, verify the commit's signature:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>gitsign verify \
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    --certificate-identity=&lt;identity&gt; \
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>    --certificate-oidc-issuer=https://github.com/login/oauth \
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    &lt;commit&gt;
+</code></pre></div>
+<p><code>&lt;identity&gt;</code> comes from <code>REVIEWER_IDENTITIES</code> in
+   <code>scripts/review-tracking.py</code>, which maps a reviewer name to a
+   signing identity; that map is the authority, and the example
+   here (<code>mikal</code> signs as <code>mikal@stillhq.com</code>) may not list every
+   reviewer. Run this in a full clone, not a linked worktree:
+   gitsign reads the repository through go-git, which cannot
+   follow a worktree's <code>.git</code> file, and reports every commit as
+   "reference not found". See "Commit signing" for the trust path
+   this checks.
+3. Confirm the commit records a full-file review of that blob:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>git show &lt;commit&gt;:.vscode/&lt;reviewer&gt;.weaudit-shas.json
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>git show &lt;commit&gt;:.vscode/&lt;reviewer&gt;.weaudit
+</code></pre></div>
+<p>The first must have an entry for the source path with the same
+   <code>sha</code> and <code>date</code> as the imported entry. The second must list
+   the source path in the top-level <code>auditedFiles</code> array, as a
+   plain <code>{"path": ..., "author": ...}</code> entry -- not in
+   <code>partiallyAuditedFiles</code>, whose region marks never count for
+   import.
+4. In the target repository, confirm the entry is still current:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>git rev-parse origin/&lt;default branch&gt;:&lt;path&gt;
+</code></pre></div>
+<p>must equal the entry's <code>sha</code>.</p>
 <p>A file whose native mark has gone stale is not imported until
 <code>prune</code> has removed the mark, which is why the workflow will run
 <code>prune</code> first; until then the file's own review history says it
@@ -16098,10 +16138,10 @@ the human's review is the one kept.</p>
 fnmatch patterns with the same semantics as <code>exclude</code> (<code>!</code>
 re-includes), and, like the other exclusions in that file, an entry
 should say why:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Byte-identical to the template today, but this file is genuinely</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="c1"># per-repository and a shared review would hide that it needs its</span>
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="c1"># own read.</span>
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="n">import-exclude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s1">'config/local-overrides.yml'</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Byte-identical to the template today, but this file is genuinely</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="c1"># per-repository and a shared review would hide that it needs its</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="c1"># own read.</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="n">import-exclude</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s1">'config/local-overrides.yml'</span><span class="p">]</span>
 </code></pre></div>
 <p><code>import</code> never adds an entry matching <code>import-exclude</code>, and removes
 any existing imported entry that starts matching one.</p>
