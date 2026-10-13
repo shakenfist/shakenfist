@@ -15806,17 +15806,17 @@ SPICE session, and nothing on the hypervisor changes.</p>
      Microsoft clients do not speak.
    - H.264 through EGFX (AVC420/444) needs the same patent
      licensing decision the prerequisite raises for openh264.
-   - The MS-RDP<em> specifications are published under
+   - The MS-RDP* specifications are published under
      Microsoft's Open Specifications Promise. Confirm that
      covers a server implementation shipped in the wheels
      before release.
-8. </em><em>RD Gateway.</em><em> Some networks that "allow RDP" actually
+8. <strong>RD Gateway.</strong> Some networks that "allow RDP" actually
    allow only RD Gateway over HTTPS on 443, not 3389. RD
    Gateway (MS-TSGU, over RPC-over-HTTP or WebSocket) is a
    substantial protocol of its own. This plan assumes 3389
    and puts RD Gateway in Future work. Is 3389 enough for
    the networks we care about?
-9. </em><em>Placement and capacity.</em>* RDP sessions cost CPU that
+9. <strong>Placement and capacity.</strong> RDP sessions cost CPU that
    relayed SPICE sessions do not. The prerequisite's risk
    section asks how a saturated node behaves and how a
    multi-node deployment places sessions. This plan inherits

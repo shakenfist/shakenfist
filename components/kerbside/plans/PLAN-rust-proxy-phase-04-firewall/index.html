@@ -15692,7 +15692,7 @@ back brief.</p>
   <code>&amp;'static str</code>, with an "unknown" sentinel for unmodeled types) +
   <code>ChannelType</code>/<code>ChannelType::from_u8</code>/<code>ChannelType::name</code>.</li>
 <li>Authoritative external reference: <code>/srv/src-reference/spice/
-  spice-protocol/spice/enums.h</code> (SPICE_MSG_<em> / SPICE_MSGC_</em> per channel).</li>
+  spice-protocol/spice/enums.h</code> (SPICE_MSG_* / SPICE_MSGC_* per channel).</li>
 <li>gRPC: <code>AuthorizeConnectionReply</code> is a <code>oneof { Denied; Target }</code> today;
   the bookkeeping RPCs and <code>RecordAuditEvent</code> already exist and are used
   by the proxy. Metrics live in <code>metrics.rs</code> (global registry + RAII

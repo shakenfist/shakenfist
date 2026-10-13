@@ -15328,11 +15328,11 @@ key back into POSIX convention, so <code>create -f vhdx -b parent.vhdx</code>
 followed by <code>info</code> reports <code>parent.vhdx</code> and resolves correctly.</p>
 <p>The <code>backing file:</code> field itself is correct in every case — it is what
 the image's own header records, and reporting it is the point. Fixing
-the "actual path" resolution is path normalisation, which belongs with
-the composition work in
-<a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>, not this output
-path; suppressing the field instead would paper over the underlying
-issue rather than close it. The full account, including which locator
+the "actual path" resolution is path normalisation and needs a decision
+rather than a guard, so it is tracked in
+<a href="https://github.com/shakenfist/instar/issues/658">issue #658</a>;
+suppressing the field instead would paper over the underlying issue
+rather than close it. The full account, including which locator
 key <code>info</code> prefers and why the relative case is rendered back, is the
 "VHD/VHDX differencing" section of <a href="/components/instar/quirks/">quirks.md</a>.</p>
 

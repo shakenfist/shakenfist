@@ -15890,9 +15890,9 @@ error.") and the redirect to <code>/source</code> on success.</p>
 <p><strong>The nav markup that replaces <code>base.html:32-45</code>:</strong></p>
 <p><nav class="sf-nav" aria-label="Sections">
     {% for navitem in navitems %}
-    <a href="{{ navitem.href }}"
+    &lt;a href="{{ navitem.href }}"
        {% if navitem.active %}aria-current="page"{% endif %}
-       >{{ navitem.name }}</a>
+       &gt;{{ navitem.name }}</a>
     {% endfor %}
   </nav></p>
 </li>

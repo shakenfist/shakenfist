@@ -4301,10 +4301,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vhd-future" class="md-nav__link">
+  <a href="#vhd" class="md-nav__link">
     <span class="md-ellipsis">
       
-        VHD (future)
+        VHD
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vhdx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHDX
       
     </span>
   </a>
@@ -15579,10 +15590,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vhd-future" class="md-nav__link">
+  <a href="#vhd" class="md-nav__link">
     <span class="md-ellipsis">
       
-        VHD (future)
+        VHD
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vhdx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VHDX
       
     </span>
   </a>
@@ -16114,9 +16136,34 @@ filesystem file size. The VMDK chain reader uses <code>actual_size</code> in
 <code>actual_size - 1024</code>. Without the real file size, the footer search
 would use <code>capacity * sector_size</code>, which overshoots for files not
 aligned to the sector size boundary.</p>
-<h3 id="vhd-future">VHD (future)<a class="headerlink" href="#vhd-future" title="Permanent link">&para;</a></h3>
-<p>VHD stores its footer at the last 512 bytes of the file. Like VMDK,
-the chain reader will need <code>actual_size</code> to locate the footer correctly.</p>
+<h3 id="vhd">VHD<a class="headerlink" href="#vhd" title="Permanent link">&para;</a></h3>
+<p>VHD stores its footer in the last 512 bytes of the file, but the chain
+reader does not need <code>actual_size</code> to find it. <code>VhdState::init()</code> reads
+sector 0 first, because a dynamic or differencing VHD carries a footer
+<em>copy</em> there, and falls back to the last sector -- located as
+<code>input_capacity - 1</code>, from the virtio capacity -- only for a fixed VHD.
+So unlike the VMDK arm above, <code>init_chain_states()</code> hands this reader no
+<code>actual_size</code>; the one the crate computes internally is a local
+<code>input_capacity * sector_size</code> bound for range checks, not this field.</p>
+<p>What a differencing child does need is the per-block sector bitmap. Each
+allocated block is preceded by a bitmap whose bits say, per 512-byte
+sector, whether that sector's data is the child's or the parent's: set
+means the child, most significant bit first. The chain walker coalesces
+runs of equally owned sectors and descends for the runs the bitmap
+leaves to the parent; an unallocated block belongs to the parent
+entirely.</p>
+<h3 id="vhdx">VHDX<a class="headerlink" href="#vhdx" title="Permanent link">&para;</a></h3>
+<p>VHDX has no footer at all -- its headers, region tables and BAT sit at
+offsets the format fixes -- so <code>VhdxState::init()</code> also takes no
+<code>actual_size</code>, and bounds itself by <code>input_capacity * sector_size</code> the
+same way.</p>
+<p>Its sector bitmaps are arranged differently from VHD's: one 1 MiB bitmap
+block serves a whole chunk of payload blocks instead of preceding each
+block, so bit numbering restarts at the chunk's start, bits are least
+significant first, and they count the image's declared
+<code>logical_sector_size</code> of 512 or 4096. Only a block the BAT marks
+<code>PAYLOAD_BLOCK_PARTIALLY_PRESENT</code> sends the reader to the bitmap; the
+other states name an owner by themselves.</p>
 <h2 id="constants-reference">Constants Reference<a class="headerlink" href="#constants-reference" title="Permanent link">&para;</a></h2>
 <p>All constants are defined in <code>src/shared/src/lib.rs</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>CHAIN_CONFIG_ADDR      = 0x000F2000

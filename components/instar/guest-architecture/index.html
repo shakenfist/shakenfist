@@ -15682,14 +15682,14 @@ provides a modular architecture with:
  size extraction not implemented) and
  <code>ERROR_BACKING_SIZE_TOO_LARGE</code> (pre-flight ceiling check
  surfaces a clearer "try a larger cluster size" hint instead
- of plan_<em>'s generic <code>InvalidVirtualSize</code>). There are also
+ of plan_*'s generic <code>InvalidVirtualSize</code>). There are also
  preallocation modes for raw and qcow2: for qcow2,
  <code>Preallocation::{Metadata,Falloc,Full}</code> (any non-Off mode)
  extends the <code>qcow2::create::Qcow2Layout</code> to cover L2 tables
  and a data region, populates L1 entries with L2 offsets
  (each with <code>OFLAG_COPIED</code>), and marks every used cluster
  (header + L1 + reftable + refblocks + L2 + data) refcount=1.
- The L2 tables are emitted by the guest </em>outside<em> the
+ The L2 tables are emitted by the guest <em>outside</em> the
  <code>MetadataPlan</code> (via a reusable single-cluster scratch slot)
  because they can total far more than
  <code>GUEST_CREATE_SCRATCH_LIMIT</code> (128 MiB at 1 TiB virtual with
@@ -15726,10 +15726,10 @@ provides a modular architecture with:
  (filename, actual-size, vmdk cid + parent-cid, vhdx log-size,
  the wrapping-file physical size, cache hints) before
  comparison; remaining writer divergences (qcow2 compat
- hardcode, zstd accept-ignore, vhdx default block_size, vhd
- CHS-rounded virtual_size) are documented as per-case skips
+ hardcode, zstd accept-ignore, vhdx default block<strong>ize, vhd
+ CHS-roun</strong>d virtual<strong>ize) are docume</strong>ed as per-case skips
  rather than whitelist extensions so each gap stays visible.
-- </em><em>operations/resize/</em><em> - In-place virtual-size mutation
+- <strong>operations/resize/**</strong> In-place virtual-size mutation
  operation. Reads a <code>ResizeConfig</code> (target format, current and
  new virtual sizes, current file size, per-format hints from the
  existing header, preallocation mode, <code>--shrink</code> flag) from
@@ -15786,14 +15786,15 @@ provides a modular architecture with:
  <code>src/fuzz/fuzz_targets/fuzz_resize_planners.rs</code> and
  <code>scripts/differential-fuzz.py</code>'s <code>op_resize</code>. The binary
  builds at ~73 KiB / 384 KiB.
-- </em><em>operations/map/</em><em> - Allocation-map operation. Reads a
- <code>MapConfig</code> (sector_size, input_device_count, start_offset,
- max_length window) from <code>OPERATION_CONFIG_ADDR</code>, detects the
+- <strong>operations/map/**</strong> Allocation-map operation. Reads a
+ <code>MapConfig</code> (sector<strong>ize, input_dev</strong>e<strong>oun</strong> start<strong>ffset,
+ max_length</strong>indow) from <code>OPERATION_CONFIG_ADDR</code>, detects the
  source format on input device 0, refuses sources with chain
  composition (qcow2 backing-file references, vhd differencing
- disks; vhdx differencing is already rejected by
- <code>VhdxState::init</code>; vmdk multi-extent layouts fail the
- binary-header parse naturally), and dispatches to the matching
+ disks, and vhdx differencing in an arm of its own, since
+ <code>VhdxState::init</code> reports <code>has_parent</code> rather than rejecting it;
+ vmdk multi-extent layouts fail the binary-header parse
+ naturally), and dispatches to the matching
  per-format <code>&lt;Format&gt;State::map_extents</code> walker from the
  PLAN-map work. <code>map</code> refuses a differencing source outright, like
  <code>measure</code> and <code>check</code>; <code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and
@@ -15837,12 +15838,12 @@ provides a modular architecture with:
  suite that catches accidental fixes to known instar-vs-
  qemu-img gaps so <code>KNOWN_MAP_DIVERGENCES</code> doesn't go stale.
  Current baseline: 95 active tests + 91 documented skips.
-- </em><em>operations/snapshot/</em><em> - Internal-snapshot operation
+- <strong>operation</strong>snapshot/<strong> - Internal-snaps</strong>t operation
  (PLAN-snapshot, qcow2-only like <code>qemu-img snapshot</code>). Reads a
  <code>SnapshotConfig</code> (mode discriminator, argument bytes, flags,
  and for create the host-stamped <code>date_sec</code>/<code>date_nsec</code>) from
  <code>OPERATION_CONFIG_ADDR</code>, opens the image RW as input device 0,
- and dispatches on mode. MODE_LIST streams one
+ and dispatches on mode. MODE<strong>IST str</strong>ms one
  <code>SnapshotEntryRecord</code> per table entry via the qcow2 crate's
  <code>for_each_snapshot_entry</code> (no in-memory cap; one entry
  resident at a time) followed by a <code>SnapshotResult</code> terminator;
@@ -15880,7 +15881,7 @@ provides a modular architecture with:
  coverage-guided fuzz targets (<code>fuzz_snapshot_parse</code>,
  <code>fuzz_snapshot_refcount</code>); and the differential fuzzer's
  <code>op_snapshot</code> chain (byte-identity after every element).
-- </em><em>operations/amend/</em><em> - In-place qcow2 header amendment operation
+- <strong>operations/amend/</strong> - In-place qcow2 header amendment operation
  (PLAN-amend, qcow2-only). Reads an <code>AmendConfig</code> (target compat
  version and/or lazy_refcounts flag) from <code>OPERATION_CONFIG_ADDR</code>,
  opens the image RW as the output device, reads the existing header
@@ -15895,11 +15896,11 @@ provides a modular architecture with:
  header-extension relocation across the version change is
  unsupported. Needs <code>/dev/kvm</code> (launches a guest VMM). See
  <a href="/components/instar/amend/">docs/amend.md</a> for the full user reference.
-- </em><em>operations/dd/</em><em> - Windowed block-copy operation (PLAN-dd,
+- <strong>operations/dd/</strong> - Windowed block-copy operation (PLAN-dd,
  qemu-img dd compatible). Implemented host-side in <code>run_dd</code>
  (<code>src/vmm/src/main.rs</code>): parses <code>name=value</code> operands (<code>if=</code>,
  <code>of=</code>, <code>bs=</code>, <code>count=</code>, <code>skip=</code>) and the <code>-O</code> output-format flag
- (default </em><em>raw</em><em>, not the input format), computes the input byte
+ (default <strong>raw</strong>, not the input format), computes the input byte
  window via <code>crates/dd::compute_dd_window</code> (count-then-skip
  semantics: <code>count</code> clamps down, <code>skip</code> subtracts from the front,
  skip-past-EOF ⇒ empty output with exit 0), then launches the
@@ -15915,7 +15916,7 @@ provides a modular architecture with:
  Known divergences: vhdx default block size (32 MiB vs qemu's 8
  MiB for small images), count=0 vmdk/vhdx edge cases. See
  <a href="/components/instar/dd/">docs/dd.md</a> for the full user reference.
-- </em><em>operations/bitmap/</em><em> - qcow2 persistent-dirty-bitmap management
+- <strong>operations/bitmap/</strong> - qcow2 persistent-dirty-bitmap management
  operation (PLAN-bitmap, qcow2 v3-only). The host side (<code>run_bitmap</code>
  in <code>src/vmm/src/main.rs</code>) validates the CLI surface (the repeatable
  CLI-order actions <code>--add</code>/<code>--remove</code>/<code>--clear</code>/<code>--enable</code>/
@@ -15925,7 +15926,7 @@ provides a modular architecture with:
  <code>crates/bitmap</code> planner provides the bitmap directory/table/action/
  merge logic, reusing the snapshot refcount mutators to allocate and
  free bitmap-table clusters. The guest applies each action under the
- crash-safe </em><em>autoclear</em><em> dance (clearing the header's
+ crash-safe <strong>autoclear</strong> dance (clearing the header's
  <code>bitmaps</code> autoclear bit while the extension is inconsistent and
  restoring it once the write settles) so a crash mid-update leaves
  the image safe rather than corrupt. Needs <code>/dev/kvm</code> (launches a
@@ -15935,7 +15936,7 @@ provides a modular architecture with:
  <code>tests/test_bitmap.py</code> integration parity against <code>qemu-img
  bitmap</code>, cross-version baselines, and fuzzing. See
  <a href="/components/instar/bitmap/">docs/bitmap.md</a>.
-- </em><em>operations/bench/</em><em> - I/O benchmark operation (PLAN-bench), the
+- <strong>operations/bench/</strong> - I/O benchmark operation (PLAN-bench), the
  sandboxed equivalent of <code>qemu-img bench</code>. Measures instar's own
  end-to-end sandboxed path (guest format layer → virtio-block →
  ioeventfd → host I/O thread → file I/O) rather than qemu's block
@@ -15972,7 +15973,7 @@ provides a modular architecture with:
  <code>tests/test_bench.py</code> (76 tests), the <code>fuzz_bench_schedule</code>
  coverage fuzzer, and the differential fuzzer's <code>op_bench</code> arm. See
  <a href="/components/instar/bench/">docs/bench.md</a>.
-- </em><em>shared/</em>* - Shared library code between components (call table, configs,
+- <strong>shared/</strong> - Shared library code between components (call table, configs,
  format detection, memory layout constants, shared utilities,
  <code>bump_allocator!</code> macro for operations needing heap allocation,
  centralized byte-order helpers: <code>be_u16/32/64</code>, <code>le_u16/32/64</code>,

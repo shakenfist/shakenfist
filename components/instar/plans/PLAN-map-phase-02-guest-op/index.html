@@ -15863,7 +15863,7 @@ LUKS, no preallocation). Target: &lt; 150 KiB.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Add <code>MapConfig</code>, <code>MapExtentRecord</code>, and <code>MapResult</code> to <code>src/shared/src/lib.rs</code> right after <code>MeasureResult</code> (around line 2389). Use the exact schemas in the Architecture section. Magic constants <code>0x4D41505F</code> ("MAP_"), <code>0x4D584554</code> ("MXET"), <code>0x4D505253</code> ("MPRS"). <code>impl</code> blocks expose <code>MAGIC</code>, <code>is_valid</code>, <code>FLAG_VERBOSE</code>, <code>STATE_*</code>, and <code>ERROR_*</code> constants. Add ≥6 unit tests inside the existing <code>#[cfg(test)] mod tests</code> verifying: all three magic values are unique vs. the 21 existing magics; each <code>is_valid()</code> accepts the correct magic and rejects 0; the STATE_<em> and ERROR_</em> constants have the documented values. Run <code>make lint</code>, <code>make test-rust</code>, <code>pre-commit run --all-files</code>. Only <code>src/shared/src/lib.rs</code> changes.</td>
+<td>Add <code>MapConfig</code>, <code>MapExtentRecord</code>, and <code>MapResult</code> to <code>src/shared/src/lib.rs</code> right after <code>MeasureResult</code> (around line 2389). Use the exact schemas in the Architecture section. Magic constants <code>0x4D41505F</code> ("MAP_"), <code>0x4D584554</code> ("MXET"), <code>0x4D505253</code> ("MPRS"). <code>impl</code> blocks expose <code>MAGIC</code>, <code>is_valid</code>, <code>FLAG_VERBOSE</code>, <code>STATE_*</code>, and <code>ERROR_*</code> constants. Add ≥6 unit tests inside the existing <code>#[cfg(test)] mod tests</code> verifying: all three magic values are unique vs. the 21 existing magics; each <code>is_valid()</code> accepts the correct magic and rejects 0; the STATE_* and ERROR_* constants have the documented values. Run <code>make lint</code>, <code>make test-rust</code>, <code>pre-commit run --all-files</code>. Only <code>src/shared/src/lib.rs</code> changes.</td>
 </tr>
 <tr>
 <td>2b</td>
@@ -15964,7 +15964,7 @@ LUKS, no preallocation). Target: &lt; 150 KiB.</p>
 <ul>
 <li><code>src/shared/src/lib.rs</code> defines <code>MapConfig</code>,
   <code>MapExtentRecord</code>, and <code>MapResult</code> with magic constants,
-  <code>is_valid</code>, FLAGs, STATE_<em> codes, and ERROR_</em> codes.</li>
+  <code>is_valid</code>, FLAGs, STATE_* codes, and ERROR_* codes.</li>
 <li><code>crates/guest-protocol/proto/guest.proto</code> carries
   <code>MapExtentMessage</code> as field 15 and <code>MapResultMessage</code> as
   field 16 in the <code>GuestMessage</code> oneof.</li>

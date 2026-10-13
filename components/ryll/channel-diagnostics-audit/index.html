@@ -15510,8 +15510,8 @@ channel's snapshot changes.</p>
 </tr>
 <tr>
 <td>inputs</td>
-<td>18</td>
-<td>motion_count, recent_events, KEY_MODIFIERS restatement counters</td>
+<td>16</td>
+<td>motion_count, recent_events</td>
 <td>complete</td>
 </tr>
 <tr>
@@ -15705,11 +15705,13 @@ signal: on QXL guests the agent never sees <code>MONITORS_CONFIG</code>, so no
 reply comes. Stalls are read from agent token starvation instead:
 <code>agent_tokens</code>, <code>queued_agent_message_count</code>,
 <code>agent_starved_since_ts_secs</code> and <code>agent_stall_count</code>.</p>
-<p>Main deliberately has no client-keepalive send counters: the
-spurious-PONG keepalive they once tracked was a band-aid made
-redundant when the underlying main-channel wedge was fixed
-(<code>370d8ce5</code>). The inputs channel carries identically-named counters
-for a different mechanism — see the inputs section below.</p>
+<p>No channel has client-keepalive send counters. Main's
+spurious-PONG keepalive was a band-aid made redundant when the
+underlying main-channel wedge was fixed (<code>370d8ce5</code>), and the
+inputs channel's KEY_MODIFIERS restatement, kept on the same
+hypothesis, was removed because the server applies KEY_MODIFIERS
+by toggling the guest's locks: each restatement undid a lock
+changed from inside the guest or by another client (#517).</p>
 <p>One nuance: the per-opcode map is less useful on main than on other
 channels because the agent-related opcodes (<code>VD_AGENT_*</code>) are nested
 under main's payload framing — a flat opcode map at the main-channel
@@ -15720,12 +15722,8 @@ report's <code>traffic.pcap</code>.</p>
 <h3 id="inputs">inputs<a class="headerlink" href="#inputs" title="Permanent link">&para;</a></h3>
 <p>Inputs has <code>motion_count</code>, <code>button_state</code>, <code>secs_since_last_key</code>, a
 <code>recent_events</code> ring that records the last N input events with
-timestamps, the KEY_MODIFIERS idle restatement counters
-(<code>client_keepalive_send_count</code>, <code>last_client_keepalive_send_ts_secs</code>
-— these count the periodic KEY_MODIFIERS restatement kept on the
-cross-channel-idleness hypothesis, and are unrelated to the removed
-main-channel keepalive despite the shared names), and the four
-per-opcode baseline fields. No channel-specific gaps identified.</p>
+timestamps, and the four per-opcode baseline fields. No
+channel-specific gaps identified.</p>
 <h3 id="cursor">cursor<a class="headerlink" href="#cursor" title="Permanent link">&para;</a></h3>
 <p>Cursor has <code>cache_entries</code> (current number of cached cursors),
 <code>cache_contents</code> (a summary of what is cached), ack-window state

@@ -16454,28 +16454,28 @@ this phase must not start until phase 2's ruleset is live.</p>
 <td>high</td>
 <td>opus</td>
 <td>none</td>
-<td>Classify every template directory under <code>templates/</code> except <code>shared-blocks/</code> and <code>renovate/</code> (which <code>PLAN-renovate-cadence.md</code> centralises). For each workflow file, fetch every live copy from each fleet repository's default branch through the GitHub API (local clones are stale), diff each one against the template, and sort the differences into drift and legitimate per-repository adaptation, citing the lines. Then decide one of three outcomes and say why: a reusable workflow in <code>actions</code>, a composite action in <code>actions</code> (when the steps need the caller's checkout or ship a script), or the template stays a template (when the differences are legitimate and cannot be expressed as <code>with:</code> inputs). For each repository and template, record which required status-check contexts its ruleset and merge queue name, because wrapping renames them. Write the result into this section as a table, and order the rollout by drift multiplied by copy count. Make no changes outside this plan file.</td>
+<td>Classify every template directory under <code>templates/</code> except <code>shared-blocks/</code> and <code>renovate/</code> (which <code>PLAN-renovate-cadence.md</code> centralises). For each workflow file, fetch every live copy from each fleet repository's default branch through the GitHub API (local clones are stale), diff each one against the template, and sort the differences into drift and legitimate per-repository adaptation, citing the lines. Then decide one of three outcomes and say why: a reusable workflow in <code>actions</code>, a composite action in <code>actions</code> (when the steps need the caller's checkout or ship a script), or the template stays a template (when the differences are legitimate and cannot be expressed as <code>with:</code> inputs). For each repository and template, record which required status-check contexts its ruleset and merge queue name, because wrapping renames them. For <code>mermaid-lint</code>, check whether the 2026-10-13 re-sync pull requests listed for #151 under Related issues landed before classifying those copies. Write the result into this section as a table, and order the rollout by drift multiplied by copy count. Make no changes outside this plan file.</td>
 </tr>
 <tr>
 <td>5b</td>
 <td>high</td>
 <td>opus</td>
 <td>worktree</td>
-<td>Pilot on <code>mermaid-lint</code> (6 copies, ships <code>mermaid-lint.sh</code>, runs on a docker-capable runner). In <code>shakenfist/actions</code>, add the composite action or reusable workflow 5a chose, carrying the script. Reduce <code>templates/mermaid-lint/mermaid-lint.yml</code> to the caller stub, update <code>templates/mermaid-lint/README.md</code>, and change the <code>mermaid-lint-ci</code> criterion (<code>scripts/audit/checks/docs_content.py:444</code>, which today requires <code>MERMAID_LINT_SCRIPT = 'tools/mermaid-lint.sh'</code> at <code>:143</code>) so it requires the caller (<code>uses: shakenfist/actions/...@main</code> with the documented inputs) and no longer requires <code>tools/mermaid-lint.sh</code>, with pass, fail and stale-copy tests. Convert this repository's own copy first, then roll out one pull request per repository, updating each repository's required-check names in the same step. Record each landing in this section.</td>
+<td>Pilot on <code>mermaid-lint</code> (6 copies, ships <code>mermaid-lint.sh</code>, runs on a docker-capable runner). In <code>shakenfist/actions</code>, add the composite action or reusable workflow 5a chose, carrying the script. Reduce <code>templates/mermaid-lint/mermaid-lint.yml</code> to the caller stub, update <code>templates/mermaid-lint/README.md</code>, and change the <code>mermaid-lint-ci</code> criterion (<code>class MermaidLintCi</code> in <code>scripts/audit/checks/docs_content.py</code>, which today requires <code>MERMAID_LINT_SCRIPT = 'tools/mermaid-lint.sh'</code> from the same module) so it requires the caller (<code>uses: shakenfist/actions/...@main</code> with the documented inputs) and no longer requires <code>tools/mermaid-lint.sh</code>, with pass, fail and stale-copy tests. Dropping the requirement is not the same as deleting the file: decide, and record here, how a developer runs the lint by hand afterwards (a thin local wrapper, or the action's script from a checkout of <code>actions</code>), because <code>AGENTS.md</code> prescribes <code>tools/mermaid-lint.sh</code> after editing a diagram. If this repository's copy goes, everything that names it moves in the same pull request. Find those files with <code>git grep -l mermaid-lint.sh</code> at the time, not from a list written here, and leave out three kinds of hit: <code>docs/plans/</code>, which records history; <code>REVIEWS.md</code> and the <code>.vscode/</code> weAudit files, which <code>prune-reviews</code> reconciles on the default branch after the merge and which <code>AGENTS.md</code> says a pull request must not edit. Three hits need more than a path change: <code>test_the_skill_pins_the_same_image</code> in <code>MermaidLintDeploymentTest</code> reads the image digest from the script, so say where that pin lives afterwards; the <code>tools/</code> clause of the <code>audit-package-tests</code> hook in <code>.pre-commit-config.yaml</code> exists because the mermaid-lint tests read the script; and the "Using it by hand" section of <code>templates/mermaid-lint/README.md</code> is where the answer above is recorded. Convert this repository's own copy first, then roll out one pull request per repository, updating each repository's required-check names in the same step. Record each landing in this section.</td>
 </tr>
 <tr>
 <td>5c</td>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Add a test under <code>scripts/tests/</code> asserting that every template 5a classified as shared is a caller stub: it calls <code>shakenfist/actions</code> at <code>@main</code>, and it has no <code>run:</code> steps of its own. Then document the convention, that a template meant to be identical everywhere is a caller and anything else says in its README why it is not, in <code>docs/consistency-audits.md</code> beside its description of templates (there is no <code>templates/README.md</code>). Mention it in <code>AGENTS.md</code> only as a one-line pointer, because it is a convention change.</td>
+<td>Add a test under <code>scripts/tests/</code> asserting that every template 5a classified as shared is a caller stub: it calls <code>shakenfist/actions</code> at <code>@main</code>, and it has no <code>run:</code> steps of its own. Then document the convention, that a template meant to be identical everywhere is a caller and anything else says in its README why it is not, in <code>docs/consistency-audits.md</code> beside its description of templates (there is no <code>templates/README.md</code>). Mention it in <code>AGENTS.md</code> only as a one-line pointer, because it is a convention change. This step sets the condition that closes #151: with 5b, it answers that issue's question of whether template directories should carry a staleness marker like the shared blocks' <code>vN</code>, by removing the copies rather than versioning them. That answer only covers templates that become callers: a template 5a keeps as a template must also say in its README how drift in its copies is caught (a <code>vN</code> marker, an audit check, or a statement that drift is acceptable there). The condition is that every template 5a classified is either a caller stub or says in its README how drift in its copies is caught; a template still queued for 5d counts as neither. The two directories 5a leaves out are outside the condition: <code>shared-blocks/</code> already meets it, because its README describes the version marker and the audit that flags a repository carrying an old version, and <code>renovate/</code> is owned by <code>PLAN-renovate-cadence.md</code>, whose shared preset replaces the copies. 5c lands before 5d, so it does not close #151 itself: put "Fixes #151" in the pull request that makes the condition true, normally the last 5d landing. If 5d stops with templates still unconverted, file a follow-up issue naming them and cite it when closing #151.</td>
 </tr>
 <tr>
 <td>5d</td>
 <td>medium</td>
 <td>sonnet</td>
 <td>worktree</td>
-<td>For each remaining template in 5a's rollout order, repeat 5b's shape: callee in <code>actions</code>, stub template, criterion change with tests, then one pull request per repository using the <code>consistency-fix</code> skill, with required checks updated in the same step. Each template is its own pull request in this repository, and its landing is recorded here.</td>
+<td>For each remaining template in 5a's rollout order, repeat 5b's shape: callee in <code>actions</code>, stub template, criterion change with tests, then one pull request per repository using the <code>consistency-fix</code> skill, with required checks updated in the same step. Each template is its own pull request in this repository, and its landing is recorded here. The landing that makes 5c's condition for #151 true carries "Fixes #151"; if 5d stops short of it, file the follow-up issue 5c describes.</td>
 </tr>
 </tbody>
 </table>
@@ -17016,6 +17016,28 @@ intend to do aligns with that plan.</p>
 <li>
 <h1 id="211-replaces-dependencies_token-the-residual-from-open">211 replaces <code>DEPENDENCIES_TOKEN</code>, the residual from open<a class="headerlink" href="#211-replaces-dependencies_token-the-residual-from-open" title="Permanent link">&para;</a></h1>
   question 1.</li>
+<li>
+<h1 id="151-templatesmermaid-lint-has-no-staleness-mechanism-is">151 (templates/mermaid-lint/ has no staleness mechanism) is<a class="headerlink" href="#151-templatesmermaid-lint-has-no-staleness-mechanism-is" title="Permanent link">&para;</a></h1>
+  closed by phase 5: 5b stops the fleet carrying a copy of
+  <code>mermaid-lint.sh</code>, and 5c makes "a caller, or a README saying
+  how drift is caught" the answer for every template, closing
+  once 5d has converted the rest. The issue's other drift path,
+  this repository's <code>tools/mermaid-lint.sh</code> against the
+  template, was open when it was filed and has since been
+  pinned byte-identical by <code>MermaidLintDeploymentTest</code>; what
+  remains open is drift in the fleet's copies. Its README
+  symptom has no drift path: the template's <code>README.md</code> is not
+  in its Files table and is not copied into adopting
+  repositories, which carry only the script, the workflow and
+  their own <code>tools/mermaid-lint-exclude</code>. Until phase 5 lands,
+  fleet copies are re-synced by hand when they lag. On
+  2026-10-13 the <code>tools/mermaid-lint.sh</code> copies in instar,
+  occystrap and
+  shakenfist lagged the template's exclusion-file hardening,
+  the drift this phase removes. Re-sync pull requests were
+  opened directly rather than left waiting for phase 5
+  (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/657" title="GitHub Issue: shakenfist/instar #657">instar#657</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/occystrap/issues/160" title="GitHub Issue: shakenfist/occystrap #160">occystrap#160</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4519" title="GitHub Issue: shakenfist/shakenfist #4519">shakenfist#4519</a>); 5a should
+  check whether they landed rather than assume it.</li>
 <li>
 <h1 id="88-standardise-renovate-groupings-interacts-with-open">88 (standardise renovate groupings) interacts with open<a class="headerlink" href="#88-standardise-renovate-groupings-interacts-with-open" title="Permanent link">&para;</a></h1>
   question 4's grouping rule.</li>

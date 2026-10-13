@@ -15315,7 +15315,7 @@ merged #4232, with no comment. Nothing in the pull request asked for
 that: the body carries only <code>Fixes #3612</code>, and
 <code>git log 91312b9a3^1..91312b9a3</code> contains no <code>Fixes #</code> line at all. The
 phase 7 commits say the opposite of fixed, in as many words -- *"filed as</p>
-<h1 id="4223-and-deliberately-not-fixed-here-and-4223-whose-lookup-is">4223 and deliberately not fixed here"<em>, and </em>"#4223, whose lookup is<a class="headerlink" href="#4223-and-deliberately-not-fixed-here-and-4223-whose-lookup-is" title="Permanent link">&para;</a></h1>
+<h1 id="4223-and-deliberately-not-fixed-here-and-4223-whose-lookup-is">4223 and deliberately not fixed here"*, and *"#4223, whose lookup is<a class="headerlink" href="#4223-and-deliberately-not-fixed-here-and-4223-whose-lookup-is" title="Permanent link">&para;</a></h1>
 <p>still wrong for anyone reaching it another [way]"*.</p>
 <p>What phase 7 actually did was guard the two API routes: a netdesc whose
 <code>network_uuid</code> is an explicit null is refused by <code>_netdesc_safety_checks</code>
@@ -18161,7 +18161,7 @@ and <code>:2143-2163</code> (the <code>render()</code> argument list), item by i
 the default mode.</strong> Two refinements:</p>
 <ul>
 <li><strong>The issue's scope misses a sink.</strong> The plan records #4242 as wanting <em>"a
-  schema <code>pattern</code> on both <code>model</code> properties </em><em>and</em><em> XML escaping at render time
+  schema <code>pattern</code> on both <code>model</code> properties <strong>and</strong> XML escaping at render time
   in <code>Instance._create_domain_xml()</code>"</em>. <code>network[].model</code> reaches libvirt by a
   second route that <code>_create_domain_xml()</code> does not cover: the interface hotplug
   path builds <code>device_xml</code> as a plain f-string at

@@ -16623,24 +16623,24 @@ instar-testdata fixtures; those measurements are recorded in
 <tr>
 <td>vhd / vpc</td>
 <td>✓</td>
-<td>✓‡ 9</td>
+<td>✓‡ 9, 18</td>
 <td>✓</td>
 <td>✓</td>
 <td>✓</td>
 <td>✓</td>
-<td>✓</td>
-<td>✓</td>
+<td>✓ 18</td>
+<td>✓ 18</td>
 </tr>
 <tr>
 <td>vhdx</td>
 <td>✓</td>
+<td>✓ 18</td>
 <td>✓</td>
 <td>✓</td>
 <td>✓</td>
 <td>✓</td>
-<td>✓</td>
-<td>✓‡ 10</td>
-<td>✓</td>
+<td>✓‡ 10, 18</td>
+<td>✓ 18</td>
 </tr>
 <tr>
 <td>luks</td>
@@ -17044,6 +17044,13 @@ qed images; instar refuses those by scope, not by inability (note 15).</p>
     so there is no qemu-img oracle for this output. See the "VHD/VHDX
     differencing (parent composition)" section below and the "VHD/VHDX
     differencing" section of quirks.md. Measured 2026-09-20.</li>
+<li><strong>VHD / VHDX differencing — <code>check</code>, <code>map</code>, <code>measure</code></strong> — these three
+    refuse when the source is a differencing VHD or VHDX, a sub-state of
+    these rows rather than a separate format; <code>convert</code>, <code>compare</code>, <code>dd</code>
+    and <code>bench</code> compose such a source against its parent instead (as does
+    <code>rebase</code>, when the differencing image is a member of the backing
+    chain it was given). See the "VHD/VHDX differencing (parent
+    composition)" section below for the full record.</li>
 </ol>
 <h3 id="vvfat">vvfat<a class="headerlink" href="#vvfat" title="Permanent link">&para;</a></h3>
 <p>vvfat is a directory-backed qemu <strong>pseudo-format</strong>: it synthesises a FAT

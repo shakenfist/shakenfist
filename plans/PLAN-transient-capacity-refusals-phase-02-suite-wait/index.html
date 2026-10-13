@@ -15630,7 +15630,7 @@ being briefly unavailable is not evidence about capacity.</p>
 <p><em>Amended by the automated review of PR #4166: survey finding 4's three
 causes were not all of them, and the fourth was a bug in this decision
 rather than in the code implementing it. <code>/admin/resources</code> keys
-<code>per_node</code> by node </em><em>uuid</em><em> (<code>summarize_resources()</code> builds it from
+<code>per_node</code> by node <strong>uuid</strong> (<code>summarize_resources()</code> builds it from
 <code>get_active_node_metrics()</code>, which keys by <code>str(n.uuid)</code>), while the
 suite pins by name almost everywhere. So a name-pinned create missed on
 every poll, and "absent means zero available, keep waiting" turned one

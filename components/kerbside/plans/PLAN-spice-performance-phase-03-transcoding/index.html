@@ -15406,7 +15406,7 @@ building on them.</p>
   and send an auth result; <code>make_message</code> and
   <code>MessageHeader::write</code> work in either direction. Every
   display-channel server message (SURFACE_CREATE, MARK,
-  DRAW_COPY, the STREAM_<em> family, INVAL_ALL_</em>,
+  DRAW_COPY, the STREAM_* family, INVAL_ALL_*,
   MONITORS_CONFIG, SET_ACK) has a reader and no writer, and
   there is no mock server that emits display messages.</li>
 <li><strong>The renderer is a client that owns its socket.</strong>

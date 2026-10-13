@@ -15485,8 +15485,8 @@ The testdata is bind-mounted read-only, as the existing jobs do.</p>
 <p><strong>published</strong> .deb/.rpm artifacts (release-plan steps 16-17, deferred
 per the v0.2.0 precedent). It is close but not identical to this plan:</p>
 <h1 id="474-is-a-one-time-manual-check-of-the-already-shipped-v030">474 is a one-time manual check of the *already-shipped v0.3.0<a class="headerlink" href="#474-is-a-one-time-manual-check-of-the-already-shipped-v030" title="Permanent link">&para;</a></h1>
-<p>binaries<em> (which are glibc-2.41 trixie builds), whereas this plan
-automates validation of </em>future* builds at a lower glibc floor.</p>
+<p>binaries* (which are glibc-2.41 trixie builds), whereas this plan
+automates validation of <em>future</em> builds at a lower glibc floor.</p>
 <p>Resolution: phase 1 opens by doing #474's manual check (install the
 published <code>instar_0.3.0-1_amd64.deb</code> and <code>.rpm</code> on real KVM-capable
 Debian/Ubuntu and Fedora/Rocky VMs, run <code>instar info</code> plus <code>create</code> +

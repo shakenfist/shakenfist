@@ -18141,9 +18141,8 @@ image as though the parent were absent, surfacing no parent at all —
 so <code>vhdiinfo</code> is the only external cross-check of the parent linkage
 instar wrote, and this suite is the only place anything other than
 instar's own parser reads a differencing image instar wrote.</p>
-<p>The assertions are structural only, per
-<a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>: the disk type, the
-parent filename for VHD, and the parent identifier for both formats,
+<p>The assertions are structural only: the disk type, the parent
+filename for VHD, and the parent identifier for both formats,
 each compared against what <code>vhdiinfo</code> reports for the parent itself
 rather than a hardcoded GUID. No composed content is read by this
 class — that is the data oracle's job, below. One limitation is
@@ -18254,8 +18253,9 @@ guard it actually fail?</strong> It is not a coverage tool and it measures
 nothing. Each case breaks one specific behaviour in <code>src/</code> and
 requires one named test to notice; a test that still passes against a
 deliberately broken emitter is not guarding what its name says it
-guards. See <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> for the
-path being guarded.</p>
+guards. See the VHD and VHDX notes in
+<a href="/components/instar/chain-config/#format-specific-notes">chain-config.md</a> for the
+composing path being guarded.</p>
 <p>There are <strong>105 cases</strong>, in eight groups.</p>
 <p>Twenty-seven cover the writer. Fifteen mutate a library crate
 (<code>create</code>, <code>vhd</code>, <code>vhdx</code>) and are caught by a Rust unit or round-trip

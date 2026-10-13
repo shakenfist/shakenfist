@@ -15912,13 +15912,13 @@ records <code>instar-testdata &lt;sha&gt; (#pr)</code> and is audited there.</p>
 <tr>
 <td>16. Composition: integration tests and fuzz</td>
 <td><a href="/components/instar/plans/PLAN-differencing-phase-16-compose-tests/">PLAN-differencing-phase-16-compose-tests.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td><code>d7a4973f</code> (#652)</td>
 </tr>
 <tr>
 <td>17. Composition: documentation</td>
-<td>PLAN-differencing-phase-17-compose-docs.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-differencing-phase-17-compose-docs/">PLAN-differencing-phase-17-compose-docs.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -16236,6 +16236,26 @@ rather than left as one phase to be split later, the way
   <code>vhdx::posix_relative_path</code> before phase 11 began, and
   <code>docs/info.md</code>'s claim that <code>--chain</code> stops at one image. The
   compose-side rows stay with phase 17.</p>
+<p><strong>Corrected by phase 17's survey on 2026-10-13.</strong> The bullet
+  above points at work phase 14 did. Commit <code>b0ba64b8</code> ("Say what
+  composes and what does not.", #630) wrote the per-operation
+  pages, the chain-discovery capability and its Known limitations
+  invariant, the compose section of <code>docs/format-coverage.md</code>, and
+  four further pages this bullet never listed; phase 15 then
+  corrected the refusal justifications. So
+  <code>docs/chain-discovery.md</code> is current and out of phase 17's scope
+  entirely, and the chain pages are 413 and 283 lines rather than
+  the 209 and 210 recorded above. What is genuinely left is four
+  false statements, two of them in files this bullet does not
+  name: <code>ARCHITECTURE.md:131-135</code> still says instar "refuses to
+  compose one on read" and links this plan for the deferral;
+  <code>docs/chain-config.md:267</code> is headed "VHD (future)" for a reader
+  built in phases 12 to 14, and predicts an <code>actual_size</code>
+  dependency the implementation does not have;
+  <code>docs/format-coverage.md</code>'s read-side rows show unmarked ticks
+  for the three operations that refuse a differencing source; and
+  <code>docs/info.md:112-117</code> defers a live limitation to this plan,
+  which has finished without fixing it.</p>
 <p>Two specifics phases 12 and 13 must confront, both already
 visible in the crates:</p>
 <ul>
