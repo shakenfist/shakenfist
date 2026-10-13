@@ -377,7 +377,10 @@ Tests verifying instar's security properties:
 ### Make Targets
 
 ```bash
-# Create Python virtual environment (first time only)
+# Create Python virtual environment (first time only). The venv sees
+# system site-packages so the libvhdi oracle (python3-libvhdi) is
+# importable; an older isolated venv is deleted and rebuilt from
+# tests/requirements.txt, so anything installed into it by hand is lost.
 make test-venv
 
 # Run safe tests (default, suitable for development)
@@ -1097,7 +1100,7 @@ differential fuzzing cannot reach.
 
 ### Fuzz targets
 
-42 targets across the parser and planner crates, organized in
+43 targets across the parser and planner crates, organized in
 `src/fuzz/`:
 
 | Target | Crate | Type |
@@ -1144,6 +1147,7 @@ differential fuzzing cannot reach.
 | `fuzz_bench_schedule` | bench | Buffer-based |
 | `fuzz_qcow2_write` | qcow2-write | Sim harness |
 | `fuzz_qcow2_write_growth` | qcow2-write | Buffer-based |
+| `fuzz_chain_compose` | qcow2 | CallTable (multi-device) |
 
 **Buffer-based** targets call parser functions that take `&[u8]`
 directly (e.g. `QcowHeader::parse(data)`). **CallTable** targets
@@ -1229,6 +1233,48 @@ debug builds on out-of-envelope petabyte-scale geometry; in release it
 returns `GrowthOverflow` gracefully, and production only passes bounded
 geometry — softening that guard to always return overflow is a recorded
 follow-up, not a bug.)
+
+`fuzz_chain_compose` is the only multi-device target, and the only one
+that reaches `read_chain_virtual_cluster` — the backing-chain compose
+path. Every other CallTable target serves one input device, so the
+chain walk (the loop over devices, the descent into the device behind
+one that does not hold a cluster, and the zero-fill at the bottom of a
+chain) was unreachable rather than merely unexplored:
+`fuzz_qcow2_l1l2`, which covers `cluster_lookup` at 93.67%, measured
+0.00% region coverage on `read_chain_virtual_cluster`.
+
+It opts the mock CallTable into a multi-device mode with
+`instar_fuzz::set_fuzz_devices(&[child, parent])`, which installs one
+buffer per device index. The mode is opt-in, and a target that never
+calls it sees one input device backed by the single `set_fuzz_input`
+buffer exactly as before — the default every other target depends on.
+`set_fuzz_input` turns the mode back off, so a target using both calls
+them in that order.
+
+The target builds a `ChainConfig` as a Rust struct rather than
+decoding one from bytes (`init_chain_states` and
+`read_chain_virtual_cluster` both take `&ChainConfig` directly, so the
+serialised form the host writes to guest memory is not on the path
+under test), varies the declared segmentation across the three shapes
+`init_chain_states` distinguishes — one chain of two, two chains of
+one, and a segmentation that tiles nothing — and asserts four
+invariants rather than the absence of a panic:
+
+1. A read that reports success filled the whole buffer. Checked by
+   reading the same span twice from two different sentinel prefills
+   and requiring the results to agree: a byte the reader never wrote
+   keeps whichever sentinel it started from, which no single sentinel
+   could prove because any byte value is one an image could
+   legitimately contain.
+2. `init_chain_states` reporting success never leaves a device the
+   reader needs state for uninitialised.
+3. A device with no state refuses rather than serving its own zeros.
+   This is the shape of a differencing child composed against a parent
+   that was never resolved, which exits 0 with the parent's data
+   replaced by zeros.
+4. A device behind the child never overrides a byte the child holds,
+   checked by comparing the composed read against the same span read
+   as the child alone.
 
 ### Running locally
 
@@ -1526,11 +1572,12 @@ The assertions are structural only, per
 [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/): the disk type, the
 parent filename for VHD, and the parent identifier for both formats,
 each compared against what `vhdiinfo` reports for the parent itself
-rather than a hardcoded GUID. No composed content is read. One
-limitation is recorded rather than worked around: `vhdiinfo` prints no
-`Parent filename` line for a VHDX, with or without `-v`, so the VHDX
-parent locator's path key cannot be checked through this tool — the
-Rust round-trip test pins it instead
+rather than a hardcoded GUID. No composed content is read by this
+class — that is the data oracle's job, below. One limitation is
+recorded rather than worked around: `vhdiinfo` prints no `Parent
+filename` line for a VHDX, with or without `-v`, so the VHDX parent
+locator's path key cannot be checked through this tool — the Rust
+round-trip test pins it instead
 (`src/crates/create/tests/round_trip.rs`).
 
 The suite runs inside the `instar-build` devcontainer, which installs
@@ -1543,6 +1590,74 @@ because a skipped test and a passing test look identical in a green
 run and `stestr` does not name skipped tests in its output — parsing
 the log could not have caught it. Removing `libvhdi-utils` from the
 devcontainer turns that job red instead of leaving it quietly green.
+
+### The data oracle: composed content, not just structure
+
+`vhdiinfo` has no way to answer "what does this chain compose to" —
+`libvhdi-utils` ships exactly two binaries, `vhdiinfo` and
+`vhdimount`, a FUSE mount that is a worse thing to put in an
+integration suite's path than a Python import. The `pyvhdi` binding
+(package `python3-libvhdi`, installed in
+`src/.devcontainer/Dockerfile` beside `libvhdi-utils` because both
+come from the same upstream release) can: `pyvhdi.file.set_parent()`
+stacks a parent behind a child so the pair reads as one image, making
+libvhdi a second, independent reader of composed *bytes*.
+`tests/base.py`'s `_require_pyvhdi` is modelled on
+`_require_vhdiinfo` and honours the same `INSTAR_REQUIRE_LIBVHDI`
+variable rather than a second one, so there is still one switch and
+one place to look.
+
+Two test classes in `tests/test_differencing.py` use it:
+
+- **`TestDifferencingOracleComposes`** drives every real chain the
+  project has — two formats, two and three images deep — through
+  `set_parent` and compares the result, byte for byte, against both
+  the recorded `*-composed.raw` golden and `instar convert -O raw`,
+  three independent readers of the same bytes. `set_parent` chains
+  cleanly to three levels, in either order, and still refuses a chain
+  given only in part, so the depth-three chains add no new exception
+  beyond the one below.
+- **`TestDifferencingCreatedChildComposes`** closes a different gap:
+  nothing previously read a byte back through a child
+  `instar create -f {vpc,vhdx} -b PARENT` itself wrote, only its
+  recorded identity fields. A freshly created child allocates
+  nothing, so all three readers must agree with the parent's own
+  content exactly — the one case here where a disagreement would
+  indict the writer rather than the reader. A created VHD child
+  composes exactly; a created VHDX child does not, for a reason that
+  is libvhdi's rather than instar's (defect D, below).
+
+**The one pinned exception.** libvhdi decodes a VHD per-block sector
+bitmap with an unmasked shift, so once a higher bit in a bitmap byte
+is set, every later sector that byte covers reads as present in the
+child. `vhd-diff-child-mixed` is the fixture built to put parent-owned
+and child-owned sectors in one bitmap byte, and sector 2 is where that
+lands: libvhdi returns 512 **zero** bytes there, not the child's data
+and not the parent's — it is reading the child's own (unwritten)
+block, not merely using the wrong source. `vhd-diff-child-aligned` is
+the fixture built to keep ownership out of shared bitmap bytes, and
+libvhdi agrees with it on all 16,777,216 bytes, which is the control
+that pins the fault on libvhdi's decoder rather than on the harness,
+the generator, or instar. The test asserts the exception positively,
+in both directions — that sector must differ, and the oracle's bytes
+there must be exactly zero — so a disagreement anywhere else fails
+loudly and an upstream fix turns this one test red rather than quietly
+passing.
+
+**Four libvhdi defects have been measured against this project's
+fixtures in total**, recorded in `tests/manifest.json` and in the
+docstrings of `TestDifferencingLibvhdiOracle`,
+`TestDifferencingOracleComposes` and
+`TestDifferencingCreatedChildComposes` in `tests/test_differencing.py`.
+None is an instar defect — each is isolated from instar's own reader
+and from the fixture generator by a control described at its source:
+
+| Defect | What libvhdi gets wrong |
+|---|---|
+| A | Decodes a VHD per-block sector bitmap with an unmasked shift, so a higher set bit makes every later sector in that byte read as present in the child (`vhd-diff-child-mixed`, sector 2, above) |
+| B | Looks up a VHDX parent locator's `relative_path` key with the wrong length, so `get_parent_filename()` returns `None` for a VHDX child instar wrote — instar writes that one key for the relative path `-b` was given, and the lookup never matches it |
+| C | Over-reads two bytes past an unterminated 512-byte parent unicode name into the following locator table, reporting a 257th character (`vhd-diff-locator-overlong`) |
+| D | Ignores a sector-bitmap BAT entry's `SB_BLOCK_NOT_PRESENT` state and reads the bitmap from file offset zero instead, misreading 56 of a freshly created, wholly unallocated VHDX child's 32768 sectors |
 
 ## Mutation harness for the differencing tests
 
@@ -1557,7 +1672,7 @@ deliberately broken emitter is not guarding what its name says it
 guards. See [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) for the
 path being guarded.
 
-There are **102 cases**, in seven groups.
+There are **105 cases**, in eight groups.
 
 Twenty-seven cover the writer. Fifteen mutate a library crate
 (`create`, `vhd`, `vhdx`) and are caught by a Rust unit or round-trip
@@ -1636,7 +1751,7 @@ differencing VHD or VHDX with its own parent absent — so the mutated
 walk fails during host-side chain discovery, before KVM is even opened,
 where the unmutated walk never tried to resolve that file at all.
 
-**14 cases guard `map`, `measure` and `check`**, which read through
+**15 cases guard `map`, `measure` and `check`**, which read through
 none of the machinery above: each reads its source on its own and
 declines a differencing one outright, so composing it is not a guest
 change those operations can inherit. **6 refusal cases** are the first
@@ -1710,7 +1825,7 @@ which SPEC(VHDX) permits -- tells the two apart. All three are
 with no test harness to drive it and the only observable verdict is
 the real command's exit code.
 
-The last group is **2 device-count cases**, guarding `bench` and
+Then **2 device-count cases**, guarding `bench` and
 `check`'s own chain-device-count check (issue #633). Every other
 operation that attaches a backing
 chain -- `convert`/`dd`, `commit`, `rebase`, `compare` -- refuses one
@@ -1729,6 +1844,25 @@ disable the guard with `if false` and are caught, through the real
 binary, by `TestAdversarialChainDeviceCount` in `tests/test_adversarial.py`
 -- the same test module that builds the fixture, since no static
 `instar-testdata` image has this shape.
+
+The last group is **2 subcluster cases**, and is the only group not
+about a differencing format at all. It is here because the defect it
+guards is the same class as the rest -- a span the reader never wrote,
+returned to the caller under a successful read -- and because the
+differencing work's own fuzz target is what found it. An extended-L2
+qcow2 entry can mark a subcluster allocated while naming host offset
+zero, which is a contradiction: there is no host cluster to read it
+from. The narrow arm of the fill loop has always zero-filled such a
+subcluster; the wide arm, taken when the device's sector size exceeds
+`cluster / 32`, matched no arm at all and left the caller's buffer
+untouched (issue #650). One case removes the arm that now handles it;
+the other reverts the lookup that classifies the entry, which is the
+vacuity guard -- without it a green test would prove only that the
+read never reached the fill loop. Both are `rust_case` against a
+static in-memory fixture at 8192-byte clusters and 512-byte sectors,
+the geometry that selects the wide arm; the default 64 KiB cluster
+takes the narrow one. `docs/quirks.md` records why instar zero-fills
+here where qemu fails the read.
 
 Most of the reader cases name a test in the `qcow2` crate and run it
 with the full input-format feature list, because the
@@ -1971,10 +2105,12 @@ Synthetic test images that cannot be created by `qemu-img` are built
 by scripts in `scripts/`:
 
 - `create-vhd-testdata.sh` — Fixed VHD (disk_type=2); differencing
-  VHD (disk_type=4) as a disk_type-only type marker via qemu-img
-  patching; real VHD and VHDX differencing chains (parent, aligned
-  and mixed children, and each chain's intended composed raw image)
-  via Python struct packing against the structure pin in
+  VHD (disk_type=4) and differencing VHDX (HasParent) as type-only
+  markers with no parent reference, via qemu-img patching; real VHD
+  and VHDX differencing chains (parent, aligned and mixed children, a
+  third differencing level over one child per format, and each
+  chain's intended composed raw image) via Python struct packing
+  against the structure pin in
   `docs/plans/PLAN-differencing-phase-01-pin.md`; and six adversarial
   parent-locator VHDs (absolute path, relative traversal, UNC, URL,
   an over-long unterminated parent name, and mutually conflicting
@@ -1985,12 +2121,17 @@ by scripts in `scripts/`:
   in `custom/format-coverage/`. Given one argument the audit
   directory becomes `<output-dir>/audit`, so a scratch run writes
   everything under the directory it was given rather than sending
-  twelve files to the scratch tree and six into the real testdata
-  checkout. Every file it writes is
-  byte-reproducible except the VHDX parent/child pair, where
-  `qemu-img` stamps fresh GUIDs on each run; that pair is therefore
-  skipped when both files already exist, and rebuilding it needs
-  `REGEN_VHDX=1` and a commit of both files together
+  sixteen files to the scratch tree and six into the real testdata
+  checkout. Every file it writes is byte-reproducible except the four
+  VHDX ones, where `qemu-img` stamps fresh GUIDs on each run; each is
+  therefore skipped when it already exists, and rebuilding any of
+  them needs `REGEN_VHDX=1`. The parent, the child and the
+  grandchild must be committed together when they are rebuilt: each
+  of the upper two records the DataWriteGuid of the one below it, so
+  a regenerated parent invalidates both images above it. The
+  generator re-checks both of those links on every run, including the
+  runs that rebuild nothing, so a half-finished regeneration fails
+  there rather than in the test suite
 - `create-vmdk-testdata.sh` — Binary VMDK4 with multi-extent descriptor
 - `create-luks-testdata.sh` — LUKS v1 containers with inner formats
 - `create-native-luks-testdata.py` — LUKS v1/v2 with known encrypted

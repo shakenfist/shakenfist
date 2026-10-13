@@ -85,7 +85,9 @@ only where YAML could put a value -- after a key, inside a `[...]`
 list, or as a `- ` item. A label is matched as a whole token, so
 `debian-12` in `debian-12-genericcloud-amd64.qcow2`,
 `kolla-ansible-master-debian-12` or `debian-12-gnome-agents` is not a
-runner reference and is not reported.
+runner reference and is not reported. A job bound to a runner of its
+own names its image as `bound-<label>`, so `bound-debian-12` is
+`debian-12` and is reported as such.
 
 **Container image references**, in a workflow's `container:` and
 `image:` keys and in the `FROM` lines of any `Dockerfile`,

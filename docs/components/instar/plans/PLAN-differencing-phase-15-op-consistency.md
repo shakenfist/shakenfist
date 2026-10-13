@@ -309,7 +309,21 @@ is stripped: zero non-comment `PLAN-*.md` references in `src/`.
 * `instar check` and `instar bench` refuse a 17-image chain before
   opening KVM, each naming its own operation. Falsifiable: a test
   asserts the message text for both, and
-  `grep -c 'exceeds the' src/vmm/src/main.rs` has grown by two.
+  `grep -c 'exceeds maximum of' src/vmm/src/main.rs` has grown by
+  two, from 3 to 5.
+
+  **Search string corrected at close-out.** As written this criterion
+  grepped for `exceeds the`, which neither guard 15c added says: both
+  render "chain depth {n} exceeds maximum of {max} devices", matching
+  the `convert`/`dd` and `compare` guards rather than the `rebase` and
+  `commit` ones that do say "exceeds the {n}-device limit". The
+  `exceeds the` count was 5 before the phase and 5 after, so the
+  criterion as phrased could not have been met by any wording 15c
+  plausibly chose. Both guards exist, both refuse before KVM opens and
+  both name their own operation (`src/vmm/src/main.rs:5389` for
+  `bench`, `:12094` for `check`), and the corrected string does grow
+  by two -- so what was wrong here was the probe, not the work it was
+  measuring.
 * Nothing in `src/`, `tests/` or the top level of `docs/` claims that
   **instar** cannot read or compose a differencing image. Falsifiable
   by a script rather than a grep:
@@ -378,8 +392,20 @@ is stripped: zero non-comment `PLAN-*.md` references in `src/`.
 * `tests/test_differencing.py` cites no plan file, phase or decision
   number at all, not merely none added by this phase. Falsifiable:
   `grep -cE 'Decision [0-9]|decision [0-9]|PLAN-[a-z0-9-]+\.md|phase 1[0-9]|phase plan' tests/test_differencing.py`
-  returns 0. Four such references predated this phase, one of which --
-  "whether instar assembles a chain the way libvhdi does is phase 15's
+  returns 0.
+
+  **This probe was too narrow, found during phase 16.** It returns 0,
+  and six plan coordinates were in the file the whole time: "step 4b"
+  twice, "phase 4", "phase 7" and two bare "this phase". `phase 1[0-9]`
+  matches phases 10 to 19 only, and no alternative covered a step
+  letter. The criterion's claim -- "at all, not merely none added by
+  this phase" -- was therefore never tested. Phase 16 swept the file
+  for the whole class and widened the pattern in its own definition of
+  done; the figure of four pre-existing references this criterion
+  mentions was itself an undercount for the same reason.
+
+  Four such references predated this phase, one of which -- "whether
+  instar assembles a chain the way libvhdi does is phase 15's
   question" -- this phase's own rescoping made false, so correcting
   them is this phase's business rather than tidying.
 * `docs/quirks.md` states the five-compose / three-report boundary

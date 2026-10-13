@@ -9,6 +9,10 @@ queue entry touching only content no lane exercises should not pay for
 them — the `docs/` directory, and the review-tracking state
 (`REVIEWS.md` and the `.vscode` weaudit files).
 
+A job bound to a runner of its own (`bound-<image>`, `bound-<size>`
+and a `bind-` token, with no `vm` label; see `workflow-standards.md`)
+runs on the same ephemeral VMs and counts as a `vm`-runner job here.
+
 Every workflow running `vm`-runner jobs on `pull_request` or
 `merge_group` must be path-filtered, and the filter must exclude a
 `docs/**` pattern where the repository has a `docs/` directory, and a
