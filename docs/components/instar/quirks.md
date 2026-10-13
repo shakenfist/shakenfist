@@ -4352,9 +4352,10 @@ locator keys hold absolute paths and are reported verbatim: instar
 writes a POSIX absolute path under `absolute_win32_path` unchanged, and
 rewriting a genuine Windows absolute path's separators would produce
 something that is neither a Win32 path nor a POSIX one. A genuine
-Hyper-V child benefits by the same rule, which is the read half of what
-[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) decision 6 assigns
-to the composition phases.
+Hyper-V child benefits by the same rule, and so do the five operations
+that compose such a child: the string `info` reports back is the one
+the host resolves when it walks the chain for them; see
+[chain-discovery.md](/components/instar/chain-discovery/#known-limitations).
 
 **A child's block size is independent of its parent's, deliberately.**
 instar gives a differencing child the same defaults as any other new
@@ -4832,8 +4833,9 @@ rather than fixed, because none of them was that change's job to close:
    `\\attacker\share\probe`, reported exactly as stored
    (`ADVERSARIAL_LOCATOR_FIXTURES` in `tests/test_differencing.py`) and
    then joined onto the image
-   directory. Path normalisation belongs with the composition work in
-   [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/). See
+   directory. Fixing it is path normalisation and needs a decision
+   rather than a guard, so it is tracked in
+   [issue #658](https://github.com/shakenfist/instar/issues/658). See
    [info.md](/components/instar/info/#known-limitations).
 3. **`instar resize` accepted a differencing VHDX** (fixed). This was a
    write path, predated the differencing work, and `resize` never called

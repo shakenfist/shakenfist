@@ -201,8 +201,8 @@ kept that way so that drift is a `diff` rather than a judgement:
 | `.github/workflows/pr-re-review.yml` | `templates/ci-review-automation/pr-re-review.yml` | `3b5142c` |
 | `.github/workflows/pr-retest.yml` | `templates/ci-review-automation/pr-retest.yml` | `5e9a4b3` |
 | `.github/workflows/pr-fix-tests.yml` | `templates/test-drift-fix/pr-fix-tests.yml` | `aec16db` |
-| `.github/workflows/mermaid-lint.yml` | `templates/mermaid-lint/mermaid-lint.yml` | `ff991f8` |
-| `tools/mermaid-lint.sh` | `templates/mermaid-lint/mermaid-lint.sh` | `b83f1f9` |
+| `.github/workflows/mermaid-lint.yml` | `templates/mermaid-lint/mermaid-lint.yml` | `7cadf3e` |
+| `tools/mermaid-lint.sh` | `templates/mermaid-lint/mermaid-lint.sh` | `5279ac3` |
 
 Fix them upstream and re-copy, rather than editing them here: the
 comments they carry are the template's, and the reason the bot trigger

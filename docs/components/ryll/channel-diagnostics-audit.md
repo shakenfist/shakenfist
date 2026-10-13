@@ -23,7 +23,7 @@ channel's snapshot changes.
 |---|---|---|---|
 | display | 55 | rich: per-stream counters, decoder backends, decode rings, STREAM_REPORT, destroyed-streams ring | no per-opcode maps — deliberate, see below |
 | main | 24 | mm_time tracking, session_id, keepalive_timeout_fired, agent request/reply stats | complete |
-| inputs | 18 | motion_count, recent_events, KEY_MODIFIERS restatement counters | complete |
+| inputs | 16 | motion_count, recent_events | complete |
 | cursor | 18 | cache_entries, cache_contents, ack-window state | complete |
 | playback | 35 | full session / decode / device pipeline, output device and stream-failure state | complete |
 | usbredir | 18 | caps handshake, redirected-device list, connect/disconnect totals | complete |
@@ -152,11 +152,13 @@ reply comes. Stalls are read from agent token starvation instead:
 `agent_tokens`, `queued_agent_message_count`,
 `agent_starved_since_ts_secs` and `agent_stall_count`.
 
-Main deliberately has no client-keepalive send counters: the
-spurious-PONG keepalive they once tracked was a band-aid made
-redundant when the underlying main-channel wedge was fixed
-(`370d8ce5`). The inputs channel carries identically-named counters
-for a different mechanism — see the inputs section below.
+No channel has client-keepalive send counters. Main's
+spurious-PONG keepalive was a band-aid made redundant when the
+underlying main-channel wedge was fixed (`370d8ce5`), and the
+inputs channel's KEY_MODIFIERS restatement, kept on the same
+hypothesis, was removed because the server applies KEY_MODIFIERS
+by toggling the guest's locks: each restatement undid a lock
+changed from inside the guest or by another client (#517).
 
 One nuance: the per-opcode map is less useful on main than on other
 channels because the agent-related opcodes (`VD_AGENT_*`) are nested
@@ -170,12 +172,8 @@ report's `traffic.pcap`.
 
 Inputs has `motion_count`, `button_state`, `secs_since_last_key`, a
 `recent_events` ring that records the last N input events with
-timestamps, the KEY_MODIFIERS idle restatement counters
-(`client_keepalive_send_count`, `last_client_keepalive_send_ts_secs`
-— these count the periodic KEY_MODIFIERS restatement kept on the
-cross-channel-idleness hypothesis, and are unrelated to the removed
-main-channel keepalive despite the shared names), and the four
-per-opcode baseline fields. No channel-specific gaps identified.
+timestamps, and the four per-opcode baseline fields. No
+channel-specific gaps identified.
 
 ### cursor
 

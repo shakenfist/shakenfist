@@ -334,31 +334,34 @@ repository and passes through to the script.
    The job-level form uses a `check_paths` job running
    `dorny/paths-filter` to compute whether anything outside the
    review paths changed, and gates the real job on that output with
-   `needs:` and `if:`. hunkydory's
-   [`codeql-analysis.yml`](https://github.com/shakenfist/hunkydory/blob/develop/.github/workflows/codeql-analysis.yml)
-   is the worked example: `Analyze` is a required check on
-   hunkydory's default branch, so pull requests skip it at the job
-   level rather than with a trigger-level filter, while `push`
-   carries no required check and keeps `paths-ignore` directly
-   (trimmed). The fleet's CodeQL template,
+   `needs:` and `if:`. The fleet's CodeQL template,
    [`templates/codeql/codeql-analysis.yml`](https://github.com/shakenfist/development/blob/main/templates/codeql/codeql-analysis.yml),
-   has the same shape and also skips `docs/**` and fork pull
-   requests:
+   is the worked example, and hunkydory runs it unchanged:
+   `Analyze` is a required check on hunkydory's default branch, so
+   pull requests skip it at the job level rather than with a
+   trigger-level filter, while `push` carries no required check and
+   keeps `paths-ignore` directly. Besides the review paths it skips
+   `docs/**`, and it does not analyse fork pull requests at all
+   (trimmed; the template's comments say why each condition is
+   there):
 
    ```yaml
    on:
      push:
-       branches: [develop]
+       branches: [main, develop]
        paths-ignore:
          - 'REVIEWS.md'
          - '.vscode/*.weaudit'
          - '.vscode/*.weaudit-shas.json'
          - '.vscode/review-scope.toml'
+         - 'docs/**'
      pull_request:
-       branches: [develop]
+       branches: [main, develop]
+     # ... and a weekly schedule
 
    jobs:
      check_paths:
+       # ... name, runner and timeout
        permissions:
          pull-requests: read
        outputs:
@@ -376,12 +379,17 @@ repository and passes through to the script.
                  - '!.vscode/*.weaudit'
                  - '!.vscode/*.weaudit-shas.json'
                  - '!.vscode/review-scope.toml'
+                 - '!docs/**'
 
      analyze:
+       name: Analyze
        needs: [check_paths]
        if: |
          !cancelled()
          && needs.check_paths.outputs.code_changed != 'false'
+         && (github.event_name != 'pull_request'
+             || github.event.pull_request.head.repo.full_name == github.repository)
+       # ... runner, concurrency and permissions
        steps:
          - uses: actions/checkout@v7
          # ... the rest of the analysis
@@ -412,6 +420,12 @@ repository and passes through to the script.
      because its own dependency failed still reads as green to the
      merge gate. `!cancelled()` forces `analyze`'s own `if:` to be
      evaluated instead of inheriting that failure as a silent pass.
+   * The fork guard is specific to CodeQL's autobuild, which runs the
+     pull request's own build on the shared static runners. A fork's
+     pull request skips `analyze`, which satisfies the required check,
+     so its change is scanned by the push after it merges rather than
+     before. A workflow whose job runs nothing from the pull request
+     does not need the clause.
 
    Which mechanism a given workflow needs is a property of whether
    it backs a required status check, not of what kind of workflow it
@@ -695,35 +709,47 @@ so it catches the sidecar and hand-edited rows without making the
 file a hot spot. An adopting repository that copies that hook
 inherits the check; one that does not, does not.
 
-**Automatic pruning and importing.** Each adopting repository
-carries a `prune-reviews` workflow, copied byte-for-byte from
+**Automatic pruning and importing.** Each adopting repository carries
+a `prune-reviews` workflow, copied byte-for-byte from
 `templates/review-tracking/` (step 7 of "Adopting a repository"
-above), that runs on every push to its default branch, once a day,
-and on manual dispatch -- the push is the only event that can
-create staleness there, and the daily and dispatch runs are what
-pick up new reviews imported from this repository even when the
-target repository itself is quiet. It clones this repository for
-the script, runs `prune` then `import`, and commits the updated
-review state and regenerated `REVIEWS.md` whenever either changed
--- including a regeneration that pruned nothing, which is what
-corrects a moved header count -- directly back to that branch as
-shakenfist-bot, in one commit, `Prune and import review marks.`.
-It lands that commit by regenerating rather than rebasing: each of
-up to three attempts fetches the branch, resets to its tip, runs
-`prune` and `import` there, and pushes. Everything in the commit is
-derived from the tree beneath it, so a merge that lands mid-run
-costs a retry, never a conflict, and the retry also prunes the marks
-that merge made stale. A concurrency group serialises the
-workflow's own runs, and the loop terminates either way:
-a repository that can push with the default `GITHUB_TOKEN` never
-retriggers the workflow at all, while one whose ruleset forces a
-PAT instead -- as ryll's does, since develop requires a pull
-request before merging and GitHub will not accept the built-in
-Actions app as a bypass actor, so shakenfist-bot pushes with
-`DEPENDENCIES_TOKEN` -- retriggers exactly once, into a run that
-finds nothing left to do (observed 2026-09-11 04:57:20 UTC, before
-ryll carried the merged workflow, `Prune stale review marks.`,
-which committed nothing).
+above), that runs on every push to its default branch, once a day, and
+on manual dispatch -- the push is the only event that can create
+staleness there, and the daily and dispatch runs are what pick up new
+reviews imported from this repository even when the target repository
+itself is quiet. It clones this repository for the script, runs
+`prune` then `import`, and commits the updated review state and
+regenerated `REVIEWS.md` whenever either changed -- including a
+regeneration that pruned nothing, which is what corrects a moved
+header count -- directly back to that branch as shakenfist-bot, in one
+commit, `Prune and import review marks.`. It lands that commit by
+regenerating rather than rebasing: each of up to three attempts
+fetches the branch, resets to its tip, runs `prune` and `import`
+there, and pushes. Everything in the commit is derived from the tree
+beneath it, so a merge that lands mid-run costs a retry, never a
+conflict, and the retry also prunes the marks that merge made stale.
+If `import` fails, the run discards whatever it wrote, lands `prune`'s
+result alone, and only then fails: `prune` is what stops a changed
+file reading as reviewed, so an import bug must not hold it up, but it
+must not pass unnoticed either. A concurrency group serialises the
+workflow's own runs, and the loop terminates either way: a repository
+that can push with the default `GITHUB_TOKEN` never retriggers the
+workflow at all, while one whose ruleset forces a PAT instead -- as
+ryll's does, since develop requires a pull request before merging and
+GitHub will not accept the built-in Actions app as a bypass actor, so
+shakenfist-bot pushes with `DEPENDENCIES_TOKEN` -- retriggers exactly
+once, into a run that finds nothing left to do (observed 2026-09-11
+04:57:20 UTC, before ryll carried the merged workflow, `Prune stale
+review marks.`, which committed nothing).
+
+The job runs on shared, long-lived static runners that also run pull
+request code, so it trusts as little as it can of what an earlier job
+could have left there. It ignores global and system git configuration,
+gives gitsign a fresh TUF cache on every run, keeps no credentials in
+the checkout, and hands the push token to its one `git push` alone,
+through the environment rather than argv or `.git/config`. "Runner
+isolation" in
+[templates/review-tracking/README.md](https://github.com/shakenfist/development/blob/main/templates/review-tracking/README.md#runner-isolation)
+has the detail.
 
 The bot's commit is not signed, and does not need to be for the
 prune half of it: prune can only *remove* marks, never add or
@@ -750,6 +776,19 @@ what bounds it: the bot can only relay an attestation a human has
 already signed, and an entry it cannot verify is skipped and
 reported rather than written.
 
+That bound has a limit worth stating plainly. The code that does the
+verifying, and `REVIEWER_IDENTITIES`, the map saying whose signature
+counts for which reviewer, both come from this repository's main
+branch, the clone every adopted repository's workflow makes. gitsign
+therefore protects against forged review *data*: a stamp or a mark
+nobody signed. It does not protect against a change to the code or
+to the identity map, which could, say, add an identity, weaken the
+check, or skip it, and every adopted repository would run the
+changed version on its next import. A pull request that changes
+`scripts/review-tracking.py`'s import path or `REVIEWER_IDENTITIES`
+therefore deserves the same scrutiny as a review attestation, since
+in effect it decides what counts as one.
+
 **Importing reviews from this repository.** Much of what an adopted
 repository has to review is not its own code: workflow templates,
 helper scripts, and exported GitHub configuration are written and
@@ -770,6 +809,11 @@ repository's history, oldest commit first, and credits a
 `.vscode/<reviewer>.weaudit` has a full-file `auditedFiles` entry for
 that path. Where a blob was reviewed more than once, the earliest
 qualifying commit wins, since that is the attestation to point at.
+The history walked is that of `origin/main` in the clone `import`
+runs from, not whatever branch the clone has checked out: a review
+committed on a branch that has not merged is not yet an attestation,
+and may never become one. A clone with no `origin/main` falls back to
+its `HEAD`, with a warning saying so.
 Any path is eligible, not only `templates/`: identical bytes need no
 context the file does not carry, and a whole-file review never
 attested to context either -- a native mark does not go stale when a
@@ -819,17 +863,22 @@ itself:
 }
 ```
 
-`date` is the source stamp's date, not the day of the import,
-because it records when the content was actually read. `verified`
-records whether the introducing commit's signature was checked --
-see the attestation argument above for why `import` checks it before
-trusting the entry, rather than leaving verification to a later
-reader. A commit that fails verification is skipped with a warning
-naming it, as is a review by a reviewer with no entry in
-`REVIEWER_IDENTITIES` (see "Commit signing"). `status` does not
-verify an imported entry's provenance, any more than it verifies a
-native mark's signature: it only checks that the blob SHA still
-matches `HEAD`, the same as it does for a native mark.
+`date` is the source stamp's date, not the day of the import, because
+it records when the content was actually read. `verified` records
+whether the introducing commit's signature was checked -- see the
+attestation argument above for why `import` checks it before trusting
+the entry, rather than leaving verification to a later reader. A
+commit that fails verification is skipped with a warning naming it, as
+is a review by a reviewer with no entry in `REVIEWER_IDENTITIES` (see
+"Commit signing"). A verification that times out is skipped the same
+way, and after three timeouts in one run (`VERIFY_TIMEOUT_BUDGET`)
+`import` stops verifying altogether: it skips every remaining
+candidate with a single warning giving the count, so that a Sigstore
+outage costs a run minutes rather than running it into its job
+timeout, and a later run picks them up. `status` does not verify an
+imported entry's provenance, any more than it verifies a native mark's
+signature: it only checks that the blob SHA still matches `HEAD`, the
+same as it does for a native mark.
 
 `--no-verify` is the only way to import without verification. It
 disables the check outright, every run under it says so on stderr,
@@ -845,8 +894,8 @@ reviewed. It still removes entries, which needs no verification.
 **Verifying an imported entry by hand.** Checking one imported
 mark without running `review-tracking.py` takes four steps. Run
 `git fetch` in both clones first: a stale clone of this repository
-may not have the commit yet, and step 4 compares against
-`origin/<default branch>`.
+may not have the commit yet, and steps 2 and 4 compare against
+each repository's `origin/<default branch>`.
 
 1. Read the entry from the target repository's
    `.vscode/imports.weaudit-shas.json` on its default branch. You
@@ -870,19 +919,37 @@ may not have the commit yet, and step 4 compares against
    follow a worktree's `.git` file, and reports every commit as
    "reference not found". See "Commit signing" for the trust path
    this checks.
+
+   Then confirm the commit is on this repository's default branch:
+
+   ```
+   git merge-base --is-ancestor <commit> origin/main && echo on main
+   ```
+
+   A signed commit that was never merged, or was rebased away, is
+   not an attestation: nobody accepted it into the record, and the
+   review it carries may have been rewritten since. `import` walks
+   only `origin/main` for this reason, so an entry whose commit is
+   not on it did not come from `import`.
 3. Confirm the commit records a full-file review of that blob:
 
    ```
-   git show <commit>:.vscode/<reviewer>.weaudit-shas.json
-   git show <commit>:.vscode/<reviewer>.weaudit
+   git show <commit>:.vscode/<reviewer>.weaudit-shas.json \
+       | jq -c --arg p '<source path>' '.files[$p]'
+   git show <commit>:.vscode/<reviewer>.weaudit \
+       | jq -c --arg p '<source path>' \
+           '{full: [.auditedFiles[]? | select(.path == $p)],
+             partial: [.partiallyAuditedFiles[]? | select(.path == $p)]}'
    ```
 
-   The first must have an entry for the source path with the same
-   `sha` and `date` as the imported entry. The second must list
-   the source path in the top-level `auditedFiles` array, as a
-   plain `{"path": ..., "author": ...}` entry -- not in
-   `partiallyAuditedFiles`, whose region marks never count for
-   import.
+   The first must print the same `sha` and `date` as the imported
+   entry. The second must show one `full` entry and an empty
+   `partial` list: a full-file mark is a plain
+   `{"path": ..., "author": ...}` entry in the top-level
+   `auditedFiles` array, and region marks in
+   `partiallyAuditedFiles` never count for import. (Both files are
+   whole-repository state, hundreds of entries long; `jq` keeps the
+   output to the one path being checked.)
 4. In the target repository, confirm the entry is still current:
 
    ```
@@ -901,6 +968,32 @@ otherwise removed by `import` itself, with the same message `prune`
 gives, so that `REVIEWS.md` never shows it as reviewed in the
 meantime. `import` regenerates `REVIEWS.md` when it changes
 anything, as `stamp` and `prune` do.
+
+Every run also checks the entries already in the imports file against
+this repository's history, not only the ones it adds. An attestation
+is introduced at a commit whose state holds the review and none of
+whose parents' state does, so the same review can be introduced more
+than once -- on a review branch merged after main made it too, or by
+re-stamping a blob after a prune -- and an entry pointing at any of
+those commits is supported. An entry whose `sha`, `imported.reviewer`,
+`imported.path` and `imported.commit` are not one of them -- one
+written by hand, or one pointing at a commit that is not on
+`origin/main` or merely carries a review forward, such as a prune or
+the merge of a review branch, or one naming a repository other than
+shakenfist/development -- is replaced by a real import of the same
+content if there is one, and otherwise removed, with a warning on
+stderr either way. Entries imported under `--no-verify` are checked
+the same way and kept when history supports them. A run that cannot
+judge an entry keeps it and says so: one without gitsign, one that has
+spent its timeout budget, and one walking a shallow clone or a clone
+with no `origin/main`, whose history may simply lack the attestation.
+
+An entry not shaped as `import` writes it -- not an object, or missing
+a string `sha` or a string `repo`, `reviewer`, `path` or `commit`
+under `imported` -- is ignored with a warning by every command that
+reads the imports file, and dropped from it the next time `import` or
+`prune` writes it. A file that is not valid JSON, or not a JSON
+object, is treated as empty the same way.
 
 A native review always supersedes an import: if a reviewer marks a
 file that already carries an imported entry, `import` removes its

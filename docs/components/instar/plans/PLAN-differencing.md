@@ -372,8 +372,8 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 | 13. Composition: guest VHDX sector-bitmap read path | [PLAN-differencing-phase-13-vhdx-compose.md](/components/instar/plans/PLAN-differencing-phase-13-vhdx-compose/) | Complete | `d677823c` (#624) |
 | 14. Composition: rollout across the chain-walker operations | [PLAN-differencing-phase-14-op-rollout.md](/components/instar/plans/PLAN-differencing-phase-14-op-rollout/) | Complete | `7fef1321` (#630) |
 | 15. Consistency for the non-composing operations | [PLAN-differencing-phase-15-op-consistency.md](/components/instar/plans/PLAN-differencing-phase-15-op-consistency/) | Complete | `f14554cf` (#646) |
-| 16. Composition: integration tests and fuzz | [PLAN-differencing-phase-16-compose-tests.md](/components/instar/plans/PLAN-differencing-phase-16-compose-tests/) | In progress | |
-| 17. Composition: documentation | PLAN-differencing-phase-17-compose-docs.md | Not started | |
+| 16. Composition: integration tests and fuzz | [PLAN-differencing-phase-16-compose-tests.md](/components/instar/plans/PLAN-differencing-phase-16-compose-tests/) | Complete | `d7a4973f` (#652) |
+| 17. Composition: documentation | [PLAN-differencing-phase-17-compose-docs.md](/components/instar/plans/PLAN-differencing-phase-17-compose-docs/) | In progress | |
 | 18. Push audit: `PUSH-AUDIT.md` over every phase above | PLAN-differencing-phase-18-push-audit.md | Not started | |
 
 ### Sequencing rationale
@@ -695,6 +695,27 @@ rather than left as one phase to be split later, the way
   `vhdx::posix_relative_path` before phase 11 began, and
   `docs/info.md`'s claim that `--chain` stops at one image. The
   compose-side rows stay with phase 17.
+
+  **Corrected by phase 17's survey on 2026-10-13.** The bullet
+  above points at work phase 14 did. Commit `b0ba64b8` ("Say what
+  composes and what does not.", #630) wrote the per-operation
+  pages, the chain-discovery capability and its Known limitations
+  invariant, the compose section of `docs/format-coverage.md`, and
+  four further pages this bullet never listed; phase 15 then
+  corrected the refusal justifications. So
+  `docs/chain-discovery.md` is current and out of phase 17's scope
+  entirely, and the chain pages are 413 and 283 lines rather than
+  the 209 and 210 recorded above. What is genuinely left is four
+  false statements, two of them in files this bullet does not
+  name: `ARCHITECTURE.md:131-135` still says instar "refuses to
+  compose one on read" and links this plan for the deferral;
+  `docs/chain-config.md:267` is headed "VHD (future)" for a reader
+  built in phases 12 to 14, and predicts an `actual_size`
+  dependency the implementation does not have;
+  `docs/format-coverage.md`'s read-side rows show unmarked ticks
+  for the three operations that refuse a differencing source; and
+  `docs/info.md:112-117` defers a live limitation to this plan,
+  which has finished without fixing it.
 
 Two specifics phases 12 and 13 must confront, both already
 visible in the crates:
