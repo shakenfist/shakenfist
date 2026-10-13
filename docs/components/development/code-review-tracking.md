@@ -842,6 +842,55 @@ so and pointing at `--no-verify`, and still exits zero, so that a
 CI job on a runner without gitsign neither fails nor marks anything
 reviewed. It still removes entries, which needs no verification.
 
+**Verifying an imported entry by hand.** Checking one imported
+mark without running `review-tracking.py` takes four steps. Run
+`git fetch` in both clones first: a stale clone of this repository
+may not have the commit yet, and step 4 compares against
+`origin/<default branch>`.
+
+1. Read the entry from the target repository's
+   `.vscode/imports.weaudit-shas.json` on its default branch. You
+   need the target `path` and `sha`, plus `imported.reviewer`,
+   `imported.path` (the source path here) and `imported.commit`.
+2. In a clone of this repository, verify the commit's signature:
+
+   ```
+   gitsign verify \
+       --certificate-identity=<identity> \
+       --certificate-oidc-issuer=https://github.com/login/oauth \
+       <commit>
+   ```
+
+   `<identity>` comes from `REVIEWER_IDENTITIES` in
+   `scripts/review-tracking.py`, which maps a reviewer name to a
+   signing identity; that map is the authority, and the example
+   here (`mikal` signs as `mikal@stillhq.com`) may not list every
+   reviewer. Run this in a full clone, not a linked worktree:
+   gitsign reads the repository through go-git, which cannot
+   follow a worktree's `.git` file, and reports every commit as
+   "reference not found". See "Commit signing" for the trust path
+   this checks.
+3. Confirm the commit records a full-file review of that blob:
+
+   ```
+   git show <commit>:.vscode/<reviewer>.weaudit-shas.json
+   git show <commit>:.vscode/<reviewer>.weaudit
+   ```
+
+   The first must have an entry for the source path with the same
+   `sha` and `date` as the imported entry. The second must list
+   the source path in the top-level `auditedFiles` array, as a
+   plain `{"path": ..., "author": ...}` entry -- not in
+   `partiallyAuditedFiles`, whose region marks never count for
+   import.
+4. In the target repository, confirm the entry is still current:
+
+   ```
+   git rev-parse origin/<default branch>:<path>
+   ```
+
+   must equal the entry's `sha`.
+
 A file whose native mark has gone stale is not imported until
 `prune` has removed the mark, which is why the workflow will run
 `prune` first; until then the file's own review history says it

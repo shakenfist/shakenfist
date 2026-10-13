@@ -285,8 +285,8 @@ answers.
 |-------|--------|--------|
 | 1. `import` subcommand | Complete | 54c7ecc (#177) |
 | 2. Review tracking CI template and rollout | Complete | 02d6dbb (#186); actions 74a33c9 (#111); hunkydory f24d413 (#57); kerbside 62ccbcb (#504); ryll ce3ebb3 (#418) |
-| 3. Template convergence | In progress | |
-| 4. Verification | Not started | |
+| 3. Template convergence | Complete | b520c22 (#203); actions 89717fa (#122), e05bbb1 (#134); hunkydory 8730d75 (#63), c22059e (#66); kerbside 700102e (#511), ede2d7d (#519); ryll 79721f3 (#425), f8a4e2f (#455) |
+| 4. Verification | In progress | |
 | 5. Push audit | Not started | |
 
 <!-- shared-block: plan-status-vocabulary v1 -->
@@ -888,27 +888,327 @@ agrees the CodeQL template's event table with Michael. It is the
 one change here that alters a security scanner's coverage in every
 copy.
 
+**Outcome.** Re-measured 2026-10-13 against each repository's
+default branch: every copy the classification table converges is
+byte-identical to its template, stamped here, and reviewed in its
+repository (by import or by a direct stamp). The three copies that
+differ are the ones the table keeps per-repository: CodeQL in
+actions and kerbside, and actions' reusable `export-repo-config.yml`.
+A review-only hunkydory pull request (#68) merged with `Analyze`
+reported as skipped.
+
+Convergence did not hold on its own. The first-round re-sync pull
+requests merged on 09-30 (actions#122, hunkydory#63), 10-01
+(kerbside#511) and 10-03 (ryll#425). Meanwhile 5e9a4b3 (#204, on
+`main` 10-01) changed both bot workflow templates, 3b5142c (#212,
+on `main` 10-03) changed `pr-re-review.yml` again, and Renovate
+bumped `renovate.yml` on 10-02. actions' and hunkydory's copies
+lagged within a day of merging; kerbside's and ryll's
+`pr-re-review.yml` were already behind when they merged. Eight bot
+workflow copies lagged until a second round of re-sync pull
+requests (actions#134, hunkydory#66, kerbside#519, ryll#455)
+merged on 10-03 and 10-04. Renovate's bumps converge by
+themselves, because it makes the same edit in every repository; a
+hand edit to a template does not. Phase 4 takes this as its main
+input.
+
+`audit-check.py` against the five default branches shows no failure
+this phase caused. hunkydory's `ci-review-automation` failure
+predates it: hunkydory's `ci.yml` has never called the automatic
+reviewer, and this phase did not touch that file.
+
 ### Phase 4: verification
 
-Planning effort: medium.
+Planning effort: medium. Nothing here changes what a criterion
+means or touches `audit-check.py`'s scheduler; the one judgement
+call (decision 3) is recorded, not implemented.
 
-Once phases 2 and 3 have merged in every adopted repository, and
-the converged templates have been re-reviewed and stamped here:
+**Scope.** In: measure what phases 1 to 3 bought, against the
+2026-09-24 "Situation" baseline; test that the documentation is
+enough to verify an imported mark by hand, and fix it where it is
+not; record the evidence that `prune` removes an imported mark; and
+put the drift phase 3 hit in front of the decision about a template
+conformance criterion. Out: building that criterion, re-syncing any
+copy that has drifted since 2026-10-13 (that is ordinary
+`standards-alignment` work), and anything under Future work.
 
-* Record the imports each repository's first runs made, and the
-  per-repository counts in the "Situation" table re-measured, so
-  the plan says what the work actually bought.
-* Pick one imported mark in each repository and verify it by hand
-  from the review account, following the procedure the phase 1
-  documentation describes, to confirm the documentation is
-  sufficient.
-* Confirm `prune` removes an imported mark when the target file
-  changes, by watching it happen on the next ordinary change to an
-  imported file.
+**What the survey found (2026-10-13).** The section as first
+written was mostly right. Corrected here, in place of the old text:
+
+* **"Collect the `prune-reviews` run logs" is the wrong source.**
+  Actions logs expire after 90 days; the record that lasts is the
+  git history of each repository's `.vscode/imports.weaudit-shas.json`,
+  which every prune-and-import commit updates. In actions it shows
+  five commits from 2026-09-28 to 2026-10-09, each adding or removing
+  entries. 4a reads that history instead.
+* **The third bullet has already happened** and needs recording, not
+  watching for. In actions, 00642fd dropped the imported
+  `renovate.yml` mark after a Renovate bump, and 953a997 dropped
+  `pr-re-review.yml` and replaced `pr-retest.yml` after the 10-01
+  template change. 7e77693 then re-imported `renovate.yml` at the
+  new blob once it was stamped here.
+* **The documentation has no hand procedure for an imported mark.**
+  `docs/code-review-tracking.md` gives the `gitsign verify` command
+  for a commit ("Commit signing") and explains why an imported entry
+  is a pointer to an attestation, but not the steps a reader takes
+  to follow that pointer. Those are: verify the entry's `commit`
+  here, and confirm that commit's sidecar records the same blob SHA
+  at the entry's `path` with no partial marks. 4b tests whether a
+  reader can get there from the text alone; the expectation is
+  that it cannot, and the fix is a short procedure in the doc.
+* **Drift returned within days** (see phase 3's Outcome), and
+  Renovate bumps converge by themselves while hand edits do not.
+  The Future work item "A template conformance criterion" asked to
+  revisit after this phase; shakenfist/development#151 asks the same
+  question for `templates/mermaid-lint/`.
+* **gitsign is installed on this host** (`/usr/bin/gitsign`), so the
+  hand verification needs no setup.
+
+**Decisions.**
+
+1. **The measurement is a script in this plan, not a new tool.**
+   Phase 3's Definition of done promised "a script run by phase 4".
+   It lives in 4a's brief, below, so it costs no review here and
+   no maintenance; if the conformance criterion is ever built, it
+   is that criterion's first draft.
+2. **The hand verification is done by an agent working only from
+   `docs/`**, then repeated by Michael on one entry. The agent is the
+   better test of whether the documentation is enough, because it
+   cannot fall back on knowing the code; Michael's run checks the
+   agent did not.
+3. **No conformance criterion in this plan.** The data argues for
+   one: import made drift *visible* (files fell out of review in
+   each repository), but nothing said *why* or which template to
+   re-sync from, and a person measuring by hand found it. That
+   change is high effort here (a new criterion that files issues in
+   other repositories), and #151 already frames it more broadly than
+   this plan can, across every template, not just the ones import
+   touches. 4c adds this plan's drift data to #151 and points the
+   Future work item at it.
+4. **A doc fix is the only change to shipped content.** If 4b finds
+   the procedure gap, the fix lands in this phase's pull request.
+   Anything else 4b finds is recorded and filed, not fixed.
+
+The decision most open to argument is 3. The drift cost a second
+round of four pull requests, and the next hand edit to a template
+will cost another; a reviewer could fairly say the criterion is
+the actual deliverable. The reason to defer it is that the right
+design (shared-block-style version markers, a hash comparison in
+the audit, or development opening the re-sync pull requests
+itself) is the question #151 already asks, and answering it inside
+a verification phase would be the scope creep this plan's phases
+have avoided.
 
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
-| 4a | medium | sonnet | none | Collect the `prune-reviews` run logs since phase 2 landed in each adopted repository (`ci-status`), extract the import lines, re-run the "Situation" measurement against fresh clones, and report. |
+| 4a | medium | sonnet | none | Measure, write nothing to any repository. For each of development (`main`), actions (`main`), hunkydory, kerbside and ryll (`develop`), make a detached worktree of the freshly fetched default branch in the scratchpad (local clones live beside this one under `src/shakenfist/`), and report: (1) in-scope files needing review, from `tools/review-tracking.sh status` (`python3 scripts/review-tracking.py status` here), against the "Situation" table; (2) how many in-scope files are byte-identical to a blob this repository has stamped as fully reviewed, at `HEAD` and anywhere in the sidecar's history, the same two counts "Situation" gives; (3) entries in `.vscode/imports.weaudit-shas.json` now, all with `verified: true` or not; (4) from `git log -p` of that file, every entry added and removed, with dates. Then run the template copy check below and report it as a table. Remove the worktrees afterwards. |
+| 4b | medium | sonnet | none | Using ONLY `docs/code-review-tracking.md` and `docs/` (do not read `scripts/review-tracking.py`), verify one imported entry by hand in each of actions, hunkydory, kerbside and ryll: pick an entry from its `.vscode/imports.weaudit-shas.json`, and establish from the doc's instructions that the named commit in shakenfist/development is signed by the named reviewer's identity and records a full review of that blob at that path. Report each step taken, where the doc did not say what to do next, and the result. If the doc lacks the procedure, draft the shortest addition that would have been enough, under "Importing reviews from this repository", for the management session to review. Michael then repeats the check on one entry from the drafted text. |
+| 4c | low | sonnet | none | Write the results into this section as an Outcome paragraph: the re-measured "Situation" table beside the baseline, the imports per repository and the prune removals (00642fd, 953a997 in actions, plus any 4a found elsewhere), 4b's result, and the copy check. Comment on shakenfist/development#151 with this plan's drift data (templates changed after convergence, the copies that lagged and for how long, and that Renovate bumps converged by themselves), and change the Future work item "A template conformance criterion" to point at #151. |
+
+The template copy check, for 4a (run from `src/shakenfist/`, after
+fetching each clone):
+
+```bash
+declare -A B=([actions]=main [hunkydory]=develop [kerbside]=develop [ryll]=develop)
+pairs="mermaid-lint/mermaid-lint.sh:tools/mermaid-lint.sh
+mermaid-lint/mermaid-lint.yml:.github/workflows/mermaid-lint.yml
+export-repo-config/export-repo-config.yml:.github/workflows/export-repo-config.yml
+renovate/renovate.yml:.github/workflows/renovate.yml
+ci-review-automation/pr-retest.yml:.github/workflows/pr-retest.yml
+ci-review-automation/pr-re-review.yml:.github/workflows/pr-re-review.yml
+codeql/codeql-analysis.yml:.github/workflows/codeql-analysis.yml
+pin-indirect-dependencies/pin-indirect-dependencies.yml:.github/workflows/pin-indirect-dependencies.yml
+pin-indirect-dependencies/pin-indirect-dependencies.sh:tools/pin-indirect-dependencies.sh
+pin-indirect-dependencies/pin-indirect-dependencies-apt.sh:tools/pin-indirect-dependencies-apt.sh
+review-tracking/prune-reviews.yml:.github/workflows/prune-reviews.yml
+review-tracking/ci-prune-reviews.sh:tools/ci-prune-reviews.sh
+review-tracking/review-tracking.sh:tools/review-tracking.sh"
+for r in actions hunkydory kerbside ryll; do
+  for p in $pairs; do
+    t=${p%%:*}; c=${p#*:}
+    th=$(git -C development rev-parse origin/main:templates/$t)
+    ch=$(git -C $r rev-parse -q --verify origin/${B[$r]}:$c) || { echo "MISSING $r $c"; continue; }
+    [ "$th" = "$ch" ] && echo "same $r $c" || echo "DIFF $r $c"
+  done
+done
+```
+
+On 2026-10-13 it prints `DIFF` for exactly the three per-repository
+copies (CodeQL in actions and kerbside, actions'
+`export-repo-config.yml`) and `same` for the other 36. It also
+prints 13 `MISSING` lines, for copies those repositories never had:
+`mermaid-lint` exists only in kerbside and ryll, and
+`pin-indirect-dependencies` only in kerbside, the one application
+among the four. A new `MISSING` line would mean a copy was deleted.
+
+**Risks.**
+
+* *4b's agent reads the code anyway, and the test proves nothing.*
+  The management session checks the agent's transcript lists only
+  `docs/` reads, and Michael's repeat from the drafted text is the
+  backstop.
+* *The re-measured counts are not comparable with the baseline.*
+  The baseline used local clones one to five days old; 4a uses fresh
+  default branches. The Outcome says so beside the table rather than
+  presenting the difference as all import's doing.
+* *A copy has drifted again by the time 4a runs.* That is a result,
+  not a failure: the Outcome reports it, and it goes into the #151
+  comment.
+
+**Definition of done.**
+
+* The phase 4 Outcome has a "Situation" table re-measured on a
+  stated date, beside the 2026-09-24 baseline, with imports per
+  repository.
+* `docs/code-review-tracking.md` has a hand procedure for an
+  imported entry (`grep -n 'imports.weaudit-shas.json'` finds it
+  next to a `gitsign verify` command), or 4b's report shows the doc
+  was already enough and the Outcome says so.
+* Michael has verified one imported entry from the doc text, and
+  the Outcome names it.
+* shakenfist/development#151 has a comment with this plan's drift
+  data, and the Future work item links #151.
+* `pre-commit run --all-files` passes, and `audit-check.py` for this
+  repository reports what it reported before.
+
+**Back brief.** None needed beyond the plan's: no step here is
+expensive to redo.
+
+**Outcome.** Measured 2026-10-13 on fresh default branches.
+"Needing review" is from `status`; "byte-identical" means
+identical to a blob this repository has stamped as fully
+reviewed, both at this repository's `HEAD` and anywhere in its
+sidecar's history:
+
+| Repository | In scope | Needing review 09-24 → 10-13 | Byte-identical (history) 09-24 → 10-13 | Byte-identical (at HEAD) 09-24 → 10-13 | Imported now |
+|---|---|---|---|---|---|
+| actions | 147 | 14 → 5 | 0 → 6 | 0 → 6 | 5 |
+| hunkydory | 40 | 2 → 0 | 5 → 9 | 5 → 9 | 7 |
+| kerbside | 258 | 140 → 130 | 4 → 12 | 3 → 12 | 5 |
+| ryll | 245 | 37 → 101 | 4 → 10 | 2 → 10 | 3 |
+
+Notes on the table:
+
+* Every imported entry is `verified: true`.
+* The at-`HEAD` and history counts are now equal in all four
+  repositories: no copy lags a template.
+* The byte-identical counts exceed the imported counts because a
+  native mark on the same blob pre-empts import.
+* ryll's rise is new Rust code entering scope
+  (`shakenfist-spice-protocol/`, `shakenfist-spice-renderer/`,
+  `ryll/src/app/`), not import.
+* The baseline used local clones one to five days old, so the
+  difference above is not all import's doing (see the risk above).
+
+**Import history**, from each repository's own
+`.vscode/imports.weaudit-shas.json` git log:
+
+* **actions**: 6e0aa3e (09-28) added three review tracking files;
+  017a178 (09-30) added `pr-re-review.yml`, `pr-retest.yml` and
+  `renovate.yml`; 00642fd (10-03) dropped `renovate.yml` after the
+  v46.3.6 Renovate bump; 953a997 (10-03) dropped `pr-re-review.yml`
+  and replaced `pr-retest.yml` after the template change in
+  5e9a4b3; 7e77693 (10-09) imported `renovate.yml` at the v46.3.7
+  blob.
+* **hunkydory**: fff62e1 (09-28) added six; 0d24140 (09-30) added
+  `codeql-analysis.yml` and `renovate.yml`; 1cc5885/0e3e3fe (10-03)
+  dropped `renovate.yml` (v46.3.6 bump) and `pr-re-review.yml`;
+  cfc85d2 (10-10) imported `renovate.yml` at the v46.3.7 blob.
+* **kerbside**: 6df1ee3 (09-28) added four; 233eb40 (09-30) dropped
+  `pr-re-review.yml` and `prune-reviews.yml`; f126408 (10-01) added
+  eight; fddd582/89ac333 (10-03) dropped `renovate.yml` (v46.3.6
+  bump) and `pr-re-review.yml` (template change); e425a42 (10-05)
+  dropped `export-repo-config.yml`, `mermaid-lint.yml`,
+  `pin-indirect-dependencies.yml` and `pr-retest.yml` after native
+  re-stamps; efc652b (10-11) imported `renovate.yml` at the v46.3.7
+  blob.
+* **ryll**: 6d5a3da (09-28) added three; 13fa6e9 (10-03) added
+  seven; 41541fb (10-04) dropped `pr-re-review.yml` (template
+  change) and 09ffde3 (10-04) dropped `renovate.yml` (v46.3.6 bump,
+  merged in ryll#440 on 10-03); 3dc0ce4 (10-04) imported both at
+  their new blobs, stamped here hours earlier, and dropped
+  `prune-reviews.yml`, which had gained a native mark; c494993
+  (10-05) dropped seven after native re-stamps; ebca209 (10-10)
+  imported `renovate.yml` at the v46.3.7 blob.
+
+**Prune of an imported mark when its file changes** is confirmed
+in every repository. The v46.3.6 Renovate bump (10-02) dropped the
+imported `renovate.yml` in actions (00642fd), hunkydory (1cc5885)
+and kerbside (fddd582) on 10-03, and in ryll (09ffde3) on 10-04,
+after its bump merged. Only ryll re-imported that blob (3dc0ce4, the
+same day); the other three were re-stamped natively before an
+import could happen. For the v46.3.7 bump (10-08), this repository
+stamped the new blob on 10-09 (f2bc259), and all four repositories
+imported it between 10-09 and 10-11: a lag of one to three days
+from the bump.
+
+**Key finding: imported files were re-reviewed by hand anyway.**
+kerbside's e425a42 and ryll's c494993 dropped imports even though
+the files had not changed. In both repositories a human review
+commit had just stamped the same blobs natively:
+
+* kerbside 2dafb4e, "review: CI workflows", 2026-10-05, stamped
+  six files. Four of them (`export-repo-config.yml`,
+  `mermaid-lint.yml`, `pin-indirect-dependencies.yml`,
+  `pr-retest.yml`) were still imported at blobs that had not
+  changed; the other two, `pr-re-review.yml` and `renovate.yml`,
+  had lost their imports on 10-03 when their blobs changed;
+* ryll 3d16282, "review: docs, with a lot of unrelated stamp
+  updates too", 2026-10-05.
+
+A native mark always takes precedence, so `prune` dropped the
+now-redundant import entries. Import kept those files out of the
+review queue for days, but they were still read again by a human.
+The likely cause is that imported marks live only in
+`.vscode/imports.weaudit-shas.json` and never in a `.weaudit`
+file, so the weAudit editor shows those files as unreviewed and a
+reviewer working through the tree finds and re-reads them anyway.
+Not diagnosed further here; see Future work.
+
+**4b result.** An agent working only from `docs/` verified one
+imported entry in each repository:
+
+| Repository | Entry | Source commit |
+|---|---|---|
+| actions | `pr-retest.yml` | 3343336 |
+| hunkydory | `codeql-analysis.yml` | f82b09c |
+| kerbside | `tools/mermaid-lint.sh` | d7638dc |
+| ryll | `tools/ci-prune-reviews.sh` | d771816 |
+
+All four signatures verify and all four are full `auditedFiles`
+marks. The agent had to assemble the steps from three sections of
+`docs/code-review-tracking.md`, and two facts it needed were not
+written down anywhere in `docs/`: the `.weaudit` JSON shape for a
+full versus a partial mark, and how to find a reviewer's signing
+identity. "Verifying an imported entry by hand", added in this
+phase, closes both gaps. Michael's repeat of the check from the
+documented procedure: pending.
+
+The drift data below was posted to shakenfist/development#151 on
+2026-10-13
+(https://github.com/shakenfist/development/issues/151#issuecomment-6133037509).
+Dates in this plan are in Michael's local time (AEST/AEDT).
+
+**Template copy check.** Unchanged from this phase's first run on
+2026-10-13: three `DIFF` (CodeQL in actions and kerbside,
+actions' `export-repo-config.yml`), all per-repository by design,
+and 36 `same`.
+
+**Drift.** The templates behind those copies changed again after
+phase 3 converged them:
+
+* 5e9a4b3 (#204, on `main` 10-01) changed both bot workflow
+  templates;
+* 3b5142c (#212, on `main` 10-03) changed `pr-re-review.yml` again;
+* Renovate bumped `renovate.yml` on 10-02 and 10-08.
+
+Eight bot workflow copies lagged from 10-01 until a second round
+of re-sync pull requests (actions#134, hunkydory#66, kerbside#519,
+ryll#455) merged on 10-03 and 10-04: two to three days. Renovate's
+bumps converged by themselves, because it makes the same edit
+everywhere; the hand edits did not. Import made this drift visible
+only as files dropping out of review; nothing named the template
+to re-sync from.
 
 ### Phase 5: push audit
 
@@ -1219,10 +1519,24 @@ intend to do aligns with that plan.
   remove the copies altogether, leaving small identical callers.
   It changes the trust model (a caller pinned by SHA, bumped by
   Renovate) and is a bigger decision than this plan should make.
-* **A template conformance criterion.** Phase 3 converges the
-  copies once; without enforcement they will drift again. Revisit
-  after phase 4 shows whether import makes the drift visible
-  enough on its own.
+* **A template conformance criterion.** Tracked in
+  shakenfist/development#151. Phase 4 found that templates
+  changed again within days of phase 3's convergence. Renovate's
+  bumps converged by themselves; the hand edits to the bot
+  workflow templates (5e9a4b3, 3b5142c) needed a second round of
+  four re-sync pull requests. #151 asks the same question across
+  every template, not only the ones import touches.
+* **Imported marks are invisible in the editor.** Phase 4 found
+  that kerbside (2dafb4e) and ryll (3d16282) both carried native
+  review commits that re-stamped files already covered by an
+  import, even though the imported blobs had not changed. The
+  likely cause is that an imported entry lives only in
+  `.vscode/imports.weaudit-shas.json`, never in a `.weaudit` file,
+  so weAudit's own UI shows the file as unreviewed and a reviewer
+  working through the tree re-reads it anyway. A possible
+  direction is to show imported files as reviewed in weAudit, or
+  to have `next` and the reviewer's own workflow surface that a
+  file is already covered by an import; the design is left open.
 * **Shared blocks.** See the mission statement for why they are
   out of scope.
 * **Upgrading unverified imports.** An entry imported with
