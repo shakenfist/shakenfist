@@ -15462,8 +15462,22 @@ is stripped: zero non-comment <code>PLAN-*.md</code> references in <code>src/</c
 <li><code>instar check</code> and <code>instar bench</code> refuse a 17-image chain before
   opening KVM, each naming its own operation. Falsifiable: a test
   asserts the message text for both, and
-  <code>grep -c 'exceeds the' src/vmm/src/main.rs</code> has grown by two.</li>
-<li>Nothing in <code>src/</code>, <code>tests/</code> or the top level of <code>docs/</code> claims that
+  <code>grep -c 'exceeds maximum of' src/vmm/src/main.rs</code> has grown by
+  two, from 3 to 5.</li>
+</ul>
+<p><strong>Search string corrected at close-out.</strong> As written this criterion
+  grepped for <code>exceeds the</code>, which neither guard 15c added says: both
+  render "chain depth {n} exceeds maximum of {max} devices", matching
+  the <code>convert</code>/<code>dd</code> and <code>compare</code> guards rather than the <code>rebase</code> and
+  <code>commit</code> ones that do say "exceeds the {n}-device limit". The
+  <code>exceeds the</code> count was 5 before the phase and 5 after, so the
+  criterion as phrased could not have been met by any wording 15c
+  plausibly chose. Both guards exist, both refuse before KVM opens and
+  both name their own operation (<code>src/vmm/src/main.rs:5389</code> for
+  <code>bench</code>, <code>:12094</code> for <code>check</code>), and the corrected string does grow
+  by two -- so what was wrong here was the probe, not the work it was
+  measuring.
+* Nothing in <code>src/</code>, <code>tests/</code> or the top level of <code>docs/</code> claims that
   <strong>instar</strong> cannot read or compose a differencing image. Falsifiable
   by a script rather than a grep:
   <code>python3 tools/check-no-capability-claims.py</code>, exit 0.
@@ -15472,8 +15486,7 @@ is stripped: zero non-comment <code>PLAN-*.md</code> references in <code>src/</c
   <code>src/shared/src/lib.rs</code> reading "Instar cannot / compose a parent
   yet" across a line break. The script is verified by mutation, not
   only by passing: restoring that wrapped claim makes it exit 1 and
-  name the line.</li>
-</ul>
+  name the line.</p>
 <p><strong>Widened during review.</strong> As first written this criterion said "no
   comment in <code>src/</code>", and the script read only <code>//</code> comments there. The
   first review round asked whether that was enough; widening it to
@@ -15526,14 +15539,24 @@ is stripped: zero non-comment <code>PLAN-*.md</code> references in <code>src/</c
 <li><code>tests/test_differencing.py</code> cites no plan file, phase or decision
   number at all, not merely none added by this phase. Falsifiable:
   <code>grep -cE 'Decision [0-9]|decision [0-9]|PLAN-[a-z0-9-]+\.md|phase 1[0-9]|phase plan' tests/test_differencing.py</code>
-  returns 0. Four such references predated this phase, one of which --
-  "whether instar assembles a chain the way libvhdi does is phase 15's
-  question" -- this phase's own rescoping made false, so correcting
-  them is this phase's business rather than tidying.</li>
-<li><code>docs/quirks.md</code> states the five-compose / three-report boundary
-  with a reason per operation, and #641, #642 and #643 are linked
-  from the pages that describe the limitation they would close.</li>
+  returns 0.</li>
 </ul>
+<p><strong>This probe was too narrow, found during phase 16.</strong> It returns 0,
+  and six plan coordinates were in the file the whole time: "step 4b"
+  twice, "phase 4", "phase 7" and two bare "this phase". <code>phase 1[0-9]</code>
+  matches phases 10 to 19 only, and no alternative covered a step
+  letter. The criterion's claim -- "at all, not merely none added by
+  this phase" -- was therefore never tested. Phase 16 swept the file
+  for the whole class and widened the pattern in its own definition of
+  done; the figure of four pre-existing references this criterion
+  mentions was itself an undercount for the same reason.</p>
+<p>Four such references predated this phase, one of which -- "whether
+  instar assembles a chain the way libvhdi does is phase 15's
+  question" -- this phase's own rescoping made false, so correcting
+  them is this phase's business rather than tidying.
+* <code>docs/quirks.md</code> states the five-compose / three-report boundary
+  with a reason per operation, and #641, #642 and #643 are linked
+  from the pages that describe the limitation they would close.</p>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before implementation starts, confirm:</p>
 <ol>

@@ -15906,13 +15906,13 @@ records <code>instar-testdata &lt;sha&gt; (#pr)</code> and is audited there.</p>
 <tr>
 <td>15. Consistency for the non-composing operations</td>
 <td><a href="/components/instar/plans/PLAN-differencing-phase-15-op-consistency/">PLAN-differencing-phase-15-op-consistency.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td><code>f14554cf</code> (#646)</td>
 </tr>
 <tr>
 <td>16. Composition: integration tests and fuzz</td>
-<td>PLAN-differencing-phase-16-compose-tests.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-differencing-phase-16-compose-tests/">PLAN-differencing-phase-16-compose-tests.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -16183,13 +16183,45 @@ rather than left as one phase to be split later, the way
   is 4096. At 4096-byte sectors it is 32768, so the padded BAT bound
   and the chunk-group stride are arithmetic nothing drives at the
   larger geometry. Its harness drives
-  the <code>python3-libvhdi</code> binding with an explicit <code>set_parent()</code>
-  rather than a CLI export, and its VHD fixtures are subject to
+  the <code>python3-libvhdi</code> binding with an explicit <code>set_parent()</code>,
+  and its VHD fixtures are subject to
   the sector-bitmap caveat above. Phase 9 fuzzes the locator
   <em>parsers</em>; composing a chain is new surface, and a malicious
   child pointing at a well-formed parent is a different input
   space from a malformed locator table.</li>
-<li><strong>Phase 17, documentation.</strong> Separate because phase 10 will
+</ul>
+<p><strong>Three corrections from phase 16's survey on 2026-10-11.</strong> The
+  binding is the right route but not for the reason stated: this
+  bullet originally contrasted it with "a CLI export", and there is
+  no such tool to contrast it with. Debian 13's <code>libvhdi-utils</code>
+  20240509-2+b1 ships <code>vhdiinfo</code> and <code>vhdimount</code> and nothing else --
+  measured by extracting the package. The real alternative is a FUSE
+  mount. <code>python3-libvhdi</code> is a separate package and is not in the
+  devcontainer, which installs <code>libvhdi-utils</code> alone
+  (<code>src/.devcontainer/Dockerfile:39</code>).</p>
+<p>The 4K gap cannot be closed by an integration fixture at all, and
+  phase 16 therefore closes it at crate level. <code>chunk_ratio</code> is
+  <code>2^23 * logical_sector_size / block_size</code>, so reaching a second
+  chunk group at 4096-byte sectors needs 65536 payload blocks -- a
+  64 GiB virtual disk with a 512 KiB BAT, where a crate fixture
+  declares that size and materialises only the blocks it lists. And
+  nothing authors a 4K-logical-sector VHDX at any size: <code>qemu-img
+  create -f vhdx -o help</code> on 10.0.13 offers <code>block_size</code>,
+  <code>block_state_zero</code>, <code>log_size</code>, <code>size</code> and <code>subformat</code>, and
+  <code>instar create</code>'s vhdx <code>-o</code> parser takes <code>block_size</code> and nothing
+  sector-shaped. One 4K case does now exist, added by phase 15's
+  second review round, and it is single-group with a single block.</p>
+<p>The oracle was measured against the project's own goldens before
+  phase 16 was planned, because everything in the phase rests on it.
+  Driving <code>set_parent()</code> over the three real chains in
+  <code>instar-testdata</code>, libvhdi agrees with <code>vhd-diff-aligned-composed</code>
+  and <code>vhdx-diff-composed</code> over all 16 MiB, and disagrees with
+  <code>vhd-diff-mixed-composed</code> in exactly one sector -- sector 2, where
+  it returns zeros and the golden holds the parent's pattern. That is
+  the unmasked-shift defect described above, and its shape is worth
+  recording: the symptom is zeros, not the child's data, because the
+  child never wrote the sector it is being read from.
+* <strong>Phase 17, documentation.</strong> Separate because phase 10 will
   have documented a refusal that phase 14 removes: at minimum
   <code>docs/chain-discovery.md</code>, <code>docs/chain-config.md</code> and the
   read-side rows and divergence notes of
@@ -16203,8 +16235,7 @@ rather than left as one phase to be split later, the way
   one of whose two stated reasons was already falsified by
   <code>vhdx::posix_relative_path</code> before phase 11 began, and
   <code>docs/info.md</code>'s claim that <code>--chain</code> stops at one image. The
-  compose-side rows stay with phase 17.</li>
-</ul>
+  compose-side rows stay with phase 17.</p>
 <p>Two specifics phases 12 and 13 must confront, both already
 visible in the crates:</p>
 <ul>

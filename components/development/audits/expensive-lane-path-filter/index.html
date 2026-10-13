@@ -15192,6 +15192,9 @@ costs tens of minutes to hours of capacity. A pull request or merge
 queue entry touching only content no lane exercises should not pay for
 them — the <code>docs/</code> directory, and the review-tracking state
 (<code>REVIEWS.md</code> and the <code>.vscode</code> weaudit files).</p>
+<p>A job bound to a runner of its own (<code>bound-&lt;image&gt;</code>, <code>bound-&lt;size&gt;</code>
+and a <code>bind-</code> token, with no <code>vm</code> label; see <code>workflow-standards.md</code>)
+runs on the same ephemeral VMs and counts as a <code>vm</code>-runner job here.</p>
 <p>Every workflow running <code>vm</code>-runner jobs on <code>pull_request</code> or
 <code>merge_group</code> must be path-filtered, and the filter must exclude a
 <code>docs/**</code> pattern where the repository has a <code>docs/</code> directory, and a

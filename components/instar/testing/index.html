@@ -4999,6 +4999,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Differencing oracle cross-check">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-data-oracle-composed-content-not-just-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The data oracle: composed content, not just structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -16300,6 +16317,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Differencing oracle cross-check">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-data-oracle-composed-content-not-just-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The data oracle: composed content, not just structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -16719,23 +16753,26 @@ ones that must stay byte-identical to them.</p>
 - VMDK descriptor extent paths are not accessed</p>
 <h2 id="running-tests">Running Tests<a class="headerlink" href="#running-tests" title="Permanent link">&para;</a></h2>
 <h3 id="make-targets">Make Targets<a class="headerlink" href="#make-targets" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Create Python virtual environment (first time only)</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>make<span class="w"> </span>test-venv
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Run safe tests (default, suitable for development)</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>make<span class="w"> </span><span class="nb">test</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Create Python virtual environment (first time only). The venv sees</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># system site-packages so the libvhdi oracle (python3-libvhdi) is</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># importable; an older isolated venv is deleted and rebuilt from</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># tests/requirements.txt, so anything installed into it by hand is lost.</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>make<span class="w"> </span>test-venv
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Run CI-suitable tests</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>make<span class="w"> </span>test-ci
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Run safe tests (default, suitable for development)</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>make<span class="w"> </span><span class="nb">test</span>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># Run all tests including malicious images (explicit opt-in)</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>make<span class="w"> </span>test-malicious
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># Run CI-suitable tests</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>make<span class="w"> </span>test-ci
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># Run with verbose output (useful for debugging diffs)</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>make<span class="w"> </span>test-report
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># Run all tests including malicious images (explicit opt-in)</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>make<span class="w"> </span>test-malicious
 <a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="c1"># Clean test artifacts</span>
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>make<span class="w"> </span>clean-tests
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="c1"># Run with verbose output (useful for debugging diffs)</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>make<span class="w"> </span>test-report
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="c1"># Clean test artifacts</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>make<span class="w"> </span>clean-tests
 </code></pre></div>
 <h3 id="direct-stestr-usage">Direct stestr Usage<a class="headerlink" href="#direct-stestr-usage" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>tests
@@ -17507,7 +17544,7 @@ mock <code>CallTable</code> backed by fuzzer input provides the I/O layer,
 allowing libFuzzer to explore malformed input space that differential
 differential fuzzing cannot reach.</p>
 <h3 id="fuzz-targets">Fuzz targets<a class="headerlink" href="#fuzz-targets" title="Permanent link">&para;</a></h3>
-<p>42 targets across the parser and planner crates, organized in
+<p>43 targets across the parser and planner crates, organized in
 <code>src/fuzz/</code>:</p>
 <table>
 <thead>
@@ -17728,6 +17765,11 @@ differential fuzzing cannot reach.</p>
 <td>qcow2-write</td>
 <td>Buffer-based</td>
 </tr>
+<tr>
+<td><code>fuzz_chain_compose</code></td>
+<td>qcow2</td>
+<td>CallTable (multi-device)</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Buffer-based</strong> targets call parser functions that take <code>&amp;[u8]</code>
@@ -17809,6 +17851,46 @@ debug builds on out-of-envelope petabyte-scale geometry; in release it
 returns <code>GrowthOverflow</code> gracefully, and production only passes bounded
 geometry — softening that guard to always return overflow is a recorded
 follow-up, not a bug.)</p>
+<p><code>fuzz_chain_compose</code> is the only multi-device target, and the only one
+that reaches <code>read_chain_virtual_cluster</code> — the backing-chain compose
+path. Every other CallTable target serves one input device, so the
+chain walk (the loop over devices, the descent into the device behind
+one that does not hold a cluster, and the zero-fill at the bottom of a
+chain) was unreachable rather than merely unexplored:
+<code>fuzz_qcow2_l1l2</code>, which covers <code>cluster_lookup</code> at 93.67%, measured
+0.00% region coverage on <code>read_chain_virtual_cluster</code>.</p>
+<p>It opts the mock CallTable into a multi-device mode with
+<code>instar_fuzz::set_fuzz_devices(&amp;[child, parent])</code>, which installs one
+buffer per device index. The mode is opt-in, and a target that never
+calls it sees one input device backed by the single <code>set_fuzz_input</code>
+buffer exactly as before — the default every other target depends on.
+<code>set_fuzz_input</code> turns the mode back off, so a target using both calls
+them in that order.</p>
+<p>The target builds a <code>ChainConfig</code> as a Rust struct rather than
+decoding one from bytes (<code>init_chain_states</code> and
+<code>read_chain_virtual_cluster</code> both take <code>&amp;ChainConfig</code> directly, so the
+serialised form the host writes to guest memory is not on the path
+under test), varies the declared segmentation across the three shapes
+<code>init_chain_states</code> distinguishes — one chain of two, two chains of
+one, and a segmentation that tiles nothing — and asserts four
+invariants rather than the absence of a panic:</p>
+<ol>
+<li>A read that reports success filled the whole buffer. Checked by
+   reading the same span twice from two different sentinel prefills
+   and requiring the results to agree: a byte the reader never wrote
+   keeps whichever sentinel it started from, which no single sentinel
+   could prove because any byte value is one an image could
+   legitimately contain.</li>
+<li><code>init_chain_states</code> reporting success never leaves a device the
+   reader needs state for uninitialised.</li>
+<li>A device with no state refuses rather than serving its own zeros.
+   This is the shape of a differencing child composed against a parent
+   that was never resolved, which exits 0 with the parent's data
+   replaced by zeros.</li>
+<li>A device behind the child never overrides a byte the child holds,
+   checked by comparing the composed read against the same span read
+   as the child alone.</li>
+</ol>
 <h3 id="running-locally_1">Running locally<a class="headerlink" href="#running-locally_1" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Inside the instar-build container:</span>
 <a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
@@ -18063,11 +18145,12 @@ instar's own parser reads a differencing image instar wrote.</p>
 <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a>: the disk type, the
 parent filename for VHD, and the parent identifier for both formats,
 each compared against what <code>vhdiinfo</code> reports for the parent itself
-rather than a hardcoded GUID. No composed content is read. One
-limitation is recorded rather than worked around: <code>vhdiinfo</code> prints no
-<code>Parent filename</code> line for a VHDX, with or without <code>-v</code>, so the VHDX
-parent locator's path key cannot be checked through this tool — the
-Rust round-trip test pins it instead
+rather than a hardcoded GUID. No composed content is read by this
+class — that is the data oracle's job, below. One limitation is
+recorded rather than worked around: <code>vhdiinfo</code> prints no <code>Parent
+filename</code> line for a VHDX, with or without <code>-v</code>, so the VHDX parent
+locator's path key cannot be checked through this tool — the Rust
+round-trip test pins it instead
 (<code>src/crates/create/tests/round_trip.rs</code>).</p>
 <p>The suite runs inside the <code>instar-build</code> devcontainer, which installs
 <code>libvhdi-utils</code>, so locally these tests skip when <code>vhdiinfo</code> is absent
@@ -18079,6 +18162,89 @@ because a skipped test and a passing test look identical in a green
 run and <code>stestr</code> does not name skipped tests in its output — parsing
 the log could not have caught it. Removing <code>libvhdi-utils</code> from the
 devcontainer turns that job red instead of leaving it quietly green.</p>
+<h3 id="the-data-oracle-composed-content-not-just-structure">The data oracle: composed content, not just structure<a class="headerlink" href="#the-data-oracle-composed-content-not-just-structure" title="Permanent link">&para;</a></h3>
+<p><code>vhdiinfo</code> has no way to answer "what does this chain compose to" —
+<code>libvhdi-utils</code> ships exactly two binaries, <code>vhdiinfo</code> and
+<code>vhdimount</code>, a FUSE mount that is a worse thing to put in an
+integration suite's path than a Python import. The <code>pyvhdi</code> binding
+(package <code>python3-libvhdi</code>, installed in
+<code>src/.devcontainer/Dockerfile</code> beside <code>libvhdi-utils</code> because both
+come from the same upstream release) can: <code>pyvhdi.file.set_parent()</code>
+stacks a parent behind a child so the pair reads as one image, making
+libvhdi a second, independent reader of composed <em>bytes</em>.
+<code>tests/base.py</code>'s <code>_require_pyvhdi</code> is modelled on
+<code>_require_vhdiinfo</code> and honours the same <code>INSTAR_REQUIRE_LIBVHDI</code>
+variable rather than a second one, so there is still one switch and
+one place to look.</p>
+<p>Two test classes in <code>tests/test_differencing.py</code> use it:</p>
+<ul>
+<li><strong><code>TestDifferencingOracleComposes</code></strong> drives every real chain the
+  project has — two formats, two and three images deep — through
+  <code>set_parent</code> and compares the result, byte for byte, against both
+  the recorded <code>*-composed.raw</code> golden and <code>instar convert -O raw</code>,
+  three independent readers of the same bytes. <code>set_parent</code> chains
+  cleanly to three levels, in either order, and still refuses a chain
+  given only in part, so the depth-three chains add no new exception
+  beyond the one below.</li>
+<li><strong><code>TestDifferencingCreatedChildComposes</code></strong> closes a different gap:
+  nothing previously read a byte back through a child
+  <code>instar create -f {vpc,vhdx} -b PARENT</code> itself wrote, only its
+  recorded identity fields. A freshly created child allocates
+  nothing, so all three readers must agree with the parent's own
+  content exactly — the one case here where a disagreement would
+  indict the writer rather than the reader. A created VHD child
+  composes exactly; a created VHDX child does not, for a reason that
+  is libvhdi's rather than instar's (defect D, below).</li>
+</ul>
+<p><strong>The one pinned exception.</strong> libvhdi decodes a VHD per-block sector
+bitmap with an unmasked shift, so once a higher bit in a bitmap byte
+is set, every later sector that byte covers reads as present in the
+child. <code>vhd-diff-child-mixed</code> is the fixture built to put parent-owned
+and child-owned sectors in one bitmap byte, and sector 2 is where that
+lands: libvhdi returns 512 <strong>zero</strong> bytes there, not the child's data
+and not the parent's — it is reading the child's own (unwritten)
+block, not merely using the wrong source. <code>vhd-diff-child-aligned</code> is
+the fixture built to keep ownership out of shared bitmap bytes, and
+libvhdi agrees with it on all 16,777,216 bytes, which is the control
+that pins the fault on libvhdi's decoder rather than on the harness,
+the generator, or instar. The test asserts the exception positively,
+in both directions — that sector must differ, and the oracle's bytes
+there must be exactly zero — so a disagreement anywhere else fails
+loudly and an upstream fix turns this one test red rather than quietly
+passing.</p>
+<p><strong>Four libvhdi defects have been measured against this project's
+fixtures in total</strong>, recorded in <code>tests/manifest.json</code> and in the
+docstrings of <code>TestDifferencingLibvhdiOracle</code>,
+<code>TestDifferencingOracleComposes</code> and
+<code>TestDifferencingCreatedChildComposes</code> in <code>tests/test_differencing.py</code>.
+None is an instar defect — each is isolated from instar's own reader
+and from the fixture generator by a control described at its source:</p>
+<table>
+<thead>
+<tr>
+<th>Defect</th>
+<th>What libvhdi gets wrong</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A</td>
+<td>Decodes a VHD per-block sector bitmap with an unmasked shift, so a higher set bit makes every later sector in that byte read as present in the child (<code>vhd-diff-child-mixed</code>, sector 2, above)</td>
+</tr>
+<tr>
+<td>B</td>
+<td>Looks up a VHDX parent locator's <code>relative_path</code> key with the wrong length, so <code>get_parent_filename()</code> returns <code>None</code> for a VHDX child instar wrote — instar writes that one key for the relative path <code>-b</code> was given, and the lookup never matches it</td>
+</tr>
+<tr>
+<td>C</td>
+<td>Over-reads two bytes past an unterminated 512-byte parent unicode name into the following locator table, reporting a 257th character (<code>vhd-diff-locator-overlong</code>)</td>
+</tr>
+<tr>
+<td>D</td>
+<td>Ignores a sector-bitmap BAT entry's <code>SB_BLOCK_NOT_PRESENT</code> state and reads the bitmap from file offset zero instead, misreading 56 of a freshly created, wholly unallocated VHDX child's 32768 sectors</td>
+</tr>
+</tbody>
+</table>
 <h2 id="mutation-harness-for-the-differencing-tests">Mutation harness for the differencing tests<a class="headerlink" href="#mutation-harness-for-the-differencing-tests" title="Permanent link">&para;</a></h2>
 <p><code>tools/mutate-differencing.sh</code> answers one question about
 differencing support, on both sides of it — writing an image with
@@ -18090,7 +18256,7 @@ requires one named test to notice; a test that still passes against a
 deliberately broken emitter is not guarding what its name says it
 guards. See <a href="/components/instar/plans/PLAN-differencing/">PLAN-differencing.md</a> for the
 path being guarded.</p>
-<p>There are <strong>102 cases</strong>, in seven groups.</p>
+<p>There are <strong>105 cases</strong>, in eight groups.</p>
 <p>Twenty-seven cover the writer. Fifteen mutate a library crate
 (<code>create</code>, <code>vhd</code>, <code>vhdx</code>) and are caught by a Rust unit or round-trip
 test; twelve are caught by a Python integration test through the real
@@ -18162,7 +18328,7 @@ builds a qcow2 overlay over a qcow2 backing whose own backing is a real
 differencing VHD or VHDX with its own parent absent — so the mutated
 walk fails during host-side chain discovery, before KVM is even opened,
 where the unmutated walk never tried to resolve that file at all.</p>
-<p><strong>14 cases guard <code>map</code>, <code>measure</code> and <code>check</code></strong>, which read through
+<p><strong>15 cases guard <code>map</code>, <code>measure</code> and <code>check</code></strong>, which read through
 none of the machinery above: each reads its source on its own and
 declines a differencing one outright, so composing it is not a guest
 change those operations can inherit. <strong>6 refusal cases</strong> are the first
@@ -18231,7 +18397,7 @@ which SPEC(VHDX) permits -- tells the two apart. All three are
 <code>integration_case</code>, because the arm lives in a <code>no_std</code> guest binary
 with no test harness to drive it and the only observable verdict is
 the real command's exit code.</p>
-<p>The last group is <strong>2 device-count cases</strong>, guarding <code>bench</code> and
+<p>Then <strong>2 device-count cases</strong>, guarding <code>bench</code> and
 <code>check</code>'s own chain-device-count check (issue #633). Every other
 operation that attaches a backing
 chain -- <code>convert</code>/<code>dd</code>, <code>commit</code>, <code>rebase</code>, <code>compare</code> -- refuses one
@@ -18250,6 +18416,24 @@ disable the guard with <code>if false</code> and are caught, through the real
 binary, by <code>TestAdversarialChainDeviceCount</code> in <code>tests/test_adversarial.py</code>
 -- the same test module that builds the fixture, since no static
 <code>instar-testdata</code> image has this shape.</p>
+<p>The last group is <strong>2 subcluster cases</strong>, and is the only group not
+about a differencing format at all. It is here because the defect it
+guards is the same class as the rest -- a span the reader never wrote,
+returned to the caller under a successful read -- and because the
+differencing work's own fuzz target is what found it. An extended-L2
+qcow2 entry can mark a subcluster allocated while naming host offset
+zero, which is a contradiction: there is no host cluster to read it
+from. The narrow arm of the fill loop has always zero-filled such a
+subcluster; the wide arm, taken when the device's sector size exceeds
+<code>cluster / 32</code>, matched no arm at all and left the caller's buffer
+untouched (issue #650). One case removes the arm that now handles it;
+the other reverts the lookup that classifies the entry, which is the
+vacuity guard -- without it a green test would prove only that the
+read never reached the fill loop. Both are <code>rust_case</code> against a
+static in-memory fixture at 8192-byte clusters and 512-byte sectors,
+the geometry that selects the wide arm; the default 64 KiB cluster
+takes the narrow one. <code>docs/quirks.md</code> records why instar zero-fills
+here where qemu fails the read.</p>
 <p>Most of the reader cases name a test in the <code>qcow2</code> crate and run it
 with the full input-format feature list, because the
 arms are behind <code>vhd-input</code> and <code>vhdx-input</code> and a run without those
@@ -18502,10 +18686,12 @@ one.</p>
 by scripts in <code>scripts/</code>:</p>
 <ul>
 <li><code>create-vhd-testdata.sh</code> — Fixed VHD (disk_type=2); differencing
-  VHD (disk_type=4) as a disk_type-only type marker via qemu-img
-  patching; real VHD and VHDX differencing chains (parent, aligned
-  and mixed children, and each chain's intended composed raw image)
-  via Python struct packing against the structure pin in
+  VHD (disk_type=4) and differencing VHDX (HasParent) as type-only
+  markers with no parent reference, via qemu-img patching; real VHD
+  and VHDX differencing chains (parent, aligned and mixed children, a
+  third differencing level over one child per format, and each
+  chain's intended composed raw image) via Python struct packing
+  against the structure pin in
   <code>docs/plans/PLAN-differencing-phase-01-pin.md</code>; and six adversarial
   parent-locator VHDs (absolute path, relative traversal, UNC, URL,
   an over-long unterminated parent name, and mutually conflicting
@@ -18516,12 +18702,17 @@ by scripts in <code>scripts/</code>:</p>
   in <code>custom/format-coverage/</code>. Given one argument the audit
   directory becomes <code>&lt;output-dir&gt;/audit</code>, so a scratch run writes
   everything under the directory it was given rather than sending
-  twelve files to the scratch tree and six into the real testdata
-  checkout. Every file it writes is
-  byte-reproducible except the VHDX parent/child pair, where
-  <code>qemu-img</code> stamps fresh GUIDs on each run; that pair is therefore
-  skipped when both files already exist, and rebuilding it needs
-  <code>REGEN_VHDX=1</code> and a commit of both files together</li>
+  sixteen files to the scratch tree and six into the real testdata
+  checkout. Every file it writes is byte-reproducible except the four
+  VHDX ones, where <code>qemu-img</code> stamps fresh GUIDs on each run; each is
+  therefore skipped when it already exists, and rebuilding any of
+  them needs <code>REGEN_VHDX=1</code>. The parent, the child and the
+  grandchild must be committed together when they are rebuilt: each
+  of the upper two records the DataWriteGuid of the one below it, so
+  a regenerated parent invalidates both images above it. The
+  generator re-checks both of those links on every run, including the
+  runs that rebuild nothing, so a half-finished regeneration fails
+  there rather than in the test suite</li>
 <li><code>create-vmdk-testdata.sh</code> — Binary VMDK4 with multi-extent descriptor</li>
 <li><code>create-luks-testdata.sh</code> — LUKS v1 containers with inner formats</li>
 <li><code>create-native-luks-testdata.py</code> — LUKS v1/v2 with known encrypted

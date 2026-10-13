@@ -15560,12 +15560,35 @@ otherwise picks for it.</p>
   because a case is known: writing <code>xs</code> costs one word and states the
   same decision honestly, so a marker whose reason amounts to "we did
   not choose" is the wrong answer.</li>
-<li>Only the inline-list (<code>[self-hosted, vm, l]</code>) and scalar forms of
+<li>
+<p>Only the inline-list (<code>[self-hosted, vm, l]</code>) and scalar forms of
   <code>runs-on:</code> are examined. A block sequence spread over the following
   lines is not matched, so a job written that way is neither passed
   nor flagged -- it is simply not seen. No repository in scope writes
   one today, and the sibling runner checks share the blind spot; this
-  is recorded so the coverage claim is honest rather than assumed.</li>
+  is recorded so the coverage claim is honest rather than assumed.</p>
+</li>
+<li>
+<p>A job may instead <strong>bind itself to a runner started for it alone</strong>:
+  <code>[self-hosted, bound-debian-13, bound-s, "bind-${{ github.run_id }}-${{ github.run_attempt }}-&lt;slug&gt;"]</code>.
+  This form names no <code>vm</code>, plain image or plain size, so that no
+  unbound job can take the bound runner. It satisfies this rule when it
+  names <code>self-hosted</code>, exactly one <code>bind-</code> element, exactly one
+  <code>bound-&lt;image&gt;</code> and exactly one <code>bound-&lt;size&gt;</code> with a size from the
+  list above, and nothing else. The <code>bind-</code> element is always an
+  expression including <code>${{ github.run_id }}</code> and
+  <code>${{ github.run_attempt }}</code>, so that every run and every re-run binds
+  its own runners, and needs no marker. A <code>bound-${{ ... }}</code> element
+  beside a literal <code>bound-&lt;size&gt;</code> is read as the image; a <code>bound-&lt;size&gt;</code> that is itself an
+  expression is treated like any other expression size, and is the
+  only bound finding the marker excuses. Any <code>bound-</code> or <code>bind-</code>
+  element without the full form is a finding: <code>bound-</code> with no <code>bind-</code>,
+  <code>bind-</code> with no <code>bound-</code> labels, a missing image or size, two sizes,
+  an unknown bound size, or any other label alongside them -- <code>vm</code>, a
+  plain image or size, or an expression that could evaluate to one. See
+  "Binding a job to its runner" in shakenfist/private-ci
+  <code>docs/capacity-claims.md</code>.</p>
+</li>
 </ul>
 <p>The two failures look nothing alike, which is why this needs its own
 check. An over-labelled <code>static</code> job is never scheduled and someone

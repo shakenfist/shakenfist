@@ -15408,7 +15408,9 @@ only where YAML could put a value -- after a key, inside a <code>[...]</code>
 list, or as a <code>-</code> item. A label is matched as a whole token, so
 <code>debian-12</code> in <code>debian-12-genericcloud-amd64.qcow2</code>,
 <code>kolla-ansible-master-debian-12</code> or <code>debian-12-gnome-agents</code> is not a
-runner reference and is not reported.</p>
+runner reference and is not reported. A job bound to a runner of its
+own names its image as <code>bound-&lt;label&gt;</code>, so <code>bound-debian-12</code> is
+<code>debian-12</code> and is reported as such.</p>
 <p><strong>Container image references</strong>, in a workflow's <code>container:</code> and
 <code>image:</code> keys and in the <code>FROM</code> lines of any <code>Dockerfile</code>,
 <code>Dockerfile.*</code>, <code>*.dockerfile</code> or <code>Containerfile</code> in the tree. The tag
