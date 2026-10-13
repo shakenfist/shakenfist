@@ -581,9 +581,10 @@ provides a modular architecture with:
  max_length window) from `OPERATION_CONFIG_ADDR`, detects the
  source format on input device 0, refuses sources with chain
  composition (qcow2 backing-file references, vhd differencing
- disks; vhdx differencing is already rejected by
- `VhdxState::init`; vmdk multi-extent layouts fail the
- binary-header parse naturally), and dispatches to the matching
+ disks, and vhdx differencing in an arm of its own, since
+ `VhdxState::init` reports `has_parent` rather than rejecting it;
+ vmdk multi-extent layouts fail the binary-header parse
+ naturally), and dispatches to the matching
  per-format `<Format>State::map_extents` walker from the
  PLAN-map work. `map` refuses a differencing source outright, like
  `measure` and `check`; `convert`, `dd`, `compare`, `bench` and

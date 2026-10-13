@@ -111,10 +111,10 @@ followed by `info` reports `parent.vhdx` and resolves correctly.
 
 The `backing file:` field itself is correct in every case — it is what
 the image's own header records, and reporting it is the point. Fixing
-the "actual path" resolution is path normalisation, which belongs with
-the composition work in
-[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/), not this output
-path; suppressing the field instead would paper over the underlying
-issue rather than close it. The full account, including which locator
+the "actual path" resolution is path normalisation and needs a decision
+rather than a guard, so it is tracked in
+[issue #658](https://github.com/shakenfist/instar/issues/658);
+suppressing the field instead would paper over the underlying issue
+rather than close it. The full account, including which locator
 key `info` prefers and why the relative case is rendered back, is the
 "VHD/VHDX differencing" section of [quirks.md](/components/instar/quirks/).

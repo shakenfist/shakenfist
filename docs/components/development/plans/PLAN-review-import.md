@@ -286,8 +286,8 @@ answers.
 | 1. `import` subcommand | Complete | 54c7ecc (#177) |
 | 2. Review tracking CI template and rollout | Complete | 02d6dbb (#186); actions 74a33c9 (#111); hunkydory f24d413 (#57); kerbside 62ccbcb (#504); ryll ce3ebb3 (#418) |
 | 3. Template convergence | Complete | b520c22 (#203); actions 89717fa (#122), e05bbb1 (#134); hunkydory 8730d75 (#63), c22059e (#66); kerbside 700102e (#511), ede2d7d (#519); ryll 79721f3 (#425), f8a4e2f (#455) |
-| 4. Verification | In progress | |
-| 5. Push audit | Not started | |
+| 4. Verification | Complete | bdc52ab (#249) |
+| 5. Push audit | In progress | |
 
 <!-- shared-block: plan-status-vocabulary v1 -->
 Plan status vocabulary (shared block; do not edit -- the canonical
@@ -1181,8 +1181,19 @@ marks. The agent had to assemble the steps from three sections of
 written down anywhere in `docs/`: the `.weaudit` JSON shape for a
 full versus a partial mark, and how to find a reviewer's signing
 identity. "Verifying an imported entry by hand", added in this
-phase, closes both gaps. Michael's repeat of the check from the
-documented procedure: pending.
+phase, closes both gaps. Michael repeated the check from the
+documented procedure on 2026-10-13, on ryll's imported
+`renovate.yml` (source commit f2bc259, blob d63b3b2): the signature,
+Rekor entry and certificate claims validate, the sidecar and
+`auditedFiles` both record a full review of that blob, and ryll's
+`develop` carries it. His one difficulty was that step 3 prints both
+state files whole, hundreds of lines to find one path; the step now
+filters to the path.
+
+The converged `renovate.yml` also works in practice: ryll's Renovate
+run on 2026-10-13 resolved the new `${{ github.repository }}` filter
+to `shakenfist/ryll` and autodiscovered exactly that repository
+(shakenfist/ryll Actions run 38329074401).
 
 The drift data below was posted to shakenfist/development#151 on
 2026-10-13
@@ -1212,10 +1223,208 @@ to re-sync from.
 
 ### Phase 5: push audit
 
-Run `PUSH-AUDIT.md` over the merge commits recorded for phases 1
-to 4 in this repository, and cite the per-repository audits for
-the pull requests that landed elsewhere. Findings land as their
-own pull request.
+Planning effort: medium. The runbooks already exist in all five
+repositories; the judgement here is in scoping (decision 2).
+
+**Scope.** In: development's `PUSH-AUDIT.md` over the four merge
+commits that landed phases 1 to 4 here, and each adopted
+repository's own `PUSH-AUDIT.md` over the three merges that landed
+phases 2 and 3 there. Findings are fixed or declined in writing.
+Out: anything Future work already records, and work merged in
+those repositories since that did not come from this plan.
+
+**What the survey found (2026-10-13).**
+
+* **The out-of-repository audits this section planned to cite do
+  not exist.** As first written, the section said to "cite the
+  per-repository audits for the pull requests that landed
+  elsewhere", and the `plan-push-audit-phase` shared block expects a
+  phase landing in another repository to be audited as part of its
+  pull request. None of the twelve was: no body or comment on
+  actions#111, #122, #134, hunkydory#57, #63, #66, kerbside#504,
+  #511, #519 or ryll#418, #425, #455 mentions a push audit. They are
+  audited here instead (decision 2), and this section is corrected
+  to say so.
+* **The ranges are all recorded**, every one as a merge commit, so
+  none needs reconstructing. Sizes against first parent:
+
+  | Repository | Merge (PR) | Files | Insertions | Deletions |
+  |---|---|---|---|---|
+  | development | 54c7ecc (#177) | 11 | 2903 | 262 |
+  | development | 02d6dbb (#186) | 20 | 1427 | 163 |
+  | development | b520c22 (#203) | 29 | 1262 | 177 |
+  | development | bdc52ab (#249) | 2 | 383 | 20 |
+  | actions | 74a33c9 (#111), 89717fa (#122), e05bbb1 (#134) | 5, 6, 2 | 310, 111, 88 | 100, 48, 0 |
+  | hunkydory | f24d413 (#57), 8730d75 (#63), c22059e (#66) | 5, 5, 2 | 437, 115, 88 | 60, 41, 0 |
+  | kerbside | 62ccbcb (#504), 700102e (#511), ede2d7d (#519) | 3, 9, 2 | 310, 764, 88 | 53, 71, 0 |
+  | ryll | ce3ebb3 (#418), 79721f3 (#425), f8a4e2f (#455) | 3, 10, 2 | 305, 302, 88 | 68, 57, 0 |
+
+* **Most of the out-of-repository diff is template content**
+  byte-identical to files development's own audit reads. What is
+  each repository's own: actions' `tests/test_workflow_references.py`,
+  `docs/ci.md`, `.gitignore` and the CodeQL `paths-ignore` lines;
+  hunkydory's `check_paths` jobs in `ci.yml` and the `renovate.json`
+  description; kerbside's `tools/pin-indirect-dependencies-apt.txt`;
+  ryll's `docs/ci.md`, `MERGE-TEMPLATE.md` and `renovate.json`
+  description.
+* All four adopted repositories have a `PUSH-AUDIT.md` (563 to 702
+  lines), so none needs the "no runbook yet" fallback.
+
+**Decisions.**
+
+1. **Development's audit runs the runbook as written**, with
+   `AUDIT_RANGE` set to each of the four merges in turn
+   (`<sha>^1..<sha>`), and each wave 2 brief carries all four
+   concrete ranges and the insertion totals above. The runbook's
+   own guard applies: a report whose totals do not match is re-run.
+   Findings are judged against current `main`. Phase 1's code was
+   changed by later phases, and a finding about a line that no
+   longer exists is resolved.
+2. **The adopted repositories are audited by their own runbooks,
+   scoped to their own content.** For each file a merge touched,
+   the agent compares it against its template at the template
+   revision of the time. A byte-identical copy is recorded as
+   "audited as development's `templates/<path>`" and not re-read;
+   only the per-repository content listed above gets wave 2. This
+   is the decision most open to argument. Each runbook is written
+   for its repository's own risks (kerbside's for a Python service,
+   ryll's for Rust), and a copy can be wrong *for its repository*
+   even when its template is right. A reasonable reviewer could ask
+   for full runs. The answer is that each re-sync agent already read
+   every old copy against its template before replacing it, and
+   reported every behaviour the copy lost (phases 2 and 3). Four
+   full wave 2 runs over 90% shared bytes would spend most of their
+   effort re-auditing development's templates four times.
+3. **One agent per adopted repository**, running wave 1 and the
+   scoped wave 2 together. Their diffs are a few hundred lines of
+   their own content. Development's audit gets the runbook's four
+   parallel wave 2 agents, because its diff is about 6,000 lines of
+   Python, shell, workflow and documentation.
+4. **Findings land where the code is.** Development's findings land
+   in this phase's pull request, which also closes the plan.
+   Findings in an adopted repository land as one pull request there,
+   opened only when Michael asks. This plan is not complete until
+   each finding is fixed or declined in writing in the Outcome below.
+
+| Step | Effort | Model | Isolation | Brief for sub-agent |
+|------|--------|-------|-----------|---------------------|
+| 5a | low | sonnet | none | Development wave 1 (`PUSH-AUDIT.md`, "Wave 1: Mechanical checks"), run once per merge with `AUDIT_RANGE` set explicitly to `54c7ecc^1..54c7ecc`, `02d6dbb^1..02d6dbb`, `b520c22^1..b520c22`, `bdc52ab^1..bdc52ab`, after `git fetch origin`. Report each range's `git diff --shortstat` (it must match the survey table), the `pre-commit run --all-files` result on current `main`, and every grep hit with file and line. Change nothing. |
+| 5b | high | opus | none | Development wave 2a, code quality, per `PUSH-AUDIT.md` "2a". Read the four ranges from 5a; the substituted commands and the totals they must reproduce go in the brief. Concentrate on `scripts/review-tracking.py`'s `import` path and `templates/review-tracking/ci-prune-reviews.sh`. Judge findings against current `main`. State the insertion and deletion totals measured. |
+| 5c | high | sonnet | none | Development wave 2b, tests, per "2b": `scripts/tests/test_review_tracking.py`, `scripts/tests/test_ci_prune_reviews.py` and the registry and docs tests the four ranges touched. Mutate before believing a test guards something. Same range and totals rule. |
+| 5d | medium | sonnet | none | Development wave 2c, documentation, per "2c": `docs/code-review-tracking.md`, the template READMEs, the adoption and standards-alignment skills, and `AGENTS.md`/`ARCHITECTURE.md` as the ranges changed them. Check that no fact is stated two ways, and that nothing in `docs/` cites a plan phase. Same range and totals rule. |
+| 5e | high | opus | none | Development wave 2d, security, per "2d". The import trust argument ("The prune commit's attestation argument" and "Amplification" in "Situation"), gitsign verification and its failure modes, the CI token scope, the gitsign download pin, and the CodeQL template's fork guard and fail-open filter. Same range and totals rule. |
+| 5f | medium | sonnet | none | actions: its own `PUSH-AUDIT.md`, wave 1 and a scoped wave 2 over 74a33c9, 89717fa and e05bbb1 (`<sha>^1..<sha>`; totals in the survey table). For each touched file, hash it at the merge and compare with development's `templates/` blob at the date of the merge (`git log --before`). List byte-identical copies as audited elsewhere; give wave 2 to the rest (decision 2's list for actions). Change nothing; report findings with file and line. |
+| 5g | medium | sonnet | none | hunkydory: as 5f, over f24d413, 8730d75 and c22059e. The `check_paths` jobs in `ci.yml` gate required checks, so verify the fail-open (`\|\| 'true'`, `!cancelled()`) and `predicate-quantifier: 'every'`. |
+| 5h | medium | sonnet | none | kerbside: as 5f, over 62ccbcb, 700102e and ede2d7d. |
+| 5i | medium | sonnet | none | ryll: as 5f, over ce3ebb3, 79721f3 and f8a4e2f. A Rust repository; do not install a toolchain. A wave 1 check that needs cargo is reported as skipped, not run. |
+| 5j | medium | sonnet | none | Fix the development findings the management session accepts, one commit each. Write the Outcome below: every finding with its disposition (fixed in which commit, declined and why, or filed where), and one line per repository that had none. Then mark this phase and the plan `Complete` in the Execution table and in `docs/plans/index.md`; this phase records no `Merged` cell, per the shared block. |
+
+**Risks.**
+
+* *An agent audits an empty diff and reports it clean.* Every report
+  states its measured totals, and the management session compares
+  them with the survey table before reading the findings.
+* *Decision 2's scoping misses a defect in a copy.* That would be a
+  copy wrong for its repository but right as a template. The
+  per-repository agents are told to flag any copy whose behaviour
+  depends on something its repository lacks, such as a variable, a
+  label or a file. The re-sync reports from phases 2 and 3 are the
+  other check.
+* *A finding needs a template change.* It lands here first and then
+  in the copies, as phase 3 did. A fix that would re-open
+  convergence is recorded and filed rather than made in this phase.
+
+**Definition of done.**
+
+* Each development report states totals that match the survey
+  table for its ranges.
+* Every finding has a disposition in the Outcome: a fixing commit,
+  a written decline, or an issue link.
+* Any adopted repository with findings has a pull request linked
+  from the Outcome, or an explicit "no findings".
+* The Execution table shows phase 5 `Complete` with no `Merged`
+  cell, and the `docs/plans/index.md` row shows `Complete`.
+* `pre-commit run --all-files` passes, and `audit-check.py` for this
+  repository reports what it reported before.
+
+**Back brief.** Before 5j opens any pull request in an adopted
+repository, the management session lists the findings to Michael
+and he chooses which land.
+
+**Outcome.**
+
+**1. Range check.** All nine audit reports reproduced the survey
+table's totals exactly (5a-5i).
+
+**2. Methodology note.** Finding the template revision at a
+merge's date with `git rev-list -1 --before=<date> origin/main`
+needs `--first-parent`. Without it, a commit from a merged side
+branch can be chosen and give a false "differs". The actions and
+hunkydory audits (5f, 5g) both hit this and re-derived the
+comparison.
+
+**3. Adopted repositories: no findings in any of the four.**
+- actions: 452 tests, gitleaks clean, local
+  test/docs/`.gitignore`/CodeQL paths correct.
+- hunkydory: the `check_paths` jobs fail open and keep the
+  required check names; `RETEST_WORKFLOW` and `RENOVATE_TOKEN` are
+  present.
+- kerbside: all 11 copies identical; the apt list is right for
+  mysqlclient on Debian 13; `pyproject.toml` is at the root and
+  `functional-tests.yml` is dispatchable.
+- ryll: wave 1 passed including cargo in Docker; the docs,
+  `MERGE-TEMPLATE.md` and `renovate.json` are accurate;
+  `DEPENDENCIES_TOKEN` and the ruleset are confirmed.
+
+No pull requests were needed for audit findings.
+
+**4. Development findings and dispositions.** Commit hashes are
+taken from `git log`.
+
+| Finding | Source | Disposition |
+|---|---|---|
+| 5b-1 | import walked the source's `HEAD` | Fixed: it walks `origin/main` (59d2e02) |
+| 5e-M1, first half | wrongly typed history crashed the walk | Fixed (05bb3e7) |
+| 5e-M1, second half | an import failure lost prune's results | Fixed: prune's result lands, then the run fails (0aca89b) |
+| 5b-2 | no per-run verification budget | Fixed (99a2783); timeout comment corrected (ce3b32d) |
+| 5e-L2 | existing target entries never re-checked | Fixed (cfc232a) |
+| 5b-3 | wrong exit-code docstring | Fixed (648db83) |
+| 5e-M3 | residual trust in development's code and identity map | Documented (d0de9c3); Michael chose this over CODEOWNERS, as sole reviewer of development PRs |
+| 5d | CodeQL example in adoption step 8 out of date | Fixed (89400f5) |
+| 5e-L4 | silent `DEPENDENCIES_TOKEN` fallback | Documented (944b61a) |
+| 5e-M2 | push token and global git config on shared static runners | Fixed: config isolation, per-run `TUF_ROOT`, token scoped to the push, hooks off for the push (9556eba) |
+| 5c, first | architecture refusal untested | Fixed (8a2a37a) |
+| 5e-L1 | stamps not tied to content in the commit's ancestry | Declined, added to Future work: the exact-match fix is wrong, since 8 legitimate stamps survive rebases, and the ancestry check is a larger change |
+| 5e-L3 | `docs/**` could skip executable docs code | Declined: a template change for a speculative case; no adopted repository has code under `docs/` |
+| 5b-4 | every state file buffered in memory | Declined: about 8.5 MB today; stream if it ever matters |
+| 5b-5 | partial-to-full upgrade without prune | Declined: no clean fix; stamp's stale ERROR is the defence |
+| 5b-6 | published details string changed | No action: intentional |
+| 5c, second | verified-to-unverified downgrade protection is incidental | No action: the property holds |
+| 9556eba's report | the checkout's own `.git/config` on a reused workspace is outside the isolation | Declined, added to Future work: landing from a fresh clone would close it |
+| #251 review, round one | an entry pointing at a later genuine introduction of a review was replaced as unsupported; malformed imports entries crashed import | Fixed: every introducing commit attests, and `load_imports()` checks the file's shape in one place (559e9ef) |
+| #251 review, round two | default history simplification hid review branches whose merge matched main | Fixed: the walk uses `--full-history`; an invalid or non-object imports file is treated as empty (c61040f) |
+
+**5. Follow-up.**
+- The template change (new hashes: `prune-reviews.yml` 3383bef,
+  `ci-prune-reviews.sh` ff66340) must be re-synced into actions,
+  hunkydory, kerbside and ryll. Script and workflow go together,
+  because the script now requires `PUSH_TOKEN`.
+- Michael must re-stamp the changed files here before the copies
+  import.
+- The config isolation is untested on a real static runner until
+  development's own `prune-reviews` runs after this merges. Ignoring
+  the global configuration also drops any `safe.directory`, proxy or
+  CA setting the runners rely on; if that run fails with "dubious
+  ownership" or a TLS error, add the setting for the checkout through
+  `GIT_CONFIG_COUNT` rather than restoring the global file.
+  The re-sync pull requests open only after that run has succeeded,
+  so that a runner dependency is found in one repository, not five.
+- The plan reaches `Complete` when the re-sync pull requests
+  merge. Until then the success criterion "the three review
+  tracking CI files are byte-identical across the four adopted
+  repositories" is false. So leave phase 5 and the index row `In
+  progress` in this commit, and say that a one-line close-out
+  follows the re-syncs.
 
 ## Agent guidance
 
@@ -1578,6 +1787,20 @@ intend to do aligns with that plan.
   Phase 3 makes the target a repository variable; whether the bot
   should instead re-run a pull request's own gating lanes is a
   change to the review automation template, not to convergence.
+* **Stamps are not tied to content in the commit's ancestry.**
+  Raised by phase 5's security audit (5e-L1). A stamp is matched
+  to a file by an exact content match today, which is deliberate:
+  8 legitimate stamps survive rebases that an ancestry check would
+  break. Tying a stamp to its blob's ancestry instead would catch
+  a narrower class of forgery, but is a larger change than this
+  plan should make.
+* **Landing from a fresh clone.** Raised by phase 5's security
+  audit (5e-M2). The prune job's config isolation keeps
+  `PUSH_TOKEN` and git configuration out of a reused static
+  runner's shared state, but the checkout's own `.git/config`
+  still sits inside the job's reach for the run. Landing from a
+  fresh clone each time would close that gap too, at the cost of
+  a clone on every run instead of reusing a checkout.
 
 Related issues: shakenfist/development#173 is this repository's
 own review-coverage issue; import does not affect it, because this

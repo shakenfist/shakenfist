@@ -427,21 +427,10 @@ the main-channel client-side keepalive timeout fired
 (distinguishing "we timed ourselves out" from a server
 RST), and embeds a per-channel diagnostics map so a
 maintainer can compare the dropped channel against the
-others' last-known traffic state.
-
-Two fields in that map are nullable, and the distinction
-matters when reading one. `client_keepalive_send_count`
-is `null` when the channel has no client-side keepalive
-mechanism at all, and `0` when it has one that never
-fired. Only the inputs channel implements one, so the
-other six report `null`; the main channel used to
-implement one and no longer does, and reporting a bare
-`0` for it would have claimed the mechanism ran and
-never fired — precisely the wrong answer for someone
-reading a main-channel disconnect report.
-`last_client_keepalive_send_ts_secs` is `null` both when
-no keepalive has been sent and when the channel has no
-mechanism.
+others' last-known traffic state. ryll sends no
+application-level keepalive on any channel: an idle
+channel is kept alive by TCP keepalive on the socket and
+by answering the server's PINGs.
 
 A 60 s cooldown bounds disk usage during a disconnect
 storm; the cooldown is updated even on write failure so

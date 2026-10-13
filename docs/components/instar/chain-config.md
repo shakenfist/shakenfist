@@ -264,10 +264,39 @@ filesystem file size. The VMDK chain reader uses `actual_size` in
 would use `capacity * sector_size`, which overshoots for files not
 aligned to the sector size boundary.
 
-### VHD (future)
+### VHD
 
-VHD stores its footer at the last 512 bytes of the file. Like VMDK,
-the chain reader will need `actual_size` to locate the footer correctly.
+VHD stores its footer in the last 512 bytes of the file, but the chain
+reader does not need `actual_size` to find it. `VhdState::init()` reads
+sector 0 first, because a dynamic or differencing VHD carries a footer
+*copy* there, and falls back to the last sector -- located as
+`input_capacity - 1`, from the virtio capacity -- only for a fixed VHD.
+So unlike the VMDK arm above, `init_chain_states()` hands this reader no
+`actual_size`; the one the crate computes internally is a local
+`input_capacity * sector_size` bound for range checks, not this field.
+
+What a differencing child does need is the per-block sector bitmap. Each
+allocated block is preceded by a bitmap whose bits say, per 512-byte
+sector, whether that sector's data is the child's or the parent's: set
+means the child, most significant bit first. The chain walker coalesces
+runs of equally owned sectors and descends for the runs the bitmap
+leaves to the parent; an unallocated block belongs to the parent
+entirely.
+
+### VHDX
+
+VHDX has no footer at all -- its headers, region tables and BAT sit at
+offsets the format fixes -- so `VhdxState::init()` also takes no
+`actual_size`, and bounds itself by `input_capacity * sector_size` the
+same way.
+
+Its sector bitmaps are arranged differently from VHD's: one 1 MiB bitmap
+block serves a whole chunk of payload blocks instead of preceding each
+block, so bit numbering restarts at the chunk's start, bits are least
+significant first, and they count the image's declared
+`logical_sector_size` of 512 or 4096. Only a block the BAT marks
+`PAYLOAD_BLOCK_PARTIALLY_PRESENT` sends the reader to the bitmap; the
+other states name an owner by themselves.
 
 ## Constants Reference
 

@@ -1568,9 +1568,8 @@ so `vhdiinfo` is the only external cross-check of the parent linkage
 instar wrote, and this suite is the only place anything other than
 instar's own parser reads a differencing image instar wrote.
 
-The assertions are structural only, per
-[PLAN-differencing.md](/components/instar/plans/PLAN-differencing/): the disk type, the
-parent filename for VHD, and the parent identifier for both formats,
+The assertions are structural only: the disk type, the parent
+filename for VHD, and the parent identifier for both formats,
 each compared against what `vhdiinfo` reports for the parent itself
 rather than a hardcoded GUID. No composed content is read by this
 class — that is the data oracle's job, below. One limitation is
@@ -1669,8 +1668,9 @@ guard it actually fail?** It is not a coverage tool and it measures
 nothing. Each case breaks one specific behaviour in `src/` and
 requires one named test to notice; a test that still passes against a
 deliberately broken emitter is not guarding what its name says it
-guards. See [PLAN-differencing.md](/components/instar/plans/PLAN-differencing/) for the
-path being guarded.
+guards. See the VHD and VHDX notes in
+[chain-config.md](/components/instar/chain-config/#format-specific-notes) for the
+composing path being guarded.
 
 There are **105 cases**, in eight groups.
 

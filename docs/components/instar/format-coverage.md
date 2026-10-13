@@ -112,8 +112,8 @@ These ops read an image without mutating it.
 | raw | ✓ | R= | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | qcow2 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | vmdk | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| vhd / vpc | ✓ | ✓‡ 9 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| vhdx | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓‡ 10 | ✓ |
+| vhd / vpc | ✓ | ✓‡ 9, 18 | ✓ | ✓ | ✓ | ✓ | ✓ 18 | ✓ 18 |
+| vhdx | ✓ | ✓ 18 | ✓ | ✓ | ✓ | ✓ | ✓‡ 10, 18 | ✓ 18 |
 | luks | ✓ | R= 16 | ✓ 16 | ✓ 16 | ✓ 16 | R= 16 | R= 16 | R= 16 |
 | vdi | ✓ | R‡ 1 | ✓ | ✓ | ✓ | ✓ | R‡ 2 | R‡ 2 |
 | parallels | ✓ | R‡ 3 | ✓ | ✓ | ✓ | ✓ | R‡ 2 | R‡ 2 |
@@ -256,6 +256,13 @@ qed images; instar refuses those by scope, not by inability (note 15).
     so there is no qemu-img oracle for this output. See the "VHD/VHDX
     differencing (parent composition)" section below and the "VHD/VHDX
     differencing" section of quirks.md. Measured 2026-09-20.
+18. **VHD / VHDX differencing — `check`, `map`, `measure`** — these three
+    refuse when the source is a differencing VHD or VHDX, a sub-state of
+    these rows rather than a separate format; `convert`, `compare`, `dd`
+    and `bench` compose such a source against its parent instead (as does
+    `rebase`, when the differencing image is a member of the backing
+    chain it was given). See the "VHD/VHDX differencing (parent
+    composition)" section below for the full record.
 
 ### vvfat
 
