@@ -287,7 +287,7 @@ answers.
 | 2. Review tracking CI template and rollout | Complete | 02d6dbb (#186); actions 74a33c9 (#111); hunkydory f24d413 (#57); kerbside 62ccbcb (#504); ryll ce3ebb3 (#418) |
 | 3. Template convergence | Complete | b520c22 (#203); actions 89717fa (#122), e05bbb1 (#134); hunkydory 8730d75 (#63), c22059e (#66); kerbside 700102e (#511), ede2d7d (#519); ryll 79721f3 (#425), f8a4e2f (#455) |
 | 4. Verification | Complete | bdc52ab (#249) |
-| 5. Push audit | In progress | |
+| 5. Push audit | Complete | 99158da (#251), 728f0ae (#254); actions e3e6155 (#157), 68dc806 (#160); hunkydory e5a9b0e (#74), e8c62e5 (#77); kerbside c608d2c (#563); ryll 60990bb (#530) |
 
 <!-- shared-block: plan-status-vocabulary v1 -->
 Plan status vocabulary (shared block; do not edit -- the canonical
@@ -404,9 +404,9 @@ command in it is written against `main...HEAD`: a stale local
 before starting, or read it as `origin/main...HEAD`.
 
 Phases 2 and 3 land partly in actions, hunkydory, kerbside and
-ryll. Each of those pull requests is audited against its own
-repository's default branch as it lands, and phase 5 cites those
-audits.
+ryll. Each of those pull requests was to be audited against its own
+repository's default branch as it landed; phase 5 found none had
+been, and audited those repositories itself (phase 5, decision 2).
 
 <!-- shared-block: plan-phase-landing v1 -->
 Phase landing (shared block; do not edit -- the canonical copy
@@ -1317,7 +1317,7 @@ those repositories since that did not come from this plan.
 | 5g | medium | sonnet | none | hunkydory: as 5f, over f24d413, 8730d75 and c22059e. The `check_paths` jobs in `ci.yml` gate required checks, so verify the fail-open (`\|\| 'true'`, `!cancelled()`) and `predicate-quantifier: 'every'`. |
 | 5h | medium | sonnet | none | kerbside: as 5f, over 62ccbcb, 700102e and ede2d7d. |
 | 5i | medium | sonnet | none | ryll: as 5f, over ce3ebb3, 79721f3 and f8a4e2f. A Rust repository; do not install a toolchain. A wave 1 check that needs cargo is reported as skipped, not run. |
-| 5j | medium | sonnet | none | Fix the development findings the management session accepts, one commit each. Write the Outcome below: every finding with its disposition (fixed in which commit, declined and why, or filed where), and one line per repository that had none. Then mark this phase and the plan `Complete` in the Execution table and in `docs/plans/index.md`; this phase records no `Merged` cell, per the shared block. |
+| 5j | medium | sonnet | none | Fix the development findings the management session accepts, one commit each. Write the Outcome below: every finding with its disposition (fixed in which commit, declined and why, or filed where), and one line per repository that had none. Then mark this phase and the plan `Complete` in the Execution table and in `docs/plans/index.md`; this phase records no `Merged` cell, per the shared block. (As it turned out, the audit's template findings needed re-sync pull requests in the four adopted repositories, so the close-out followed them and recorded their merge commits, as plan-phase-landing allows for a findings carrier.) |
 
 **Risks.**
 
@@ -1342,8 +1342,12 @@ those repositories since that did not come from this plan.
   a written decline, or an issue link.
 * Any adopted repository with findings has a pull request linked
   from the Outcome, or an explicit "no findings".
-* The Execution table shows phase 5 `Complete` with no `Merged`
-  cell, and the `docs/plans/index.md` row shows `Complete`.
+* The Execution table shows phase 5 `Complete`, and the
+  `docs/plans/index.md` row shows `Complete`. The `Merged` cell is
+  empty if the audit found nothing; this one found template
+  findings, carried by re-sync pull requests that landed after it,
+  so the cell records their merge commits (see plan-phase-landing
+  above).
 * `pre-commit run --all-files` passes, and `audit-check.py` for this
   repository reports what it reported before.
 
@@ -1410,7 +1414,10 @@ taken from `git log`.
   hunkydory, kerbside and ryll. Script and workflow go together,
   because the script now requires `PUSH_TOKEN`.
 - Michael must re-stamp the changed files here before the copies
-  import.
+  import. At close-out this had not happened: of the files #251 and
+  #254 changed, only `scripts/tests/test_review.py` is stamped at its
+  current content. That is ordinary review coverage, tracked by
+  #173, not a condition of this plan.
 - The config isolation is untested on a real static runner until
   development's own `prune-reviews` runs after this merges. Ignoring
   the global configuration also drops any `safe.directory`, proxy or
@@ -1437,7 +1444,14 @@ taken from `git log`.
   tracking CI files are byte-identical across the four adopted
   repositories" is false. So leave phase 5 and the index row `In
   progress` in this commit, and say that a one-line close-out
-  follows the re-syncs.
+  follows the re-syncs. They merged as actions#157 (e3e6155) and
+  #160 (68dc806), hunkydory#74 (e5a9b0e) and #77 (e8c62e5),
+  kerbside#563 (c608d2c) and ryll#530 (60990bb), after #254 here
+  (728f0ae). At close-out `prune-reviews.yml` 91ff178,
+  `ci-prune-reviews.sh` b4ce5b6 and `review-tracking.sh` db83f95
+  hashed identically to their templates in all four, so phase 5 and
+  the plan are `Complete`, with a `Merged` cell recording those
+  commits.
 
 ## Agent guidance
 

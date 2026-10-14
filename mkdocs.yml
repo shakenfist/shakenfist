@@ -162,6 +162,7 @@ nav:
                 - "Consistency Audit Specifications": components/development/audits/README.md
             - Plans:
                 - "Plans index": components/development/plans/index.md
+                - "Bot bypass identity": components/development/plans/PLAN-bot-bypass-identity.md
                 - "Consistency audits v2": components/development/plans/PLAN-consistency-audits-v2.md
                 - "Plan references in code": components/development/plans/PLAN-plan-references-in-code.md
                 - "Plan: a `scope-coverage` audit, reconciling the audit lists against the organisation": components/development/plans/PLAN-scope-coverage.md
