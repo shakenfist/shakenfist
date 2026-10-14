@@ -17492,7 +17492,7 @@ taken from <code>git log</code>.</p>
 <tr>
 <td>9556eba's report</td>
 <td>the checkout's own <code>.git/config</code> on a reused workspace is outside the isolation</td>
-<td>Declined, added to Future work: landing from a fresh clone would close it</td>
+<td>Declined here, then fixed when <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/563" title="GitHub Issue: shakenfist/kerbside #563">kerbside#563</a>'s review of the re-sync showed hooks in the reused <code>.git/hooks</code> also ran on fetch, reset and commit: the job lands from a fresh clone and runs no git command in the workspace</td>
 </tr>
 <tr>
 <td>#251 review, round one</td>
@@ -17507,8 +17507,8 @@ taken from <code>git log</code>.</p>
 </tbody>
 </table>
 <p><strong>5. Follow-up.</strong>
-- The template change (new hashes: <code>prune-reviews.yml</code> 3383bef,
-  <code>ci-prune-reviews.sh</code> ff66340) must be re-synced into actions,
+- The template change (new hashes: <code>prune-reviews.yml</code> 91ff178,
+  <code>ci-prune-reviews.sh</code> b4ce5b6) must be re-synced into actions,
   hunkydory, kerbside and ryll. Script and workflow go together,
   because the script now requires <code>PUSH_TOKEN</code>.
 - Michael must re-stamp the changed files here before the copies
@@ -17521,6 +17521,19 @@ taken from <code>git log</code>.</p>
   <code>GIT_CONFIG_COUNT</code> rather than restoring the global file.
   The re-sync pull requests open only after that run has succeeded,
   so that a runner dependency is found in one repository, not five.
+  That run passed (38378512735, shakenfist-static-2) and the four
+  opened, but <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/563" title="GitHub Issue: shakenfist/kerbside #563">kerbside#563</a>'s review then found hooks and
+  configuration in the reused workspace's <code>.git</code> still reached the
+  job, and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/157" title="GitHub Issue: shakenfist/actions #157">actions#157</a>'s that a hook could rewrite the script during
+  the checkout itself, so the workflow now fetches the script, and
+  the script lands, from fresh clones. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/157" title="GitHub Issue: shakenfist/actions #157">actions#157</a> and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/hunkydory/issues/74" title="GitHub Issue: shakenfist/hunkydory #74">hunkydory#74</a>
+  merged before this did, carrying ci-prune-reviews.sh 883d3e9, and
+  their first runs (actions 38480219082 on shakenfist-static-2,
+  hunkydory 38480253693 on shakenfist-static-1) cloned shallowly
+  with no checkout and pushed, so the fresh-clone workflow has run on
+  both static runners. The final template differs from 883d3e9 only
+  in a comment, so those two need one more verbatim re-sync; kerbside
+  and ryll take the final hashes directly.
 - The plan reaches <code>Complete</code> when the re-sync pull requests
   merge. Until then the success criterion "the three review
   tracking CI files are byte-identical across the four adopted
@@ -17883,13 +17896,6 @@ intend to do aligns with that plan.</p>
   break. Tying a stamp to its blob's ancestry instead would catch
   a narrower class of forgery, but is a larger change than this
   plan should make.</li>
-<li><strong>Landing from a fresh clone.</strong> Raised by phase 5's security
-  audit (5e-M2). The prune job's config isolation keeps
-  <code>PUSH_TOKEN</code> and git configuration out of a reused static
-  runner's shared state, but the checkout's own <code>.git/config</code>
-  still sits inside the job's reach for the run. Landing from a
-  fresh clone each time would close that gap too, at the cost of
-  a clone on every run instead of reusing a checkout.</li>
 </ul>
 <p>Related issues: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/173" title="GitHub Issue: shakenfist/development #173">development#173</a> is this repository's
 own review-coverage issue; import does not affect it, because this

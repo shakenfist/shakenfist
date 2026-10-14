@@ -16732,8 +16732,9 @@ are sent but the display never updates in response.</p>
 - The SPICE agent in the VM may not be running</p>
 <p><strong>Solutions:</strong>
 1. Use Tab to navigate instead of mouse clicking
-2. Check <code>/tmp/ryll.log</code> for <code>inputs: mouse down:</code> lines
-   to confirm clicks are being sent
+2. Run ryll with <code>--verbose</code> and check <code>/tmp/ryll.log</code> for
+   <code>inputs: mouse down:</code> lines to confirm clicks are being sent.
+   They are debug-level, so they do not appear without it
 3. Submit a bug report (F12) with category <strong>Input</strong> — the
    channel-state.json will show whether button events are
    reaching the wire

@@ -15990,11 +15990,12 @@ once, into a run that finds nothing left to do (observed 2026-09-11
 review marks.</code>, which committed nothing).</p>
 <p>The job runs on shared, long-lived static runners that also run pull
 request code, so it trusts as little as it can of what an earlier job
-could have left there. It ignores global and system git configuration,
-gives gitsign a fresh TUF cache on every run, keeps no credentials in
-the checkout, and hands the push token to its one <code>git push</code> alone,
-through the environment rather than argv or <code>.git/config</code>. "Runner
-isolation" in
+could have left there. It never reads the reused workspace: the script
+comes from a fresh clone in <code>RUNNER_TEMP</code>, and lands from another; it
+ignores global and system git configuration, gives gitsign a fresh TUF
+cache on every run, keeps no credentials in either clone, and hands
+the push token to its one <code>git push</code> alone, through the environment
+rather than argv or <code>.git/config</code>. "Runner isolation" in
 <a href="https://github.com/shakenfist/development/blob/main/templates/review-tracking/README.md#runner-isolation">templates/review-tracking/README.md</a>
 has the detail.</p>
 <p>The bot's commit is not signed, and does not need to be for the
