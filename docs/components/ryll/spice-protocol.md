@@ -190,6 +190,27 @@ still recorded on `MainSnapshot` as passive diagnostics, next to the token
 and queue fields; the "Guest agent diagnostics" section in
 [troubleshooting.md](/components/ryll/troubleshooting/) explains each one.
 
+#### Display size requests
+
+Every frontend asks for a display size the same way: it puts the size
+on the main channel's resize queue (the GUI when its window changes,
+web mode for the browser's viewport, and the control socket's `resize`
+verb). The main channel waits for 200 ms of quiet so that a drag
+reaches the guest as the size it ended on, then sends a
+`VD_AGENT_MONITORS_CONFIG`. If the agent is not connected, or ryll has
+not yet announced its capabilities to it, the size is held, and sent
+once the agent connects or the guest announces its own capabilities,
+which is when spice-gtk sends its display configuration too. A size
+equal to the last one sent is not sent again.
+
+The GUI also tells the main channel when it has fitted its window to
+a new guest surface, as a size the guest already has rather than one
+it asks for. That sends nothing: the main channel records the size as
+the agent's and drops any size it was still holding. Otherwise a
+guest that booted without its agent would, when the agent started, be
+resized to the window's size from before the fit, away from the size
+it chose.
+
 #### Guest agent message reassembly
 
 The other direction is split the same way. A guest agent message is a

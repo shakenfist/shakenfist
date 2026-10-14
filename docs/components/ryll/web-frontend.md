@@ -135,8 +135,10 @@ tears down cleanly.
 
 - Single viewer at a time. A second offer replaces the
   existing connection.
-- No clipboard sync, USB redirection, or folder sharing
-  (out of MVP scope).
+- No clipboard sync in the browser, USB redirection, or
+  folder sharing (out of MVP scope). A
+  [control socket](/components/ryll/control-socket-protocol/) can still set
+  and read the guest's clipboard.
 - No multi-monitor (single video track, single primary
   surface).
 - Browser audio autoplay policy: click the volume button on

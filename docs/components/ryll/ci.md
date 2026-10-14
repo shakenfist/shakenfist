@@ -695,11 +695,12 @@ where a `GITHUB_TOKEN` push does not, so `prune-reviews`
 triggers itself once. That is safe rather than a loop: the
 second run finds nothing to prune and exits before committing.
 
-The workflow is guarded to `refs/heads/develop`, because
-`tools/ci-prune-reviews.sh` rebases onto `develop` and pushes to
-`develop` whatever ref was checked out — dispatching it on a
-branch would otherwise push that branch's unmerged commits
-straight to `develop`.
+The workflow is guarded to the default branch, because every
+push starts a run and only `develop`'s should land anything. It
+never reads the static runner's reused workspace: there is no
+checkout, the script comes from a fresh depth 1 clone of
+`develop` in `RUNNER_TEMP`, and it lands from a second fresh
+clone, with the token given to the final `git push` alone.
 
 Ruleset changes are captured under `.github/exported-config/`
 by `export-repo-config.yml`, which runs daily and on demand.

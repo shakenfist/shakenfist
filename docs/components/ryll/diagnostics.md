@@ -350,6 +350,16 @@ construction. Packets are recorded in `send()` and the read
 loop of each channel handler. Writers use unbuffered I/O (no
 `BufWriter`) so every packet hits disk immediately.
 
+Clipboard text crosses the main channel in `AGENT_DATA` messages,
+so whatever is copied between host and guest is in `main.pcap`, and
+in the main channel's ring buffer that bug reports include. The GUI
+has always synced the clipboard. Headless and web sessions do so
+only when they run a control socket (`--control-socket`), whose
+clipboard verbs need it; such a session fetches every guest copy at
+once, so guest clipboard text can appear in their captures and bug
+reports too, as can text set with `clipboard_set`. Without a control
+socket they never request the guest's clipboard.
+
 Large SPICE messages (e.g. uncompressed display updates) can
 exceed the IPv4 maximum packet size (65535 bytes). The pcap
 writer splits these into multiple TCP segments with sequential

@@ -1,4 +1,4 @@
-# Control Socket Protocol — Version 1.2
+# Control Socket Protocol — Version 1.3
 
 This document specifies the wire protocol spoken between a Ryll session
 with no host window — `--headless` or `--web` — and any external driver
@@ -8,7 +8,7 @@ such as latency loadtests and Sextant scenario tests implement against
 this document. Read the whole document before writing a client or
 implementing a verb.
 
-Protocol version: **1.2**
+Protocol version: **1.3**
 
 Version history:
 
@@ -32,6 +32,11 @@ Version history:
   and the break bit on the prefix rather than the scancode — see
   the note under [`send_key`](#send_key).  Plain scancodes are
   unaffected, so a client that only sends those sees no difference.
+- **1.3** — added the `clipboard_set`, `clipboard_get` and `resize`
+  verbs, the `clipboard_changed` event and the `queue_full` error
+  code, so a session with no host window can carry clipboard text to
+  and from the guest and ask the guest for a display size.  Additive;
+  a client that does not use them sees no difference.
 
 ---
 
@@ -66,9 +71,13 @@ Version history:
 - Sending keyboard input as individual scancodes or as paste-as-
   keystrokes text.
 - Capturing a screenshot of any live surface.
+- Setting and reading the session's clipboard, which ryll syncs with
+  the guest's through the SPICE vdagent, and asking the guest for a
+  display size.
 - Subscribing to an asynchronous stream of events: SPICE latency
   samples, agent connect/disconnect transitions, paste completion
-  notifications, per-draw surface notifications, decoded
+  notifications, text the guest copied, per-draw surface
+  notifications, decoded
   visual-digest updates (on `digest-decode` builds, in both
   `--headless` and `--web`), and queue-overflow notifications.
 - Negotiating the protocol version at connection time so clients and
@@ -155,6 +164,20 @@ object.
   line always has a complete JSON object.
 - JSON values that span multiple lines are not supported. Do not pretty-
   print messages on the wire.
+- A request line may be at most 629,145,600 bytes (600 MiB) plus
+  1,048,576 (1 MiB), not counting its `\n`: six times the largest
+  `clipboard_set` text, which is the most JSON escaping can grow it
+  (a control character becomes `\u00XX`), plus room for the envelope.
+  Any request within the verbs' own limits therefore fits, however
+  the client's encoder escapes. The server stops reading a longer
+  line once it passes the limit, writes a `bad_params` error with no
+  `id` (the line was never parsed), and closes the connection, since
+  the rest of the line is still unread and there is no reliable way
+  back to a line boundary. Added in v1.3; earlier servers had no
+  limit.
+- A request line that is not valid UTF-8 gets a `bad_params` error
+  with no `id`, and the connection stays open. Earlier servers closed
+  the connection.
 
 ---
 
@@ -263,7 +286,7 @@ Parameters:
 ### Hello response — success
 
 ```json
-{"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.2", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
+{"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.3", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed"]}}
 ```
 
 Result fields:
@@ -271,7 +294,7 @@ Result fields:
 | Field | Type | Description |
 |-------|------|-------------|
 | `server_name` | string | Always `"ryll"` in this implementation. |
-| `protocol_version` | string | The version the server will speak. In v1.x this is `"1.2"`; older servers reported `"1.0"` or `"1.1"`. Clients should not compare for exact equality — see the compat note below. |
+| `protocol_version` | string | The version the server will speak. In v1.x this is `"1.3"`; older servers reported `"1.0"`, `"1.1"` or `"1.2"`. Clients should not compare for exact equality — see the compat note below. |
 | `supported_methods` | array of string | The complete set of verb names the server recognises. Clients should use this list rather than hard-coding expectations, especially when connecting to a newer server. |
 | `supported_events` | array of string | The complete set of event names the server can emit. |
 
@@ -361,7 +384,7 @@ Worked example:
 
 ```
 → {"id": 1, "method": "hello", "params": {"client_name": "demo", "protocol_version": "1.1"}}
-← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.2", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
+← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.3", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed"]}}
 ```
 
 ---
@@ -590,6 +613,143 @@ Worked example:
 
 The `data_base64` value above is truncated; a real PNG will be
 hundreds of kilobytes when base64-encoded.
+
+---
+
+### `clipboard_set`
+
+Added in v1.3.  Set the session's clipboard, as if the user had
+copied the text on the host.
+
+Ryll keeps the clipboard in memory and syncs it with the guest's
+through the SPICE vdagent, the same way the GUI syncs the host's.
+It checks the clipboard every 500 ms, and when the text has changed
+it tells the guest agent that the clipboard has new content (a
+`VD_AGENT_CLIPBOARD_GRAB` offering UTF-8 text). The guest fetches
+the text when something in it pastes. So the response does not mean
+the guest has the text yet: allow up to about half a second, more
+while the agent is starting.
+
+The text is held whether or not the agent is connected; the grab
+follows once the agent has connected and both sides have announced
+their capabilities. This verb therefore never fails with
+`agent_not_connected`. Only the CLIPBOARD selection is synced, not
+PRIMARY, and only UTF-8 text.
+
+Setting text equal to the last text that crossed -- copied in the
+guest, or set here and offered to it -- does not grab: the guest
+already has it. The comparison ignores differences in line endings
+(CRLF, CR and LF) and trailing whitespace, so that text which
+made a round trip through a host clipboard is not offered back to the
+guest. A client that needs the guest to receive an exact byte
+sequence differing from its last copy only in those ways should vary
+the text some other way. Empty text is stored, and `clipboard_get`
+returns it, but is never offered to the guest, which keeps its own
+clipboard. Setting the clipboard does not raise `clipboard_changed`,
+which reports only text from the guest.
+
+Params:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `text` | string | The text to put on the clipboard, at most 104,857,600 bytes (100 MiB) of UTF-8. |
+
+Result on success: `{}`
+
+Verb-specific error codes:
+
+| Code | When |
+|------|------|
+| `bad_params` | `text` is missing, not a string, or longer than 100 MiB. The limit is spice-gtk's default `max-clipboard`, the largest clipboard ryll accepts from a guest; the clipboard is left unchanged. |
+
+Worked example:
+
+```
+→ {"id": 10, "method": "clipboard_set", "params": {"text": "hello from the host"}}
+← {"id": 10, "ok": true, "result": {}}
+```
+
+---
+
+### `clipboard_get`
+
+Added in v1.3.  Read the session's clipboard: the text most recently
+set by `clipboard_set` or copied in the guest, whichever came last.
+
+Params: `{}` (none required)
+
+Result on success:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `text` | string or null | The clipboard's text, or `null` if nothing has been set or copied yet. |
+
+Verb-specific error codes: none beyond the common set.
+
+Worked example:
+
+```
+→ {"id": 11, "method": "clipboard_get", "params": {}}
+← {"id": 11, "ok": true, "result": {"text": "hello from the guest"}}
+```
+
+---
+
+### `resize`
+
+Added in v1.3.  Ask the guest for a display size, as the GUI does
+when its window is resized: ryll sends a `VD_AGENT_MONITORS_CONFIG`
+with one monitor of that size (or `--monitors` identical monitors
+side by side).
+
+Each side must be between 1 and 16384, the largest surface ryll will
+display. Within that range each side is rounded **down** to a multiple
+of 8, with 8 as the floor, as the GUI rounds its window size; the
+result reports the size actually asked for.
+
+This verb is asynchronous in the way `clipboard_set` is. Ryll
+debounces display sizes for 200 ms, so a burst of requests reaches
+the guest as the last of them, and sends the size once the agent is
+connected and ryll has announced its capabilities. A size asked for
+before then is held and sent when they are, so this verb never fails
+with `agent_not_connected`. A size equal to the last one sent is not
+sent again. Whether the guest applies the size is up to the guest;
+watch `status` (or `screenshot`) for the new surface dimensions.
+
+In `--web` mode the browser reports its viewport size on the same
+queue, so a later viewport change -- the browser window resized, or a
+viewer connecting -- replaces a size a control client asked for, and
+the reverse. A scenario that needs a fixed size should run with no
+browser connected, or resize after the browser has settled.
+
+Params:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `width` | u32 | Requested width in pixels, 1 to 16384. |
+| `height` | u32 | Requested height in pixels, 1 to 16384. |
+
+Result on success:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `width` | u32 | The width asked of the guest, after rounding. |
+| `height` | u32 | The height asked of the guest, after rounding. |
+
+Verb-specific error codes:
+
+| Code | When |
+|------|------|
+| `bad_params` | A side is missing, not a non-negative integer, zero, or larger than 16384. |
+| `queue_full` | Ryll's display-size queue is full, which takes dozens of requests faster than the session reads them. Nothing was queued; retry after a short delay. |
+| `internal_error` | The display-size queue is closed: the session has ended. |
+
+Worked example:
+
+```
+→ {"id": 12, "method": "resize", "params": {"width": 1366, "height": 768}}
+← {"id": 12, "ok": true, "result": {"width": 1360, "height": 768}}
+```
 
 ---
 
@@ -827,6 +987,48 @@ Worked example:
 
 ---
 
+### `clipboard_changed`
+
+Added in v1.3.  Emitted each time text copied in the guest arrives
+and is stored as the session's clipboard: the guest agent grabbed the
+clipboard offering UTF-8 text, ryll fetched it at once, and the text
+came back. Only the CLIPBOARD selection is synced, so selecting text
+in an X11 guest (PRIMARY) does not raise this event. Text set with
+`clipboard_set` does not raise it either.
+
+The event does not carry the text, only its length: a copy can be as
+large as 100 MiB, and events wait in a per-client queue bounded by
+count rather than size. Read the text with `clipboard_get`. That
+returns the clipboard as it is when the request is handled, which is
+the copy this event reported unless the guest has copied again, or
+`clipboard_set` has been called, since.
+
+Every copy is reported, including a copy of the same text as the
+last. The copy is noticed from the session directly rather than from
+the event bus, like `agent_connected`, so falling behind the bus does
+not skip it, and a client slow to read several copies made in quick
+succession may hear only of the newest. Like any event, though, it is
+lost if this client's outbound queue is full when it is produced; that
+loss is reported by a `dropped` event, after which a client waiting on
+a copy should call `clipboard_get` rather than wait. Copies made before
+the client connected are not replayed; use `clipboard_get`.
+
+Data fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `bytes` | u64 | The length of the copied text in bytes, as UTF-8. |
+
+Worked example:
+
+```
+← {"event": "clipboard_changed", "data": {"bytes": 20}}
+→ {"id": 13, "method": "clipboard_get", "params": {}}
+← {"id": 13, "ok": true, "result": {"text": "hello from the guest"}}
+```
+
+---
+
 ### `surface_drawn`
 
 Added in v1.1.  Emitted once per draw command that modifies a display
@@ -993,7 +1195,7 @@ The `code` field is a stable, machine-readable string. Do not parse
 `message` programmatically; it may change between minor versions.
 
 The following error codes are defined in v1.x (all were present in
-v1.0; v1.1 added no new codes):
+v1.0 except `queue_full`, added in v1.3):
 
 | Code | Semantics |
 |------|-----------|
@@ -1003,9 +1205,10 @@ v1.0; v1.1 added no new codes):
 | `unknown_method` | The `method` field names a verb the server does not know. |
 | `bad_params` | The `params` object is missing a required field, has a field of the wrong type, or is not a JSON object at all. |
 | `bad_state` | The `state` field in a `send_key` request is not `"down"`, `"up"`, or `"press"`. |
-| `agent_not_connected` | A `paste` was requested but the SPICE vdagent is not currently connected. |
+| `agent_not_connected` | A `paste` was requested but the SPICE vdagent is not currently connected. Not returned by `clipboard_set` or `resize`, which hold their request until the agent connects. |
 | `no_such_surface` | A `screenshot` was requested for a `surface_id` that does not exist in the current session. |
 | `unsupported_format` | A `screenshot` was requested with a `format` value other than `"png"` or `"rgba"`. |
+| `queue_full` | A queue into the session was full, so nothing was queued. Retryable after a short delay. Returned by `resize`. |
 | `not_implemented` | The method is recognised but not yet implemented. Should not appear in a complete implementation; retained in the code so partial builds have a stable code to return during incremental rollout of a new verb. |
 | `internal_error` | An unexpected condition occurred server-side. The `message` field will contain details. Report these as bugs. |
 
@@ -1013,7 +1216,7 @@ Additional error codes may be added in future **minor** version bumps.
 Clients should treat any unrecognised `code` value as a generic error
 (print the `message` and fail the operation) rather than treating it as
 `internal_error`. This ensures forward compatibility when a client
-compiled against v1.0 connects to a v1.2 server that has added new
+compiled against v1.0 connects to a v1.3 server that has added new
 domain-specific codes.
 
 ---
@@ -1021,7 +1224,7 @@ domain-specific codes.
 ## Versioning
 
 The protocol version is a dotted `major.minor` string. The current
-version is **1.2**.
+version is **1.3**.
 
 Rules:
 
@@ -1058,10 +1261,11 @@ Forward-compatibility obligations:
   event names in `subscribe`/`unsubscribe` params.
 
 Version 1.0 was the first published version. Version 1.1 added the
-`surface_drawn` and `digest_updated` events. Version 1.2 (the
-current version) extended the socket to `--web` mode and corrected
-`send_key`'s extended-scancode encoding; see the version history at
-the top of this document.
+`surface_drawn` and `digest_updated` events. Version 1.2 extended the
+socket to `--web` mode and corrected `send_key`'s extended-scancode
+encoding. Version 1.3 (the current version) added the clipboard and
+`resize` verbs and the `clipboard_changed` event; see the version
+history at the top of this document.
 
 ---
 
@@ -1074,7 +1278,7 @@ indicates the sender: `→` is client-to-server, `←` is server-to-client.
 
 ```
 → {"id": 1, "method": "hello", "params": {"client_name": "demo-client", "protocol_version": "1.0"}}
-← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.2", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
+← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.3", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed"]}}
 → {"id": 2, "method": "status", "params": {}}
 ← {"id": 2, "ok": true, "result": {"spice_connected": true, "agent_connected": true, "surfaces": [{"channel_id": 1, "surface_id": 0, "width": 1024, "height": 768}]}}
 → {"id": 3, "method": "subscribe", "params": {"events": ["latency", "agent_connected", "paste_completed", "paste_failed"]}}
@@ -1098,9 +1302,9 @@ Key observations from this transcript:
 
 - The `hello` handshake always comes first and its response lists the
   full verb and event catalogue. Note the minor-version interop at
-  work: the client requested `"1.0"` and the v1.1 server accepted it,
-  responding with the version *it* speaks and advertising
-  `surface_drawn`, which this v1.0 client simply never subscribes to.
+  work: the client requested `"1.0"` and the v1.3 server accepted it,
+  responding with the version *it* speaks and advertising verbs and
+  events this v1.0 client simply never uses.
 - `status` gives a snapshot of the session state at that instant. The
   surfaces list shows one surface, which is all that most single-monitor
   guests present.
@@ -1143,7 +1347,7 @@ growing separate implementations.
 
 | File | Role |
 |------|------|
-| `mod.rs` | Public re-exports: `Server`, `StatusProvider` |
+| `mod.rs` | Public re-exports: `Server`, `SessionHandles`, `StatusProvider` |
 | `protocol.rs` | Wire-level types: `Request`, `Response`, `Event`, verb params and result structs, serialisation helpers |
 | `server.rs` | `Server::bind`, which binds the socket at startup, and `Server::run`, the tokio task that accepts one client at a time and dispatches verbs |
 
@@ -1176,6 +1380,26 @@ line and is immediately closed.
 - The control server is given an `Arc<dyn StatusProvider>` so
   `status` can query SPICE-connection state and agent presence
   without coupling `server.rs` to `session.rs` internals.
+- What the verbs act on arrives as one `SessionHandles` value: the
+  inputs channel's queue, the surface mirror, the session's
+  clipboard and the main channel's display-size queue. Each client
+  gets a clone.
+- The clipboard is a `MemoryClipboard` (`clipboard.rs`), an
+  implementation of the same `ClipboardBackend` trait the GUI's
+  host clipboard implements. The mode creates it only when a control
+  socket is configured, and gives the same one to the main channel
+  and to the server. The main channel polls it and stores guest
+  copies in it exactly as it does the GUI's clipboard; `clipboard_set`
+  writes it through a separate method so that only guest copies are
+  published on its watch, which is what `clipboard_changed` is
+  translated from. The watch carries each copy's length, not its
+  text, so neither it nor a slow client's event queue holds a second
+  copy of a large clipboard.
+- `resize` sends on the same display-size queue the GUI's window and
+  the browser's viewport use (in web mode it shares the browser's),
+  so the main channel's debounce and its hold-until-the-agent-connects
+  apply to all of them alike. Its rounding is the GUI's, from the
+  shared `align_monitor_dimension`.
 - Per-client outbound events use a two-task pipeline: an
   event-translator task (subscribes to the broadcast bus, filters by
   the client's subscription set, converts `ChannelEvent` to JSON)
