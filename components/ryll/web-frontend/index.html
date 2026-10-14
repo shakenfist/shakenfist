@@ -11284,7 +11284,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.2
+    Control Socket Protocol — Version 1.3
   
 
     
@@ -16140,8 +16140,10 @@ tears down cleanly.</p>
 <ul>
 <li>Single viewer at a time. A second offer replaces the
   existing connection.</li>
-<li>No clipboard sync, USB redirection, or folder sharing
-  (out of MVP scope).</li>
+<li>No clipboard sync in the browser, USB redirection, or
+  folder sharing (out of MVP scope). A
+  <a href="/components/ryll/control-socket-protocol/">control socket</a> can still set
+  and read the guest's clipboard.</li>
 <li>No multi-monitor (single video track, single primary
   surface).</li>
 <li>Browser audio autoplay policy: click the volume button on

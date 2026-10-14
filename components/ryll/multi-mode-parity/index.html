@@ -11284,7 +11284,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.2
+    Control Socket Protocol — Version 1.3
   
 
     
@@ -15302,7 +15302,8 @@ Web column's MVP set; the control socket work gave headless an
 interactive driving surface). Last full audit: the web frontend
 sweep; control-socket cells refreshed 2026-08-23 (web mode gained
 the socket, its <code>status</code> and event rows, and the shared digest
-poller), media socket binding added 2026-08-21.</p>
+poller), media socket binding added 2026-08-21, clipboard and
+resize rows refreshed 2026-10-14 (control protocol 1.3).</p>
 <h2 id="parity-matrix">Parity matrix<a class="headerlink" href="#parity-matrix" title="Permanent link">&para;</a></h2>
 <p>Headless cells name two functions. The renderer's <code>run_headless()</code>,
 in <code>shakenfist-spice-renderer/src/session.rs</code>, runs the session and its
@@ -15380,7 +15381,7 @@ around it.</p>
 <td>available (<code>run_web</code> builds a <code>SessionStatus</code> from the same <code>spice_connected</code> flag, <code>SessionState</code> agent watch and surface mirror headless uses)</td>
 </tr>
 <tr>
-<td>Event subscription (<code>latency</code>, <code>agent_connected</code>, <code>paste_*</code>, <code>surface_drawn</code>, <code>digest_updated</code>)</td>
+<td>Event subscription (<code>latency</code>, <code>agent_connected</code>, <code>paste_*</code>, <code>surface_drawn</code>, <code>clipboard_changed</code>, <code>digest_updated</code>)</td>
 <td>n/a — intrinsic</td>
 <td>available (<code>digest_updated</code> needs the <code>digest-decode</code> build feature)</td>
 <td>available (same <code>event_broadcast_tx</code>; <code>digest_updated</code> needs the <code>digest-decode</code> build feature, and the poller is spawned only when <code>--control-socket</code> is given so an ordinary browser session does not pay to decode QR)</td>
@@ -15430,7 +15431,7 @@ around it.</p>
 <tr>
 <td>Window auto-resize to surface size</td>
 <td>available</td>
-<td>n/a — intrinsic (no window; resize channel exists but <code>_resize_tx</code> in the renderer's <code>run_headless()</code> is never connected to a window)</td>
+<td>n/a — intrinsic (no window)</td>
 <td>n/a — intrinsic (browser viewport is user-controlled)</td>
 </tr>
 <tr>
@@ -15442,8 +15443,8 @@ around it.</p>
 <tr>
 <td>Guest resolution follows viewport (<code>VDAgentMonitorsConfig</code>)</td>
 <td>available</td>
-<td>missing (the renderer's <code>run_headless()</code> — <code>_resize_tx</code> is created but never used to drive resize logic in headless)</td>
-<td>available</td>
+<td>available (via the control socket <code>resize</code> verb, rounded to the GUI's 8-pixel grid; there is no viewport to follow)</td>
+<td>available (also via the control socket <code>resize</code> verb, which shares the browser's resize queue)</td>
 </tr>
 <tr>
 <td><strong>Cursor</strong></td>
@@ -15552,6 +15553,18 @@ around it.</p>
 <td>available</td>
 <td>available</td>
 <td>missing (out of MVP scope; no test-automation use case in browser)</td>
+</tr>
+<tr>
+<td><strong>Clipboard</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Clipboard sync with the guest (vdagent, CLIPBOARD selection, UTF-8 text)</td>
+<td>available (host clipboard via <code>arboard</code>)</td>
+<td>available (via the control socket: <code>clipboard_set</code> offers text to the guest, <code>clipboard_get</code> reads it back, <code>clipboard_changed</code> reports guest copies; the in-memory clipboard exists only with <code>--control-socket</code>)</td>
+<td>partial (the browser has no clipboard sync — out of MVP scope; the control socket's clipboard verbs work as in headless)</td>
 </tr>
 <tr>
 <td><strong>Paste-as-keystrokes</strong></td>

@@ -11284,7 +11284,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.2
+    Control Socket Protocol — Version 1.3
   
 
     
@@ -11834,6 +11834,17 @@
     <span class="md-ellipsis">
       
         Agent flow control and stall detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#display-size-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Display size requests
       
     </span>
   </a>
@@ -15502,6 +15513,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#display-size-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Display size requests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#guest-agent-message-reassembly" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15943,6 +15965,24 @@ never sees it and never sends <code>VD_AGENT_REPLY</code>. Reply counts and lags
 still recorded on <code>MainSnapshot</code> as passive diagnostics, next to the token
 and queue fields; the "Guest agent diagnostics" section in
 <a href="/components/ryll/troubleshooting/">troubleshooting.md</a> explains each one.</p>
+<h4 id="display-size-requests">Display size requests<a class="headerlink" href="#display-size-requests" title="Permanent link">&para;</a></h4>
+<p>Every frontend asks for a display size the same way: it puts the size
+on the main channel's resize queue (the GUI when its window changes,
+web mode for the browser's viewport, and the control socket's <code>resize</code>
+verb). The main channel waits for 200 ms of quiet so that a drag
+reaches the guest as the size it ended on, then sends a
+<code>VD_AGENT_MONITORS_CONFIG</code>. If the agent is not connected, or ryll has
+not yet announced its capabilities to it, the size is held, and sent
+once the agent connects or the guest announces its own capabilities,
+which is when spice-gtk sends its display configuration too. A size
+equal to the last one sent is not sent again.</p>
+<p>The GUI also tells the main channel when it has fitted its window to
+a new guest surface, as a size the guest already has rather than one
+it asks for. That sends nothing: the main channel records the size as
+the agent's and drops any size it was still holding. Otherwise a
+guest that booted without its agent would, when the agent started, be
+resized to the window's size from before the fit, away from the size
+it chose.</p>
 <h4 id="guest-agent-message-reassembly">Guest agent message reassembly<a class="headerlink" href="#guest-agent-message-reassembly" title="Permanent link">&para;</a></h4>
 <p>The other direction is split the same way. A guest agent message is a
 20-byte <code>VDAgentMessage</code> header followed by <code>size</code> bytes of body, and

@@ -11580,7 +11580,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.2
+    Control Socket Protocol — Version 1.3
   
 
     
@@ -16313,11 +16313,12 @@ escape hatch if the ruleset ever wedges.</p>
 where a <code>GITHUB_TOKEN</code> push does not, so <code>prune-reviews</code>
 triggers itself once. That is safe rather than a loop: the
 second run finds nothing to prune and exits before committing.</p>
-<p>The workflow is guarded to <code>refs/heads/develop</code>, because
-<code>tools/ci-prune-reviews.sh</code> rebases onto <code>develop</code> and pushes to
-<code>develop</code> whatever ref was checked out — dispatching it on a
-branch would otherwise push that branch's unmerged commits
-straight to <code>develop</code>.</p>
+<p>The workflow is guarded to the default branch, because every
+push starts a run and only <code>develop</code>'s should land anything. It
+never reads the static runner's reused workspace: there is no
+checkout, the script comes from a fresh depth 1 clone of
+<code>develop</code> in <code>RUNNER_TEMP</code>, and it lands from a second fresh
+clone, with the token given to the final <code>git push</code> alone.</p>
 <p>Ruleset changes are captured under <code>.github/exported-config/</code>
 by <code>export-repo-config.yml</code>, which runs daily and on demand.</p>
 <h2 id="reproducing-ci-locally">Reproducing CI locally<a class="headerlink" href="#reproducing-ci-locally" title="Permanent link">&para;</a></h2>

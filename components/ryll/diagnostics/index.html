@@ -11284,7 +11284,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.2
+    Control Socket Protocol — Version 1.3
   
 
     
@@ -15851,6 +15851,15 @@ headers. Wireshark can open these directly.</p>
 construction. Packets are recorded in <code>send()</code> and the read
 loop of each channel handler. Writers use unbuffered I/O (no
 <code>BufWriter</code>) so every packet hits disk immediately.</p>
+<p>Clipboard text crosses the main channel in <code>AGENT_DATA</code> messages,
+so whatever is copied between host and guest is in <code>main.pcap</code>, and
+in the main channel's ring buffer that bug reports include. The GUI
+has always synced the clipboard. Headless and web sessions do so
+only when they run a control socket (<code>--control-socket</code>), whose
+clipboard verbs need it; such a session fetches every guest copy at
+once, so guest clipboard text can appear in their captures and bug
+reports too, as can text set with <code>clipboard_set</code>. Without a control
+socket they never request the guest's clipboard.</p>
 <p>Large SPICE messages (e.g. uncompressed display updates) can
 exceed the IPv4 maximum packet size (65535 bytes). The pcap
 writer splits these into multiple TCP segments with sequential

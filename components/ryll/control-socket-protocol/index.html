@@ -27,7 +27,7 @@
     
     
       
-        <title>Control Socket Protocol — Version 1.2 - Shaken Fist</title>
+        <title>Control Socket Protocol — Version 1.3 - Shaken Fist</title>
       
     
     
@@ -101,7 +101,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#control-socket-protocol-version-12" class="md-skip">
+        <a href="#control-socket-protocol-version-13" class="md-skip">
           Skip to content
         </a>
       
@@ -137,7 +137,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Control Socket Protocol — Version 1.2
+              Control Socket Protocol — Version 1.3
             
           </span>
         </div>
@@ -11293,7 +11293,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.2
+    Control Socket Protocol — Version 1.3
   
 
     
@@ -11311,7 +11311,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.2
+    Control Socket Protocol — Version 1.3
   
 
     
@@ -11598,6 +11598,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#clipboard_set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        clipboard_set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clipboard_get" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        clipboard_get
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resize
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#subscribe" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -11685,6 +11718,17 @@
     <span class="md-ellipsis">
       
         dropped
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clipboard_changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        clipboard_changed
       
     </span>
   </a>
@@ -15805,6 +15849,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#clipboard_set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        clipboard_set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clipboard_get" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        clipboard_get
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        resize
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#subscribe" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15892,6 +15969,17 @@
     <span class="md-ellipsis">
       
         dropped
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clipboard_changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        clipboard_changed
       
     </span>
   </a>
@@ -16012,7 +16100,7 @@
   
 
 
-<h1 id="control-socket-protocol-version-12">Control Socket Protocol — Version 1.2<a class="headerlink" href="#control-socket-protocol-version-12" title="Permanent link">&para;</a></h1>
+<h1 id="control-socket-protocol-version-13">Control Socket Protocol — Version 1.3<a class="headerlink" href="#control-socket-protocol-version-13" title="Permanent link">&para;</a></h1>
 <p>This document specifies the wire protocol spoken between a Ryll session
 with no host window — <code>--headless</code> or <code>--web</code> — and any external driver
 that connects to its Unix-domain control socket. It is the load-bearing
@@ -16020,7 +16108,7 @@ contract for the automated SPICE-test-harness work: external drivers
 such as latency loadtests and Sextant scenario tests implement against
 this document. Read the whole document before writing a client or
 implementing a verb.</p>
-<p>Protocol version: <strong>1.2</strong></p>
+<p>Protocol version: <strong>1.3</strong></p>
 <p>Version history:</p>
 <ul>
 <li><strong>1.0</strong> — initial.  <code>hello</code>, <code>status</code>, <code>send_key</code>, <code>paste</code>,
@@ -16043,6 +16131,11 @@ implementing a verb.</p>
   and the break bit on the prefix rather than the scancode — see
   the note under <a href="#send_key"><code>send_key</code></a>.  Plain scancodes are
   unaffected, so a client that only sends those sees no difference.</li>
+<li><strong>1.3</strong> — added the <code>clipboard_set</code>, <code>clipboard_get</code> and <code>resize</code>
+  verbs, the <code>clipboard_changed</code> event and the <code>queue_full</code> error
+  code, so a session with no host window can carry clipboard text to
+  and from the guest and ask the guest for a display size.  Additive;
+  a client that does not use them sees no difference.</li>
 </ul>
 <hr />
 <h2 id="contents">Contents<a class="headerlink" href="#contents" title="Permanent link">&para;</a></h2>
@@ -16074,9 +16167,13 @@ implementing a verb.</p>
 <li>Sending keyboard input as individual scancodes or as paste-as-
   keystrokes text.</li>
 <li>Capturing a screenshot of any live surface.</li>
+<li>Setting and reading the session's clipboard, which ryll syncs with
+  the guest's through the SPICE vdagent, and asking the guest for a
+  display size.</li>
 <li>Subscribing to an asynchronous stream of events: SPICE latency
   samples, agent connect/disconnect transitions, paste completion
-  notifications, per-draw surface notifications, decoded
+  notifications, text the guest copied, per-draw surface
+  notifications, decoded
   visual-digest updates (on <code>digest-decode</code> builds, in both
   <code>--headless</code> and <code>--web</code>), and queue-overflow notifications.</li>
 <li>Negotiating the protocol version at connection time so clients and
@@ -16155,6 +16252,20 @@ object.</p>
   line always has a complete JSON object.</li>
 <li>JSON values that span multiple lines are not supported. Do not pretty-
   print messages on the wire.</li>
+<li>A request line may be at most 629,145,600 bytes (600 MiB) plus
+  1,048,576 (1 MiB), not counting its <code>\n</code>: six times the largest
+  <code>clipboard_set</code> text, which is the most JSON escaping can grow it
+  (a control character becomes <code>\u00XX</code>), plus room for the envelope.
+  Any request within the verbs' own limits therefore fits, however
+  the client's encoder escapes. The server stops reading a longer
+  line once it passes the limit, writes a <code>bad_params</code> error with no
+  <code>id</code> (the line was never parsed), and closes the connection, since
+  the rest of the line is still unread and there is no reliable way
+  back to a line boundary. Added in v1.3; earlier servers had no
+  limit.</li>
+<li>A request line that is not valid UTF-8 gets a <code>bad_params</code> error
+  with no <code>id</code>, and the connection stays open. Earlier servers closed
+  the connection.</li>
 </ul>
 <hr />
 <h2 id="message-envelopes">Message envelopes<a class="headerlink" href="#message-envelopes" title="Permanent link">&para;</a></h2>
@@ -16313,7 +16424,7 @@ order should be able to recover without reconnecting.</p>
 </tbody>
 </table>
 <h3 id="hello-response-success">Hello response — success<a class="headerlink" href="#hello-response-success" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"server_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ryll"</span><span class="p">,</span><span class="w"> </span><span class="nt">"protocol_version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.2"</span><span class="p">,</span><span class="w"> </span><span class="nt">"supported_methods"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"hello"</span><span class="p">,</span><span class="w"> </span><span class="s2">"status"</span><span class="p">,</span><span class="w"> </span><span class="s2">"send_key"</span><span class="p">,</span><span class="w"> </span><span class="s2">"paste"</span><span class="p">,</span><span class="w"> </span><span class="s2">"screenshot"</span><span class="p">,</span><span class="w"> </span><span class="s2">"subscribe"</span><span class="p">,</span><span class="w"> </span><span class="s2">"unsubscribe"</span><span class="p">],</span><span class="w"> </span><span class="nt">"supported_events"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"latency"</span><span class="p">,</span><span class="w"> </span><span class="s2">"agent_connected"</span><span class="p">,</span><span class="w"> </span><span class="s2">"paste_completed"</span><span class="p">,</span><span class="w"> </span><span class="s2">"paste_failed"</span><span class="p">,</span><span class="w"> </span><span class="s2">"dropped"</span><span class="p">,</span><span class="w"> </span><span class="s2">"surface_drawn"</span><span class="p">]}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"server_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ryll"</span><span class="p">,</span><span class="w"> </span><span class="nt">"protocol_version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1.3"</span><span class="p">,</span><span class="w"> </span><span class="nt">"supported_methods"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"hello"</span><span class="p">,</span><span class="w"> </span><span class="s2">"status"</span><span class="p">,</span><span class="w"> </span><span class="s2">"send_key"</span><span class="p">,</span><span class="w"> </span><span class="s2">"paste"</span><span class="p">,</span><span class="w"> </span><span class="s2">"screenshot"</span><span class="p">,</span><span class="w"> </span><span class="s2">"subscribe"</span><span class="p">,</span><span class="w"> </span><span class="s2">"unsubscribe"</span><span class="p">,</span><span class="w"> </span><span class="s2">"clipboard_set"</span><span class="p">,</span><span class="w"> </span><span class="s2">"clipboard_get"</span><span class="p">,</span><span class="w"> </span><span class="s2">"resize"</span><span class="p">],</span><span class="w"> </span><span class="nt">"supported_events"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"latency"</span><span class="p">,</span><span class="w"> </span><span class="s2">"agent_connected"</span><span class="p">,</span><span class="w"> </span><span class="s2">"paste_completed"</span><span class="p">,</span><span class="w"> </span><span class="s2">"paste_failed"</span><span class="p">,</span><span class="w"> </span><span class="s2">"dropped"</span><span class="p">,</span><span class="w"> </span><span class="s2">"surface_drawn"</span><span class="p">,</span><span class="w"> </span><span class="s2">"clipboard_changed"</span><span class="p">]}}</span>
 </code></pre></div>
 <p>Result fields:</p>
 <table>
@@ -16333,7 +16444,7 @@ order should be able to recover without reconnecting.</p>
 <tr>
 <td><code>protocol_version</code></td>
 <td>string</td>
-<td>The version the server will speak. In v1.x this is <code>"1.2"</code>; older servers reported <code>"1.0"</code> or <code>"1.1"</code>. Clients should not compare for exact equality — see the compat note below.</td>
+<td>The version the server will speak. In v1.x this is <code>"1.3"</code>; older servers reported <code>"1.0"</code>, <code>"1.1"</code> or <code>"1.2"</code>. Clients should not compare for exact equality — see the compat note below.</td>
 </tr>
 <tr>
 <td><code>supported_methods</code></td>
@@ -16459,7 +16570,7 @@ completeness as a verb-reference entry.</p>
 </table>
 <p>Worked example:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>→ {"id": 1, "method": "hello", "params": {"client_name": "demo", "protocol_version": "1.1"}}
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.2", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.3", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed"]}}
 </code></pre></div>
 <hr />
 <h3 id="status"><code>status</code><a class="headerlink" href="#status" title="Permanent link">&para;</a></h3>
@@ -16784,6 +16895,192 @@ surface events.</p>
 <p>The <code>data_base64</code> value above is truncated; a real PNG will be
 hundreds of kilobytes when base64-encoded.</p>
 <hr />
+<h3 id="clipboard_set"><code>clipboard_set</code><a class="headerlink" href="#clipboard_set" title="Permanent link">&para;</a></h3>
+<p>Added in v1.3.  Set the session's clipboard, as if the user had
+copied the text on the host.</p>
+<p>Ryll keeps the clipboard in memory and syncs it with the guest's
+through the SPICE vdagent, the same way the GUI syncs the host's.
+It checks the clipboard every 500 ms, and when the text has changed
+it tells the guest agent that the clipboard has new content (a
+<code>VD_AGENT_CLIPBOARD_GRAB</code> offering UTF-8 text). The guest fetches
+the text when something in it pastes. So the response does not mean
+the guest has the text yet: allow up to about half a second, more
+while the agent is starting.</p>
+<p>The text is held whether or not the agent is connected; the grab
+follows once the agent has connected and both sides have announced
+their capabilities. This verb therefore never fails with
+<code>agent_not_connected</code>. Only the CLIPBOARD selection is synced, not
+PRIMARY, and only UTF-8 text.</p>
+<p>Setting text equal to the last text that crossed -- copied in the
+guest, or set here and offered to it -- does not grab: the guest
+already has it. The comparison ignores differences in line endings
+(CRLF, CR and LF) and trailing whitespace, so that text which
+made a round trip through a host clipboard is not offered back to the
+guest. A client that needs the guest to receive an exact byte
+sequence differing from its last copy only in those ways should vary
+the text some other way. Empty text is stored, and <code>clipboard_get</code>
+returns it, but is never offered to the guest, which keeps its own
+clipboard. Setting the clipboard does not raise <code>clipboard_changed</code>,
+which reports only text from the guest.</p>
+<p>Params:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>text</code></td>
+<td>string</td>
+<td>The text to put on the clipboard, at most 104,857,600 bytes (100 MiB) of UTF-8.</td>
+</tr>
+</tbody>
+</table>
+<p>Result on success: <code>{}</code></p>
+<p>Verb-specific error codes:</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bad_params</code></td>
+<td><code>text</code> is missing, not a string, or longer than 100 MiB. The limit is spice-gtk's default <code>max-clipboard</code>, the largest clipboard ryll accepts from a guest; the clipboard is left unchanged.</td>
+</tr>
+</tbody>
+</table>
+<p>Worked example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>→ {"id": 10, "method": "clipboard_set", "params": {"text": "hello from the host"}}
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>← {"id": 10, "ok": true, "result": {}}
+</code></pre></div>
+<hr />
+<h3 id="clipboard_get"><code>clipboard_get</code><a class="headerlink" href="#clipboard_get" title="Permanent link">&para;</a></h3>
+<p>Added in v1.3.  Read the session's clipboard: the text most recently
+set by <code>clipboard_set</code> or copied in the guest, whichever came last.</p>
+<p>Params: <code>{}</code> (none required)</p>
+<p>Result on success:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>text</code></td>
+<td>string or null</td>
+<td>The clipboard's text, or <code>null</code> if nothing has been set or copied yet.</td>
+</tr>
+</tbody>
+</table>
+<p>Verb-specific error codes: none beyond the common set.</p>
+<p>Worked example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>→ {"id": 11, "method": "clipboard_get", "params": {}}
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>← {"id": 11, "ok": true, "result": {"text": "hello from the guest"}}
+</code></pre></div>
+<hr />
+<h3 id="resize"><code>resize</code><a class="headerlink" href="#resize" title="Permanent link">&para;</a></h3>
+<p>Added in v1.3.  Ask the guest for a display size, as the GUI does
+when its window is resized: ryll sends a <code>VD_AGENT_MONITORS_CONFIG</code>
+with one monitor of that size (or <code>--monitors</code> identical monitors
+side by side).</p>
+<p>Each side must be between 1 and 16384, the largest surface ryll will
+display. Within that range each side is rounded <strong>down</strong> to a multiple
+of 8, with 8 as the floor, as the GUI rounds its window size; the
+result reports the size actually asked for.</p>
+<p>This verb is asynchronous in the way <code>clipboard_set</code> is. Ryll
+debounces display sizes for 200 ms, so a burst of requests reaches
+the guest as the last of them, and sends the size once the agent is
+connected and ryll has announced its capabilities. A size asked for
+before then is held and sent when they are, so this verb never fails
+with <code>agent_not_connected</code>. A size equal to the last one sent is not
+sent again. Whether the guest applies the size is up to the guest;
+watch <code>status</code> (or <code>screenshot</code>) for the new surface dimensions.</p>
+<p>In <code>--web</code> mode the browser reports its viewport size on the same
+queue, so a later viewport change -- the browser window resized, or a
+viewer connecting -- replaces a size a control client asked for, and
+the reverse. A scenario that needs a fixed size should run with no
+browser connected, or resize after the browser has settled.</p>
+<p>Params:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>width</code></td>
+<td>u32</td>
+<td>Requested width in pixels, 1 to 16384.</td>
+</tr>
+<tr>
+<td><code>height</code></td>
+<td>u32</td>
+<td>Requested height in pixels, 1 to 16384.</td>
+</tr>
+</tbody>
+</table>
+<p>Result on success:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>width</code></td>
+<td>u32</td>
+<td>The width asked of the guest, after rounding.</td>
+</tr>
+<tr>
+<td><code>height</code></td>
+<td>u32</td>
+<td>The height asked of the guest, after rounding.</td>
+</tr>
+</tbody>
+</table>
+<p>Verb-specific error codes:</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bad_params</code></td>
+<td>A side is missing, not a non-negative integer, zero, or larger than 16384.</td>
+</tr>
+<tr>
+<td><code>queue_full</code></td>
+<td>Ryll's display-size queue is full, which takes dozens of requests faster than the session reads them. Nothing was queued; retry after a short delay.</td>
+</tr>
+<tr>
+<td><code>internal_error</code></td>
+<td>The display-size queue is closed: the session has ended.</td>
+</tr>
+</tbody>
+</table>
+<p>Worked example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>→ {"id": 12, "method": "resize", "params": {"width": 1366, "height": 768}}
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>← {"id": 12, "ok": true, "result": {"width": 1360, "height": 768}}
+</code></pre></div>
+<hr />
 <h3 id="subscribe"><code>subscribe</code><a class="headerlink" href="#subscribe" title="Permanent link">&para;</a></h3>
 <p>Register interest in one or more named events. After a successful
 <code>subscribe</code> call, the server will begin delivering matching events to
@@ -16838,8 +17135,8 @@ and fall back gracefully if a name it needs is not present.</p>
 </table>
 <p>Verb-specific error codes: none beyond the common set.</p>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>→ {"id": 8, "method": "subscribe", "params": {"events": ["latency", "digest_updated"]}}
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>← {"id": 8, "ok": true, "result": {"subscribed": ["latency"]}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>→ {"id": 8, "method": "subscribe", "params": {"events": ["latency", "digest_updated"]}}
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>← {"id": 8, "ok": true, "result": {"subscribed": ["latency"]}}
 </code></pre></div>
 <p>In this example <code>digest_updated</code> was silently dropped — the server
 is either a v1.0 build or a v1.1 build without the <code>digest-decode</code>
@@ -16890,8 +17187,8 @@ active subscription set.</p>
 </table>
 <p>Verb-specific error codes: none beyond the common set.</p>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>→ {"id": 9, "method": "unsubscribe", "params": {"events": ["latency"]}}
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>← {"id": 9, "ok": true, "result": {"unsubscribed": ["latency"]}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>→ {"id": 9, "method": "unsubscribe", "params": {"events": ["latency"]}}
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>← {"id": 9, "ok": true, "result": {"unsubscribed": ["latency"]}}
 </code></pre></div>
 <hr />
 <h2 id="event-reference">Event reference<a class="headerlink" href="#event-reference" title="Permanent link">&para;</a></h2>
@@ -16940,7 +17237,7 @@ this event and accumulate samples client-side rather than polling with
 </tbody>
 </table>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>← {"event": "latency", "data": {"sample_ms": 0.83, "wallclock_us": 1717000000456789}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>← {"event": "latency", "data": {"sample_ms": 0.83, "wallclock_us": 1717000000456789}}
 </code></pre></div>
 <hr />
 <h3 id="agent_connected"><code>agent_connected</code><a class="headerlink" href="#agent_connected" title="Permanent link">&para;</a></h3>
@@ -16976,10 +17273,10 @@ first paste request.</p>
 </tbody>
 </table>
 <p>Worked example (agent connects):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>← {"event": "agent_connected", "data": {"connected": true}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>← {"event": "agent_connected", "data": {"connected": true}}
 </code></pre></div>
 <p>Worked example (agent disconnects, e.g. guest shutdown):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>← {"event": "agent_connected", "data": {"connected": false}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>← {"event": "agent_connected", "data": {"connected": false}}
 </code></pre></div>
 <hr />
 <h3 id="paste_completed"><code>paste_completed</code><a class="headerlink" href="#paste_completed" title="Permanent link">&para;</a></h3>
@@ -17010,7 +17307,7 @@ original request.</p>
 </tbody>
 </table>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>← {"event": "paste_completed", "data": {"request_id": 6, "chars_sent": 7}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>← {"event": "paste_completed", "data": {"request_id": 6, "chars_sent": 7}}
 </code></pre></div>
 <hr />
 <h3 id="paste_failed"><code>paste_failed</code><a class="headerlink" href="#paste_failed" title="Permanent link">&para;</a></h3>
@@ -17041,7 +17338,7 @@ be cancelled.</p>
 </tbody>
 </table>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>← {"event": "paste_failed", "data": {"request_id": 6, "reason": "agent disconnected during paste"}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>← {"event": "paste_failed", "data": {"request_id": 6, "reason": "agent disconnected during paste"}}
 </code></pre></div>
 <hr />
 <h3 id="dropped"><code>dropped</code><a class="headerlink" href="#dropped" title="Permanent link">&para;</a></h3>
@@ -17068,7 +17365,52 @@ the first one).</p>
 </tbody>
 </table>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>← {"event": "dropped", "data": {"count": 14}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>← {"event": "dropped", "data": {"count": 14}}
+</code></pre></div>
+<hr />
+<h3 id="clipboard_changed"><code>clipboard_changed</code><a class="headerlink" href="#clipboard_changed" title="Permanent link">&para;</a></h3>
+<p>Added in v1.3.  Emitted each time text copied in the guest arrives
+and is stored as the session's clipboard: the guest agent grabbed the
+clipboard offering UTF-8 text, ryll fetched it at once, and the text
+came back. Only the CLIPBOARD selection is synced, so selecting text
+in an X11 guest (PRIMARY) does not raise this event. Text set with
+<code>clipboard_set</code> does not raise it either.</p>
+<p>The event does not carry the text, only its length: a copy can be as
+large as 100 MiB, and events wait in a per-client queue bounded by
+count rather than size. Read the text with <code>clipboard_get</code>. That
+returns the clipboard as it is when the request is handled, which is
+the copy this event reported unless the guest has copied again, or
+<code>clipboard_set</code> has been called, since.</p>
+<p>Every copy is reported, including a copy of the same text as the
+last. The copy is noticed from the session directly rather than from
+the event bus, like <code>agent_connected</code>, so falling behind the bus does
+not skip it, and a client slow to read several copies made in quick
+succession may hear only of the newest. Like any event, though, it is
+lost if this client's outbound queue is full when it is produced; that
+loss is reported by a <code>dropped</code> event, after which a client waiting on
+a copy should call <code>clipboard_get</code> rather than wait. Copies made before
+the client connected are not replayed; use <code>clipboard_get</code>.</p>
+<p>Data fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bytes</code></td>
+<td>u64</td>
+<td>The length of the copied text in bytes, as UTF-8.</td>
+</tr>
+</tbody>
+</table>
+<p>Worked example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>← {"event": "clipboard_changed", "data": {"bytes": 20}}
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>→ {"id": 13, "method": "clipboard_get", "params": {}}
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>← {"id": 13, "ok": true, "result": {"text": "hello from the guest"}}
 </code></pre></div>
 <hr />
 <h3 id="surface_drawn"><code>surface_drawn</code><a class="headerlink" href="#surface_drawn" title="Permanent link">&para;</a></h3>
@@ -17116,7 +17458,7 @@ the consumer, not by the server.</p>
 </tbody>
 </table>
 <p>Worked example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>← {"event": "surface_drawn", "data": {"display_channel_id": 0, "surface_id": 0, "produced_at_secs": 1.234, "wallclock_us": 1717000000123456}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>← {"event": "surface_drawn", "data": {"display_channel_id": 0, "surface_id": 0, "produced_at_secs": 1.234, "wallclock_us": 1717000000123456}}
 </code></pre></div>
 <p>Backpressure note: <code>surface_drawn</code> shares the same 256-slot per-client
 event buffer as every other event (see <a href="#backpressure">Backpressure</a>).
@@ -17173,11 +17515,11 @@ envelope.  Variant names and field names are snake_case; nested
 enums such as <code>Phase</code> and <code>BootloaderChoice</code> serialise as
 snake_case strings; booleans and numbers are native JSON values.
 Observed on the wire:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>{"event": "digest_updated", "data": {"events": [
-<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>  {"keypress": {"scancode": 0, "timestamp_ms": 138550, "unicode": "\r"}},
-<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>  {"scene_transition": {"from": "awaiting", "timestamp_ms": 138550, "to": "booting"}},
-<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>  {"line_rendered": {"row": 0, "timestamp_ms": 138550}}
-<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>], "frame_counter": 281, "framebuffer_hash": 4022250974, "wallclock_us": 1765432100000000}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>{"event": "digest_updated", "data": {"events": [
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>  {"keypress": {"scancode": 0, "timestamp_ms": 138550, "unicode": "\r"}},
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>  {"scene_transition": {"from": "awaiting", "timestamp_ms": 138550, "to": "booting"}},
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>  {"line_rendered": {"row": 0, "timestamp_ms": 138550}}
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a>], "frame_counter": 281, "framebuffer_hash": 4022250974, "wallclock_us": 1765432100000000}}
 </code></pre></div>
 <p>Clients matching on these records should treat unknown variant
 keys as forward-compatible additions and skip them.</p>
@@ -17247,12 +17589,12 @@ rather than adding a second <code>dropped</code> entry.</p>
 <hr />
 <h2 id="error-model">Error model<a class="headerlink" href="#error-model" title="Permanent link">&para;</a></h2>
 <p>All error responses share the same structure:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="err">&lt;id&gt;</span><span class="p">,</span><span class="w"> </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;stable_code&gt;"</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;human_readable&gt;"</span><span class="p">}}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="err">&lt;id&gt;</span><span class="p">,</span><span class="w"> </span><span class="nt">"ok"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;stable_code&gt;"</span><span class="p">,</span><span class="w"> </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"&lt;human_readable&gt;"</span><span class="p">}}</span>
 </code></pre></div>
 <p>The <code>code</code> field is a stable, machine-readable string. Do not parse
 <code>message</code> programmatically; it may change between minor versions.</p>
 <p>The following error codes are defined in v1.x (all were present in
-v1.0; v1.1 added no new codes):</p>
+v1.0 except <code>queue_full</code>, added in v1.3):</p>
 <table>
 <thead>
 <tr>
@@ -17287,7 +17629,7 @@ v1.0; v1.1 added no new codes):</p>
 </tr>
 <tr>
 <td><code>agent_not_connected</code></td>
-<td>A <code>paste</code> was requested but the SPICE vdagent is not currently connected.</td>
+<td>A <code>paste</code> was requested but the SPICE vdagent is not currently connected. Not returned by <code>clipboard_set</code> or <code>resize</code>, which hold their request until the agent connects.</td>
 </tr>
 <tr>
 <td><code>no_such_surface</code></td>
@@ -17296,6 +17638,10 @@ v1.0; v1.1 added no new codes):</p>
 <tr>
 <td><code>unsupported_format</code></td>
 <td>A <code>screenshot</code> was requested with a <code>format</code> value other than <code>"png"</code> or <code>"rgba"</code>.</td>
+</tr>
+<tr>
+<td><code>queue_full</code></td>
+<td>A queue into the session was full, so nothing was queued. Retryable after a short delay. Returned by <code>resize</code>.</td>
 </tr>
 <tr>
 <td><code>not_implemented</code></td>
@@ -17311,12 +17657,12 @@ v1.0; v1.1 added no new codes):</p>
 Clients should treat any unrecognised <code>code</code> value as a generic error
 (print the <code>message</code> and fail the operation) rather than treating it as
 <code>internal_error</code>. This ensures forward compatibility when a client
-compiled against v1.0 connects to a v1.2 server that has added new
+compiled against v1.0 connects to a v1.3 server that has added new
 domain-specific codes.</p>
 <hr />
 <h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Permanent link">&para;</a></h2>
 <p>The protocol version is a dotted <code>major.minor</code> string. The current
-version is <strong>1.2</strong>.</p>
+version is <strong>1.3</strong>.</p>
 <p>Rules:</p>
 <ul>
 <li>A <strong>major</strong> version bump (e.g. 1.x → 2.0) indicates a breaking
@@ -17352,30 +17698,31 @@ version is <strong>1.2</strong>.</p>
   event names in <code>subscribe</code>/<code>unsubscribe</code> params.</li>
 </ul>
 <p>Version 1.0 was the first published version. Version 1.1 added the
-<code>surface_drawn</code> and <code>digest_updated</code> events. Version 1.2 (the
-current version) extended the socket to <code>--web</code> mode and corrected
-<code>send_key</code>'s extended-scancode encoding; see the version history at
-the top of this document.</p>
+<code>surface_drawn</code> and <code>digest_updated</code> events. Version 1.2 extended the
+socket to <code>--web</code> mode and corrected <code>send_key</code>'s extended-scancode
+encoding. Version 1.3 (the current version) added the clipboard and
+<code>resize</code> verbs and the <code>clipboard_changed</code> event; see the version
+history at the top of this document.</p>
 <hr />
 <h2 id="end-to-end-worked-example">End-to-end worked example<a class="headerlink" href="#end-to-end-worked-example" title="Permanent link">&para;</a></h2>
 <p>The following transcript shows a complete client session: connect,
 hello, status, subscribe, a latency event arriving, a key press, a
 paste with async completion, and then disconnect. Arrow direction
 indicates the sender: <code>→</code> is client-to-server, <code>←</code> is server-to-client.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>→ {"id": 1, "method": "hello", "params": {"client_name": "demo-client", "protocol_version": "1.0"}}
-<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.2", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn"]}}
-<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>→ {"id": 2, "method": "status", "params": {}}
-<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>← {"id": 2, "ok": true, "result": {"spice_connected": true, "agent_connected": true, "surfaces": [{"channel_id": 1, "surface_id": 0, "width": 1024, "height": 768}]}}
-<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>→ {"id": 3, "method": "subscribe", "params": {"events": ["latency", "agent_connected", "paste_completed", "paste_failed"]}}
-<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>← {"id": 3, "ok": true, "result": {"subscribed": ["latency", "agent_connected", "paste_completed", "paste_failed"]}}
-<a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a>← {"event": "latency", "data": {"sample_ms": 1.2, "wallclock_us": 1717000000000100}}
-<a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a>→ {"id": 4, "method": "send_key", "params": {"scancode": 28, "state": "press"}}
-<a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a>← {"id": 4, "ok": true, "result": {}}
-<a id="__codelineno-28-10" name="__codelineno-28-10" href="#__codelineno-28-10"></a>← {"event": "latency", "data": {"sample_ms": 1.1, "wallclock_us": 1717000002000200}}
-<a id="__codelineno-28-11" name="__codelineno-28-11" href="#__codelineno-28-11"></a>→ {"id": 5, "method": "paste", "params": {"text": "hello", "char_delay_ms": 10}}
-<a id="__codelineno-28-12" name="__codelineno-28-12" href="#__codelineno-28-12"></a>← {"id": 5, "ok": true, "result": {}}
-<a id="__codelineno-28-13" name="__codelineno-28-13" href="#__codelineno-28-13"></a>← {"event": "latency", "data": {"sample_ms": 1.3, "wallclock_us": 1717000002100300}}
-<a id="__codelineno-28-14" name="__codelineno-28-14" href="#__codelineno-28-14"></a>← {"event": "paste_completed", "data": {"request_id": 5, "chars_sent": 5}}
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>→ {"id": 1, "method": "hello", "params": {"client_name": "demo-client", "protocol_version": "1.0"}}
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.3", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed"]}}
+<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>→ {"id": 2, "method": "status", "params": {}}
+<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>← {"id": 2, "ok": true, "result": {"spice_connected": true, "agent_connected": true, "surfaces": [{"channel_id": 1, "surface_id": 0, "width": 1024, "height": 768}]}}
+<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>→ {"id": 3, "method": "subscribe", "params": {"events": ["latency", "agent_connected", "paste_completed", "paste_failed"]}}
+<a id="__codelineno-32-6" name="__codelineno-32-6" href="#__codelineno-32-6"></a>← {"id": 3, "ok": true, "result": {"subscribed": ["latency", "agent_connected", "paste_completed", "paste_failed"]}}
+<a id="__codelineno-32-7" name="__codelineno-32-7" href="#__codelineno-32-7"></a>← {"event": "latency", "data": {"sample_ms": 1.2, "wallclock_us": 1717000000000100}}
+<a id="__codelineno-32-8" name="__codelineno-32-8" href="#__codelineno-32-8"></a>→ {"id": 4, "method": "send_key", "params": {"scancode": 28, "state": "press"}}
+<a id="__codelineno-32-9" name="__codelineno-32-9" href="#__codelineno-32-9"></a>← {"id": 4, "ok": true, "result": {}}
+<a id="__codelineno-32-10" name="__codelineno-32-10" href="#__codelineno-32-10"></a>← {"event": "latency", "data": {"sample_ms": 1.1, "wallclock_us": 1717000002000200}}
+<a id="__codelineno-32-11" name="__codelineno-32-11" href="#__codelineno-32-11"></a>→ {"id": 5, "method": "paste", "params": {"text": "hello", "char_delay_ms": 10}}
+<a id="__codelineno-32-12" name="__codelineno-32-12" href="#__codelineno-32-12"></a>← {"id": 5, "ok": true, "result": {}}
+<a id="__codelineno-32-13" name="__codelineno-32-13" href="#__codelineno-32-13"></a>← {"event": "latency", "data": {"sample_ms": 1.3, "wallclock_us": 1717000002100300}}
+<a id="__codelineno-32-14" name="__codelineno-32-14" href="#__codelineno-32-14"></a>← {"event": "paste_completed", "data": {"request_id": 5, "chars_sent": 5}}
 </code></pre></div>
 <p>After the <code>paste_completed</code> event the client closes the connection
 (TCP FIN). Ryll detects the EOF on the socket, cleans up the per-client
@@ -17385,9 +17732,9 @@ listening for the next client.</p>
 <ul>
 <li>The <code>hello</code> handshake always comes first and its response lists the
   full verb and event catalogue. Note the minor-version interop at
-  work: the client requested <code>"1.0"</code> and the v1.1 server accepted it,
-  responding with the version <em>it</em> speaks and advertising
-  <code>surface_drawn</code>, which this v1.0 client simply never subscribes to.</li>
+  work: the client requested <code>"1.0"</code> and the v1.3 server accepted it,
+  responding with the version <em>it</em> speaks and advertising verbs and
+  events this v1.0 client simply never uses.</li>
 <li><code>status</code> gives a snapshot of the session state at that instant. The
   surfaces list shows one surface, which is all that most single-monitor
   guests present.</li>
@@ -17432,7 +17779,7 @@ growing separate implementations.</p>
 <tbody>
 <tr>
 <td><code>mod.rs</code></td>
-<td>Public re-exports: <code>Server</code>, <code>StatusProvider</code></td>
+<td>Public re-exports: <code>Server</code>, <code>SessionHandles</code>, <code>StatusProvider</code></td>
 </tr>
 <tr>
 <td><code>protocol.rs</code></td>
@@ -17472,6 +17819,26 @@ line and is immediately closed.</p>
 <li>The control server is given an <code>Arc&lt;dyn StatusProvider&gt;</code> so
   <code>status</code> can query SPICE-connection state and agent presence
   without coupling <code>server.rs</code> to <code>session.rs</code> internals.</li>
+<li>What the verbs act on arrives as one <code>SessionHandles</code> value: the
+  inputs channel's queue, the surface mirror, the session's
+  clipboard and the main channel's display-size queue. Each client
+  gets a clone.</li>
+<li>The clipboard is a <code>MemoryClipboard</code> (<code>clipboard.rs</code>), an
+  implementation of the same <code>ClipboardBackend</code> trait the GUI's
+  host clipboard implements. The mode creates it only when a control
+  socket is configured, and gives the same one to the main channel
+  and to the server. The main channel polls it and stores guest
+  copies in it exactly as it does the GUI's clipboard; <code>clipboard_set</code>
+  writes it through a separate method so that only guest copies are
+  published on its watch, which is what <code>clipboard_changed</code> is
+  translated from. The watch carries each copy's length, not its
+  text, so neither it nor a slow client's event queue holds a second
+  copy of a large clipboard.</li>
+<li><code>resize</code> sends on the same display-size queue the GUI's window and
+  the browser's viewport use (in web mode it shares the browser's),
+  so the main channel's debounce and its hold-until-the-agent-connects
+  apply to all of them alike. Its rounding is the GUI's, from the
+  shared <code>align_monitor_dimension</code>.</li>
 <li>Per-client outbound events use a two-task pipeline: an
   event-translator task (subscribes to the broadcast bus, filters by
   the client's subscription set, converts <code>ChannelEvent</code> to JSON)
