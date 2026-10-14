@@ -1400,13 +1400,13 @@ taken from `git log`.
 | 5b-5 | partial-to-full upgrade without prune | Declined: no clean fix; stamp's stale ERROR is the defence |
 | 5b-6 | published details string changed | No action: intentional |
 | 5c, second | verified-to-unverified downgrade protection is incidental | No action: the property holds |
-| 9556eba's report | the checkout's own `.git/config` on a reused workspace is outside the isolation | Declined, added to Future work: landing from a fresh clone would close it |
+| 9556eba's report | the checkout's own `.git/config` on a reused workspace is outside the isolation | Declined here, then fixed when kerbside#563's review of the re-sync showed hooks in the reused `.git/hooks` also ran on fetch, reset and commit: the job lands from a fresh clone and runs no git command in the workspace |
 | #251 review, round one | an entry pointing at a later genuine introduction of a review was replaced as unsupported; malformed imports entries crashed import | Fixed: every introducing commit attests, and `load_imports()` checks the file's shape in one place (559e9ef) |
 | #251 review, round two | default history simplification hid review branches whose merge matched main | Fixed: the walk uses `--full-history`; an invalid or non-object imports file is treated as empty (c61040f) |
 
 **5. Follow-up.**
-- The template change (new hashes: `prune-reviews.yml` 3383bef,
-  `ci-prune-reviews.sh` ff66340) must be re-synced into actions,
+- The template change (new hashes: `prune-reviews.yml` 91ff178,
+  `ci-prune-reviews.sh` b4ce5b6) must be re-synced into actions,
   hunkydory, kerbside and ryll. Script and workflow go together,
   because the script now requires `PUSH_TOKEN`.
 - Michael must re-stamp the changed files here before the copies
@@ -1419,6 +1419,19 @@ taken from `git log`.
   `GIT_CONFIG_COUNT` rather than restoring the global file.
   The re-sync pull requests open only after that run has succeeded,
   so that a runner dependency is found in one repository, not five.
+  That run passed (38378512735, shakenfist-static-2) and the four
+  opened, but kerbside#563's review then found hooks and
+  configuration in the reused workspace's `.git` still reached the
+  job, and actions#157's that a hook could rewrite the script during
+  the checkout itself, so the workflow now fetches the script, and
+  the script lands, from fresh clones. actions#157 and hunkydory#74
+  merged before this did, carrying ci-prune-reviews.sh 883d3e9, and
+  their first runs (actions 38480219082 on shakenfist-static-2,
+  hunkydory 38480253693 on shakenfist-static-1) cloned shallowly
+  with no checkout and pushed, so the fresh-clone workflow has run on
+  both static runners. The final template differs from 883d3e9 only
+  in a comment, so those two need one more verbatim re-sync; kerbside
+  and ryll take the final hashes directly.
 - The plan reaches `Complete` when the re-sync pull requests
   merge. Until then the success criterion "the three review
   tracking CI files are byte-identical across the four adopted
@@ -1794,13 +1807,6 @@ intend to do aligns with that plan.
   break. Tying a stamp to its blob's ancestry instead would catch
   a narrower class of forgery, but is a larger change than this
   plan should make.
-* **Landing from a fresh clone.** Raised by phase 5's security
-  audit (5e-M2). The prune job's config isolation keeps
-  `PUSH_TOKEN` and git configuration out of a reused static
-  runner's shared state, but the checkout's own `.git/config`
-  still sits inside the job's reach for the run. Landing from a
-  fresh clone each time would close that gap too, at the cost of
-  a clone on every run instead of reusing a checkout.
 
 Related issues: shakenfist/development#173 is this repository's
 own review-coverage issue; import does not affect it, because this

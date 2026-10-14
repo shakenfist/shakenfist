@@ -313,8 +313,9 @@ are sent but the display never updates in response.
 
 **Solutions:**
 1. Use Tab to navigate instead of mouse clicking
-2. Check `/tmp/ryll.log` for `inputs: mouse down:` lines
-   to confirm clicks are being sent
+2. Run ryll with `--verbose` and check `/tmp/ryll.log` for
+   `inputs: mouse down:` lines to confirm clicks are being sent.
+   They are debug-level, so they do not appear without it
 3. Submit a bug report (F12) with category **Input** — the
    channel-state.json will show whether button events are
    reaching the wire
