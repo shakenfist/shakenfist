@@ -62,7 +62,8 @@ Web column's MVP set; the control socket work gave headless an
 interactive driving surface). Last full audit: the web frontend
 sweep; control-socket cells refreshed 2026-08-23 (web mode gained
 the socket, its `status` and event rows, and the shared digest
-poller), media socket binding added 2026-08-21.
+poller), media socket binding added 2026-08-21, clipboard and
+resize rows refreshed 2026-10-14 (control protocol 1.3).
 
 ## Parity matrix
 
@@ -84,7 +85,7 @@ around it.
 | **Control socket** | | | |
 | Control socket (`--control-socket`) | n/a — intrinsic (the window owns input and the surface; combining with the GUI is a CLI error) | available | available |
 | Session state query (`status` verb) | n/a — intrinsic | available | available (`run_web` builds a `SessionStatus` from the same `spice_connected` flag, `SessionState` agent watch and surface mirror headless uses) |
-| Event subscription (`latency`, `agent_connected`, `paste_*`, `surface_drawn`, `digest_updated`) | n/a — intrinsic | available (`digest_updated` needs the `digest-decode` build feature) | available (same `event_broadcast_tx`; `digest_updated` needs the `digest-decode` build feature, and the poller is spawned only when `--control-socket` is given so an ordinary browser session does not pay to decode QR) |
+| Event subscription (`latency`, `agent_connected`, `paste_*`, `surface_drawn`, `clipboard_changed`, `digest_updated`) | n/a — intrinsic | available (`digest_updated` needs the `digest-decode` build feature) | available (same `event_broadcast_tx`; `digest_updated` needs the `digest-decode` build feature, and the poller is spawned only when `--control-socket` is given so an ordinary browser session does not pay to decode QR) |
 | **Display** | | | |
 | Display framebuffer (render SPICE draw ops) | available | partial (the renderer's `run_headless()` counts `ImageReady` events but never paints continuously; with `--control-socket`, a `SurfaceMirror` renders draw ops on demand for the `screenshot` verb, instantiated on first use) | available (single monitor, MVP) |
 | Multi-monitor (`--monitors N`) | available | partial (the renderer's `run_headless()` — channel connects but frames are silently dropped; surfaces are never created in headless) | missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope) |
@@ -92,9 +93,9 @@ around it.
 | SPICE streaming / MJPEG | available | partial (decoded messages counted as frames, not rendered) | available (inherited) |
 | Display capabilities advertisement (COMPOSITE, MONITORS_CONFIG, etc.) | available | available | available |
 | Opt in to H.264 from spice-server (`--experimental-h264`) | available | available | available (affects only the SPICE side; the WebRTC encoder is unchanged) — temporary: remove once ryll#398 makes H.264 decode and it is advertised by default again |
-| Window auto-resize to surface size | available | n/a — intrinsic (no window; resize channel exists but `_resize_tx` in the renderer's `run_headless()` is never connected to a window) | n/a — intrinsic (browser viewport is user-controlled) |
+| Window auto-resize to surface size | available | n/a — intrinsic (no window) | n/a — intrinsic (browser viewport is user-controlled) |
 | Obey guest size hints toggle (`--no-obey-guest-size` / hamburger toggle) | available | n/a — intrinsic (no window; flag accepted in headless for CLI symmetry but ignored, `_obey_guest_size` in ryll's `run_headless()`) | missing (out of MVP scope; the web frontend's "guest fits browser viewport" inverse is planned) |
-| Guest resolution follows viewport (`VDAgentMonitorsConfig`) | available | missing (the renderer's `run_headless()` — `_resize_tx` is created but never used to drive resize logic in headless) | available |
+| Guest resolution follows viewport (`VDAgentMonitorsConfig`) | available | available (via the control socket `resize` verb, rounded to the GUI's 8-pixel grid; there is no viewport to follow) | available (also via the control socket `resize` verb, which shares the browser's resize queue) |
 | **Cursor** | | | |
 | Server cursor rendering (SET/INIT) | available | missing (the renderer's `run_headless()` — `CursorChannel` runs, events arrive, but its event loop has no handler for `CursorImage`/`CursorPos` events) | available (datachannel CSS overlay; the host cursor is only hidden once a real SPICE shape has arrived, so a guest that never sends one leaves the browser's own pointer visible rather than none at all) |
 | Cursor position tracking | available | missing (same as above) | available (MVP) |
@@ -113,6 +114,8 @@ around it.
 | Modifier state tracking (Ctrl/Shift/Alt) | available | partial (`InputsChannel` in `shakenfist-spice-renderer/src/channels/inputs.rs` — tracked internally but only used by the paste state machine; cadence does not restore modifiers) | available (MVP) |
 | **Cadence mode** | | | |
 | Cadence mode (`--cadence`) | available | available | missing (out of MVP scope; no test-automation use case in browser) |
+| **Clipboard** | | | |
+| Clipboard sync with the guest (vdagent, CLIPBOARD selection, UTF-8 text) | available (host clipboard via `arboard`) | available (via the control socket: `clipboard_set` offers text to the guest, `clipboard_get` reads it back, `clipboard_changed` reports guest copies; the in-memory clipboard exists only with `--control-socket`) | partial (the browser has no clipboard sync — out of MVP scope; the control socket's clipboard verbs work as in headless) |
 | **Paste-as-keystrokes** | | | |
 | Paste-as-keystrokes (enable flag) | available | available (`--enable-paste-as-keystrokes`) | missing (out of MVP scope; clipboard sync is in Future work list in PLAN-web-frontend.md) |
 | Paste-as-keystrokes (runtime trigger via Ctrl+Alt+V) | available | available (via the control socket `paste` verb; Ctrl+Alt+V itself is GUI-only) | missing (out of MVP scope) |
