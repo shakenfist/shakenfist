@@ -3084,6 +3084,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../PLAN-bot-bypass-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bot bypass identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../PLAN-consistency-audits-v2/" class="md-nav__link">
         
   
@@ -15975,8 +16003,8 @@ answers.</p>
 </tr>
 <tr>
 <td>5. Push audit</td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>99158da (#251), 728f0ae (#254); actions e3e6155 (#157), 68dc806 (#160); hunkydory e5a9b0e (#74), e8c62e5 (#77); kerbside c608d2c (#563); ryll 60990bb (#530)</td>
 </tr>
 </tbody>
 </table>
@@ -16092,9 +16120,9 @@ command in it is written against <code>main...HEAD</code>: a stale local
 <code>main</code> silently widens the audit to unrelated history, so fetch
 before starting, or read it as <code>origin/main...HEAD</code>.</p>
 <p>Phases 2 and 3 land partly in actions, hunkydory, kerbside and
-ryll. Each of those pull requests is audited against its own
-repository's default branch as it lands, and phase 5 cites those
-audits.</p>
+ryll. Each of those pull requests was to be audited against its own
+repository's default branch as it landed; phase 5 found none had
+been, and audited those repositories itself (phase 5, decision 2).</p>
 <!-- shared-block: plan-phase-landing v1 -->
 <p>Phase landing (shared block; do not edit -- the canonical copy
 lives in shakenfist/development at
@@ -17336,7 +17364,7 @@ those repositories since that did not come from this plan.</p>
 <td>medium</td>
 <td>sonnet</td>
 <td>none</td>
-<td>Fix the development findings the management session accepts, one commit each. Write the Outcome below: every finding with its disposition (fixed in which commit, declined and why, or filed where), and one line per repository that had none. Then mark this phase and the plan <code>Complete</code> in the Execution table and in <code>docs/plans/index.md</code>; this phase records no <code>Merged</code> cell, per the shared block.</td>
+<td>Fix the development findings the management session accepts, one commit each. Write the Outcome below: every finding with its disposition (fixed in which commit, declined and why, or filed where), and one line per repository that had none. Then mark this phase and the plan <code>Complete</code> in the Execution table and in <code>docs/plans/index.md</code>; this phase records no <code>Merged</code> cell, per the shared block. (As it turned out, the audit's template findings needed re-sync pull requests in the four adopted repositories, so the close-out followed them and recorded their merge commits, as plan-phase-landing allows for a findings carrier.)</td>
 </tr>
 </tbody>
 </table>
@@ -17363,8 +17391,12 @@ those repositories since that did not come from this plan.</p>
   a written decline, or an issue link.</li>
 <li>Any adopted repository with findings has a pull request linked
   from the Outcome, or an explicit "no findings".</li>
-<li>The Execution table shows phase 5 <code>Complete</code> with no <code>Merged</code>
-  cell, and the <code>docs/plans/index.md</code> row shows <code>Complete</code>.</li>
+<li>The Execution table shows phase 5 <code>Complete</code>, and the
+  <code>docs/plans/index.md</code> row shows <code>Complete</code>. The <code>Merged</code> cell is
+  empty if the audit found nothing; this one found template
+  findings, carried by re-sync pull requests that landed after it,
+  so the cell records their merge commits (see plan-phase-landing
+  above).</li>
 <li><code>pre-commit run --all-files</code> passes, and <code>audit-check.py</code> for this
   repository reports what it reported before.</li>
 </ul>
@@ -17512,7 +17544,10 @@ taken from <code>git log</code>.</p>
   hunkydory, kerbside and ryll. Script and workflow go together,
   because the script now requires <code>PUSH_TOKEN</code>.
 - Michael must re-stamp the changed files here before the copies
-  import.
+  import. At close-out this had not happened: of the files #251 and
+  #254 changed, only <code>scripts/tests/test_review.py</code> is stamped at its
+  current content. That is ordinary review coverage, tracked by
+  #173, not a condition of this plan.
 - The config isolation is untested on a real static runner until
   development's own <code>prune-reviews</code> runs after this merges. Ignoring
   the global configuration also drops any <code>safe.directory</code>, proxy or
@@ -17539,7 +17574,14 @@ taken from <code>git log</code>.</p>
   tracking CI files are byte-identical across the four adopted
   repositories" is false. So leave phase 5 and the index row <code>In
   progress</code> in this commit, and say that a one-line close-out
-  follows the re-syncs.</p>
+  follows the re-syncs. They merged as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/157" title="GitHub Issue: shakenfist/actions #157">actions#157</a> (e3e6155) and
+  #160 (68dc806), <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/hunkydory/issues/74" title="GitHub Issue: shakenfist/hunkydory #74">hunkydory#74</a> (e5a9b0e) and #77 (e8c62e5),
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/563" title="GitHub Issue: shakenfist/kerbside #563">kerbside#563</a> (c608d2c) and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/530" title="GitHub Issue: shakenfist/ryll #530">ryll#530</a> (60990bb), after #254 here
+  (728f0ae). At close-out <code>prune-reviews.yml</code> 91ff178,
+  <code>ci-prune-reviews.sh</code> b4ce5b6 and <code>review-tracking.sh</code> db83f95
+  hashed identically to their templates in all four, so phase 5 and
+  the plan are <code>Complete</code>, with a <code>Merged</code> cell recording those
+  commits.</p>
 <h2 id="agent-guidance">Agent guidance<a class="headerlink" href="#agent-guidance" title="Permanent link">&para;</a></h2>
 <h3 id="execution-model">Execution model<a class="headerlink" href="#execution-model" title="Permanent link">&para;</a></h3>
 <!-- shared-block: subagent-execution-model v1 -->

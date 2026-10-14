@@ -16,7 +16,7 @@
         <link rel="prev" href="../audits/">
       
       
-        <link rel="next" href="PLAN-consistency-audits-v2/">
+        <link rel="next" href="PLAN-bot-bypass-identity/">
       
       
         
@@ -3082,6 +3082,34 @@
 
       </a>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-bot-bypass-identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bot bypass identity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -15184,7 +15212,7 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <td>2026-09-24</td>
 <td><a href="/components/development/plans/PLAN-review-import/">Review import</a></td>
 <td>Count a review done here wherever the same bytes appear in another adopted repository: an <code>import</code> step beside prune that follows each imported mark to its signed commit here, the review tracking CI as a byte-identical template, and converging drifted template copies so more files qualify</td>
-<td>In progress</td>
+<td>Complete</td>
 </tr>
 <tr>
 <td>2026-10-02</td>
@@ -15196,6 +15224,12 @@ the phase arithmetic and the summary of what happened live in the plan.</p>
 <td>2026-10-03</td>
 <td><a href="/components/development/plans/PLAN-renovate-cadence/">Renovate cadence</a></td>
 <td>Cut the pull requests Renovate opens, and the CI they cost, by about half without slowing security fixes: one central runner instead of a copy per repository, the fleet policy in a shared preset with tiered schedules, and CI-tooling updates grouped monthly</td>
+<td>Not started</td>
+</tr>
+<tr>
+<td>2026-10-07</td>
+<td><a href="/components/development/plans/PLAN-bot-bypass-identity/">Bot bypass identity</a></td>
+<td>Settle #211: make the only automation bypass on default-branch rulesets a GitHub App whose key only default-branch code can read, and take the bypass away from <code>shakenfist-bot</code>, whose PATs every Renovate run and several pull-request jobs carry</td>
 <td>Not started</td>
 </tr>
 <tr>
