@@ -186,7 +186,7 @@ around it.
 | File logging to `/tmp/ryll.log` (`-v`) | available | available | available |
 | Intimate logging (`--intimate`, keystrokes/mouse) | available | available | missing (no interactive input to log in web MVP that wouldn't also appear in the browser console) |
 | **Connection Source** | | | |
-| VDAgent connection status (agent_connected flag) | available | available (read from the session's `SessionState` watch and logged; also a control-socket event and `status` field) | available (wired through same channel path) |
+| VDAgent connection status (agent_connected flag) | available (status-bar `Agent` indicator; a server with no agent is notified as such, not as a disconnect) | available (read from the session's `SessionState` watch and logged; also a control-socket event and `status` field) | available (wired through same channel path) |
 | TCP keepalive on all channel sockets | available | available | available (inherited from SpiceClient) |
 | **Authentication / Session Token** | | | |
 | Per-launch URL token (web mode only) | n/a — intrinsic (no HTTP server) | n/a — intrinsic (no HTTP server) | available (MVP; random 32-byte token printed to stdout) |

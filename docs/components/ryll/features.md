@@ -24,7 +24,7 @@ for how each subsystem works internally see
 
 - **Multi-channel support** - Handles main, display, cursor, inputs, playback, usbredir, and webdav channels.
 - **Keyboard forwarding** - Keys are sent to the guest as PC scancodes for their physical position, so the guest's keyboard layout decides which character is typed. ryll tracks which keys it has sent as pressed: host auto-repeats of a held key are not forwarded, and held keys are released in the guest when ryll's window loses focus or a ryll dialog takes over input, so no key is left stuck down. When the inputs channel opens, ryll sets the guest's locks to Num Lock on and Caps Lock and Scroll Lock off, and never asserts them again: a lock changed later, from the guest or from another client sharing its desktop, stays as it was set.
-- **Clipboard sync** - With spice-vdagent running in the guest, UTF-8 text copied on the host can be pasted in the guest and vice versa. Only the CLIPBOARD selection is synced. In an X11 guest, text that is merely selected (the PRIMARY selection, pasted with middle-click) stays in the guest, so selecting text never overwrites the host clipboard.
+- **Clipboard sync** - With spice-vdagent running in the guest, UTF-8 text copied on the host can be pasted in the guest and vice versa. Only the CLIPBOARD selection is synced. In an X11 guest, text that is merely selected (the PRIMARY selection, pasted with middle-click) stays in the guest, so selecting text never overwrites the host clipboard. Without an agent nothing is synced: the status bar's **Agent** indicator stays grey, and on macOS the first Cmd+V of the session raises a notification pointing to paste-as-keystrokes, since ryll never forwards Cmd and the chord would otherwise do nothing.
 - **Paste-as-keystrokes** - Type arbitrary text into guests without vdagent by translating characters into US-QWERTY scancode sequences. Cooperative timer-driven state machine keeps the inputs channel responsive during long pastes. Triggered via Ctrl+Alt+V shortcut or Menu → Paste in the GUI (when enabled). Automatically disabled when vdagent is connected. Characters are mapped to US-QWERTY scancodes; guests with a different keyboard layout will see different characters. Maximum paste length is 4096 characters. CLI flags: `--enable-paste-as-keystrokes`, `--paste-text TEXT`, `--paste-char-delay-ms N`.
 - **Screenshot capture** - Press F8 or use Menu → Screenshot to save the current display as a PNG via a native file dialog. With multiple monitors, one PNG per surface is saved with `-1`, `-2` suffixes.
 
@@ -48,6 +48,7 @@ for how each subsystem works internally see
 - **Bandwidth sparkline** - Real-time bandwidth graph in the status bar showing rolling bytes/sec history.
 - **Latency sparkline** - Bottom stats panel shows client-observed inter-PING interval from the main channel (lower variance is better; spikes indicate network or server stalls).
 - **Streaming indicator** - Small triangle (▶) glyph in the status bar reflects the live SPICE display-stream state: grey (off), green (active), amber (a stream was destroyed in the last 5 s), red (≥3 destroys in 30 s with mean lifetime <3 s — fires a `Warn` notification once per minute). Hover for per-stream codec, dimensions, and decoded-frame counts. See [troubleshooting § Streaming indicator](/components/ryll/troubleshooting/#streaming-indicator).
+- **Guest agent indicator** - `Agent` label in the status bar shows the SPICE guest agent, which carries clipboard sync and guest resizing: green when connected, grey when the server has none (or before the session connects), amber when it was connected and went away. Hover for what that means for the clipboard and resizing.
 - **Protocol-gap counter** - `Gaps: N` button in the status bar tracks the number of distinct protocol edge cases seen this session (unknown opcodes, deferred ops, recoverable decode failures). Highlights red when N > 0; click to open a floating window listing the keys. Complements `--pedantic` mode.
 - **File logging** - Verbose mode writes to `/tmp/ryll.log` for debugging.
 - **Unbuffered pcap I/O** - Packet writes go directly to disk so pcap data survives abrupt termination.
@@ -215,7 +216,8 @@ tints amber or red when there are unread Warn or Error-severity entries
 
 Entries are tagged with a source label — `Connection` for connect /
 disconnect / reconnect cycle / channel error / guest-agent state
-transitions, `Gap` for protocol gaps, `BugReport` for save status,
+transitions (a server with no agent at all says so once, as "The server
+has no guest agent…", rather than as a disconnect), `Gap` for protocol gaps, `BugReport` for save status,
 `SPICE/<channel>` for server NOTIFY messages, `Internal` for everything
 else.
 

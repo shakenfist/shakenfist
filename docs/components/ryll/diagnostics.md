@@ -157,7 +157,8 @@ ryll-bugreport-YYYY-MM-DDTHH-MM-SSZ.zip
 │                         #   (submit), triggered_at (dialog-open),
 │                         #   session_uptime_secs (submit),
 │                         #   triggered_uptime_secs (dialog-open)
-├── session.json          # AppSnapshot (FPS, bandwidth, surfaces)
+├── session.json          # AppSnapshot (FPS, bandwidth, surfaces,
+│                         #   held keys and recent key events)
 ├── channel-state.json    # snapshot of the affected channel
 ├── traffic.pcap          # ring buffer pcap (capture feature only)
 ├── screenshot.png        # trigger-time full surface (Display only)

@@ -787,7 +787,7 @@ cd src/fuzz
 cargo fuzz run fuzz_qcow2_header -- -max_total_time=60
 ```
 
-40 fuzz targets cover all parser crates (QCOW2, VMDK, VHD, VHDX,
+43 fuzz targets cover all parser crates (QCOW2, VMDK, VHD, VHDX,
 VDI, Parallels, QCOW1, DMG, RAW, LUKS) including header parsing,
 L1/L2 lookup, refcount traversal, and decompression, plus the
 create / resize / rebase / commit planners, the qcow2 check-repair

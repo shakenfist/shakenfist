@@ -296,6 +296,40 @@ are sent but the display never updates in response.
    link negotiation includes COMPOSITE in the advertised
    capabilities
 
+### A key stays held down in the guest
+
+**Symptom:** the guest repeats a key you are not holding, or one you
+never pressed.
+
+ryll sends the guest a press when a key goes down and a release when
+it comes up. If the host never delivers the release, or delivers it
+as a different key, the guest is left holding the key and repeats it
+until ryll lets go of every held key: when the window loses focus,
+or when a dialog such as the bug report opens.
+
+**What to do:** press F12 while the key is still repeating, and
+report it as an **Input** bug. The `keyboard` section of the report's
+`session.json` records what ryll saw and did:
+
+- `held` lists the keys the guest has been sent a press for and no
+  release yet, with the scancode that releases each.
+- `withheld` lists keys pressed with the macOS Cmd key down. ryll
+  keeps those from the guest, and their releases too.
+- `recent_events` holds the last 256 keyboard events egui handed ryll:
+  key presses and releases, clipboard events, modifier changes and
+  focus loss. Each records the logical and physical key, whether it
+  was a press or a repeat, the modifiers, what ryll did with it
+  (`outcome`), and the scancodes it sent (`sent`). The F12 dialog
+  releases every held key, so the last entries are `release_all`
+  ones naming the key that was stuck.
+- `at_secs` is seconds since the session started, the clock the
+  inputs channel's `recent_events` and `traffic.pcap` also use. That
+  makes it possible to match a press on the wire to the host event
+  behind it, and to see whether its release ever arrived.
+
+`events_seen` counts every event logged in the session, including
+those that have since dropped out of `recent_events`.
+
 ### Mouse not working
 
 **Symptom:** Mouse cursor visible but clicks don't register.
@@ -582,7 +616,8 @@ ryll-bugreport-YYYY-MM-DDTHH-MM-SSZ.zip
 │                           timestamp (submit), triggered_at
 │                           (dialog-open), submitted uptime
 │                           and triggered uptime
-├── session.json          — FPS, bandwidth, surfaces, uptime
+├── session.json          — FPS, bandwidth, surfaces, uptime,
+│                           keyboard state and recent key events
 ├── channel-state.json    — snapshot of the affected channel
 ├── traffic.pcap          — recent protocol traffic (pcap format)
 ├── screenshot.png        — full display surface captured at the

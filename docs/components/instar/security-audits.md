@@ -463,7 +463,7 @@ Coverage-guided fuzzing of all `no_std` parser crates using
 `cargo-fuzz` (libFuzzer). The campaign began with the parser targets
 listed below — format detection, header parsing, L1/L2 cluster lookup,
 refcount table traversal, decompression, grain directory lookup, BAT
-traversal and VHDX metadata parsing — and has grown to **40 targets**
+traversal and VHDX metadata parsing — and has grown to **43 targets**
 (`src/fuzz/fuzz_targets/`): every subcommand implemented since brought
 its own planner and emitter targets onto the same harness
 infrastructure, and the later input-format work added VDI, Parallels,
