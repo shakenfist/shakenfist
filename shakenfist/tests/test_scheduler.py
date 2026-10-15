@@ -388,6 +388,99 @@ class MetricsRefreshTestCase(SchedulerTestCase):
         self.assertEqual(11000, s.metrics[net_uuid]['memory_available'])
 
 
+class ScheduleInputsFreshnessTestCase(SchedulerTestCase):
+    """The schedule inputs event describes the metrics the decision used.
+
+    Issue 4521: the event published the age of the cache the decision
+    replaced -- measured before the refresh that exceeding the cache
+    timeout triggers -- so a routine decision made on freshly loaded
+    metrics read from the event log as placement on hour-old data.
+    """
+
+    def _schedule_inputs_extra(self, aem):
+        inputs = [c for c in aem.call_args_list
+                  if c.args[2] == 'schedule inputs']
+        self.assertEqual(1, len(inputs))
+        return inputs[0].kwargs['extra']
+
+    def test_expired_cache_reports_post_refresh_age(self):
+        self.mock_mariadb.set_node_metrics_same()
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+
+        s = scheduler.Scheduler()
+        s.metrics_updated = time.time() - 3415
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            s.find_candidates(fake_inst)
+
+        extra = self._schedule_inputs_extra(aem)
+        self.assertTrue(extra['metrics_refreshed'])
+        # The age of the snapshot the decision read, not the 3415 second
+        # old cache the refresh replaced.
+        self.assertLess(extra['metrics_age_seconds'], 30)
+
+    def test_warm_cache_reports_cache_age_without_refresh(self):
+        self.mock_mariadb.set_node_metrics_same()
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+
+        s = scheduler.Scheduler()
+        # Within fake_config's 30 second SCHEDULER_CACHE_TIMEOUT, so the
+        # decision reads the cached snapshot and the age published is
+        # that snapshot's real age.
+        s.metrics_updated = time.time() - 10
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            s.find_candidates(fake_inst)
+
+        extra = self._schedule_inputs_extra(aem)
+        self.assertFalse(extra['metrics_refreshed'])
+        self.assertGreaterEqual(extra['metrics_age_seconds'], 10)
+        self.assertLess(extra['metrics_age_seconds'], 30)
+
+    def test_oldest_node_row_bounds_the_decision(self):
+        self.mock_mariadb.set_node_metrics_same()
+        node2_uuid = self._node_uuid('node2')
+        self.mock_mariadb.node_metrics_store[node2_uuid]['timestamp'] = \
+            time.time() - 50
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            scheduler.Scheduler().find_candidates(fake_inst)
+
+        extra = self._schedule_inputs_extra(aem)
+        oldest = extra['oldest_node_metrics_age_seconds']
+        self.assertGreaterEqual(oldest, 50)
+        self.assertLess(oldest, 60)
+
+    def test_a_discarded_stale_row_does_not_set_the_bound(self):
+        # get_active_node_metrics() discards rows older than 120 seconds
+        # rather than offering them, so a node whose daemon has stopped
+        # publishing must not drag the bound out either.
+        self.mock_mariadb.set_node_metrics_same()
+        node2_uuid = self._node_uuid('node2')
+        self.mock_mariadb.node_metrics_store[node2_uuid]['timestamp'] = \
+            time.time() - 400
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            scheduler.Scheduler().find_candidates(fake_inst)
+
+        extra = self._schedule_inputs_extra(aem)
+        self.assertLess(extra['oldest_node_metrics_age_seconds'], 30)
+
+    def test_no_usable_rows_reports_none(self):
+        self.mock_mariadb.set_node_metrics_same()
+        for row in self.mock_mariadb.node_metrics_store.values():
+            row['timestamp'] = time.time() - 400
+
+        fake_inst = self.mock_mariadb.create_instance('fake-inst')
+        with mock.patch('shakenfist.scheduler.add_event_multi') as aem:
+            self.assertRaises(
+                exceptions.LowResourceException,
+                scheduler.Scheduler().find_candidates, fake_inst)
+
+        extra = self._schedule_inputs_extra(aem)
+        self.assertIsNone(extra['oldest_node_metrics_age_seconds'])
+
+
 class LoadAwareOrderingTestCase(SchedulerTestCase):
     """Test load-per-thread bucketing and headroom-weighted selection.
 

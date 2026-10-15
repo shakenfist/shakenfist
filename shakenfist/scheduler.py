@@ -54,11 +54,15 @@ def get_active_node_metrics():
             node_uuid = str(n.uuid)
             new_metrics = mariadb.get_node_metrics(node_uuid)
             if new_metrics:
-                if (time.time()
-                        - new_metrics.get('timestamp', 0)
-                        < 120):
+                row_timestamp = new_metrics.get('timestamp', 0)
+                if time.time() - row_timestamp < 120:
                     new_metrics = new_metrics.get(
                         'metrics', {})
+                    # When the resources daemon wrote this row. Kept so a
+                    # placement decision can publish the real staleness of
+                    # what it read, not just the age of this scheduler's
+                    # cache of it (issue 4521).
+                    new_metrics['metrics_timestamp'] = row_timestamp
                 else:
                     n.add_event(
                         EVENT_TYPE_AUDIT,
@@ -182,6 +186,24 @@ class Scheduler:
     def refresh_metrics(self):
         self.metrics = get_active_node_metrics()
         self.metrics_updated = time.time()
+
+    def _oldest_node_metrics_age(self):
+        # The age of the oldest metrics row behind any node offered to
+        # this decision, which is the decision's real staleness bound:
+        # metrics_updated says when this scheduler last fetched, not when
+        # the resources daemons last measured. None when no node carried
+        # a usable row (issue 4521).
+        oldest = None
+        for node_metrics in self.metrics.values():
+            row_timestamp = node_metrics.get('metrics_timestamp')
+            if not row_timestamp:
+                continue
+            age = time.time() - row_timestamp
+            if oldest is None or age > oldest:
+                oldest = age
+        if oldest is None:
+            return None
+        return round(oldest, 2)
 
     def _has_reasonable_queue_state(self, log_ctx, node):
         waiting = self.metrics[node].get('node_queue_waiting', 0)
@@ -581,9 +603,11 @@ class Scheduler:
             log_ctx = self.log.with_fields({'instance': inst})
 
             # Refresh metrics if its too old, or there are no nodes.
+            metrics_refreshed = False
             diff = time.time() - self.metrics_updated
             if diff > config.SCHEDULER_CACHE_TIMEOUT or len(self.metrics) == 0:
                 self.refresh_metrics()
+                metrics_refreshed = True
 
             # Record the inputs to the scheduling decision so failures can be
             # diagnosed from the event log alone.
@@ -602,7 +626,17 @@ class Scheduler:
                     'disk_spec': inst.disk_spec,
                     'namespace': inst.namespace,
                     'forced_candidates': candidates is not None,
-                    'metrics_age_seconds': diff,
+                    # Measured after the refresh above, so this is the age
+                    # of the snapshot the decision reads. The pre-refresh
+                    # age is usually old precisely because exceeding the
+                    # cache timeout is what triggers the refresh, and
+                    # publishing it read as placement on hour-old metrics
+                    # when the decision used fresh ones (issue 4521).
+                    'metrics_age_seconds': round(
+                        time.time() - self.metrics_updated, 2),
+                    'metrics_refreshed': metrics_refreshed,
+                    'oldest_node_metrics_age_seconds':
+                        self._oldest_node_metrics_age(),
                 })
 
             # An empty forced list is still forced: the preflight
