@@ -20,6 +20,7 @@ from shakenfist import mariadb
 from shakenfist.config import SFConfig
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.daemons import daemon
+from shakenfist.daemons.sidechannel import main as sidechannel
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
@@ -2128,6 +2129,34 @@ class AgentOperationQueueTestCase(base.ShakenFistTestCase):
 
         self.assertIsNone(self.inst.agent_operation_next())
         self.assertEqual(AgentOperation.STATE_PREFLIGHT, op1.state.value)
+
+    def test_a_reaped_never_queued_head_unwedges_the_queue(self):
+        # Issue #4539, against real operations so that the initial ->
+        # expired and preflight -> expired edges are proven rather than
+        # assumed. Left alone above, a head whose preflight never runs
+        # blocked every operation behind it forever; once the
+        # sidechannel reaper has expired it, the ordinary terminal rule
+        # here retires it and the queue moves again.
+        for state in (AgentOperation.STATE_INITIAL,
+                      AgentOperation.STATE_PREFLIGHT):
+            stuck = self._make_agentop(state=state, deadline=1.0)
+            behind = self._make_agentop(
+                state=AgentOperation.STATE_QUEUED,
+                deadline=time.time() + 3600)
+            self.assertEqual(state, stuck.state.value)
+            self.assertIsNone(self.inst.agent_operation_next())
+
+            self.assertTrue(
+                sidechannel.expire_unpromoted_head(stuck, stuck.state))
+
+            self.assertEqual(AgentOperation.STATE_EXPIRED, stuck.state.value)
+            self.assertEqual(
+                str(behind.uuid), str(self.inst.agent_operation_next().uuid))
+            self.assertEqual([str(behind.uuid)], self._queue())
+
+            behind.state = AgentOperation.STATE_EXECUTING
+            behind.state = AgentOperation.STATE_COMPLETE
+            self.assertIsNone(self.inst.agent_operation_next())
 
     def test_next_retires_an_already_expired_head(self):
         # Expired elsewhere -- by preflight or the executor -- the head

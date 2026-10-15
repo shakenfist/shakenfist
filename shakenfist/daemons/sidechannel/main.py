@@ -76,6 +76,14 @@ BUDGET_CHECK_INTERVAL = 1
 # cost the dispatch check's own rate limit exists to avoid.
 EXECUTOR_REAP_INTERVAL = 30
 
+# How far past its deadline an operation must be before the reaper
+# expires it for never having been queued. The preflight task runs on
+# this node and checks the same deadline immediately before promoting
+# the operation, so the reaper only races a live task if that check and
+# the promotion are further apart than this. They are adjacent
+# statements, so a minute is ample.
+UNPROMOTED_HEAD_GRACE = 60
+
 # How often the dispatcher asks one instance whether it has an agent
 # operation to run. A failed dispatch (the executor couldn't connect, or
 # the agent never welcomed us) leaves the operation at the head of the
@@ -683,6 +691,67 @@ def resolve_abandoned_operation(agentop, reason, terminal):
             'attempts': attempts,
             'max_attempts': config.AGENT_OPERATION_MAX_ATTEMPTS
         })
+    return True
+
+
+# The two states an operation is in before it is first queued, and the
+# reason recorded when the reaper finds one which never left. Initial
+# lasts only while the API server is between creating the operation
+# and finishing its enqueue; preflight until a NodeAgentopOp preflight
+# task promotes it.
+UNPROMOTED_HEAD_REASONS = {
+    AgentOperation.STATE_INITIAL:
+        'the operation deadline passed and its enqueue never completed',
+    AgentOperation.STATE_PREFLIGHT:
+        'the operation deadline passed and no preflight task promoted it',
+}
+
+
+def expire_unpromoted_head(agentop, state):
+    """Expire a never-queued head whose deadline is long past.
+
+    Instance.agent_operation_next() deliberately leaves an initial or
+    preflight head alone, deadline or not, because expiring it there
+    would race the preflight task, which enforces the deadline itself.
+    That only works if the preflight task runs. If its cluster
+    operation was lost, or the API server died mid-enqueue, nothing
+    else will ever move the head, and every later operation for the
+    instance waits behind it forever (issue #4539).
+
+    The reaper can close that without the race, because the preflight
+    task runs on this node and checks the deadline immediately before
+    it promotes: waiting UNPROMOTED_HEAD_GRACE past the deadline means
+    a live task has either expired the operation already or is not
+    going to promote it. A late task finds the operation terminal and
+    leaves it alone. The outcome is expire(), not fail(), and with the
+    deadline budget, so that it matches what _preflight() records when
+    it runs late: in both cases the caller's budget is what ran out.
+
+    An operation with no wall-clock deadline (0.0 alongside a live
+    progress timeout) would otherwise never qualify, and its progress
+    timeout cannot help because only an executor applies it. It is
+    bounded by AGENT_OPERATION_MAX_DEADLINE from its last transition
+    instead, the same backstop effective_deadline() gives an operation
+    with neither budget.
+
+    state is the State already read for agentop, which anchors a NULL
+    deadline without a second read. Returns True if the operation was
+    expired.
+    """
+    deadline = agentop.effective_deadline(state=state)
+    if deadline is None:
+        deadline = state.update_time + config.AGENT_OPERATION_MAX_DEADLINE
+    if time.time() <= deadline + UNPROMOTED_HEAD_GRACE:
+        return False
+
+    LOG.with_fields({
+        'instance': agentop.instance_uuid,
+        'agentoperation': agentop.uuid,
+        'state': state.value
+    }).warning('Agent operation was never queued and its deadline has '
+               'passed; expiring it')
+    agentop.expire(UNPROMOTED_HEAD_REASONS[state.value],
+                   AgentOperation.EXPIRY_REASON_DEADLINE)
     return True
 
 
@@ -1726,13 +1795,16 @@ class Monitor(daemon.Daemon):
     def _resolve_stuck_queue_head(self, instance_uuid):
         """Resolve an operation this instance's agent queue is stuck behind.
 
-        Three cases, and only three. Two of them are the absence of a
-        thread, which is directly observable; the third is a wall-clock
-        deadline, which is an absolute timestamp and so cannot be wrong
-        about a thread which is still making progress. A live executor
-        inside its budgets is left entirely alone, because the progress
-        timeout is that executor's own job and it holds state this
-        method does not.
+        Four cases, and only four. Two of them are the absence of a
+        thread, which is directly observable; the other two are a
+        wall-clock deadline, which is an absolute timestamp and so
+        cannot be wrong about a thread which is still making progress.
+        A live executor inside its budgets is left entirely alone,
+        because the progress timeout is that executor's own job and it
+        holds state this method does not. So is an initial or preflight
+        head inside its deadline plus UNPROMOTED_HEAD_GRACE, because
+        promoting it is the preflight task's job; see
+        expire_unpromoted_head() for the one which never runs.
 
         That leaves two shapes this cannot see, both of which need
         evidence a node-local reaper does not have. An instance with no
@@ -1785,10 +1857,18 @@ class Monitor(daemon.Daemon):
             # the dispatch path instead.
             return
 
-        # Read once and passed to deadline_passed(), which would
+        # Read once and passed down to the deadline checks, which would
         # otherwise resolve a NULL deadline's anchor with a second
         # uncached GetState.
         state = agentop.state
+        if state.value in UNPROMOTED_HEAD_REASONS:
+            # Case four: an operation which was never queued, and whose
+            # deadline is long enough past that whatever should have
+            # queued it is not going to. Expiring it lets
+            # agent_operation_next() retire it and drain the queue.
+            expire_unpromoted_head(agentop, state)
+            return
+
         if state.value != AgentOperation.STATE_EXECUTING:
             return
 

@@ -836,12 +836,14 @@ is meaningful.
     in the operator guide for the retry rules and the node-local reaper
     that backs them up.
 
-    Three places enforce this, so an abandoned operation is retired
+    Four places enforce this, so an abandoned operation is retired
     wherever it happens to be sitting: when it reaches the head of the
     instance's queue, during preflight (either side of any blob copy),
-    and once per second while the executor is running it. Only the
-    executor can enforce `progress_timeout_seconds`, since it is the
-    only one of the three watching replies arrive.
+    once per second while the executor is running it, and, for an
+    operation whose preflight never ran at all, by the hypervisor's
+    reaper a minute after the deadline. Only the executor can enforce
+    `progress_timeout_seconds`, since it is the only one of the four
+    watching replies arrive.
 
     The reason is recorded as an audit event against both the operation
     and its instance, and the instance's copy is the one which
