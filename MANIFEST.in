@@ -1,0 +1,4 @@
+# docs/plans is the working history of how the code was built. It stays in
+# git, but nobody installing a release needs it, and setuptools-scm would
+# otherwise ship every tracked file in the sdist.
+prune docs/plans
