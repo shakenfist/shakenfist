@@ -48,6 +48,17 @@ Memory is measured in MiB in Shaken Fist. All references to memory size are stor
   `LOG.with_fields({'instance_uuid': uuid})` rather than formatting it into
   the message
 - Every file starts with `# Copyright 2019 Michael Still and contributors`
+- Comments, docstrings, test names and log messages describe the code as
+  it is, not the plan that built it: no `added in phase 5`,
+  `per decision 3` or `pending step 5f`. Write the reason the citation
+  stood for. The
+  rule is the `plan-references-in-code` block in `PUSH-AUDIT.md`, and the
+  daily [plan history in source](../components/development/audits/plan-history-in-source.md)
+  audit measures it out of band. A line where the shape is genuinely not
+  a plan reference carries `# audit-ok: phase-reference`; a file made of
+  the shapes, such as a test suite for a plan-reference checker, carries
+  `# audit-ok: phase-reference-file` once near the top, with a sentence
+  saying why
 
 This page is the style guide; `AGENTS.md` summarises it and links here.
 

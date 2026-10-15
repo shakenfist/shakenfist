@@ -398,13 +398,13 @@ class DatabaseServiceStub:
     ReapFederationReplay: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReapFederationReplayRequest, _database_pb2.ReapFederationReply]
     ReapFederationRateLimits: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReapFederationRateLimitsRequest, _database_pb2.ReapFederationReply]
     ReconcileSchedulerCapacity: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReconcileSchedulerCapacityRequest, _database_pb2.ReconcileSchedulerCapacityReply]
-    """Scheduler Capacity Operations (MariaDB) The scheduler capacity
-    reconciler's single RPC. One call expires stale namespace claims,
-    refreshes per-node limits from node_metrics, recomputes usage and
-    expected demand from placement ground truth, and rebuilds the
-    cluster_capacity singleton. The demand parameters ride in the request
-    so the database daemon needs no copy of the caller's scheduler
-    configuration.
+    """Scheduler Capacity Operations (MariaDB)
+    The scheduler capacity reconciler's single RPC. One call expires
+    stale namespace claims, refreshes per-node limits from node_metrics,
+    recomputes usage and expected demand from placement ground truth, and
+    rebuilds the cluster_capacity singleton. The demand parameters ride in
+    the request so the database daemon needs no copy of the caller's
+    scheduler configuration.
     """
     AdmitInstancePlacement: _grpc.UnaryUnaryMultiCallable[_database_pb2.AdmitInstancePlacementRequest, _database_pb2.AdmitInstancePlacementReply]
     """The scheduler's atomicity primitive: capacity is consumed at
@@ -811,13 +811,13 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     ReapFederationReplay: _aio.UnaryUnaryMultiCallable[_database_pb2.ReapFederationReplayRequest, _database_pb2.ReapFederationReply]  # type: ignore[assignment]
     ReapFederationRateLimits: _aio.UnaryUnaryMultiCallable[_database_pb2.ReapFederationRateLimitsRequest, _database_pb2.ReapFederationReply]  # type: ignore[assignment]
     ReconcileSchedulerCapacity: _aio.UnaryUnaryMultiCallable[_database_pb2.ReconcileSchedulerCapacityRequest, _database_pb2.ReconcileSchedulerCapacityReply]  # type: ignore[assignment]
-    """Scheduler Capacity Operations (MariaDB) The scheduler capacity
-    reconciler's single RPC. One call expires stale namespace claims,
-    refreshes per-node limits from node_metrics, recomputes usage and
-    expected demand from placement ground truth, and rebuilds the
-    cluster_capacity singleton. The demand parameters ride in the request
-    so the database daemon needs no copy of the caller's scheduler
-    configuration.
+    """Scheduler Capacity Operations (MariaDB)
+    The scheduler capacity reconciler's single RPC. One call expires
+    stale namespace claims, refreshes per-node limits from node_metrics,
+    recomputes usage and expected demand from placement ground truth, and
+    rebuilds the cluster_capacity singleton. The demand parameters ride in
+    the request so the database daemon needs no copy of the caller's
+    scheduler configuration.
     """
     AdmitInstancePlacement: _aio.UnaryUnaryMultiCallable[_database_pb2.AdmitInstancePlacementRequest, _database_pb2.AdmitInstancePlacementReply]  # type: ignore[assignment]
     """The scheduler's atomicity primitive: capacity is consumed at
@@ -2583,13 +2583,13 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _database_pb2.ReconcileSchedulerCapacityRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.ReconcileSchedulerCapacityReply, _abc.Awaitable[_database_pb2.ReconcileSchedulerCapacityReply]]:
-        """Scheduler Capacity Operations (MariaDB) The scheduler capacity
-        reconciler's single RPC. One call expires stale namespace claims,
-        refreshes per-node limits from node_metrics, recomputes usage and
-        expected demand from placement ground truth, and rebuilds the
-        cluster_capacity singleton. The demand parameters ride in the request
-        so the database daemon needs no copy of the caller's scheduler
-        configuration.
+        """Scheduler Capacity Operations (MariaDB)
+        The scheduler capacity reconciler's single RPC. One call expires
+        stale namespace claims, refreshes per-node limits from node_metrics,
+        recomputes usage and expected demand from placement ground truth, and
+        rebuilds the cluster_capacity singleton. The demand parameters ride in
+        the request so the database daemon needs no copy of the caller's
+        scheduler configuration.
         """
 
     @_abc_1.abstractmethod

@@ -2680,13 +2680,13 @@ class DatabaseServiceServicer:
         raise NotImplementedError('Method not implemented!')
 
     def ReconcileSchedulerCapacity(self, request, context):
-        """Scheduler Capacity Operations (MariaDB) The scheduler capacity
-        reconciler's single RPC. One call expires stale namespace claims,
-        refreshes per-node limits from node_metrics, recomputes usage and
-        expected demand from placement ground truth, and rebuilds the
-        cluster_capacity singleton. The demand parameters ride in the request
-        so the database daemon needs no copy of the caller's scheduler
-        configuration.
+        """Scheduler Capacity Operations (MariaDB)
+        The scheduler capacity reconciler's single RPC. One call expires
+        stale namespace claims, refreshes per-node limits from node_metrics,
+        recomputes usage and expected demand from placement ground truth, and
+        rebuilds the cluster_capacity singleton. The demand parameters ride in
+        the request so the database daemon needs no copy of the caller's
+        scheduler configuration.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
