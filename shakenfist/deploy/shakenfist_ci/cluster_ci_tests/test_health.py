@@ -11,12 +11,12 @@ paths directly to that URL — the same pattern used in ``test_api.py`` for
 the Flasgger CSS endpoint.
 
 Drain-behaviour coverage: the SIGTERM / API_DRAIN_GRACE drain is covered by
-unit tests in ``shakenfist/tests/test_gunicorn_drain.py``. A live end-to-end
-assertion (restart sf-api and observe the 503 window) would require stopping a
-daemon in the shared CI cluster, which is too invasive for a single test
-module. That assertion belongs in a node-level CI script which can stop and
-restart sf-api on one node and always leave it running again (see
-PLAN-health-checks-phase-04-operator-docs.md); no such script exists yet.
+unit tests in ``shakenfist/tests/external_api/test_gunicorn_drain.py``. A live
+end-to-end assertion (restart sf-api and observe the 503 window) would require
+stopping a daemon in the shared CI cluster, which is too invasive for a single
+test module. It runs instead as the "Check sf-api drain" step of the shared
+smoke cluster workflow (``tools/ci_drain_check.sh`` in shakenfist/actions),
+which stops and restarts sf-api on one node and always leaves it running.
 """
 
 import requests
