@@ -1,3 +1,7 @@
+# Runs Renovate dependency updater hourly on a self-hosted runner.
+#
+# Template source: shakenfist/development/templates/renovate/
+
 name: Renovate dependency updater
 
 permissions:
@@ -11,14 +15,55 @@ on:
 jobs:
   renovate:
     runs-on: [self-hosted, static]
+    timeout-minutes: 30
+    # timeout-minutes does not cover queue time: a static runner can sit
+    # queued for a while under load, so an hourly cron can fire while
+    # the previous run is still waiting for one, and workflow_dispatch
+    # can collide with either. Two Renovate instances autodiscovering
+    # the same repository race on branch creation and produce duplicate
+    # or half-written pull requests.
+    #
+    # Not cancel-in-progress: killing Renovate mid-push is worse than
+    # skipping an hour, and the next cron is an hour away.
+    concurrency:
+      group: renovate
+      cancel-in-progress: false
     steps:
+      # Only hashFiles() reads the checkout: Renovate clones into
+      # RENOVATE_BASE_DIR with RENOVATE_TOKEN, so the job token is not
+      # left in .git/config.
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Renovate runs from npm rather than through
+      # renovatebot/github-action, which runs it as a container and so
+      # needs a Docker daemon the runner may not have. node-version is
+      # the major Renovate's package.json declares in engines.node; read
+      # the template's README before bumping either.
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      # Renovate refreshes lock files with the runner's own tools, which
+      # a container used to install for it. Cargo is the one the fleet
+      # needs that the runner lacks. A rust-toolchain.toml in the
+      # repository still wins: this only sets rustup's default.
+      - name: Set up Rust for Cargo.lock
+        if: hashFiles('**/Cargo.lock') != ''
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Self-hosted Renovate
-        uses: renovatebot/github-action@v46.3.8
-        with:
-          token: ${{ secrets.RENOVATE_TOKEN }}
         env:
+          # renovate: datasource=npm depName=renovate
+          PINNED_RENOVATE_VERSION: 44.155.1
+          RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
           RENOVATE_AUTODISCOVER: "true"
-          RENOVATE_AUTODISCOVER_FILTER: "shakenfist/shakenfist"
+          RENOVATE_AUTODISCOVER_FILTER: ${{ github.repository }}
+          # A clone and cache per job, so a long-lived runner behaves
+          # like an ephemeral one.
+          RENOVATE_BASE_DIR: ${{ runner.temp }}/renovate
+        run: npx --yes "renovate@${PINNED_RENOVATE_VERSION}"
