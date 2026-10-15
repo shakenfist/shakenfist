@@ -1354,8 +1354,8 @@ computed by `tools/ci/fuzz-tier.sh`: the fast-saturating targets (pure
 window math, CHS rounding, and the planner/emitter crates) take a short
 fixed slice (300s — they reach steady coverage in well under a minute),
 and the deep parser/format targets split the remainder. With the
-current 42 targets (17 fast, 25 deep) that gives the 25 deep targets
-~15 min each versus ~11 min under an even split (27000 / 42).
+current 43 targets (17 fast, 26 deep) that gives the 26 deep targets
+~14 min each versus ~10 min under an even split (27000 / 43).
 
 This is one of two levers for keeping per-target time useful as the
 target count grows; the other is corpus persistence (see *Corpus
@@ -1770,7 +1770,7 @@ one of these three operations' refusals — the way this phase lifted
 accident: removing a guard here must fail a named test before it can
 land.
 
-The other eight guard the one place these operations were not merely
+The other nine guard the one place these operations were not merely
 non-composing but were answering differently from the readers. `map`
 and `measure` never call `block_lookup`: each walks the whole BAT once,
 through `VhdxState::map_extents` and `VhdxState::scan_allocation`
@@ -1793,19 +1793,20 @@ hand-patched BAT entry no image in `instar-testdata` carries. Each
 reverts one call site only, so the verdict names the walk and the guard
 that was lost.
 
-A fifth is on the shared walk rather than on either guard, and exists
-because those four cannot cover it. A refusal case cannot see a
+Two more are on the shared walk rather than on either guard, and exist
+because those four cannot cover them. A refusal case cannot see a
 miscount: disabling the sector-bitmap skip in
 `for_each_payload_bat_entry` -- the arithmetic both the scanner and
 the allocation counter go through -- leaves all four passing, because
 a walk whose payload bookkeeping has drifted still reaches the
 malformed entry and still refuses it. What a drift changes is where
 the walk stops, since the "all payload blocks seen" cap then arrives
-one slot early per chunk group. So this case is caught by a count
+one slot early per chunk group. So these cases are caught by counts
 taken from a **well-formed** two-group image with a block declared
 either side of the group boundary, which reports one block instead of
-two under the mutation. It is the only case in this group whose
-fixture is not malformed.
+two under the mutation -- once at 512-byte sectors and once at 4096.
+They are the only cases in this group whose fixtures are not
+malformed.
 
 The last three are `check`'s, which was the fourth answer to the same
 question and for a long time gave none: it builds no `VhdxState` and
@@ -2038,8 +2039,8 @@ the harness closes each:
   the failure gets credited to the mutation. Each named test is
   therefore run once against unmutated source first, and a case whose
   baseline does not pass is `BROKEN` rather than `PASS`. Baselines are
-  cached per target: the 62 cases name 50 distinct targets (43 Rust,
-  7 integration), so that is 50 extra test runs and no extra rebuilds
+  cached per target, so the baseline cost is one run per distinct
+  target rather than one per case, and no extra rebuilds
   — the integration baselines reuse the clean binary each case
   restores anyway.
 * **The test errored rather than failed.** `unittest` reports an

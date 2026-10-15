@@ -6,11 +6,39 @@
   self-hosted runner. `RENOVATE_AUTODISCOVER_FILTER` is
   `${{ github.repository }}`, supplied by the runtime, so the file is
   copied verbatim rather than edited per repository.
+* `renovate.yml` does not run `renovatebot/github-action`, which needs
+  a Docker daemon on the runner.
 * `renovate.json` exists, with package grouping rules and scheduling.
   It is a per-repository adaptation, not expected to be
   byte-identical to the template's copy.
+* `renovate.json` extends `customManagers:githubActionsVersions`, so
+  the Renovate version pinned in `renovate.yml` is bumped.
 * `renovate.json` enables the `pre-commit` manager, where the
   repository has remote pre-commit hooks to manage.
+
+### Renovate without Docker
+
+`renovatebot/github-action` runs Renovate as a container. The static
+runner pool is gaining ephemeral pods on a Kubernetes cluster, and
+they have no Docker daemon, so the action fails on every run a pod
+takes. The template now sets up Node and runs a pinned Renovate from
+npm, which works on a VM and a pod alike. A workflow step that still
+uses the action is a finding. The action named in a comment is not.
+
+The template pins Renovate behind a `# renovate:` comment, which only
+the built-in `customManagers:githubActionsVersions` preset reads. A
+copy of the new workflow without the preset in `renovate.json` runs a
+Renovate that never bumps itself, so that is a finding too.
+`regexManagers:githubActionsVersions`, the preset's name before
+Renovate renamed it, also passes.
+
+Both findings go in the one issue, so a repository still on the old
+copy is told to change both files at once. The template README covers
+what else changes when Renovate leaves its container. The one that
+matters is lock files, which Renovate now refreshes with the runner's
+own tools. The template provides npm always and a Rust toolchain when
+the repository has a `Cargo.lock`, so every repository can copy it
+unmodified.
 
 ### The pre-commit manager
 
@@ -60,6 +88,12 @@ extra path is named:
 
 This applies to `development` today, and to any repository that grows
 a second home for workflow files.
+
+`customManagers:githubActionsVersions` has the same blind spot, and
+its file patterns cannot be extended from outside the preset. So
+`development` also carries a `customManagers` entry with the preset's
+match string and `templates/` as its only file pattern. That keeps the
+template's Renovate pin moving with the copy the repository runs.
 
 ### Python version constraints
 

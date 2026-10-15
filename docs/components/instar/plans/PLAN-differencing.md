@@ -373,8 +373,8 @@ records `instar-testdata <sha> (#pr)` and is audited there.
 | 14. Composition: rollout across the chain-walker operations | [PLAN-differencing-phase-14-op-rollout.md](/components/instar/plans/PLAN-differencing-phase-14-op-rollout/) | Complete | `7fef1321` (#630) |
 | 15. Consistency for the non-composing operations | [PLAN-differencing-phase-15-op-consistency.md](/components/instar/plans/PLAN-differencing-phase-15-op-consistency/) | Complete | `f14554cf` (#646) |
 | 16. Composition: integration tests and fuzz | [PLAN-differencing-phase-16-compose-tests.md](/components/instar/plans/PLAN-differencing-phase-16-compose-tests/) | Complete | `d7a4973f` (#652) |
-| 17. Composition: documentation | [PLAN-differencing-phase-17-compose-docs.md](/components/instar/plans/PLAN-differencing-phase-17-compose-docs/) | In progress | |
-| 18. Push audit: `PUSH-AUDIT.md` over every phase above | PLAN-differencing-phase-18-push-audit.md | Not started | |
+| 17. Composition: documentation | [PLAN-differencing-phase-17-compose-docs.md](/components/instar/plans/PLAN-differencing-phase-17-compose-docs/) | Complete | `60e4381c` (#659) |
+| 18. Push audit: `PUSH-AUDIT.md` over every phase above | [PLAN-differencing-phase-18-push-audit.md](/components/instar/plans/PLAN-differencing-phase-18-push-audit/) | Complete | |
 
 ### Sequencing rationale
 

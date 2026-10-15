@@ -75,8 +75,13 @@ own, but SPEC(VHD) and SPEC(VHDX) both require a parent to be the same
 format as its child, so the format is known without one.
 
 **A reported parent is not a resolved parent.** `info` on its own
-decodes the parent name and the parent locator entries from the image's
-own header and prints what it finds; it does not open the result.
+decodes a parent reference from the image's own header and prints what it
+finds; it does not open the result. For VHD that reference is the parent
+unicode name in the dynamic header, and only that -- the eight parent
+locator entries beside it are parsed by the `vhd` crate but no read path
+consults them, so a differencing VHD whose name field is blank reports no
+parent even when its locator table names one. For VHDX, which has no name
+field, it is the parent locator item.
 `--chain` does resolve a VHD or VHDX parent and walk into it, under the
 same allowlist and depth checks a qcow2 backing file gets — but only
 when it can: whenever a parent cannot be resolved, the walk ends at the
