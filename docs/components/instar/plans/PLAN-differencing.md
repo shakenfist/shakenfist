@@ -1,6 +1,6 @@
 # VHD and VHDX differencing output
 
-## Status: In progress
+## Status: Complete
 
 ## Prompt
 
@@ -914,6 +914,96 @@ status becomes `Complete`.
 * Differencing-aware `check`, once a chain can be resolved:
   today `check` refuses VHDX differencing and validates a VHD
   differencing child as if it were dynamic.
+
+**Outstanding work this plan filed and did not close.**
+Twenty-six issues this plan's phases filed are still open. Phase
+plans are not read again once a plan retires, so this list -- not
+the phase plans that found them -- is the record, and it is
+grouped by what a reader would fix together rather than by the
+phase that happened to find it. Enumerated against `f4a4961f`;
+#566 above is the twenty-sixth. Issue #375 is cited by a phase
+plan as precedent but predates this plan by three months and is
+not its deferral, so it is deliberately absent.
+
+**Data correctness and safety.** #653 and #654 are the sharper
+pair: `host_offset == 0` is interpreted ad hoc per branch instead
+of each subcluster being classified once into the types qcow2
+defines, so an extended-L2 `Standard(0)` serves the image's own
+header to the guest as payload and exits 0, and an
+`UNALLOCATED_PLAIN` subcluster zero-fills rather than descending
+to the backing file on well-formed images, in both I/O arms. They
+share a root cause and want fixing together. Alongside them, #613
+(the VHD chain read arm does not cap a chunk at the block
+boundary), #601 (chain devices past `MAX_CHAIN_DEVICES` are
+dropped with only a debug log) and #660 (TOCTOU between
+backing-path validation and the backing-file open).
+
+**Parent locators and format interop.** #602 and #661 are the
+same defect written up twice, seventeen days apart, and that is
+worth knowing before either is worked: phase 11 filed #602 as a
+host-ABI gap (the locator table is parsed in `crates/vhd` but
+nothing in `InfoResult` carries it), and phase 18's audit filed
+#661 as dead code (`preferred_locator`, `decode_path` and
+`raw_path_bytes` have no production caller). Both reach the same
+interoperability consequence -- a third-party child with an empty
+unicode name and a valid `W2ru`/`W2ku` entry resolves under
+Hyper-V and not under instar -- and the duplication is itself
+evidence for keeping this list: #602 was recorded only in a phase
+plan, so by phase 18 nobody was looking at it. One should be
+closed as a duplicate of the other. With them: #662 (locator
+parse laxity -- unchecked `LocatorType`, missing length
+validation), #608 (`info --chain` does not check a resolved
+parent is the same format as its child), #583 (the VHD footer
+checksum is never verified, so any `conectix` block is accepted
+as a footer), #576 (the VHDX metadata parser does not detect
+overlapping metadata items, SPEC(VHDX) 2.6.1.2) and #658 (`info`
+reports an unresolvable "actual path" for a Windows-converted
+chain).
+
+**Chain parity, and refusals whose stated reason is no longer
+true.** #641 (`map` refuses a chain qemu-img composes), #642
+(`measure` answers only the top layer of one) and #643 (whether
+`check` and `measure` should still refuse a differencing child at
+all); phase 15 established by measurement against qemu-img
+10.0.13 that the first two are qcow2-chain parity work which
+`PLAN-map.md` and `PLAN-measure.md` each deferred before reaching
+Complete, rather than differencing work. Then #628 (`create -b`
+refuses a differencing backing file for a reason that is no
+longer true) and #632 (safe-mode `rebase` onto a raw new backing
+always fails as an unparseable overlay header).
+
+**Checks that report on less than they examined.** This is the
+shape that recurred most across the plan, in the instrument
+rather than the product, and phase 18 found its own audit scripts
+were an instance. Still open: #590 (the differential fuzzer
+silently skips libyal cross-checks when a tool is missing), #593
+(`extract-fuzz-corpus.py` silently drops 21% of manifest fixtures
+over `MAX_SEED_SIZE`), #651 (nothing cross-checks the three fuzz
+target lists), #663 (checks documented as guards that run
+nowhere, or cannot fail), #664 (`fuzz_chain_compose` cannot reach
+the VHD or VHDX compose arms, so the target named for composition
+never composes) and #626 (an unverified claim: the
+non-differencing VHDX BAT entry count may over-declare by one).
+Anything that ships a new guard during this group's cleanup should
+be mutation-tested rather than read, which is what turned these up.
+
+**Structure and documentation debt.** #665 (compose logic
+duplicated across four layers, with nothing pairing a raiser to a
+renderer) and #592 (plan phase, step and decision references in
+docs and code). #592 is the tracking issue for a convention
+rather than a defect, and the scale is worth stating because the
+issue does not: measured on `f4a4961f`, 41 `PLAN-differencing`
+citations remain in `src/` and `crates/`, 105 counting every
+`PLAN-*.md`, so that part is a sweep. A case-insensitive grep for
+bare numbered-phase references in `.rs` files matches 407 lines,
+which needs triage instead -- among them
+`src/vmm/src/main.rs:7034` and `:7038`, which are `///` doc
+comments and so reach users as CLI help reading "Phase 3 only
+supports 512 because the" and "Documented; phase 5 may relax
+this". Not covered by any issue: the 4096-byte-sector VHDX
+limitation that phase 13 found and phase 16 confirmed cannot be
+fixtured appears in plan files only, so it will vanish when they
+stop being read.
 
 ### Bugs fixed during this work
 
