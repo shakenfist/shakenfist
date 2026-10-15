@@ -15345,6 +15345,7 @@ which is why the tables were moved to one page in the first place.</p>
 <li>andris</li>
 <li>client-python</li>
 <li>client-python-k3s</li>
+<li>client-python-ova</li>
 <li>clingwrap</li>
 <li>cloudgood</li>
 <li>development</li>
@@ -15404,7 +15405,6 @@ not projects in the sense these criteria mean:</p>
 <li>ansible-modules</li>
 <li>client-js</li>
 <li>client-go</li>
-<li>client-python-ova</li>
 <li>deploy</li>
 <li>divergulent-reviews</li>
 <li>homebrew-tap</li>
@@ -15421,13 +15421,13 @@ not projects in the sense these criteria mean:</p>
 <li>uefi-latency-guest</li>
 <li>website</li>
 </ul>
-<p><code>client-python-ova</code>, <code>divergulent-reviews</code>, <code>homebrew-tap</code>,
-<code>performance</code>, <code>reproducables</code>, <code>sonobouy</code> and <code>uefi-latency-guest</code>
-were confirmed on 2026-10-05 to have no <code>.github/workflows/</code>
-directory, no container build file and no top-level <code>templates/</code>, so
-<code>eol-distro</code> would report <code>not applicable</code> for every one of them; that
-is why they stay excluded, which is narrower and truer than the
-reasons the list gives above.</p>
+<p><code>divergulent-reviews</code>, <code>homebrew-tap</code>, <code>performance</code>,
+<code>reproducables</code>, <code>sonobouy</code> and <code>uefi-latency-guest</code> were confirmed
+on 2026-10-05 to have no <code>.github/workflows/</code> directory, no container
+build file and no top-level <code>templates/</code>, so <code>eol-distro</code> would
+report <code>not applicable</code> for every one of them; that is why they stay
+excluded, which is narrower and truer than the reasons the list
+gives above.</p>
 <p>The <code>actions</code> repository is audited despite being tooling: the whole
 fleet depends on it for its composite actions and reusable workflows,
 so it is held to the same standards as anything else. <code>development</code>,

@@ -11974,6 +11974,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#a-key-stays-held-down-in-the-guest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A key stays held down in the guest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#mouse-not-working" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15984,6 +15995,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#a-key-stays-held-down-in-the-guest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A key stays held down in the guest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#mouse-not-working" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16746,6 +16768,36 @@ are sent but the display never updates in response.</p>
 5. Enable verbose logging and check that the display channel
    link negotiation includes COMPOSITE in the advertised
    capabilities</p>
+<h3 id="a-key-stays-held-down-in-the-guest">A key stays held down in the guest<a class="headerlink" href="#a-key-stays-held-down-in-the-guest" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom:</strong> the guest repeats a key you are not holding, or one you
+never pressed.</p>
+<p>ryll sends the guest a press when a key goes down and a release when
+it comes up. If the host never delivers the release, or delivers it
+as a different key, the guest is left holding the key and repeats it
+until ryll lets go of every held key: when the window loses focus,
+or when a dialog such as the bug report opens.</p>
+<p><strong>What to do:</strong> press F12 while the key is still repeating, and
+report it as an <strong>Input</strong> bug. The <code>keyboard</code> section of the report's
+<code>session.json</code> records what ryll saw and did:</p>
+<ul>
+<li><code>held</code> lists the keys the guest has been sent a press for and no
+  release yet, with the scancode that releases each.</li>
+<li><code>withheld</code> lists keys pressed with the macOS Cmd key down. ryll
+  keeps those from the guest, and their releases too.</li>
+<li><code>recent_events</code> holds the last 256 keyboard events egui handed ryll:
+  key presses and releases, clipboard events, modifier changes and
+  focus loss. Each records the logical and physical key, whether it
+  was a press or a repeat, the modifiers, what ryll did with it
+  (<code>outcome</code>), and the scancodes it sent (<code>sent</code>). The F12 dialog
+  releases every held key, so the last entries are <code>release_all</code>
+  ones naming the key that was stuck.</li>
+<li><code>at_secs</code> is seconds since the session started, the clock the
+  inputs channel's <code>recent_events</code> and <code>traffic.pcap</code> also use. That
+  makes it possible to match a press on the wire to the host event
+  behind it, and to see whether its release ever arrived.</li>
+</ul>
+<p><code>events_seen</code> counts every event logged in the session, including
+those that have since dropped out of <code>recent_events</code>.</p>
 <h3 id="mouse-not-working">Mouse not working<a class="headerlink" href="#mouse-not-working" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong> Mouse cursor visible but clicks don't register.</p>
 <p><strong>Causes:</strong>
@@ -16960,16 +17012,17 @@ report is written without a region.</p>
 <a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>│                           timestamp (submit), triggered_at
 <a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>│                           (dialog-open), submitted uptime
 <a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>│                           and triggered uptime
-<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>├── session.json          — FPS, bandwidth, surfaces, uptime
-<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>├── channel-state.json    — snapshot of the affected channel
-<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>├── traffic.pcap          — recent protocol traffic (pcap format)
-<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>├── screenshot.png        — full display surface captured at the
-<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>│                           moment the dialog opened (Display
-<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>│                           reports only)
-<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a>├── screenshot-region.png — crop of the submit-time surface at
-<a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a>│                           the selected region (Display reports
-<a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a>│                           only, when a region was drawn)
-<a id="__codelineno-19-16" name="__codelineno-19-16" href="#__codelineno-19-16"></a>└── runtime-metrics.json  — process and per-thread CPU / RSS
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>├── session.json          — FPS, bandwidth, surfaces, uptime,
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>│                           keyboard state and recent key events
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>├── channel-state.json    — snapshot of the affected channel
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>├── traffic.pcap          — recent protocol traffic (pcap format)
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>├── screenshot.png        — full display surface captured at the
+<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>│                           moment the dialog opened (Display
+<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a>│                           reports only)
+<a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a>├── screenshot-region.png — crop of the submit-time surface at
+<a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a>│                           the selected region (Display reports
+<a id="__codelineno-19-16" name="__codelineno-19-16" href="#__codelineno-19-16"></a>│                           only, when a region was drawn)
+<a id="__codelineno-19-17" name="__codelineno-19-17" href="#__codelineno-19-17"></a>└── runtime-metrics.json  — process and per-thread CPU / RSS
 </code></pre></div>
 <p><strong>Mac-specific verification.</strong> If you are debugging the
 runtime-metrics output specifically on a Mac, see

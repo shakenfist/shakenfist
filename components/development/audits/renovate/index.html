@@ -2793,6 +2793,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#renovate-without-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renovate without Docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-pre-commit-manager" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15221,6 +15232,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#renovate-without-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renovate without Docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-pre-commit-manager" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15319,12 +15341,36 @@
   self-hosted runner. <code>RENOVATE_AUTODISCOVER_FILTER</code> is
   <code>${{ github.repository }}</code>, supplied by the runtime, so the file is
   copied verbatim rather than edited per repository.</li>
+<li><code>renovate.yml</code> does not run <code>renovatebot/github-action</code>, which needs
+  a Docker daemon on the runner.</li>
 <li><code>renovate.json</code> exists, with package grouping rules and scheduling.
   It is a per-repository adaptation, not expected to be
   byte-identical to the template's copy.</li>
+<li><code>renovate.json</code> extends <code>customManagers:githubActionsVersions</code>, so
+  the Renovate version pinned in <code>renovate.yml</code> is bumped.</li>
 <li><code>renovate.json</code> enables the <code>pre-commit</code> manager, where the
   repository has remote pre-commit hooks to manage.</li>
 </ul>
+<h3 id="renovate-without-docker">Renovate without Docker<a class="headerlink" href="#renovate-without-docker" title="Permanent link">&para;</a></h3>
+<p><code>renovatebot/github-action</code> runs Renovate as a container. The static
+runner pool is gaining ephemeral pods on a Kubernetes cluster, and
+they have no Docker daemon, so the action fails on every run a pod
+takes. The template now sets up Node and runs a pinned Renovate from
+npm, which works on a VM and a pod alike. A workflow step that still
+uses the action is a finding. The action named in a comment is not.</p>
+<p>The template pins Renovate behind a <code># renovate:</code> comment, which only
+the built-in <code>customManagers:githubActionsVersions</code> preset reads. A
+copy of the new workflow without the preset in <code>renovate.json</code> runs a
+Renovate that never bumps itself, so that is a finding too.
+<code>regexManagers:githubActionsVersions</code>, the preset's name before
+Renovate renamed it, also passes.</p>
+<p>Both findings go in the one issue, so a repository still on the old
+copy is told to change both files at once. The template README covers
+what else changes when Renovate leaves its container. The one that
+matters is lock files, which Renovate now refreshes with the runner's
+own tools. The template provides npm always and a Rust toolchain when
+the repository has a <code>Cargo.lock</code>, so every repository can copy it
+unmodified.</p>
 <h3 id="the-pre-commit-manager">The pre-commit manager<a class="headerlink" href="#the-pre-commit-manager" title="Permanent link">&para;</a></h3>
 <p>Renovate's <code>pre-commit</code> manager is opt-in: cargo, dockerfile,
 github-actions and the Python managers are on by default, but
@@ -15362,6 +15408,11 @@ extra path is named:</p>
 </code></pre></div>
 <p>This applies to <code>development</code> today, and to any repository that grows
 a second home for workflow files.</p>
+<p><code>customManagers:githubActionsVersions</code> has the same blind spot, and
+its file patterns cannot be extended from outside the preset. So
+<code>development</code> also carries a <code>customManagers</code> entry with the preset's
+match string and <code>templates/</code> as its only file pattern. That keeps the
+template's Renovate pin moving with the copy the repository runs.</p>
 <h3 id="python-version-constraints">Python version constraints<a class="headerlink" href="#python-version-constraints" title="Permanent link">&para;</a></h3>
 <p>Projects supporting multiple Linux distributions set
 <code>constraints.python</code> to the oldest Python they support, so renovate

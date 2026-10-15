@@ -16332,7 +16332,7 @@ parser crates directly without the VMM/KVM stack:</p>
 <a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
 <a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
 </code></pre></div>
-<p>40 fuzz targets cover all parser crates (QCOW2, VMDK, VHD, VHDX,
+<p>43 fuzz targets cover all parser crates (QCOW2, VMDK, VHD, VHDX,
 VDI, Parallels, QCOW1, DMG, RAW, LUKS) including header parsing,
 L1/L2 lookup, refcount traversal, and decompression, plus the
 create / resize / rebase / commit planners, the qcow2 check-repair

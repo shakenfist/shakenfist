@@ -17981,8 +17981,8 @@ computed by <code>tools/ci/fuzz-tier.sh</code>: the fast-saturating targets (pur
 window math, CHS rounding, and the planner/emitter crates) take a short
 fixed slice (300s — they reach steady coverage in well under a minute),
 and the deep parser/format targets split the remainder. With the
-current 42 targets (17 fast, 25 deep) that gives the 25 deep targets
-~15 min each versus ~11 min under an even split (27000 / 42).</p>
+current 43 targets (17 fast, 26 deep) that gives the 26 deep targets
+~14 min each versus ~10 min under an even split (27000 / 43).</p>
 <p>This is one of two levers for keeping per-target time useful as the
 target count grows; the other is corpus persistence (see <em>Corpus
 seeding</em>). <strong>When the deep-tier share computed by <code>fuzz-tier.sh</code> falls
@@ -18374,7 +18374,7 @@ one of these three operations' refusals — the way this phase lifted
 <code>convert</code>, <code>dd</code>, <code>compare</code>, <code>bench</code> and <code>rebase</code> — cannot happen by
 accident: removing a guard here must fail a named test before it can
 land.</p>
-<p>The other eight guard the one place these operations were not merely
+<p>The other nine guard the one place these operations were not merely
 non-composing but were answering differently from the readers. <code>map</code>
 and <code>measure</code> never call <code>block_lookup</code>: each walks the whole BAT once,
 through <code>VhdxState::map_extents</code> and <code>VhdxState::scan_allocation</code>
@@ -18395,19 +18395,20 @@ functions a unit test can drive directly, and because the fixture is a
 hand-patched BAT entry no image in <code>instar-testdata</code> carries. Each
 reverts one call site only, so the verdict names the walk and the guard
 that was lost.</p>
-<p>A fifth is on the shared walk rather than on either guard, and exists
-because those four cannot cover it. A refusal case cannot see a
+<p>Two more are on the shared walk rather than on either guard, and exist
+because those four cannot cover them. A refusal case cannot see a
 miscount: disabling the sector-bitmap skip in
 <code>for_each_payload_bat_entry</code> -- the arithmetic both the scanner and
 the allocation counter go through -- leaves all four passing, because
 a walk whose payload bookkeeping has drifted still reaches the
 malformed entry and still refuses it. What a drift changes is where
 the walk stops, since the "all payload blocks seen" cap then arrives
-one slot early per chunk group. So this case is caught by a count
+one slot early per chunk group. So these cases are caught by counts
 taken from a <strong>well-formed</strong> two-group image with a block declared
 either side of the group boundary, which reports one block instead of
-two under the mutation. It is the only case in this group whose
-fixture is not malformed.</p>
+two under the mutation -- once at 512-byte sectors and once at 4096.
+They are the only cases in this group whose fixtures are not
+malformed.</p>
 <p>The last three are <code>check</code>'s, which was the fourth answer to the same
 question and for a long time gave none: it builds no <code>VhdxState</code> and
 runs its own file identifier, header CRC-32C, region table 1+2
@@ -18654,8 +18655,8 @@ the harness closes each:</p>
   the failure gets credited to the mutation. Each named test is
   therefore run once against unmutated source first, and a case whose
   baseline does not pass is <code>BROKEN</code> rather than <code>PASS</code>. Baselines are
-  cached per target: the 62 cases name 50 distinct targets (43 Rust,
-  7 integration), so that is 50 extra test runs and no extra rebuilds
+  cached per target, so the baseline cost is one run per distinct
+  target rather than one per case, and no extra rebuilds
   — the integration baselines reuse the clean binary each case
   restores anyway.</li>
 <li><strong>The test errored rather than failed.</strong> <code>unittest</code> reports an
