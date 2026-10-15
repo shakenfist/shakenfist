@@ -5827,10 +5827,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-in-progress" class="md-nav__link">
+  <a href="#status-complete" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: In progress
+        Status: Complete
       
     </span>
   </a>
@@ -5970,28 +5970,6 @@
     <span class="md-ellipsis">
       
         Future work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs fixed during this work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
       
     </span>
   </a>
@@ -15303,10 +15281,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#status-in-progress" class="md-nav__link">
+  <a href="#status-complete" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Status: In progress
+        Status: Complete
       
     </span>
   </a>
@@ -15452,28 +15430,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs fixed during this work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -15501,7 +15457,7 @@
 
 
 <h1 id="vhd-and-vhdx-differencing-output">VHD and VHDX differencing output<a class="headerlink" href="#vhd-and-vhdx-differencing-output" title="Permanent link">&para;</a></h1>
-<h2 id="status-in-progress">Status: In progress<a class="headerlink" href="#status-in-progress" title="Permanent link">&para;</a></h2>
+<h2 id="status-complete">Status: Complete<a class="headerlink" href="#status-complete" title="Permanent link">&para;</a></h2>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant
@@ -16474,6 +16430,90 @@ status becomes <code>Complete</code>.</p>
   today <code>check</code> refuses VHDX differencing and validates a VHD
   differencing child as if it were dynamic.</li>
 </ul>
+<p><strong>Outstanding work this plan filed and did not close.</strong>
+Twenty-six issues this plan's phases filed are still open. Phase
+plans are not read again once a plan retires, so this list -- not
+the phase plans that found them -- is the record, and it is
+grouped by what a reader would fix together rather than by the
+phase that happened to find it. Enumerated against <code>f4a4961f</code>;</p>
+<h1 id="566-above-is-the-twenty-sixth-issue-375-is-cited-by-a-phase">566 above is the twenty-sixth. Issue #375 is cited by a phase<a class="headerlink" href="#566-above-is-the-twenty-sixth-issue-375-is-cited-by-a-phase" title="Permanent link">&para;</a></h1>
+<p>plan as precedent but predates this plan by three months and is
+not its deferral, so it is deliberately absent.</p>
+<p><strong>Data correctness and safety.</strong> #653 and #654 are the sharper
+pair: <code>host_offset == 0</code> is interpreted ad hoc per branch instead
+of each subcluster being classified once into the types qcow2
+defines, so an extended-L2 <code>Standard(0)</code> serves the image's own
+header to the guest as payload and exits 0, and an
+<code>UNALLOCATED_PLAIN</code> subcluster zero-fills rather than descending
+to the backing file on well-formed images, in both I/O arms. They
+share a root cause and want fixing together. Alongside them, #613
+(the VHD chain read arm does not cap a chunk at the block
+boundary), #601 (chain devices past <code>MAX_CHAIN_DEVICES</code> are
+dropped with only a debug log) and #660 (TOCTOU between
+backing-path validation and the backing-file open).</p>
+<p><strong>Parent locators and format interop.</strong> #602 and #661 are the
+same defect written up twice, seventeen days apart, and that is
+worth knowing before either is worked: phase 11 filed #602 as a
+host-ABI gap (the locator table is parsed in <code>crates/vhd</code> but
+nothing in <code>InfoResult</code> carries it), and phase 18's audit filed</p>
+<h1 id="661-as-dead-code-preferred_locator-decode_path-and">661 as dead code (<code>preferred_locator</code>, <code>decode_path</code> and<a class="headerlink" href="#661-as-dead-code-preferred_locator-decode_path-and" title="Permanent link">&para;</a></h1>
+<p><code>raw_path_bytes</code> have no production caller). Both reach the same
+interoperability consequence -- a third-party child with an empty
+unicode name and a valid <code>W2ru</code>/<code>W2ku</code> entry resolves under
+Hyper-V and not under instar -- and the duplication is itself
+evidence for keeping this list: #602 was recorded only in a phase
+plan, so by phase 18 nobody was looking at it. One should be
+closed as a duplicate of the other. With them: #662 (locator
+parse laxity -- unchecked <code>LocatorType</code>, missing length
+validation), #608 (<code>info --chain</code> does not check a resolved
+parent is the same format as its child), #583 (the VHD footer
+checksum is never verified, so any <code>conectix</code> block is accepted
+as a footer), #576 (the VHDX metadata parser does not detect
+overlapping metadata items, SPEC(VHDX) 2.6.1.2) and #658 (<code>info</code>
+reports an unresolvable "actual path" for a Windows-converted
+chain).</p>
+<p><strong>Chain parity, and refusals whose stated reason is no longer
+true.</strong> #641 (<code>map</code> refuses a chain qemu-img composes), #642
+(<code>measure</code> answers only the top layer of one) and #643 (whether
+<code>check</code> and <code>measure</code> should still refuse a differencing child at
+all); phase 15 established by measurement against qemu-img
+10.0.13 that the first two are qcow2-chain parity work which
+<code>PLAN-map.md</code> and <code>PLAN-measure.md</code> each deferred before reaching
+Complete, rather than differencing work. Then #628 (<code>create -b</code>
+refuses a differencing backing file for a reason that is no
+longer true) and #632 (safe-mode <code>rebase</code> onto a raw new backing
+always fails as an unparseable overlay header).</p>
+<p><strong>Checks that report on less than they examined.</strong> This is the
+shape that recurred most across the plan, in the instrument
+rather than the product, and phase 18 found its own audit scripts
+were an instance. Still open: #590 (the differential fuzzer
+silently skips libyal cross-checks when a tool is missing), #593
+(<code>extract-fuzz-corpus.py</code> silently drops 21% of manifest fixtures
+over <code>MAX_SEED_SIZE</code>), #651 (nothing cross-checks the three fuzz
+target lists), #663 (checks documented as guards that run
+nowhere, or cannot fail), #664 (<code>fuzz_chain_compose</code> cannot reach
+the VHD or VHDX compose arms, so the target named for composition
+never composes) and #626 (an unverified claim: the
+non-differencing VHDX BAT entry count may over-declare by one).
+Anything that ships a new guard during this group's cleanup should
+be mutation-tested rather than read, which is what turned these up.</p>
+<p><strong>Structure and documentation debt.</strong> #665 (compose logic
+duplicated across four layers, with nothing pairing a raiser to a
+renderer) and #592 (plan phase, step and decision references in
+docs and code). #592 is the tracking issue for a convention
+rather than a defect, and the scale is worth stating because the
+issue does not: measured on <code>f4a4961f</code>, 41 <code>PLAN-differencing</code>
+citations remain in <code>src/</code> and <code>crates/</code>, 105 counting every
+<code>PLAN-*.md</code>, so that part is a sweep. A case-insensitive grep for
+bare numbered-phase references in <code>.rs</code> files matches 407 lines,
+which needs triage instead -- among them
+<code>src/vmm/src/main.rs:7034</code> and <code>:7038</code>, which are <code>///</code> doc
+comments and so reach users as CLI help reading "Phase 3 only
+supports 512 because the" and "Documented; phase 5 may relax
+this". Not covered by any issue: the 4096-byte-sector VHDX
+limitation that phase 13 found and phase 16 confirmed cannot be
+fixtured appears in plan files only, so it will vanish when they
+stop being read.</p>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>docs/create.md</code> claimed vpc and vhdx honoured <code>backing_file</code>
