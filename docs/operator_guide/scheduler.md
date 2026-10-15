@@ -813,7 +813,17 @@ instance (and the candidate nodes), so `sf-client instance events`
 tells the whole story:
 
 - `schedule inputs` records what was asked for (vCPUs, memory,
-  disk, affinity, namespace) and the age of the metrics snapshot.
+  disk, affinity, namespace) and the freshness of the metrics the
+  decision used. `metrics_age_seconds` is the age of the scheduler's
+  metrics snapshot measured *after* any refresh: a decision whose
+  cache had expired refreshes before deciding, so the pre-refresh age
+  would describe data the decision never read (issue 4521).
+  `metrics_refreshed` says whether this decision triggered that
+  refresh, and `oldest_node_metrics_age_seconds` is the age of the
+  oldest per-node metrics row offered to the decision -- the real
+  staleness bound for the placement, since rows are written per node
+  on the resources daemon's own cadence (null when no node carried a
+  usable row).
 - Each pre-filter stage emits `schedule at stage <name>` with the
   surviving candidates and a `dropped` map giving each excluded
   node's reason dict -- for the CPU pre-filter that includes the

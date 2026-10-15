@@ -6,6 +6,74 @@ from shakenfist_ci import base
 from shakenfist_client import apiclient
 
 
+class TestScheduleInputsFreshness(base.BaseNamespacedTestCase):
+    """The schedule inputs event describes the metrics the decision used.
+
+    Issue 4521: the event published the scheduler's cache age measured
+    before the refresh that exceeding the cache timeout triggers, so a
+    decision made on freshly loaded metrics read from the event log as
+    placement on hour-old data -- 3415 seconds, in the triage that led
+    to a retracted diagnosis. The bounds here are deliberately loose:
+    they hold on any healthy cluster, and only an age from before the
+    refresh can breach them.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs['namespace_prefix'] = 'schedfresh'
+        super().__init__(*args, **kwargs)
+
+    def setUp(self):
+        super().setUp()
+        self.net = self.test_client.allocate_network(
+            '192.168.242.0/24', True, True, '%s-net' % self.namespace)
+        self._await_networks_ready([self.net['uuid']])
+
+    def test_schedule_inputs_age_is_the_snapshot_used(self):
+        inst = self.create_instance(
+            'freshness', 1, 1024,
+            [{'network_uuid': self.net['uuid']}],
+            [{'size': 8, 'base': base.CLUSTER_CI_IMAGE, 'type': 'disk'}],
+            None, None)
+        self._await_instance_create(inst['uuid'])
+
+        events = [
+            e for e in self.system_client.get_instance_events(
+                inst['uuid'], event_type='audit', limit=1000)
+            if str(e.get('message', '')) == 'schedule inputs']
+        self.addDetail(
+            'schedule inputs events',
+            content.text_content(json.dumps(
+                events, indent=4, sort_keys=True, default=str)))
+        self.assertTrue(events, 'no schedule inputs event was recorded')
+
+        # Every scheduling pass for this instance -- the create pass and
+        # any preflight re-run -- must describe the snapshot it used.
+        for event in events:
+            extra = event.get('extra') or {}
+            self.assertIn('metrics_refreshed', extra)
+            self.assertIn(extra['metrics_refreshed'], (True, False))
+
+            # The snapshot's age after any refresh is bounded by the
+            # cache timeout (5 seconds by default); 60 allows for slow
+            # CI without readmitting the pre-refresh ages.
+            self.assertLessEqual(
+                extra['metrics_age_seconds'], 60,
+                'metrics_age_seconds describes data from before the '
+                'refresh, not the snapshot the decision used')
+
+            # Rows older than 120 seconds are discarded at fetch rather
+            # than offered, so the oldest row behind a decision is
+            # bounded by that cutoff plus the cache timeout. None means
+            # no node carried a usable row, which a successful placement
+            # rules out.
+            oldest = extra.get('oldest_node_metrics_age_seconds')
+            self.assertIsNotNone(oldest)
+            self.assertLessEqual(
+                oldest, 300,
+                'a node metrics row older than the fetch cutoff was '
+                'offered to the decision')
+
+
 class TestAffinity(base.BaseNamespacedTestCase):
     def __init__(self, *args, **kwargs):
         kwargs['namespace_prefix'] = 'affinity'
