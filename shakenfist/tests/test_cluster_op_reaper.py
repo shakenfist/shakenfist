@@ -1,7 +1,6 @@
 # Copyright 2026 Michael Still and contributors
 #
-# Tests for the stuck-job reaper introduced in phase 7 of the
-# etcd-removal ops-queues plan. The reaper walks mariadb
+# Tests for the stuck-job reaper. The reaper walks mariadb
 # work_queue rows whose claim has gone stale and either returns
 # them to the queue or rejects them after max_attempts claims.
 

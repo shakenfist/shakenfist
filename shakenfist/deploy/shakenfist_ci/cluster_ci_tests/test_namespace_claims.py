@@ -5,9 +5,9 @@ A claim is a namespace's promise of aggregate capacity: creating one is
 itself a guarded admission decision against the cluster, an instance
 create in a claimed namespace draws the claim down instead of the
 cluster's unclaimed sums, and -- for this release -- exceeding a claim
-is *recorded* rather than refused (D16's advisory period). None of that
-is exercised by a test which mocks the database away, so it is exercised
-here.
+is *recorded* rather than refused (an advisory period before it becomes
+a hard refusal). None of that is exercised by a test which mocks the
+database away, so it is exercised here.
 
 What this file defends
 ----------------------
@@ -23,14 +23,13 @@ This file used to drive the endpoints through
 ``apiclient.Client._request_url()`` instead, on the reasoning that the
 collection installs ``shakenfist-client`` from PyPI, so a test written
 against new ``apiclient`` methods could not pass in CI until a client
-release existed. That reasoning (phase 4's decision D7) was wrong, and
-had been wrong since 2026-06-24: cluster CI does not install the
-released client. It builds a wheel from a ``client-python`` checkout at
-``develop`` -- see "Where the functional jobs get their code" in
-``docs/developer_guide/ci.md`` -- so a verb is available here as soon
-as it merges, with no release involved. Phase 4b
-(``docs/plans/PLAN-scheduler-reservations-phase-04b-client.md``) added
-the verbs and moved this file onto them.
+release existed. That reasoning was wrong, and had been wrong since
+2026-06-24: cluster CI does not install the released client. It builds
+a wheel from a ``client-python`` checkout at ``develop`` -- see "Where
+the functional jobs get their code" in ``docs/developer_guide/ci.md``
+-- so a verb is available here as soon as it merges, with no release
+involved. The verbs were then added to the client and this file moved
+onto them (``docs/plans/PLAN-scheduler-reservations-phase-04b-client.md``).
 
 Why success assertions retry 507
 --------------------------------

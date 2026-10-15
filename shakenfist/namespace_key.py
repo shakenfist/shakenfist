@@ -5,9 +5,8 @@
 # JWT's "<namespace>:<keyname>" identity string refers to.
 #
 # Keys used to be anonymous entries in the namespace_attributes "keys"
-# JSON column. Phase 2 of the auth federation plan promotes them to
-# first-class objects with their own tables, lifecycle, events, expiry
-# and reaping -- see
+# JSON column. They are now first-class objects with their own tables,
+# lifecycle, events, expiry and reaping -- see
 # docs/plans/PLAN-auth-federation-phase-02-key-objects.md.
 #
 # The secret material (the base64 encoded bcrypt hash and the nonce)

@@ -175,11 +175,10 @@ class Namespace(dbo):
     def keys(self):
         """This namespace's usable keys, in the historical wire shape.
 
-        Keys are NamespaceKey objects since phase 2 of the auth
-        federation plan, but the shape returned here is unchanged: a
-        dict of key name to {'key': hash, 'nonce': ..., 'expiry': ...},
-        with expired keys omitted and 'expiry' absent entirely for keys
-        which never expire.
+        Keys are now NamespaceKey objects, but the shape returned here is
+        unchanged: a dict of key name to {'key': hash, 'nonce': ...,
+        'expiry': ...}, with expired keys omitted and 'expiry' absent
+        entirely for keys which never expire.
 
         Two things did change. The read is a single indexed listing of
         the (namespace, name) index instead of a whole
@@ -462,9 +461,10 @@ class Namespaces(dbo_iter):
     base_object = Namespace
 
     def _resolve_prefilter_to_states(self) -> set[str]:
-        """Preserve the pre-phase-5 behaviour: when no prefilter is set,
-        do not filter on state (return every namespace). The base-class
-        default of ACTIVE_STATES is used when a prefilter is explicitly given.
+        """Preserve the behaviour from before namespaces were listed via SQL
+        pushdown: when no prefilter is set, do not filter on state (return
+        every namespace). The base-class default of ACTIVE_STATES is used
+        when a prefilter is explicitly given.
         """
         if self.prefilter is None:
             return set()
@@ -474,7 +474,7 @@ class Namespaces(dbo_iter):
         # NamespaceData has no .uuid attribute (namespace uses name as
         # primary key), so we iterate _find directly rather than going
         # through get_iterator() which assumes a .uuid field on the data.
-        # Sort by name for stable output — the pre-phase-5 path used
+        # Sort by name for stable output — the pre-pushdown path used
         # mariadb.get_all_namespace_names() which returned names in
         # alphabetical order, and at least one REST test asserts that.
         target_states = self._resolve_prefilter_to_states()

@@ -2,8 +2,8 @@
 #
 # Tests for the public mariadb.enqueue_work_item /
 # dequeue_work_items / resolve_work_item / get_work_queue_length /
-# restart_work_queue wrappers introduced in phase 6 of the
-# etcd-removal ops-queues plan.
+# restart_work_queue wrappers, which replaced the etcd-backed work
+# queues.
 #
 # These cover the three-layer dispatch (direct vs. gRPC branches)
 # and the defaulting behaviour of the public wrappers. The

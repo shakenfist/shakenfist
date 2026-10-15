@@ -2,8 +2,7 @@
 
 """Compile the published parameter declarations into request schemas.
 
-Phase 3 of ``docs/plans/PLAN-api-input-validation.md``. Nothing here
-rejects anything: this module turns declarations into marshmallow
+Nothing here rejects anything: this module turns declarations into marshmallow
 schemas and mounts them in a registry. The decorator which consults
 them, and the warn-only telemetry which reports what they would have
 refused, are separate.
@@ -15,10 +14,10 @@ declarations into one schema, and expanding each type token into
 ``type``/``format`` and any constraints. Reading that output rather
 than re-interpreting the tokens means the compiled schema and the
 published specification cannot disagree, because there is only one
-interpretation of a token in the process. Two consecutive review
-rounds in phase 2 found a type token that contradicted its handler,
-and a second independent mapping here would be a third way for that
-class of defect to arrive.
+interpretation of a token in the process. Two consecutive reviews of
+the type vocabulary each found a type token that contradicted its
+handler, and a second independent mapping here would be a third way
+for that class of defect to arrive.
 
 It also gets three rules from the plan for free rather than as special
 cases:
@@ -38,13 +37,12 @@ cases:
   ``object``, which is exactly the discriminator needed to leave
   upload bodies alone.
 
-``format`` used to be documentation in every case. Phase 6's step 4
-made five of the format strings mean something -- see ``_FORMATS``
-below -- so ``type``, ``format``, ``pattern``, ``minimum`` and
-``maximum`` are now the five keys which constrain anything. The
-validators are keyed on the exact string ``ARGTYPES`` renders, so the
-published specification and the enforced check are the same string by
-construction (decision D33).
+``format`` used to be documentation in every case. Five of the format
+strings now mean something -- see ``_FORMATS`` below -- so ``type``,
+``format``, ``pattern``, ``minimum`` and ``maximum`` are the five keys
+which constrain anything. The validators are keyed on the exact string
+``ARGTYPES`` renders, so the published specification and the enforced
+check are the same string by construction.
 """
 
 import base64
@@ -92,12 +90,12 @@ ANY_VALUE_FORMAT = 'any JSON value'
 
 
 class _ExactInteger(fields.Integer):
-    """fields.Integer, except that 1.5 is not an integer (decision D46).
+    """fields.Integer, except that 1.5 is not an integer.
 
     marshmallow's Integer accepts any value int() will take, so 1.5
     passes because int(1.5) is 1. In a *deserialising* layer that is
     merely lax: the handler would receive the 1 the field produced.
-    This layer is check-only by design (decision D14) --
+    This layer is check-only by design --
     validate_request() runs schema.validate() for its findings and
     throws the deserialised result away, so the handler always sees the
     body the caller sent. A field which accepts a value it would have
@@ -105,13 +103,13 @@ class _ExactInteger(fields.Integer):
     it says the value is a valid integer about a value which is not one
     and which nothing downstream will convert.
 
-    Measured before the fix (phase 7 finding F8): POST /instances with
+    Measured before the fix: POST /instances with
     "cpus": 1.5 passed validation, reached InstanceData unchanged and
     raised a pydantic ValidationError -- a recorded 500 for a caller's
     mistake.
 
-    **This is not marshmallow's `strict=True`, which D46 asked for and
-    which cannot be used here.** `strict=True` refuses anything that is
+    **This is not marshmallow's `strict=True`, which was the first
+    design and cannot be used here.** `strict=True` refuses anything that is
     not already a Python int, and two kinds of caller legitimately send
     something else:
 
@@ -125,8 +123,8 @@ class _ExactInteger(fields.Integer):
       coerces it. `{"cpus": "8"}` is accepted today because pydantic's
       lax mode converts it, so refusing it here would be a validator
       narrower than its handler -- the breaking-change-dressed-as-a-fix
-      that phase 6's width rule (and the _FORMATS comment above) exists
-      to prevent.
+      that the rule that no validator is narrower than its handler (see
+      the _FORMATS comment below) exists to prevent.
 
     So the check is written against the defect rather than against the
     Python type: a JSON number with a fractional part is refused, and
@@ -138,8 +136,8 @@ class _ExactInteger(fields.Integer):
     better message for it ("Number too large.") than this would.
 
     A subclass rather than a keyword at the construction site, because
-    the construction site is the _SCALARS lookup below and D46 asks for
-    this at every nesting depth. Binding it to the mapping from
+    the construction site is the _SCALARS lookup below and the refusal
+    is wanted at every nesting depth. Binding it to the mapping from
     rendered type to field class means a branch of _field() which one
     day builds an integer some other way cannot forget it.
     """
@@ -198,7 +196,7 @@ def declared_boolean(value: Any) -> bool:
 
 
 # ---------------------------------------------------------------------
-# Semantic formats (phase 6 step 4, decision D33, issue 3269).
+# Semantic formats (issue 3269).
 #
 # Keyed on the exact `format` string ARGTYPES renders, so the promise
 # the published OpenAPI makes and the check the server performs are the
@@ -215,14 +213,14 @@ def declared_boolean(value: Any) -> bool:
 #   as one -- the shipped client sends `"source_url": null` and
 #   `"nvram_template": null` on every upload and every instance create
 #   -- so a validator which refused it would refuse the API's dominant
-#   caller. Required-ness is step 3's business and is decided before
-#   any of this runs.
+#   caller. Required-ness is checked separately, by check(), before
+#   the schema runs.
 # * only marshmallow.ValidationError escapes. _schema_findings() has a
 #   broad except for exactly this failure, but a validator which
 #   reached it would report *no* findings for the whole schema, which
 #   would silently disable every other check on the same request.
 # * the check is written to be no narrower than the handler already is.
-#   That is the whole risk of this step: a validator stricter than its
+#   That is the whole risk of these validators: one stricter than its
 #   handler is a breaking change dressed as a correctness fix, and unit
 #   tests will not show it. Each comment below records what was read to
 #   establish the width.
@@ -430,9 +428,9 @@ class CompiledEndpoint:
     """The schemas one handler's declarations compile to.
 
     ``required_names`` is recorded here and enforced by
-    ``validate_request`` in ``shakenfist/external_api/base.py`` --
-    phase 6's step 3 turned that on, once step 2 had corrected every
-    declaration a handler's own defaults had quietly made optional.
+    ``validate_request`` in ``shakenfist/external_api/base.py``.
+    Turning that on first required correcting every declaration which
+    a handler's own defaults had quietly made optional.
 
     Enforcement is a property of the decorator, not of this compiler:
     a declaration can still be more required than its handler is.
@@ -443,7 +441,8 @@ class CompiledEndpoint:
     ``instance.py:2097``). Enforcement changes what such an omission
     answers -- 400, naming the parameter, instead of a 200 the guest
     agent can only fail on -- without touching the handler, which still
-    behaves the old way under ``warn`` and ``off`` (decision D34).
+    behaves the old way under ``warn`` and ``off``, so that those modes
+    remain a rollback.
     """
 
     def __init__(self, body: Optional[marshmallow.Schema],
@@ -476,11 +475,11 @@ def _field(spec: dict[str, Any], required: bool = False) -> fields.Field[Any]:
     rather than described by a declaration, and in warn-only it would
     fill the log with findings that are artefacts of this module. That
     is not a hypothetical: the shipped client sends five documented
-    keys as an explicit null on every instance create (census finding
-    N1 of the phase 7 plan). Optional because at the top level
-    required-ness is metadata here (see CompiledEndpoint), which phase
-    6 enforces itself so that it can say which parameter is missing in
-    its own words.
+    keys as an explicit null on every instance create, as a census of
+    its requests found. Optional because at the top level required-ness
+    is metadata here (see CompiledEndpoint), which check() enforces
+    itself so that it can say which parameter is missing in its own
+    words.
 
     `required` is the one exception, and only the object branch below
     passes it: a property inside a rendered object fragment has no
@@ -490,18 +489,17 @@ def _field(spec: dict[str, Any], required: bool = False) -> fields.Field[Any]:
     property becomes a finding naming its path, exactly as a
     wrong-typed one does.
     """
-    # A required property is the one thing which is not nullable, which
-    # is decision D44: `required` inside a fragment means present *and
-    # not an explicit null*, the same meaning phase 6 gave `required` at
-    # the top level. check() applies that rule to compiled.required_names
+    # A required property is the one thing which is not nullable:
+    # `required` inside a fragment means present *and not an explicit
+    # null*, the same meaning `required` has at the top level. check() applies that rule to compiled.required_names
     # a few hundred lines below, with a comment arguing that a caller who
     # sent `{"key": null}` and one who sent no key at all are stating one
     # fact from the handler's side and must get one answer; this is that
     # rule one level down, not a new one. Without it a required,
     # string-typed `network_uuid` accepted `{"network_uuid": null}` and
     # reached Network.from_db_by_ref(None, namespace), which resolves to
-    # an arbitrary network in the namespace -- finding F7, measured as a
-    # 200 and a created interface on the hotplug route.
+    # an arbitrary network in the namespace -- measured as a 200 and a
+    # created interface on the hotplug route.
     #
     # The nullability invariant above is untouched by this, because its
     # stated reason is about *optional* parameters. Nothing this compiler
@@ -513,8 +511,8 @@ def _field(spec: dict[str, Any], required: bool = False) -> fields.Field[Any]:
     # written out, so the two cannot drift apart: marshmallow would
     # otherwise answer 'Field may not be null.' for the null and 'Missing
     # data for required field.' for the omission, which is two messages
-    # for the one fact and undoes the uniform malformed-input shape phase
-    # 4 spent a step on. An error_messages override rather than a
+    # for the one fact and undoes the uniform shape every malformed
+    # input is answered with. An error_messages override rather than a
     # schema-level validator because a validator never runs on a null --
     # the field has refused it before any validator is reached -- so
     # matching the messages that way would mean a @validates_schema
@@ -558,15 +556,17 @@ def _field(spec: dict[str, Any], required: bool = False) -> fields.Field[Any]:
     # published document and the enforced check are the same structure
     # by construction, so a vocabulary entry cannot say "one of these
     # four" to a client generator and mean nothing at all to the
-    # server. Phase 7's structured tokens (base.py's DISKSPEC_SCHEMA
-    # and VIDEOSPEC_SCHEMA) are the first fragments in the tree to
-    # publish one; decision D43 is the rule which decides that a key
-    # gets an enum, and it is deliberately met by only three of them.
+    # server. The structured tokens (base.py's DISKSPEC_SCHEMA and
+    # VIDEOSPEC_SCHEMA) are the fragments in the tree which publish
+    # one. A key gets an enum only where the server already refuses
+    # values outside it, a rule deliberately met by only three keys:
+    # the two `model` keys are rendered raw into the domain XML, so
+    # their true vocabulary is the hypervisor's and varies by node.
     #
     # marshmallow runs no validator on a null, so an enum does not
     # fire on the explicit nulls the shipped clients send for a disk's
-    # bus and type -- which is the property that lets D43 publish an
-    # enum on a key whose dominant value is null.
+    # bus and type -- which is the property that allows an enum on a
+    # key whose dominant value is null.
     #
     # Dropped again by the object, `any` and unrecognised-type branches
     # below along with the rest of the validator list, for the reason
@@ -613,17 +613,17 @@ def _field(spec: dict[str, Any], required: bool = False) -> fields.Field[Any]:
         # array-typed fragment carries an enum or a semantic format. A
         # future token which rendered one would want to decide
         # deliberately between the two meanings rather than inherit
-        # this one by accident (phase 8 audit, 2a).
+        # this one by accident.
         return fields.List(_field(spec.get('items', {})), **kwargs)
 
     element_properties = spec.get('properties')
     if isinstance(element_properties, dict):
-        # A structured object fragment (phase 7): compile its
-        # properties into a nested schema so a value one level down is
-        # checked the way a top level one is.
+        # A structured object fragment: compile its properties into a
+        # nested schema so a value one level down is checked the way a
+        # top level one is.
         #
         # Keyed on the presence of `properties` rather than on the type
-        # being `object`, which is the whole of decision D47.
+        # being `object`, deliberately.
         # ARGTYPES['dict'] renders a bare {'type': 'object'} and two
         # live parameters need that to keep meaning "any mapping at
         # all": `metadata` on POST /instances, whose keys are the
@@ -679,7 +679,7 @@ def _field(spec: dict[str, Any], required: bool = False) -> fields.Field[Any]:
         # which every one of these parameters compiled to before this
         # branch existed, said "Not a valid mapping type.". The wrong
         # container was already refused with a good message before
-        # phase 7 (finding F1 records it as such), so teaching a
+        # this branch existed, so teaching a
         # structure to say something new about a case whose answer has
         # not changed would be a contract move nobody asked for.
         nested.error_messages = {'type': 'Not a valid mapping type.'}
@@ -717,8 +717,8 @@ def _field(spec: dict[str, Any], required: bool = False) -> fields.Field[Any]:
     if field_class is None:
         # A type this does not know is documented rather than enforced.
         # Raw accepts anything, which keeps an unrecognised token from
-        # silently becoming a rejection -- the failure mode phase 2's
-        # netblock reasoning is about. Its bounds are dropped too: Raw
+        # silently becoming a rejection -- the failure mode the netblock
+        # rule in the module docstring is about. Its bounds are dropped too: Raw
         # deserialises without coercing, so a Range or Regexp validator
         # would raise TypeError from inside schema.validate() the
         # moment it met a value of the wrong Python type, and an
@@ -852,7 +852,10 @@ BODY_PATH_COLLISIONS = 'sf_body_path_collisions'
 PARSED_BODY = 'sf_parsed_body'
 
 # Reason codes. Counted separately because they answer different
-# questions: see the table in the phase 3 plan.
+# questions: a type mismatch means the declaration is wrong or callers
+# send junk, an unknown parameter means callers send keys we do not
+# declare, a missing required parameter means `required` is
+# over-declared, and a body/path collision means that hazard is real.
 UNKNOWN_PARAMETER = 'unknown-parameter'
 TYPE_MISMATCH = 'type-mismatch'
 MISSING_REQUIRED = 'missing-required'
@@ -878,8 +881,8 @@ MAX_UNKNOWN_PARAMETER_FINDINGS = 20
 # _flatten_messages), so a single declared parameter carrying a large
 # enough array puts one log line per bad element into centralised
 # logging -- exactly the property MAX_UNKNOWN_PARAMETER_FINDINGS exists
-# to bound, arriving by a different route once phase 4 taught the
-# flattener to name elements. The body's overall size is capped by
+# to bound, arriving by a different route because the flattener names
+# each element. The body's overall size is capped by
 # app.py's limit_request_body_size (issue 4249), but within that cap a
 # thousand-element disk list is still a thousand findings without this.
 # The overflow is summarised in one finding carrying the count, in the
@@ -945,8 +948,8 @@ def _flatten_messages(parameter: str, messages: Any, container: Any = None,
     but a dict keyed by index or sub-field when a *container's elements*
     are wrong -- `{0: ['Not a valid mapping type.']}` for a bad entry in
     an arrayofdict. Rendering that with str() puts a Python dict repr in
-    the detail, which the enforce flip of phase 4 turned from a log line
-    into the caller's error message: `disk: {0: ['Not a valid mapping
+    the detail, which in enforce mode is not just a log line but the
+    caller's error message: `disk: {0: ['Not a valid mapping
     type.']}`. Naming the offending element instead gives
     `disk[0]: Not a valid mapping type.`
 
@@ -1095,12 +1098,12 @@ def check(compiled: CompiledEndpoint, body: Any,
     # An undeclared body key is already fatal when the request reaches
     # its handler -- log_request merges every key into kwargs and no
     # handler is variadic, so Python raises TypeError. Counting these
-    # is how phase 4 chose between webargs' EXCLUDE and RAISE
-    # (decision D10). Until phase 5 that TypeError was caught by a
-    # broad except in handle_authorization_exceptions and returned as
-    # a 400 carrying interpreter text; that arm is gone (decision
-    # D23), so in 'warn' and 'off' -- the only modes where such a key
-    # still reaches a handler -- it is now a recorded 500 (D25).
+    # is what decided that enforce mode refuses them (webargs' RAISE)
+    # rather than dropping them (EXCLUDE). That TypeError was once
+    # caught by a broad except in handle_authorization_exceptions and
+    # returned as a 400 carrying interpreter text; that arm is gone, so
+    # in 'warn' and 'off' -- the only modes where such a key still
+    # reaches a handler -- it is now a recorded 500.
     if not compiled.raw_body:
         unknown = [name for name in body if name not in compiled.names]
         for name in unknown[:MAX_UNKNOWN_PARAMETER_FINDINGS]:

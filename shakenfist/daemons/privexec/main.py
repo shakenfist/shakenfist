@@ -584,11 +584,11 @@ class PrivExecJob:
         # MAC), so upstream ARP caches can hold the previous holder's
         # MAC; the announcement converges them immediately. This is
         # the same L2 advertisement the network carrier model plans to
-        # use on lease acquire (PLAN-network-carrier-model phase 9),
-        # and one of the exec sites PLAN-replace-exec-with-netlink
-        # phase 6 will absorb. Best effort: reachability usually works
-        # without it, so a missing arping binary or a transient
-        # failure should not fail the float add.
+        # use on lease acquire (see PLAN-network-carrier-model.md), and
+        # one of the remaining arping exec sites that
+        # PLAN-replace-exec-with-netlink.md will replace. Best effort:
+        # reachability usually works without it, so a missing arping
+        # binary or a transient failure should not fail the float add.
         self._announce_floating_ip(req)
 
         return privexec_pb2.PrivExecReply(

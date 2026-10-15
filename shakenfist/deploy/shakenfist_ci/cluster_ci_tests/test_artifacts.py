@@ -538,8 +538,9 @@ class TestTypoedLabel(base.BaseNamespacedTestCase):
 class TestArtifactLookupByName(base.BaseNamespacedTestCase):
     """Functional tests for Artifact.from_db_by_ref name-based lookup.
 
-    These tests verify the behaviour added in phase 2 of the SQL pushdown
-    filtering plan (PLAN-sql-pushdown-filtering-phase-02-artifact.md):
+    These tests verify name lookups now that they run as one indexed SQL
+    query filtering on state, namespace and name together
+    (PLAN-sql-pushdown-filtering-phase-02-artifact.md):
 
     A) Same-name-different-namespace: each namespace resolves its own artifact.
     B) System-namespace cross-visibility: the system client sees at least one
@@ -643,7 +644,7 @@ class TestArtifactLookupByName(base.BaseNamespacedTestCase):
                     {art_a['uuid'], art_b['uuid']},
                     'System client resolved an unexpected artifact UUID')
             except apiclient.RequestMalformedException:
-                # This is the expected path after phase 2: the API surfaces
+                # This is the expected path: the API surfaces
                 # MultipleObjects as a 400 when the system client sees both.
                 pass
 

@@ -14,8 +14,9 @@ Drain-behaviour coverage: the SIGTERM / API_DRAIN_GRACE drain is covered by
 unit tests in ``shakenfist/tests/test_gunicorn_drain.py``. A live end-to-end
 assertion (restart sf-api and observe the 503 window) would require stopping a
 daemon in the shared CI cluster, which is too invasive for a single test
-module. That assertion is tracked for phase 4's rolling-upgrade operator
-documentation.
+module. That assertion belongs in a node-level CI script which can stop and
+restart sf-api on one node and always leave it running again (see
+PLAN-health-checks-phase-04-operator-docs.md); no such script exists yet.
 """
 
 import requests

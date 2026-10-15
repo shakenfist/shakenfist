@@ -201,21 +201,21 @@ class NetOp(BaseClusterOperation):
             self.state = NetOp.STATE_ERROR
 
     def _network_deploy(self, n):
-        # This task is no longer enqueued by any production code path as of
-        # phase 6 of `PLAN-network-facade.md`. Any in-flight op at deploy
-        # time gracefully transitions to STATE_ERROR via the dispatcher's
-        # outer Exception handler, which persists an ErrorReport. The
-        # task-enum value stays in the schema for on-disk record
-        # compatibility.
+        # This task is no longer enqueued by any production code path;
+        # explicit per-node task lists (network_apply_* and
+        # network_ensure_mesh) replaced it. Any in-flight op at deploy time
+        # gracefully transitions to STATE_ERROR via the dispatcher's outer
+        # Exception handler, which persists an ErrorReport. The task-enum
+        # value stays in the schema for on-disk record compatibility.
         raise InvalidStateForTask(self)
 
     def _network_destroy(self, n):
-        # Phase 6: superseded by network_apply_delete_network_node (task
-        # 12). See _network_deploy above for the rationale.
+        # Superseded by network_apply_delete_network_node (task 12). See
+        # _network_deploy above for the rationale.
         raise InvalidStateForTask(self)
 
     def _network_update_dnsmasq(self, n):
-        # Phase 6: this misleadingly-named composite task was superseded
+        # This misleadingly-named composite task was superseded
         # by the explicit [network_apply_create_network_node,
         # network_ensure_mesh] task list. See _network_deploy above for
         # the rationale.

@@ -741,10 +741,11 @@ def bundle_record(github, run, artifact, kind, jobs, cache_dir, report,
         # The wording of the reason is frozen, deliberately: it is recorded
         # verbatim into the committed records in
         # docs/plans/data/ci-cloud-sizing-baseline/, so rewording it would
-        # split that dataset on one condition.
+        # split that dataset on one condition. That is why it still says
+        # `phase 1`, meaning the change which added the headroom probe.
         record['absent_reason'] = (
             'the bundle carries no traces/headroom.jsonl, so the probe never '
-            'ran or predates phase 1')
+            'ran or predates phase 1')  # audit-ok: phase-reference
         return record
 
     record['series_present'] = True

@@ -309,10 +309,11 @@ class NetworkInterfaces(dbo_iter):
     base_object = NetworkInterface
 
     def _resolve_prefilter_to_states(self):
-        # Preserve the pre-phase-5 NetworkInterfaces override behaviour:
-        # when no prefilter is set, do not filter on state (return every
-        # network interface and let predicate filters scope). The base
-        # class default of ACTIVE_STATES is kept for other inheritors.
+        # Preserve what this iterator did before it moved onto the SQL
+        # pushdown base class: when no prefilter is set, do not filter on
+        # state (return every network interface and let predicate filters
+        # scope). The base class default of ACTIVE_STATES is kept for other
+        # inheritors.
         if self.prefilter is None:
             return set()
         return super()._resolve_prefilter_to_states()

@@ -1,7 +1,7 @@
 # Copyright 2019 Michael Still and contributors
 #
 # Behaviour-preservation tests for namespace keys, written before the
-# phase 2 migration of keys from the namespace_attributes JSON column to
+# migration of keys from the namespace_attributes JSON column to
 # first-class NamespaceKey objects (see
 # docs/plans/PLAN-auth-federation-phase-02-key-objects.md). Every test here
 # pins the CURRENT semantics of the anonymous-dict-entry implementation so

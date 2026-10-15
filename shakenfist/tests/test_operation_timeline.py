@@ -21,10 +21,9 @@ to most of them.
 
 The third is truncation. Loki silently returns only the most recent 5000
 lines for a query which asks for exactly 5000, so a truncated window looks
-exactly like a complete one. That already caused one wrong measurement in
-phase 9 of PLAN-queue-performance.md, so the paging, the subdivision and the
-reporting of a chunk which cannot be subdivided any further are all covered
-here.
+exactly like a complete one. That has already caused one wrong measurement of
+queue performance, so the paging, the subdivision and the reporting of a chunk
+which cannot be subdivided any further are all covered here.
 """
 
 import contextlib
@@ -145,10 +144,11 @@ class TimelineParseTestCase(base.ShakenFistTestCase):
         self.assertEqual({'artifact_fetch_op'}, defer.waiting_on_types)
 
     def test_falls_back_to_the_message_prose(self):
-        # Every event retained from before step 10a of
-        # PLAN-queue-performance-phase-10-defer-latency.md has the delay in
-        # the message and nowhere else, and that is the entire window this
-        # tool was written to measure. The fallback is not garnish.
+        # Every event retained from before defer events carried the delay
+        # as a structured field has it in the message and nowhere else
+        # (see PLAN-queue-performance-phase-10-defer-latency.md), and that
+        # is the entire window this tool was written to measure. The
+        # fallback is not garnish.
         defer, reason = timeline.parse_defer_line(
             defer_line('2026-08-29T10:09:58.197Z', delay=1.6,
                        delay_in_extra=False))

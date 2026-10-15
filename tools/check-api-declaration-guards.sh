@@ -92,8 +92,8 @@ failures=0
 # test_openapi_spec's subject; whether the *derivation* those two
 # compare against is itself right belongs to test_derivation_generator,
 # the only one building sources the tree does not contain; and whether
-# the declarations compile into the schemas phase 4 will enforce is
-# test_validation_compiler's. A mutation caught by none of them is a
+# the declarations compile into the schemas validate_request enforces
+# is test_validation_compiler's. A mutation caught by none of them is a
 # gap in the guards, not in the mutation.
 run() {
     "${PYTHON}" -m stestr run \
@@ -432,9 +432,9 @@ sed -i "s/names = {segment.split(':')\[-1\]/names = {segment.split(':')[0]/" \
     shakenfist/external_api/declarations.py
 check 'route converter prefix taken as the name'
 
-# 29-31 mutate the compiler. Phase 3 compiles the declarations into
-# marshmallow schemas, so from here a misreading is not a wrong line of
-# documentation but a rejected request the moment phase 4 enforces.
+# 29-31 mutate the compiler. The declarations compile into marshmallow
+# schemas, so from here a misreading is not a wrong line of
+# documentation but a rejected request whenever enforcement is on.
 
 # 29. required compiled as a constraint rather than recorded as
 # metadata. `mode` on the agent-put endpoint is declared required while
@@ -473,9 +473,9 @@ check 'undocumented handler compiled as empty'
 # 32-34 cover the term the derivation gained for #3739: the kwargs a
 # handler's decorators consume on its behalf. Without it the popped
 # `namespace` on 55 ref-lookup routes was a functional parameter which
-# nothing required anybody to declare, and phase 3's warn window found
-# it as a rejection against the official client rather than CI finding
-# it as a defect.
+# nothing required anybody to declare, and the warn-only measurement
+# window found it as a rejection against the official client rather
+# than CI finding it as a defect.
 
 # 32. A ref-lookup handler which stops declaring the namespace its
 # decorator consumes. This is #3739 itself, reintroduced on one route.

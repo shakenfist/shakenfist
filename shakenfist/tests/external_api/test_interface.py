@@ -12,7 +12,7 @@ from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 class InterfaceEndpointGetTestCase(base.ShakenFistTestCase):
-    """Phase 7 step 7b: InterfaceEndpoint.get is now a synchronous read.
+    """InterfaceEndpoint.get is a synchronous read.
 
     The endpoint previously carried `@redirect_to_network_node`, which
     forced the API server to proxy the request to the elected network

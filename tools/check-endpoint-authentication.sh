@@ -7,9 +7,8 @@
 # and the four which did not were the correct four -- but the failure
 # mode was wrong. Forgetting the decorator on a new endpoint left it
 # silently reachable with no credential, and nothing would have caught
-# it. Phase 3 of the auth federation plan moved authentication onto
-# `api_base.Resource.method_decorators` so it applies by default, with
-# `@api_base.public` as the only way out.
+# it. Authentication now lives on `api_base.Resource.method_decorators`
+# so it applies by default, with `@api_base.public` as the only way out.
 #
 # This walker enforces two things the runtime cannot:
 #

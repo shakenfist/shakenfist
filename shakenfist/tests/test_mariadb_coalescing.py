@@ -51,9 +51,10 @@ SIBLING_UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 TASK = 'network_apply_update_dnsmasq'
 
 # Two per-node NetOp keys, plus the cluster-wide (None) case. These stand
-# in for the two hypervisors in the phase 8 regression
-# (test_single_virtual_networks_work): a fold on node A's queue must
-# never touch node B's work on the same network.
+# in for the two hypervisors in the regression
+# test_single_virtual_networks_work caught when network_ensure_mesh was
+# coalesced on the network alone: a fold on node A's queue must never
+# touch node B's work on the same network.
 NODE_A_UUID = 'c0000000-0000-4000-8000-000000000001'
 NODE_B_UUID = 'c0000000-0000-4000-8000-000000000002'
 
@@ -376,19 +377,19 @@ class CoalescingSQLTestCase(
         for call in mock_log.warning.call_args_list:
             self.assertIn('not a coalescible target column', call.args[0])
 
-    # -- Phase 11: the two-pair (network_uuid, node_uuid) key -----------
+    # -- The two-pair (network_uuid, node_uuid) key ---------------------
     #
-    # These are the tests decision 8 exists to be proven by: a key that
+    # These tests prove the widened key is sound: a key that
     # names node_uuid must be strictly narrower than the network alone,
     # in both directions -- a per-node op folds only its own node's
     # siblings, and a cluster-wide op (node_uuid unset, binding IS NULL)
     # folds only other cluster-wide ops. Getting either direction wrong
-    # reproduces one of two real failures: the phase 8
+    # reproduces one of two real failures: the
     # ``test_single_virtual_networks_work`` regression (one hypervisor's
-    # fold silently eating another's work) or decision 8's near-miss
-    # (widening the key to include node_uuid would have switched off the
-    # only coalescing the cluster does, by refusing every NULL-valued
-    # key instead of binding IS NULL).
+    # fold silently eating another's work) or a near-miss caught in
+    # review (widening the key to include node_uuid would have switched
+    # off the only coalescing the cluster does, by refusing every
+    # NULL-valued key instead of binding IS NULL).
 
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_claim_siblings_folds_a_sibling_on_the_same_node(
@@ -416,9 +417,9 @@ class CoalescingSQLTestCase(
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_claim_siblings_leaves_a_different_node_alone(
             self, mock_get_engine):
-        # The phase 8 regression this whole phase exists to prevent
-        # recurring: node A's survivor must not fold node B's op on the
-        # same network, or B's mesh apply is silently never run.
+        # The regression the per-node key exists to prevent recurring:
+        # node A's survivor must not fold node B's op on the same
+        # network, or B's mesh apply is silently never run.
         engine = self._build_engine()
         mock_get_engine.return_value = engine
         with engine.connect() as conn:
@@ -443,8 +444,8 @@ class CoalescingSQLTestCase(
     def test_claim_siblings_cluster_wide_survivor_folds_other_cluster_wide(
             self, mock_get_engine):
         # node_uuid unset on both sides binds IS NULL on both sides, so
-        # this is the pre-phase-11 behaviour: the two ops that actually
-        # fold today (network_apply_update_dnsmasq,
+        # this is the network-only key's behaviour: the two ops that
+        # actually fold cluster-wide (network_apply_update_dnsmasq,
         # network_apply_create_network_node) live on the cluster-wide
         # queue and must keep folding each other under the wider key.
         engine = self._build_engine()
@@ -469,7 +470,7 @@ class CoalescingSQLTestCase(
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_claim_siblings_cluster_wide_survivor_leaves_per_node_op_alone(
             self, mock_get_engine):
-        # The regression decision 8 exists to prevent: if a NULL key
+        # The regression binding IS NULL exists to prevent: if a NULL key
         # value were refused (rather than bound as IS NULL) the
         # cluster-wide fold above would have silently stopped matching
         # anything the moment the key widened. Proving the negative here
@@ -514,7 +515,7 @@ class CoalescingSQLTestCase(
     @mock.patch('shakenfist.mariadb._get_engine')
     def test_find_existing_ignores_a_different_nodes_op(
             self, mock_get_engine):
-        # The enqueue-side counterpart of the phase 8 regression: a
+        # The enqueue-side counterpart of the cross-node fold: a
         # lookup for node A's work must not be satisfied by node B's
         # pending op, or the caller believes its work is already queued
         # when nobody is actually going to do it on node A.

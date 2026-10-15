@@ -274,8 +274,8 @@ class PreflightRedirectTestCase(base.ShakenFistTestCase):
     def test_every_candidate_denied_carries_the_capacity_guard_stage(self):
         # The preflight redirect's own exhaustion raise is the same fact
         # the create path publishes as the capacity_guard stage, so it
-        # carries the stage too and no handler has to parse the message
-        # (PLAN-transient-capacity-refusals phase 4, D30). The abort is
+        # carries the stage too and no handler has to parse the message.
+        # The abort is
         # raised from inside the ``except LowResourceException`` suite,
         # so the refusal is reachable as the abort's implicit context.
         first = str(uuid4())

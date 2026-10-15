@@ -344,7 +344,7 @@ class BaseClusterOperation(BaseOperation):
         # invisible for three months: zero looked exactly like
         # disabled. ``coalesce_seconds`` is the cost of the
         # claim_coalescible_siblings call, which baseoperation asserted
-        # to be ~200 ms under load until phase 9 measured it at a 3.7 ms
+        # to be ~200 ms under load until it was measured at a 3.7 ms
         # median over 42 hours of sfcbr.
         # It is measured with a monotonic clock: it is a pure interval,
         # never differenced against a stored timestamp the way
@@ -460,13 +460,13 @@ class BaseClusterOperation(BaseOperation):
         # skipping a query which cannot help is free.
         #
         # This guard used to be justified by a "~200 ms under load" cost
-        # taken from a CI bundle profile. Phase 9 measured the call on
-        # sfcbr over 42 hours and found a 3.7 ms median, a 5.2 ms p90 and a
-        # 149.5 ms maximum -- the old figure was measured while #3878 made
-        # every one of those queries unmatchable, so it was timing the
-        # wrong thing. Keep the guard for tidiness; do not justify anything
-        # else with the cost of this call without measuring it again. See
-        # "What step 9 measured" in docs/plans/PLAN-queue-performance.md.
+        # taken from a CI bundle profile. Measuring the call on sfcbr over
+        # 42 hours found a 3.7 ms median, a 5.2 ms p90 and a 149.5 ms
+        # maximum -- the old figure was measured while #3878 made every one
+        # of those queries unmatchable, so it was timing the wrong thing.
+        # Keep the guard for tidiness; do not justify anything else with
+        # the cost of this call without measuring it again. The measurement
+        # is written up in docs/plans/PLAN-queue-performance.md.
         #
         # A ``None`` value (e.g. op loaded outside the queue path) is
         # treated as "we don't know, be conservative" and the fold runs.
@@ -531,8 +531,9 @@ class BaseClusterOperation(BaseOperation):
         # on its network. A column the class does not have is NULL on
         # every row as well, so binding ``IS NULL`` for it would
         # silently degenerate the key to whichever columns did resolve:
-        # for a NetOp, back to the network alone, which is exactly the
-        # phase 8 cross-node fold this phase exists to make impossible.
+        # for a NetOp, back to the network alone, which would fold
+        # different hypervisors' node-local operations together -- the
+        # cross-node fold the multi-column key exists to make impossible.
         # The enqueue side catches its own version of this with the
         # ``KeyError`` in ``_coalescible_keys``; this is the fold's.
         #
@@ -547,9 +548,7 @@ class BaseClusterOperation(BaseOperation):
         # Each branch records the guard which decided the outcome, so
         # the guards exist exactly once and the instrumentation cannot
         # report an outcome the code did not take -- which is the class
-        # of invisible wrongness this phase exists to remove. See
-        # decision 4 of
-        # PLAN-queue-performance-phase-09-prove-coalescing.md.
+        # of invisible wrongness that hid #3878 for three months.
         #
         # 'type_not_coalescible' and 'no_coalescible_tasks' are
         # deliberately different outcomes. The first is "this operation
@@ -558,8 +557,9 @@ class BaseClusterOperation(BaseOperation):
         # majority of them; the second is "this job could have
         # coalesced and happened not to contain anything coalescible".
         # Merging them buries the interesting case under the boring one
-        # in the by-queue-class table, and decision 4's whole aim is
-        # that "coalescing is doing nothing" stays answerable.
+        # in the by-queue-class table, and the point of recording an
+        # outcome at all is that "coalescing is doing nothing" stays
+        # answerable.
         if not coalescible or not key_columns:
             self.coalesce_outcome = 'type_not_coalescible'
         elif skip_due_to_empty_queue:
@@ -589,9 +589,7 @@ class BaseClusterOperation(BaseOperation):
                 # operations on its network, exactly as a per-node
                 # operation folds only its own node's. Abandoning the
                 # fold instead would switch off the only coalescing the
-                # cluster currently does the moment the key widens --
-                # see decision 8 of
-                # docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md
+                # cluster currently does the moment the key widens.
                 # ``getattr`` with no default: every declared column
                 # is known to resolve, because ``missing_key_columns``
                 # above already skipped the fold if one did not.

@@ -1,4 +1,4 @@
-# Tests for Instance.from_db_by_ref (phase 3 SQL pushdown filtering).
+# Tests for Instance.from_db_by_ref (SQL pushdown filtering).
 #
 # This module tests:
 # - UUID input short-circuits to cls.from_db (find_instances NOT called)

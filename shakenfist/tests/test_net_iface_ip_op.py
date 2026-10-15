@@ -1,9 +1,8 @@
 # Copyright 2019 Michael Still and contributors
 """Tests for ``shakenfist.operations.net_iface_ip_op.NetIfaceIPOp.dispatch_task``.
 
-Covers the Phase 3 migration of ``_interface_defloat`` to
-BridgedVXLanNetwork and the multi-target audit event emitted at dispatch
-time. Also covers ErrorReport persistence on the outer except.
+Covers ``_interface_defloat`` running through BridgedVXLanNetwork and the
+multi-target audit event emitted at dispatch time. Also covers ErrorReport persistence on the outer except.
 """
 
 from unittest import mock

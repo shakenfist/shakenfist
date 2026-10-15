@@ -170,8 +170,8 @@ MIGRATION_UNKNOWN_NODE = '__migrated_unknown_node__'
 # another process never reclaims anything here at all. The cache would
 # therefore grow to every object uuid the process has ever touched rather than
 # its working set, which is why _object_cache_put enforces
-# OBJECT_CACHE_MAX_ENTRIES. Found by the phase 8 push audit; phase 2 deferred
-# the bound believing TTL expiry supplied it.
+# OBJECT_CACHE_MAX_ENTRIES. The cache first shipped without that bound, on the
+# mistaken belief that TTL expiry supplied one.
 # See PLAN-database-load-reduction-phase-02-static-cache.md.
 # ---------------------------------------------------------------------------
 _OBJECT_CACHE: dict[tuple[str, str], tuple[float, Any]] = {}
@@ -440,9 +440,9 @@ OBJECT_METADATA_VERSION = 3
 CLUSTER_OPERATION_TARGETS_VERSION = 2
 # v1: schema creation. v2: etcd data-import marker (historical).
 # v3: adds 15 typed nullable capacity columns projected from
-# metrics_json at upsert time (scheduler-reservations phase 1).
+# metrics_json at upsert time, for the capacity reconciler to read.
 # v4: adds is_hypervisor, projected the same way, so the capacity
-# reconciler can filter to hypervisors in SQL (phase 2).
+# reconciler can filter to hypervisors in SQL.
 NODE_METRICS_VERSION = 4
 # v1: schema creation. v2: data migration from node_attributes.daemon_states
 # JSON column.
@@ -474,16 +474,16 @@ NAMESPACE_CLAIMS_VERSION = 2
 CLUSTER_CAPACITY_VERSION = 1
 
 
-# Minimum supported MariaDB version. Originally 10.6.0 (see
-# docs/plans/PLAN-byo-mariadb-phase-01-statelessness.md decision 1: alignment
-# with Ubuntu 22.04's MariaDB), but the ipam_reservations.address column uses
-# the native INET4 type, which only exists from MariaDB 10.10 -- so schema
-# creation on 10.6 fails and that floor had silently stopped being real
-# (found by scheduler-reservations phase 2 validation). 10.11 is the oldest
-# in-support LTS above 10.10 (itself a short-term release, EOL 2023), ships
-# with Debian 12 and Ubuntu 24.04, and is the version the cluster CI
-# functional tests exercise through their Debian 12 guest images. The live
-# MariaDB tests run on a Debian 13 runner and so exercise 11.8 instead.
+# Minimum supported MariaDB version. Originally 10.6.0, to align with Ubuntu
+# 22.04's MariaDB (see docs/plans/PLAN-byo-mariadb-phase-01-statelessness.md),
+# but the ipam_reservations.address column uses the native INET4 type, which
+# only exists from MariaDB 10.10 -- so schema creation on 10.6 fails and that
+# floor had silently stopped being real (found by running ensure_schema()
+# against a real 10.6). 10.11 is the oldest in-support LTS above 10.10
+# (itself a short-term release, EOL 2023), ships with Debian 12 and Ubuntu
+# 24.04, and is the version the cluster CI functional tests exercise through
+# their Debian 12 guest images. The live MariaDB tests run on a Debian 13
+# runner and so exercise 11.8 instead.
 MIN_MARIADB_VERSION: tuple[int, int, int] = (10, 11, 0)
 
 
@@ -1872,7 +1872,7 @@ def _node_metric_to_bool(value: Any) -> bool:
 
 
 # Projection of capacity-relevant metrics_json fields to typed columns on
-# node_metrics (scheduler-reservations phase 1). Each entry is
+# node_metrics, so capacity arithmetic can run in SQL. Each entry is
 # (metrics_key, column_name, coercion). This single spec drives both the
 # column population in _direct_upsert_node_metrics() and the unit tests
 # that guard against drift between the spec and the table definition.
@@ -1897,7 +1897,7 @@ NODE_METRICS_EXTRACTION_SPEC: tuple[tuple[str, str, Callable[[Any], Any]], ...] 
     # non-hypervisor candidates before any capacity arithmetic), and
     # sf-resources publishes metrics from every node regardless of role.
     # A typed column keeps that filter in SQL rather than unpacking
-    # metrics_json per row (scheduler-reservations phase 2).
+    # metrics_json per row.
     ('is_hypervisor', 'is_hypervisor', _node_metric_to_bool),
 )
 
@@ -1936,9 +1936,8 @@ def _get_node_metrics_table() -> sa.Table:
 
     Capacity-relevant fields are additionally projected to typed nullable
     columns at upsert time (driven by NODE_METRICS_EXTRACTION_SPEC) so that
-    SQL-side capacity arithmetic is possible (scheduler-reservations
-    phase 1). metrics_json remains the full authoritative payload for
-    readers.
+    SQL-side capacity arithmetic is possible. metrics_json remains the
+    full authoritative payload for readers.
 
     One row per node, upserted each update cycle.
     """
@@ -2016,7 +2015,7 @@ def _ensure_node_metrics_schema(engine: sa.Engine) -> dict[str, Any]:
 
     if current_ver < 3:
         # v3 adds typed nullable capacity columns projected from
-        # metrics_json at upsert time (scheduler-reservations phase 1).
+        # metrics_json at upsert time, for SQL-side capacity arithmetic.
         # Existing rows keep NULL columns until the next 60 second upsert
         # cycle repopulates every live node -- no backfill is needed for a
         # table whose rows are ephemeral by design. The column types are
@@ -2031,11 +2030,11 @@ def _ensure_node_metrics_schema(engine: sa.Engine) -> dict[str, Any]:
     if current_ver < 4:
         # v4 adds is_hypervisor, projected from metrics_json alongside the
         # v3 capacity columns so the capacity reconciler can filter to
-        # hypervisors in SQL (scheduler-reservations phase 2). Same
-        # spec-driven, existence-guarded ADD COLUMN pass as v3: both steps
-        # simply converge the table onto NODE_METRICS_EXTRACTION_SPEC, so
-        # running them in sequence on an old database is safe and the end
-        # state does not depend on which step introduced a column.
+        # hypervisors in SQL. Same spec-driven, existence-guarded ADD
+        # COLUMN pass as v3: both steps simply converge the table onto
+        # NODE_METRICS_EXTRACTION_SPEC, so running them in sequence on an
+        # old database is safe and the end state does not depend on which
+        # step introduced a column.
         LOG.info(f'Adding is_hypervisor column to {table_name} table (version 4)')
         _add_missing_node_metrics_columns(engine, table, table_name)
         current_ver = 4
@@ -2350,9 +2349,9 @@ def _get_work_queue_table() -> sa.Table:
     UNIX_TIMESTAMP(NOW(6)) >= scheduled_at so a future timestamp
     defers the job past its eligibility point.
 
-    attempts is incremented on each successful claim. Phase 7's
-    reaper will use it to enforce max_attempts (the "job of death"
-    guard) when clearing stale claims.
+    attempts is incremented on each successful claim. The stale-claim
+    reaper (reap_stuck_cluster_operation_jobs() in the cluster daemon)
+    uses it to enforce max_attempts (the "job of death" guard).
     """
     global _work_queue_table
     if _work_queue_table is None:
@@ -3561,7 +3560,7 @@ def _ensure_artifact_indexes_schema(engine: sa.Engine) -> dict[str, Any]:
 
 
 # =============================================================================
-# Scheduler Capacity Table Definitions (scheduler-reservations phase 2)
+# Scheduler Capacity Table Definitions
 # =============================================================================
 
 _scheduler_node_capacity_table: Optional[sa.Table] = None
@@ -3576,9 +3575,9 @@ def _get_scheduler_node_capacity_table() -> sa.Table:
     docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md).
     One row per hypervisor: the schedulable limits derived from the typed
     node_metrics columns, the materialised usage counters recomputed from
-    placed instances, and the decaying expected-demand signal. In this
-    phase the tables are maintained solely by the reconciler; the
-    guarded-UPDATE admission path arrives in phase 3.
+    placed instances, and the decaying expected-demand signal. The
+    reconciler recomputes these rows; the guarded-UPDATE admission path
+    draws them down and releases them between passes.
 
     ``updated_at`` follows the cluster_locks TIMESTAMP idiom: a
     server-side timestamp so comparisons happen against the database's
@@ -3712,9 +3711,11 @@ def _get_cluster_capacity_table() -> sa.Table:
     docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md).
     A singleton row (id always 1): cluster-wide totals summed from node
     limits, capacity claimed by active namespace claims, and usage by
-    instances in namespaces without an active claim. The D14 admission
-    guards run against this row in phases 3/4; in this phase it is
-    maintained solely by the reconciler.
+    instances in namespaces without an active claim. The cluster-wide
+    admission guards run against this row: an unclaimed create must fit
+    in ``total - claimed``, and a claim must fit in
+    ``total - unclaimed_used``, so claims can never oversubscribe the
+    cluster.
 
     ``updated_at`` follows the cluster_locks TIMESTAMP idiom: a
     server-side timestamp so comparisons happen against the database's
@@ -3772,8 +3773,8 @@ def _ensure_scheduler_node_capacity_schema(
     table = _get_scheduler_node_capacity_table()
 
     # Version 0 or -1 means the table doesn't exist yet - create it at
-    # the current schema version. This table is new in scheduler-
-    # reservations phase 2, so there is no prior shape to migrate.
+    # the current schema version. A table that does not exist has no
+    # prior shape to migrate.
     if current_ver <= 0:
         LOG.info(f'Creating {table_name} table '
                  f'(version {SCHEDULER_NODE_CAPACITY_VERSION})')
@@ -3827,10 +3828,9 @@ def _ensure_namespace_claims_schema(engine: sa.Engine) -> dict[str, Any]:
     table = _get_namespace_claims_table()
 
     # Version 0 or -1 means the table doesn't exist yet - create it at
-    # the current schema version. This table is new in scheduler-
-    # reservations phase 2, so there is no prior shape to migrate. The
-    # namespace index is part of the table definition and is created by
-    # create_all alongside the table.
+    # the current schema version. A table that does not exist has no
+    # prior shape to migrate. The namespace index is part of the table
+    # definition and is created by create_all alongside the table.
     if current_ver <= 0:
         LOG.info(f'Creating {table_name} table '
                  f'(version {NAMESPACE_CLAIMS_VERSION})')
@@ -3866,9 +3866,9 @@ def _ensure_cluster_capacity_schema(engine: sa.Engine) -> dict[str, Any]:
     table = _get_cluster_capacity_table()
 
     # Version 0 or -1 means the table doesn't exist yet - create it at
-    # the current schema version. This table is new in scheduler-
-    # reservations phase 2, so there is no prior shape to migrate. The
-    # singleton row (id=1) is written by the reconciler, not here.
+    # the current schema version. A table that does not exist has no
+    # prior shape to migrate. The singleton row (id=1) is written by the
+    # reconciler, not here.
     if current_ver <= 0:
         LOG.info(f'Creating {table_name} table '
                  f'(version {CLUSTER_CAPACITY_VERSION})')
@@ -4198,7 +4198,7 @@ def _direct_get_objects_by_state(object_type: ObjectType,
 
     An empty ``state_values`` list means "no state filter" — return every
     object of ``object_type`` regardless of state. This matches the
-    pre-phase-5 ``Nodes([])`` semantics where no prefilter returned every
+    older ``Nodes([])`` semantics where no prefilter returned every
     node, including DELETED.
 
     ``updated_before`` pushes an age filter down to SQL: only rows whose
@@ -7650,8 +7650,9 @@ def get_active_blob_uuids() -> list[str]:
     both. That is the right answer for the first and an acceptable one
     for the second -- no client can shrink the reply, so there is no
     action the distinction would unlock, and a retrying client is still
-    better off than under the silent 200-with-[] this replaced. Phase 3
-    of docs/plans/PLAN-grpc-bounded-replies.md removes the second
+    better off than under the silent 200-with-[] this replaced. The
+    planned general mechanism for bounding unbounded reads (see
+    docs/plans/PLAN-grpc-bounded-replies.md) removes the second
     condition rather than teaching callers to tell the two apart.
 
     Returns:
@@ -12884,10 +12885,10 @@ def _migrate_keys_from_namespace_attributes(
 
     The hash, the nonce and the expiry are copied verbatim; tokens
     minted before the migration must keep validating afterwards. Scopes
-    and provenance are NULL, which means "unscoped" until phase 3 of
-    PLAN-auth-federation gives them meaning. Expired entries are
-    migrated too: the reaper deletes them on its first pass, so the
-    migration needs no expiry policy of its own.
+    and provenance are NULL, which means "unscoped": such a key carries
+    the wildcard scope, as every key did before scopes existed. Expired
+    entries are migrated too: the reaper deletes them on its first pass,
+    so the migration needs no expiry policy of its own.
 
     Idempotent: keys that already have a row for their (namespace, name)
     pair are skipped, and the inserts use INSERT ... ON DUPLICATE KEY
@@ -17774,7 +17775,7 @@ def get_ipam(ipam_uuid: UUID) -> Optional[IPAMData]:
     # The IPAM record read here is the immutable static block definition
     # (uuid/namespace/network_uuid/ipblock/version); the mutable allocations
     # live in the ipam_reservations table and are read by other functions. So
-    # this is a phase 2 immutable-tier cache candidate -- update_ipam (the
+    # it is safe to cache in the immutable tier -- update_ipam (the
     # version-upgrade persist path) and delete_ipam evict it. See issue #3501.
     cached: Optional[IPAMData] = _object_cache_get('ipam', ipam_uuid)
     if cached is not None:
@@ -17947,7 +17948,7 @@ def _ensure_network_attributes_schema(
         _set_table_version(engine, table_name, current_ver)
 
     if current_ver < NETWORK_ATTRIBUTES_VERSION:
-        # Phase 7: drop the cached child-NI list. The
+        # Drop the cached child-NI list. The
         # ``Network.networkinterfaces`` property now queries
         # network_interfaces live via an indexed
         # ``WHERE network_uuid = ?``. ``DROP COLUMN IF EXISTS`` is
@@ -19800,7 +19801,7 @@ def _ensure_instance_attributes_schema(
             conn.commit()
 
     if current_ver < INSTANCE_ATTRIBUTES_VERSION:
-        # Phase 7: drop the cached per-instance NI UUID list. The
+        # Drop the cached per-instance NI UUID list. The
         # ``Instance.interfaces`` property now queries
         # network_interfaces live via an indexed
         # ``WHERE instance_uuid = ?``. ``DROP COLUMN IF EXISTS`` is
@@ -21485,7 +21486,7 @@ def _direct_create_and_enqueue_cluster_operation(
        payload dict of
        {'operation_type': operation_type,
         'operation_uuid': str(op_uuid)} -- the same shape
-       phase 5's from_db() consumer will read via Dequeue.
+       the dequeuing worker reads via Dequeue to call from_db().
     4. One cluster_operation_targets row per entry in ``targets``
        (each an ``(ObjectType, target_uuid)`` pair). Writing these
        in the same transaction as the op is what makes a by-target
@@ -22308,8 +22309,9 @@ def _coalescible_key_pairs(
     """Convert a coalescing key into its protobuf representation.
 
     A ``None`` value means "this column must be NULL", which is a
-    narrower key rather than a missing one -- see decision 8 of
-    docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
+    narrower key rather than a missing one: a cluster-wide operation,
+    whose ``node_uuid`` is None, folds only other cluster-wide
+    operations, and refusing a None key would switch that folding off.
     proto3 cannot distinguish an empty string from an unset field, so
     that has to travel as an explicit ``is_null`` flag; the V2 handlers
     turn it back into a ``None`` before calling the direct functions.
@@ -22326,14 +22328,13 @@ def _coalescible_key_pairs(
 # whole multi-column key. An sf-database from before the V2 pair existed
 # answers UNIMPLEMENTED, and the *only* correct response to that is to
 # behave as though coalescing is unavailable. Falling back to the V1 RPC
-# would send just the first
-# key column, and the server would happily fold every operation matching
-# it -- during a rolling upgrade that is a survivor on one hypervisor
-# marking another hypervisor's genuinely different work complete, which
-# is the cross-node corruption the separate RPC names exist to prevent.
-# Losing an optimisation loudly for the length of an upgrade is the
-# cheap failure; folding across nodes silently is not. See decision 1 of
-# docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
+# would send just the first key column, and the server would happily
+# fold every operation matching it -- during a rolling upgrade that is a
+# survivor on one hypervisor marking another hypervisor's genuinely
+# different work complete, which is the cross-node corruption the
+# separate RPC names exist to prevent. Losing an optimisation loudly for
+# the length of an upgrade is the cheap failure; folding across nodes
+# silently is not.
 #
 # "Loudly" is why UNIMPLEMENTED raises CoalescingUnavailable rather than
 # returning the same "nothing matched" both functions return on every
@@ -22459,8 +22460,8 @@ def get_cluster_operation(
     """Get a cluster operation header.
 
     Returns a dict shaped {**metadata_json, uuid, operation_type,
-    created_at} -- a drop-in replacement for the legacy etcd payload
-    that phase 5's from_db() switch relies on.
+    created_at} -- a drop-in replacement for the legacy etcd payload,
+    which is what lets from_db() read operations from MariaDB unchanged.
 
     Args:
         uuid: The operation's UUID (str or UUID).
@@ -22503,8 +22504,8 @@ def list_cluster_operations_for_target(
 
     Namespace scoping is the caller's responsibility. The REST handler
     that consumes this helper validates the caller's access to the
-    target object before issuing the query (Approach (b) from the
-    Phase 7 plan), so this function does no namespace filtering itself.
+    target object before issuing the query, so this function does no
+    namespace filtering itself.
 
     Args:
         target_object_type: The ObjectType of the target object.
@@ -22937,7 +22938,7 @@ def _direct_work_queue_restart(queue_name: str) -> int:
     """Clear all claims on a queue so workers re-pick up the jobs.
 
     Used by the queues daemon at startup to recover in-flight work
-    after a crash. Does NOT reset attempts -- phase 7's reaper
+    after a crash. Does NOT reset attempts -- the stale-claim reaper
     still needs to notice persistently-failing jobs eventually.
 
     Returns the number of rows whose claim was cleared.
@@ -23121,10 +23122,9 @@ def _coalescible_preflight(
     node_uuid, so a ``('network_uuid', 'node_uuid')`` key with a NULL
     node matches only the other cluster-wide operations on that network,
     exactly as a per-node key matches only that node's. Refusing it
-    would have switched off the only coalescing the cluster does the
-    moment the key widened -- see decision 8 of
-    docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md. The
-    protection against a caller who *forgot* a value lives upstream in
+    would switch off the cluster-wide coalescing the cluster already did
+    before the key widened to include node_uuid. The protection against
+    a caller who *forgot* a value lives upstream in
     ``_coalescible_keys``, which raises ``KeyError`` for a column with
     no entry at all: a missing entry is a bug, an explicit ``None`` is a
     decision.
@@ -23279,10 +23279,10 @@ def _direct_find_existing_coalescible_op(
     enqueue deduped onto a queued ``background`` repair of the same
     network and node does not merely lose its lane, it blocks a caller
     which is sitting in ``raise_for_error()`` on the background lane's
-    queue-sit tail -- the tail phase 10 measured. Callers therefore
-    pass every priority at least as urgent as their own. ``None`` or an
-    empty list means no priority filter, which is the pre-#4007
-    behaviour.
+    queue-sit tail, where measurement on sfcbr found the deepest
+    operation waits come from. Callers therefore pass every priority at
+    least as urgent as their own. ``None`` or an empty list means no
+    priority filter, which is the pre-#4007 behaviour.
 
     Returns ``None`` when there's no match. Callers use this to skip
     a new ``create_and_enqueue`` insert when an equivalent op is
@@ -24918,20 +24918,21 @@ def delete_orphaned_artifact_attributes() -> Optional[int]:
 
 
 # =============================================================================
-# Scheduler capacity reconcile (scheduler-reservations phase 2)
+# Scheduler capacity reconcile
 #
-# The reconciler (D5) recomputes every counter in the three capacity
-# tables from ground truth in a single RPC: it expires stale namespace
-# claims, refreshes per-node limits from the typed node_metrics columns,
+# The reconciler recomputes every counter in the three capacity tables
+# from ground truth in a single RPC: it expires stale namespace claims,
+# refreshes per-node limits from the typed node_metrics columns,
 # recomputes usage from placed instances (instance_location rows in
-# object_references), recomputes the D13 expected-demand decay, and
-# rebuilds the cluster_capacity singleton. In this phase the reconciler
-# is the only writer of these tables; phase 3's guarded-UPDATE admission
-# path turns the recompute into a drift correction.
+# object_references), recomputes the expected-demand decay, and rebuilds
+# the cluster_capacity singleton. There is no per-placement reservation
+# row to reap, so a periodic recompute is what bounds any drift: the
+# guarded-UPDATE admission path keeps the counters current between
+# passes, and the recompute corrects whatever drift it leaves.
 #
 # The limit formulas below deliberately mirror scheduler.py
-# (_has_sufficient_cpu/_ram/_disk) so that the phase 3 guard
-# ``used + x <= limit`` admits exactly what today's Python filter admits.
+# (_has_sufficient_cpu/_ram/_disk) so that the admission guard
+# ``used + x <= limit`` admits exactly what the Python filter admits.
 # See docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
 # =============================================================================
 
@@ -24958,8 +24959,8 @@ def _derive_cpu_memory_limits(
     than a ceiling on what may be allocated). Neither scheduler test has
     this shape. It is an allocation ledger, not the KSM-aware
     actual-usage check; the actual-free and actual-usage checks remain
-    phase 3 candidate *filters* over the typed node_metrics columns per
-    D7, with this as the allocation backstop underneath them.
+    candidate *filters* over the typed node_metrics columns, with this
+    as the allocation backstop underneath them.
 
     A dimension whose inputs are NULL (a metrics row written by an old
     resources daemon mid-upgrade) derives as None so the caller keeps
@@ -24967,11 +24968,11 @@ def _derive_cpu_memory_limits(
     of scheduler.py covers the arithmetic but deliberately not the
     inputs: Scheduler._schedulable_threads() and
     Scheduler._memory_reserved_mb() substitute per-node fallbacks for a
-    pre-phase-1 metrics row, where this returns None and the caller
-    prefers no capacity row to a guessed one. So mid-upgrade the
-    scheduler may place on a node that has no capacity row yet. That is
-    the conservative direction, but it means the two are not
-    interchangeable while an upgrade is in flight.
+    metrics row written before the typed capacity columns existed, where
+    this returns None and the caller prefers no capacity row to a
+    guessed one. So mid-upgrade the scheduler may place on a node that
+    has no capacity row yet. That is the conservative direction, but it
+    means the two are not interchangeable while an upgrade is in flight.
 
     ``limit_memory_mb`` is clamped at zero, matching the headroom clamp
     in _derive_disk_limit_gb: a reservation exceeding the overcommit
@@ -25007,11 +25008,12 @@ def _derive_disk_limit_gb(
     is the only ground truth that survives qcow2 growth, so the limit is
     "current virtual drawdown plus what the filesystem says still fits":
     ``used_disk_gb + max(0, floor(disk_free_instances/GiB) -
-    disk_reservation_gb) x disk_overcommit``. The phase 3 guard
-    ``used + x <= limit`` is then today's free-space check scaled by
+    disk_reservation_gb) x disk_overcommit``. The admission guard
+    ``used + x <= limit`` is then the free-space check scaled by
     ``disk_overcommit`` on the headroom term only, while accounting
-    virtual size (decision P3,
-    docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md).
+    virtual size. Scaling headroom rather than a physical total keeps a
+    genuinely full disk admitting nothing (headroom falls to zero with
+    free space) while letting a burst of sparse virtual claims through.
     ``disk_overcommit`` of 1.0 reproduces the pre-ratio arithmetic
     exactly.
 
@@ -25127,15 +25129,15 @@ def disk_spec_virtual_gb(disk_spec: Any) -> int:
 # or one placed but not yet defined in libvirt, still holds its
 # reservation here and does not appear there, so used_cpus reads higher
 # than today's scheduler filter sees whenever a node has powered-off
-# instances. That is the right semantics for a reservation ledger, but
-# it means phase 3 must decide explicitly which number its guard uses
-# rather than assuming the two agree.
+# instances. That is the right semantics for a reservation ledger, and
+# the admission guard is denominated in this ledger rather than in the
+# measurements, so guard and reconciler agree by construction; the two
+# numbers must never be assumed to agree with each other.
 #
 # The ledger reads only these INSTANCE_LOCATION rows. The legacy
 # node_attributes.instances JSON column, its dual-write and the union
-# in Node.instances were removed in scheduler-reservations phase 3
-# (this change), so a placement is always visible here once written --
-# the precondition for enabling the counter guard is met.
+# in Node.instances have been removed, so a placement is always visible
+# here once written -- the precondition for enabling the counter guard.
 #
 # Duplicated placements are the other way this ledger is inexact: a
 # lost node's INSTANCE_LOCATION row can survive place_instance()'s
@@ -25265,14 +25267,14 @@ _RECONCILE_USAGE_SQL = sa.text('''
 #
 # The aggregation itself is a module-level *fragment* rather than a
 # statement, because two callers have to agree on it exactly and one of
-# them is not the reconciler. Scheduler-reservations phase 4 seeds a new
-# claim's used_* with its namespace's existing drawdown (D3), and if that
-# seeding query and this recompute could disagree by so much as a join
-# condition, every freshly created claim's counters would flap on every
-# reconcile pass -- five minutes apart, forever, and only on the clusters
-# whose data happens to expose the difference. Sharing the text is what
-# makes "the seed is what the reconciler would have computed" a property
-# of the code rather than a claim in a comment.
+# them is not the reconciler. Claim creation seeds a new claim's used_*
+# with its namespace's existing drawdown, and if that seeding query and
+# this recompute could disagree by so much as a join condition, every
+# freshly created claim's counters would flap on every reconcile pass --
+# five minutes apart, forever, and only on the clusters whose data
+# happens to expose the difference. Sharing the text is what makes "the
+# seed is what the reconciler would have computed" a property of the
+# code rather than a claim in a comment.
 _NAMESPACE_USAGE_AGGREGATION = '''
                SELECT i.namespace AS namespace,
                       COALESCE(SUM(i.cpus), 0) AS used_cpus,
@@ -25336,11 +25338,12 @@ _RECONCILE_CLAIM_USAGE_SQL = sa.text(f'''
 
 
 # One namespace's drawdown, from the identical aggregation the per-claim
-# recompute rewrites its counters from. Phase 4's claim creation reads
-# this before it opens its transaction and seeds the new row with it
-# (D3), so that a claim created for a namespace which already holds
-# instances starts life at the figure the next reconcile pass will
-# compute, and that pass then moves nothing.
+# recompute rewrites its counters from. Claim creation reads this before
+# it opens its transaction and seeds the new row with it, so that a
+# claim created for a namespace which already holds instances starts
+# life at the figure the next reconcile pass will compute, and that pass
+# then moves nothing. Seeding zero instead would let the namespace place
+# its entire claim twice until that pass ran.
 #
 # The namespace restriction is deliberately applied *outside* the shared
 # fragment rather than inside it, so the two callers execute the same
@@ -25496,7 +25499,7 @@ def _direct_reconcile_scheduler_capacity(
         disk_overcommit: float) -> Optional[dict[str, Any]]:
     """Run one full capacity reconcile pass directly against MariaDB.
 
-    One pass, in order (D5): expire stale namespace claims; refresh node
+    One pass, in order: expire stale namespace claims; refresh node
     limit rows from node_metrics; recompute usage from placement ground
     truth; recompute expected_demand; rebuild the cluster_capacity
     singleton. Usage is computed before limits are written because
@@ -25507,10 +25510,10 @@ def _direct_reconcile_scheduler_capacity(
     shares, unlike the demand parameters and ``disk_overcommit`` which
     ride in from the caller.
 
-    Since phase 3 this pass is not the only writer of these tables: the
-    placement admission and release transactions update
-    cluster_capacity, namespace_claims and scheduler_node_capacity on
-    the instance hot path, concurrently with a pass. The reconciler is
+    This pass is not the only writer of these tables: the placement
+    admission and release transactions update cluster_capacity,
+    namespace_claims and scheduler_node_capacity on the instance hot
+    path, concurrently with a pass. The reconciler is
     still the authority on every counter it writes, because it
     recomputes each one from ground truth -- the placement rows and the
     instances they point at -- rather than adjusting it incrementally.
@@ -25552,8 +25555,8 @@ def _direct_reconcile_scheduler_capacity(
             for row in conn.execute(sa.select(capacity)).fetchall():
                 previous[row.node_uuid] = row
 
-            # The typed capacity columns from node_metrics (phase 1),
-            # restricted to hypervisors with fresh metrics.
+            # The typed capacity columns from node_metrics, restricted
+            # to hypervisors with fresh metrics.
             #
             # sf-resources publishes metrics from every node whatever its
             # roles, but only a hypervisor can host an instance -- the
@@ -25977,21 +25980,20 @@ def reconcile_scheduler_capacity() -> Optional[dict[str, Any]]:
 # =============================================================================
 # Scheduler Placement Admission (MariaDB)
 #
-# Scheduler-reservations phase 3: the atomicity primitive the plan exists
-# for (D1, D3). AdmitInstancePlacement performs the guarded capacity
-# drawdown, the placement attribute write and the placement reference
-# rewrite in one transaction, so two concurrent creates racing one
-# remaining slot admit exactly once and a stale duplicate placement row
-# cannot be produced. ReleaseInstancePlacement is its floored-decrement
-# mirror. See
-# docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
+# The atomicity primitive for scheduling. AdmitInstancePlacement performs
+# the guarded capacity drawdown, the placement attribute write and the
+# placement reference rewrite in one transaction, so two concurrent
+# creates racing one remaining slot admit exactly once, no grant-then-
+# crash window leaks capacity, and a stale duplicate placement row cannot
+# be produced. ReleaseInstancePlacement is its floored-decrement mirror.
+# See docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
 #
 # There is deliberately no fallback Python composition of the existing
 # single-table RPCs: the whole point is that these are one transaction.
 # =============================================================================
 
-# MariaDB errnos on which the entire admission transaction is retried
-# (D1). 1213 ER_LOCK_DEADLOCK is the InnoDB deadlock victim, 1205
+# MariaDB errnos on which the entire admission transaction is retried.
+# 1213 ER_LOCK_DEADLOCK is the InnoDB deadlock victim, 1205
 # ER_LOCK_WAIT_TIMEOUT is the same contention resolved by the timeout
 # rather than the detector, and 1020 ER_CHECKREAD is "record has changed
 # since last read". All three mean "your transaction lost a race, run it
@@ -26005,8 +26007,8 @@ def reconcile_scheduler_capacity() -> Optional[dict[str, Any]]:
 #
 # 1020 is belt and braces rather than a working part. Both transactions
 # open with a guarded UPDATE (see the block comment above
-# _probe_admission_rows()), which is the shape phase 0 benchmarked as
-# never raising it, and the live concurrency suite confirms it does not
+# _probe_admission_rows()), which is the shape benchmarked as never
+# raising it, and the live concurrency suite confirms it does not
 # fire against a server with innodb_snapshot_isolation ON. It stays in
 # the set because MDEV-39263 reports the error firing "most of the time,
 # but not every time", so it is not something to rely on the absence of.
@@ -26019,13 +26021,15 @@ _TRANSACTION_BASE_DELAY = 0.005
 # demand clause is what refused.
 CAPACITY_DIMENSIONS = ('cpus', 'memory_mb', 'disk_gb')
 
-# Is a namespace claim's ceiling enforced, or merely recorded? D16 makes
-# claim ceilings advisory for one release: an admission that pushes a
-# claim's used_* past its limit_* is admitted and reported
-# (claim_over_limit plus the offending dimensions) rather than refused.
-# Phase 5 flips this to True together with the HTTP 403 refusal path.
+# Is a namespace claim's ceiling enforced, or merely recorded? Claim
+# ceilings are advisory for now, so learned footprints can calibrate
+# before rejections start: an admission that pushes a claim's used_*
+# past its limit_* is admitted and reported (claim_over_limit plus the
+# offending dimensions) rather than refused. Flipping this to True
+# together with an HTTP 403 refusal path is pending caller migration
+# (see docs/plans/PLAN-scheduler-reservations.md).
 #
-# Deliberately a module constant and not a config option (D4): a `hard`
+# Deliberately a module constant and not a config option: a `hard`
 # setting whose refusal path does not exist yet is a trap for the
 # operator who sets it. It is *not* folded into the node and cluster
 # fail-open either -- see the three guard flags in
@@ -26690,22 +26694,22 @@ def _instance_location_nodes(
 # on the row lock and then re-evaluates the WHERE, which is the behaviour
 # the whole guarded-UPDATE design depends on.
 #
-# This is not a hypothesis. Phase 0's step 2 benchmark (see
+# This is not a hypothesis. The design benchmark (see
 # docs/plans/PLAN-scheduler-reservations-phase-00-findings.md, "Step 2
 # benchmark results") ran 96 cells across both regimes and recorded
 # ER_CHECKREAD never firing for the guarded-UPDATE idioms, explicitly
 # because the guarded UPDATE was the transaction's first statement, with
 # the warning that "the risk returns if a plain SELECT precedes the guarded
-# UPDATE inside the same RR transaction". Phase 3's step 6 validation then
-# demonstrated exactly that: with the branch and presence probes opening
-# the transaction, 46 of a 50-way admission burst exhausted the retry
-# budget on 1020 and surfaced as HTTP 500s on instance create.
+# UPDATE inside the same RR transaction". A concurrency run against a real
+# MariaDB then demonstrated exactly that: with the branch and presence
+# probes opening the transaction, 46 of a 50-way admission burst exhausted
+# the retry budget on 1020 and surfaced as HTTP 500s on instance create.
 #
 # So the probes run here, on their own connection, before the transaction
 # opens. Reads that happen *after* our own writes inside the transaction
 # are fine -- those rows are already locked by our UPDATEs -- which is why
 # the post-admit counter SELECT may stay where it is. Subqueries carried
-# inside a guarded UPDATE (the D13 demand clause against node_metrics) are
+# inside a guarded UPDATE (the demand clause against node_metrics) are
 # likewise fine: they are part of the DML that establishes the read view.
 # ---------------------------------------------------------------------------
 
@@ -26782,18 +26786,18 @@ def _probe_release_rows(
     branch select cannot run inside the transaction.
 
     **The instance_location rows are the sole authority for what is
-    charged, whether or not the caller names a node.** Since phase 3 the
-    placement attribute and the reference rows are written by one
-    transaction, so a node with no reference row for this instance is a
-    node holding nothing on its behalf. ``named_node`` is therefore a
+    charged, whether or not the caller names a node.** The placement
+    attribute and the reference rows are written by one transaction, so
+    a node with no reference row for this instance is a node holding
+    nothing on its behalf. ``named_node`` is therefore a
     *filter* over the located rows, never an override: named and located
     releases that node's row; named and not located releases nothing at
     all, returning ``released=False`` with no counter touched.
 
     That distinction is what makes a repeat release harmless for a
     *named-node* caller too. ``Instance._delete_globally()`` names the
-    node from the ``placement`` attribute, which is never cleared (P8),
-    and the delete path's re-entrancy guard only catches state
+    node from the ``placement`` attribute, which is never cleared, and
+    the delete path's re-entrancy guard only catches state
     ``deleted`` -- an instance that ended in ``error`` reaches the
     release on every delete attempt. Taking the named node on trust
     decremented the node and namespace counters again each time (the
@@ -27070,13 +27074,13 @@ def _direct_admit_instance_placement(
         node_present = probe.node_present
 
         if not node_present:
-            # P7: mid-upgrade, a node whose metrics row predates phase 1
-            # has no capacity row, and the cluster totals do not include
-            # its limits either -- so guarding the cluster row against a
-            # total this node contributes nothing to would deny
-            # placements for a reason that is not true. Fail open on
-            # every guard, loudly, and let the reconciler create the row
-            # on its next pass.
+            # Mid-upgrade, a node whose metrics row predates the typed
+            # capacity columns has no capacity row, and the cluster
+            # totals do not include its limits either -- so guarding the
+            # cluster row against a total this node contributes nothing
+            # to would deny placements for a reason that is not true.
+            # Fail open on every guard, loudly, and let the reconciler
+            # create the row on its next pass.
             outcome['unguarded'] = True
 
         # Three guards, three flags (D6). The node and cluster guards
@@ -27106,9 +27110,9 @@ def _direct_admit_instance_placement(
             # and makes every later guarded UPDATE against a contended
             # row abort with ER_CHECKREAD (1020) under
             # innodb_snapshot_isolation, which is ON by default from
-            # MariaDB 11.6.2. Phase 0's step 2 benchmark predicted this
-            # and phase 3's step 6 validation reproduced it (46 of 50
-            # concurrent admissions exhausting the retry budget). Reads
+            # MariaDB 11.6.2. The design benchmark predicted this and a
+            # concurrency run against a real MariaDB reproduced it (46 of
+            # 50 concurrent admissions exhausting the retry budget). Reads
             # after our own writes are fine -- we hold those row locks.
 
             # (2) The cluster or claim guard, which a move skips
@@ -27864,18 +27868,20 @@ def get_scheduler_node_capacity() -> SchedulerNodeCapacityRead:
 # =============================================================================
 # Namespace Claim CRUD (MariaDB)
 #
-# Scheduler-reservations phase 4: the rows nothing could create until now,
-# which is why phase 3's claim branch was unreachable in production. See
+# This is the only code that creates namespace_claims rows, and so the
+# only thing that can bring the claim branch of the admission primitive
+# above into play. See
 # docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md.
 #
 # A claim is a promise the cluster has to be able to keep, so creating one
 # -- and growing one -- is an admission decision in its own right, against
-# the same cluster_capacity singleton an instance create draws down. D14's
-# mirror guard is _claim_capacity_guard(): claimed + requested +
-# GREATEST(0, unclaimed_used - migrated) <= total, which tests the state
-# the guarded statement's own SET produces rather than the one it started
-# from. Everything the admission primitive above had to get right applies
-# here unchanged:
+# the same cluster_capacity singleton an instance create draws down. The
+# mirror image of the unclaimed instance guard, so that claims can never
+# oversubscribe the cluster, is _claim_capacity_guard(): claimed +
+# requested + GREATEST(0, unclaimed_used - migrated) <= total, which
+# tests the state the guarded statement's own SET produces rather than
+# the one it started from. Everything the admission primitive above had
+# to get right applies here unchanged:
 #
 # * the canonical write order, cluster_capacity then namespace_claims, so
 #   these transactions contend with instance admission rather than
@@ -27888,12 +27894,13 @@ def get_scheduler_node_capacity() -> SchedulerNodeCapacityRead:
 #   changing any of them,
 # * _retry_transaction() for 1213/1205/1020, whole-transaction retry.
 #
-# Two things are new. Creation migrates the namespace's existing drawdown
-# into the claim (D3) rather than seeding zero, closing a window in which
-# a namespace could place its entire claim a second time. And an update
-# evaluates each dimension on its own terms in one transaction (D8): a
-# grow is guarded, a shrink is floored at the claim's current used_*, and
-# one request may do both. There is no auto-grow, ever (D15).
+# Two things differ from instance admission. Creation migrates the
+# namespace's existing drawdown into the claim rather than seeding zero,
+# closing a window in which a namespace could place its entire claim a
+# second time. And an update evaluates each dimension on its own terms in
+# one transaction: a grow is guarded, a shrink is floored at the claim's
+# current used_*, and one request may do both. There is no auto-grow,
+# ever: a ceiling that stretches stops keeping declared footprints honest.
 # =============================================================================
 
 # Coverage states of a claim (D2). These are *not* the object's existence
@@ -28097,7 +28104,7 @@ def _claim_expiry_expression(expires_in_seconds: int) -> sa.ColumnElement[Any]:
     expiry sweep and by _active_claim_for_namespace() -- so a value
     computed on a node whose clock or timezone differs expires the claim
     at the wrong moment, or instantly, with nothing to show for it. The
-    reconciler's live suite records finding exactly that during phase 2.
+    reconciler's live MariaDB suite found exactly that.
 
     UNIX_TIMESTAMP()/FROM_UNIXTIME() rather than ``NOW() + INTERVAL n
     SECOND`` so the arithmetic is an ordinary bound integer instead of
@@ -28177,7 +28184,7 @@ class _ClaimCreateProbe(NamedTuple):
 
 
 def _probe_claim_create(namespace: str) -> _ClaimCreateProbe:
-    """Read a creation's drawdown and presence probes (D3).
+    """Read a creation's drawdown and presence probes.
 
     Runs on its own connection, outside the write transaction, for the
     reason in the block comment above _probe_admission_rows(): a plain
@@ -28192,7 +28199,9 @@ def _probe_claim_create(namespace: str) -> _ClaimCreateProbe:
       instance's allocation, in one direction, and the reconciler
       recomputes both the claim's used_* and the cluster's unclaimed
       sums from ground truth within a pass. This is the same bargain
-      phase 3 struck for the branch probe, and D3 names it explicitly.
+      the admission branch probe strikes, and it is far cheaper than
+      seeding zero, which would let the namespace place its entire claim
+      twice until that pass.
     * The cluster singleton probe. Absent-then-created refuses a create
       the operator can simply repeat; present-then-deleted makes the
       guarded UPDATE match no row, which reads as a capacity refusal.

@@ -123,12 +123,13 @@ def apply_result(node: Node, result: NodeHealthResult) -> bool:
     stops scheduling onto the node and stops its blob copies counting as
     replicas. Returns True if the node was changed.
 
-    It never clears error (recovery is operator-only, master plan D6) and
+    It never clears error (recovery is operator-only) and
     never touches created/degraded, which the daemon-state and heartbeat
     logic own. Already-errored nodes are left untouched so the diagnosis is
     recorded once, not re-emitted every cycle. The health event is the durable
-    record phase 3 consumes for the affected object types (node attributes are
-    a fixed typed schema, so a free-form record lives in the event log). It
+    record the cluster cascade reads for the affected object types (node
+    attributes are a fixed typed schema, so a free-form record lives in the
+    event log). It
     uses EVENT_TYPE_HEALTH, a channel distinct from the audit action log, so
     errored_node_affected_types() can read it back regardless of how many
     audit events the cascade has since written against the node.
@@ -171,7 +172,7 @@ def errored_node_affected_types(node: Node) -> set[ObjectType] | None:
     Reads the diagnosis apply_result() recorded, from the most recent
     resource-health event on the node, and returns the affected object types.
     Returns None when no such event is found -- the blast radius is unknown, so
-    the caller (the cluster cascade, phase 3) does nothing and retries on a
+    the caller (the cluster daemon's cascade) does nothing and retries on a
     later pass.
 
     get_object_events() returns events newest-first, so the first
@@ -179,7 +180,7 @@ def errored_node_affected_types(node: Node) -> set[ObjectType] | None:
     diagnosis; apply_result() writes one such event on each transition into
     error. The dedicated health channel means the cascade's own audit events
     never crowd the diagnosis out of the read window. This is the read side of
-    the event-log contract phase 2 established (nodes have no free-form
+    the event-log contract apply_result() writes (nodes have no free-form
     attribute store, so the diagnosis lives in the event log).
 
     Defensive against a malformed row (a non-dict extra, or an affected_types

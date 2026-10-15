@@ -600,8 +600,7 @@ class ArtifactMutationTestCase(ArtifactAccessFixture):
 class ArtifactMaxVersionsTestCase(ArtifactAccessFixture):
     """POST /artifacts/<ref>/versions, in all three validation modes.
 
-    Added by the phase 8 audit of PLAN-api-input-validation. This is
-    the first of the three routes which write an artifact's
+    This is the first of the three routes which write an artifact's
     `max_versions`, and the only one whose negative guard had no test
     at all -- the route appeared in the suite only as a 200 in an
     authorisation matrix. The guard matters because a negative

@@ -1,7 +1,7 @@
 # Copyright 2026 Michael Still and contributors
 #
-# Tests for the mariadb._direct_work_queue_* functions introduced
-# in phase 2 of the etcd-removal ops-queues plan.
+# Tests for the mariadb._direct_work_queue_* functions which replaced
+# the etcd-backed ops queues.
 #
 # Pattern follows test_mariadb_blob_hashes.py: mock _get_engine and
 # assert the direct-layer functions issue the expected SQL shape.
@@ -381,7 +381,7 @@ class WorkQueueRestartTestCase(base.ShakenFistTestCase):
         mock_conn.commit.assert_called_once()
 
         # Assert the UPDATE clears claim fields but does NOT touch
-        # attempts -- phase 7's reaper needs to keep seeing them.
+        # attempts -- the stale-claim reaper needs to keep seeing them.
         update_stmt = mock_conn.execute.call_args[0][0]
         compiled = update_stmt.compile()
         self.assertIn('claimed_at', compiled.params)

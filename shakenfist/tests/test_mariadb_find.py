@@ -1,4 +1,4 @@
-# Tests for the mariadb find functions (phase 1 SQL pushdown filtering).
+# Tests for the mariadb find functions (SQL pushdown filtering).
 #
 # This module tests:
 # - find_artifacts() — public wrapper (direct and gRPC paths)
@@ -1495,7 +1495,7 @@ class BuildObjectFilterQueryJoinTestCase(base.ShakenFistTestCase):
 
     The mocking-heavy tests above never execute the rendered SQL, so they
     cannot catch a JOIN whose WHERE clause silently matches zero rows.
-    Phase 1 of the SQL-pushdown work introduced exactly that bug:
+    The original SQL-pushdown change introduced exactly that bug:
     ``object_states.object_uuid`` is ``VARCHAR(36)`` (with dashes) but
     every per-type ``uuid`` column is ``sa.Uuid()`` which renders as
     ``CHAR(32)`` (no dashes) on MariaDB. The CI smoke tests broke because
@@ -1594,8 +1594,9 @@ class DirectGetObjectsByStateTestCase(base.ShakenFistTestCase):
     ``Nodes([])`` (no prefilter) resolves to an empty state list and
     relies on the default iterator's ``get_objects_by_state`` path. An
     empty list must mean "no state filter — return every object of this
-    type" (preserving the pre-phase-5 ``Nodes([])`` semantics that
-    returned every node, including DELETED). This was missed in the
+    type" (preserving the ``Nodes([])`` semantics from before the
+    iterator was ported to this path, which returned every node,
+    including DELETED). This was missed in the
     initial port and surfaced as ``test_metadata.TestNodeMetadata``
     failing with ``IndexError`` because ``get_nodes()`` came back empty.
     """

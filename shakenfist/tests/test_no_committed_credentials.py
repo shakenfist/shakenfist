@@ -116,9 +116,9 @@ class NoCommittedCredentialsTestCase(base.ShakenFistTestCase):
 
         Without this, a scanner which silently matched nothing -- a
         broken regex, a walk which skipped everything, a validity check
-        inverted -- would report a clean tree forever. Phase 6 emptied
-        six leak guards exactly that way, so the guard here is proven to
-        fire before it is trusted to pass.
+        inverted -- would report a clean tree forever. Six leak guards
+        were once silently emptied exactly that way, so the guard here is
+        proven to fire before it is trusted to pass.
         """
         planted = credentials.generate()
         path = self._tempfile(

@@ -142,12 +142,12 @@ class AuthorizationFailureLoggingTestCase(base.ShakenFistTestCase):
         self._assert_attribution(record, 'NoAuthorizationError')
 
     def test_a_type_error_is_not_an_authorization_failure(self):
-        """Phase 5 of PLAN-api-input-validation, decision D23.
+        """A TypeError is a server fault, not an authorization failure.
 
         A TypeError used to be caught here and answered as a 400
         carrying str(e) -- the second half of the mechanism issue 3612
-        describes, and a workaround for the absence of the validation
-        layer phases 1 to 4 built. It is not an authorization
+        describes, and a workaround for the absence of a request
+        validation layer, which now exists. It is not an authorization
         condition: nothing in flask_jwt_extended or PyJWT signals one
         with it, and there is no attribute on a TypeError that would
         let this wrapper tell where it came from. So it must now travel

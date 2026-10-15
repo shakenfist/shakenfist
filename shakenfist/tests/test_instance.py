@@ -2740,7 +2740,7 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
     attribute, remove the old node's reference, insert the new one. It
     is now a single database transaction which also draws down the
     capacity counters, so a placement can never be recorded without the
-    capacity it consumes (scheduler-reservations phase 3).
+    capacity it consumes.
     """
 
     def setUp(self):
@@ -3154,11 +3154,12 @@ class InstancePlacementAdmissionTestCase(base.ShakenFistTestCase):
             extras[0]['claim_dimensions'])
 
     def test_the_mock_can_produce_a_claim_stage_denial(self):
-        # Not a test of enforcement, which does not exist: it is a test
-        # that the fixture can produce the reply shape phase 5's callers
-        # will have to handle, which is the gap the phase 3 plan recorded
-        # against mock_mariadb. Patching the constant here is what keeps
-        # the mock and mariadb.py flipping together.
+        # Not a test of enforcement, which does not exist yet: it is a
+        # test that the fixture can produce the reply shape callers will
+        # have to handle once the claim ceiling is hard (see
+        # PLAN-scheduler-reservations.md), which mock_mariadb once could
+        # not. Patching the constant here is what keeps the mock and
+        # mariadb.py flipping together.
         self.mock_mariadb.set_namespace_claim(
             'unittest', limit_cpus=1, limit_memory_mb=16384,
             limit_disk_gb=100)

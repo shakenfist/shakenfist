@@ -292,12 +292,12 @@ class TestUserDataFormatEnforced(base.BaseNamespacedTestCase):
 class TestNestedSpecKeysRefused(base.BaseNamespacedTestCase):
     """PLAN-api-input-validation-phase-07-structured.md, step 7.
 
-    Phase 7 taught the validation vocabulary to describe what is
-    *inside* a diskspec, a networkspec and a videospec. Until it did, a
-    `dict` compiled to a marshmallow field which checked only that the
-    value was a mapping, so every key inside one of those specs was
-    unexamined: an unknown key was silently discarded and a wrong-typed
-    value reached a handler which could not cope with it.
+    The validation vocabulary describes what is *inside* a diskspec, a
+    networkspec and a videospec. Before it could, a `dict` compiled to a
+    marshmallow field which checked only that the value was a mapping,
+    so every key inside one of those specs was unexamined: an unknown
+    key was silently discarded and a wrong-typed value reached a handler
+    which could not cope with it.
 
     The unit sweep -- shakenfist/tests/external_api/test_nested_sweep.py
     -- measures ninety nine of those values against a mocked MariaDB and
@@ -473,11 +473,12 @@ class TestNestedSpecKeysRefused(base.BaseNamespacedTestCase):
         (`used + requested <= limit`) always admits a negative request
         and *deflates* the node's `used_disk_gb` -- inflating the
         capacity every other namespace's claims are admitted against.
-        That was the only cross-namespace effect in the warn/off
-        inventory of the phase 8 push audit.
+        That was the only cross-namespace effect found when every input
+        the schemas refuse was inventoried for what it does at the
+        `warn`/`off` rollback.
 
         This suite runs at the `enforce` default, so the refusal pinned
-        here is the schema's `minimum: 0` (D45). The handler guard which
+        here is the schema's `minimum: 0`. The handler guard which
         holds the same refusal at the `warn`/`off` rollback answers a
         different 400 and is pinned by the unit sweep's
         `disk.size.negative` rows, because a deployed cluster's
@@ -583,8 +584,8 @@ class TestNullNetworkUuidRefusedOnHotplug(base.BaseNamespacedTestCase):
     of `{"network_uuid": null}` answered **200 and created an interface
     on an arbitrary network**.
 
-    D44 makes `required` inside an object fragment mean present *and
-    not null*, the same rule phase 6 gave it at the top level, which
+    `required` inside an object fragment now means present *and not
+    null*, the same rule it has for a top-level parameter, which
     closes the only path a caller can reach that lookup by. #4223 stays
     open for the lookup itself.
 
@@ -677,12 +678,12 @@ class TestNullNetworkUuidRefusedOnHotplug(base.BaseNamespacedTestCase):
 class TestEveryDocumentedSpecKeyStillBoots(base.BaseNamespacedTestCase):
     """PLAN-api-input-validation-phase-07-structured.md, step 7.
 
-    The other half of the phase, and the more important one. Every
-    narrowing phase 7 added -- five new type tokens, three enums, two
-    deliberate narrowings and `additionalProperties: false` on all three
-    specs -- is a chance to have refused a request some caller legitimately
-    sends, and a suite which only tested refusals would pass just as well
-    against a server which refused everything.
+    The other half of the nested spec schemas, and the more important
+    one. Every narrowing they added -- five new type tokens, three
+    enums, two deliberate narrowings and `additionalProperties: false`
+    on all three specs -- is a chance to have refused a request some
+    caller legitimately sends, and a suite which only tested refusals
+    would pass just as well against a server which refused everything.
 
     So this sends one instance carrying *every* documented key of all
     three specs, with the values a real caller sends, and requires it to

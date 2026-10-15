@@ -133,8 +133,8 @@ class ClaimCreateTestCase(ClaimEndpointTestCase):
 
     # The three refusals below are now made by the published parameter
     # declarations rather than by the handler's own guards, because
-    # phase 4 of PLAN-api-input-validation runs validation ahead of
-    # every per-method decorator. The guards remain and still answer
+    # enforced request validation runs ahead of every per-method
+    # decorator. The guards remain and still answer
     # when API_VALIDATION_MODE is not 'enforce', so what is asserted
     # here is the bound rather than either wording.
 

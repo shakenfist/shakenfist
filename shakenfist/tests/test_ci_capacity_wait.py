@@ -473,8 +473,8 @@ class WaitForCapacityTestCase(test_base.ShakenFistTestCase):
         self.assertEqual(2, record['polls'])
         self.assertEqual(
             'memory_mb', record['binding_dimension'],
-            'The wait must say what it waited on, or phase 5 reads a '
-            'duration with no cause attached to it.')
+            'The wait must say what it waited on, or the wait-trace '
+            'analysis reads a duration with no cause attached to it.')
         self.assertEqual(512, record['headroom_at_start']['memory_mb'])
         self.assertEqual(4096, record['headroom_at_end']['memory_mb'])
 
@@ -1230,9 +1230,10 @@ class EnsureCapacityWaitTraceTestCase(test_base.ShakenFistTestCase):
     The append path opens the trace 'a', so a run in which no create was
     ever refused used to leave no file at all -- indistinguishable from a
     component ref predating the wrapper and from a run whose writes all
-    failed, which made 92% of phase 5's first measurement window unknown
-    (issue 4337). setUp() now touches the file into existence, so 'empty'
-    is a real observation and 'absent' keeps only the other two meanings.
+    failed, which made 92% of the first window of wait traces read for
+    the server-side queueing decision unknown (issue 4337). setUp() now
+    touches the file into existence, so 'empty' is a real observation
+    and 'absent' keeps only the other two meanings.
     """
 
     def setUp(self):

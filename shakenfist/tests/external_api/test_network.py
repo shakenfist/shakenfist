@@ -81,7 +81,7 @@ class NetworksDeleteNoneTestCase(base.ShakenFistTestCase):
                                       'confirm': True,
                                       'namespace': 'foo'
                                   }))
-        # Phase 7 contract: bulk delete returns 202 with a list of
+        # Contract: bulk delete returns 202 with a list of
         # {network_uuid, op_type, op_uuid} entries. When the namespace
         # has no active networks the list is empty.
         self.assertEqual(202, resp.status_code)
@@ -154,7 +154,7 @@ class NetworksDeleteAllTestCase(base.ShakenFistTestCase):
                                       'confirm': True,
                                       'namespace': 'foo'
                                   }))
-        # Phase 7 contract: bulk delete returns HTTP 202 with a list of
+        # Contract: bulk delete returns HTTP 202 with a list of
         # {network_uuid, op_type, op_uuid} entries.
         self.assertEqual(202, resp.status_code)
         self.assertEqual(
@@ -167,9 +167,9 @@ class NetworksDeleteAllTestCase(base.ShakenFistTestCase):
 
 
 class NetworkDeleteEnqueueTaskTestCase(base.ShakenFistTestCase):
-    """Phase 6 step 6c: DELETE /networks/<uuid> enqueues
-    network_apply_delete_network_node (task 12) directly, not the retired
-    network_destroy composite task (task 2).
+    """DELETE /networks/<uuid> enqueues network_apply_delete_network_node
+    (task 12) directly, not the retired network_destroy composite task
+    (task 2).
     """
 
     def setUp(self):
@@ -220,7 +220,7 @@ class NetworkDeleteEnqueueTaskTestCase(base.ShakenFistTestCase):
     def test_delete_network_enqueues_apply_delete_network_node(
             self, mock_enqueue):
         # The mocked enqueue returns the (op_type, op_uuid) tuple the real
-        # function returns; the Phase 7 DELETE handler surfaces these as
+        # function returns; the DELETE handler surfaces these as
         # `op_type` / `op_uuid` in the 202 response body.
         fake_op_uuid = str(uuid4())
         mock_enqueue.return_value = ('net_op', fake_op_uuid)
@@ -228,7 +228,7 @@ class NetworkDeleteEnqueueTaskTestCase(base.ShakenFistTestCase):
         resp = self.client.delete(
             '/networks/%s' % self.network_id,
             headers={'Authorization': self.auth_token})
-        # Phase 7 contract: single-network delete returns HTTP 202 with
+        # Contract: single-network delete returns HTTP 202 with
         # `{op_type, op_uuid}` identifying the queued cluster operation.
         self.assertEqual(202, resp.status_code)
         self.assertEqual(
@@ -658,8 +658,8 @@ class NetworkCreateFloatingOverlapTestCase(base.ShakenFistTestCase):
 
 
 class NetworkDNSAddressEndpointTestCase(base.ShakenFistTestCase):
-    """Regression tests for step 4f: REST handlers call raise_for_error()
-    after update_dns_entry / remove_dns_entry."""
+    """Regression tests that REST handlers call raise_for_error() after
+    update_dns_entry / remove_dns_entry."""
 
     #: The API_VALIDATION_MODE requests in this class run at. The guard
     #: subclasses below re-run at the rollback modes, where the handler
@@ -814,9 +814,9 @@ class NetworkDNSAddressValueGuardTestCase(NetworkDNSAddressEndpointTestCase):
     @mock.patch('shakenfist.network.network.Network.update_dns_entry')
     def test_post_dns_value_non_string_refused(self, mock_update):
         # ip_address() accepts an integer, so the guard has to refuse
-        # non-strings before asking it. A null is the phase 6 sweep's
-        # measured omission behaviour -- a DNS record pointing at null
-        # -- and is refused by the same arm.
+        # non-strings before asking it. A null is also what the handler
+        # was measured to receive when the value is omitted -- a DNS
+        # record pointing at null -- and is refused by the same arm.
         for value in (167772161, None, {'address': '10.0.0.1'}):
             resp = self.client.post(
                 '/networks/%s/dns' % self.network_id,
@@ -832,7 +832,8 @@ class NetworkDNSAddressValueGuardTestCase(NetworkDNSAddressEndpointTestCase):
     def test_post_dns_value_v6_still_accepted(self, mock_update):
         # A hosts file takes an IPv6 address perfectly well, and the
         # schema's own validator accepts one, so a guard refusing it
-        # would be narrower than the server (phase 6's width rule).
+        # would be narrower than the server, and refusing input the
+        # server handles correctly is the failure guards must avoid.
         fake_op = mock.MagicMock()
         fake_op.raise_for_error.return_value = None
         mock_update.return_value = fake_op

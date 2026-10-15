@@ -1,13 +1,13 @@
 # Copyright 2026 Michael Still and contributors
 #
 # GET /blobs/<uuid>/data publishes a minimum of 0 on both offset and
-# limit, and the server backs that rather than waiting for phase 4 to
-# compile the bound, because unbacked both failed worse than
-# meaninglessly. A negative offset reached f.seek() inside
-# stream_with_context, so the OSError arrived after the 200 had begun
-# and the caller saw a truncated body rather than an error. A negative
-# limit made `remaining` negative, so f.read(min(CHUNK_SIZE, -1)) read
-# to EOF and quietly defeated the cap it was asked for.
+# limit, and the handler backs that whatever API_VALIDATION_MODE is set
+# to, because unbacked both failed worse than meaninglessly. A negative
+# offset reached f.seek() inside stream_with_context, so the OSError
+# arrived after the 200 had begun and the caller saw a truncated body
+# rather than an error. A negative limit made `remaining` negative, so
+# f.read(min(CHUNK_SIZE, -1)) read to EOF and quietly defeated the cap
+# it was asked for.
 #
 # The bound is checked in the handler rather than declared as a
 # marshmallow validate=Range(min=0) on the webargs schema, because
@@ -79,11 +79,10 @@ class BlobDataBoundsTestCase(base.ShakenFistTestCase):
 class BlobDataBoundsWarnTestCase(BlobDataBoundsTestCase):
     """The same assertions with the schema layer not refusing.
 
-    Added by the phase 8 audit of PLAN-api-input-validation. At the
-    shipped default the declared `minimum: 0` refuses a negative bound
-    before the handler is entered, so `assertIn('offset', error)` above
-    is satisfied by `offset: Must be greater than or equal to 0.` and
-    the handler guard this file was written for never executed. That
+    At the shipped default the declared `minimum: 0` refuses a negative
+    bound before the handler is entered, so `assertIn('offset', error)`
+    above is satisfied by `offset: Must be greater than or equal to 0.`
+    and the handler guard this file was written for never executed. That
     guard is the only defence at `warn` and `off`, and the assertion on
     its own message below is what identifies the answering layer rather
     than inferring it from a status code both layers produce.

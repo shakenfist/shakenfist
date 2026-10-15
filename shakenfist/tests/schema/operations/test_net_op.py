@@ -151,8 +151,8 @@ class NetOpTestCase(base.ShakenFistTestCase):
 
     def test_create_and_enqueue_derives_node_uuid_from_target(self):
         # ``target`` is queue routing, but for a per-node enqueue it
-        # *is* the node uuid -- decision 2 derives node_uuid from it
-        # rather than taking a separate parameter, so a caller cannot
+        # *is* the node uuid -- node_uuid is derived from it rather than
+        # taken as a separate parameter, so a caller cannot
         # forget to pass one and silently degrade the coalescing key.
         u1 = str(uuid4())
         node = str(uuid4())
@@ -331,8 +331,8 @@ class NetOpTestCase(base.ShakenFistTestCase):
 
 
 class EnqueueTimeCoalescibleGuardTestCase(base.ShakenFistTestCase):
-    """Decision 4: a coalescible task's target must be one the key can
-    distinguish, on a dispatcher that partitions its workers by it.
+    """A coalescible task's target must be one the key can distinguish,
+    on a dispatcher that partitions its workers by it.
 
     ``shakenfist/tests/schema/test_net_op_coalescing.py`` covers this
     guard exhaustively with the enqueue path mocked out; these tests
@@ -347,7 +347,7 @@ class EnqueueTimeCoalescibleGuardTestCase(base.ShakenFistTestCase):
         self.mock_mariadb.setup()
 
     def test_coalescible_task_per_node_clusteroperation_family_raises(self):
-        # Decision 5: the default 'clusteroperation' family routes a
+        # The default 'clusteroperation' family routes a
         # per-node target to sf-queues, which has no per-target worker
         # partitioning -- a node-aware key is necessary but not
         # sufficient there. This is the case that must never regress.
@@ -501,9 +501,8 @@ class ModelVersionTestCase(base.ShakenFistTestCase):
     # _upgrade_step_N_to_N+1 has to exist and run. upgrade() resolves
     # each step with a bare getattr(self, step) and no default, so a
     # missing step raises AttributeError rather than the documented
-    # UpgradeException -- which is survey finding 8 of the phase 11
-    # plan, and why _upgrade_step_1_to_2 exists at all despite doing
-    # nothing.
+    # UpgradeException -- which is why _upgrade_step_1_to_2 exists at
+    # all despite doing nothing.
     def _static_values_at_version(self, version):
         # Deliberately built by *removing* the fields each version
         # added rather than by listing them, so a field added to the

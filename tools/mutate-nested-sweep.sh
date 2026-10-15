@@ -30,7 +30,8 @@
 # and it takes about a minute. Run it after changing ARGTYPES'
 # structured schemas, the object branch of validation._field(), the
 # nested finding flattener, or any of the three instance handler
-# guards phase 7 added.
+# guards on nested values (a null network_uuid, a null video model or
+# memory, and a diskspec with neither a size nor a base).
 #
 # Usage:
 #
@@ -424,13 +425,12 @@ mutate "${SWEEP}" \
 check "accepted-value coverage" "only ever refused in the table"
 
 # ---------------------------------------------------------------------
-# 15. The character class's first position, which is the defect the
-#     first round of review on phase 8 found: CPython reads a leading
-#     ']' as a literal class member, ECMA-262 reads '[]' as an empty
-#     class, and the scanner used to call the disagreement a top level
-#     alternation. Reverting the check makes '^[]|]$' fall through to
-#     the alternation message, which is what the pinned message refuses
-#     to accept.
+# 15. The character class's first position, a defect found in review:
+#     CPython reads a leading ']' as a literal class member, ECMA-262
+#     reads '[]' as an empty class, and the scanner used to call the
+#     disagreement a top level alternation. Reverting the check makes
+#     '^[]|]$' fall through to the alternation message, which is what
+#     the pinned message refuses to accept.
 # ---------------------------------------------------------------------
 run "a leading ']' in a class is blamed on the alternation again"
 mutate "${BASE}" \

@@ -94,8 +94,9 @@ COALESCE_SKIPPED = (
     '"coalesce_outcome": "batch_size_one"}, '
     '"net_op": "4ed3668d-351c-4f86-b1aa-f86547ce1929", "program": "sf-net"}')
 
-# An event from a build predating the phase 11 rename, as it still sits
-# in retained Loki history.
+# An event from a build predating the rename of the not_cluster_wide
+# coalesce outcome to key_cannot_distinguish_queue, as it still sits in
+# retained Loki history.
 COALESCE_RETIRED_OUTCOME = (
     '{"message": "execution duration", "event_type": "usage", '
     '"extra": {"seconds": 0.1, "wait_seconds": 0.5, "defer_count": 0, '
@@ -398,10 +399,10 @@ class CoalescingParseTestCase(base.ShakenFistTestCase):
         self.assertIsNone(sample.coalesce_folded)
 
     def test_a_retired_outcome_name_is_still_counted(self):
-        # The tool reads retained history, which still carries the phase
-        # 9 name for the guard phase 11 renamed. Dropping it would stop
-        # counting every event emitted before the rename, and the outcome
-        # columns would quietly stop summing to n.
+        # The tool reads retained history, which still carries the old
+        # name (not_cluster_wide) for the guard since renamed. Dropping it
+        # would stop counting every event emitted before the rename, and
+        # the outcome columns would quietly stop summing to n.
         sample = report.parse_line(COALESCE_RETIRED_OUTCOME)
         self.assertEqual(
             'key_cannot_distinguish_queue', sample.coalesce_outcome)

@@ -155,11 +155,10 @@ class DecoratorOrderingTestCase(base.ShakenFistTestCase):
         #
         # Asserted as an ordering rather than as authentication sitting
         # at index 0, which is what this said while authentication was
-        # the innermost entry. Phase 3's request validation is now
-        # inside it -- deliberately, so an unauthenticated caller cannot
-        # probe an endpoint's schema -- and pinning the index would have
-        # made that read as a regression rather than as the property it
-        # is.
+        # the innermost entry. Request validation is now inside it --
+        # deliberately, so an unauthenticated caller cannot probe an
+        # endpoint's schema -- and pinning the index would have made
+        # that read as a regression rather than as the property it is.
         decorators = api_base.Resource.method_decorators
         self.assertLess(
             decorators.index(api_base._authenticate_unless_public),
@@ -176,10 +175,11 @@ class DecoratorOrderingTestCase(base.ShakenFistTestCase):
     def test_validation_runs_after_authentication(self):
         """An unauthenticated caller must not be able to probe a schema.
 
-        Decision D3. Validation is innermost of the class-level set, so
-        it runs after authentication and before every per-method
-        decorator -- which is also why enforcing it in phase 4 will
-        answer ahead of the 404s those decorators produce.
+        Validation is innermost of the class-level set, so it runs after
+        authentication and before every per-method decorator. Those
+        decorators do database lookups with the request's values, so
+        they must not see unvalidated input -- which is also why, when
+        enforcing, validation answers ahead of the 404s they produce.
         """
         decorators = api_base.Resource.method_decorators
 

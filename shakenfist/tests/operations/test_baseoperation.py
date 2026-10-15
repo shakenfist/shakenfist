@@ -594,14 +594,14 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         op.dispatch_task.assert_called_once()
 
     def test_a_key_column_the_operation_lacks_skips_the_fold(self):
-        # The fold used to build its key with getattr(self, column,
-        # None), which cannot raise: a column named in
-        # coalescible_key_columns but absent from the class bound
-        # IS NULL, and since it is NULL on every row too, the key
-        # degenerated to the columns which did resolve -- for a NetOp,
-        # back to the network alone, which is the phase 8 cross-node
-        # fold. Skip loudly instead, with an outcome of its own so a
-        # mis-declaration is visible as one.
+        # The fold used to build its key with getattr(self, column, None),
+        # which cannot raise: a column named in coalescible_key_columns but
+        # absent from the class bound IS NULL, and since it is NULL on every
+        # row too, the key degenerated to the columns which did resolve --
+        # for a NetOp, back to the network alone, which lets one
+        # hypervisor's fold mark another hypervisor's node-local work
+        # complete without it ever running. Skip loudly instead, with an
+        # outcome of its own so a mis-declaration is visible as one.
         op = self._make_net_op(
             ['network_ensure_mesh'],
             queue_name=f'{NODE_UUID}-network-user_facing',
@@ -642,20 +642,21 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
             [('network_uuid', NETWORK_UUID), ('node_uuid', None)],
             self.mock_claim.call_args.kwargs['keys'])
 
-    # -- Phase 11: the per-node fold guard (decisions 4 and 5) ---------
+    # -- The per-node fold guard ---------------------------------------
     #
     # ``key_distinguishes_node`` in ``BaseClusterOperation.execute``
     # requires three things at once: the key names ``node_uuid``, this
     # operation carries one, and the queue name is that same node's own
     # ``{node_uuid}-network-*`` queue. Each test below removes exactly
     # one of those and checks the fold still refuses -- except the one
-    # where all three hold, which is the case this phase exists to
-    # allow.
+    # where all three hold, which is the case the guard exists to allow.
 
     def test_coalescing_runs_on_a_per_node_queue_with_a_node_aware_key(self):
         # All three conditions hold: the key names node_uuid, this op
         # carries one, and the queue is that node's own network queue.
-        # This is the case decision 4's four-link argument makes safe.
+        # That is safe because such a key only matches operations for
+        # this node, all of which are on this node's own queue, which
+        # one sf-net process drains with one worker thread per network.
         op = self._make_net_op(
             ['network_ensure_mesh'],
             queue_name=f'{NODE_UUID}-network-user_facing',
@@ -670,14 +671,13 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.assertEqual('ran', op.coalesce_outcome)
 
     def test_fold_skipped_on_a_per_node_clusteroperation_family_queue(self):
-        # Decision 5, and the case that must never regress: a per-node
-        # queue on the *clusteroperation* family is drained by
-        # sf-queues, which has no per-target worker partitioning. A
-        # node-aware key is necessary but not sufficient -- the queue
-        # name's family half has to be checked too, or two of sf-queues'
-        # workers could hold two operations for the same (network, node)
-        # at once and one's fold could flip the other's operation to
-        # complete mid-dequeue.
+        # The case that must never regress: a per-node queue on the
+        # *clusteroperation* family is drained by sf-queues, which has no
+        # per-target worker partitioning. A node-aware key is necessary but
+        # not sufficient -- the queue name's family half has to be checked
+        # too, or two of sf-queues' workers could hold two operations for
+        # the same (network, node) at once and one's fold could flip the
+        # other's operation to complete mid-dequeue.
         op = self._make_net_op(
             ['network_ensure_mesh'],
             queue_name=f'{NODE_UUID}-clusteroperation-user_facing',
@@ -718,8 +718,8 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
             'key_cannot_distinguish_queue', op.coalesce_outcome)
 
     def test_fold_runs_for_a_cluster_wide_queue_with_node_uuid_unset(self):
-        # The other side of decision 8: a cluster-wide op (node_uuid
-        # unset) on the cluster-wide queue still folds, with
+        # The other side of the per-node key: a cluster-wide op
+        # (node_uuid unset) on the cluster-wide queue still folds, with
         # ('node_uuid', None) in the key so it binds IS NULL and only
         # matches other cluster-wide siblings.
         op = self._make_net_op(['network_apply_update_dnsmasq'])
@@ -733,11 +733,11 @@ class CoalescingExecuteTestCase(base.ShakenFistTestCase):
         self.assertEqual('ran', op.coalesce_outcome)
 
     def test_fold_skipped_for_a_network_only_key_on_a_per_node_queue(self):
-        # Even with a node_uuid set on the operation and on the queue
-        # name, a key which does not name node_uuid at all -- the
-        # pre-phase-11 shape -- must still refuse the per-node fold.
-        # ``key_distinguishes_node`` tests the key's columns, not just
-        # the operation's attributes.
+        # Even with a node_uuid set on the operation and on the queue name,
+        # a key which does not name node_uuid at all -- the older
+        # network-only shape -- must still refuse the per-node fold.
+        # ``key_distinguishes_node`` tests the key's columns, not just the
+        # operation's attributes.
         with mock.patch.object(
                 NetOp, 'coalescible_key_columns', ('network_uuid',)):
             op = self._make_net_op(

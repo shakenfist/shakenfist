@@ -1,8 +1,8 @@
 # The format of key secrets Shaken Fist generates for itself.
 #
-# Phase 3 of the auth federation plan is where the cluster starts
-# minting key secrets rather than only accepting operator-chosen ones,
-# so it is where the generated form gets a recognisable shape:
+# The cluster mints key secrets for itself -- the federated token
+# exchange, for example -- rather than only accepting operator-chosen
+# ones, so the generated form has a recognisable shape:
 #
 #     sfk_<32 chars base62 random><6 chars base62 CRC32 checksum>
 #

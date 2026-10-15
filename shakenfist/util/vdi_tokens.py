@@ -3,8 +3,8 @@
 
 This module owns the one place in Shaken Fist that understands the
 asymmetric key material Kerbside VDI console tokens are signed with.
-Phase 2's minting endpoint and the ``sf-ctl`` ensure/rotate commands
-all go through these helpers; nothing else parses the stored row.
+The console token minting endpoint and the ``sf-ctl`` ensure/rotate
+commands all go through these helpers; nothing else parses the stored row.
 
 The material lives in a single ``cluster_config`` row named
 ``KERBSIDE_JWT_SIGNING_KEY`` holding this JSON value::
@@ -143,10 +143,10 @@ def ensure_signing_key() -> dict[str, Any]:
     Idempotent: if the row already exists it is returned unchanged. If
     it is absent, a fresh keypair is generated and written. The write
     is a last-writer-wins upsert: cluster_config deliberately has no
-    create-if-absent primitive (phase 1 decision 3 of
-    PLAN-kerbside-vdi-tokens), so two concurrent creators each write a
-    whole new ``{'active_kid': ..., 'keys': [...]}`` value and the
-    loser's key is discarded, not merged. Tokens minted with a
+    create-if-absent primitive, because adding one means proto and
+    gRPC-tier churn this feature does not need, so two concurrent
+    creators each write a whole new ``{'active_kid': ..., 'keys':
+    [...]}`` value and the loser's key is discarded, not merged. Tokens minted with a
     discarded key can never be verified. The row is re-read after the
     write so the caller sees what is stored at that moment, but that
     is a diagnostic courtesy, not a race guarantee. This is only safe

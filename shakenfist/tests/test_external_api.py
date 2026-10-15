@@ -586,9 +586,9 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
                                     'placed_on': None,
                                     'namespace': None,
                                 }))
-        # Phase 4 of PLAN-api-input-validation: the declared arrayofdict
-        # refuses this ahead of the handler's own guard, which remains
-        # and answers when API_VALIDATION_MODE is not 'enforce'.
+        # The declared arrayofdict refuses this ahead of the handler's
+        # own guard, which remains and answers when API_VALIDATION_MODE
+        # is not 'enforce'.
         self.assertEqual(
             {'error': 'disk[0]: Not a valid mapping type.', 'status': 400},
             resp.get_json())
@@ -690,8 +690,8 @@ class ExternalApiInstanceTestCase(ExternalApiTestCase):
         # a look at this. The handler guard is still there and still
         # says 'network specification is missing network_uuid' -- it is
         # what a cluster running API_VALIDATION_MODE=warn or off
-        # answers, which is decision D42, and the phase 7 sweep is what
-        # pins that.
+        # answers, because those modes are a rollback and must not hand
+        # back a newly unguarded API; test_nested_sweep.py pins that.
         self.assertEqual(
             {'error': 'network[0].network_uuid: Missing data for required '
              'field.', 'status': 400},
@@ -1030,23 +1030,24 @@ class ExternalApiTransientRefusalContractTestCase(
         ExternalApiAffinityRefusalTestCase):
     """Which of ``POST /instances``' refusals are transient.
 
-    Phase 4 of PLAN-transient-capacity-refusals (D29) marks only the two
-    *scheduling* 507s -- the filter branch (``LowResourceException`` from
-    ``SCHEDULER.find_candidates()``) and the capacity-guard branch (every
-    candidate refused by ``place_instance()``) -- with a ``Retry-After``
-    header and ``transient: true``. The ``CongestedNetwork`` 507 from
-    address allocation, the affinity 409 and the not-found 404 are left
-    bare: none of them is the "CPU/memory freed up within seconds" fact
-    the 15 s hint encodes.
+    Only the two *scheduling* 507s -- the filter branch
+    (``LowResourceException`` from ``SCHEDULER.find_candidates()``) and
+    the capacity-guard branch (every candidate refused by
+    ``place_instance()``) -- are marked with a ``Retry-After`` header and
+    ``transient: true``, so a client can tell a refusal worth retrying
+    from one that is not. The ``CongestedNetwork`` 507 from address
+    allocation, the affinity 409 and the not-found 404 are left bare:
+    none of them is the "CPU/memory freed up within seconds" fact the
+    15 s hint encodes.
 
-    The phase's first review round drew a further line *inside* the
-    filter branch: a ``LowResourceException`` from a structural stage
-    such as ``cpu_max_per_instance`` is a real 507 carrying a real
-    stage, but no wait clears it, so it publishes ``transient: false``
-    and no header. ``api_base.TRANSIENT_CAPACITY_STAGES`` is the
-    discriminator and ``test_capacity_error.py`` pins that every
-    scheduler stage is classified; these tests pin that the handler
-    routes each branch through it.
+    There is a further line *inside* the filter branch: a
+    ``LowResourceException`` from a structural stage such as
+    ``cpu_max_per_instance`` is a real 507 carrying a real stage, but no
+    wait clears it, so it publishes ``transient: false`` and no header.
+    ``api_base.TRANSIENT_CAPACITY_STAGES`` is the discriminator and
+    ``test_capacity_error.py`` pins that every scheduler stage is
+    classified; these tests pin that the handler routes each branch
+    through it.
     """
 
     def test_filter_branch_507_is_transient(self):

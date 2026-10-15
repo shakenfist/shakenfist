@@ -1,9 +1,9 @@
 # Copyright 2019 Michael Still and contributors
 """Tests for ``shakenfist.operations.net_iface_op.NetIfaceOp.dispatch_task``.
 
-Covers the Phase 3 migration of ``_interface_float`` to
-BridgedVXLanNetwork and the multi-target audit event emitted at dispatch
-time to preserve event correlation. Also covers ErrorReport persistence
+Covers ``_interface_float``'s use of BridgedVXLanNetwork and the
+multi-target audit event emitted at dispatch time to preserve event
+correlation. Also covers ErrorReport persistence
 on the outer except.
 """
 

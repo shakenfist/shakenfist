@@ -2,11 +2,11 @@
 """Where each declared API parameter really comes from.
 
 The ``swagger_helper()`` declarations on every endpoint say which
-parameters exist, what type they are and where they arrive. Phase 3 of
-docs/plans/PLAN-api-input-validation.md compiles them into request
-validation, at which point a declaration that disagrees with its handler
-stops being a documentation bug and starts rejecting valid requests. This
-module is the single statement of what agreement means.
+parameters exist, what type they are and where they arrive.
+``validation.py`` compiles them into request validation, so a declaration
+that disagrees with its handler is not just a documentation bug: it
+rejects valid requests. This module is the single statement of what
+agreement means.
 
 Five sources decide where a parameter comes from, in order:
 
@@ -15,8 +15,8 @@ Five sources decide where a parameter comes from, in order:
   handler is in the ``query``;
 * a name the handler reads from ``flask.request.args`` is in the
   ``query``, even if it can also arrive in the body -- the published
-  documentation and the query-string fallback phase 3 compiles must
-  agree;
+  documentation and the query-string fallback the validation layer
+  compiles must agree;
 * a name one of the handler's decorators pops out of kwargs before the
   handler runs is in the ``body``. It needs a term of its own precisely
   because it reaches none of the other three and never appears in the
@@ -87,8 +87,9 @@ class Declaration(NamedTuple):
 
     ``argtype`` is carried even though this module's own derivation
     never consults it, because two audits do -- the ``any`` token pin
-    in ``test_parameter_declarations.py`` and phase 6's required sweep
-    -- and each had grown its own copy of the walk below to reach it.
+    in ``test_parameter_declarations.py`` and the required sweep in
+    ``test_required_sweep.py`` -- and each had grown its own copy of the
+    walk below to reach it.
     A second reader of a declaration tuple is how the published
     specification and the enforced check stop agreeing.
     """
@@ -177,8 +178,8 @@ def route_parameters(app: str = APP,
     A route this cannot read is recorded in ``problems`` rather than
     dropped. Dropping it empties the class's route set, which derives
     every one of its parameters to ``body`` -- so the fixer would
-    rewrite a *correct* ``path`` declaration, and phase 3 would compile
-    a schema looking in the JSON body for a URL segment.
+    rewrite a *correct* ``path`` declaration, and the validation layer
+    would compile a schema looking in the JSON body for a URL segment.
 
     Keyed on the bare class name, which is what the caller has. Two
     endpoint classes of the same name in different modules would
@@ -319,8 +320,9 @@ def _schema_keys(scopes: list[Scope], name: str,
     inside it -- so one endpoint class's ``get_args`` cannot leak into
     the derivation for another class in the same file. That leak was
     real: it made the fixer willing to rewrite a correct `body`
-    declaration to `query`, and phase 3 would then have compiled a
-    query-string fallback for a parameter which never arrives that way.
+    declaration to `query`, and the validation layer would then have
+    compiled a query-string fallback for a parameter which never arrives
+    that way.
     Drift introduced by the machinery built to prevent drift.
 
     Returns None when no scope defines the name, which the caller
@@ -585,8 +587,9 @@ def decorator_kwargs(fn: ast.FunctionDef,
     flask.request.args read, and it never reaches the handler's
     signature either, because the decorator took it. Without this term
     the derivation has nothing to say about it, so it was declared
-    nowhere and phase 3's warn window found it as an
-    ``unknown-parameter`` finding against working callers (#3739).
+    nowhere, and running validation in warn-only mode against real
+    traffic found it as an ``unknown-parameter`` finding against working
+    callers (#3739).
 
     A decorator name this cannot find among the package's module level
     functions is skipped in silence, and that is deliberate rather than

@@ -2,20 +2,20 @@
 
 """Request validation, in both of its modes.
 
-Phase 3 built the layer and rejected nothing; phase 4 flipped
-API_VALIDATION_MODE's default to 'enforce', which is what the
+The layer first shipped observing and rejecting nothing; the default
+for API_VALIDATION_MODE is now 'enforce', which is what the
 EnforcedValidationTestCase class at the bottom of this file pins.
 The warn-mode properties above it are still worth keeping -- 'warn'
 is the operator's rollback, and its promise is that no request behaves
 differently than it does with the layer switched off -- so each of
-those tests now sets the mode it is about rather than relying on a
-default which has moved.
+those tests sets the mode it is about rather than relying on a default
+which has moved.
 
-Phase 5 then deleted the `except TypeError` arm which used to answer a
-handler's rejected kwargs as a 400 in the interpreter's own words, so
-that promise is now kept against a 500 rather than against that 400.
-The mode did not change; what a request the mode declines to intervene
-in answers did.
+The `except TypeError` arm which used to answer a handler's rejected
+kwargs as a 400 in the interpreter's own words has since been deleted,
+so that promise is now kept against a 500 rather than against that
+400. The mode did not change; what a request the mode declines to
+intervene in answers did.
 """
 
 import json
@@ -90,27 +90,28 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         Warn observes and never answers, and that is unchanged -- which
         is why this test still carries the name it does.
 
-        What the underlying request answers *did* change, in phase 5.
-        Until then an undeclared key reached the handler, failed the
-        kwargs merge with a TypeError, and
-        handle_authorization_exceptions turned that into a 400 carrying
-        the interpreter's own words. That is the defect of issue 3612,
-        and leaving it in the one mode an operator can reach by rolling
-        enforcement back would have preserved it behind a flag. The arm
-        is gone (decision D23), so a request whose kwargs its handler
+        What the underlying request answers *did* change. An undeclared
+        key used to reach the handler, fail the kwargs merge with a
+        TypeError, and handle_authorization_exceptions turned that into
+        a 400 carrying the interpreter's own words. That is the defect
+        of issue 3612, and leaving it in the one mode an operator can
+        reach by rolling enforcement back would have preserved it behind
+        a flag. The arm is gone, so a request whose kwargs its handler
         cannot accept is now answered as what it has always been
         underneath: an unhandled server side exception, recorded on
-        disk and answered as a 500 (decision D25). An operator rolling
-        back is buying "requests that were working keep working", not a
-        tidier error for requests that were already being refused.
+        disk and answered as a 500. An operator rolling back is buying
+        "requests that were working keep working", not a tidier error
+        for requests that were already being refused.
 
         The five metadata delete handlers are one of the things the
         rollback does not undo at all: they no longer accept the
         `value` kwarg they used to ignore, in any mode. That was
         UNDECLARED_BY_DESIGN's last entry, and removing it is what
-        emptied the set. Phase 7's three handler guards are three more,
-        and `test_nested_sweep.py`'s `NestedSweepWarnTestCase` is where
-        they are measured.
+        emptied the set. The three handler guards on POST /instances'
+        structured parameters (a diskspec with neither size nor base, a
+        null networkspec network_uuid, a null videospec model or memory)
+        are three more, and `test_nested_sweep.py`'s
+        `NestedSweepWarnTestCase` is where they are measured.
         """
         config.API_VALIDATION_MODE = 'warn'
 
@@ -189,9 +190,9 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
             '5', str(fields), 'a finding must not carry the value')
 
     def test_enforce_mode_answers_in_the_api_error_shape(self):
-        """Phase 4's switch, present from the start so the flip is
-        configuration rather than a code change. webargs' own 422 shape
-        is not what this API returns."""
+        """The enforce switch, present from the start so turning
+        enforcement on was configuration rather than a code change.
+        webargs' own 422 shape is not what this API returns."""
         config.API_VALIDATION_MODE = 'enforce'
 
         response, _ = self._post_auth(
@@ -204,14 +205,13 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         self.assertNotIn('unexpected keyword argument', body['error'])
 
     def test_enforce_mode_rejects_missing_required(self):
-        """Phase 6's step 3: missing-required is enforced like any
-        other reason now. Until this step, `key` on POST /auth being
-        omitted answered the handler's own `missing key in request` --
-        this test used to pin that as `never rejects`, three review
-        rounds deep in the documentation saying so. Deleting the
-        filter at base.py:1914 makes this the same generic refusal
-        every other reason produces, naming the parameter and never
-        reaching the handler.
+        """Missing-required is enforced like any other reason. An
+        omitted `key` on POST /auth used to answer the handler's own
+        `missing key in request`, and this test used to pin that as
+        `never rejects`. With validate_request no longer filtering
+        MISSING_REQUIRED out, it is the same generic refusal every other
+        reason produces, naming the parameter and never reaching the
+        handler.
         """
         config.API_VALIDATION_MODE = 'enforce'
 
@@ -273,11 +273,10 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         not merely that findings are discarded.
 
         So the response is the request's own, with nothing of the layer
-        in it. Phase 5 changed what that is: deleting the `except
-        TypeError` arm (decision D23) means a body key the handler
-        cannot accept is no longer converted into a 400 carrying the
-        interpreter's words, and is instead recorded and answered as
-        the 500 it always was underneath (decision D25). The status
+        in it. With the `except TypeError` arm deleted, a body key the
+        handler cannot accept is no longer converted into a 400 carrying
+        the interpreter's words, and is instead recorded and answered as
+        the 500 it always was underneath. The status
         asserted here is identical to warn's, which is the point --
         warn observes and off does not look, and neither answers.
         """
@@ -508,20 +507,20 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
             api_base.Resource.method_decorators[0])
 
     def test_webargs_failures_use_the_api_error_shape(self):
-        """Decision D4, and a defect fixed on the way past.
+        """A webargs failure answers in this API's error shape.
 
-        No webargs error handler was registered before phase 3, and
-        webargs' default 422 abort was swallowed into a 500 by
+        Before a webargs error handler was registered, webargs' default
+        422 abort was swallowed into a 500 by
         suppress_exceptions_to_client's bare except -- so the four
         @use_kwargs sites answered a bad query parameter with a server
         error, a traceback in the log and an exception record on disk.
         Nothing about *what* is rejected changes.
 
         This exercises the handler in isolation, which asserts the
-        response it builds and nothing about what a client sees; the
-        first review round proved those are different questions. The
-        request-level assertion lives in
-        AuthenticatedValidationTestCase.
+        response it builds and nothing about what a client sees; those
+        have been shown to be different questions (see
+        AuthenticatedStackTestCase). The request-level assertion lives
+        in AuthenticatedValidationTestCase.
         """
         with external_api.app.test_request_context('/'):
             with self.assertRaises(werkzeug.exceptions.HTTPException) as caught:
@@ -538,10 +537,10 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
     def test_a_non_object_body_is_still_a_400(self):
         """A JSON body which is not an object has always been a 400.
 
-        The per-key merge phase 3 replaced raised TypeError for one,
-        which handle_authorization_exceptions used to answer as 400.
-        Phase 5 deleted that arm, so log_request returns the 400
-        itself and this test holds across both.
+        An earlier form of the body-into-kwargs merge raised TypeError
+        for one, which handle_authorization_exceptions used to answer as
+        400. That arm is gone, so log_request returns the 400 itself and
+        this test holds across both.
         dict.update would instead raise ValueError for most of these
         (a 500, since nothing catches ValueError) -- and would silently
         merge a list of two-character strings as key/value pairs, which
@@ -560,17 +559,17 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
                     response.get_json()['error'])
 
     def test_a_non_object_body_400_is_attributed(self):
-        """Item 3 of the phase 5 review: the 400 above must still carry
-        the attribution issue 4069 added.
+        """The 400 above must still carry the attribution issue 4069
+        added.
 
-        Before phase 5, this path raised TypeError and
+        This path used to raise TypeError, and
         handle_authorization_exceptions caught it, logging
         _authorization_failure_log(e).info('API request rejected as
         malformed') -- a line carrying request-id, method, path and
         remote-address so the rejection can be joined to the 'API
-        request parsed' and audit records. Answering directly (decision
-        D23) dropped that logging unless log_request emits it itself,
-        which is what this pins.
+        request parsed' and audit records. Answering directly dropped
+        that logging unless log_request emits it itself, which is what
+        this pins.
         """
         # The RequestID middleware sets FLASK_REQUEST_ID from an
         # incoming X-Request-ID header (or generates one if absent), so
@@ -606,8 +605,8 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
         would merely change.
 
         The status recorded here is the request's own, whatever it is.
-        Since phase 5 that is a 500 for this input rather than the 400
-        the deleted `except TypeError` arm used to manufacture, which
+        That is now a 500 for this input rather than the 400 the
+        deleted `except TypeError` arm used to manufacture, which
         is precisely the sort of movement the field exists to make
         visible."""
         config.API_VALIDATION_MODE = 'warn'
@@ -630,11 +629,11 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
     def test_enforced_rejections_still_emit_their_findings(self):
         """An enforced rejection must not be silent in the log.
 
-        The third review round caught the enforce branch returning
-        before the findings were stashed, which would have turned the
-        measurement apparatus off at the exact moment phase 4 flips
-        the switch -- when an operator most needs to see which
-        parameter a refused request was refused for.
+        An enforce branch which returns before the findings are stashed
+        turns the measurement apparatus off at the exact moment
+        enforcement is switched on -- when an operator most needs to see
+        which parameter a refused request was refused for. That bug was
+        written once and caught in review.
         """
         config.API_VALIDATION_MODE = 'enforce'
 
@@ -691,13 +690,12 @@ class RequestValidationTestCase(base.ShakenFistTestCase):
 class AuthenticatedStackTestCase(base.ShakenFistTestCase):
     """A real authenticated client against the whole decorator stack.
 
-    The first review round of phase 3 found the deployed behaviour and
-    the behaviour of a handler tested in isolation were different
-    answers: _webargs_error built a perfect 400 which
-    suppress_exceptions_to_client then swallowed into a 500. Phase 4's
-    step 4 brief repeats the rule for the enforcement tests, so both
-    subclasses below drive a real request end to end and assert only
-    what a client sees or what actually reached a spy.
+    The deployed behaviour and the behaviour of a handler tested in
+    isolation have been different answers here before: _webargs_error
+    built a perfect 400 which suppress_exceptions_to_client then
+    swallowed into a 500, and the unit test of _webargs_error passed.
+    So both subclasses below drive a real request end to end and assert
+    only what a client sees or what actually reached a spy.
 
     Carries no tests of its own: the two subclasses are the same
     fixture at the two modes that do something.
@@ -871,11 +869,11 @@ INTERPRETER_TEXT = [
 class EnforcedValidationTestCase(AuthenticatedStackTestCase):
     """What enforcement means, at request level.
 
-    Decision D16 made 'enforce' the default, so this is the behaviour
-    every deployment gets. Every test here drives a real authenticated
-    request through the whole decorator stack for the reason the parent
-    class documents: phase 3's review found two defects which unit
-    tests missed because they exercised components in isolation.
+    'enforce' is the default, so this is the behaviour every deployment
+    gets. Every test here drives a real authenticated request through
+    the whole decorator stack for the reason the parent class
+    documents: unit tests which exercise components in isolation have
+    missed defects in how those components compose.
     """
 
     mode = 'enforce'
@@ -937,13 +935,14 @@ class EnforcedValidationTestCase(AuthenticatedStackTestCase):
         self.assertNoInterpreterText(response)
 
     def test_a_handler_internal_type_error_is_a_recorded_500(self):
-        """Decision D30: the removal, asserted.
+        """The removal, asserted.
 
-        Phase 5 deleted the `except TypeError` arm from
-        handle_authorization_exceptions (decision D23). A deletion is
-        the change a suite is least likely to notice, and restoring
-        that arm would silently reinstate the leak four phases were
-        spent closing, so the property it establishes is pinned here:
+        The `except TypeError` arm is gone from
+        handle_authorization_exceptions. A deletion is the change a
+        suite is least likely to notice, and restoring that arm would
+        silently reinstate the interpreter-text leak it took a long
+        series of changes to close, so the property it establishes is
+        pinned here:
         a TypeError raised inside a handler is a server fault, recorded
         and answered as a 500, and never a 400 telling the caller
         something about the call it made.
@@ -956,8 +955,8 @@ class EnforcedValidationTestCase(AuthenticatedStackTestCase):
         actually produces.
 
         On what the body carries. Every INTERPRETER_TEXT marker is
-        asserted absent, with no exemption: decision D31 stopped
-        suppress_exceptions_to_client putting `repr(e)` in the body,
+        asserted absent, with no exemption: suppress_exceptions_to_client
+        no longer puts `repr(e)` in the body,
         so the generic 500 path no longer leaks the exception class
         name either. The caller learns no endpoint class, no method
         name, no traceback, no source path and no exception class, and
@@ -1327,7 +1326,7 @@ class EnforcedValidationTestCase(AuthenticatedStackTestCase):
 # for the reason it says it does. A single node cluster with no
 # hypervisor cannot place an instance, so a well formed request lands
 # on the scheduler's 507 -- which is the control this file uses to say
-# "the request got past every guard", the same one the phase 6 sweep
+# "the request got past every guard", the same one test_required_sweep.py
 # and test_instance_create_validation.py use.
 PLACEABLE_INSTANCE = {
     'name': 'validationfixture',
@@ -1338,14 +1337,14 @@ PLACEABLE_INSTANCE = {
 
 
 class InstanceCreateBodyTestCase(AuthenticatedStackTestCase):
-    """POST /instances at 'enforce', for the phase 7 step 2 properties.
+    """POST /instances at 'enforce', for how its body's integers and dicts compile.
 
     Through the whole decorator stack for the reason
     AuthenticatedStackTestCase documents, and with record_exception
     spied on rather than performed: a 500 here writes a file under
     /srv/shakenfist/exceptions/ for what is a caller's mistake, and "no
-    record was written" is the half of finding F8 that a status code
-    assertion alone would not catch.
+    record was written" is the half that a status code assertion alone
+    would not catch.
     """
 
     mode = 'enforce'
@@ -1398,14 +1397,14 @@ class InstanceCreateBodyTestCase(AuthenticatedStackTestCase):
         recorded.assert_not_called()
 
     def test_a_numeric_string_cpu_count_still_reaches_placement(self):
-        """The width D46 could not have, written as an assertion.
+        """The width strict=True could not have, written as an assertion.
 
-        D46 asked for marshmallow's strict=True, which refuses anything
-        that is not already a Python int. `{"cpus": "2"}` is accepted
-        today -- pydantic's lax mode converts it -- so refusing it here
-        would be a validator narrower than its handler, which is the
-        breaking change dressed as a correctness fix that phase 6's
-        width rule exists to stop. See _ExactInteger's docstring for
+        marshmallow's strict=True refuses anything that is not already a
+        Python int. `{"cpus": "2"}` is accepted today -- pydantic's lax
+        mode converts it -- so refusing it here would be a validator
+        narrower than its handler, which is the breaking change dressed
+        as a correctness fix that the rule against such validators
+        exists to stop. See _ExactInteger's docstring for
         the other half of the argument, which is that strict=True also
         refuses every integer *query* parameter, all of which arrive as
         strings.

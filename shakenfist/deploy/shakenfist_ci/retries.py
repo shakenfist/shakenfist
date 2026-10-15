@@ -327,9 +327,10 @@ def wait_for_capacity(poll, cpus, memory_mb, disk_gb, node, deadline,
             if record['headroom_at_start'] is None:
                 record['headroom_at_start'] = headroom
                 # What the create was short of when it was refused, which
-                # is the question phase 5 asks of this data. Only the
-                # first poll can answer it: by the last one the shortfall
-                # is usually gone, which is why the wait ended.
+                # is what this data has to answer for any decision about
+                # queueing refused creates server-side. Only the first
+                # poll can answer it: by the last one the shortfall is
+                # usually gone, which is why the wait ended.
                 if coverage < 1.0:
                     record['binding_dimension'] = binding
 

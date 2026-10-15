@@ -1,4 +1,4 @@
-# Tests for Artifact.from_db_by_ref (phase 2 SQL pushdown filtering)
+# Tests for Artifact.from_db_by_ref (SQL pushdown filtering)
 # and Artifact.from_db_by_ref_visible_to.
 #
 # This module tests:

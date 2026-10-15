@@ -197,7 +197,8 @@ class SideChannelAbortPathTestCase(base.ShakenFistTestCase):
     monitor, and the monitor's restart cleared the file again --
     possibly before the wedged executor's one second poll had read it,
     leaving it wedged with the executor slot still held, which is the
-    thing steps 5b and 5d exist to prevent.
+    thing the reaper and the abortable pre-connection wait exist to
+    prevent.
 
     These construct real jobs. A hand-built object would pass whatever
     the derivation did, which is exactly how the two came to share a
@@ -335,7 +336,7 @@ class RequestAllThreadsExitTestCase(base.ShakenFistTestCase):
 class SideChannelPreConnectionWaitTestCase(base.ShakenFistTestCase):
     """The pre-connection wait in SideChannelJob.execute() must be
     abortable, or the reaper can resolve a wedged operation and still not
-    free the instance's executor slot (step 5d)."""
+    free the instance's executor slot."""
 
     def _make_job(self, instance_path):
         # The real constructor, so the abort path is the one production
@@ -445,8 +446,9 @@ class AgentCommandHandlerTestCase(base.ShakenFistTestCase):
                 f'{cls.__name__} does not override dispatch')
 
     def test_declared_capabilities(self):
-        # Declared in phase 1 and consumed in phases 4 and 5. Nothing reads
-        # these yet, so this test is the only thing holding them honest.
+        # Deadline enforcement reads reports_progress and the retry policy
+        # reads retryable, so a wrong value here silently changes how an
+        # operation is timed or retried. This test holds them honest.
         expected = {
             # name: (reports_progress, retryable, register_as_outstanding)
             'execute': (False, False, False),
@@ -1908,7 +1910,7 @@ class ExecutorReaperTestCase(base.ShakenFistTestCase):
         return from_db, abort
 
     def test_a_daemon_restart_drains_the_queue(self):
-        # The case decision 1 names: the daemon died with an operation
+        # The case the reaper exists for: the daemon died with an operation
         # executing, so no finally block ever ran and there is no
         # executor entry to find. One pass must leave the operation in a
         # state Instance.agent_operation_next() will pop, or the
@@ -1920,8 +1922,8 @@ class ExecutorReaperTestCase(base.ShakenFistTestCase):
 
         self.assertIn(agentop.state.value, AgentOperation.TERMINAL_STATES)
 
-        # error, not expired. Decision 3 splits the two on what went
-        # wrong rather than on who noticed, and this is an executor
+        # error, not expired. The two are split on what went wrong
+        # rather than on who noticed, and this is an executor
         # which went away -- the same failure the finally block
         # handles, differing only in that the process died first. The
         # difference is load bearing: expired is in

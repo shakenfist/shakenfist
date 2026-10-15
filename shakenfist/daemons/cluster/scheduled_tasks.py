@@ -238,9 +238,9 @@ def clear_sweep_failure_metrics() -> None:
     _SWEEP_FAILURE_STREAK.clear()
 
 
-# Scheduler capacity reconciler metrics (phase 2, D5). Per-node gauges are
-# labelled by node uuid and resource dimension; the resource label values
-# are 'cpus', 'memory_mb' and 'disk_gb'.
+# Scheduler capacity reconciler metrics. Per-node gauges are labelled by node
+# uuid and resource dimension; the resource label values are 'cpus',
+# 'memory_mb' and 'disk_gb'.
 CAPACITY_RESOURCES = ('cpus', 'memory_mb', 'disk_gb')
 SCHEDULER_CAPACITY_NODE_LIMIT = Gauge(
     'scheduler_capacity_node_limit',
@@ -1125,16 +1125,19 @@ def clear_scheduler_capacity_metrics() -> None:
 
 @util_general.recorded_method
 def reconcile_scheduler_capacity() -> None:
-    """Run the scheduler capacity reconciler (phase 2, D5) cadence.
+    """Run the scheduler capacity reconciler cadence.
 
     Runs only on the elected cluster node. One pass is a single
     mariadb.reconcile_scheduler_capacity() RPC which expires stale
     claims, refreshes the node capacity rows from node_metrics,
     recomputes usage and expected demand, and recomputes the cluster
-    singleton row. This phase is observable-but-inert: nothing consumes
-    the capacity tables for admission until phase 3, so this task's
-    whole job is to keep the tables fresh and export what it saw as
-    prometheus metrics and one structured log line per pass. See
+    singleton row. Placement admits against the counters in those
+    tables, and a counter is only as good as its last recompute from
+    ground truth, so this task's job is to keep the tables fresh and
+    export what it saw as prometheus metrics and one structured log
+    line per pass. It is a reconciler rather than a reaper: there are
+    no abandoned rows to steal, only counters to correct, and any
+    drift it corrects indicates a bug. See
     docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
     """
     SCHEDULER_CAPACITY_PASSES.inc()

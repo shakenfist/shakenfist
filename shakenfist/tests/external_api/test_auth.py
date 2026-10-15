@@ -100,9 +100,9 @@ class AuthTestCase(base.ShakenFistTestCase):
             resp.get_json())
 
     def test_post_auth_key_non_string(self):
-        # Phase 4 of PLAN-api-input-validation: the declared type is
-        # what refuses this now, so the wording is the validator's
-        # rather than the handler's. The handler's own guard is still
+        # The declared type is what refuses this at the default
+        # 'enforce' mode, so the wording is the validator's rather than
+        # the handler's. The handler's own guard is still
         # there and still answers when API_VALIDATION_MODE is not
         # 'enforce'.
         resp = self.client.post(
@@ -215,9 +215,8 @@ class AuthDatabaseUnavailableTestCase(base.ShakenFistTestCase):
         auth_token = self._get_token()
 
         # Token verification point reads the JWT's key via
-        # get_namespace_key_by_name (auth federation phase 2), so that
-        # is the read which must not conflate an outage with "no such
-        # key".
+        # get_namespace_key_by_name, so that is the read which must not
+        # conflate an outage with "no such key".
         with mock.patch(
                 'shakenfist.mariadb.get_namespace_key_by_name',
                 side_effect=exceptions.DatabaseUnavailable('keys unreadable')):
@@ -233,9 +232,9 @@ class AuthDatabaseUnavailableTestCase(base.ShakenFistTestCase):
             _clean_traceback(resp.get_json()))
 
     def test_login_surfaces_outage_as_503(self):
-        # /auth lists the namespace's keys via find_namespace_keys
-        # (auth federation phase 2), so that is the read which must not
-        # conflate an outage with "the namespace has no usable keys".
+        # /auth lists the namespace's keys via find_namespace_keys, so
+        # that is the read which must not conflate an outage with "the
+        # namespace has no usable keys".
         with mock.patch(
                 'shakenfist.mariadb.find_namespace_keys',
                 side_effect=exceptions.DatabaseUnavailable('keys unreadable')):

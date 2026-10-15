@@ -765,8 +765,8 @@ class Node(dbo):
         (observed as the scheduler's affinity pass scoring a node zero
         in CI). References are single-row inserts and deletes, so no
         cross-writer coordination is needed. These reference rows are
-        the sole record of placement; the legacy JSON column was
-        removed in scheduler-reservations phase 3.
+        the sole record of placement; the legacy JSON column no longer
+        exists.
         """
         refs = mariadb.get_references_from(
             ObjectType.NODE, str(self.uuid),
@@ -775,8 +775,8 @@ class Node(dbo):
 
     # NOTE(mikal): there is deliberately no add_instance() or
     # remove_instance() here. Placement rows are written only by the
-    # atomic admission and release RPCs (scheduler-reservations phase
-    # 3), which move the capacity counters in the same transaction --
+    # atomic admission and release RPCs, which move the capacity
+    # counters in the same transaction --
     # a helper which wrote a reference row on its own would record a
     # placement nothing had paid for.
 
@@ -887,9 +887,10 @@ class Nodes(dbo_iter):
     base_object = Node
 
     def _resolve_prefilter_to_states(self) -> set[str]:
-        """Preserve the pre-phase-5 behaviour: when no prefilter is set,
-        do not filter on state (return every node). The base-class default
-        of ACTIVE_STATES is used when a prefilter is explicitly given.
+        """Preserve what this iterator did before it moved onto the SQL
+        pushdown base class: when no prefilter is set, do not filter on
+        state (return every node). The base-class default of ACTIVE_STATES
+        is used when a prefilter is explicitly given.
         """
         if self.prefilter is None:
             return set()

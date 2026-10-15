@@ -390,8 +390,8 @@ class DirectHasPendingClusterOperationTargetTestCase(
         base.ShakenFistTestCase):
     """Test the SQL-level _direct_has_pending_cluster_operation_target.
 
-    Tests 4-8 from phase 1 plan: no targets, one in-flight, one terminal,
-    terminal-then-in-flight (the latest-only race fix), multiple terminal.
+    Covers no targets, one in-flight, one terminal, terminal-then-in-flight
+    (the latest-only race fix), and multiple terminal.
     """
 
     def setUp(self):

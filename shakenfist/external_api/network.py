@@ -58,9 +58,9 @@ def _delete_network(network_from_db, wait_interfaces=None):
     * If ``wait_interfaces`` is truthy the network is also moved to
       ``STATE_DELETE_WAIT`` to stop new interfaces being attached;
       the enqueued op defers itself in the worker until the existing
-      interfaces drain, then performs the delete. The Phase 7 REST
-      contract guarantees the caller always receives an op handle to
-      poll, even on this slow path.
+      interfaces drain, then performs the delete. The REST contract
+      guarantees the caller always receives an op handle to poll, even
+      on this slow path.
     * On failure (network missing or already deleted), ``result`` is the
       Flask error response to return; ``op_type`` / ``op_uuid`` are
       ``None``.
@@ -89,9 +89,8 @@ def _delete_network(network_from_db, wait_interfaces=None):
         # until they drain.
         n.state = network.Network.STATE_DELETE_WAIT
 
-    # Phase 6 of `PLAN-network-facade.md` retired the
-    # `network_destroy` composite; `network_apply_delete_network_node`
-    # is the direct behavioural equivalent.
+    # `network_apply_delete_network_node` is the direct behavioural
+    # equivalent of the retired `network_destroy` composite.
     op_type, op_uuid = net_create_and_enqueue(
         n.uuid,
         [net_tasks.network_apply_delete_network_node],
@@ -171,8 +170,8 @@ class NetworkEndpoint(api_base.Resource):
             return sf_api.error(403, 'you cannot delete the floating network')
 
         # An already-deleted network has nothing left to enqueue, but the
-        # Phase 7 client contract is "DELETE returns 202+op-handle and
-        # the client polls"; returning a bare ``return`` here produced a
+        # client contract is "DELETE returns 202+op-handle and the client
+        # polls"; returning a bare ``return`` here produced a
         # 200 ``null`` body that crashed the client on
         # ``handle['op_type']``. ``_delete_network`` itself emits a clean
         # 404 for dead networks (other than DELETE_WAIT, which it lets
@@ -182,10 +181,10 @@ class NetworkEndpoint(api_base.Resource):
         if err is not None:
             return err
 
-        # Phase 7 of `PLAN-network-facade.md` flipped this endpoint to the
-        # 202+poll contract: the delete work runs asynchronously via the
-        # cluster operation queue, so the response acknowledges receipt
-        # and returns the op handle the client can poll.
+        # This endpoint uses the 202+poll contract: the delete work runs
+        # asynchronously via the cluster operation queue, so the response
+        # acknowledges receipt and returns the op handle the client can
+        # poll.
         resp = flask.jsonify({'op_type': op_type, 'op_uuid': op_uuid})
         resp.status_code = 202
         return resp
@@ -421,9 +420,8 @@ class NetworksEndpoint(api_base.Resource):
             return sf_api.error(403, {'deleted': networks_del,
                                       'unable': networks_unable})
 
-        # Phase 7 of `PLAN-network-facade.md` flipped this endpoint to the
-        # 202+poll contract: each network's delete work runs asynchronously
-        # via the cluster operation queue, so the response acknowledges
+        # This endpoint uses the 202+poll contract: each network's delete
+        # work runs asynchronously via the cluster operation queue, so the response acknowledges
         # receipt and returns one op handle per network for the client to
         # poll.
         resp = flask.jsonify(networks_del)
@@ -675,7 +673,7 @@ class NetworkPingEndpoint(api_base.Resource):
         requires_admin=True))
     @api_base.arg_is_network_ref
     @api_base.requires_network_ownership
-    # NOTE(phase-7): this is the sole remaining `redirect_to_network_node`
+    # NOTE: this is the sole remaining `redirect_to_network_node`
     # site. The ping handler shells out to `ip netns exec <network_uuid>
     # ping -c 10 <address>`, so it genuinely needs to execute on the
     # elected network node where the network namespace exists. Migrating
@@ -683,8 +681,8 @@ class NetworkPingEndpoint(api_base.Resource):
     # not yet exist -- today the operation queue carries error reports
     # only, not arbitrary command stdout/stderr. See
     # `docs/plans/PLAN-network-facade.md` future work for the migration
-    # plan; Phase 7 intentionally kept the redirect here as a tactical
-    # exception while removing it from the other three sites.
+    # plan; the redirect is kept here as a deliberate tactical exception,
+    # having been removed from the other three sites.
     @api_base.redirect_to_network_node
     @api_base.requires_network_active
     @api_base.log_token_use

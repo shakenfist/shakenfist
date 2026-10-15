@@ -192,9 +192,9 @@ def _is_health_probe():
 # It lives in base.py because base.py's log_request needs the same
 # answer, and two copies of this predicate would eventually disagree.
 #
-# Two redactions hang off this one predicate, and since phase 4 of
-# PLAN-api-input-validation they hold each other up. A validation
-# refusal puts the offending parameter's *name* -- which a buggy
+# Two redactions hang off this one predicate, and now that validation
+# refuses bad requests rather than only logging them, they hold each
+# other up. A validation refusal puts the offending parameter's *name* -- which a buggy
 # caller can put secret-bearing material into, which is why
 # log_validation_findings redacts it on these routes -- verbatim into
 # the response body. The name stays out of the log stream only because
@@ -339,9 +339,8 @@ def log_response_info(response):
 # feature-detects a server-side capability by looking for its token
 # here and nowhere else, so a capability that ships without its token
 # is invisible to every client -- which is exactly what happened to
-# namespace-claims, added in scheduler-reservations phase 4 and only
-# advertised at the phase's close-out because nothing enumerated this
-# list or pinned it in a test. Keeping the tokens in a dict means the
+# namespace-claims, whose token shipped later than its endpoints
+# because nothing enumerated this list or pinned it in a test. Keeping the tokens in a dict means the
 # list can be diffed, iterated and asserted on; test_root.py pins it.
 #
 # Tokens are append-only in practice: removing one silently changes
@@ -412,9 +411,9 @@ API_CAPABILITIES = {
         # cannot feature-detect it any other way, so a client that
         # checks this capability can degrade to unclaimed behaviour
         # against a cluster that predates it. Client verbs for claims
-        # are phase 9 of PLAN-scheduler-reservations (client-python
-        # issue 364); the server-side advertisement is an obligation
-        # regardless of whether a client has caught up yet.
+        # are client-python issue 364 (see PLAN-scheduler-reservations.md);
+        # the server-side advertisement is an obligation regardless of
+        # whether a client has caught up yet.
         'namespace-claims',
         # namespace-events and namespace-claim-events are the two
         # per-object events endpoints this family serves. They are
@@ -736,13 +735,13 @@ def log_validation_findings(response):
     finding on a request which went on to return 200 is a rejection
     enforcement would introduce; one on a request which returned 404 is
     a status code enforcement would change, because validation sits
-    ahead of the per-method decorators which produce those. Phase 4
-    needs to tell those two populations apart to choose between
-    webargs' EXCLUDE and RAISE (decision D10), and neither is knowable
-    from inside the validator.
+    ahead of the per-method decorators which produce those. Telling
+    those two populations apart is what decides whether an undeclared
+    body key is dropped or refused (webargs' EXCLUDE or RAISE), and
+    neither is knowable from inside the validator.
 
-    Values are never logged, only their types: decision D5, and some of
-    these routes carry credentials.
+    Values are never logged, only their types: a value may be user
+    data, and some of these routes carry credentials.
     """
     findings = getattr(flask.g, validation.VALIDATION_FINDINGS, None)
     if not findings:

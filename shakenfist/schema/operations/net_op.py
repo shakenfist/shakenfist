@@ -160,7 +160,9 @@ def _reusable_priorities(priority: PRIORITY) -> list[str]:
     queues entirely, and the caller does not merely lose its lane: the
     waiters in ``raise_for_error()`` and the ``runs_after`` dependency
     an instance start hangs off both then block on the slower lane's
-    queue-sit tail, which phase 10 measured as the deep one.
+    queue-sit tail, which measurement on sfcbr found to be the deep one:
+    over nine in ten operations waiting 15 seconds or more had sat on a
+    background lane without ever deferring.
 
     That is not hypothetical for either coalescible task which has two
     enqueue sites. ``Network.ensure_mesh`` enqueues
@@ -286,8 +288,9 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
         # default ``clusteroperation`` routes to sf-queues, which does
         # not partition at all. A node-aware key on a sf-queues queue
         # would let two workers on the same node hold two operations
-        # for the same (network, node) at once -- see decision 5 of the
-        # phase 11 plan.
+        # for the same (network, node) at once, and one worker's fold
+        # could then mark the other's operation complete between its
+        # queued-state check and its own transition to executing.
         key_distinguishes_target = (
             'node_uuid' in COALESCIBLE_KEY_COLUMNS
             and node_uuid is not None
@@ -304,9 +307,9 @@ def create_and_enqueue(network_uuid, tasks, priority, request_id=None,
                 f'apart, and route the enqueue to the network family so '
                 f'sf-net drains it. A node-aware key is only sound on a '
                 f'dispatcher which partitions its workers by target: sf-net '
-                f'does, sf-queues does not (see the phase 11 plan, decision '
-                f'5, and issue #4017 for the sf-queues half). This enqueue '
-                f'is on the {family!r} family.')
+                f'does, sf-queues does not (see issue #4017 for the '
+                f'sf-queues half). This enqueue is on the {family!r} '
+                f'family.')
 
     if (len(tasks) == 1
             and tasks[0] in COALESCIBLE_TASKS

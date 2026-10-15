@@ -3,7 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 
-"""Tests for the scheduler capacity reconciler (phase 2, D5).
+"""Tests for the scheduler capacity reconciler.
 
 Covers the pure limit-derivation and demand-decay helpers (including
 scheduler-parity cases mirroring the arithmetic in scheduler.py's
@@ -11,8 +11,8 @@ _has_sufficient_cpu/_ram/_disk), the disk_spec reference aggregation,
 and the SQL layer of _direct_reconcile_scheduler_capacity() against
 mocked engines in the style of test_mariadb_node_metrics_schema.py:
 statement shapes are verified by compiling what was executed, not by
-running it (step 4 of the plan validates execution against a real
-MariaDB).
+running it (test_mariadb_capacity_reconcile_live.py validates execution
+against a real MariaDB).
 """
 
 import math
@@ -54,7 +54,7 @@ class LimitDerivationTestCase(base.ShakenFistTestCase):
             cpu_schedulable, None, None, ratio, 3.0)
         self.assertEqual(42, limit_cpus)
 
-        # Guard parity at the boundary: the phase 3 guard
+        # Guard parity at the boundary: the capacity admission guard's
         # used + requested <= limit admits exactly what the scheduler's
         # current + requested > hard_max rejects.
         hard_max = cpu_schedulable * ratio

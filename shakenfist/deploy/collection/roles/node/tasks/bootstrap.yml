@@ -170,9 +170,9 @@
 # /tmp/shakenfist-0.8.x.whl (the local/CI mode that tests the current commit).
 # In local/CI mode, BUILDING the wheels, DISTRIBUTING them to each node's /tmp,
 # and overriding server_package/client_package (and pip_extra with any
-# index/proxy flags) is the consuming playbook's / CI's responsibility
-# (phase-6 steps 3 and 5), NOT this role's. This role only installs whatever
-# package references it is handed.
+# index/proxy flags) is the consuming playbook's / CI's responsibility, NOT
+# this role's. This role only installs whatever package references it is
+# handed.
 #
 # --system-site-packages is required so the venv can see apt-installed modules
 # such as python3-libvirt. --reinstall is required so a re-deploy picks up a

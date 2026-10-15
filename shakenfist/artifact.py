@@ -777,10 +777,11 @@ class Artifacts(dbo_iter):
     base_object = Artifact
 
     def _resolve_prefilter_to_states(self):
-        # Preserve the pre-phase-4 Artifacts override behaviour: when
+        # Artifacts has always differed from the base class here: when
         # no prefilter is set, do not filter on state (return every
-        # artifact and let predicate filters scope). The base class
-        # default of ACTIVE_STATES is kept for other inheritors.
+        # artifact and let predicate filters scope), as callers predating
+        # the SQL iterator expect. The base class default of
+        # ACTIVE_STATES is kept for other inheritors.
         if self.prefilter is None:
             return set()
         return super()._resolve_prefilter_to_states()

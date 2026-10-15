@@ -3,7 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 
-"""Tests for the placement admission primitive (phase 3, D1 and D3).
+"""Tests for the placement admission primitive.
 
 Covers the pure retry-classification and denial-detail helpers, and the
 SQL layer of _direct_admit_instance_placement() /
@@ -323,17 +323,19 @@ class AdmitBranchSelectionTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertNotIn('<=', update.split('WHERE', 1)[1])
 
     def test_the_claim_guard_survives_a_missing_node_capacity_row(self):
-        # D6, and the property this whole step exists to establish: P7's
-        # fail-open is a statement about *this node's* limits being
-        # absent from the totals the node and cluster guards test, and a
+        # The node, cluster and claim guards are independent flags. A
+        # node without a capacity row admits with its node and cluster
+        # guards failing open, which is a statement about *this node's*
+        # limits being absent from the totals those guards test, and a
         # claim's limits are namespace-denominated and node-independent,
         # so a missing node row must not drop the claim guard with them.
         #
-        # CLAIM_ENFORCEMENT_HARD is False this phase, which makes the
+        # CLAIM_ENFORCEMENT_HARD is False for now, which makes the
         # property unobservable through default behaviour -- with the
         # guard off either way there is nothing to see. So it is pinned
         # here against the flag computation itself, by flipping the
-        # constant the way phase 5 will: if claim_guarded ever gets
+        # constant the way the pending hard ceiling will (see
+        # PLAN-scheduler-reservations.md): if claim_guarded ever gets
         # folded back into node_present, this fails the day the
         # constant flips rather than the day a namespace overspends.
         with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
@@ -352,9 +354,9 @@ class AdmitBranchSelectionTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertIn('limit_disk_gb', update)
 
     def test_enforce_false_still_disables_the_claim_guard(self):
-        # P5's ground-truth writers record where a domain already is, and
-        # a guard cannot refuse reality -- that stays true when phase 5
-        # turns claim enforcement on.
+        # Ground-truth writers (enforce=False) record where a domain
+        # already is, and a guard cannot refuse reality -- that stays
+        # true once claim enforcement is made hard.
         with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
             router = _PlacementRouter(claim=_claim_row())
             self._run(router, enforce=False)
@@ -433,8 +435,9 @@ class AdmitAdvisoryClaimTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertEqual([], result['claim_dimensions'])
 
     def test_exactly_at_the_limit_is_not_over_it(self):
-        # The guard phase 5 will restore is used + x <= limit, so a claim
-        # sitting exactly on its ceiling has not exceeded it.
+        # The guard hard claim enforcement will restore is
+        # used + x <= limit, so a claim sitting exactly on its ceiling
+        # has not exceeded it.
         router = _PlacementRouter(claim=_claim_row(
             limit_cpus=8, used_cpus=8, limit_memory_mb=16384,
             used_memory_mb=8192, limit_disk_gb=100, used_disk_gb=40))
@@ -720,11 +723,12 @@ class AdmitDenialTestCase(_PlacementMixin, base.ShakenFistTestCase):
         self.assertFalse(detail['memory_mb']['exceeded'])
 
     def test_claim_denial_reports_the_claim_limits(self):
-        # Advisory mode (D16) means the claim's WHERE is a bare primary
-        # key this release, so the only way it matches no row is that the
-        # row went away between the probe and the transaction. The denial
-        # path is unchanged and still has to report why, because phase 5
-        # turns the guard back on and reaches it the ordinary way.
+        # Claims are advisory while CLAIM_ENFORCEMENT_HARD is False, so
+        # the claim's WHERE is a bare primary key and the only way it
+        # matches no row is that the row went away between the probe and
+        # the transaction. The denial path still has to report why,
+        # because hard enforcement turns the guard back on and reaches it
+        # the ordinary way.
         router = _PlacementRouter(
             claim=_claim_row(limit_cpus=8, used_cpus=6),
             rowcounts={'claim_update': 0})
@@ -1264,16 +1268,16 @@ class ReleaseTestCase(_PlacementMixin, base.ShakenFistTestCase):
 
 class SnapshotIsolationInvariantTestCase(_PlacementMixin,
                                          base.ShakenFistTestCase):
-    """No plain SELECT may precede the first guarded UPDATE (step 6a).
+    """No plain SELECT may precede the first guarded UPDATE.
 
     innodb_snapshot_isolation is ON by default from MariaDB 11.6.2. A
     plain SELECT inside the transaction establishes its read view early,
     and every later guarded UPDATE against a row another admission has
     since changed then aborts with ER_CHECKREAD (1020) rather than
-    blocking and re-evaluating its WHERE. Phase 0's benchmark predicted
-    it; phase 3's step 6 validation reproduced it as 46 of 50 concurrent
-    admissions exhausting the retry budget and 500ing an instance
-    create.
+    blocking and re-evaluating its WHERE. A benchmark predicted it, and
+    validation against a server with the variable ON reproduced it as 46
+    of 50 concurrent admissions exhausting the retry budget and 500ing
+    an instance create.
 
     These are the structural regression tests for that. The live suite's
     PlacementAdmissionConcurrencyLiveTestCase is the behavioural one,

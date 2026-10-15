@@ -1722,7 +1722,8 @@ class ReconcileSchedulerCapacityTaskTestCase(base.ShakenFistTestCase):
         # from "we did not look". A quiet pass must say drifted_nodes=0
         # rather than say nothing, otherwise zero drift and absent
         # instrumentation are the same log line -- which is exactly the
-        # ambiguity that left the phase 3 exit criterion uncheckable.
+        # ambiguity that once meant a soak could not confirm the
+        # reconciler found zero drift, only that it ran.
         mock_reconcile.return_value = _capacity_reply(
             [_capacity_node(NODE_UUID_1), _capacity_node(NODE_UUID_2)])
 

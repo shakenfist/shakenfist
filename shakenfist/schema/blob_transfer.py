@@ -101,8 +101,8 @@ class BlobTransfer(BaseModel):
         emitted to the log stream, which ships to Loki, so until this
         field was removed a live transfer token left the cluster on every
         blob transfer -- in exactly the ``extra={'token': token}`` shape
-        phase 2's step 2g removed five times over in the authentication
-        code. Found while sweeping for secret-carrying fields in phase 6.
+        already removed five times over from the authentication code.
+        Found while sweeping for secret-carrying fields.
 
         Nothing needed it here; the daemon reads ``.token`` from the model
         directly. This mirrors NamespaceKey.external_view(), which omits

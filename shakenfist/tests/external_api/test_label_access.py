@@ -284,12 +284,11 @@ class LabelWriteTargetTestCase(LabelAccessFixture):
 class LabelWriteTargetWarnTestCase(LabelWriteTargetTestCase):
     """The write route with the schema layer not refusing.
 
-    Added by the phase 8 audit of PLAN-api-input-validation. At the
-    shipped default `max_versions` carries `unsignedinteger`'s
+    At the shipped default `max_versions` carries `unsignedinteger`'s
     `minimum: 0`, so the compiled schema refuses a negative before the
-    handler is entered and `external_api/label.py`'s own
-    `except InvalidMaxVersions` arm -- the only defence at `warn` and
-    `off` -- never executed in the whole suite.
+    handler is entered and, without this class, `external_api/label.py`'s
+    own `except InvalidMaxVersions` arm -- the only defence at `warn` and
+    `off` -- would never execute in the whole suite.
     """
 
     mode = 'warn'

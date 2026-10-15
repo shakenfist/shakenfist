@@ -281,9 +281,9 @@ class Instance(dbowo):
     health_dependencies = ['instances', 'image_cache', 'blobs']
 
     # Attributes stored in MariaDB (everything else stays in etcd).
-    # ``interfaces`` was here pre-phase-7; the column on
-    # ``instance_attributes`` is dropped in phase 7e and the property
-    # now queries ``network_interfaces`` directly.
+    # ``interfaces`` is deliberately absent: its column on
+    # ``instance_attributes`` is dropped and the property queries
+    # ``network_interfaces`` directly.
     # ``error`` maps to the ``error_message`` column, which is no longer
     # read or written by the error property -- the message now lives on
     # the object's state row like every other object type (issue 3899).
@@ -3196,8 +3196,8 @@ class Instances(dbo_iter):
     base_object = Instance
 
     def _resolve_prefilter_to_states(self):
-        # Preserve the pre-phase-4 Instances override behaviour: when
-        # no prefilter is set, do not filter on state (return every
+        # Instances deliberately differs from the base class: when no
+        # prefilter is set, do not filter on state (return every
         # instance and let predicate filters scope). The base class
         # default of ACTIVE_STATES is kept for other inheritors.
         if self.prefilter is None:

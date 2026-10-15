@@ -22,18 +22,20 @@ a caller sees afterwards:
   parameter are refused with the exact published shapes, carrying no
   interpreter text;
 * at `warn`: the wrong-typed request now succeeds unchanged, while the
-  three phase 7 handler guards -- a diskspec asking for neither size
-  nor base, a null video model, and a null network_uuid on interface
-  hotplug -- still refuse. That is decisions D34 and D42 (a guard
-  keeps working under the rollback) proven on a real cluster.
+  three handler guards which duplicate the structured schemas -- a
+  diskspec asking for neither size nor base, a null video model, and a
+  null network_uuid on interface hotplug -- still refuse. Handler
+  guards are kept even where enforcement makes them unreachable so
+  that the rollback does not hand back a newly unguarded API; this
+  proves that on a real cluster.
 
 Issue 4253's sketch asked for the *undeclared key* to be shown
 succeeding at warn, and that is not what warn does: an undeclared key
 merges into the handler's kwargs and raises TypeError at the call,
-which since phase 5 is a recorded 500 answering `server error`
-(decision D25 -- warn restores the pre-validation behaviour, and the
-pre-validation behaviour of this input was never success). That 500 is
-pinned in the unit suite (test_request_validation.py's
+which is a recorded 500 answering `server error` (answering it 400
+would put interpreter text in the caller's error field, #3612; and
+the pre-validation behaviour of this input was never success). That
+500 is pinned in the unit suite (test_request_validation.py's
 test_warn_mode_changes_no_response); it is not driven here because
 deliberately provoking recorded server exceptions on the CI cluster
 would trip the job's log checks. The input which really is refused at
@@ -214,8 +216,8 @@ def assert_warn(client):
     # 1. The request enforce refuses now succeeds, answered exactly as
     #    it always was -- a JSON list of instances. The undeclared-key
     #    probe is deliberately not sent here: at warn it is a recorded
-    #    500 (decision D25), pinned in the unit suite, and provoking
-    #    recorded server exceptions would trip the job's log checks.
+    #    500, pinned in the unit suite, and provoking recorded server
+    #    exceptions would trip the job's log checks.
     r = client._request_url('GET', '/instances', data=BAD_BOOLEAN_BODY)
     body = r.json()
     if not isinstance(body, list):
@@ -223,10 +225,11 @@ def assert_warn(client):
              'answer an instance list at warn: %s' % body)
     log('OK: warn accepts the wrong-typed parameter enforce refuses')
 
-    # 2. The three phase 7 handler guards, which D42 keeps precisely so
-    #    the rollback does not hand back a newly unguarded API. Each
-    #    message is asserted in full, because at warn a 400 alone
-    #    cannot tell a guard's answer from a stray validation refusal.
+    # 2. The three handler guards the structured schemas duplicate,
+    #    kept precisely so the rollback does not hand back a newly
+    #    unguarded API. Each message is asserted in full, because at
+    #    warn a 400 alone cannot tell a guard's answer from a stray
+    #    validation refusal.
     expect_400(
         client, 'POST', '/instances',
         {'name': 'rollback-disk', 'cpus': 1, 'memory': 128, 'disk': [{}]},

@@ -318,11 +318,10 @@ class Network(dbowo):
         n = Network.from_db(network_uuid)
         n.state = Network.STATE_INITIAL
 
-        # Networks should immediately appear on the network node. Phase 6
-        # of `PLAN-network-facade.md` retired the `network_deploy` composite
-        # task; the explicit task list preserves the original semantic
-        # (create on the network node, then ensure the mesh FDB) without
-        # going through the obsolete handler.
+        # Networks should immediately appear on the network node. The
+        # `network_deploy` composite task has been retired; the explicit task
+        # list preserves its semantic (create on the network node, then
+        # ensure the mesh FDB) without going through the obsolete handler.
         net_create_and_enqueue(
             n.uuid,
             [net_tasks.network_apply_create_network_node,
@@ -1167,9 +1166,9 @@ class Networks(dbo_iter):
     base_object = Network
 
     def _resolve_prefilter_to_states(self):
-        # Preserve the pre-phase-4 Networks override behaviour: when
-        # no prefilter is set, do not filter on state (return every
-        # network and let predicate filters scope). The base class
+        # Preserve the Networks override behaviour from before iteration
+        # moved to SQL pushdown: when no prefilter is set, do not filter on
+        # state (return every network and let predicate filters scope). The base class
         # default of ACTIVE_STATES is kept for other inheritors.
         if self.prefilter is None:
             return set()

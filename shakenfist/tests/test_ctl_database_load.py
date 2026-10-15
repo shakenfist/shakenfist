@@ -7,7 +7,8 @@ ask for in a bug report, so the property which matters most is that it
 never reports a partial measurement as a whole one. A tier gateway which
 does not answer takes its share of the load with it, and a total quietly
 missing a third of the cluster reads as load having fallen -- which is the
-same mistake, in a smaller way, that #3708 made for a fortnight of phase 6.
+same mistake, in a smaller way, that #3708 made for a fortnight of load
+analysis.
 """
 
 import json

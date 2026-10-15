@@ -18,10 +18,11 @@
 # - attribute/network/{uuid}/routing -> floating_gateway
 # - attribute/network/{uuid}/hosteddns -> hosteddns
 #
-# The cached ``networkinterfaces`` list (and its
-# ``networkinterfaces_initialized`` flag) was removed in phase 7;
-# ``Network.networkinterfaces`` now queries the network_interfaces
-# table live via an indexed ``WHERE network_uuid = ?``.
+# There is no cached ``networkinterfaces`` list (nor its
+# ``networkinterfaces_initialized`` flag): rather than hand-maintain a
+# copy of what the table already holds, ``Network.networkinterfaces``
+# queries the network_interfaces table live via an indexed
+# ``WHERE network_uuid = ?``.
 
 from typing import Annotated
 from typing import Any

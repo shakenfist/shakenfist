@@ -56,15 +56,14 @@ class _NamespaceAttributesStore(dict):
     """The namespace attributes store, with a legacy `keys` view.
 
     Namespace keys used to live in the namespace_attributes.keys JSON
-    column. Phase 2 of the auth federation plan moved them into the
-    namespace_keys tables, and production code now neither reads nor
-    writes that column -- it is vestigial until a later schema version
-    drops it.
+    column. They now live in the namespace_keys tables, and production
+    code neither reads nor writes that column -- it is vestigial until a
+    later schema version drops it.
 
     The behaviour preservation tests written before that cutover
     (shakenfist/tests/test_namespace_keys.py) assert against this store
-    using the old shape. They are the phase's bit compatibility proof
-    and must pass unmodified, so reads through this mapping render the
+    using the old shape. They are the bit compatibility proof for the
+    move and must pass unmodified, so reads through this mapping render the
     key tables back into the legacy shape. The assertions stay
     meaningful -- they still describe the key material which was
     actually stored, just read out of the table which now stores it.
@@ -132,8 +131,8 @@ class MockMariaDB():
         self._cot_sequence = count(1)  # AUTO_INCREMENT mock
         self.node_metrics_store = {}  # Mock MariaDB node metrics
         # Mock scheduler_node_capacity rows, keyed by node uuid. Empty
-        # by default, which is the phase 3 fail-open case (P7): a node
-        # with no capacity row admits unguarded. Tests which want the
+        # by default, which is the fail-open case: a node with no
+        # capacity row admits unguarded. Tests which want the
         # guard to bite seed a row with set_node_capacity().
         self.node_capacity = {}
         # Whether a read of those rows reports itself as degraded. False
@@ -1291,7 +1290,7 @@ class MockMariaDB():
         """Return the metadata dict of a stored cluster operation.
 
         Tests previously asserted on `/sf/{operation_type}/{uuid}` etcd
-        paths; after phase 5, headers live in MariaDB via
+        paths; headers now live in MariaDB via
         cluster_operations_store. The stored row has the metadata dict
         plus `operation_type` and `created_at` overlaid; this helper
         returns just the metadata-shaped view tests compare against.
@@ -1852,7 +1851,7 @@ class MockMariaDB():
     # MariaDB NamespaceKey mock implementations
 
     def legacy_namespace_keys_view(self, namespace):
-        """Render one namespace's keys in the pre-phase-2 JSON shape.
+        """Render one namespace's keys in the legacy namespace_attributes JSON shape.
 
         See _NamespaceAttributesStore. Expired keys are included, as
         they always were in storage -- the expiry filter was and is
@@ -2760,11 +2759,11 @@ class MockMariaDB():
                           demand_limit=None):
         """Seed a scheduler_node_capacity row for a node.
 
-        No node has one by default, which is the phase 3 fail-open case
-        (P7): admission proceeds unguarded and says so. Seeding a row
-        makes the guard apply to that node.
+        No node has one by default, which is the fail-open case:
+        admission proceeds unguarded and says so. Seeding a row makes
+        the guard apply to that node.
 
-        ``demand_limit`` is the mock's stand-in for the real D13 bound
+        ``demand_limit`` is the mock's stand-in for the real demand bound
         of ``SCHEDULER_TARGET_LOAD x cpu_schedulable`` (the mock has no
         node_metrics table; fold any measured load into
         ``expected_demand``). ``None``, the default, leaves the demand
@@ -3102,8 +3101,8 @@ class MockMariaDB():
         accumulates the placement's demand contribution whether or not
         the clause was enforced -- also like the real UPDATE.
 
-        That clause is **check-then-charge**, matching the real one
-        since phase 4a: it compares the node's existing
+        That clause is **check-then-charge**, matching the real one: it
+        compares the node's existing
         ``expected_demand`` against ``demand_limit`` and does *not* add
         the incoming ``demand_add``, which is reported as ``requested``
         but not tested. An under-target node therefore admits a
@@ -3111,22 +3110,23 @@ class MockMariaDB():
         ``mariadb._demand_guard_clause()`` matters more than it looks:
         ``CapacityAdmissionDenied.demand_only`` is derived from which
         dimensions report ``exceeded``, so a mock that charged the
-        placement would refuse where production admits and send the P9
-        waiver tests down a second walk the real code never takes.
+        placement would refuse where production admits and send the
+        demand waiver tests down a second walk the real code never
+        takes.
 
         The claim stage applies to namespaces seeded with
         set_namespace_claim(), and matches the real implementation's
         semantics rather than approximating them: it is skipped by a
         move (which changes node, never namespace, so consumes nothing
         on the namespace side), it is guarded only when
-        mariadb.CLAIM_ENFORCEMENT_HARD is True (D6's third flag, read at
-        call time so a phase 5 test can patch it), and when it is not
-        guarded an over-claim placement is *admitted* and reported --
-        ``claim_over_limit`` with only the dimensions actually over in
-        ``claim_dimensions``, each carrying the usage the claim held
-        *before* this admission (D5's read-back). A denial at any stage
-        charges nothing at all, as the real transaction's rollback does,
-        so a denied reply can never carry an exceedance.
+        mariadb.CLAIM_ENFORCEMENT_HARD is True (read at call time so a
+        test can patch it), and when it is not guarded an over-claim
+        placement is *admitted* and reported -- ``claim_over_limit`` with
+        only the dimensions actually over in ``claim_dimensions``, each
+        carrying the usage the claim held *before* this admission. A
+        denial at any stage charges nothing at all, as the real
+        transaction's rollback does, so a denied reply can never carry an
+        exceedance.
 
         The cluster singleton is still not modelled: an unclaimed
         namespace's charge has no caller-observable effect, so there is
@@ -3664,11 +3664,7 @@ class MockMariaDB():
         ``targets`` is supplied -- writes one
         cluster_operation_targets row per target in the same call,
         matching the real function which now writes them in the
-        same transaction as the operation. Until phase 5 switches
-        from_db() to read cluster_operations from MariaDB, this
-        mock also writes the legacy etcd path at
-        /sf/{operation_type}/{uuid} so existing tests that load
-        operations via from_db() continue to work.
+        same transaction as the operation.
         """
         key = str(op_uuid)
         if key in self.cluster_operations_store:
@@ -3908,9 +3904,8 @@ class MockMariaDB():
         through ``_maybe_uuid`` and returns on ``ValueError``. A mock
         looser than that would report a match where production reports
         a logged skip, which is how a previous divergence in this
-        helper came within one commit of making step 11e's assertions
-        measure nothing. See decision 8 of
-        docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
+        helper came within one commit of making the multi-column key
+        tests in test_mariadb_coalescing.py measure nothing.
         """
         if not keys:
             return False
