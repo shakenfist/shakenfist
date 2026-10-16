@@ -21,6 +21,15 @@ For every `.sfui-commit` found, the check verifies:
   a copy behind canonical means improvements have not propagated;
   re-run `tools/vendor.sh` from an up to date sfui checkout.
 
+The recorded commit must also be **on the canonical default branch**
+before anything is checked out. Running `tools/vendor.sh` at that commit
+is running code the audited repository chose, and a clone of sfui holds
+every pushed branch, so a commit that merely exists could be one nobody
+reviewed. A commit off the default branch fails without its script
+being run. None of the check's subprocesses inherits `GH_TOKEN` or
+`GITHUB_TOKEN`: the audit step holds a token that can file and close
+issues across the organisation, and cloning public sfui needs none.
+
 Repositories with no `.sfui-commit` are not applicable.
 
 private-ci, the first sfui consumer, is internal tooling excluded from
