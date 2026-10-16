@@ -1,6 +1,6 @@
 # Phase 5 — Auto-snapshot bug-report mode
 
-Phase 5 of [PLAN-stream-caps-and-flap.md](/components/ryll/plans/PLAN-stream-caps-and-flap/).
+Phase 5 of [PLAN-stream-caps-and-flap.md](/components/ryll/plans/completed/PLAN-stream-caps-and-flap/).
 
 ## Prompt
 
@@ -260,7 +260,7 @@ interval of 10 s in the CLI help text.
 |------|--------|-------|-----------|---------------------|
 | 5A | medium | sonnet | none | **Core implementation.** Add `auto_snapshot_interval: Option<u64>` and `auto_snapshot_cap: Option<usize>` to `ryll/src/config.rs` (clap derive). Thread through `main.rs` to `RyllApp::new`. Add `AutoSnapshotState` struct in a new `ryll/src/auto_snapshot.rs` (or `bugreport.rs` if cleaner) holding Arc'd handles to traffic, channel_snapshots, app_snapshot, notifications, plus resolved target_host/port, output_dir, cap, interval. Per Q1 working proposal: if any of these fields on `RyllApp` aren't already `Arc`-backed, bump them. Add `BugReport::new_auto(...)` helper that wraps `BugReport::new` with auto-generated description (`format!("auto-snapshot T+{:.1}s", session_uptime_secs)`) and `BugReportType::AutoSnapshot` (new variant — defaults its channel name dispatch to include playback + main + display + cursor + inputs + usbredir + webdav so a single zip carries everything). Spawn the interval task from `RyllApp::on_session_ready` (or wherever the session-bring-up code lives) when `auto_snapshot_interval` is set. **At spawn time** push one `NotifySeverity::Info` notification (`NotificationSource::Internal`): `"Auto-snapshot mode enabled — every {N}s, max {cap} snapshots, saving to {path}"` — one-shot, no cool-down. Add `auto_snapshots_saved: u64` and `auto_snapshots_pruned: u64` to `AppSnapshot` (or the snapshot the stats panel reads); bump after each successful write_zip / prune respectively. Render in the existing stats panel as `"Auto-snapshot: {saved}/{cap}"` only when the mode is enabled (hide the line entirely when disabled). Implement the prune-to-cap step per Q2: glob `auto-snapshots/ryll-auto-snapshot-*.zip`, sort by filename, delete oldest beyond cap. Per Q3: handle write_zip errors with a notification cool-down (5 min, single warn log on first failure). Per Q4: subdirectory is `<bug_report_dir>/auto-snapshots/` using `manual_bug_report_dir`'s fallback chain. Verify `make build && make test && make lint && pre-commit run --all-files`. |
 | 5B | low | haiku | none | **Docs touch-up.** Update `README.md` (if it covers CLI flags) and `docs/configuration.md` to document `--auto-snapshot-interval` and `--auto-snapshot-cap`. Add a short paragraph to `docs/troubleshooting.md` under or near the playback-observability section explaining when to enable auto-snapshot mode (intermittent issues, flight-data-recorder use case). Cross-link from `docs/libvirt-spice-recommendations.md`'s "Side-by-side testing recipe" section as an alternative to manual periodic reports. Run `pre-commit run --all-files`. |
-| 5C | — | — | — | **Operator smoke test.** Run a ryll session against `sf-4` with `--auto-snapshot-interval 30 --auto-snapshot-cap 20`. Let it run for ≥ 3 minutes while doing typical workload. Confirm: (a) at session start the notification panel shows one `Info` notification confirming auto-snapshot mode is enabled with the interval, cap, and target path; (b) the stats panel shows `"Auto-snapshot: N/20"` and N increments by 1 every ~30 s; (c) `<bug-report-dir>/auto-snapshots/` contains 6+ zips spaced ~30 s apart; (d) each zip's `channel-state.json` shows playback fields populating differently across snapshots (proves the snapshot is being re-taken not just the same data re-zipped); (e) after the cap is exceeded, oldest zips are pruned and the stats counter still reads N/20 (no overflow); (f) pcap is present in each zip and contains the ~20 seconds of traffic preceding the snapshot; (g) the notification panel does NOT show one notification per snapshot (proves we didn't accidentally make it noisy). This is operator verification, not a code change. |
+| 5C | — | — | — | **Operator smoke test.** Run a ryll session against `sf-4` with `--auto-snapshot-interval 30 --auto-snapshot-cap 20`. Let it run for ≥ 3 minutes while doing typical workload. Confirm: (a) at session start the notification panel shows one `Info` notification confirming auto-snapshot mode is enabled with the interval, cap, and target path; (b) the stats panel shows `"Auto-snapshot: N/20"` and N increments by 1 every ~30 s (N is a cumulative lifetime count, not a files-on-disk count — see (e) and issue #433; only the *incrementing* is checked here); (c) `<bug-report-dir>/auto-snapshots/` contains 6+ zips spaced ~30 s apart; (d) each zip's `channel-state.json` shows playback fields populating differently across snapshots (proves the snapshot is being re-taken not just the same data re-zipped); (e) after the cap is exceeded, oldest zips are pruned: `ls <bug-report-dir>/auto-snapshots/*.zip \| wc -l` is **at most** `--auto-snapshot-cap`, and `du -sm <bug-report-dir>/auto-snapshots/` is at most 512 MiB (`DEFAULT_AUTO_SNAPSHOT_BYTE_CAP`). **Fewer** files than the cap is a pass, not a failure — the byte budget binds first on a busy session, because `traffic.pcap` is stored uncompressed. Do NOT check this against the stats panel: `auto_snapshots_saved` is monotonic and exceeds the cap on any session longer than cap x interval, so the panel reads e.g. `97/20` while pruning is working correctly (issue #433). Cross-check instead in a bug report that `auto_snapshots_saved - auto_snapshots_pruned` equals the file count on disk; (f) pcap is present in each zip and holds the traffic preceding the snapshot. The window is **byte**-bounded, not time-bounded (50 MiB across the six rings), so its duration varies with session bandwidth — a quiet session's zip can legitimately hold the *entire* session, and a busy one only seconds. Assert that the pcap parses and that its last frame is within a few seconds of the snapshot timestamp; do NOT assert a fixed number of seconds; (g) the notification panel does NOT show one notification per snapshot (proves we didn't accidentally make it noisy). This is operator verification, not a code change. |
 
 Commits: one per step (5A, 5B). 5C is operator verification.
 
@@ -318,3 +318,38 @@ back-brief the operator with:
 - How they're handling the cpal/audio-thread thread-safety
   concern (should be a non-issue if `channel_snapshots` is
   already `Arc<ChannelSnapshots>` — verify).
+
+## Smoke result: 5C
+
+**Passed, session 011 (2026-10-02, ryll 78c7238f, macOS aarch64).**
+Run with `--auto-snapshot-interval 30 --auto-snapshot-cap 20` for 86
+minutes.
+
+| | Result |
+|---|---|
+| a | One startup `Info` naming interval, cap and path |
+| b | Counter incremented once per 30 s |
+| c | 20 zips, spaced exactly 30.0 s (`T+4590.1s` .. `T+5160.1s`) |
+| d | 71 of 233 `channel-state.json` fields differ first vs last; 9 of 28 **playback** fields change |
+| e | 20 files, 231 MiB — both budgets satisfied. `auto_snapshots_saved` 96, `auto_snapshots_pruned` 76, `96 - 76 = 20` = file count |
+| f | pcap present, parses, 5 TCP conversations (`channel=all`) |
+| g | No per-snapshot notification |
+
+Criteria (e) and (f) were **wrong as originally written** and were
+rewritten in the same commit that recorded this result:
+
+- (e) asserted the stats panel "still reads N/20 (no overflow)". That is
+  unsatisfiable: `auto_snapshots_saved` is monotonic, so any session
+  outliving cap x interval (ten minutes here) necessarily shows a
+  numerator above the cap. The operator read `97/20` as a pruning
+  failure; pruning was correct. Filed as #433, still open.
+- (f) asserted the pcap holds "~20 seconds" of traffic. The rings are
+  byte-bounded, not time-bounded; this session's pcap held all 5162 s.
+  The 20-second figure only holds for a session busy enough to fill
+  50 MiB quickly.
+
+Four defects unrelated to 5C's own criteria were found in the same
+session's artifacts and tracked separately: #428, #429, #430 (all since
+fixed) and #432 (`recent_events` flooded by motion, still open). #429
+in particular filled 46 of the 56 notification-panel entries, which is
+why criterion (g) is worth keeping.

@@ -79,7 +79,8 @@ window. The operator guide, including reverse-proxy and TLS setup, is
 | `--capture <DIR>` | none | Write pcap + video capture to directory |
 | `-v, --verbose` | false | Enable debug-level logging |
 | `--latency-file <PATH>` | none | Write latency measurements to CSV file |
-| `--experimental-h264` | false | Experimental: let spice-server stream video to ryll as H.264, by advertising the display channel's `CODEC_H264` capability and asking for H.264 ahead of MJPEG. Off by default because H.264 from spice-server does not decode yet ([#398](https://github.com/shakenfist/ryll/issues/398)); video regions streamed as H.264 are likely to go black or stale. For work on that bug; see [H.264 from spice-server is currently disabled](/components/ryll/libvirt-spice-recommendations/#h264-from-spice-server-is-currently-disabled) |
+| `--experimental-h264` | false | Experimental: prefer H.264 video streams, asking for H.264 ahead of MJPEG in the display channel's `PREFERRED_VIDEO_CODEC_TYPE`. By default ryll asks for MJPEG first, which keeps spice-server on MJPEG, because H.264 from spice-server does not decode yet ([#398](https://github.com/shakenfist/ryll/issues/398)): with this flag its video regions are likely to go black or stale. For work on that bug; see [H.264 from spice-server](/components/ryll/libvirt-spice-recommendations/#h264-from-spice-server). Cannot be combined with `--no-h264` |
+| `--no-h264` | false | Do not offer H.264 video streams: leave out the display channel's `CODEC_H264` capability and ask only for MJPEG. A server that encodes only H.264, such as andris, then sends no video streams. An escape hatch for a server whose H.264 does not decode, such as a guest's spice-streaming-agent; see [H.264 from spice-server](/components/ryll/libvirt-spice-recommendations/#h264-from-spice-server). Cannot be combined with `--experimental-h264` |
 
 ### Examples
 

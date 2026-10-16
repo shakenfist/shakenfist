@@ -439,7 +439,7 @@ nav:
             - "Channel diagnostics audit": components/ryll/channel-diagnostics-audit.md
             - "Configuration": components/ryll/configuration.md
             - "Continuous integration": components/ryll/ci.md
-            - "Control Socket Protocol — Version 1.3": components/ryll/control-socket-protocol.md
+            - "Control Socket Protocol — Version 1.4": components/ryll/control-socket-protocol.md
             - "Development": components/ryll/development.md
             - "Device redirection": components/ryll/device-redirection.md
             - "Diagnostics and instrumentation": components/ryll/diagnostics.md

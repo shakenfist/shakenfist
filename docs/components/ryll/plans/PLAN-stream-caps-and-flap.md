@@ -275,11 +275,11 @@ session 002b showed that MJPEG decode in the pure-Rust
 | 2. LZ4 compression | [PLAN-stream-caps-and-flap-phase-02-lz4.md](/components/ryll/plans/PLAN-stream-caps-and-flap-phase-02-lz4/) | Code landed; smoke test (2C) folded into phase 3 step 3H | `f22416a` (PR #102) |
 | 3. Fast JPEG decode | [PLAN-stream-caps-and-flap-phase-03-jpeg-decoders.md](/components/ryll/plans/PLAN-stream-caps-and-flap-phase-03-jpeg-decoders/) | Code landed (3A-3G). Session 006 follow-up revealed still-image JPEG path missed the wiring (was on pure-Rust at ~263 ms/frame); fix landed. 3H replaced with the 007 still-image JPEG smoke matrix (one shared guest, three client OSes) — pending operator runs. | `f22416a` (PR #102) |
 | 4. Channel diagnostics audit + playback observability | [completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics.md](/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics/) | Complete (4G verified in session 002g: `data_packets_received == data_packets_decoded`, no decode failures, underruns visible — instrumentation distinguishes the four failure modes as designed) | `f22416a` (PR #102) |
-| 5. Auto-snapshot bug-report mode | [PLAN-stream-caps-and-flap-phase-05-auto-snapshot.md](/components/ryll/plans/PLAN-stream-caps-and-flap-phase-05-auto-snapshot/) | Code landed (5A-5B); 5C operator smoke test pending | `f22416a` (PR #102) |
+| 5. Auto-snapshot bug-report mode | [PLAN-stream-caps-and-flap-phase-05-auto-snapshot.md](/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-05-auto-snapshot/) | **Complete.** 5A-5B landed; 5C operator smoke **passed** in session 011 (2026-10-02): 20 zips / 231 MiB against a 20 / 512 MiB budget, 30.0 s cadence, playback fields re-sampled per snapshot, no per-snapshot notification. Criteria (e) and (f) were unsatisfiable as written and were rewritten against what the code actually bounds; (e) produced issue #433. | `f22416a` (PR #102) |
 | 6. Multi-codec + H.264 | [PLAN-stream-caps-and-flap-phase-06-h264.md](/components/ryll/plans/PLAN-stream-caps-and-flap-phase-06-h264/) | Code landed (6A-6E); 6F operator smoke test pending (needs an H.264-capable spice-server build to actually exercise the new path) | `f22416a` (PR #102) |
 | 7. Preference messages | [PLAN-stream-caps-and-flap-phase-07-pref-messages.md](/components/ryll/plans/PLAN-stream-caps-and-flap-phase-07-pref-messages/) | Code landed (7A-7C); session 006 measurement drove AUTO_LZ → AUTO_GLZ revert (server stopped using GLZ entirely under AUTO_LZ; +25% bytes_in). 7D smoke folded into the next 005-style run. | `f22416a` (PR #102) |
 | 8. Live streaming indicator + flap notification | [PLAN-stream-caps-and-flap-phase-08-streaming-indicator.md](/components/ryll/plans/PLAN-stream-caps-and-flap-phase-08-streaming-indicator/) | Code landed. | `f22416a` (PR #102) |
-| 9. Vdagent responsiveness probe | [PLAN-stream-caps-and-flap-phase-09-vdagent-probe.md](/components/ryll/plans/PLAN-stream-caps-and-flap-phase-09-vdagent-probe/) | Code landed (9A-9D). 9E operator smoke (deliberately freeze the guest agent to verify the Warn notification fires) is pending. | `cd4c7d9` (PR #105) |
+| 9. Vdagent responsiveness probe | [PLAN-stream-caps-and-flap-phase-09-vdagent-probe.md](/components/ryll/plans/PLAN-stream-caps-and-flap-phase-09-vdagent-probe/) | Code landed (9A-9D), then **the mechanism was replaced**. Sessions 011 / 013 / 014 showed the reply-lag probe cannot work on a QXL guest: when every QXL instance handles client monitors config, spice-server's agent write filter diverts `VD_AGENT_MONITORS_CONFIG` to the display device (`agent-msg-filter.c`, `reds_on_main_agent_monitors_config`) and the agent never sees it, so no `VD_AGENT_REPLY` is ever produced. Replaced by token-starvation detection in `0b35c07` / `52edaed` (issue #429, closed). 9E has been rewritten against the new fields and is runnable again. | `cd4c7d9` (PR #105), `0b35c07` + `52edaed` (#429) |
 | 10. Documentation | (no separate plan — docs catch-all dispatched directly) | Complete. Capability table + CLI flag docs + troubleshooting JPEG-decoder subsection landed across three commits (faa8ebd9 / c4849822 / dfc59950). The first two landed in `ARCHITECTURE.md` and `README.md` and have since been relocated by the `readme-pitch` (PR #222) and `llm-doc-structure` (PR #277) work: the capability table is now in `docs/spice-protocol.md`, the CLI flags in `docs/features.md` and `docs/diagnostics.md`. Phase-9D's vdagent docs already covered the agent-probe surface. | `cd4c7d9` (PR #105) |
 | 11. Remove spurious-PONG keepalive | [PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive.md](/components/ryll/plans/PLAN-stream-caps-and-flap-phase-11-remove-pong-keepalive/) | 11A landed (main channel); 11B doc cleanup landed (channel-diagnostics-audit + plan addendum); inputs-channel `send_idle_keepalive` kept (decision recorded in phase 11 plan — different mechanism + no visible side effects + cross-channel-idleness hypothesis); 11C long-idle soak pending. | `f22416a` (11A, PR #102), `cd4c7d9` (11B, PR #105) |
 | 12. Bounded image cache | [completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache.md](/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-12-bounded-image-cache/) | **Complete.** 12A-12C landed; 12D smoke FAILED (revealed GlzDictionary was a second unbounded cache the snapshot was summing in); 12E (bound GLZ), 12F (split snapshot fields), 12G (docs) all landed; 12H verified in session 005b — `glz_dictionary_bytes` held at 247 MiB / 256 cap across 67 snapshots over 670 s with eviction firing, `image_cache_bytes` stayed at 0, no RSS drift. | `f22416a` (PR #102) |
@@ -310,16 +310,21 @@ before re-assessing. The remaining open items are:
 - **Phase 2 / 3** — code landed; 2C smoke folded into 3H,
   the per-platform JPEG-decode smoke test. Operator-side
   work.
-- **Phase 5C** — auto-snapshot operator smoke test.
-  Functionally validated by every 005-onwards session
-  (auto-snapshots ARE the bundle source). Likely just
-  marking complete; verify and close.
+- **Phase 5C** — **done.** Smoke passed in session 011;
+  see the phase 5 plan's *Smoke result: 5C* section. Two
+  of its seven criteria were unsatisfiable as written and
+  have been corrected.
 - **Phase 6F** — H.264 wire-smoke. Needs an H.264-capable
   spice-server build. Operator-side; gated on the spice-
   server side rather than ryll. Mark blocked-on-external
   rather than open.
-- **Phase 9** — vdagent responsiveness probe. Independent
-  of video work. Worth picking up.
+- **Phase 9** — the liveness mechanism was **rebuilt**
+  (#429): reply-lag out, token starvation in, because
+  spice-server diverts monitors-config away from the
+  agent on QXL guests. 9E is rewritten and runnable; it
+  now needs an operator to freeze `spice-vdagent` and
+  check the new `agent_starved_*` / `agent_stall_count`
+  fields rather than reply lag.
 - **Phase 10** — documentation catch-all. Last of the
   work phases; phase 18 audits what they add up to.
 - **Phase 11B / 11C** — inputs-channel keepalive decision
@@ -328,10 +333,12 @@ before re-assessing. The remaining open items are:
   the management session to chase until / unless
   reproductions come back.
 
-Suggested ordering for closeout: 5C/2C/3H closures first
-(mostly bookkeeping against existing sessions), then 11B
-+ 11C, then phase 9, then phase 10 to roll up the new
-caps + the phase-13 / 16 / 17 parking into the docs. After
+Suggested ordering for closeout, revised 2026-10-16: 5C is
+**done**; 2C/3H remain. Then 9E against the rebuilt
+token-starvation mechanism, then 11B + 11C, then phase 10 to
+roll up the new caps + the phase-13 / 16 / 17 parking into the
+docs. Phase 9 moved ahead of 11C because its mechanism just
+changed and the new code is unexercised by any operator run. After
 that, re-open phase 13 with the "why isn't the video a
 stream" question and decide whether to chase the
 predicate read or the client-side instrumentation first.
@@ -540,6 +547,17 @@ Per-phase intent:
   `VD_AGENT_DISPLAY_CONFIG` (Windows only). `VDAgentReply` is
   `{ uint32 type, uint32 error }` where `type` echoes the
   request opcode, so we can correlate replies to requests.
+
+  **Correction, 2026-10-16.** The premise above is true of the
+  *agent* but not of the path to it. On a QXL guest where every
+  instance handles client monitors config, spice-server's agent
+  write filter diverts `VD_AGENT_MONITORS_CONFIG` to the display
+  device (`agent-msg-filter.c`,
+  `reds_on_main_agent_monitors_config`) and the agent never
+  receives it, so it cannot reply no matter what either side
+  advertises in `VD_AGENT_CAP_REPLY`. Sessions 011 / 013 / 014
+  showed this; see issue #429. The probe now detects stalls by
+  token starvation instead.
 
   Mechanism: instrument the existing send/receive path for
   `VD_AGENT_MONITORS_CONFIG` (we already send this on window
@@ -1067,6 +1085,33 @@ Items deliberately deferred from this plan:
   right values depend on what we see in the field.
 * **`GL_SCANOUT` cap.** Only useful if we add a zero-copy GL
   surface path. Not on the roadmap.
+
+Found while running the 5C smoke in session 011 (2026-10-02) and
+filed rather than fixed in-plan. Status as at 2026-10-16:
+
+* **#428** — *fixed* (PR #434). The main channel's 5 s event-send
+  timeout discarded state-transition events. Resolved by publishing
+  mouse mode and agent state on a watch, never dropping the
+  session-end event, and warning when a drop happens.
+* **#429** — *fixed* (`0b35c07`, `52edaed`). See the phase 9 row and
+  the correction note under *Execution*; the reply-lag probe was
+  structurally unable to work on QXL guests.
+* **#430** — *closed*. UI thread stalled 20 s+ during a guest reboot,
+  filling the 1024-slot event queue.
+* **#431** — **open.** The motion-ack throttle is inert because
+  click-adjacent position sends are not counted. Wire-verified:
+  3279 positions sent, 819 acks, 2731 counted against 3276
+  decremented.
+* **#432** — **open.** `recent_events` is flooded by mouse motion
+  (50 entries covering 1.68 s), so an input bug report captures no
+  button events. This is why session 011's click report could not be
+  diagnosed from the report itself.
+* **#433** — **open.** The auto-snapshot stats panel renders a
+  cumulative counter over the retention cap. Criterion 5C(e) depended
+  on this and has been rewritten.
+
+The three that remain open are all diagnostic-quality issues rather
+than functional defects, and none blocks this plan's closeout.
 
 ### Bugs fixed during this work
 

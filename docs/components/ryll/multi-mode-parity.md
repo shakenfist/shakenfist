@@ -21,7 +21,7 @@ Use it two ways:
 | Mode | Invocation | Description |
 |------|-----------|-------------|
 | GUI | (default) | Desktop window with menus, status bar, panels. See [Features](/components/ryll/features/). |
-| Headless | `--headless` | No window. Frames are counted, stats print every 10 s, and an optional [control socket](/components/ryll/control-socket-protocol/) (`--control-socket`) lets an external driver send input, take screenshots, and subscribe to events. |
+| Headless | `--headless` | No window. Draws are applied to an in-memory surface, a stats line is logged every 10 s, and an optional [control socket](/components/ryll/control-socket-protocol/) (`--control-socket`) lets an external driver send input, take screenshots, read the display counters, and subscribe to events. |
 | Web | `--web` | Serves a browser client over WebRTC. Shipped; the MVP scope was declared in [PLAN-web-frontend.md](/components/ryll/plans/PLAN-web-frontend/) and items outside it are marked below. See the [web frontend operator guide](/components/ryll/web-frontend/). |
 
 ## How to read the matrix
@@ -63,7 +63,9 @@ interactive driving surface). Last full audit: the web frontend
 sweep; control-socket cells refreshed 2026-08-23 (web mode gained
 the socket, its `status` and event rows, and the shared digest
 poller), media socket binding added 2026-08-21, clipboard and
-resize rows refreshed 2026-10-14 (control protocol 1.3).
+resize rows refreshed 2026-10-14 (control protocol 1.3), display,
+streaming and statistics rows refreshed 2026-10-16 (control protocol
+1.4's `stats` verb).
 
 ## Parity matrix
 
@@ -85,14 +87,16 @@ around it.
 | **Control socket** | | | |
 | Control socket (`--control-socket`) | n/a — intrinsic (the window owns input and the surface; combining with the GUI is a CLI error) | available | available |
 | Session state query (`status` verb) | n/a — intrinsic | available | available (`run_web` builds a `SessionStatus` from the same `spice_connected` flag, `SessionState` agent watch and surface mirror headless uses) |
+| Display and video-stream counters (`stats` verb) | n/a — intrinsic | available | available (`run_web` hands the socket the same display snapshot it gives the session) |
 | Event subscription (`latency`, `agent_connected`, `paste_*`, `surface_drawn`, `clipboard_changed`, `digest_updated`) | n/a — intrinsic | available (`digest_updated` needs the `digest-decode` build feature) | available (same `event_broadcast_tx`; `digest_updated` needs the `digest-decode` build feature, and the poller is spawned only when `--control-socket` is given so an ordinary browser session does not pay to decode QR) |
 | **Display** | | | |
-| Display framebuffer (render SPICE draw ops) | available | partial (the renderer's `run_headless()` counts `ImageReady` events but never paints continuously; with `--control-socket`, a `SurfaceMirror` renders draw ops on demand for the `screenshot` verb, instantiated on first use) | available (single monitor, MVP) |
-| Multi-monitor (`--monitors N`) | available | partial (the renderer's `run_headless()` — channel connects but frames are silently dropped; surfaces are never created in headless) | missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope) |
-| Full draw-op coverage (FILL, COPY, BLEND, etc.) | available | partial (same as display framebuffer — channel runs but output is discarded outside the control-socket mirror) | available (inherited from shared framebuffer) |
-| SPICE streaming / MJPEG | available | partial (decoded messages counted as frames, not rendered) | available (inherited) |
+| Display framebuffer (render SPICE draw ops) | available | available (the renderer's `run_headless()` applies every draw op to a `SurfaceMirror` as it arrives, whether or not a control socket is open; nothing displays it, but the `screenshot` verb reads it) | available (single monitor, MVP) |
+| Multi-monitor (`--monitors N`) | available | partial (`--monitors` reaches the session as in the GUI, and the renderer's `run_headless()` applies every display channel's draws to the `SurfaceMirror`, which creates a surface for each `SurfaceCreated`; `status` lists them all with their channel, but `screenshot` takes only a `surface_id` and so reaches only the primary's display channel. Multi-monitor headless is unverified end to end: [ryll#549](https://github.com/shakenfist/ryll/issues/549)) | missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope) |
+| Full draw-op coverage (FILL, COPY, BLEND, etc.) | available | available (the same `SurfaceMirror::apply_event` dispatch as the GUI and web mode) | available (inherited from shared framebuffer) |
+| SPICE video streams (MJPEG, H.264) | available | available (decoded frames are applied to the `SurfaceMirror` like any draw; the `stats` verb reports each stream's codec and decode counts) | available (inherited) |
 | Display capabilities advertisement (COMPOSITE, MONITORS_CONFIG, etc.) | available | available | available |
-| Opt in to H.264 from spice-server (`--experimental-h264`) | available | available | available (affects only the SPICE side; the WebRTC encoder is unchanged) — temporary: remove once ryll#398 makes H.264 decode and it is advertised by default again |
+| Prefer H.264 from the server (`--experimental-h264`) | available | available | available (affects only the SPICE side; the WebRTC encoder is unchanged) |
+| Do not offer H.264 to the server (`--no-h264`) | available | available | available (affects only the SPICE side; the WebRTC encoder is unchanged) |
 | Window auto-resize to surface size | available | n/a — intrinsic (no window) | n/a — intrinsic (browser viewport is user-controlled) |
 | Obey guest size hints toggle (`--no-obey-guest-size` / hamburger toggle) | available | n/a — intrinsic (no window; flag accepted in headless for CLI symmetry but ignored, `_obey_guest_size` in ryll's `run_headless()`) | missing (out of MVP scope; the web frontend's "guest fits browser viewport" inverse is planned) |
 | Guest resolution follows viewport (`VDAgentMonitorsConfig`) | available | available (via the control socket `resize` verb, rounded to the GUI's 8-pixel grid; there is no viewport to follow) | available (also via the control socket `resize` verb, which shares the browser's resize queue) |
@@ -138,10 +142,10 @@ around it.
 | Read-only share (`--share-dir-ro`) | available | available | missing (out of MVP scope) |
 | Runtime directory picker (native file dialog) | available | n/a — intrinsic (no GUI) | missing (out of MVP scope) |
 | **Statistics and Instrumentation** | | | |
-| FPS tracking (sliding window from DisplayMark) | available | partial (the renderer's `run_headless()` — frame count incremented but FPS not computed; only raw count printed every 10 s) | missing (out of MVP scope; no stats panel in browser MVP) |
-| Bandwidth sparkline (rolling bytes/sec graph) | available | missing (the renderer's `run_headless()` — `byte_counter` wired in but never sampled or reported in headless) | missing (out of MVP scope) |
-| Latency sparkline (inter-PING interval graph) | available | partial (no graph; raw latency samples are reachable as control-socket `latency` events, and bytes_in/bytes_out are tracked from `Statistics` events in the renderer's `run_headless()`) | missing (out of MVP scope) |
-| Periodic stats to stdout (headless only) | n/a — intrinsic (GUI shows live stats in status bar) | available (every 10 s: frames, bytes_in, bytes_out) | n/a — intrinsic (browser context) |
+| FPS tracking (sliding window from DisplayMark) | available | partial (no FPS is computed; the control socket's `stats` verb returns `marks_received`, whose rate between polls is the GUI's measure) | partial (no stats panel in the browser MVP; the control socket's `stats` verb works as in headless) |
+| Bandwidth sparkline (rolling bytes/sec graph) | available | partial (no graph; the control socket's `stats` verb returns the display channel's `bytes_in`, whose rate between polls is its bandwidth) | partial (no graph; the control socket's `stats` verb works as in headless) |
+| Latency sparkline (inter-PING interval graph) | available | partial (no graph; raw latency samples are reachable as control-socket `latency` events) | missing (out of MVP scope) |
+| Periodic stats to stdout (headless only) | n/a — intrinsic (GUI shows live stats in status bar) | available (every 10 s: DISPLAY_MARKs, image draws, and bytes in and out across every channel) | n/a — intrinsic (browser context) |
 | `--latency-file` latency measurements export | missing (`Args::latency_file` in `ryll/src/config.rs` — flag declared but never read or acted upon anywhere in the codebase) | missing (same — flag is declared but unused; control-socket `latency` events are the working alternative) | missing (out of MVP scope) |
 | Channel state snapshots (for bug reports) | available | available | missing (out of MVP scope) |
 | Traffic ring buffer (always active) | available | available | missing (out of MVP scope) |

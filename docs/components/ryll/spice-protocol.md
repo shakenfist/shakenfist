@@ -324,6 +324,12 @@ constructs a boxed `VideoDecoder` stored on `StreamState`. Each `STREAM_DATA`
 packet is dispatched through `stream.video_decoder.decode(packet)` regardless
 of codec — the per-codec logic lives in the impl, not the dispatch.
 
+A decoded frame is painted at the top-left corner of its dest rect (the
+`STREAM_DATA_SIZED` dest, else the stream's) as soon as it arrives. A frame
+larger than the dest, such as an H.264 frame rounded up to whole macroblocks,
+is cropped to the dest's size, keeping its top-left corner. Ryll does not
+scale frames, and ignores the stream's clip and its `TOP_DOWN` flag.
+
 Currently supported codec types:
 - `1` (MJPEG): decoded by `MJpegVideoDecoder`, which wraps the
   platform-optimised JPEG backend and maintains a DHT cache for frames
@@ -333,10 +339,48 @@ Currently supported codec types:
   decoder. H.264 is typically more bandwidth-efficient than MJPEG for
   sustained video playback, but H.264 from spice-server's GStreamer
   encoder does not decode yet
-  ([#398](https://github.com/shakenfist/ryll/issues/398)), so ryll
-  currently neither advertises `CODEC_H264` nor lists H.264 in its
-  codec preference, and the server never streams it H.264. The decoder
-  is kept for when that is fixed.
+  ([#398](https://github.com/shakenfist/ryll/issues/398)).
+
+**Which codec a server picks.** Each display channel advertises
+`CODEC_MJPEG` and `CODEC_H264`, and at link-up sends
+`PREFERRED_VIDEO_CODEC_TYPE` listing MJPEG then H.264.
+`--experimental-h264` reverses that order. `--no-h264` drops both the
+capability and H.264 from the list (see [configuration.md](/components/ryll/configuration/)).
+
+A server that encodes only H.264, such as andris, streams H.264 whenever
+the capability is there, whatever the order. spice-server still streams
+MJPEG to ryll by default, which keeps #398 out of the way. Its
+behaviour, read from spice-server's `server/` sources, is this:
+
+- `dcc_update_preferred_video_codecs` (`dcc.cpp`) sorts the server's own
+  codec list by the client's preference.
+- `dcc_create_video_encoder` (`video-stream.cpp`) walks that sorted list.
+  It skips codecs whose capability the client did not advertise, and
+  takes the first whose encoder starts. If none starts, it falls back
+  to its built-in MJPEG encoder, provided the client has `CODEC_MJPEG`.
+- The default list (`default_video_codecs` in `reds.cpp`) is
+  `spice:mjpeg;gstreamer:mjpeg;gstreamer:h264;gstreamer:vp8;gstreamer:vp9`.
+  Sorted with MJPEG first, the built-in `spice:mjpeg` comes first, and
+  it always starts.
+
+Two cases still reach H.264 from spice-server, and with it #398:
+
+- **A server whose codec list has no MJPEG.** The preference only
+  reorders the list; it never removes anything from it. Without
+  `CODEC_H264` spice-server would skip H.264 and fall back to its
+  built-in MJPEG encoder, so `--no-h264` restores MJPEG. The one such
+  list QEMU sets is for `-spice gl=on` with a network port
+  (`ui/spice-core.c`): `gstreamer:h264`, or the GStreamer codec named by
+  `video-codec`. That remote-GL stream carries the whole display, and
+  only a GStreamer encoder can encode it (`encode_dmabuf`, used by
+  `red_marshall_gl_draw_stream` in `dcc-send.cpp`), so the built-in
+  fallback never served it. `--no-h264` does not help there, but
+  `video-codec=mjpeg` does.
+- **The streaming-agent path.** spice-server's stream channel
+  (`stream_channel_get_supported_codecs` in `stream-channel.cpp`) offers
+  the guest's spice-streaming-agent every codec all clients have the
+  capability for. It stores the client's preference but never uses it,
+  so the agent may choose H.264. `--no-h264` keeps it on MJPEG.
 
 **JPEG decoder selection** (used by `MJpegVideoDecoder`) runs once per
 display channel at startup and selects the fastest available backend:
@@ -528,7 +572,7 @@ important:
 | PREF_COMPRESSION | 6 | Client preference messaging for image compression algorithm |
 | MULTI_CODEC | 8 | Multiple video codec support in streaming |
 | CODEC_MJPEG | 9 | MJPEG video codec for streaming |
-| CODEC_H264 | 11 | H.264 video codec for streaming. Not currently advertised: see [#398](https://github.com/shakenfist/ryll/issues/398) |
+| CODEC_H264 | 11 | H.264 video codec for streaming. Dropped by `--no-h264`; see "Which codec a server picks" above |
 | PREF_VIDEO_CODEC_TYPE | 12 | Client preference messaging for video codec selection |
 
 Without **COMPOSITE**, the guest QXL driver falls back to a slow

@@ -16,30 +16,40 @@ pipeline.
 
 ### `H264Encoder`
 
-A stateful wrapper around openh264. Takes an RGBA pixel buffer,
-converts to YUV 4:2:0, encodes to Annex-B framed NAL units
-(each NAL prefixed with the 4-byte start code `00 00 00 01`).
-Every IDR frame is accompanied by SPS (NAL type 7) and PPS
-(NAL type 8) NALs so keyframes are self-contained. Even-dimension
-constraint: width and height are rounded down to even numbers
-before encoding, via the shared `even_dimensions()` helper that
-every producer of a size the encoder will see uses. The
-`force_keyframe: bool` parameter to `encode()` calls openh264's
-`force_intra_frame()` for the next encode.
+The renderer's `H264Encoder` adapts the H.264 encoder in
+`shakenfist-spice-compression` (its `encode` feature), which a
+SPICE server can use without the renderer. The adapter takes an
+RGBA pixel buffer and returns Annex-B framed NAL units (each NAL
+prefixed with the 4-byte start code `00 00 00 01`) as an
+`EncodedFrame`. Every IDR frame is accompanied by SPS (NAL type 7)
+and PPS (NAL type 8) NALs so keyframes are self-contained.
+Even-dimension constraint: width and height are rounded down to
+even numbers before encoding, via the shared `even_dimensions()`
+helper that every producer of a size the encoder will see uses. The
+`force_keyframe: bool` parameter to `encode()` makes the frame an
+IDR. A frame openh264 skips to hold its bitrate comes back with no
+NAL units.
 
 `encode()` demands a buffer of exactly the encoder's (rounded)
 size. `encode_cropped()` takes the *source* size instead and
-discards the last row and/or column to reach it — an odd height
-alone is a free subslice, an odd width needs a row-wise copy into
-a staging buffer. Odd surfaces are ordinary: the browser asks the
-guest for `Math.round()` of a CSS viewport and X grants odd modes.
+discards the last row and/or column to reach it, at no cost: the
+RGB-to-YUV conversion reads the kept pixels of each row in place.
+Odd surfaces are ordinary: the browser asks the guest for
+`Math.round()` of a CSS viewport and X grants odd modes.
 
 Bitrate is not openh264's default. That default is a flat
 120 kbit/s regardless of resolution, which is a webcam-era number
 that renders a desktop unreadable. `H264Encoder::new` derives a
 target from surface area and frame rate instead
-(`MILLIBITS_PER_PIXEL_PER_FRAME`, ~2.4 Mbit/s at 1024x768@30),
-clamped to 1–20 Mbit/s, and selects `UsageType::ScreenContentRealTime`.
+(`target_bitrate_bps`, ~2.4 Mbit/s at 1024x768@30), clamped to
+1–20 Mbit/s, and selects `UsageType::ScreenContentRealTime`. The
+quantiser range is set to 12–51 explicitly, because openh264
+silently narrows its default 0–51 to 26–35 for screen content,
+which makes most targets unreachable. Frames are one slice each,
+since browsers have not been tried with more. Rate control is openh264's
+quality mode with frame skipping on, as it always was here; a SPICE
+server using the compression crate's encoder directly gets bitrate
+mode and can change the bitrate and frame rate live.
 The derivation is **open-loop**: nothing feeds the receiver's
 bandwidth estimate (REMB/TWCC) back into the encoder, because
 `EncoderControl` carries only keyframe and stop. On a constrained

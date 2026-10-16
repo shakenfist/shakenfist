@@ -1,4 +1,4 @@
-# Control Socket Protocol — Version 1.3
+# Control Socket Protocol — Version 1.4
 
 This document specifies the wire protocol spoken between a Ryll session
 with no host window — `--headless` or `--web` — and any external driver
@@ -8,7 +8,7 @@ such as latency loadtests and Sextant scenario tests implement against
 this document. Read the whole document before writing a client or
 implementing a verb.
 
-Protocol version: **1.3**
+Protocol version: **1.4**
 
 Version history:
 
@@ -37,6 +37,10 @@ Version history:
   code, so a session with no host window can carry clipboard text to
   and from the guest and ask the guest for a display size.  Additive;
   a client that does not use them sees no difference.
+- **1.4** — added the `stats` verb, which returns the display
+  channel's byte, message and `DISPLAY_MARK` counts and its video
+  stream counters, so a test can measure a server's frame rate and
+  check its video streams.  Additive.
 
 ---
 
@@ -67,7 +71,8 @@ Version history:
   `--web` — from an external process over a Unix-domain socket. The
   GUI cannot host the socket; see the Transport section.
 - Querying session state (SPICE connection status, surfaces, agent
-  availability).
+  availability) and the display channel's counters (bytes, messages,
+  frame marks, video streams).
 - Sending keyboard input as individual scancodes or as paste-as-
   keystrokes text.
 - Capturing a screenshot of any live surface.
@@ -286,7 +291,7 @@ Parameters:
 ### Hello response — success
 
 ```json
-{"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.3", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed"]}}
+{"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.4", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed"]}}
 ```
 
 Result fields:
@@ -294,7 +299,7 @@ Result fields:
 | Field | Type | Description |
 |-------|------|-------------|
 | `server_name` | string | Always `"ryll"` in this implementation. |
-| `protocol_version` | string | The version the server will speak. In v1.x this is `"1.3"`; older servers reported `"1.0"`, `"1.1"` or `"1.2"`. Clients should not compare for exact equality — see the compat note below. |
+| `protocol_version` | string | The version the server will speak. In v1.x this is `"1.4"`; older servers reported `"1.0"`, `"1.1"`, `"1.2"` or `"1.3"`. Clients should not compare for exact equality — see the compat note below. |
 | `supported_methods` | array of string | The complete set of verb names the server recognises. Clients should use this list rather than hard-coding expectations, especially when connecting to a newer server. |
 | `supported_events` | array of string | The complete set of event names the server can emit. |
 
@@ -311,7 +316,7 @@ error and then **closes the connection**:
 The server writes the error line and then closes the socket. The client
 will see EOF immediately after reading that line.
 
-**Minor version mismatches are accepted in both directions.** A v1.3
+**Minor version mismatches are accepted in both directions.** A v1.4
 client connecting to a v1.0 server, or vice versa, is fine: the server
 responds with whatever minor version *it* speaks (e.g. `"1.0"` or
 `"1.1"`), and both sides behave according to the features they each
@@ -384,7 +389,7 @@ Worked example:
 
 ```
 → {"id": 1, "method": "hello", "params": {"client_name": "demo", "protocol_version": "1.1"}}
-← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.3", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed"]}}
+← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.4", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed"]}}
 ```
 
 ---
@@ -749,6 +754,74 @@ Worked example:
 ```
 → {"id": 12, "method": "resize", "params": {"width": 1366, "height": 768}}
 ← {"id": 12, "ok": true, "result": {"width": 1360, "height": 768}}
+```
+
+---
+
+### `stats`
+
+Added in v1.4.  Read the display channel's counters: what it has
+received, and the video streams the server has sent it. A test polls
+this to measure a server, for example its frame rate as the rate of
+`marks_received`, or to check that a video stream was created with the
+expected codec, decoded without failures, and was destroyed.
+
+The counters are those the display channel last published, which it
+does after each batch of messages it reads, so they trail the wire by
+at most one batch. They count from the session's connection. With more
+than one display channel (some guests open one per monitor) they are
+the counters of whichever channel published last, which `channel_id`
+names. A client taking differences between polls should check that
+`channel_id` did not change, or the counters can appear to go
+backwards.
+
+Params: `{}` (none required)
+
+Result on success: an object with one field, `display`, holding:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `channel_id` | u8 | The display channel these counters are from. |
+| `bytes_in` | u64 | Bytes received on the display channel. |
+| `messages_received` | u64 | Messages received on the display channel. |
+| `marks_received` | u64 | `DISPLAY_MARK` messages received. The GUI's frame rate is the rate of these, so the difference between two polls divided by the time between them is the same measure. |
+| `streams_active` | u64 | Video streams open now: the length of `streams`. |
+| `streams_created_total` | u64 | Video streams the server has created. |
+| `streams_destroyed_total` | u64 | Video streams the server has destroyed. |
+| `stream_data_orphan_count` | u64 | Stream frames naming a stream that is not open. |
+| `stream_reports_sent_total` | u64 | `STREAM_REPORT` messages ryll has sent the server. |
+| `decodes` | object | Stream frame decodes by codec name, for every stream, open or destroyed. Each value has `decodes_total`, the frames handed to the decoder (an H.264 packet that completed no frame included), and `decode_failures_total`, those it failed on. Only `mjpeg` and `h264` can appear, and each appears once a frame of it has been decoded. |
+| `streams` | array of stream objects | The open video streams. |
+| `streams_recently_destroyed` | array of stream objects | The most recently destroyed streams, oldest first, at most 16. |
+
+Each stream object:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `stream_id` | u32 | The server's id for the stream. Ids are reused. |
+| `surface_id` | u32 | The surface the stream paints. |
+| `codec` | string | `"mjpeg"`, `"vp8"`, `"h264"`, `"vp9"`, `"h265"` or `"unknown"`. Ryll decodes MJPEG and H.264, and opens no stream for other codecs. |
+| `codec_type` | u8 | The codec's SPICE `video_codec_type` number. |
+| `width` | u32 | The stream's width, from `STREAM_CREATE`. |
+| `height` | u32 | The stream's height, from `STREAM_CREATE`. |
+| `frames_received` | u64 | Frames received, decodable or not. |
+| `frames_decoded_ok` | u64 | Frames decoded and painted. |
+| `frames_decode_failed` | u64 | Frames the decoder failed on. |
+| `created_at_secs` | f64 | When the stream was created, in seconds since the session started. |
+| `destroyed_at_secs` | f64 or null | When the stream was destroyed, on the same clock; `null` while it is open. |
+
+A stream destroyed between two polls is in `streams_recently_destroyed`
+at the second, with its codec and final counts, unless more than 16
+streams were destroyed in between. `streams_destroyed_total` says
+whether that happened.
+
+Verb-specific error codes: none beyond the common set.
+
+Worked example, polled while an H.264 stream plays:
+
+```
+→ {"id": 13, "method": "stats", "params": {}}
+← {"id": 13, "ok": true, "result": {"display": {"channel_id": 0, "bytes_in": 48211953, "messages_received": 5120, "marks_received": 1474, "streams_active": 1, "streams_created_total": 1, "streams_destroyed_total": 0, "stream_data_orphan_count": 0, "stream_reports_sent_total": 92, "decodes": {"h264": {"decodes_total": 460, "decode_failures_total": 0}}, "streams": [{"stream_id": 0, "surface_id": 0, "codec": "h264", "codec_type": 3, "width": 1280, "height": 720, "frames_received": 460, "frames_decoded_ok": 460, "frames_decode_failed": 0, "created_at_secs": 31.42, "destroyed_at_secs": null}], "streams_recently_destroyed": []}}}
 ```
 
 ---
@@ -1216,7 +1289,7 @@ Additional error codes may be added in future **minor** version bumps.
 Clients should treat any unrecognised `code` value as a generic error
 (print the `message` and fail the operation) rather than treating it as
 `internal_error`. This ensures forward compatibility when a client
-compiled against v1.0 connects to a v1.3 server that has added new
+compiled against v1.0 connects to a v1.4 server that has added new
 domain-specific codes.
 
 ---
@@ -1224,7 +1297,7 @@ domain-specific codes.
 ## Versioning
 
 The protocol version is a dotted `major.minor` string. The current
-version is **1.3**.
+version is **1.4**.
 
 Rules:
 
@@ -1263,9 +1336,9 @@ Forward-compatibility obligations:
 Version 1.0 was the first published version. Version 1.1 added the
 `surface_drawn` and `digest_updated` events. Version 1.2 extended the
 socket to `--web` mode and corrected `send_key`'s extended-scancode
-encoding. Version 1.3 (the current version) added the clipboard and
-`resize` verbs and the `clipboard_changed` event; see the version
-history at the top of this document.
+encoding. Version 1.3 added the clipboard and `resize` verbs and the
+`clipboard_changed` event. Version 1.4 (the current version) added the
+`stats` verb; see the version history at the top of this document.
 
 ---
 
@@ -1278,7 +1351,7 @@ indicates the sender: `→` is client-to-server, `←` is server-to-client.
 
 ```
 → {"id": 1, "method": "hello", "params": {"client_name": "demo-client", "protocol_version": "1.0"}}
-← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.3", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed"]}}
+← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.4", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed"]}}
 → {"id": 2, "method": "status", "params": {}}
 ← {"id": 2, "ok": true, "result": {"spice_connected": true, "agent_connected": true, "surfaces": [{"channel_id": 1, "surface_id": 0, "width": 1024, "height": 768}]}}
 → {"id": 3, "method": "subscribe", "params": {"events": ["latency", "agent_connected", "paste_completed", "paste_failed"]}}
@@ -1302,7 +1375,7 @@ Key observations from this transcript:
 
 - The `hello` handshake always comes first and its response lists the
   full verb and event catalogue. Note the minor-version interop at
-  work: the client requested `"1.0"` and the v1.3 server accepted it,
+  work: the client requested `"1.0"` and the v1.4 server accepted it,
   responding with the version *it* speaks and advertising verbs and
   events this v1.0 client simply never uses.
 - `status` gives a snapshot of the session state at that instant. The
@@ -1382,8 +1455,9 @@ line and is immediately closed.
   without coupling `server.rs` to `session.rs` internals.
 - What the verbs act on arrives as one `SessionHandles` value: the
   inputs channel's queue, the surface mirror, the session's
-  clipboard and the main channel's display-size queue. Each client
-  gets a clone.
+  clipboard, the main channel's display-size queue and the display
+  channel's published `DisplaySnapshot`, which `stats` reads. Each
+  client gets a clone.
 - The clipboard is a `MemoryClipboard` (`clipboard.rs`), an
   implementation of the same `ClipboardBackend` trait the GUI's
   host clipboard implements. The mode creates it only when a control

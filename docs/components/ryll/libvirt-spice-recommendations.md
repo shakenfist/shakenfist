@@ -33,8 +33,8 @@ because that is the most common deployment path; the equivalent direct
     Install `spice-vdagent` in the guest for clipboard, absolute
     pointer, and dynamic monitor configuration. The GStreamer H.264
     plugins on the hypervisor are not needed by ryll for now: by
-    default it does not accept H.264 streams from spice-server (see
-    [H.264 from spice-server is currently disabled](#h264-from-spice-server-is-currently-disabled)).
+    default it asks spice-server for MJPEG (see
+    [H.264 from spice-server](#h264-from-spice-server)).
 
 The rest of this document explains why.
 
@@ -249,48 +249,63 @@ extremes are wrong for typical desktop workloads:
   for everything else. This is the right answer for almost every
   workload.
 
-Ryll currently receives every video stream from spice-server as MJPEG.
+By default ryll receives video streams from spice-server as MJPEG (see
+below for the exceptions).
 If `streaming-video=filter` chooses not to stream a region at all, no
 codec gets exercised and the region arrives as ordinary image updates
 instead (see the QXL resolution-cliff discussion above).
 
-### H.264 from spice-server is currently disabled
+### H.264 from spice-server
 
 H.264 streams produced by spice-server's GStreamer encoder do not decode
 in ryll yet: openh264 never sees the stream's parameter sets, so a video
 region streamed as H.264 stays black or stale. This is tracked in
 [shakenfist/ryll#398](https://github.com/shakenfist/ryll/issues/398).
-Until it is fixed, ryll does not advertise the `CODEC_H264` display
-capability and asks only for MJPEG in its `PREFERRED_VIDEO_CODEC_TYPE`
-message, so the server never picks H.264 for ryll. Dropping H.264 from
-the preference alone would not be enough, because spice-server uses that
-list only to reorder its own codec list, and still chooses any codec the
-client has the capability for.
+
+Ryll advertises the `CODEC_H264` display capability, so that a server
+which encodes only H.264 can stream to it, but lists MJPEG ahead of
+H.264 in its `PREFERRED_VIDEO_CODEC_TYPE` message. spice-server tries
+its codecs in the client's preferred order, and its built-in MJPEG
+encoder always starts, so a ryll session on a stock QEMU still receives
+MJPEG. [spice-protocol.md](/components/ryll/spice-protocol/) explains how spice-server
+chooses, citing its source.
+
+Two setups still reach spice-server's H.264, and with it #398:
+
+- A guest running spice-streaming-agent, which chooses from every codec
+  the client advertises, ignoring its preference. Start ryll with
+  `--no-h264`: each display channel then leaves out `CODEC_H264` and
+  asks only for MJPEG, as ryll did by default before it offered H.264.
+  The same flag helps any spice-server whose `video-codecs` list has no
+  MJPEG encoder.
+- QEMU with `-spice gl=on` and a network port. QEMU then restricts
+  spice-server to `gstreamer:h264`, and remote GL sends the whole
+  display as that one video stream. spice-server's built-in MJPEG
+  encoder cannot encode it, so `--no-h264` does not help. Add
+  `video-codec=mjpeg` to `-spice` instead.
 
 Installing the GStreamer H.264 plugins on the hypervisor
 (`gstreamer1.0-plugins-bad` and `gstreamer1.0-vaapi` on Debian/Ubuntu,
 `gstreamer1-plugins-bad-free-extras` and `gstreamer1-vaapi` on
-Fedora/RHEL) is therefore harmless but has no effect on ryll sessions
-by default. Other SPICE clients connected to the same guest may still
-use them. Those plugins are a *necessary* (not sufficient) condition
-for H.264 whenever ryll does ask for it: without them spice-server can
-only encode MJPEG, and the streaming heuristic still has to fire in the
-first place.
+Fedora/RHEL) therefore has no effect on most ryll sessions by default. Other
+SPICE clients connected to the same guest may still use them. Those
+plugins are a *necessary* (not sufficient) condition for H.264 whenever
+ryll does prefer it: without them spice-server can only encode MJPEG,
+and the streaming heuristic still has to fire in the first place.
 
-#### Opting back in with `--experimental-h264`
+#### Preferring H.264 with `--experimental-h264`
 
 To work on #398, or to try H.264 anyway, start ryll with
 `--experimental-h264`. It works the same in GUI, `--headless` and
-`--web` modes. With it, each display channel advertises `CODEC_H264`
-again and asks for H.264 ahead of MJPEG, which is what ryll did before
-H.264 was disabled; ryll logs a warning at startup saying H.264 from
-spice-server is enabled and experimental. Expect the failure described
-above: on a hypervisor with the GStreamer H.264 plugins, video regions
-streamed as H.264 are likely to go black or stale, and the bug report's
+`--web` modes. With it, each display channel asks for H.264 ahead of
+MJPEG, and ryll logs a warning at startup that spice-server's H.264
+does not decode yet. Expect the failure described above: on a
+hypervisor with the GStreamer H.264 plugins, video regions streamed as
+H.264 are likely to go black or stale, and the bug report's
 `h264_decode_failed_count` climbs. The display channel's
-`channel-state.json` records `experimental_h264`, so a bug report shows
-whether H.264 was on offer at all. The flag is off by default and will
-go away once #398 is fixed and H.264 is advertised again by default.
+`channel-state.json` records `h264_offer` (`after_mjpeg` by default,
+`preferred` with this flag, `off` with `--no-h264`), so a bug report
+shows how H.264 was offered.
 
 This only concerns video *from* spice-server. Ryll's web mode encodes
 its own H.264 to send to the browser over WebRTC, which is unaffected.
