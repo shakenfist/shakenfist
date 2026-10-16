@@ -1,11 +1,13 @@
 # Copyright 2026 Michael Still and contributors
 from unittest import mock
 
+from shakenfist import exceptions
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.instance import Instance
 from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
 from shakenfist.operations.node_inst_netdesc_op import NodeInstNetdescOp
+from shakenfist.schema.object_state import State
 from shakenfist.schema.operations import node_inst_netdesc_op as schema
 from shakenfist.tests import base
 
@@ -88,10 +90,13 @@ class DependencyFailedTestCase(base.ShakenFistTestCase):
         self.mock_from_db.assert_called_once_with(
             INSTANCE_UUID, suppress_failure_audit=True)
 
+    @mock.patch('shakenfist.mariadb.get_state',
+                return_value=State(value=BaseClusterOperation.STATE_QUEUED,
+                                   update_time=0))
     @mock.patch('shakenfist.operations.baseoperation.eventlog.add_event_multi')
     @mock.patch.object(BaseClusterOperation, '_state_update')
     def test_abandoned_fetch_wait_errors_the_instance(
-            self, mock_state_update, mock_add_event_multi):
+            self, mock_state_update, mock_add_event_multi, mock_get_state):
         """The issue's own sequence: the start op gives up on a fetch op
         still executing, and the instance it was starting reaches an
         error state naming that fetch rather than staying in initial."""
@@ -113,3 +118,84 @@ class DependencyFailedTestCase(base.ShakenFistTestCase):
             'instance start abandoned: gave up waiting for dependency '
             f'artifact_fetch_op {DEP_UUID}, which was still '
             f'{BaseClusterOperation.STATE_EXECUTING}')
+
+
+class DependencyHelpersTestCase(base.ShakenFistTestCase):
+    """The other two dependency paths, driven into the real override.
+
+    Each helper must error a queued op's instance, and none may touch an
+    instance whose op already ran: a COMPLETE instance_create the
+    stuck-row reaper re-dispatches, with a dependency deleted since,
+    would otherwise error the running instance it started.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        for name, patcher in [
+                ('from_db', mock.patch.object(Instance, 'from_db')),
+                ('state_update', mock.patch.object(
+                    BaseClusterOperation, '_state_update')),
+                ('add_event', mock.patch.object(
+                    BaseClusterOperation, 'add_event')),
+                ('add_event_multi', mock.patch(
+                    'shakenfist.operations.baseoperation.eventlog.'
+                    'add_event_multi')),
+                ('get_state', mock.patch('shakenfist.mariadb.get_state'))]:
+            setattr(self, f'mock_{name}', patcher.start())
+            self.addCleanup(patcher.stop)
+
+    def _dep_op(self, state):
+        dep_op = mock.MagicMock()
+        dep_op.object_type = 'artifact_fetch_op'
+        dep_op.uuid = DEP_UUID
+        dep_op.state.value = state
+        return dep_op
+
+    def _paths(self):
+        return {
+            'unsuitable': (
+                lambda op: op.abort_for_unsuitable_dependency(
+                    self._dep_op(BaseClusterOperation.STATE_ERROR)),
+                f'dependency artifact_fetch_op {DEP_UUID} is '
+                f'{BaseClusterOperation.STATE_ERROR}'),
+            'missing': (
+                lambda op: op.cancel_for_missing_dependency(
+                    {'op_type': 'artifact_fetch_op', 'op_uuid': DEP_UUID}),
+                f'dependency artifact_fetch_op {DEP_UUID} does not exist'),
+            'abandoned': (
+                lambda op: op.abandon_dependency_wait(
+                    self._dep_op(BaseClusterOperation.STATE_EXECUTING)),
+                f'gave up waiting for dependency artifact_fetch_op '
+                f'{DEP_UUID}, which was still '
+                f'{BaseClusterOperation.STATE_EXECUTING}'),
+        }
+
+    def test_queued_op_errors_its_instance(self):
+        self.mock_get_state.return_value = State(
+            value=BaseClusterOperation.STATE_QUEUED, update_time=0)
+        for name, (call, reason) in self._paths().items():
+            with self.subTest(path=name):
+                inst = _make_instance(dbo.STATE_INITIAL)
+                self.mock_from_db.return_value = inst
+
+                call(NodeInstNetdescOp(_make_static_values()))
+
+                inst.enqueue_delete_due_error.assert_called_once_with(
+                    f'instance start abandoned: {reason}')
+
+    def test_finished_op_never_errors_its_instance(self):
+        self.mock_state_update.side_effect = exceptions.InvalidStateException(
+            'no such transition')
+        for op_state in [BaseClusterOperation.STATE_COMPLETE,
+                         BaseClusterOperation.STATE_EXECUTING]:
+            self.mock_get_state.return_value = State(
+                value=op_state, update_time=0)
+            for name, (call, _) in self._paths().items():
+                with self.subTest(op_state=op_state, path=name):
+                    inst = _make_instance(dbo.STATE_CREATED)
+                    self.mock_from_db.return_value = inst
+
+                    call(NodeInstNetdescOp(_make_static_values()))
+
+                    inst.enqueue_delete_due_error.assert_not_called()

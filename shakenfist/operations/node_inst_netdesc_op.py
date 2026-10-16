@@ -116,7 +116,8 @@ class NodeInstNetdescOp(BaseClusterOperation):
         # forever while its client waits (issue 4542). An artifact
         # fetch dependency which failed has normally errored the
         # instance already, so leave a terminal instance alone rather
-        # than erroring it twice.
+        # than erroring it twice. That check is also what makes this
+        # idempotent, as _dependency_failed requires.
         inst = Instance.from_db(self.instance_uuid, suppress_failure_audit=True)
         if not inst or inst.state.value in Instance.TERMINAL_STATES:
             return

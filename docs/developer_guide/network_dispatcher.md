@@ -60,14 +60,21 @@ seconds. The defer cycle is:
 5. When all dependencies are satisfied the op executes normally and its map
    entry is dropped.
 
-Each of the three ways a dependency ends an op in steps 3 and 4 then calls the
-op's `_dependency_failed()` hook. Ending the op alone tells a client watching
-its target nothing, so an op class whose targets would be left half-built
-overrides the hook. `NodeInstNetdescOp` (instance preflight, start and create)
-errors its instance, which would otherwise sit in `initial` indefinitely
-(issue 4542). The base class does nothing. These methods live on
-`BaseClusterOperation` so that `sf-queues` and `sf-network` share one
-implementation.
+Each of the three ways a dependency ends an op in steps 3 and 4 also calls the
+op's `_dependency_failed()` hook, provided the op is still `queued` and so has
+never run. Ending the op alone tells a client watching its target nothing, so
+an op class whose targets would be left half-built overrides the hook.
+`NodeInstNetdescOp` (instance preflight, start and create) errors its instance,
+which would otherwise sit in `initial` indefinitely (issue 4542). The base class
+does nothing. These methods live on `BaseClusterOperation` so that `sf-queues`
+and `sf-network` share one implementation.
+
+The hook runs before the op's state is written, not after. Both dispatchers
+skip an op that is already terminal before looking at its dependencies (a work
+item the stuck-row reaper re-queues can name an op that has already finished),
+so a hook that raised after the op had gone terminal would never be retried.
+Raising while the op is still `queued` leaves the work item to the reaper, and
+the retry calls the hook again. Overrides must therefore be idempotent.
 
 ## Exponential back-off map
 

@@ -56,9 +56,13 @@ class DependencyWaitDeferTest(base.ShakenFistTestCase):
 
     def _run_defer(self, defer_count, dep_kind,
                    dep_state=BaseClusterOperation.STATE_QUEUED,
-                   dep_missing=False):
+                   dep_missing=False,
+                   op_state=BaseClusterOperation.STATE_QUEUED):
         mock_op = mock.MagicMock()
-        mock_op.state.value = BaseClusterOperation.STATE_QUEUED
+        mock_op.state.value = op_state
+        # The real terminal test, so that op_state is what decides it.
+        mock_op.is_outstanding.side_effect = (
+            lambda: BaseClusterOperation.is_outstanding(mock_op))
         mock_op.depends_on = []
         mock_op.runs_after = []
 
@@ -173,6 +177,33 @@ class DependencyWaitDeferTest(base.ShakenFistTestCase):
             {'op_type': 'net_op', 'op_uuid': DEP_UUID})
         mock_op.defer.assert_not_called()
         mock_op.execute.assert_not_called()
+
+    def test_finished_operation_is_skipped_before_its_dependencies(self):
+        """A work item the stuck-row reaper re-queued after its op
+        finished must not have that op's dependencies judged again. A
+        dependency cleaned up since would otherwise abort a COMPLETE
+        instance_create and error the running instance it started."""
+        for op_state in [BaseClusterOperation.STATE_COMPLETE,
+                         BaseClusterOperation.STATE_ABORT,
+                         BaseClusterOperation.STATE_ERROR,
+                         BaseClusterOperation.STATE_DELETED]:
+            for dep_missing, dep_state in [
+                    (False, BaseClusterOperation.STATE_DELETED),
+                    (True, BaseClusterOperation.STATE_QUEUED)]:
+                with self.subTest(op_state=op_state, dep_missing=dep_missing):
+                    mock_op, _ = self._run_defer(
+                        DEPENDENCY_DEFER_BUDGET, 'depends_on',
+                        dep_state=dep_state, dep_missing=dep_missing,
+                        op_state=op_state)
+
+                    mock_op.add_event.assert_called_once_with(
+                        mock.ANY,
+                        f'skipping op already in terminal state {op_state}')
+                    mock_op.abort_for_unsuitable_dependency.assert_not_called()
+                    mock_op.cancel_for_missing_dependency.assert_not_called()
+                    mock_op.abandon_dependency_wait.assert_not_called()
+                    mock_op.defer.assert_not_called()
+                    mock_op.execute.assert_not_called()
 
     def test_runs_after_below_budget_still_defers(self):
         mock_op, mock_dep_op = self._run_defer(
