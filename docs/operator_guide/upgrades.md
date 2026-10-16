@@ -137,6 +137,38 @@ iptables -m conntrack --help > /dev/null && echo ok
 See the floating IP discussion in [the networking overview](networking/overview.md)
 for what the rule does and why both of its matches are needed.
 
+### The SPICE TLS private key is no longer world readable
+
+Earlier releases of the `internal_ca` role installed each node's SPICE TLS
+private key, `/etc/pki/libvirt-spice/server-key.pem`, as `root:root 0444`.
+Any local user on a hypervisor could read it, and with it impersonate that
+hypervisor's SPICE endpoint to a client which trusts the cluster CA,
+Kerbside's connection to the hypervisor included. The cluster CA's own key
+never leaves the control node, so it was not exposed.
+
+The role now installs the key `root:kvm 0440`. QEMU opens the key itself,
+running as `libvirt-qemu`, whose primary group is `kvm` on every supported
+distribution. Redeploying corrects the mode and group of an existing key in
+place; check afterwards with:
+
+```bash
+stat -c '%a %U:%G' /etc/pki/libvirt-spice/server-key.pem
+```
+
+which should print `440 root:kvm`. If you call the role from your own
+playbook and pass `cert_group` or `cert_key_mode` for the SPICE certificate,
+review those values: a key QEMU cannot read stops SPICE TLS, and with it
+every instance start, on that hypervisor.
+
+Redeploying does not replace the key, which was readable before the
+upgrade. If you have local users on your hypervisors you do not trust with
+it, rotate it: on the control node, remove both
+`/srv/shakenfist/pki/CA/<node>-server-key.pem` and
+`/srv/shakenfist/pki/CA/<node>-server-cert.pem` for each node (removing only
+the key leaves a certificate which no longer matches it), then redeploy. An
+instance keeps the certificate it started with until it is next powered off
+and on.
+
 ### Federated issuers: JWKS redirects and the rotation cooldown
 
 This release moves to PyJWT 2.14, which changes two things an operator
