@@ -327,9 +327,10 @@ dependency.
 - **cpal** - Cross-platform audio output
 - **rtrb** - Lock-free ring buffer for audio sample passing
 - **opus-decoder** - Pure-Rust Opus audio decoding
-- **openh264** - H.264 encoding in `shakenfist-spice-renderer`
-  (the encoder pipeline). Capture mode in ryll consumes it
-  transitively via the renderer.
+- **openh264** - H.264 decoding in `shakenfist-spice-compression`,
+  and encoding behind its `encode` feature (with `openh264-sys2`
+  for the options openh264 does not wrap), which the renderer's
+  encoder pipeline and ryll's capture use.
 - **jpeg-encoder** - JPEG encoding behind the `encode` feature of
   `shakenfist-spice-compression`
 - **lz4_flex** - LZ4 image decode and encode in
