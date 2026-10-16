@@ -108,6 +108,16 @@ class Job(util_concurrency.Job):
             self.log.error('Operation not found')
             return
 
+        # A work item the stuck-row reaper re-queued can name an operation
+        # which already finished. Its dependencies may since have been
+        # cleaned up, and judging them now would abort it after the fact
+        # (and error an instance it started). sf-network skips these too.
+        if not op.is_outstanding():
+            op.add_event(
+                EVENT_TYPE_AUDIT,
+                f'skipping op already in terminal state {op.state.value}')
+            return
+
         op.queue_name = self.queue_name
         op.current_defer_count = self.workitem.get('defer_count', 0)
         op.dispatcher_batch_size = self.batch_size

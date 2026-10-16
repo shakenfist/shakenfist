@@ -7,6 +7,7 @@ from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import CannotDeferUnqueued
 from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
 from shakenfist.operations.net_op import NetOp
+from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations import artifact_fetch_op as fetch_schema
 from shakenfist.schema.operations import net_op as net_op_schema
@@ -197,6 +198,13 @@ class AbandonDependencyWaitTestCase(base.ShakenFistTestCase):
         self.mock_add_event_multi = self.add_event_multi_patcher.start()
         self.addCleanup(self.add_event_multi_patcher.stop)
 
+        self.get_state_patcher = mock.patch(
+            'shakenfist.mariadb.get_state',
+            return_value=State(value=BaseClusterOperation.STATE_QUEUED,
+                               update_time=0))
+        self.mock_get_state = self.get_state_patcher.start()
+        self.addCleanup(self.get_state_patcher.stop)
+
     def _make_op(self):
         op = NetOp(_make_net_op_static_values(['network_ensure_mesh']))
         op.current_defer_count = DEPENDENCY_DEFER_BUDGET
@@ -280,6 +288,47 @@ class AbandonDependencyWaitTestCase(base.ShakenFistTestCase):
 
         mock_failed.assert_called_once()
 
+    def test_targets_are_told_before_the_abort(self):
+        """Both dispatchers skip a terminal op, so a hook which raised
+        after the abort would never be retried. Told first, a raise
+        leaves the op queued for the stuck-row reaper."""
+        op = self._make_op()
+        with mock.patch.object(NetOp, '_dependency_failed') as mock_failed:
+            mock_failed.side_effect = (
+                lambda reason: self.mock_state_update.assert_not_called())
+            op.abandon_dependency_wait(self._make_dep_op())
+
+        mock_failed.assert_called_once()
+        self.mock_state_update.assert_called_once_with(
+            BaseClusterOperation.STATE_ABORT)
+
+    def test_hook_raising_leaves_the_operation_queued(self):
+        op = self._make_op()
+        with mock.patch.object(NetOp, '_dependency_failed') as mock_failed:
+            mock_failed.side_effect = exceptions.DatabaseUnavailable('gone')
+            self.assertRaises(
+                exceptions.DatabaseUnavailable,
+                op.abandon_dependency_wait, self._make_dep_op())
+
+        self.mock_state_update.assert_not_called()
+
+    def test_started_operation_does_not_tell_targets(self):
+        """Only a queued op has never run. One already executing, or
+        finished, was not prevented from running by its dependency."""
+        for state in [BaseClusterOperation.STATE_EXECUTING,
+                      BaseClusterOperation.STATE_COMPLETE,
+                      BaseClusterOperation.STATE_ABORT,
+                      BaseClusterOperation.STATE_ERROR]:
+            with self.subTest(state=state):
+                self.mock_get_state.return_value = State(
+                    value=state, update_time=0)
+                op = self._make_op()
+                with mock.patch.object(
+                        NetOp, '_dependency_failed') as mock_failed:
+                    op.abandon_dependency_wait(self._make_dep_op())
+
+                mock_failed.assert_not_called()
+
 
 class DependencyFailedTestCase(base.ShakenFistTestCase):
     """The two other ways a depends_on dependency ends an operation.
@@ -305,6 +354,13 @@ class DependencyFailedTestCase(base.ShakenFistTestCase):
         self.failed_patcher = mock.patch.object(NetOp, '_dependency_failed')
         self.mock_failed = self.failed_patcher.start()
         self.addCleanup(self.failed_patcher.stop)
+
+        self.get_state_patcher = mock.patch(
+            'shakenfist.mariadb.get_state',
+            return_value=State(value=BaseClusterOperation.STATE_QUEUED,
+                               update_time=0))
+        self.mock_get_state = self.get_state_patcher.start()
+        self.addCleanup(self.get_state_patcher.stop)
 
     def _make_op(self):
         return NetOp(_make_net_op_static_values(['network_ensure_mesh']))
@@ -363,6 +419,41 @@ class DependencyFailedTestCase(base.ShakenFistTestCase):
             BaseClusterOperation.STATE_ERROR)
         self.mock_failed.assert_called_once_with(
             f'dependency net_op {DEP_UUID} does not exist')
+
+    def test_missing_dependency_failed_error_is_recorded_not_raised(self):
+        self.mock_state_update.side_effect = exceptions.InvalidStateException(
+            'no such transition')
+
+        op = self._make_op()
+        op.cancel_for_missing_dependency(
+            {'op_type': 'net_op', 'op_uuid': DEP_UUID})
+
+        self.mock_add_event.assert_called_with(
+            EVENT_TYPE_AUDIT, 'failed to mark operation as errored')
+        self.mock_failed.assert_called_once()
+
+    def test_started_operation_does_not_tell_targets(self):
+        """A COMPLETE instance_create re-dispatched after a failed
+        resolve, whose dependency has since been deleted, must not error
+        the instance it already started."""
+        paths = {
+            'unsuitable': lambda op: op.abort_for_unsuitable_dependency(
+                self._make_dep_op(BaseClusterOperation.STATE_DELETED)),
+            'missing': lambda op: op.cancel_for_missing_dependency(
+                {'op_type': 'net_op', 'op_uuid': DEP_UUID}),
+        }
+        for state in [BaseClusterOperation.STATE_EXECUTING,
+                      BaseClusterOperation.STATE_COMPLETE,
+                      BaseClusterOperation.STATE_ABORT,
+                      BaseClusterOperation.STATE_ERROR]:
+            for name, call in paths.items():
+                with self.subTest(state=state, path=name):
+                    self.mock_failed.reset_mock()
+                    self.mock_get_state.return_value = State(
+                        value=state, update_time=0)
+                    call(self._make_op())
+
+                    self.mock_failed.assert_not_called()
 
 
 class CoalescingExecuteTestCase(base.ShakenFistTestCase):
