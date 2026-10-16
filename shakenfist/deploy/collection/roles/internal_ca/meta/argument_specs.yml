@@ -107,9 +107,12 @@ argument_specs:
           - Owner of the installed files.
       cert_group:
         type: str
-        default: "root"
+        default: "kvm"
         description:
-          - Group of the installed files.
+          - >-
+            Group of the installed files. The default suits the SPICE
+            certificate: QEMU runs as libvirt-qemu, whose primary group is
+            kvm, and must be able to read the key.
       cert_mode:
         type: str
         default: "0444"
@@ -117,9 +120,12 @@ argument_specs:
           - Mode of the installed CA and host certificates, as a quoted four digit octal string.
       cert_key_mode:
         type: str
-        default: "0444"
+        default: "0440"
         description:
-          - Mode of the installed host private key, as a quoted four digit octal string.
+          - >-
+            Mode of the installed host private key, as a quoted four digit
+            octal string. Never make it world readable: anyone who can read
+            the key can impersonate the host's TLS endpoint.
   bootstrap:
     short_description: Create the deployment's internal certificate authority.
     description:

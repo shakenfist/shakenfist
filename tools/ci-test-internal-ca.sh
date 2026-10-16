@@ -218,7 +218,7 @@ case_1_fresh_issue() {
     assert_year_lifetime "${HOST_CERT}"
     assert_mode "${DEST}/testhost/ca-cert.pem" 444
     assert_mode "${DEST}/testhost/server-cert.pem" 444
-    assert_mode "${DEST}/testhost/server-key.pem" 444
+    assert_mode "${DEST}/testhost/server-key.pem" 440
     cmp -s "${HOST_CERT}" "${DEST}/testhost/server-cert.pem" || fail 'installed certificate differs'
     cmp -s "${HOST_KEY}" "${DEST}/testhost/server-key.pem" || fail 'installed key differs'
     cmp -s "${CA_CERT}" "${DEST}/testhost/ca-cert.pem" || fail 'installed CA certificate differs'
