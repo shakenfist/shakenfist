@@ -11,8 +11,8 @@
 # certificate is reissued, with the same key, when it nears expiry or its
 # template changes -- and not otherwise, even when the run that saw the
 # change is interrupted; and that a mode or certificate name which would be
-# misread is refused. Before this existed nothing ran
-# the role's renewal path at all, and it had never worked.
+# misread, or a group the host lacks, is refused. Before this existed
+# nothing ran the role's renewal path at all, and it had never worked.
 #
 # It runs without root, which is a shape the role must support anyway:
 # sfcbr deploys from an unprivileged control node. -e ansible_become=false
@@ -336,7 +336,7 @@ case_7_interrupted_reissue() {
 }
 
 case_8_rejects_bad_values() {
-    CURRENT_CASE='case 8: values which would be misread are rejected'
+    CURRENT_CASE='case 8: values which would be misread, and missing groups, are rejected'
     local host_serial
     host_serial="$(serial "${HOST_CERT}")"
     # The JSON integer 256 is what an unquoted 0400 becomes in YAML.
@@ -355,6 +355,21 @@ case_8_rejects_bad_values() {
     run_play_fails 'cert_dest_key_name is \\?"\.\./server-key\.pem\\?", but must be a plain file name' \
         "${WORK}/bad-dest-name.json"
     [ "$(serial "${HOST_CERT}")" = "${host_serial}" ] || fail 'a rejected run reissued the certificate'
+
+    # The default group, kvm, comes from udev, so a node can lack it. That
+    # is refused by name before anything is installed, not left to chgrp.
+    local installed_key="${DEST}/testhost/server-key.pem"
+    local key_before
+    key_before="$(stat -c '%a %G %Y' "${installed_key}")"
+    echo '{"cert_group": "sf-ci-no-such-group"}' > "${WORK}/bad-group.json"
+    run_play_fails 'cert_group is \\?"sf-ci-no-such-group\\?", but localhost has no such group' \
+        "${WORK}/bad-group.json"
+    [ "$(stat -c '%a %G %Y' "${installed_key}")" = "${key_before}" ] \
+        || fail 'a rejected cert_group changed the installed key'
+    # A numeric gid is reported by getent under its name, and must pass.
+    echo "{\"cert_group\": \"$(id -g)\"}" > "${WORK}/numeric-group.json"
+    run_play "${WORK}/numeric-group.json"
+    [ "${CHANGED}" -eq 0 ] || fail "the same group by number changed ${CHANGED} things"
 }
 
 case_9_upgrade_and_checkout() {

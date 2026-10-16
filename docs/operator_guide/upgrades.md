@@ -160,6 +160,12 @@ playbook and pass `cert_group` or `cert_key_mode` for the SPICE certificate,
 review those values: a key QEMU cannot read stops SPICE TLS, and with it
 every instance start, on that hypervisor.
 
+The certificate goes to every node, not only hypervisors, so every node now
+needs a `kvm` group. udev creates it, and every supported distribution
+installs udev; a node without one, a minimal or container-based install
+say, fails the deploy with a message naming `cert_group` before anything is
+installed on it.
+
 Redeploying does not replace the key, which was readable before the
 upgrade. If you have local users on your hypervisors you do not trust with
 it, rotate it: on the control node, remove both
