@@ -785,6 +785,72 @@ class BaseClusterOperation(BaseOperation):
         except exceptions.InvalidStateException:
             self.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
 
+        self._dependency_failed(
+            f'gave up waiting for dependency {dep_op.object_type} '
+            f'{dep_op.uuid}, which was still {dep_op.state.value}')
+
+    def abort_for_unsuitable_dependency(
+            self, dep_op: 'BaseClusterOperation') -> None:
+        """Abort this operation because a dependency failed.
+
+        Called by the dispatchers when a ``depends_on`` operation is in
+        error, aborted or deleted. It lives here rather than in either
+        dispatcher for the reason ``abandon_dependency_wait`` gives.
+        """
+        self.add_event(
+            EVENT_TYPE_AUDIT,
+            'aborting operation, as dependency is unsuitable',
+            extra={
+                'dep_object_type': dep_op.object_type,
+                'dep_object_uuid': dep_op.uuid,
+                'dep_object_state': dep_op.state.value
+            })
+
+        try:
+            self.state = BaseClusterOperation.STATE_ABORT  # type: ignore[misc]
+        except exceptions.InvalidStateException:
+            self.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
+
+        self._dependency_failed(
+            f'dependency {dep_op.object_type} {dep_op.uuid} is '
+            f'{dep_op.state.value}')
+
+    def cancel_for_missing_dependency(self, dep: dict[str, Any]) -> None:
+        """Error this operation because a dependency no longer exists.
+
+        Called by the dispatchers when a ``depends_on`` operation cannot
+        be loaded. It lives here rather than in either dispatcher for
+        the reason ``abandon_dependency_wait`` gives.
+        """
+        self.add_event(
+            EVENT_TYPE_AUDIT,
+            'cancelling operation, as dependency does not exist',
+            extra={
+                'dep_object_type': dep['op_type'],
+                'dep_object_uuid': dep['op_uuid']
+            })
+        self.state = BaseClusterOperation.STATE_ERROR  # type: ignore[misc]
+
+        self._dependency_failed(
+            f'dependency {dep["op_type"]} {dep["op_uuid"]} does not exist')
+
+    def _dependency_failed(self, reason: str) -> None:
+        """Tell this operation's targets that it will never run.
+
+        Each of the three ways a ``depends_on`` dependency can end an
+        operation (missing, unsuitable, or a wait abandoned once the
+        defer budget is spent) calls this once the operation itself is
+        terminal. Ending the operation alone says nothing to a client
+        watching the object the operation was meant to change: an
+        instance whose start was abandoned stays in ``initial``,
+        indistinguishable from one still being built (issue 4542).
+
+        The default does nothing, which suits operations whose targets
+        are left usable by the operation never running. Operations
+        whose targets are not, override it.
+        """
+        pass
+
     def is_outstanding(self) -> bool:
         if self.state.value in [BaseClusterOperation.STATE_ERROR,
                                 BaseClusterOperation.STATE_DELETED,
