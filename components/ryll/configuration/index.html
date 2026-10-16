@@ -11702,7 +11702,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.3
+    Control Socket Protocol — Version 1.4
   
 
     
@@ -16063,7 +16063,12 @@ window. The operator guide, including reverse-proxy and TLS setup, is
 <tr>
 <td><code>--experimental-h264</code></td>
 <td>false</td>
-<td>Experimental: let spice-server stream video to ryll as H.264, by advertising the display channel's <code>CODEC_H264</code> capability and asking for H.264 ahead of MJPEG. Off by default because H.264 from spice-server does not decode yet (<a href="https://github.com/shakenfist/ryll/issues/398">#398</a>); video regions streamed as H.264 are likely to go black or stale. For work on that bug; see <a href="/components/ryll/libvirt-spice-recommendations/#h264-from-spice-server-is-currently-disabled">H.264 from spice-server is currently disabled</a></td>
+<td>Experimental: prefer H.264 video streams, asking for H.264 ahead of MJPEG in the display channel's <code>PREFERRED_VIDEO_CODEC_TYPE</code>. By default ryll asks for MJPEG first, which keeps spice-server on MJPEG, because H.264 from spice-server does not decode yet (<a href="https://github.com/shakenfist/ryll/issues/398">#398</a>): with this flag its video regions are likely to go black or stale. For work on that bug; see <a href="/components/ryll/libvirt-spice-recommendations/#h264-from-spice-server">H.264 from spice-server</a>. Cannot be combined with <code>--no-h264</code></td>
+</tr>
+<tr>
+<td><code>--no-h264</code></td>
+<td>false</td>
+<td>Do not offer H.264 video streams: leave out the display channel's <code>CODEC_H264</code> capability and ask only for MJPEG. A server that encodes only H.264, such as andris, then sends no video streams. An escape hatch for a server whose H.264 does not decode, such as a guest's spice-streaming-agent; see <a href="/components/ryll/libvirt-spice-recommendations/#h264-from-spice-server">H.264 from spice-server</a>. Cannot be combined with <code>--experimental-h264</code></td>
 </tr>
 </tbody>
 </table>

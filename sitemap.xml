@@ -2657,10 +2657,6 @@
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>
-         <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap-phase-05-auto-snapshot/</loc>
-         <lastmod>2026-10-16</lastmod>
-    </url>
-    <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-stream-caps-and-flap-phase-06-h264/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
@@ -2934,6 +2930,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-04-channel-diagnostics/</loc>
+         <lastmod>2026-10-16</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-05-auto-snapshot/</loc>
          <lastmod>2026-10-16</lastmod>
     </url>
     <url>

@@ -11312,7 +11312,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.3
+    Control Socket Protocol — Version 1.4
   
 
     
@@ -15266,7 +15266,7 @@ what is reachable in each mode today.</p>
 <tr>
 <td>Headless</td>
 <td><code>--headless</code></td>
-<td>No window. Frames are counted, stats print every 10 s, and an optional <a href="/components/ryll/control-socket-protocol/">control socket</a> (<code>--control-socket</code>) lets an external driver send input, take screenshots, and subscribe to events.</td>
+<td>No window. Draws are applied to an in-memory surface, a stats line is logged every 10 s, and an optional <a href="/components/ryll/control-socket-protocol/">control socket</a> (<code>--control-socket</code>) lets an external driver send input, take screenshots, read the display counters, and subscribe to events.</td>
 </tr>
 <tr>
 <td>Web</td>
@@ -15331,7 +15331,9 @@ interactive driving surface). Last full audit: the web frontend
 sweep; control-socket cells refreshed 2026-08-23 (web mode gained
 the socket, its <code>status</code> and event rows, and the shared digest
 poller), media socket binding added 2026-08-21, clipboard and
-resize rows refreshed 2026-10-14 (control protocol 1.3).</p>
+resize rows refreshed 2026-10-14 (control protocol 1.3), display,
+streaming and statistics rows refreshed 2026-10-16 (control protocol
+1.4's <code>stats</code> verb).</p>
 <h2 id="parity-matrix">Parity matrix<a class="headerlink" href="#parity-matrix" title="Permanent link">&para;</a></h2>
 <p>Headless cells name two functions. The renderer's <code>run_headless()</code>,
 in <code>shakenfist-spice-renderer/src/session.rs</code>, runs the session and its
@@ -15409,6 +15411,12 @@ around it.</p>
 <td>available (<code>run_web</code> builds a <code>SessionStatus</code> from the same <code>spice_connected</code> flag, <code>SessionState</code> agent watch and surface mirror headless uses)</td>
 </tr>
 <tr>
+<td>Display and video-stream counters (<code>stats</code> verb)</td>
+<td>n/a — intrinsic</td>
+<td>available</td>
+<td>available (<code>run_web</code> hands the socket the same display snapshot it gives the session)</td>
+</tr>
+<tr>
 <td>Event subscription (<code>latency</code>, <code>agent_connected</code>, <code>paste_*</code>, <code>surface_drawn</code>, <code>clipboard_changed</code>, <code>digest_updated</code>)</td>
 <td>n/a — intrinsic</td>
 <td>available (<code>digest_updated</code> needs the <code>digest-decode</code> build feature)</td>
@@ -15423,25 +15431,25 @@ around it.</p>
 <tr>
 <td>Display framebuffer (render SPICE draw ops)</td>
 <td>available</td>
-<td>partial (the renderer's <code>run_headless()</code> counts <code>ImageReady</code> events but never paints continuously; with <code>--control-socket</code>, a <code>SurfaceMirror</code> renders draw ops on demand for the <code>screenshot</code> verb, instantiated on first use)</td>
+<td>available (the renderer's <code>run_headless()</code> applies every draw op to a <code>SurfaceMirror</code> as it arrives, whether or not a control socket is open; nothing displays it, but the <code>screenshot</code> verb reads it)</td>
 <td>available (single monitor, MVP)</td>
 </tr>
 <tr>
 <td>Multi-monitor (<code>--monitors N</code>)</td>
 <td>available</td>
-<td>partial (the renderer's <code>run_headless()</code> — channel connects but frames are silently dropped; surfaces are never created in headless)</td>
+<td>partial (<code>--monitors</code> reaches the session as in the GUI, and the renderer's <code>run_headless()</code> applies every display channel's draws to the <code>SurfaceMirror</code>, which creates a surface for each <code>SurfaceCreated</code>; <code>status</code> lists them all with their channel, but <code>screenshot</code> takes only a <code>surface_id</code> and so reaches only the primary's display channel. Multi-monitor headless is unverified end to end: <a href="https://github.com/shakenfist/ryll/issues/549">ryll#549</a>)</td>
 <td>missing (out of MVP scope; see PLAN-web-frontend.md §Out of MVP scope)</td>
 </tr>
 <tr>
 <td>Full draw-op coverage (FILL, COPY, BLEND, etc.)</td>
 <td>available</td>
-<td>partial (same as display framebuffer — channel runs but output is discarded outside the control-socket mirror)</td>
+<td>available (the same <code>SurfaceMirror::apply_event</code> dispatch as the GUI and web mode)</td>
 <td>available (inherited from shared framebuffer)</td>
 </tr>
 <tr>
-<td>SPICE streaming / MJPEG</td>
+<td>SPICE video streams (MJPEG, H.264)</td>
 <td>available</td>
-<td>partial (decoded messages counted as frames, not rendered)</td>
+<td>available (decoded frames are applied to the <code>SurfaceMirror</code> like any draw; the <code>stats</code> verb reports each stream's codec and decode counts)</td>
 <td>available (inherited)</td>
 </tr>
 <tr>
@@ -15451,10 +15459,16 @@ around it.</p>
 <td>available</td>
 </tr>
 <tr>
-<td>Opt in to H.264 from spice-server (<code>--experimental-h264</code>)</td>
+<td>Prefer H.264 from the server (<code>--experimental-h264</code>)</td>
 <td>available</td>
 <td>available</td>
-<td>available (affects only the SPICE side; the WebRTC encoder is unchanged) — temporary: remove once <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/398" title="GitHub Issue: shakenfist/ryll #398">ryll#398</a> makes H.264 decode and it is advertised by default again</td>
+<td>available (affects only the SPICE side; the WebRTC encoder is unchanged)</td>
+</tr>
+<tr>
+<td>Do not offer H.264 to the server (<code>--no-h264</code>)</td>
+<td>available</td>
+<td>available</td>
+<td>available (affects only the SPICE side; the WebRTC encoder is unchanged)</td>
 </tr>
 <tr>
 <td>Window auto-resize to surface size</td>
@@ -15729,25 +15743,25 @@ around it.</p>
 <tr>
 <td>FPS tracking (sliding window from DisplayMark)</td>
 <td>available</td>
-<td>partial (the renderer's <code>run_headless()</code> — frame count incremented but FPS not computed; only raw count printed every 10 s)</td>
-<td>missing (out of MVP scope; no stats panel in browser MVP)</td>
+<td>partial (no FPS is computed; the control socket's <code>stats</code> verb returns <code>marks_received</code>, whose rate between polls is the GUI's measure)</td>
+<td>partial (no stats panel in the browser MVP; the control socket's <code>stats</code> verb works as in headless)</td>
 </tr>
 <tr>
 <td>Bandwidth sparkline (rolling bytes/sec graph)</td>
 <td>available</td>
-<td>missing (the renderer's <code>run_headless()</code> — <code>byte_counter</code> wired in but never sampled or reported in headless)</td>
-<td>missing (out of MVP scope)</td>
+<td>partial (no graph; the control socket's <code>stats</code> verb returns the display channel's <code>bytes_in</code>, whose rate between polls is its bandwidth)</td>
+<td>partial (no graph; the control socket's <code>stats</code> verb works as in headless)</td>
 </tr>
 <tr>
 <td>Latency sparkline (inter-PING interval graph)</td>
 <td>available</td>
-<td>partial (no graph; raw latency samples are reachable as control-socket <code>latency</code> events, and bytes_in/bytes_out are tracked from <code>Statistics</code> events in the renderer's <code>run_headless()</code>)</td>
+<td>partial (no graph; raw latency samples are reachable as control-socket <code>latency</code> events)</td>
 <td>missing (out of MVP scope)</td>
 </tr>
 <tr>
 <td>Periodic stats to stdout (headless only)</td>
 <td>n/a — intrinsic (GUI shows live stats in status bar)</td>
-<td>available (every 10 s: frames, bytes_in, bytes_out)</td>
+<td>available (every 10 s: DISPLAY_MARKs, image draws, and bytes in and out across every channel)</td>
 <td>n/a — intrinsic (browser context)</td>
 </tr>
 <tr>

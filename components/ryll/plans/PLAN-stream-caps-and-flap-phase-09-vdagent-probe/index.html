@@ -11304,7 +11304,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.3
+    Control Socket Protocol — Version 1.4
   
 
     
@@ -15351,7 +15351,7 @@ the agent is connected and we have actually sent a probe.</p>
 <td>—</td>
 <td>—</td>
 <td>—</td>
-<td><strong>Operator smoke.</strong> One ryll session against any test instance. After session bring-up, wait one probe interval (~30 s), file a bug report, confirm <code>main.agent_request_count &gt; 0</code>, <code>main.agent_reply_count &gt; 0</code>, <code>main.last_agent_reply_lag_us</code> is small (typically &lt;10 ms). Then deliberately freeze the guest (e.g. <code>kill -STOP &lt;gnome-shell-pid&gt;</code>) and wait 30 s; check that the Warn notification fires once. Unfreeze and confirm the next REPLY drops <code>outstanding_agent_request_count</code> back to zero. Operator-driven, not a sub-agent task.</td>
+<td><strong>Rewritten 2026-10-16: the mechanism this smoke tested no longer exists.</strong> The reply-lag probe was replaced by token-starvation detection in 0b35c07 / 52edaed (issue #429), so <code>agent_reply_count</code> and <code>last_agent_reply_lag_us</code> are no longer liveness signals and the original criteria below are unreachable on a QXL guest by construction. <strong>New smoke:</strong> one ryll session against any test instance. After bring-up, file a Connection bug report and confirm <code>main.agent_tokens &gt; 0</code> and <code>main.agent_starved_since_ts_secs</code> is null (healthy baseline). Then deliberately freeze the in-guest agent (<code>kill -STOP $(pidof spice-vdagent)</code>), generate clipboard or monitors traffic so messages queue, and wait out <code>STUCK_AGENT_THRESHOLD</code>; confirm <code>main.agent_tokens</code> is 0, <code>main.queued_agent_message_count &gt; 0</code>, <code>main.agent_starved_since_ts_secs</code> is set, <code>main.agent_stall_count</code> has incremented, and the Warn notification repeats at <code>STUCK_AGENT_NOTIFY_INTERVAL</code> (20 s) rather than once. Unfreeze and confirm tokens are granted again, <code>agent_starved_since_ts_secs</code> returns to null, and no further warnings fire. Operator-driven, not a sub-agent task. <strong>Original criteria, retained as history:</strong> wait one probe interval (~30 s), file a bug report, confirm <code>main.agent_request_count &gt; 0</code>, <code>main.agent_reply_count &gt; 0</code>, <code>main.last_agent_reply_lag_us</code> is small (typically &lt;10 ms); freeze the guest and wait 30 s; check the Warn notification fires once; unfreeze and confirm the next REPLY drops <code>outstanding_agent_request_count</code> back to zero.</td>
 </tr>
 </tbody>
 </table>

@@ -11312,7 +11312,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.3
+    Control Socket Protocol — Version 1.4
   
 
     
@@ -15995,8 +15995,8 @@ session 002b showed that MJPEG decode in the pure-Rust
 </tr>
 <tr>
 <td>5. Auto-snapshot bug-report mode</td>
-<td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-05-auto-snapshot/">PLAN-stream-caps-and-flap-phase-05-auto-snapshot.md</a></td>
-<td>Code landed (5A-5B); 5C operator smoke test pending</td>
+<td><a href="/components/ryll/plans/completed/PLAN-stream-caps-and-flap-phase-05-auto-snapshot/">PLAN-stream-caps-and-flap-phase-05-auto-snapshot.md</a></td>
+<td><strong>Complete.</strong> 5A-5B landed; 5C operator smoke <strong>passed</strong> in session 011 (2026-10-02): 20 zips / 231 MiB against a 20 / 512 MiB budget, 30.0 s cadence, playback fields re-sampled per snapshot, no per-snapshot notification. Criteria (e) and (f) were unsatisfiable as written and were rewritten against what the code actually bounds; (e) produced issue #433.</td>
 <td><code>f22416a</code> (PR #102)</td>
 </tr>
 <tr>
@@ -16020,8 +16020,8 @@ session 002b showed that MJPEG decode in the pure-Rust
 <tr>
 <td>9. Vdagent responsiveness probe</td>
 <td><a href="/components/ryll/plans/PLAN-stream-caps-and-flap-phase-09-vdagent-probe/">PLAN-stream-caps-and-flap-phase-09-vdagent-probe.md</a></td>
-<td>Code landed (9A-9D). 9E operator smoke (deliberately freeze the guest agent to verify the Warn notification fires) is pending.</td>
-<td><code>cd4c7d9</code> (PR #105)</td>
+<td>Code landed (9A-9D), then <strong>the mechanism was replaced</strong>. Sessions 011 / 013 / 014 showed the reply-lag probe cannot work on a QXL guest: when every QXL instance handles client monitors config, spice-server's agent write filter diverts <code>VD_AGENT_MONITORS_CONFIG</code> to the display device (<code>agent-msg-filter.c</code>, <code>reds_on_main_agent_monitors_config</code>) and the agent never sees it, so no <code>VD_AGENT_REPLY</code> is ever produced. Replaced by token-starvation detection in <code>0b35c07</code> / <code>52edaed</code> (issue #429, closed). 9E has been rewritten against the new fields and is runnable again.</td>
+<td><code>cd4c7d9</code> (PR #105), <code>0b35c07</code> + <code>52edaed</code> (#429)</td>
 </tr>
 <tr>
 <td>10. Documentation</td>
@@ -16097,16 +16097,21 @@ before re-assessing. The remaining open items are:</p>
 <li><strong>Phase 2 / 3</strong> — code landed; 2C smoke folded into 3H,
   the per-platform JPEG-decode smoke test. Operator-side
   work.</li>
-<li><strong>Phase 5C</strong> — auto-snapshot operator smoke test.
-  Functionally validated by every 005-onwards session
-  (auto-snapshots ARE the bundle source). Likely just
-  marking complete; verify and close.</li>
+<li><strong>Phase 5C</strong> — <strong>done.</strong> Smoke passed in session 011;
+  see the phase 5 plan's <em>Smoke result: 5C</em> section. Two
+  of its seven criteria were unsatisfiable as written and
+  have been corrected.</li>
 <li><strong>Phase 6F</strong> — H.264 wire-smoke. Needs an H.264-capable
   spice-server build. Operator-side; gated on the spice-
   server side rather than ryll. Mark blocked-on-external
   rather than open.</li>
-<li><strong>Phase 9</strong> — vdagent responsiveness probe. Independent
-  of video work. Worth picking up.</li>
+<li><strong>Phase 9</strong> — the liveness mechanism was <strong>rebuilt</strong>
+  (#429): reply-lag out, token starvation in, because
+  spice-server diverts monitors-config away from the
+  agent on QXL guests. 9E is rewritten and runnable; it
+  now needs an operator to freeze <code>spice-vdagent</code> and
+  check the new <code>agent_starved_*</code> / <code>agent_stall_count</code>
+  fields rather than reply lag.</li>
 <li><strong>Phase 10</strong> — documentation catch-all. Last of the
   work phases; phase 18 audits what they add up to.</li>
 <li><strong>Phase 11B / 11C</strong> — inputs-channel keepalive decision</li>
@@ -16115,10 +16120,12 @@ before re-assessing. The remaining open items are:</p>
   the management session to chase until / unless
   reproductions come back.</li>
 </ul>
-<p>Suggested ordering for closeout: 5C/2C/3H closures first
-(mostly bookkeeping against existing sessions), then 11B
-+ 11C, then phase 9, then phase 10 to roll up the new
-caps + the phase-13 / 16 / 17 parking into the docs. After
+<p>Suggested ordering for closeout, revised 2026-10-16: 5C is
+<strong>done</strong>; 2C/3H remain. Then 9E against the rebuilt
+token-starvation mechanism, then 11B + 11C, then phase 10 to
+roll up the new caps + the phase-13 / 16 / 17 parking into the
+docs. Phase 9 moved ahead of 11C because its mechanism just
+changed and the new code is unexercised by any operator run. After
 that, re-open phase 13 with the "why isn't the video a
 stream" question and decide whether to chase the
 predicate read or the client-side instrumentation first.
@@ -16376,6 +16383,16 @@ phases that are going to land have landed.</p>
   <code>{ uint32 type, uint32 error }</code> where <code>type</code> echoes the
   request opcode, so we can correlate replies to requests.</li>
 </ul>
+<p><strong>Correction, 2026-10-16.</strong> The premise above is true of the
+  <em>agent</em> but not of the path to it. On a QXL guest where every
+  instance handles client monitors config, spice-server's agent
+  write filter diverts <code>VD_AGENT_MONITORS_CONFIG</code> to the display
+  device (<code>agent-msg-filter.c</code>,
+  <code>reds_on_main_agent_monitors_config</code>) and the agent never
+  receives it, so it cannot reply no matter what either side
+  advertises in <code>VD_AGENT_CAP_REPLY</code>. Sessions 011 / 013 / 014
+  showed this; see issue #429. The probe now detects stalls by
+  token starvation instead.</p>
 <p>Mechanism: instrument the existing send/receive path for
   <code>VD_AGENT_MONITORS_CONFIG</code> (we already send this on window
   resize and at session start) to record send-timestamp and
@@ -16888,6 +16905,32 @@ all of the following are true:</p>
 <li><strong><code>GL_SCANOUT</code> cap.</strong> Only useful if we add a zero-copy GL
   surface path. Not on the roadmap.</li>
 </ul>
+<p>Found while running the 5C smoke in session 011 (2026-10-02) and
+filed rather than fixed in-plan. Status as at 2026-10-16:</p>
+<ul>
+<li><strong>#428</strong> — <em>fixed</em> (PR #434). The main channel's 5 s event-send
+  timeout discarded state-transition events. Resolved by publishing
+  mouse mode and agent state on a watch, never dropping the
+  session-end event, and warning when a drop happens.</li>
+<li><strong>#429</strong> — <em>fixed</em> (<code>0b35c07</code>, <code>52edaed</code>). See the phase 9 row and
+  the correction note under <em>Execution</em>; the reply-lag probe was
+  structurally unable to work on QXL guests.</li>
+<li><strong>#430</strong> — <em>closed</em>. UI thread stalled 20 s+ during a guest reboot,
+  filling the 1024-slot event queue.</li>
+<li><strong>#431</strong> — <strong>open.</strong> The motion-ack throttle is inert because
+  click-adjacent position sends are not counted. Wire-verified:
+  3279 positions sent, 819 acks, 2731 counted against 3276
+  decremented.</li>
+<li><strong>#432</strong> — <strong>open.</strong> <code>recent_events</code> is flooded by mouse motion
+  (50 entries covering 1.68 s), so an input bug report captures no
+  button events. This is why session 011's click report could not be
+  diagnosed from the report itself.</li>
+<li><strong>#433</strong> — <strong>open.</strong> The auto-snapshot stats panel renders a
+  cumulative counter over the retention cap. Criterion 5C(e) depended
+  on this and has been rewritten.</li>
+</ul>
+<p>The three that remain open are all diagnostic-quality issues rather
+than functional defects, and none blocks this plan's closeout.</p>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>Fixed while the phases ran, rather than as findings:</p>
 <ul>
