@@ -42,14 +42,21 @@ Bitrate is not openh264's default. That default is a flat
 that renders a desktop unreadable. `H264Encoder::new` derives a
 target from surface area and frame rate instead
 (`target_bitrate_bps`, ~2.4 Mbit/s at 1024x768@30), clamped to
-1–20 Mbit/s, and selects `UsageType::ScreenContentRealTime`. The
+1–20 Mbit/s, and encodes it as `H264Content::Screen`, openh264's
+`ScreenContentRealTime` usage. The
 quantiser range is set to 12–51 explicitly, because openh264
 silently narrows its default 0–51 to 26–35 for screen content,
 which makes most targets unreachable. Frames are one slice each,
 since browsers have not been tried with more. Rate control is openh264's
 quality mode with frame skipping on, as it always was here; a SPICE
 server using the compression crate's encoder directly gets bitrate
-mode and can change the bitrate and frame rate live.
+mode and can change the bitrate and frame rate live. A server
+streaming a moving picture should choose `H264Content::Video`
+(`CameraVideoRealTime`): in bitrate mode, screen content keeps
+P-frames at the bottom of the QP range and holds the target only by
+skipping frames, which turns a 25 fps video into about 7 fps. The
+numbers are on `H264Content` in
+`shakenfist-spice-compression/src/encode/h264.rs`.
 The derivation is **open-loop**: nothing feeds the receiver's
 bandwidth estimate (REMB/TWCC) back into the encoder, because
 `EncoderControl` carries only keyframe and stop. On a constrained

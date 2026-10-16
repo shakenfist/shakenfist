@@ -459,6 +459,41 @@ MATRIX_SELECT='test_map\.' \
 makes the run partial, and a partial run must not be able to report as
 a green matrix entry. The wrapper prints a warning whenever it is set.
 
+**The wrapper call above still reproduces a merge-queue entry exactly
+— what it runs by default does not.** The matrix suite is now split in
+two, and `run-matrix-entry.sh` reads `MATRIX_SET` to pick which half:
+`queue` (the default, and what the command above runs — this is the
+half that gates a merge), `nightly` (the six heavy VHD conversion
+tests that do not), or `all` (the whole suite, both halves together,
+which is what every matrix entry ran before the split). To reproduce
+the nightly's selection on one distro instead:
+
+```bash
+PACKAGE_DIR=src/target/debian \
+TESTDATA_PATH=../instar-testdata \
+MATRIX_SET=nightly \
+    tools/ci/run-matrix-entry.sh 'Debian 12' debian:12 deb
+```
+
+The nightly itself runs in its own workflow,
+`.github/workflows/nightly-matrix.yml`, once a night across all seven
+distros, plus one further Debian-13-only leg that runs the whole suite
+(`MATRIX_SET=all`) to measure `tests/stestr-timing.txt`, since no other
+job executes the whole suite in one stestr repository any more; a second
+job with no tests in it publishes the refresh. See
+"CI job layout and the partition guard" below for the two Makefile
+targets that define the split and the guard that keeps the queue and
+nightly selections exact complements of what a matrix entry used to
+run.
+
+Measured before this split: per-distro matrix-leg suite medians ranged
+30 to 38 minutes, and every distro's own maximum exceeded the
+*slowest* distro's median -- host contention moved a leg's duration
+more than the distro did. That is the baseline a later reader should
+compare this split's own measurement against, to check whether the
+spread is still this narrow; a fresh measurement is being taken on
+#543 and is not included here.
+
 **Classify before you attribute.** Running two matrix containers at
 once — or any other heavy job on the host — starves the suite, and the
 resulting failures do not look like resource problems. The large
@@ -509,11 +544,17 @@ event, and the split is deliberate:
 
 The merge queue does **not** re-run the PR integration jobs. That is a
 coverage argument rather than a cost one: each matrix entry runs the
-*full* Python suite against the installed package on its own distro,
-against that distro's `qemu-img`, so the queue's coverage is a superset
-of the PR jobs on seven distros instead of one. `build-and-test` is the
-deliberate exception — it stays in both as the cheap fast-fail, and
-`package-build` depends on it.
+Python suite against the installed package on its own distro, against
+that distro's `qemu-img`, so the queue's coverage is a superset of the
+PR jobs on seven distros instead of one, with two exceptions — the
+libvhdi differencing oracle, and the six heavy VHD conversion tests
+that moved to a nightly cross-distro run instead of gating every
+merge. See "What runs where, and why" at the top of
+`functional-tests.yml` for both, and "Running against an installed
+package" above for where the moved tests run and at what cadence.
+`build-and-test` is the deliberate exception to the split itself — it
+stays in both as the cheap fast-fail, and `package-build` depends on
+it.
 
 `package-build` builds one `.deb` and one `.rpm` and uploads them as a
 single artifact that all seven entries consume. This works only because
@@ -614,6 +655,201 @@ for what the unfixed version cost across repositories, and the fleet
 audit
 [merge-group-cancellation](https://github.com/shakenfist/development/blob/main/audits/merge-group-cancellation.md).
 
+### The nightly matrix's timing refresh and failure reporting
+
+`nightly-matrix.yml` runs unattended, so everything it produces is
+produced by a script: nobody opens the Actions tab on a morning when
+nothing seems wrong. It fires at **22:00 UTC** — four hours ahead of the
+other daily schedules, because the shared `xl` pool has a measured
+ceiling of about three concurrent legs and this is the largest nightly
+the repository runs — and holds two shapes of job:
+
+| Job | Runs | Produces |
+|-----|------|----------|
+| `nightly-legs` (seven, one per distro) | the six moved VHD conversion tests (`MATRIX_SET=nightly`) | a GitHub issue per failing distro, and the leg's log as an artifact |
+| `measure` (one, Debian 13) | the **whole** suite (`MATRIX_SET=all`), deliberately unseeded | the measured timings as a 30-day artifact, and an issue if the suite fails |
+| `publish-timing` (one, no tests) | nothing — it downloads that artifact and compares it | a pull request refreshing `tests/stestr-timing.txt`, an issue if the refresh itself fails, and an issue if there was no measurement to refresh from |
+
+`measure` is redundant as coverage — every test in it either still gates
+a merge or runs on the seven legs above — and that is not why it is
+there. It is the only job left in CI that executes the whole suite in a
+single stestr repository, which makes it the only place the timing data
+can be measured rather than guessed.
+
+**Measuring and publishing are two jobs because of the token.** The
+workflow level is `contents: read`, because every leg that runs the
+suite runs instar and `qemu-img` over deliberately malicious images
+outside the KVM sandbox, over a working tree the container can read.
+`publish-timing` is the only job that holds a write scope
+(`contents: write` for the branch it pushes, `pull-requests: write` for
+the pull request it opens), it is the only checkout in the workflow that
+keeps its job token, and it runs no test, installs no package and reads
+no testdata — it downloads one derived text file and pushes. The
+invariant to preserve when editing this workflow: **no job both runs the
+suite and holds a write scope.** `issues: write` is the one exception,
+on every leg, because a leg files its own failure issue and that scope
+cannot push code or touch a pull request.
+
+**A failed night publishes nothing, and says so.** `publish-timing`
+checks that a measurement actually arrived and skips the publisher when
+one did not, so a morning with a failure issue does not also get a
+timing pull request nobody should read. It no longer skips the whole
+job, though, and that distinction matters: the refresh's own failure
+issue is filed from this job, so while a failed measurement skipped it
+entirely, a measuring leg that failed night after night left the
+committed timings quietly ageing with nothing naming that. The same hole
+swallowed the quieter case — the derivation inside the measuring leg is
+a warning rather than an error on purpose, so a leg could go green,
+upload no timing artifact, and leave the publisher red at its download
+step with no issue. Both now file one, under a key of their own (see
+"Failure reporting" below).
+
+**The timing-refresh pull request arrives with its checks not running.**
+It is opened with the job's own `GITHUB_TOKEN`, so its author is
+`github-actions[bot]`, and this repository sets the Actions
+contributor-approval policy to `all_external_contributors`, which a bot
+counts as. Measured on the `rust-nightly-bump` pull requests #584, #604,
+#627 and #656, which are opened the same way: every `pull_request`
+workflow run *is* created within seconds, and attempt 1 of each ends
+`action_required`, waiting for an approval that never arrives on its
+own — on all four a maintainer approved them hours later, attempt 2 ran
+green, and the pull request merged through the queue normally. So the
+commonly repeated version of this, that a `GITHUB_TOKEN`-created pull
+request triggers no workflow runs at all, is not what happens here; the
+runs exist and wait. The effect is the same either way, since `develop`
+requires those checks. **To unblock it, use "Approve and run workflows"
+on the pull request's checks tab.** Closing and reopening is the usual
+advice for a pull request whose checks never fired and is probably not
+the fix here, because the gate is keyed on who authored the pull
+request; a PAT for an account with write access would avoid the gate
+altogether, at the cost of a secret to rotate and to leave in reach of a
+nightly job. The pull request body says all of this too, so whoever
+finds it does not have to come here.
+
+**The timing data and the four scripts that maintain it.**
+`tests/stestr-timing.txt` is a committed list of `<test id><TAB><duration
+seconds>` lines, sorted by id and rounded to 0.01s. It is a *scheduling
+hint*: stestr partitions a run across workers from durations held in its
+own repository, and a repository created fresh in every CI container
+starts with none, so without it a test that takes minutes lands wherever
+round-robin puts it and that worker becomes the run's wall time. A stale
+hint degrades packing gradually and can never make a run wrong, which
+sets the bias for the whole mechanism — stay quiet unless the numbers
+actually moved.
+
+- **`tools/ci/seed-stestr-timing.sh STESTR_BIN TIMING_FILE`** is the
+  consumer. `tools/test-package-functional.sh` calls it from the
+  directory `stestr run` is about to run in; it converts the committed
+  text into a synthetic subunit v2 stream and `stestr load
+  --force-init`s it, which is the only mechanism stestr offers for this
+  short of a hand-written worker-assignment file. A missing or unusable
+  timing file is **not** an error: the run proceeds with the scheduler
+  partitioning blind, exactly as it did before the file existed.
+- **`tools/ci/generate-stestr-timing.py REPO_DIR OUTPUT_FILE`** is the
+  derivation, reading the durations out of a stestr repository's on-disk
+  `times.dbm`. Text rather than a subunit stream, sorted and rounded, so
+  a nightly refresh is a small diff instead of a fresh ~700 KB binary
+  blob every night. Generating twice from the same repository must give
+  byte-identical output.
+- **`tools/ci/compare-stestr-timing.py OLD NEW`** decides whether a
+  measurement is worth a human's attention, and exits 0 for material, 10
+  for immaterial, 1 for an error. Both of its rules are expressed in each
+  test's *share of the suite's weight*, because bin packing is scale-free
+  — a contended or slower runner changes every number in the file without
+  changing a single scheduling decision, and that is by far the commonest
+  night-to-night difference. It publishes when one test's share moves by
+  at least 2 percentage points, or when at least 10 points of the suite's
+  weight relocate between tests. It is also where the measured test ids
+  are validated, because this is the path that publishes them: an id
+  must be a dotted `module.Class.method` with an optional parenthesised
+  scenario suffix, drawn from a conservative charset, and anything else
+  stops the refresh rather than being dropped. The ids come from the job
+  that ran the suite over the malicious images, and they travel from
+  here into a Markdown report, into the body of a pull request opened
+  unattended, and into the committed file — so a backtick, a pipe, a
+  code fence or an `@name` in one would be rendering as Markdown in a
+  pull request nobody wrote. Failing closed is the opposite of the
+  seeding path's behaviour above, and deliberately: this one writes the
+  file, that one only reads it.
+- **`tools/ci/publish-stestr-timing.sh MEASURED [--dry-run] [--force]`**
+  acts on that verdict. On a material change it copies the measurement
+  over the committed file, force-pushes the single long-lived
+  `stestr-timing/refresh` branch, and opens a pull request — or, if one
+  is already open for that branch, says so and leaves it to be updated
+  in place rather than opening a second. It never pushes to `develop`: a
+  scheduling hint is nowhere near a good enough reason to be the first
+  thing in this repository that writes to a merge-queue-protected
+  branch. On an immaterial change it prints the comparison and exits 0
+  having done nothing, which is the normal case. It assigns the pull
+  request to nobody unless `TIMING_PR_ASSIGNEE` names a login, and a
+  failed assignment is a warning rather than a failed nightly: a
+  hardcoded account that is renamed or loses access would turn a
+  scheduling hint into a failure issue.
+
+**Failure reporting.**
+`tools/ci/report-nightly-matrix-failure.sh DISTRO IMAGE LOG_FILE` files
+the issue, under the existing `test-failure` and `needs-attention`
+labels so there is one queue of "CI found something and nobody has
+looked" rather than two. The body names both the distro and the failing
+tests, because that pair is the whole signal: one distro red and six
+green is a `qemu-img` divergence at that distro's version, while all
+seven red is an instar regression the pull-request jobs missed. It also
+records the leg's live `qemu-img` version and the `Ran: N tests` totals,
+and quotes a bounded excerpt anchored on stestr's failure block rather
+than the end of the log — a matrix log ends with the totals and the
+worker balance, so a plain tail says how long the run took and nothing
+about why it failed.
+
+Deduplication is **per distro**, keyed on a hidden `<!-- dedup_key: ...
+-->` marker in the body rather than on the title alone, so a divergence
+that takes a week to work through arrives as one issue with a comment
+per night instead of seven issues. `--kind` switches to one of two
+separate keys, because these are three different things with three
+different places to look, and collapsing any of them into the others
+sends a reader looking for a `qemu-img` difference that is not there:
+
+- `--kind timing-refresh` is a bug in the publisher. The suite passed
+  and the refresh broke, and the report opens by saying no test failed.
+- `--kind timing-unmeasured` is no measurement to publish — the
+  measuring leg did not succeed, or succeeded without deriving the file.
+  Nothing is published from a run that fell over, which is right; this
+  is the issue that stops the resulting staleness being invisible, and
+  it collects a comment each night until a refresh lands again.
+
+**Driving all of it by hand.** None of this needs CI:
+
+```bash
+# Re-derive the committed timing file from a local full run.
+cd tests && ../tests/.venv/bin/stestr run --exclude-regex test_info_malicious
+cd ..
+tests/.venv/bin/python3 tools/ci/generate-stestr-timing.py \
+    tests/.stestr tests/stestr-timing.txt
+
+# Ask what the nightly would do with a measurement, touching neither
+# git nor the GitHub API.
+tools/ci/publish-stestr-timing.sh /path/to/measured-timing.txt --dry-run
+
+# Ask what the reporter would file for a downloaded leg log.
+tools/ci/report-nightly-matrix-failure.sh "Rocky 9" rockylinux:9 \
+    matrix.log --dry-run
+```
+
+A manual `workflow_dispatch` of `nightly-matrix.yml` takes a
+`force_timing_pr` input, which opens the refresh pull request even when
+the comparison called the change immaterial; the scheduled run never
+sets it. A dispatch runs in a concurrency group of its own, keyed on its
+run id, so it cannot be the pending run that GitHub discards when the
+22:00 schedule arrives — which also means a dispatch can run alongside
+the schedule, and the two will share the `xl` pool rather than fit in
+it. `publish-timing` carries its own group, so the branch push stays
+serialised whatever the rest of the workflow does. The self-tests —
+`tools/ci/test-seed-stestr-timing.sh`,
+`test-generate-stestr-timing.sh`, `test-publish-stestr-timing.sh`,
+`test-report-nightly-matrix-failure.sh` and
+`tools/ci/test_compare_stestr_timing.py` — all run in the `ci-tooling`
+job, and none of them needs docker, a venv or testdata beyond what they
+build themselves.
+
 ### CI job layout and the partition guard
 
 On a pull request the integration suite is split across several jobs
@@ -651,6 +887,34 @@ reason. Run it locally with:
 ```bash
 tools/ci/check-test-partition.sh
 ```
+
+The same guard checks a **second partition**: the merge-queue distro
+matrix and the nightly matrix, which between them must run everything
+an unselected matrix entry used to run. It asserts the two halves cover
+that baseline, that they do not overlap, that each half is actually
+invoked by a workflow job, and that the two workflows' distro lists
+agree entry for entry — those lists are deliberately copies, because
+their entries carry comments and an audit marker a shared file could
+not hold, so this check is the only thing keeping them in step.
+
+Nothing there is restated in the guard. A matrix leg does not invoke a
+Makefile target; it calls `tools/ci/run-matrix-entry.sh` with a
+`MATRIX_SET` of `queue`, `nightly` or `all`, so the guard reads the
+`MATRIX_SET` out of each workflow job (or its absence, which means that
+script's own default), the set-to-target mapping out of the script, the
+selector out of the named Makefile target, and the baseline exclusions
+out of `tools/test-package-functional.sh`. A renamed target or a
+typo'd `MATRIX_SET` is therefore a parse failure rather than a quietly
+different selection.
+
+One limit worth knowing when reading its output: `stestr list`
+collapses a parameterised test to its bare id, so the figure it reports
+is smaller than a run's (2378 against 3675 when last measured). Every
+selector bar one is prefix-style, and a variant's id begins with its
+bare id, so claiming the bare id claims every variant. The nightly's
+selector is `$`-anchored instead, which means a future parameterised
+variant of one of the six moved tests would stay on the merge gate
+rather than move to the nightly — the safe direction.
 
 Its own logic is unit-tested (stdlib only, no venv) via:
 
@@ -742,6 +1006,34 @@ failure mode: it inspects known canary fixtures and hard-fails the job with
 an explicit "infrastructure problem, not a test regression" message if any is
 still a pointer, so a git-LFS outage can never be silently misattributed to
 instar (see GitHub issue #451 for the incident this guards against).
+
+Eight of the nine jobs that prepare testdata then run
+**`tools/ci/resparsify-testdata.sh <tree>`** — every one that runs the Python
+integration suite over the tree (five in `functional-tests.yml`, two in
+`nightly-matrix.yml`, one in `test-drift-fix.yml`). The exception is
+`coverage-fuzz.yml`, which prepares the tree only to seed fuzz corpora and
+never asks `qemu-img info` for an allocated size, so the fully allocated
+tree costs it disk and nothing else. git and git-lfs write each file
+out fully allocated, so a clone or an `lfs pull` fills the images' sparse
+holes with real zeros: the tree becomes about 7.5 GiB of mostly zeros, and
+`qemu-img info` reports an allocated size that belongs to git rather than to
+the fixture, which the disk_size comparisons check. The script restores the
+holes with `cp --sparse=always`, over `downloaded/` only and over the five
+whole-disk image extensions only — `custom/` fixtures keep the allocation
+their tests expect. It is a shared script rather than a step repeated in each
+workflow because a mirrored copy's only symptom when it drifts is a slower
+job.
+
+That script is also a **cross-repository interface**: private-ci's
+instar-testdata dependencies-disk image build fetches it from instar's default
+branch over HTTPS and runs it against its own clone, outside GitHub Actions.
+So its one-argument call means "the whole tree" permanently, it reads no
+`GITHUB_*` variable, and it exits non-zero on failure so that a broken fetch
+fails their build rather than quietly shipping an unsparsified image. Anything
+narrower — resparsifying only the files a fetch changed, say — has to arrive as
+further optional arguments. `tools/ci/test-resparsify-testdata.sh` exercises
+exactly that calling convention, and measures allocated blocks before and
+after rather than trusting the exit status.
 
 ## Expected Output Overrides
 
@@ -953,8 +1245,30 @@ that reports as a pass (one Rocky run "passed" having executed 454 of
 `assert_bytes_identical` (`tests/base.py`), which reports sizes and the
 first differing offset rather than the buffers, and
 `tools/test-package-functional.sh`, which fails the run outright on the
-crash marker, on any worker reporting `N/A` elapsed time, or on a
-full-suite test count far below the expected ~3250.
+crash marker, on any worker reporting `N/A` elapsed time, or on a run
+that executed fewer tests than `stestr list` found for the same
+selection. That floor is derived per selection rather than being a
+written-down total, so it covers the merge queue's half of the suite and
+the nightly's six tests as well as an unselected full run; a constant
+could only ever check the last of those, and drifted every time a test
+was added.
+
+**Nor must a run where everything skipped.** A skip reports a result, so
+it counts towards stestr's `Ran:` total, which means the floor above is
+satisfied by a selection in which every test skipped exactly as by one
+in which every test executed. That is reachable: every test in the
+nightly's six calls `skipTest` when its VHD fixture is missing, so one
+absent file would give a green leg that tested nothing. So
+`tools/test-package-functional.sh` also fails when `Ran:` minus
+`Skipped:` is zero, and prints the executed count on every run. The rule
+is "nothing executed at all" rather than a minimum fraction executed,
+deliberately: skips are a property of the distro rather than of the
+change — the EL streams with no `qemu-storage-daemon` skip the whole
+bitmap oracle set, and the full suite legitimately skips hundreds — so
+any fraction tight enough to catch a real loss on Debian would fail
+Rocky on a good night. One consequence worth knowing before it surprises
+you: a hand-run `--select` whose every case skips on this distro now
+fails rather than passing.
 
 ## Environment Variables
 
@@ -2213,9 +2527,12 @@ the per-distro table.
 `tools/test-package-functional.sh <package> <distro-image>` runs the
 full suite against the **installed** `.deb`/`.rpm` inside a target-distro
 container, using that distro's own `qemu-img` as the oracle (tests from
-the tree, binary from the package via `INSTAR_BINARY_PATH`). It is the
-per-entry runner for the distro-matrix CI and the first check to surface
-version-specific output-format parity gaps that host-only CI cannot. It
+the tree, binary from the package via `INSTAR_BINARY_PATH`). Run by hand like
+that it selects nothing, so it really is the whole suite; the
+distro-matrix CI reaches the same script through
+`tools/ci/run-matrix-entry.sh`, which passes the half of the split that
+entry is for. It is the first check to surface version-specific
+output-format parity gaps that host-only CI cannot. It
 is distinct from `tools/test-package-install.sh` (fast packaging smoke)
 and is driven across seven distros by the `package-matrix` job, which
 runs **only** in the merge queue and on `workflow_dispatch` — never on a
