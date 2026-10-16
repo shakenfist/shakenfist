@@ -54,7 +54,9 @@ class DependencyWaitDeferTest(base.ShakenFistTestCase):
     op.defer() for both depends_on and runs_after waits, rather than taking
     defer()'s flat 15 second default."""
 
-    def _run_defer(self, defer_count, dep_kind):
+    def _run_defer(self, defer_count, dep_kind,
+                   dep_state=BaseClusterOperation.STATE_QUEUED,
+                   dep_missing=False):
         mock_op = mock.MagicMock()
         mock_op.state.value = BaseClusterOperation.STATE_QUEUED
         mock_op.depends_on = []
@@ -64,12 +66,12 @@ class DependencyWaitDeferTest(base.ShakenFistTestCase):
         setattr(mock_op, dep_kind, [dep])
 
         mock_dep_op = mock.MagicMock()
-        mock_dep_op.state.value = BaseClusterOperation.STATE_QUEUED
+        mock_dep_op.state.value = dep_state
 
         op_class = mock.MagicMock()
         op_class.from_db.return_value = mock_op
         dep_class = mock.MagicMock()
-        dep_class.from_db.return_value = mock_dep_op
+        dep_class.from_db.return_value = None if dep_missing else mock_dep_op
         classes = {'node_inst_netdesc_op': op_class, 'net_op': dep_class}
 
         job = workitem.Job.__new__(workitem.Job)
@@ -148,6 +150,29 @@ class DependencyWaitDeferTest(base.ShakenFistTestCase):
         messages = [c.args[1] for c in mock_op.add_event.call_args_list]
         self.assertIn(
             'warning, gave up waiting for runs_after dependency', messages)
+
+    def test_failed_dependency_aborts_through_the_operation(self):
+        """Issue 4542: the abort lives on the operation, which is what
+        tells the instance it will never start."""
+        for state in [BaseClusterOperation.STATE_ERROR,
+                      BaseClusterOperation.STATE_ABORT,
+                      BaseClusterOperation.STATE_DELETED]:
+            with self.subTest(state=state):
+                mock_op, mock_dep_op = self._run_defer(
+                    0, 'depends_on', dep_state=state)
+
+                mock_op.abort_for_unsuitable_dependency.assert_called_once_with(
+                    mock_dep_op)
+                mock_op.defer.assert_not_called()
+                mock_op.execute.assert_not_called()
+
+    def test_missing_dependency_cancels_through_the_operation(self):
+        mock_op, _ = self._run_defer(0, 'depends_on', dep_missing=True)
+
+        mock_op.cancel_for_missing_dependency.assert_called_once_with(
+            {'op_type': 'net_op', 'op_uuid': DEP_UUID})
+        mock_op.defer.assert_not_called()
+        mock_op.execute.assert_not_called()
 
     def test_runs_after_below_budget_still_defers(self):
         mock_op, mock_dep_op = self._run_defer(

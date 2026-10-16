@@ -108,6 +108,20 @@ class NodeInstNetdescOp(BaseClusterOperation):
         })
         return retval
 
+    def _dependency_failed(self, reason):
+        # Every task this operation carries (instance_preflight,
+        # instance_start, instance_create) is a step of bringing the
+        # instance up, and nothing else will take another one. The
+        # instance must therefore be errored, or it sits in initial
+        # forever while its client waits (issue 4542). An artifact
+        # fetch dependency which failed has normally errored the
+        # instance already, so leave a terminal instance alone rather
+        # than erroring it twice.
+        inst = Instance.from_db(self.instance_uuid, suppress_failure_audit=True)
+        if not inst or inst.state.value in Instance.TERMINAL_STATES:
+            return
+        inst.enqueue_delete_due_error(f'instance start abandoned: {reason}')
+
     # Tasks
     def dispatch_task(self, task):
         if task not in schema.model_tasks:
