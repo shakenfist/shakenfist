@@ -16,8 +16,8 @@ derives the type list from the source rather than restating it, so a
 twelfth cached type cannot be added with a reader and no eviction hook.
 It is type-level, which is why it does not close #3943. This module
 used to claim the wiring was "covered in the object-type test modules";
-it was not covered anywhere, and the phase 8 push audit found that the
-claim was what stopped anyone looking.
+it was not covered anywhere, and a push audit found that the claim was
+what stopped anyone looking.
 """
 
 import pathlib

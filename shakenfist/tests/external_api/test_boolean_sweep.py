@@ -2,14 +2,13 @@
 
 """Ask every declared boolean whether the server reads it the way it publishes it.
 
-Written by the phase 8 push audit of
-``docs/plans/PLAN-api-input-validation.md`` (finding B-4). The defect it
-exists to close is not a bug in one handler, it is a class:
+The defect this file exists to close is not a bug in one handler, it is a
+class:
 
-This validation layer is check-only (decision D14). ``validate_request``
-runs the compiled schema for its *findings* and throws the deserialised
-result away (``shakenfist/external_api/base.py``), so a handler is handed
-the raw request body. marshmallow's ``Boolean`` accepts a set of string
+This validation layer is check-only. ``validate_request`` runs the
+compiled schema for its *findings* and throws the deserialised result
+away (``shakenfist/external_api/base.py``), so a handler is handed the raw
+request body. marshmallow's ``Boolean`` accepts a set of string
 spellings -- ``'false'``, ``'no'``, ``'off'``, ``'0'``, ``'f'``, ``'n'``
 and some of their cases are all False -- and every one of them is a
 non-empty string, which Python reads as True. So an endpoint which
@@ -19,15 +18,15 @@ worse than not declaring the parameter at all:
 ``validation.declared_boolean()`` exists for exactly this, and its
 docstring says why.
 
-The phase 7 review found one member of the class (``float`` on a
-netdesc) and fixed that one member. The audit then found three more in
-twenty minutes by hand, which is the evidence that a reviewer's eye is
-the wrong instrument: the class is *not* uniform, so there is nothing to
-pattern-match on. Of the nineteen top-level declared booleans, three
-arrive through a ``@use_kwargs`` schema and are deserialised before the
-handler sees them, three are coerced somewhere downstream, and three are
-read with ``is not True`` and fail closed. Only a differential
-measurement can tell those apart from the ones that are simply wrong.
+A review found one member of the class (``float`` on a netdesc) and fixed
+that one member. An audit then found three more in twenty minutes by hand,
+which is the evidence that a reviewer's eye is the wrong instrument: the
+class is *not* uniform, so there is nothing to pattern-match on. Of the
+nineteen top-level declared booleans, three arrive through a
+``@use_kwargs`` schema and are deserialised before the handler sees them,
+three are coerced somewhere downstream, and three are read with
+``is not True`` and fail closed. Only a differential measurement can tell
+those apart from the ones that are simply wrong.
 
 So this file is derived and differential:
 
@@ -36,11 +35,10 @@ So this file is derived and differential:
   ``test_required_sweep.required_declarations()`` and the published
   specification are built from -- and reports every parameter declared
   ``boolean``, *and* every boolean property of a structured one, read out
-  of ``api_base.ARGTYPES``. That second half arrived in the second round
-  of review, which pointed out that filtering on the top-level argtype
-  made ``network[].float`` invisible here -- so the one member of the
-  class already known to have failed was the one member this enumeration
-  could not see. ``test_every_declared_boolean_has_a_reading`` fails if a
+  of ``api_base.ARGTYPES``. The second half matters because filtering on
+  the top-level argtype alone made ``network[].float`` invisible here --
+  so the one member of the class already known to have failed was the one
+  member this enumeration could not see. ``test_every_declared_boolean_has_a_reading`` fails if a
   boolean has no entry in ``BOOLEAN_READS``, and if an entry names a
   declaration which no longer exists. A twenty-second boolean cannot join
   the class silently: it fails CI until somebody has measured it.
@@ -211,7 +209,7 @@ BOOLEAN_READS = {
     },
 
     # `float`, inside a netdesc, on both routes which take one. This is
-    # the member of the class phase 7's review found by eye, and it is
+    # the member of the class first found by eye in review, and it is
     # here because the enumeration above now descends into the
     # structured schemas -- before that it was the one shape already
     # known to have failed and the one shape this file could not see.
@@ -443,9 +441,9 @@ def boolean_declarations():
     A boolean *property* of a structured parameter is reported as
     ``parameter.property``. Filtering on ``argtype == 'boolean'`` alone
     would have missed ``network[].float``, which is the member of the
-    class phase 7's review found by eye -- so the one shape already
+    class first found by eye in review -- so the one shape already
     known to fail would have been the one shape this enumeration could
-    not see. Added by the second round of review on phase 8.
+    not see.
     """
     rows = []
     unreadable = []
@@ -527,8 +525,7 @@ class BooleanSweepTestCase(SweepFixtureTestCase):
         spelling the schema says means true has to be *accepted*, or a
         row claiming that strings are refused would pass just as well
         against a route which refused everything. One request each, and
-        every one of them asserted. Added by the second round of review
-        on phase 8.
+        every one of them asserted.
         """
         cls, method, name = key
         accepted = self._observe(entry, name, True)
@@ -655,8 +652,8 @@ class BooleanSweepTestCase(SweepFixtureTestCase):
         Every row shares one fixture and several of them create real
         objects -- eight instances, twelve networks in the ``system``
         namespace -- so a row's observable could in principle depend on
-        what an earlier row left behind. The first round of review on
-        phase 8 read the ``clean_wait`` row as depending on it: its
+        what an earlier row left behind. A reviewer read the
+        ``clean_wait`` row as depending on it: its
         observable is a 202-versus-403 over every network in ``system``,
         and it runs before the network-creating rows only because
         ``'clean_wait'`` sorts before ``'post'``.

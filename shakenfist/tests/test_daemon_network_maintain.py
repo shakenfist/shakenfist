@@ -2,8 +2,8 @@
 
 """Tests for shakenfist.daemons.network.maintain.
 
-Phase 6 rewrote maintain.py as a discovery-only pass governed by the
-five-guard pipeline: queue-depth, pending-op, cooldown, circuit-breaker
+maintain.py is a discovery-only pass governed by the five-guard
+pipeline: queue-depth, pending-op, cooldown, circuit-breaker
 and (on success) enqueue at PRIORITY.background. These tests exercise
 each guard.
 """

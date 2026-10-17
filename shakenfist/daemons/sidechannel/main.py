@@ -454,7 +454,7 @@ class AgentCommandHandler:
     # only applies the progress timeout while a command that can
     # actually report progress is in flight.
     reports_progress = False
-    retryable = True            # read in phase 5
+    retryable = True            # read by operation_is_retryable()
     register_as_outstanding = False
 
     def __init__(self, job):
@@ -598,7 +598,7 @@ def operation_is_retryable(agentop):
     command list at index 0, so an [execute, get-file] operation which
     stalls in the get-file would re-run the execute on its second
     attempt -- exactly the side effect the agent cannot take back, and
-    exactly what phase 0 decision 6 forbids. The cheaper per-command
+    which a retry must therefore never repeat. The cheaper per-command
     reading ("the stalled command is a get-file, get-file is
     retryable, so retry") would ship a smaller diff and be wrong.
 
@@ -637,11 +637,11 @@ def resolve_abandoned_operation(agentop, reason, terminal):
     and belongs to the caller rather than to this function because the
     two callers differ: a stall which cannot retry expires, since the
     progress timeout is a budget the caller set, while an executor
-    exit which cannot retry errors, preserving the message phase 4
-    gave it. Callers pass agentop.fail, or agentop.expire with its
-    budget bound via functools.partial -- the caller is the one which
-    knows which budget it detected running out, and expire() records
-    that as the expiry_reason a client can branch on.
+    exit which cannot retry errors. Callers pass agentop.fail, or
+    agentop.expire with its budget bound via functools.partial -- the
+    caller is the one which knows which budget it detected running
+    out, and expire() records that as the expiry_reason a client can
+    branch on.
 
     Retry is for a stalled attempt and never for a failed one. A
     passed deadline therefore never retries -- retrying spends time
@@ -840,8 +840,7 @@ class SideChannelExecutorJob(SideChannelJob):
             # than leaving it orphaned until the caller times out: the attempt
             # got nowhere rather than failing, so it is retried when the
             # command list allows it and the budgets have room, and errors
-            # otherwise with the message phase 4 gave it. See issues #3516 and
-            # #2240.
+            # otherwise. See issues #3516 and #2240.
             if self.agentop.state.value == AgentOperation.STATE_EXECUTING:
                 self.log.error(
                     'Executor exited with the operation still executing; '
@@ -1319,11 +1318,10 @@ class SideChannelExecutorJob(SideChannelJob):
         through leaves the guest in a state no caller asked for --
         a delete says the record is unwanted, not that a half applied
         change should be left in place -- and because deciding
-        otherwise is a behaviour change this phase has no way to test
-        end to end. That gap is pre-existing rather than introduced
+        otherwise is a behaviour change with no end to end test to
+        prove it. That gap is pre-existing rather than introduced
         here, and interrupting live work belongs with the node-local
-        reaper in phase 5 of
-        docs/plans/PLAN-agent-operation-deadlines.md.
+        reaper in reap_instance_executors(), not here.
         """
         if self.agentop.state.value in (AgentOperation.STATE_ERROR,
                                         AgentOperation.STATE_EXPIRED):
@@ -1884,10 +1882,10 @@ class Monitor(daemon.Daemon):
             # thread was swept out by the loop above without resolving
             # it. The evidence either way is the absence of the thread.
             #
-            # The terminal outcome is fail(), not expire(), because
-            # decision 3 splits the two on what went wrong rather than
-            # on who noticed: a stall which cannot be retried expires,
-            # an executor which went away errors. This is an executor
+            # The terminal outcome is fail(), not expire(), because the
+            # two are split on what went wrong rather than on who
+            # noticed: a stall which cannot be retried expires, an
+            # executor which went away errors. This is an executor
             # which went away -- the only difference from the exit
             # handled in SideChannelExecutorJob.execute()'s finally is
             # that the process died before the finally could run, and

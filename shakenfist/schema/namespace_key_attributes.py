@@ -47,10 +47,10 @@ class NamespaceKeyAttributesData(BaseModel):
             longer mint or validate tokens. NULL means the key never
             expires.
         scopes: Nullable JSON list of scope strings. NULL means
-            unscoped (wildcard) -- phase 3 of the auth federation plan
-            formalises the vocabulary and adds enforcement.
+            unscoped, and mints a wildcard token; an empty list grants
+            nothing. The vocabulary is in external_api/scopes.py.
         provenance: Nullable JSON dict recording where the key came
-            from. Written by phase 3's federated exchange (the
+            from. Written by the federated token exchange (the
             mapping-rule reference and the satisfied claims); NULL for
             keys an operator created directly.
     """

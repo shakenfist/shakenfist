@@ -105,7 +105,7 @@ spelling above is the one to write.
 
 ...
 
-<!-- shared-block: plan-push-audit-phase v3 -->
+<!-- shared-block: plan-push-audit-phase v4 -->
 Push audit phase (shared block; do not edit -- the canonical
 copy lives in shakenfist/development at
 `templates/shared-blocks/plan-push-audit-phase.md`):
@@ -170,7 +170,32 @@ copy lives in shakenfist/development at
 - A repository with no `PUSH-AUDIT.md` still carries the phase, and
   the phase says that the runbook does not exist yet and what was
   done instead. Silently omitting it is what let the audit go
-  untriggered for as long as it did.
+  untriggered for as long as it did. What is done instead is at
+  least the checklist below, applied to the recorded ranges: it is
+  a floor, not a substitute for a runbook, and a plan adds the
+  questions its own repository's blast radius raises. Each item
+  gets a verdict, or a sentence saying why it does not apply.
+  Do not borrow another repository's runbook instead: a runbook is
+  written for one repository's blast radius.
+  1. Every recorded landing takes one of the forms above: a merge
+     commit with two parents, whose diff is read against its first
+     parent; every commit of a direct landing, or its `first..last`
+     range; a landing in another repository, whose own audit is
+     cited; or a statement that no range is recoverable, naming the
+     paths the audit read.
+  2. Anything the diff added that runs unattended -- cron, a timer,
+     a scheduled workflow, a self-update -- reports its own failure
+     somewhere a human sees, or is named as not doing so.
+  3. No secret or token entered any repository, and no private
+     hostname or IP address entered a repository more public than
+     the one it came from.
+  4. Anything the diff removed or renamed has no consumer left,
+     checked by grep across every repository that could consume it
+     rather than by assumption, with the greps stated.
+  5. Where the repository publishes something -- an image, a
+     release, a package -- a broken change fails closed: one that
+     publishes nothing is recoverable, one that publishes something
+     wrong is not.
 <!-- shared-block-end -->
 
 !!! note "In this project"

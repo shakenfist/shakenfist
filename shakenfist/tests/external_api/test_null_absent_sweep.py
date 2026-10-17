@@ -2,14 +2,13 @@
 
 """Null equals absent, asked of the server as a derived differential.
 
-Finding B4 of the phase 8 push audit of ``PLAN-api-input-validation``
-(issue 4252). ``test_nested_sweep.py``'s observable is ``(status,
+Issue 4252. ``test_nested_sweep.py``'s observable is ``(status,
 exception, message)``, and 35 of its 43 accepted rows resolve to a
 scheduler 507 -- so that table is structurally blind to **accepted with
-the wrong meaning**, which is the class of both defects the phase 7
-review found (a null ``video.model`` stored and rendered into the
-domain XML as ``type='None'``; ``{"float": "false"}`` floating the
-interface). The two tests which do observe an effect are hand-written
+the wrong meaning**, which is the class of two real defects in the
+structured parameter schemas (a null ``video.model`` stored and rendered
+into the domain XML as ``type='None'``; ``{"float": "false"}`` floating
+the interface). The two tests which do observe an effect are hand-written
 one-offs, and nothing derives the obligation to have one.
 
 This file tests the api_reference's promise as a general property: a

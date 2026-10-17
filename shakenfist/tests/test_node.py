@@ -669,8 +669,8 @@ class NodeInstanceManagementTestCase(base.ShakenFistTestCase):
 
     There is deliberately no add_instance() / remove_instance() to test:
     placement rows are written only by the atomic admission and release
-    RPCs, which move the capacity counters in the same transaction
-    (scheduler-reservations phase 3).
+    RPCs, which move the capacity counters in the same transaction, so
+    that the counters can never disagree with the placements.
     """
 
     def _make_node(self):

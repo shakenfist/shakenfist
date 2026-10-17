@@ -288,10 +288,10 @@ class ClusterOperationsEndpoint(api_base.Resource):
         ``target_uuid``: the UUID of the target object.
 
     The handler validates the caller's access to the target object via
-    its namespace before issuing the query (Approach (b) from the
-    Phase 7 plan): once the caller is confirmed authorised to see ops
-    on this specific target, the ops list follows without additional
-    namespace filtering at the SQL layer.
+    its namespace before issuing the query: once the caller is
+    confirmed authorised to see ops on this specific target, the ops
+    list follows without additional namespace filtering at the SQL
+    layer.
     """
 
     scope_family = 'clusteroperation'

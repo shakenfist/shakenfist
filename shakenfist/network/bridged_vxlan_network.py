@@ -19,14 +19,14 @@ bypass the queue and run a mutation inline is to construct a
 dispatcher itself. Public code paths must continue to use `Network` and
 its enqueueing methods.
 
-Phase 2 implements ``_apply_ensure_mesh``. Phase 3 adds the floating-IP
-and route methods: ``_apply_add_floating_ip``,
+The ``_apply_*`` methods cover the VXLAN mesh (``_apply_ensure_mesh``),
+floating IPs, routes and NAT (``_apply_add_floating_ip``,
 ``_apply_remove_floating_ip``, ``_apply_route_address``,
-``_apply_unroute_address`` and ``_apply_remove_nat``. Phase 4 adds the
-dnsmasq lifecycle methods: ``_apply_update_dnsmasq``,
-``_apply_remove_dnsmasq`` and ``_apply_remove_dhcp_lease``. The
-remaining ``_apply_*`` methods (lifecycle, ...) move across in later
-phases.
+``_apply_unroute_address``, ``_apply_remove_nat`` and
+``_apply_enable_nat``), the dnsmasq lifecycle (``_apply_update_dnsmasq``,
+``_apply_remove_dnsmasq`` and ``_apply_remove_dhcp_lease``), and creating
+and deleting the network on hypervisors and the network node
+(``_apply_create_on_*`` and ``_apply_delete_on_*``).
 """
 
 from __future__ import annotations
@@ -451,11 +451,11 @@ class BridgedVXLanNetwork:
 
         Lifted from ``Network.create_on_network_node`` (network.py:591-719).
         The original method was decorated with ``_not_on_floating_network``;
-        we preserve that semantics inline here. The Phase 4 late-import
-        workaround that constructed a fresh ``BridgedVXLanNetwork(self)``
-        to call ``_apply_update_dnsmasq`` becomes a clean
-        ``self._apply_update_dnsmasq()`` call, and the ``self.enable_nat()``
-        call becomes ``self._apply_enable_nat()``. The
+        we preserve that semantics inline here. The late-import
+        workaround the original needed, constructing a fresh
+        ``BridgedVXLanNetwork(self)`` to call ``_apply_update_dnsmasq``,
+        becomes a clean ``self._apply_update_dnsmasq()`` call, and the
+        ``self.enable_nat()`` call becomes ``self._apply_enable_nat()``. The
         ``self.assign_floating_gateway()`` helper stays on ``Network``.
         The single-threaded net-worker dispatcher is the only caller of
         this method and provides natural serialisation; no explicit lock
@@ -590,9 +590,9 @@ class BridgedVXLanNetwork:
 
             self._apply_enable_nat()
 
-        # The Phase 4 late-import workaround for dnsmasq is no longer
-        # necessary: this body now lives inside the worker class, so we
-        # can call ``self._apply_update_dnsmasq()`` directly.
+        # No late-import workaround for dnsmasq is needed: this body
+        # lives inside the worker class, so we can call
+        # ``self._apply_update_dnsmasq()`` directly.
         if self.network.provide_dhcp or self.network.provide_dns:
             self._apply_update_dnsmasq()
 
@@ -650,10 +650,10 @@ class BridgedVXLanNetwork:
         Lifted from ``Network.delete_on_network_node`` (network.py:747-797).
         The per-node fan-out loop (enqueueing ``node_net_op`` with
         ``network_destroy`` to every active node) is preserved. The
-        Phase 4 late-import workarounds for ``_apply_remove_dnsmasq``
-        and ``_apply_remove_nat`` collapse into clean
-        ``self._apply_X()`` calls since this body now lives inside the
-        worker class. The single-threaded net-worker dispatcher is the
+        late-import workarounds the original needed for
+        ``_apply_remove_dnsmasq`` and ``_apply_remove_nat`` collapse into
+        clean ``self._apply_X()`` calls since this body now lives inside
+        the worker class. The single-threaded net-worker dispatcher is the
         only caller of this method and provides natural serialisation;
         no explicit lock is required.
         """
@@ -711,9 +711,9 @@ class BridgedVXLanNetwork:
                     extra={'node': str(n.uuid), 'error': str(e)})
                 failed_enqueue_nodes.append(str(n.uuid))
 
-        # The Phase 4 late-import workarounds are no longer necessary:
-        # this body now lives inside the worker class, so we can call
-        # the sibling apply methods directly on ``self``.
+        # No late-import workarounds are needed: this body lives inside
+        # the worker class, so we can call the sibling apply methods
+        # directly on ``self``.
         if self.network.provide_dhcp or self.network.provide_dns:
             self._apply_remove_dnsmasq()
 

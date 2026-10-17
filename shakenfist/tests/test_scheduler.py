@@ -512,7 +512,7 @@ class LoadAwareOrderingTestCase(SchedulerTestCase):
             self.assertEqual(self._node_uuid('node2'), nodes[-1])
 
     def test_a_busier_node_is_ordered_last_not_dropped(self):
-        # The phase 3 regression which cost merge CI five creates on
+        # The regression which cost merge CI five creates on
         # 2026-08-14: the busiest node won the bucket ordering, the
         # capacity guard refused it, and because the ordering had
         # discarded the other two viable nodes the walk had nothing left
@@ -2513,9 +2513,10 @@ class HasSufficientRAMPredicateTestCase(SchedulerTestCase):
         ledger which does not exist. Only the measured checks above apply
         there, and the baseline satisfies them.
 
-        This is the state both halves of phase 3's functional coverage
-        deliberately skip on (``cpu_committed_row_present`` false), so
-        without this case nothing in the phase covers it at any level.
+        This is the state the cluster CI capacity tests (test_nodes.py and
+        test_saturation.py) deliberately skip on
+        (``cpu_committed_row_present`` false), so without this case
+        nothing covers it at any level.
         """
         node = self._node_uuid('node2')
         fake_inst = self.mock_mariadb.create_instance('fake-inst', memory=100)
@@ -2623,8 +2624,8 @@ class SchedulerStageAttributeTestCase(SchedulerTestCase):
     """The stage rides on the exception, not only in the message.
 
     The create path publishes the stage as a machine-readable field on
-    its 507 (PLAN-transient-capacity-refusals phase 4, D30), so it must
-    not have to parse it back out of the prose. The message assertions
+    its 507, so a client can decide whether to retry, and it must not
+    have to parse the stage back out of the prose. The message assertions
     which surround these tests are equally load bearing in the other
     direction: the cluster CI suite's assertRefusedAtStage() matches on
     the wording, so the attribute is an addition and never a

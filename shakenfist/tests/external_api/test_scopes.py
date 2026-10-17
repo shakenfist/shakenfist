@@ -483,7 +483,7 @@ class EnforcementTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
 
     def test_admin_endpoints_need_both_admin_and_the_derived_scope(self):
-        # Decision 3 requires both: 'cluster-admin' says the token may
+        # Admin endpoints require both: 'cluster-admin' says the token may
         # act administratively at all, and the derived scope says which
         # operation. Holding one without the other is not enough.
         admin_only = self._scoped_key(

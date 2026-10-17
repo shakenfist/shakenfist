@@ -2,10 +2,9 @@
 
 """The compilation of declarations into request schemas.
 
-Phase 3 PR 2. Nothing validates yet, so these assertions are about
-whether the compiled schemas *describe* what the declarations say --
-which is the property phase 4 turns into rejections, and so the last
-point at which a mistake is cheap.
+These assertions are about whether the compiled schemas *describe* what
+the declarations say -- the property enforcement turns into rejections,
+so a mistake caught here is caught before it refuses a caller.
 """
 
 import copy
@@ -37,13 +36,11 @@ def _every_compiled_field(field):
 
     A property of "every compiled field" has to be asserted at every
     depth or it is a property of the top level wearing a broader name,
-    and phase 7 gave the compiler two ways down: a list's `inner` and a
-    nested schema's `fields`. The nested arm was written in step 2,
-    before any declaration carried a `properties` block for it to walk
-    into; since step 4 it reaches the real thing, and a diskspec's
-    `size` and a videospec's `memory` are the nested integers
+    and the compiler has two ways down: a list's `inner` and a nested
+    schema's `fields`. A diskspec's `size` and a videospec's `memory`
+    are nested integers which
     test_every_compiled_integer_refuses_a_fractional_number() below
-    would otherwise have missed.
+    would otherwise miss.
     """
     yield field
     inner = getattr(field, 'inner', None)
@@ -95,10 +92,10 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
 
         Two independent readings of the same declarations: this one
         through swagger_helper() and flasgger at import time, the other
-        by parsing the source. They are the inputs to phase 4's
-        enforcement and to the fixer respectively, so a disagreement
-        between them is a parameter which is validated but not audited,
-        or audited but not validated.
+        by parsing the source. They are the inputs to enforcement and
+        to the fixer respectively, so a disagreement between them is a
+        parameter which is validated but not audited, or audited but not
+        validated.
         """
         for path, tree, cls, fn in declarations.handlers():
             key = (cls.name, fn.name)
@@ -121,7 +118,7 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
 
     def test_the_raw_body_is_not_compiled_as_json(self):
         """An upload body is bytes. Parsing it as JSON would reject
-        every upload the moment phase 4 enforces."""
+        every upload under enforcement."""
         compiled = self.registry[('UploadDataEndpoint', 'post')]
 
         self.assertTrue(compiled.raw_body)
@@ -130,14 +127,12 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
     def test_only_published_bounds_and_formats_become_validators(self):
         """A validator exists exactly where the specification says one should.
 
-        Until phase 6's step 4 this test asserted the opposite for
-        `format`: every semantic token rendered a format string and
-        compiled to a bare fields.String, which is finding F3 of
-        PLAN-api-input-validation-phase-06-required.md and the reason
-        issue 3269 survived four years. Step 4 gave five of those
-        format strings a validator apiece (decision D33), so the rule
-        is now that a field carries validators if and only if the
-        published schema carries a bound *or* a format `_FORMATS`
+        This test once asserted the opposite for `format`: every
+        semantic token rendered a format string and compiled to a bare
+        fields.String, which is the reason issue 3269 survived four
+        years. Five of those format strings now have a validator apiece,
+        so the rule is that a field carries validators if and only if
+        the published schema carries a bound *or* a format `_FORMATS`
         knows.
 
         Derived from the published specification rather than from a
@@ -217,9 +212,8 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
         # namespace claim limits. A change in either is meant to fail
         # here and be re-counted deliberately.
         #
-        # Seven events endpoints rather than five as of
-        # scheduler-reservations phase 7, which added the namespace and
-        # namespace claim ones.
+        # Seven events endpoints rather than the original five, because
+        # namespaces and namespace claims have events endpoints too.
         #
         # The agent timing five are worth a note: their `minimum: 0` is
         # backed by a 400 in api_base.agent_operation_timing() rather
@@ -282,9 +276,9 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
     def test_published_bounds_compile_into_validators(self):
         """The other direction: a bound which *is* declared must arrive.
 
-        Phase 2 published these into the specification so callers could
-        see them. If they did not compile, phase 4 would enforce a
-        contract looser than the one it publishes.
+        These bounds are published in the specification so callers can
+        see them. If they did not compile, enforcement would apply a
+        contract looser than the one the API publishes.
         """
         limit = self.registry[('BlobEventsEndpoint', 'get')].body.fields['limit']
         ranges = [v for v in limit.validators
@@ -295,13 +289,14 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
         self.assertEqual(1000, ranges[0].max)
 
     def test_required_is_recorded_but_not_enforced(self):
-        """`required` is metadata in this phase.
+        """`required` is recorded, not compiled into the schema.
 
-        `mode` on the agent-put endpoint is declared required while
-        omitting it has always been accepted, so compiling required-ness
-        into a constraint would break working clients the moment phase 4
-        enforced. Phase 6 decides what to do about it; warn-only exists
-        to give that decision numbers.
+        Required-ness travels as ``required_names`` and check() enforces
+        it under its own reason code, treating an explicit null as
+        missing. A compiled field marked required would report the same
+        omission a second time, as a schema error with a different
+        message. `mode` on the agent-put endpoint is the example:
+        declared required, recorded, and compiled as an optional field.
         """
         compiled = self.registry[('InstanceAgentPutEndpoint', 'post')]
 
@@ -315,8 +310,8 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
                 required = [n for n, f in schema.fields.items() if f.required]
                 self.assertEqual(
                     [], required,
-                    '%s.%s compiled a required field, which would reject a '
-                    'request phase 3 must not reject' % key)
+                    '%s.%s compiled a required field; required-ness belongs '
+                    'in required_names, which check() enforces' % key)
 
     def test_every_field_accepts_null(self):
         """A JSON null reaches the handler as None today.
@@ -343,8 +338,8 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
         the two agreeing is close to tautological -- which is the point.
         It is asserted anyway because the alternative design, mapping
         the type tokens a second time here, would have made them
-        independent and therefore able to drift, and that is exactly the
-        defect class phase 2 hit twice.
+        independent and therefore able to drift, and that defect class
+        has already been hit twice.
         """
         instance_create = self.registry[('InstancesEndpoint', 'post')].body
 
@@ -356,8 +351,8 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
         self.assertIsInstance(instance_create.fields['metadata'], fields.Dict)
 
         # A list of diskspecs and a list of networkspecs, so a List of
-        # Nested where phase 6 had a List of Dict. The element schema is
-        # the whole of phase 7.
+        # Nested rather than a List of Dict: the element schema is what
+        # checks the inside of each structure.
         self.assertIsInstance(instance_create.fields['disk'], fields.List)
         self.assertIsInstance(
             instance_create.fields['disk'].inner, fields.Nested)
@@ -415,14 +410,14 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
         self.assertEqual([], accepted)
 
     def test_any_accepts_every_json_shape(self):
-        """'any' (D15) compiles to fields.Raw, the same fallback the
-        compiler already uses for a type token it does not recognise --
-        phase 3's third review round made that path drop published
-        bounds, so a Raw field carrying none is already the supported
-        case. Proved at every one of the fourteen metadata `value`
-        sites, not just one, because a future compiler change could
-        special-case the token by name and treat the others
-        differently."""
+        """'any' compiles to fields.Raw, the same fallback the compiler
+        already uses for a type token it does not recognise -- that path
+        drops published bounds, because a Range on a Raw field raises
+        TypeError through schema.validate(), so a Raw field carrying none
+        is already the supported case. Proved at every one of the
+        fourteen metadata `value` sites, not just one, because a future
+        compiler change could special-case the token by name and treat
+        the others differently."""
         for (cls, method) in ANY_TOKEN_ENDPOINTS:
             value = self.registry[(cls, method)].body.fields['value']
             with self.subTest(cls=cls, method=method):
@@ -491,11 +486,10 @@ class ValidationCompilerTestCase(base.ShakenFistTestCase):
     def test_console_length_keeps_its_sentinel(self):
         """-1 means "the whole log", and the functional suite sends it.
 
-        The regression this guards was shipped once already: phase 2
-        retyped this to unsignedinteger, publishing minimum 0 over a
-        value get_console_data() special-cases. Here it would compile
-        into a rejection rather than merely a wrong line of
-        documentation.
+        The regression this guards was shipped once already: retyping
+        this to unsignedinteger published minimum 0 over a value
+        get_console_data() special-cases. Here it would compile into a
+        rejection rather than merely a wrong line of documentation.
         """
         length = self.registry[
             ('InstanceConsoleDataEndpoint', 'get')].body.fields['length']
@@ -509,17 +503,18 @@ class NestedMessageFlatteningTestCase(base.ShakenFistTestCase):
 
     marshmallow answers validate() with a list of strings when a field
     is wrong and a dict keyed by index when a container's *elements*
-    are wrong. Phase 4's enforce flip turned the finding detail from a
-    log line into the caller's error message, so rendering that dict
-    with str() would answer `disk: {0: ['Not a valid mapping type.']}`.
+    are wrong. Under enforcement the finding detail is the caller's
+    error message, not just a log line, so rendering that dict with
+    str() would answer `disk: {0: ['Not a valid mapping type.']}`.
     """
 
     class _Schema(marshmallow.Schema):
         disk = fields.List(fields.Dict())
         tags = fields.List(fields.String())
         name = fields.String()
-        # The phase 7 shape: a list of structured elements, so an error
-        # arrives two levels down rather than one.
+        # A list of structured elements, the shape a diskspec array
+        # compiles to, so an error arrives two levels down rather than
+        # one.
         spec = fields.List(fields.Nested(
             marshmallow.Schema.from_dict({
                 'size': fields.Integer(allow_none=True),
@@ -598,8 +593,8 @@ class NestedMessageFlatteningTestCase(base.ShakenFistTestCase):
         Each finding is a log line shipped to centralised logging, and
         naming elements individually is precisely what turns one bad
         parameter into one line per element. The unknown-parameter scan
-        has had this bound since phase 3 for the same reason; element
-        naming gave type mismatches the same unbounded property.
+        is bounded for the same reason; element naming gave type
+        mismatches the same unbounded property.
         """
         findings = self._findings(
             {'disk': ['x'] * (validation.MAX_TYPE_MISMATCH_FINDINGS + 500)})
@@ -663,14 +658,12 @@ class NestedMessageFlatteningTestCase(base.ShakenFistTestCase):
                 self.assertNotIn('[', detail, parameter)
 
 
-# The shape a structured type token will render once phase 7's step 3
-# writes one: a diskspec, near enough. Written out here rather than
-# read from ARGTYPES because step 2 deliberately precedes the
-# vocabulary. The compiler's contract is with the *rendered
-# specification* and not with any type token (see validation.py's
-# module docstring), so the fragment a test hands it is exactly as good
-# evidence as one ARGTYPES produced -- and these tests have to be able
-# to run before anything declares one.
+# The shape a structured type token renders: a diskspec, near enough.
+# Written out here rather than read from ARGTYPES so that these tests
+# exercise the compiler independently of the vocabulary. The compiler's
+# contract is with the *rendered specification* and not with any type
+# token (see validation.py's module docstring), so the fragment a test
+# hands it is exactly as good evidence as one ARGTYPES produced.
 OBJECT_FRAGMENT = {
     'type': 'object',
     'additionalProperties': False,
@@ -693,16 +686,14 @@ def _permissive_fragment():
 class ObjectFragmentCompilationTestCase(base.ShakenFistTestCase):
     """A rendered `properties` block becomes a nested schema.
 
-    Phase 7's step 2. Until it, `_SCALARS` mapped `object` to
-    fields.Dict and nothing else, so a diskspec was checked for being a
-    mapping and then handed to the handler unexamined -- eleven nested
-    values were a recorded 500 and nine more were accepted in silence
-    (findings F5 and F6 of
-    PLAN-api-input-validation-phase-07-structured.md).
+    Without this, `_SCALARS` mapped `object` to fields.Dict and nothing
+    else, so a diskspec was checked for being a mapping and then handed
+    to the handler unexamined -- eleven nested values were a recorded
+    500 and nine more were accepted in silence.
 
     Asserted through _schema_findings() rather than against marshmallow's
-    raw error dict, because the finding is what a caller sees: phase 4
-    turned the detail string into the response body's error message.
+    raw error dict, because the finding is what a caller sees: under
+    enforcement the detail string is the response body's error message.
     """
 
     def _findings(self, field, supplied):
@@ -828,12 +819,12 @@ class ObjectFragmentCompilationTestCase(base.ShakenFistTestCase):
         self.assertEqual([], self._findings(field, {'disk': None}))
 
     def test_a_required_property_refuses_a_null(self):
-        """Decision D44, and the half of it step 3 found unbuilt.
+        """A required property refuses an explicit null, not only an omission.
 
         `required` inside a fragment means present *and not an explicit
-        null*, which is the meaning phase 6 gave `required` at the top
-        level: check() walks compiled.required_names and treats a null
-        as missing, so `POST /instances {"cpus": null}` answers
+        null*, which is the meaning `required` has at the top level:
+        check() walks compiled.required_names and treats a null as
+        missing, so `POST /instances {"cpus": null}` answers
         `cpus: declared required but not supplied` rather than reaching
         a handler which cannot cope with it. This asserts the same rule
         one level down.
@@ -933,8 +924,8 @@ class ExactIntegerTestCase(base.ShakenFistTestCase):
     def test_an_integral_float_is_an_integer(self):
         """JSON has one numeric type, so 8.0 and 8 are the same JSON
         number and reading the first as the integer 8 invents nothing.
-        It is also accepted today, and phase 6's width rule says a
-        validator must be no narrower than its handler."""
+        It is also accepted today, and a validator must be no narrower
+        than its handler."""
         field = validation._field({'type': 'integer'})
 
         self.assertEqual(8, field.deserialize(8.0))
@@ -966,9 +957,9 @@ class ExactIntegerTestCase(base.ShakenFistTestCase):
         self.assertEqual(1.5, field.deserialize(1.5))
 
     def test_the_check_reaches_every_nesting_depth(self):
-        """D46 says "at every nesting depth", and a nested integer is
-        the case that would otherwise have inherited the lie the moment
-        phase 7's step 3 declares one."""
+        """Fractional numbers are refused at every nesting depth, and a
+        nested integer such as a diskspec's `size` is the case that would
+        otherwise inherit the lie."""
         field = validation._field(
             {'type': 'array', 'items': OBJECT_FRAGMENT})
         schema = marshmallow.Schema.from_dict({'disk': field})()
@@ -993,21 +984,21 @@ def _rendered(token):
 class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
     """What the three structured specs really accept, compiled not read.
 
-    Phase 7's step 3 added diskspec, arrayofdiskspec, networkspec,
-    arrayofnetworkspec and videospec to ARGTYPES. This module's
-    standing rule is that the published document and the enforced check
-    are the same structure by construction, so the way to find out what
-    one of those tokens says is to compile the fragment it renders and
-    send values through it. A test which read the constant and asserted
+    ARGTYPES renders them through five tokens: diskspec,
+    arrayofdiskspec, networkspec, arrayofnetworkspec and videospec. This
+    module's standing rule is that the published document and the
+    enforced check are the same structure by construction, so the way to
+    find out what one of those tokens says is to compile the fragment it
+    renders and send values through it. A test which read the constant and asserted
     its keys would only be asserting that the literal is the literal.
 
     Every assertion is against _schema_findings() rather than against
     marshmallow's raw error dict, because the finding is what a caller
-    sees: phase 4 turned the detail string into the response body's
+    sees: under enforcement the detail string is the response body's
     error message.
 
-    No declaration carries one of these tokens yet -- step 4 does
-    that -- so nothing asserted here changes the answer to any request.
+    The tokens are compiled straight from ARGTYPES, not through any
+    declaration that carries them.
     """
 
     def _findings(self, token, supplied):
@@ -1297,9 +1288,9 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
     def test_a_boolean_float_is_no_narrower_than_the_handler(self):
         """marshmallow's Boolean takes the usual string spellings, and
         so the schema accepts every one of them -- which is the right
-        answer under phase 6's width rule, and means finding F6's
-        `"float": "yes"` row keeps its old status rather than becoming a
-        400. What is refused is a value which is not a boolean under any
+        answer, because a validator must be no narrower than its
+        handler, and means `"float": "yes"` stays accepted rather than
+        becoming a 400. What is refused is a value which is not a boolean under any
         reading.
 
         What those spellings *mean* is a separate question, and it is
@@ -1507,9 +1498,8 @@ class StructuredTokenCompilationTestCase(base.ShakenFistTestCase):
 class EnumCompilationTestCase(base.ShakenFistTestCase):
     """A published `enum` is a check, not a note to the reader.
 
-    Phase 7's step 3. Until it, nothing in ARGTYPES published an enum
-    and _field() had no branch for one, so the first token to publish
-    one would have described the API as narrower than it is -- a client
+    Without this branch in _field(), the first token to publish an
+    enum would have described the API as narrower than it is -- a client
     generator refusing a value the server accepts, which is the drift
     the "compile from the rendered specification" design of this module
     exists to prevent, pointed the other way.

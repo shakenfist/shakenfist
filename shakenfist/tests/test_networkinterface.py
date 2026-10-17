@@ -43,7 +43,7 @@ class NetworkInterfaceTestCase(base.ShakenFistTestCase):
 
 
 class NetworkInterfacesPropertyTestCase(base.ShakenFistTestCase):
-    """Behaviour tests for ``Network.networkinterfaces`` (phase 7).
+    """Behaviour tests for ``Network.networkinterfaces``.
 
     The property is query-backed: each access runs
     ``find_network_interfaces`` with a state filter pinned to

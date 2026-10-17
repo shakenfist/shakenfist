@@ -1,10 +1,9 @@
 # Scope vocabulary and derivation.
 #
 # A scope is a "<family>.<verb>" string naming a class of operation a
-# key -- and every token minted from it -- may perform. Phase 3 of the
-# auth federation plan chose to derive scopes mechanically rather than
-# tag each endpoint by hand, so that coverage is automatic and a new
-# endpoint cannot be forgotten. See
+# key -- and every token minted from it -- may perform. Scopes are
+# derived mechanically rather than by tagging each endpoint by hand, so
+# that coverage is automatic and a new endpoint cannot be forgotten. See
 # docs/plans/PLAN-auth-federation-phase-03-exchange.md.
 #
 # The operator-visible vocabulary is deliberately three verbs. Adding a

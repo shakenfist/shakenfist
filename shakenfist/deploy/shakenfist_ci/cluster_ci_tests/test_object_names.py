@@ -81,10 +81,10 @@ class TestObjectNames(base.BaseNamespacedTestCase):
 
 
 class TestSameNameLookup(base.BaseNamespacedTestCase):
-    """Functional tests for same-name cross-namespace lookup (phase 3 SQL pushdown).
+    """Functional tests for same-name cross-namespace lookup pushed down to SQL.
 
-    Verifies that after the Instance and Network from_db_by_ref overrides land,
-    each namespace client resolves its own object when two namespaces share an
+    Verifies that, with the Instance and Network from_db_by_ref overrides doing
+    the name lookup in SQL, each namespace client resolves its own object when two namespaces share an
     object name, and that the system client receives either a 400
     (MultipleObjects surfaced as RequestMalformedException) or a 200 returning
     one of the two known UUIDs — never a 404.
@@ -176,7 +176,8 @@ class TestSameNameLookup(base.BaseNamespacedTestCase):
                     {inst_a['uuid'], inst_b['uuid']},
                     'System client resolved an unexpected instance UUID')
             except apiclient.RequestMalformedException:
-                # Expected after phase 3: MultipleObjects surfaces as 400
+                # Expected: the system client sees both objects, and
+                # MultipleObjects surfaces as 400
                 pass
 
         finally:
@@ -327,7 +328,8 @@ class TestSameNameLookup(base.BaseNamespacedTestCase):
                     {net_a['uuid'], net_b['uuid']},
                     'System client resolved an unexpected network UUID')
             except apiclient.RequestMalformedException:
-                # Expected after phase 3: MultipleObjects surfaces as 400
+                # Expected: the system client sees both objects, and
+                # MultipleObjects surfaces as 400
                 pass
 
         finally:

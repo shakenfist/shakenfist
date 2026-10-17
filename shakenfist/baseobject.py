@@ -741,7 +741,7 @@ class DatabaseBackedObject:
         # Import here to avoid circular imports during module loading
         from shakenfist.schema.external_view import BaseExternalView
 
-        # Phase 1: Fields handled by Pydantic model (grows over time)
+        # Step 1: Fields handled by Pydantic model (grows over time)
         # The model handles transformations like State -> state value string
         partial = BaseExternalView(
             uuid=self.uuid,
@@ -751,7 +751,7 @@ class DatabaseBackedObject:
         )
         out = partial.model_dump()
 
-        # Phase 2: Fields not yet migrated to Pydantic (shrinks over time)
+        # Step 2: Fields not yet migrated to Pydantic (shrinks over time)
         # Currently empty for base class - subclasses add their own fields
 
         return out
@@ -911,8 +911,8 @@ class DatabaseBackedObjectIterator:
             # anything else that is not worth a retry) still truncates
             # to an empty iteration here. That is tolerable only
             # because every iterator caller today iterates the result
-            # rather than complementing it; it is named in phase 1 of
-            # PLAN-grpc-bounded-replies.md so it stays a recorded
+            # rather than complementing it; it is listed for the caller
+            # audit in PLAN-grpc-bounded-replies.md so it stays a recorded
             # judgement rather than an inherited default.
             LOG.warning(
                 'get_objects_by_state returned None for '

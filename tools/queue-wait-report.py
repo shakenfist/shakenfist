@@ -60,9 +60,9 @@ query, which is not subject to the line ceiling at all:
 
     sum(count_over_time({job="shakenfist"} |= "execution duration" [42h]))
 
-Phase 9 of PLAN-queue-performance.md was measured that way; the first attempt
-at it, using the single-shot invocation above over 24 hours, undercounted the
-majority outcome by a factor of three without saying so.
+The coalescing measurement in PLAN-queue-performance.md was taken that way;
+the first attempt at it, using the single-shot invocation above over 24 hours,
+undercounted the majority outcome by a factor of three without saying so.
 
 Lines which are not JSON, and JSON objects which are not queue-wait events,
 are ignored rather than being an error: every one of those sources carries
@@ -539,10 +539,11 @@ COALESCE_OUTCOMES = [
 # make the outcome columns stop summing to n -- which is the shape of
 # #3878 all over again. A rename is not a reason to lose the past.
 #
-# 'not_cluster_wide' was the phase 9 name for the guard which now asks
+# 'not_cluster_wide' was the original name for the guard which now asks
 # whether the coalescing key can distinguish the work on this queue,
 # rather than whether the queue is the cluster-wide one. The guard is
-# the same guard; only its question got wider (phase 11, decision 4).
+# the same guard; only its question got wider, when the coalescing key
+# grew to span more than one column.
 RETIRED_COALESCE_OUTCOMES = {
     'not_cluster_wide': 'key_cannot_distinguish_queue',
 }

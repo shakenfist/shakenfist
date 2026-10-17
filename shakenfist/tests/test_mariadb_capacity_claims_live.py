@@ -3,7 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 
-"""Live-MariaDB tests for the namespace claim CRUD primitive (phase 4).
+"""Live-MariaDB tests for the namespace claim CRUD primitive.
 
 These tests run only when SF_MARIADB_TEST_DSN points at a disposable
 MariaDB database (CI provides one via tools/ci-enum-widening-test.sh,
@@ -13,10 +13,12 @@ test_mariadb_capacity_claims.py all run against a mocked connection and
 assert on compiled statement text, which cannot exercise the parts most
 likely to break:
 
-* D14's mirror guard actually binding -- that ``claimed + limit <= total
-  - unclaimed_used`` in an UPDATE WHERE really does refuse the claim
-  that would overflow and admit the one that exactly fits,
-* D8's shrink floor actually binding against a real ``used_*``,
+* the claim admission mirror guard actually binding -- that
+  ``claimed + limit <= total - unclaimed_used`` in an UPDATE WHERE
+  really does refuse the claim that would overflow and admit the one
+  that exactly fits,
+* the shrink floor (a claim cannot shrink below what it already uses)
+  actually binding against a real ``used_*``,
 * **the drawdown migration agreeing with the reconciler**. That the
   create-time seed and the per-claim recompute are the same query is a
   structural assertion in the unit suite; that they produce the same

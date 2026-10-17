@@ -1,4 +1,4 @@
-# Tests for Network.from_db_by_ref (phase 3 SQL pushdown filtering).
+# Tests for Network.from_db_by_ref (name lookup pushed down to SQL).
 #
 # This module tests:
 # - UUID input short-circuits to cls.from_db (find_networks NOT called)

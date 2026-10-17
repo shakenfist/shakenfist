@@ -1,5 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "customManagers:githubActionsVersions"
+  ],
   "gitAuthor": "shakenfist-bot <bot@shakenfist.com>",
   "dependencyDashboard": true,
   "assignees": [

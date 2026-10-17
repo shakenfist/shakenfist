@@ -26,15 +26,15 @@ REPO_ROOT = os.path.abspath(os.path.join(
 
 # Handler kwargs which are deliberately not part of the published API.
 #
-# Empty, and phase 4 of PLAN-api-input-validation is what emptied it.
-# Its five entries were the `value` kwarg the metadata delete handlers
-# accepted and none of them read. Removing them could not be done while
-# validation was warn-only, because a caller who sent `value` on a
-# metadata delete would then have received `delete() got an unexpected
-# keyword argument` as a 400 -- the exact leak that plan exists to
-# remove. With enforcement on, decision D14 answers `value: not
-# declared by this endpoint` before the handler either way, so the
-# signatures were cleaned up in the same commit as the flip.
+# Empty since request validation began to be enforced. Its five entries
+# were the `value` kwarg the metadata delete handlers accepted and none
+# of them read. Removing them could not be done while validation was
+# warn-only, because a caller who sent `value` on a metadata delete
+# would then have received `delete() got an unexpected keyword
+# argument` as a 400 -- the exact leak request validation exists to
+# remove. With enforcement on, undeclared body keys are refused with
+# `value: not declared by this endpoint` before the handler either way,
+# so the signatures were cleaned up in the same commit as the flip.
 #
 # An entry here is a kwarg a handler's signature names and the handler
 # ignores. It is not an escape hatch for a parameter a caller can
@@ -43,7 +43,7 @@ REPO_ROOT = os.path.abspath(os.path.join(
 # Keep this empty if you can.
 UNDECLARED_BY_DESIGN: set[tuple[str, str, str]] = set()
 
-# Not deferred to phase 4 after all, though it long said it was:
+# Not waiting on request validation enforcement, though it long said so:
 # InstanceSnapshotEndpoint.post treats an explicit `thin: false` as
 # unset. The official client has always transmitted the key
 # (`--thin/--flatten` defaults to False and apiclient sends it
@@ -187,8 +187,8 @@ def _declared_types():
     """(cls, method, name, location, argtype) for every declared
     parameter in the tree.
 
-    A thin projection of declarations.declarations(), which carries the
-    type token since phase 6. It used to be a second copy of that AST
+    A thin projection of declarations.declarations(), which now carries
+    the type token. It used to be a second copy of that AST
     walk, kept only because Declaration had no argtype field; the copy
     also silently skipped a declaration the walk could not read, where
     the shared helper returns a marker row with None fields so the
@@ -207,9 +207,9 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
     accordingly: every parameter appearing in a URL path but three was
     declared as query or body, five parameters were named something the
     handler could not receive, and twenty were accepted but never
-    documented. Phase 3 of PLAN-api-input-validation compiles them into
-    request validation schemas, at which point drift stops being a
-    documentation bug and starts rejecting valid requests.
+    documented. They are now compiled into request validation schemas,
+    so drift is no longer a documentation bug: it rejects valid
+    requests.
 
     Structural assertions against the AST and the route table, so they
     describe the contract rather than the source text.
@@ -259,8 +259,9 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
         untested one. An earlier version checked path-to-path and
         query-source-to-query and would have passed with `event_type`
         on the blob events endpoint declared `query`, which nothing
-        reads from the query string -- exactly the drift phase 3 would
-        compile into a live query-string fallback under decision D6.
+        reads from the query string -- exactly the drift the validation
+        compiler turns into a live query-string fallback, because a
+        parameter declared `query` is also accepted from the query string.
 
         This is the same derivation tools/fix-api-parameter-locations.py
         applies, imported rather than reimplemented, so what the script
@@ -365,8 +366,9 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
             set(), found - ANY_TOKEN_DECLARATIONS,
             'these declarations started using the \'any\' type token, '
             'which this test does not expect. If that is deliberate, read '
-            'D15 in docs/plans/PLAN-api-input-validation-phase-04-enforce'
-            '.md, confirm the parameter really is a value the API stores '
+            'the `any` token guidance in '
+            'docs/developer_guide/writing_an_endpoint.md, confirm the '
+            'parameter really is a value the API stores '
             'but never interprets, and add it to ANY_TOKEN_DECLARATIONS')
         self.assertEqual(
             set(), ANY_TOKEN_DECLARATIONS - found,
@@ -774,11 +776,10 @@ class ParameterDeclarationTestCase(base.ShakenFistTestCase):
         The decorator refuses any instance not in state `created` with
         a 406 before the handler runs, so the code is part of every
         such endpoint's contract whether or not the declaration says
-        so. The six power endpoints gained the declaration in phase 3
-        of PLAN-power-state-correctness (F12), which scoped the three
-        agent and screenshot endpoints out to issue 4449; this holds
-        the whole class closed, so the next endpoint to adopt the
-        decorator cannot reopen it.
+        so. The six power endpoints gained the declaration first, with
+        the three agent and screenshot endpoints left to issue 4449;
+        this holds the whole class closed, so the next endpoint to
+        adopt the decorator cannot reopen it.
 
         The count is pinned, like the ref decorator pairing above,
         because a walk which silently stopped finding the decorator
@@ -835,9 +836,9 @@ class DerivationTestCase(base.ShakenFistTestCase):
         the module was always one of them, so every `get_args` in a
         file contributed to every handler in it. The consequence was
         not merely a wrong test result: the fixer would have rewritten
-        a correct `body` declaration to `query`, and phase 3 would have
-        compiled a query-string fallback for a parameter that never
-        arrives from the query string.
+        a correct `body` declaration to `query`, and the validation
+        compiler would then have built a query-string fallback for a
+        parameter that never arrives from the query string.
         """
         source = """
 class A(api_base.Resource):
@@ -2122,7 +2123,7 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
         self.assertEqual(1000, prop['maximum'])
 
     def test_malformed_constraints_are_rejected(self):
-        # Every defect arrives as InvalidAPIDeclaration so phase 3's
+        # Every defect arrives as InvalidAPIDeclaration so the validation
         # compiler catches one exception type, in the established
         # import-time style: sf-api does not start with one of these
         # in the tree.
@@ -2254,11 +2255,11 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
     def test_an_accepted_pattern_dialect(self):
         # The other half of the pattern guard: what it must *not*
         # refuse. Every one of these is a pattern a declaration could
-        # reasonably carry, and '^[a|b]$' was refused at import time
-        # until the phase 8 audit of PLAN-api-input-validation taught
-        # the alternation scanner about character classes -- a '|'
-        # inside one is a literal pipe, so a declaration carrying one
-        # would have stopped sf-api from starting.
+        # reasonably carry, and '^[a|b]$' was once refused at import
+        # time because the alternation scanner did not understand
+        # character classes -- a '|' inside one is a literal pipe, so a
+        # declaration carrying one would have stopped sf-api from
+        # starting.
         for pattern in ('^(a|b)$',
                         '^((a|b)|c)$',
                         '^a\\|b$',
@@ -2373,8 +2374,8 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
         self.assertIn('does not compile', str(caught.exception))
 
     def test_new_tokens_render_their_bounds(self):
-        # The D9 vocabulary: bounds and formats phase 3 will compile,
-        # published in the specification in the meantime.
+        # The extended type vocabulary: bounds and formats which request
+        # validation compiles, published in the specification too.
         out = self._helper([
             ('count', 'query', 'unsignedinteger', 'A count.', False),
             ('mac', 'body', 'macaddr', 'A MAC.', False),
@@ -2394,8 +2395,8 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
             re.match(props['mac']['pattern'], '02:00:00:73:18:zz'))
         # netblock is deliberately format-only. An IPv4 CIDR pattern
         # would publish the API as narrower than ip_network() actually
-        # accepts, which phase 4 would then compile into a 400 for
-        # input that works today.
+        # accepts, which enforced validation would then turn into a 400
+        # for input that works today.
         self.assertEqual('a CIDR netblock', props['block']['format'])
         self.assertNotIn('pattern', props['block'])
 
@@ -2457,8 +2458,8 @@ class SwaggerHelperValidationTestCase(base.ShakenFistTestCase):
 
         The unsized cases matter for the same reason: len() raises
         TypeError on them, which is the other way a malformed
-        declaration escapes the single exception type that phase 3's
-        compiler catches.
+        declaration escapes the single exception type that the
+        validation compiler catches.
 
         Six elements is now legal arity, so a bad constraints element
         is a constraints defect and is tested as one in

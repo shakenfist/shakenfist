@@ -352,11 +352,10 @@ class Scheduler:
         return memo[node]
 
     def _has_sufficient_cpu(self, log_ctx, inst, node, capacity):
-        """A cheap CPU pre-filter (P2), denominated in both ledgers.
+        """A cheap CPU pre-filter, denominated in both ledgers.
 
-        This is not the admission decision. Since phase 3 of the
-        scheduler-reservations plan the real guard is the atomic
-        UPDATE that ``Instance.place_instance()`` makes against
+        This is not the admission decision. The real guard is the
+        atomic UPDATE that ``Instance.place_instance()`` makes against
         ``scheduler_node_capacity``, which cannot admit two concurrent
         creates into one remaining slot. This filter's job is to prune
         the candidate list cheaply so that the guard misses less often.
@@ -377,8 +376,8 @@ class Scheduler:
 
         ``capacity`` is the counters keyed by node uuid. A node with no
         row is charged nothing and measured against the live figure: it
-        is a node mid-upgrade, or one the reconciler declined to size
-        (P7), and admission will let it through unguarded, so this
+        is a node mid-upgrade, or one the reconciler declined to size,
+        and admission will let it through unguarded, so this
         filter must not refuse on a ledger which does not exist.
         """
         cpu_base, from_fallback = self._schedulable_threads(node)
@@ -575,8 +574,7 @@ class Scheduler:
                 message = f'{message}: {detail}'
             # The stage rides on the exception as well as in the
             # message, because the create path publishes it as a
-            # machine-readable field and must not parse the prose
-            # (PLAN-transient-capacity-refusals phase 4, D30).
+            # machine-readable field and must not parse the prose.
             raise exception_class(message, stage=stage)
 
         add_event_multi(
@@ -1013,12 +1011,12 @@ class Scheduler:
             # The bucketing orders rather than filters, because a
             # bucket says a node looks busier right now, not that it
             # cannot host the instance -- every node still here has
-            # passed every admission filter above. Since phase 3 the
-            # caller walks this list against a capacity guard which can
-            # refuse the head of it, so discarding the rest turns one
-            # refusal into a failed create on a cluster with room: in
-            # merge CI on 2026-08-14 three viable nodes were cut to one,
-            # that one was refused, and five tests got a 507 apiece.
+            # passed every admission filter above. The caller walks this
+            # list against a capacity guard which can refuse the head of
+            # it, so discarding the rest turns one refusal into a failed
+            # create on a cluster with room: in merge CI on 2026-08-14
+            # three viable nodes were cut to one, that one was refused,
+            # and five tests got a 507 apiece.
             # Callers walk the list on failure, so the tail order
             # matters as much as the head.
             weights = {}

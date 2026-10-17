@@ -145,10 +145,9 @@ def load_cluster_config() -> None:
     through mariadb.py rather than being added here.
 
     Otherwise, if MARIADB_GATEWAY_HOSTS is set, the process
-    reaches the sf-database tier via gRPC. Phase 3 of
-    PLAN-byo-mariadb will reshape this into a client-side
-    load-balanced channel; today we connect to the first
-    endpoint in the list.
+    reaches the sf-database tier via gRPC, over the same
+    client-side load-balanced channel (across every endpoint in
+    the list) that the rest of the code uses.
 
     Falls back silently on any failure so that fresh-install
     nodes with no database daemon yet can still start.
@@ -251,9 +250,9 @@ class SFConfig(BaseSettings):
             'Default deadline for ``BaseClusterOperation.raise_for_error()``: '
             'how long an internal caller (or REST handler) will block waiting '
             'for an enqueued cluster operation to reach a terminal state. The '
-            '15 s value used through phases 1-9 of the network-facade refactor '
-            'was too aggressive for the cascading wait-on-op patterns -- under '
-            'cluster load a ``net_op`` that took 16 s to dispatch tripped '
+            'earlier 15 s value was too aggressive for the cascading '
+            'wait-on-op patterns -- under cluster load a ``net_op`` that '
+            'took 16 s to dispatch tripped '
             'a 15 s waiter even though the op itself was healthy. Long-running '
             'startup paths still override this explicitly.'
         )
@@ -288,8 +287,7 @@ class SFConfig(BaseSettings):
         description=(
             'What the request validation layer does with input which does '
             'not match an endpoint\'s published parameter declarations. '
-            '"enforce" -- the default since phase 4 of '
-            'PLAN-api-input-validation -- answers 400 in the API error '
+            '"enforce" -- the default -- answers 400 in the API error '
             'shape, naming the offending parameter, for every finding -- '
             'a missing-required one included, so a parameter declared '
             'required but omitted, or sent as an explicit null, is '
@@ -350,7 +348,7 @@ class SFConfig(BaseSettings):
             'operation, applied to operations containing a progress-capable '
             'command when the creator did not ask for one. A client may '
             'pass an explicit progress_timeout_seconds of 0 to disable it. '
-            'The value comes from the phase 0 measurement in '
+            'The value comes from a measurement recorded in '
             'PLAN-agent-operation-deadlines-phase-00-decisions.md: across 50 '
             'transfers in five merge-queue CI runs the worst complete '
             'transfer was 625 MB in 2.83 s and 48 of 50 finished in under '
@@ -622,9 +620,9 @@ class SFConfig(BaseSettings):
             'SCHEDULER_DEMAND_PER_VCPU and the capacity reconciler '
             'decays that contribution linearly to zero over this window '
             'of instance age, by which time the real load is assumed to '
-            'be visible in measured metrics. The default is a '
-            'provisional seed pending the scheduler reservations '
-            'phase 0 step 3 data analysis.'
+            'be visible in measured metrics. The default is an '
+            'unmeasured provisional seed: no time-to-visible-load '
+            'figure has been taken for it yet.'
         )
     )
     CPU_OVERCOMMIT_RATIO: float = Field(

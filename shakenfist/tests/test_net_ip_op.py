@@ -1,7 +1,7 @@
 # Copyright 2019 Michael Still and contributors
 """Tests for ``shakenfist.operations.net_ip_op.NetIPOp.dispatch_task``.
 
-Covers the Phase 3 migration to BridgedVXLanNetwork and the
+Covers the task handlers delegating to BridgedVXLanNetwork and the
 ErrorReport-persistence wiring added to the dispatcher's outer except.
 """
 

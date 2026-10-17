@@ -262,8 +262,9 @@ class NetOpEnqueueSiteTestCase(base.ShakenFistTestCase):
 
             # Rule one: the key has to be able to tell this node's work
             # apart from another node's. This is the check which catches
-            # the phase 8 bug -- a coalescible task routed per-node
-            # while COALESCIBLE_KEY_COLUMNS is the network alone.
+            # the bug that once made network_ensure_mesh unsafe to
+            # coalesce -- a coalescible task routed per-node while
+            # COALESCIBLE_KEY_COLUMNS is the network alone.
             self.assertIn(
                 'node_uuid', COALESCIBLE_KEY_COLUMNS,
                 f'{path}:{node.lineno} enqueues coalescible task(s) '

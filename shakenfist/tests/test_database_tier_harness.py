@@ -396,11 +396,12 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         # The argument for exempting the four node-state pairs is that
         # tools/ci_headroom_probe.py reads the node roster and the cluster
         # resources on a timer for the whole functional test step. That probe
-        # is phase 1 instrumentation and is meant to come out once the sizing
-        # question it answers is closed, so derive the justification from the
-        # file rather than trusting the comment beside the exemption: when the
-        # probe goes, or stops reading those two endpoints, the exemption
-        # stops being an explanation and becomes a hole.
+        # is CI cloud sizing instrumentation (see PLAN-ci-cloud-sizing.md) and
+        # is meant to come out once the sizing question it answers is closed,
+        # so derive the justification from the file rather than trusting the
+        # comment beside the exemption: when the probe goes, or stops reading
+        # those two endpoints, the exemption stops being an explanation and
+        # becomes a hole.
         path = os.path.join(_repository_root(), 'tools',
                             'ci_headroom_probe.py')
 
@@ -541,8 +542,8 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
 
     def test_harness_reads_the_shipped_budget_not_a_copy(self):
         # If the harness ever grows its own copy of the numbers this stops
-        # being true, which is the failure decision 2 of the phase plan is
-        # about.
+        # being true. The shipped budget must stay the single source of truth
+        # for every reader, because a second copy is how two models drift.
         self.assertEqual(
             database_load_budget.load_budget().version,
             harness.load_budget()['version'])

@@ -94,14 +94,14 @@ class SnapshotMaxVersionsTestCase(base.ShakenFistTestCase):
 class SnapshotMaxVersionsWarnTestCase(SnapshotMaxVersionsTestCase):
     """The same assertions with the schema layer not refusing.
 
-    Added by the phase 8 audit of PLAN-api-input-validation. The class
-    above runs at the shipped default, where `max_versions` carries
-    `unsignedinteger`'s `minimum: 0` and the compiled schema answers
-    every assertion in it before the handler is reached -- so the
-    handler guard the file was written for had no executed coverage at
-    all, and nothing would have noticed if it stopped working. It is
-    the *only* defence at `warn` and `off`, which is exactly where an
-    operator who has rolled enforcement back is standing.
+    The class above runs at the shipped default, where `max_versions`
+    carries `unsignedinteger`'s `minimum: 0` and the compiled schema
+    answers every assertion in it before the handler is reached -- so
+    without this class the handler guard the file was written for would
+    have no executed coverage at all, and nothing would notice if it
+    stopped working. It is the *only* defence at `warn` and `off`,
+    which is exactly where an operator who has rolled enforcement back
+    is standing.
 
     Asserting the guard's own message is the other half: it says which
     layer answered, rather than leaving that to be inferred from a

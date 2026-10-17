@@ -8,10 +8,10 @@ token appears in the root page -- `shakenfist_client`'s
 That makes this list the only thing standing between a new endpoint
 family and a client that cannot tell it exists.
 
-Nothing used to check it. `namespace-claims` was written in
-scheduler-reservations phase 4, shipped without its token, and was
-found only at the phase's close-out; the phase's own Definition of done
-would not have caught it and no test pinned the list. These tests make
+Nothing used to check it. `namespace-claims` shipped without its
+token and was found only at the close-out of the work which added it;
+that work's own Definition of done would not have caught it and no test
+pinned the list. These tests make
 the omission mechanical to catch rather than something a reviewer has
 to notice.
 

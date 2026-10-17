@@ -1,11 +1,10 @@
 # Copyright 2019 Michael Still and contributors
-"""``BaseTestCase.assertRefusedAtStage()``'s phase 4 contract, standalone.
+"""``BaseTestCase.assertRefusedAtStage()``'s contract, standalone.
 
-Step 4f of
-``docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md``
-(D34): the helper now asserts ``body['stage']`` and
-``body['transient'] is True`` unconditionally, and asserts a
-``Retry-After`` header only when the exception exposes one.
+The helper asserts ``body['stage']`` and ``body['transient'] is True``
+unconditionally, and asserts a ``Retry-After`` header only when the
+exception exposes one, because a client too old to carry response
+headers on its exceptions must still be testable.
 
 ``shakenfist_ci/base.py`` is loaded the same way
 ``test_ci_capacity_wait.py`` loads it -- by path, with
@@ -41,14 +40,15 @@ CI_SUITE = os.path.join(
 def _client_stubs():
     """A shakenfist_client stub whose APIException can carry headers.
 
-    Unlike ``test_ci_capacity_wait.py``'s stub -- which predates step 4d
-    and has no ``headers`` slot at all -- this one accepts
-    ``headers=None`` and stores ``self.headers = headers or {}``,
-    matching client-python's unreleased shape exactly, so a test here
-    can construct both a pre-4d-shaped exception (omit the argument,
-    which still yields an empty ``{}`` under that stub -- see
-    ``NoHeadersAttributeAPIException`` below for the "attribute does
-    not exist at all" shape) and a post-4d one carrying a real header.
+    Unlike ``test_ci_capacity_wait.py``'s stub -- which predates the
+    client's ``headers`` addition and has no ``headers`` slot at all --
+    this one accepts ``headers=None`` and stores
+    ``self.headers = headers or {}``, matching client-python's
+    unreleased shape exactly, so a test here can construct both an
+    exception without headers (omit the argument, which still yields an
+    empty ``{}`` under that stub -- see ``NoHeadersAttributeAPIException``
+    below for the "attribute does not exist at all" shape) and one
+    carrying a real header.
     """
     client = types.ModuleType('shakenfist_client')
     apiclient = types.ModuleType('shakenfist_client.apiclient')
@@ -212,8 +212,8 @@ class AssertRefusedAtStageTestCase(test_base.ShakenFistTestCase):
         self.assertEqual('node n1 full', detail)
 
     def test_body_missing_the_marker_fails_as_an_assertion(self):
-        # A server predating phase 4 returns the bare
-        # {'error': ..., 'status': ...} body. The stage regexp still
+        # A server predating the stage and transient markers returns the
+        # bare {'error': ..., 'status': ...} body. The stage regexp still
         # matches, so the helper reaches the marker assertions with the
         # keys absent -- it must report that as a crafted failure, not
         # as a KeyError escaping from inside the helper.

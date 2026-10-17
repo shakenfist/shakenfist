@@ -185,9 +185,9 @@ def ensure_capacity_wait_trace():
     all -- the same on-disk signature as a component ref predating the
     wrapper and as a run whose every write failed.
     tools/ci_headroom_report.py --waits is right to read an absent file
-    as unknown rather than as zero, so 92% of the first measurement
-    window PLAN-transient-capacity-refusals phase 5 read was unknown
-    (issue 4337). Touching the file at start-up gives "no waits" its own
+    as unknown rather than as zero, so 92% of the first window measured
+    to decide whether the server should queue creates that do not fit
+    was unknown (issue 4337). Touching the file at start-up gives "no waits" its own
     signature: an empty file is a real zero, and absence keeps only the
     other two meanings. The report tool already keeps 'empty' apart from
     'absent', so nothing downstream changes.
@@ -443,7 +443,7 @@ class BaseTestCase(testtools.TestCase):
 
         An instrument may never fail the thing it measures, so nothing
         here is allowed to raise into the test. This is also the seam
-        step 2c hooks the CI bundle's JSONL record into -- see
+        the CI bundle's JSONL record hooks into -- see
         _append_capacity_wait_trace() below.
         """
         self._append_capacity_wait_trace(wait)
@@ -467,7 +467,7 @@ class BaseTestCase(testtools.TestCase):
     def _append_capacity_wait_trace(self, wait):
         """Append one line describing this wait to CAPACITY_WAIT_TRACE_FILE.
 
-        One line per wait, not per run (D14): concurrent stestr workers
+        One line per wait, not per run: concurrent stestr workers
         never have to agree on anything, because the file is opened 'a' and
         each write is one line, and a worker which crashes mid-wait loses
         at most its own in-flight line.
@@ -489,9 +489,8 @@ class BaseTestCase(testtools.TestCase):
 
         Every failure here is swallowed. An instrument may never fail the
         thing it measures, for the same reason ci_headroom_collect.sh's
-        header gives for never failing a job, and step 2a already
-        established this property for the caller above -- this must not
-        weaken it.
+        header gives for never failing a job, and the caller above
+        already guarantees this property -- this must not weaken it.
         """
         try:
             record = {
@@ -1716,7 +1715,7 @@ class BaseTestCase(testtools.TestCase):
             f'Expected refusal message {expected!r} (optionally with a '
             f'": <detail>" suffix) at scheduling stage {stage}, got {message!r}')
 
-        # Phase 4 (D34): the body fields are asserted unconditionally --
+        # The body fields are asserted unconditionally --
         # they arrive in APIException.text, which every released client
         # already carries. Read them the same guarded way as 'error'
         # above: against a server predating this contract, or one whose
@@ -1740,15 +1739,15 @@ class BaseTestCase(testtools.TestCase):
         # through APIException.headers, which does not exist on every
         # released client -- the suite installs shakenfist-client from
         # PyPI (deploy/collection/roles/node/defaults/main.yml), and the
-        # headers attribute was only just added on the client-python
-        # transient-capacity-refusals-phase-04-client branch (commit
-        # 80019a0, "Carry response headers on APIException."). That commit
+        # headers attribute was only just added by client-python commit
+        # 80019a0 ("Carry response headers on APIException."). That commit
         # is unreleased as of 2026-09-17 -- the last released client is
         # v0.8.3 and no version number has been assigned to the release
         # that will carry it -- so this assertion stays conditional until
         # a released client with that commit becomes the suite's floor.
         # Once it does, drop the guard and assert Retry-After
-        # unconditionally too (see this phase's Future work).
+        # unconditionally too (see Future work in
+        # PLAN-transient-capacity-refusals-phase-04-retry-after.md).
         headers = getattr(response, 'headers', None)
         if headers:
             self.assertEqual(
@@ -1839,8 +1838,8 @@ class BaseNamespacedTestCase(BaseTestCase):
         # that remainder collapsed and get-file "timed out" while still
         # legitimately executing -- the intermittent merge-queue flake.
         #
-        # Hoisted here from guest_ci_tests/test_agentops.py in agent
-        # operation deadlines phase 7: a0cc243ad fixed this bug in that
+        # Hoisted here from guest_ci_tests/test_agentops.py because
+        # a0cc243ad fixed this bug in that
         # file's copy of test_instance_put_and_get_blob but never in the
         # smoke suite's near-identical copy, which runs on every pull
         # request and kept the flake alive. A shared implementation is what
@@ -1853,7 +1852,7 @@ class BaseNamespacedTestCase(BaseTestCase):
         # on BaseTestCase because it polls as self.test_client, which only
         # the namespaced class creates. Polling as the system client instead
         # would work -- it is admin -- but it would be a different assertion
-        # about what a namespaced caller can see, which is not this step's
+        # about what a namespaced caller can see, which is not this helper's
         # to make.
         start_time = time.time()
         while aop['state'] != 'complete':

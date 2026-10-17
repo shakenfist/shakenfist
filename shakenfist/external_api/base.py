@@ -109,17 +109,16 @@ def handles_credentials():
 # directly and a divergence fails there rather than quietly making
 # this comment untrue.
 #
-# Phase 3 of PLAN-transient-capacity-refusals measured a node's
-# cpu_measured metric falling 5.3-5.6 s after a domain is destroyed, so
-# 15 s clears that path with roughly three times margin. See
-# docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md,
-# decision D31.
+# A node's cpu_measured metric was measured falling 5.3-5.6 s after a
+# domain is destroyed, so 15 s clears that path with roughly three times
+# margin. See
+# docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md.
 TRANSIENT_RETRY_AFTER_SECONDS = 15
 
 
 # Which refusal stages a retry can actually clear, and which it cannot.
 #
-# D29 originally drew this line at the exception class: every
+# This line was originally drawn at the exception class: every
 # LowResourceException was transient. That was too coarse. The class
 # covers filter stages which are momentary shortages *and* filter
 # stages which are structural facts about the request or the cluster,
@@ -127,8 +126,8 @@ TRANSIENT_RETRY_AFTER_SECONDS = 15
 # impossible request until its deadline for nothing.
 #
 # Transient -- the resource is measured, contended and returned by an
-# ordinary instance teardown within seconds (phase 3 measured 5.3-5.6 s
-# for CPU):
+# ordinary instance teardown within seconds (5.3-5.6 s was measured for
+# CPU):
 TRANSIENT_CAPACITY_STAGES = frozenset([
     'sufficient_idle_cpu',
     'sufficient_idle_memory',
@@ -140,10 +139,11 @@ TRANSIENT_CAPACITY_STAGES = frozenset([
     # which a concurrent delete or a reconciler pass moves on the same
     # horizon. This holds only while mariadb.CLAIM_ENFORCEMENT_HARD is
     # False: today a namespace claim cannot refuse a placement at all,
-    # so every guard denial is cluster or node capacity. When phase 5
-    # flips that constant a claim denial becomes namespace quota
-    # exhaustion, which no wait clears, and claim denials must be split
-    # out of this set at that point rather than silently inheriting it.
+    # so every guard denial is cluster or node capacity. Once that
+    # constant is flipped (see PLAN-scheduler-reservations.md) a claim
+    # denial becomes namespace quota exhaustion, which no wait clears,
+    # and claim denials must be split out of this set at that point
+    # rather than silently inheriting it.
     CAPACITY_GUARD_STAGE,
 ])
 
@@ -269,7 +269,7 @@ def _webargs_error(error, req, schema, *, error_status_code, error_headers):
 
     webargs' default handler aborts 422 carrying its own
     {"json": {"field": ["message"]}} body -- but no client ever saw
-    that. Nothing registered a handler before phase 3, and the abort's
+    that. Nothing registered a handler before this one, and the abort's
     HTTPException was swallowed by suppress_exceptions_to_client's bare
     except Exception, so the four @use_kwargs sites answered a bad
     query parameter with a 500, a 'Server error' log line and an
@@ -497,7 +497,7 @@ ECMA_262_ESCAPE_LETTERS = frozenset('bBdDsSwWfnrtvxuckpP')
 
 
 # The three structured specs the instance API publishes: a diskspec, a
-# networkspec and a videospec (decision D39 of
+# networkspec and a videospec (see
 # PLAN-api-input-validation-phase-07-structured.md). Each is a complete
 # JSON Schema object fragment. swagger_helper() renders one inline into
 # the operation's generated body schema and validation._field()
@@ -509,7 +509,7 @@ ECMA_262_ESCAPE_LETTERS = frozenset('bBdDsSwWfnrtvxuckpP')
 # Module level constants rather than five independent literals because
 # a networkspec is declared twice, as a list on POST /instances and as
 # a single object on the interface hotplug endpoint, and two copies of
-# a shape drift (D40). The array tokens below nest the very same object
+# a shape drift. The array tokens below nest the very same object
 # their single form names, so the two cannot say different things.
 # There is no `definitions` section and no $ref: a reference would have
 # to be taught to the renderer and to the compiler both, for two
@@ -518,18 +518,18 @@ ECMA_262_ESCAPE_LETTERS = frozenset('bBdDsSwWfnrtvxuckpP')
 # it renders one -- see the comment at that copy, which is about
 # exactly this.
 #
-# Four rules these fragments follow, each read off the phase 7 key and
-# value census rather than off the documentation:
+# Four rules these fragments follow, each read off a census of the keys
+# and values real callers send rather than off the documentation:
 #
 #  * An enum appears only where the server already refuses a value
 #    outside it, or where the narrowing is taken deliberately and
-#    written down (D43, D50); each one below names the code it was read
-#    off. The two `model` keys deliberately carry none, because both
-#    are rendered raw into the libvirt domain XML and so the set which
+#    written down; each one below names the code it was read off. The
+#    two `model` keys deliberately carry none, because both are
+#    rendered raw into the libvirt domain XML and so the set which
 #    works is the hypervisor's qemu build, not anything this API knows.
 #  * Nothing is required except a netdesc's network_uuid, which
 #    _netdesc_safety_checks already refuses a netdesc without.
-#  * Nothing declares a default. This layer is check only (D14):
+#  * Nothing declares a default. This layer is check only:
 #    validate_request() discards the deserialised result and the
 #    handler sees the body the caller sent, so a load_default here
 #    would look like it filled in a bus or a vdi and would fill in
@@ -545,7 +545,7 @@ ECMA_262_ESCAPE_LETTERS = frozenset('bBdDsSwWfnrtvxuckpP')
 # Every property is nullable, and that is load bearing rather than
 # incidental: the shipped CLI and the shipped ansible collection send
 # five of these keys as an explicit JSON null on a normal, working
-# request (census finding N1) -- a disk's size, bus and type, and a
+# request (the census found it) -- a disk's size, bus and type, and a
 # netdesc's macaddress and address. validation._field() sets
 # allow_none=True on every field it builds at every depth, and
 # marshmallow runs no validator on a null, so a pattern or an enum
@@ -672,11 +672,11 @@ NETWORKSPEC_SCHEMA: dict[str, Any] = {
             # network *name* is legal here. usage.md:255 documents
             # naming one and cluster_ci_tests/test_networking.py sends
             # 'barry_net', because the value goes to
-            # Network.from_db_by_ref, which resolves either. Phase 6's
-            # rule that a validator may be no narrower than its handler
-            # is what keeps the format off.
+            # Network.from_db_by_ref, which resolves either. A
+            # validator may be no narrower than its handler, and that is
+            # what keeps the format off.
             #
-            # `string` is finding F5's third row: a non-string reaches
+            # `string` because a non-string reaches
             # util_network.valid_uuid4 and is an AttributeError, a
             # recorded 500.
             'description': (
@@ -770,14 +770,13 @@ VIDEOSPEC_SCHEMA: dict[str, Any] = {
         'memory': {
             'type': 'integer',
             'format': 'int64',
-            # Typed, which it was not before (D49). No bound with it:
+            # Typed, which it was not before. No bound with it:
             # nothing in the handler refuses a zero or a negative, and
-            # phase 2's rule is that a published bound must be one the
-            # server backs.
+            # a published bound must be one the server backs.
             #
             # The typing looks like it ought to break a documented
             # invocation and does not, which is worth saying because
-            # D49 originally claimed it did.
+            # it was originally believed to.
             # docs/user_guide/consoles.md:94 documents
             # `--videospec model=qxl,memory=65536,vdi=spiceconcurrent`,
             # and the CLI's parser does `video[s[0]] = s[1]` with no
@@ -887,11 +886,10 @@ ARGTYPES: dict[str, dict[str, Any]] = {
     # NetworksEndpoint.post() validates with ipaddress.ip_network(),
     # which parses IPv6 too. It would also be loose enough to admit
     # 999.999.999.999/99, so it earns nothing as validation while
-    # setting phase 4 up to compile a documentation commit into a
-    # 400 for input the API accepts today. ip_network() stays the
-    # single source of truth for what parses -- and since phase 6's
-    # step 4 it is literally that: validation._FORMATS maps this
-    # format string onto a validator which calls it.
+    # letting enforcement turn a documentation commit into a 400 for
+    # input the API accepts. ip_network() stays the single source of
+    # truth for what parses -- literally: validation._FORMATS maps
+    # this format string onto a validator which calls it.
     'netblock': {'type': 'string', 'format': 'a CIDR netblock'},
     'networkspec': NETWORKSPEC_SCHEMA,
     'node': {'type': 'string', 'format': 'the name of a node'},
@@ -917,7 +915,7 @@ def _validated_constraints(section: str, name: str,
                            rendered: dict[str, Any],
                            constraints: Any) -> dict[str, Any]:
     """Check a declaration's constraints element, InvalidAPIDeclaration
-    on any defect, so phase 3's compiler catches one exception type."""
+    on any defect, so every malformed declaration is one exception type."""
     if not isinstance(constraints, dict):
         raise exceptions.InvalidAPIDeclaration(
             '%s parameter %s declares constraints which are not a '
@@ -1012,8 +1010,8 @@ def _validated_constraints(section: str, name: str,
         # newline and ECMA-262's does not). A declared ^...$ pattern is
         # the one form both read identically, so it is required rather
         # than documented -- an unanchored pattern would pass here and
-        # then wrongly reject (or wrongly admit) requests once phase 4
-        # enforces.
+        # then wrongly reject (or wrongly admit) requests under
+        # enforcement.
         if not (pattern.startswith('^') and pattern.endswith('$')):
             raise exceptions.InvalidAPIDeclaration(
                 '%s parameter %s declares a pattern which is not '
@@ -1035,10 +1033,9 @@ def _validated_constraints(section: str, name: str,
         # '|' inside one is a literal pipe and not an alternation at
         # all. Without that, '^[a|b]$' -- a perfectly ordinary pattern
         # -- is refused at import time and sf-api does not start. Found
-        # by the phase 8 audit of PLAN-api-input-validation, which
-        # exercised these branches after the coverage report said no
-        # test ever had; nothing in tree declares such a pattern yet,
-        # so the defect was latent.
+        # by an audit which exercised these branches after the coverage
+        # report said no test ever had; nothing in tree declares such a
+        # pattern yet, so the defect was latent.
         #
         # The remaining three are dialect divergences -- an escape, a
         # ']' in a class's first position, and a group extension --
@@ -1190,8 +1187,8 @@ def swagger_helper(section, description, parameters, responses,
     # Swagger 2.0 permits at most one in: body parameter per operation,
     # and it must carry a schema rather than type/format. Declarations
     # stay one tuple per parameter -- that is the shape the audit reads
-    # and phase 3 will compile -- but body-located declarations render
-    # as properties of a single generated schema instead of as
+    # and request validation compiles -- but body-located declarations
+    # render as properties of a single generated schema instead of as
     # parameters of their own, which used to be the largest class of
     # specification-validity errors (128 at its peak).
     body_properties = {}
@@ -1200,8 +1197,8 @@ def swagger_helper(section, description, parameters, responses,
 
     for parameter in parameters:
         # Checked explicitly, and first, because every malformed
-        # declaration has to arrive as an InvalidAPIDeclaration for
-        # phase 3's compiler to catch one exception type. Destructuring
+        # declaration has to arrive as an InvalidAPIDeclaration, so
+        # there is one exception type to catch. Destructuring
         # raises ValueError on a wrong-arity tuple and len() raises
         # TypeError on anything unsized, so neither is left to happen
         # by itself.
@@ -1235,10 +1232,9 @@ def swagger_helper(section, description, parameters, responses,
         # the argtypes lookup below, naming the token but neither the
         # endpoint nor the parameter it came from. Report it the way a
         # bad location is reported, so every malformed declaration
-        # raises one exception type that phase 3's compiler can catch
-        # uniformly. 'bearer' describes the Authorization header this
-        # function injects itself, so it is not a token an endpoint may
-        # declare.
+        # raises one exception type that can be caught uniformly.
+        # 'bearer' describes the Authorization header this function
+        # injects itself, so it is not a token an endpoint may declare.
         if argtype not in declarable:
             raise exceptions.InvalidAPIDeclaration(
                 '%s parameter %s declares type %r, which is not one of %s'
@@ -1445,9 +1441,8 @@ def verify_token(func):
         # NOTE(mikal): the exact name '_service_key' skips the nonce
         # check entirely. This predates nonced keys and some deployment
         # may still be holding a token of that shape, so it is
-        # deliberately preserved here (phase 2 Decision 1 of the auth
-        # federation plan); its retirement is recorded as phase 3 work.
-        # Note that this is an exact match, not a prefix match -- the
+        # deliberately preserved here until it can be retired (see
+        # PLAN-auth-federation-phase-02-key-objects.md). Note that this is an exact match, not a prefix match -- the
         # '_service_key_<rand>' keys get_api_token() mints are checked
         # like any other key.
         if key_name != '_service_key':
@@ -1922,15 +1917,14 @@ def requires_namespace_exist_if_specified(func):
     # each open with `kwargs.pop('namespace', None)` so they can resolve and
     # authorise the namespace themselves before calling inward; applied below
     # one, this decorator's `kwargs.get('namespace')` always sees `None` and
-    # the check is silently dead code. That happened: phase 4 of
-    # PLAN-api-input-validation found it on `InstanceEndpoint.delete` and
-    # `NetworkEndpoint.delete` and recorded it without filing an issue (F8 of
-    # PLAN-api-input-validation-phase-05-narrow), and phase 5 removed both
-    # uses rather than reordering them, because the ref decorator already
+    # the check is silently dead code. That happened, on
+    # `InstanceEndpoint.delete` and `NetworkEndpoint.delete` (see
+    # PLAN-api-input-validation-phase-05-narrow.md), and both uses were
+    # removed rather than reordered, because the ref decorator already
     # resolves the namespace and answers its own 404 -- reordering instead
-    # would have changed those routes' 404 message text for no benefit (D29
-    # of the same plan). If you are adding a new use of this decorator next
-    # to a ref decorator, put it above.
+    # would have changed those routes' 404 message text for no benefit. If
+    # you are adding a new use of this decorator next to a ref decorator,
+    # put it above.
     def wrapper(*args, **kwargs):
         if kwargs.get('namespace'):
             if not Namespace.from_db(kwargs['namespace']):
@@ -2006,12 +2000,11 @@ def log_request(func):
             # document -- a list, a string, a number -- has always been
             # refused as a 400 and still is, but it is refused here
             # directly rather than by raising a TypeError and depending
-            # on a catch two decorators further out. That catch is gone
-            # as of phase 5 of PLAN-api-input-validation, and this guard
-            # had to stop leaning on it first: dict.update would
-            # raise ValueError for most of them, which nothing in the
-            # decorator chain catches, and would silently merge a list
-            # of two-character strings as key value pairs.
+            # on a catch two decorators further out. That catch is gone,
+            # and this guard had to stop leaning on it first: dict.update
+            # would raise ValueError for most of them, which nothing in
+            # the decorator chain catches, and would silently merge a
+            # list of two-character strings as key value pairs.
             if not isinstance(j, dict):
                 # This used to be a raised TypeError, caught by
                 # handle_authorization_exceptions and logged through
@@ -2176,12 +2169,12 @@ def handle_authorization_exceptions(func):
     # nothing in flask_jwt_extended or PyJWT signals one with it: the
     # arm existed because a handler called with a body key it does not
     # accept raises TypeError, and a 400 was a better answer than a
-    # 500 in the absence of a validation layer. Phases 1 to 4 of
-    # PLAN-api-input-validation built that layer, so an undeclared body
-    # key is now refused by name before the handler is reached, and the
-    # workaround has been deleted (decision D23). What is left behind
-    # it is a genuine handler-internal TypeError, which is a server
-    # fault and is now recorded and answered as one.
+    # 500 in the absence of a validation layer. That layer now exists
+    # (validate_request), so an undeclared body key is refused by name
+    # before the handler is reached, and the workaround has been
+    # deleted. What is left behind it is a genuine handler-internal
+    # TypeError, which is a server fault and is now recorded and
+    # answered as one.
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -2440,14 +2433,13 @@ def validate_request(func):
     """Check a request against its published parameter declarations.
 
     PLAN-api-input-validation. While API_VALIDATION_MODE is 'enforce'
-    -- the default since phase 4 -- any finding answers 400 in the API
-    error shape, naming the parameter. Phase 6 closed the last
-    exemption: a missing-required finding used to be recorded and
-    never acted on, because several parameters were declared required
-    while omitting them had always worked; step 2 of that phase
-    corrected every declaration that was actually optional, and step 3
-    is what you are reading, so missing-required is refused like any
-    other reason now. 'warn' is the operator's rollback and changes
+    -- the default -- any finding answers 400 in the API error shape,
+    naming the parameter. That includes a missing-required finding,
+    which used to be recorded and never acted on, because several
+    parameters were declared required while omitting them had always
+    worked; every declaration which was actually optional has since
+    been corrected, so missing-required is refused like any other
+    reason now. 'warn' is the operator's rollback and changes
     nothing about any request: it records what it would have refused
     and calls through. app.py emits those records once the response
     status is known in both modes, because whether a finding
@@ -2522,9 +2514,9 @@ def validate_request(func):
         # Stashed before the enforce decision, so a rejected request
         # still emits its finding lines from the after_request hook --
         # carrying mode=enforce and the 400. Rejecting silently would
-        # turn the measurement apparatus off at the exact moment phase
-        # 4 flips the switch, which is when an operator most needs to
-        # see which parameter a refused request was refused for.
+        # turn the measurement apparatus off at the exact moment
+        # enforcement is switched on, which is when an operator most
+        # needs to see which parameter a refused request was refused for.
         try:
             setattr(flask.g, validation.VALIDATION_FINDINGS, findings)
         except RuntimeError:
@@ -2532,10 +2524,10 @@ def validate_request(func):
 
         if config.API_VALIDATION_MODE == 'enforce':
             # Every reason code is enforceable, missing-required
-            # included (decision D37 of phase 6 keeps the reason code
-            # itself, in the log and in findings, so an operator on
-            # 'warn' can still tell a required failure from a type
-            # one -- only the exemption from rejection is gone).
+            # included (the reason code itself stays, in the log and in
+            # findings, so an operator on 'warn' can still tell a
+            # required failure from a type one -- only the exemption
+            # from rejection is gone).
             if findings:
                 first = findings[0]
                 _record_refused_token_use(first)

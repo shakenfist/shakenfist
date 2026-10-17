@@ -119,9 +119,10 @@ class SchedulerException(Exception):
     a refusal is worse than producing a vague one.
 
     The stage is an attribute and not a substring of the message
-    because the REST API publishes it as a machine-readable field
-    (PLAN-transient-capacity-refusals phase 4, D30). Nothing may
-    re-derive it by parsing str(exception).
+    because the REST API publishes it as a machine-readable field.
+    Nothing may re-derive it by parsing str(exception): that would make
+    the message prose load-bearing, which the structured field exists
+    to prevent.
     """
 
     def __init__(self, *args: Any, stage: str = '') -> None:
@@ -698,9 +699,10 @@ class CoalescingUnavailable(Exception):
     Callers catch it. It never propagates to a user: the enqueue side
     treats it as "no existing op" and inserts one, the fold side skips
     and runs the task. Losing the optimisation for the length of an
-    upgrade is the intended outcome -- see decision 1 of
-    docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md for
-    why a V1 fallback is not."""
+    upgrade is the intended outcome. A fallback to the V1 RPCs is not:
+    an old server ignores the wider key and folds on the network alone,
+    which is exactly the silent cross-node fold the V2 RPC names exist
+    to turn into a loud ``UNIMPLEMENTED``."""
     ...
 
 

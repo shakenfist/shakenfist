@@ -33,8 +33,8 @@ class FakeIPAM:
     hold ``in_use`` as a plain set and answer ``is_free()`` from a separate
     ``free_addresses``, which made the two disagree in ways the real object
     cannot, and made free precisely the access that costs a round trip.
-    The phase 8 push audit found a per-address sweep surviving behind that
-    gap. ``in_use`` is now a counting property and ``is_free()`` derives
+    A push audit found a per-address sweep surviving behind that gap.
+    ``in_use`` is now a counting property and ``is_free()`` derives
     from it, so a caller which walks addresses one at a time shows up in
     ``table_reads``.
     """
@@ -497,11 +497,11 @@ class FloatingIPReaperReadShapeTestCase(base.ShakenFistTestCase):
     """The sweep's cost must not grow with the number of addresses.
 
     Issue 3655 is about access shape, not outcome, so these assert on
-    the read count. Phase 6 removed the per-address get_reservation()
-    and left is_free() reaching the same table once per address through
-    the in_use property; the phase 8 push audit found it because the
-    budget recorded a per-instance slope on GetAddressesInUse that its
-    replacement was explicitly documented not to have.
+    the read count. Removing the per-address get_reservation() left
+    is_free() reaching the same table once per address through the
+    in_use property; a push audit found it because the budget recorded
+    a per-instance slope on GetAddressesInUse that its replacement was
+    explicitly documented not to have.
     """
 
     def _sweep_with(self, address_count):

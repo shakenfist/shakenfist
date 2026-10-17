@@ -291,7 +291,7 @@ class NetworkNetNodeTestCase(NetworkTestCase):
         self.assertTrue(n.is_okay())
 
     #
-    #  is_okay() — new test cases for history-aware gating (phase 2)
+    #  is_okay() — test cases for history-aware gating
     #
     @mock.patch('shakenfist.network.network.Network.is_created')
     @mock.patch('shakenfist.network.network.Network.has_pending_cluster_operation',

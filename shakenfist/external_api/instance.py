@@ -379,9 +379,9 @@ def _netdesc_safety_checks(netdesc, namespace):
     # with an arbitrary active network in the namespace as though the
     # caller had named it (issue #4223, which stays open because the
     # lookup is still wrong for the next caller who reaches it another
-    # way). Phase 7's networkspec schema refuses the null too, but
-    # API_VALIDATION_MODE=warn and off are the operator's rollback
-    # (decision D42) and must not hand back a newly unguarded API.
+    # way). The networkspec schema refuses the null too, but
+    # API_VALIDATION_MODE=warn and off are the operator's rollback and
+    # must not hand back a newly unguarded API, so the guard stays.
     if netdesc.get('network_uuid') is None:
         return sf_api.error(
             400, 'network specification is missing network_uuid')
@@ -725,18 +725,16 @@ class InstancesEndpoint(api_base.Resource):
         # docs/developer_guide/writing_an_endpoint.md.
 
         # A name has to be a string before anything can ask whether it is a
-        # good one. Required-ness is enforced since phase 6 of
-        # PLAN-api-input-validation (decisions D32/D37 retired D17's
-        # exemption), so at 'enforce' an omitted or null name is refused
-        # before the handler runs -- but 'warn' and 'off' are the operator's
-        # rollback and hand the handler whatever the caller sent, and both an
-        # omitted name and an explicit JSON null arrive here as None.
-        # validators.hostname() *returns* a falsy ValidationError for None
-        # rather than raising, so without this guard execution reaches
-        # `'.' in name` and the interpreter raises TypeError -- which until
-        # this phase was answered as a 400 by the arm
-        # handle_authorization_exceptions no longer carries, and is otherwise
-        # a recorded 500 for a plain caller mistake.
+        # good one. Required-ness is enforced, so at 'enforce' an omitted or
+        # null name is refused before the handler runs -- but 'warn' and
+        # 'off' are the operator's rollback and hand the handler whatever the
+        # caller sent, and both an omitted name and an explicit JSON null
+        # arrive here as None. validators.hostname() *returns* a falsy
+        # ValidationError for None rather than raising, so without this guard
+        # execution reaches `'.' in name` and the interpreter raises
+        # TypeError -- which was once answered as a 400 by an `except
+        # TypeError` arm handle_authorization_exceptions no longer carries,
+        # and is otherwise a recorded 500 for a plain caller mistake.
         #
         # Two messages rather than one, because these are two different
         # mistakes. The refusal below explains the permitted character set,
@@ -1170,7 +1168,7 @@ class InstancesEndpoint(api_base.Resource):
         # not a decision: the guarded capacity claim inside
         # place_instance() is what actually admits the instance, and a
         # refusal means some other create took the slot between the two.
-        # So walk the list (D7). A WriteException is deliberately not
+        # So walk the list. A WriteException is deliberately not
         # caught by the walk -- an unreachable database is not a full
         # cluster, and trying the next node would only ask it the same
         # question -- but it is caught around the walk below, where it
@@ -1178,10 +1176,11 @@ class InstancesEndpoint(api_base.Resource):
         # catch-all 500 with the half-built instance abandoned in
         # 'initial' (issue 4246).
         #
-        # This walk (including the P9 demand-only re-walk below) also
-        # exists in node_inst_netdesc_op.py's _instance_preflight();
-        # until phase 5 extracts a shared helper, a semantic change here
-        # must be made there too.
+        # This walk (including the demand-only re-walk below) also exists
+        # in node_inst_netdesc_op.py's _instance_preflight(); until the
+        # remaining Scheduler() callers are migrated and a shared helper
+        # is extracted (see PLAN-scheduler-reservations.md), a semantic
+        # change here must be made there too.
         denials = {}
 
         def place_walk(enforce_demand):
@@ -1424,10 +1423,10 @@ class InstanceInterfacesEndpoint(api_base.Resource):
         # the network and the instance as "operation in flight" so the network
         # maintainer's Network.is_okay() check defers its own recreate path.
         #
-        # Phase 6 of `PLAN-network-facade.md` retired the misleadingly-
-        # named `network_update_dnsmasq` composite task; the explicit task
-        # list preserves the broader reconciliation (create on network
-        # node, then ensure mesh) that this caller has always wanted.
+        # The explicit task list is the broader reconciliation (create on
+        # network node, then ensure mesh) that this caller has always
+        # wanted. The composite task which used to do this was misleadingly
+        # named `network_update_dnsmasq`, and has been retired.
         reconcile_op_type, reconcile_op_uuid = net_create_and_enqueue(
             netdesc['network_uuid'],
             [net_tasks.network_apply_create_network_node,
@@ -2237,7 +2236,7 @@ class InstanceAgentPutEndpoint(api_base.Resource):
             ('blob_uuid', 'body', 'uuid',
              'The UUID of the blob to put onto the instance.', True),
             # Required, although the handler does not refuse the omission today:
-            # it queues put-blob and chmod with a null path (phase 6 sweep).
+            # it queues put-blob and chmod with a null path (test_required_sweep.py).
             ('path', 'body', 'string',
              'The path to write the file at inside the instance.', True),
             ('mode', 'body', 'string',
@@ -2336,7 +2335,7 @@ class InstanceAgentGetEndpoint(api_base.Resource):
             ('namespace', 'body', 'namespace',
              api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
             # Required, although the handler does not refuse the omission today:
-            # it queues a get-file with a null path (phase 6 sweep).
+            # it queues a get-file with a null path (test_required_sweep.py).
             ('path', 'body', 'string',
              'The path to fetch the file from inside the instance.', True),
             ('deadline_seconds', 'body', 'number',
@@ -2402,7 +2401,7 @@ class InstanceAgentExecuteEndpoint(api_base.Resource):
             ('namespace', 'body', 'namespace',
              api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
             # Required, although the handler does not refuse the omission today:
-            # it queues an execute with a null commandline (phase 6 sweep).
+            # it queues an execute with a null commandline (test_required_sweep.py).
             ('command_line', 'body', 'string', 'The command to execute.', True),
             ('deadline_seconds', 'body', 'number',
              DEADLINE_SECONDS_DESCRIPTION, False,

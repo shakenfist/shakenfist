@@ -321,7 +321,8 @@ class MigrateKeysFromNamespaceAttributesTestCase(base.ShakenFistTestCase):
                 self.assertEqual('aGFzaC10d28=', attr['key'])
                 self.assertEqual('nonce-two', attr['nonce'])
                 self.assertEqual(4242.0, attr['expiry'])
-            # Phase 3 populates these; the migration must not guess.
+            # Nothing in the legacy keys records these, so the migration
+            # must not guess.
             self.assertIsNone(attr['scopes'])
             self.assertIsNone(attr['provenance'])
 

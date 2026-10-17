@@ -49,9 +49,7 @@ class DatabaseServiceStub:
     upgrade can still serve old clients. A new client never falls back
     to V1: an old server would ignore the extra key columns and fold on
     the first column alone, which is exactly the cross-node corruption
-    the new names exist to prevent. See
-    docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md
-    decision 1.
+    the new names exist to prevent.
     """
     FindExistingCoalescibleOpV2: _grpc.UnaryUnaryMultiCallable[_database_pb2.FindExistingCoalescibleOpV2Request, _database_pb2.FindExistingCoalescibleOpReply]
     AcquireLock: _grpc.UnaryUnaryMultiCallable[_database_pb2.ClusterLockRequest, _database_pb2.ClusterLockReply]
@@ -67,14 +65,12 @@ class DatabaseServiceStub:
     DeleteClusterConfig: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteClusterConfigRequest, _database_pb2.StatusReply]
     RecordEventBatch: _grpc.UnaryUnaryMultiCallable[_database_pb2.RecordEventBatchRequest, _database_pb2.StatusReply]
     """Event Storage (MariaDB)
-    Direct write path for batches of events; replaces the sf-eventlog
-    gRPC target in phase 2.
+    Direct write path for batches of events into MariaDB, so emitters
+    need no separate event log daemon to write through.
     """
     PruneEvents: _grpc.UnaryUnaryMultiCallable[_database_pb2.PruneEventsRequest, _database_pb2.PruneEventsReply]
     GetObjectEvents: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetObjectEventsRequest, _database_pb2.GetObjectEventsReply]
-    """Per-object read and delete paths replacing the legacy sqlite
-    EventLog backend in phase 4.
-    """
+    """Per-object read and delete paths for the events stored in MariaDB."""
     DeleteObjectEvents: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteObjectEventsRequest, _database_pb2.StatusReply]
     GetObjectState: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetObjectStateRequest, _database_pb2.GetObjectStateReply]
     """Object State Operations (MariaDB)"""
@@ -403,43 +399,42 @@ class DatabaseServiceStub:
     ReapFederationRateLimits: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReapFederationRateLimitsRequest, _database_pb2.ReapFederationReply]
     ReconcileSchedulerCapacity: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReconcileSchedulerCapacityRequest, _database_pb2.ReconcileSchedulerCapacityReply]
     """Scheduler Capacity Operations (MariaDB)
-    Scheduler-reservations phase 2: the reconciler's single RPC. One
-    call expires stale namespace claims, refreshes per-node limits from
-    node_metrics, recomputes usage and expected demand from placement
-    ground truth, and rebuilds the cluster_capacity singleton. The
-    demand parameters ride in the request so the database daemon needs
-    no copy of the caller's scheduler configuration. See
-    docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
+    The scheduler capacity reconciler's single RPC. One call expires
+    stale namespace claims, refreshes per-node limits from node_metrics,
+    recomputes usage and expected demand from placement ground truth, and
+    rebuilds the cluster_capacity singleton. The demand parameters ride in
+    the request so the database daemon needs no copy of the caller's
+    scheduler configuration.
     """
     AdmitInstancePlacement: _grpc.UnaryUnaryMultiCallable[_database_pb2.AdmitInstancePlacementRequest, _database_pb2.AdmitInstancePlacementReply]
-    """Scheduler-reservations phase 3: the atomicity primitive the plan
-    exists for (D1, D3). One transaction performs the guarded capacity
-    drawdown, the placement attribute write and the placement reference
-    rewrite, so two concurrent creates racing one remaining slot admit
-    exactly once and a stale duplicate placement row cannot be produced.
-    The scheduler configuration the guards need (the demand feedforward
-    term and the target load) rides in on the request, so the database
-    daemon needs no copy of it. Audit events are emitted by the caller
-    from the reply fields; sf-database emits none. See
-    docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
+    """The scheduler's atomicity primitive: capacity is consumed at
+    placement time by guarded UPDATEs on materialised counters, which
+    behave the same under READ COMMITTED and REPEATABLE READ where an
+    aggregate-guarded INSERT is wrong under one and livelocks under the
+    other. One transaction performs the guarded capacity drawdown, the
+    placement attribute write and the placement reference rewrite, so two
+    concurrent creates racing one remaining slot admit exactly once and a
+    stale duplicate placement row cannot be produced. The scheduler
+    configuration the guards need (the demand feedforward term and the
+    target load) rides in on the request, so the database daemon needs no
+    copy of it. Audit events are emitted by the caller from the reply
+    fields; sf-database emits none.
     """
     ReleaseInstancePlacement: _grpc.UnaryUnaryMultiCallable[_database_pb2.ReleaseInstancePlacementRequest, _database_pb2.ReleaseInstancePlacementReply]
     GetSchedulerNodeCapacity: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetSchedulerNodeCapacityRequest, _database_pb2.GetSchedulerNodeCapacityReply]
     """Read the materialised per-node capacity counters. The admin resources
-    summary must publish what admission would actually allow, and since
-    phase 3 that is these counters rather than a Python walk over
-    placement rows.
+    summary must publish what admission would actually allow, and that
+    is these counters rather than a Python walk over placement rows.
     """
     CreateNamespaceClaim: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateNamespaceClaimRequest, _database_pb2.CreateNamespaceClaimReply]
-    """Scheduler-reservations phase 4: namespace claim CRUD. Creating,
-    growing and shrinking a claim are admission decisions in their own
-    right -- a claim is a promise of capacity the cluster has to be able
-    to keep -- so each writes cluster_capacity and namespace_claims in
-    one transaction, in the canonical order, opening with a guarded
-    UPDATE. Creation also migrates the namespace's existing drawdown out
-    of the cluster's unclaimed sums and into the new claim (D3), and
-    deletion migrates it back. See
-    docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md.
+    """Namespace claim CRUD. Creating, growing and shrinking a claim are
+    admission decisions in their own right -- a claim is a promise of
+    capacity the cluster has to be able to keep -- so each writes
+    cluster_capacity and namespace_claims in one transaction, in the
+    canonical order, opening with a guarded UPDATE. Creation also
+    migrates the namespace's existing drawdown out of the cluster's
+    unclaimed sums and into the new claim, so usage from before the claim
+    existed is not counted twice, and deletion migrates it back.
     """
     GetNamespaceClaim: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceClaimRequest, _database_pb2.GetNamespaceClaimReply]
     GetNamespaceClaims: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceClaimsRequest, _database_pb2.GetNamespaceClaimsReply]
@@ -467,9 +462,7 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     upgrade can still serve old clients. A new client never falls back
     to V1: an old server would ignore the extra key columns and fold on
     the first column alone, which is exactly the cross-node corruption
-    the new names exist to prevent. See
-    docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md
-    decision 1.
+    the new names exist to prevent.
     """
     FindExistingCoalescibleOpV2: _aio.UnaryUnaryMultiCallable[_database_pb2.FindExistingCoalescibleOpV2Request, _database_pb2.FindExistingCoalescibleOpReply]  # type: ignore[assignment]
     AcquireLock: _aio.UnaryUnaryMultiCallable[_database_pb2.ClusterLockRequest, _database_pb2.ClusterLockReply]  # type: ignore[assignment]
@@ -485,14 +478,12 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     DeleteClusterConfig: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteClusterConfigRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     RecordEventBatch: _aio.UnaryUnaryMultiCallable[_database_pb2.RecordEventBatchRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     """Event Storage (MariaDB)
-    Direct write path for batches of events; replaces the sf-eventlog
-    gRPC target in phase 2.
+    Direct write path for batches of events into MariaDB, so emitters
+    need no separate event log daemon to write through.
     """
     PruneEvents: _aio.UnaryUnaryMultiCallable[_database_pb2.PruneEventsRequest, _database_pb2.PruneEventsReply]  # type: ignore[assignment]
     GetObjectEvents: _aio.UnaryUnaryMultiCallable[_database_pb2.GetObjectEventsRequest, _database_pb2.GetObjectEventsReply]  # type: ignore[assignment]
-    """Per-object read and delete paths replacing the legacy sqlite
-    EventLog backend in phase 4.
-    """
+    """Per-object read and delete paths for the events stored in MariaDB."""
     DeleteObjectEvents: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteObjectEventsRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     GetObjectState: _aio.UnaryUnaryMultiCallable[_database_pb2.GetObjectStateRequest, _database_pb2.GetObjectStateReply]  # type: ignore[assignment]
     """Object State Operations (MariaDB)"""
@@ -821,43 +812,42 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     ReapFederationRateLimits: _aio.UnaryUnaryMultiCallable[_database_pb2.ReapFederationRateLimitsRequest, _database_pb2.ReapFederationReply]  # type: ignore[assignment]
     ReconcileSchedulerCapacity: _aio.UnaryUnaryMultiCallable[_database_pb2.ReconcileSchedulerCapacityRequest, _database_pb2.ReconcileSchedulerCapacityReply]  # type: ignore[assignment]
     """Scheduler Capacity Operations (MariaDB)
-    Scheduler-reservations phase 2: the reconciler's single RPC. One
-    call expires stale namespace claims, refreshes per-node limits from
-    node_metrics, recomputes usage and expected demand from placement
-    ground truth, and rebuilds the cluster_capacity singleton. The
-    demand parameters ride in the request so the database daemon needs
-    no copy of the caller's scheduler configuration. See
-    docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
+    The scheduler capacity reconciler's single RPC. One call expires
+    stale namespace claims, refreshes per-node limits from node_metrics,
+    recomputes usage and expected demand from placement ground truth, and
+    rebuilds the cluster_capacity singleton. The demand parameters ride in
+    the request so the database daemon needs no copy of the caller's
+    scheduler configuration.
     """
     AdmitInstancePlacement: _aio.UnaryUnaryMultiCallable[_database_pb2.AdmitInstancePlacementRequest, _database_pb2.AdmitInstancePlacementReply]  # type: ignore[assignment]
-    """Scheduler-reservations phase 3: the atomicity primitive the plan
-    exists for (D1, D3). One transaction performs the guarded capacity
-    drawdown, the placement attribute write and the placement reference
-    rewrite, so two concurrent creates racing one remaining slot admit
-    exactly once and a stale duplicate placement row cannot be produced.
-    The scheduler configuration the guards need (the demand feedforward
-    term and the target load) rides in on the request, so the database
-    daemon needs no copy of it. Audit events are emitted by the caller
-    from the reply fields; sf-database emits none. See
-    docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
+    """The scheduler's atomicity primitive: capacity is consumed at
+    placement time by guarded UPDATEs on materialised counters, which
+    behave the same under READ COMMITTED and REPEATABLE READ where an
+    aggregate-guarded INSERT is wrong under one and livelocks under the
+    other. One transaction performs the guarded capacity drawdown, the
+    placement attribute write and the placement reference rewrite, so two
+    concurrent creates racing one remaining slot admit exactly once and a
+    stale duplicate placement row cannot be produced. The scheduler
+    configuration the guards need (the demand feedforward term and the
+    target load) rides in on the request, so the database daemon needs no
+    copy of it. Audit events are emitted by the caller from the reply
+    fields; sf-database emits none.
     """
     ReleaseInstancePlacement: _aio.UnaryUnaryMultiCallable[_database_pb2.ReleaseInstancePlacementRequest, _database_pb2.ReleaseInstancePlacementReply]  # type: ignore[assignment]
     GetSchedulerNodeCapacity: _aio.UnaryUnaryMultiCallable[_database_pb2.GetSchedulerNodeCapacityRequest, _database_pb2.GetSchedulerNodeCapacityReply]  # type: ignore[assignment]
     """Read the materialised per-node capacity counters. The admin resources
-    summary must publish what admission would actually allow, and since
-    phase 3 that is these counters rather than a Python walk over
-    placement rows.
+    summary must publish what admission would actually allow, and that
+    is these counters rather than a Python walk over placement rows.
     """
     CreateNamespaceClaim: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateNamespaceClaimRequest, _database_pb2.CreateNamespaceClaimReply]  # type: ignore[assignment]
-    """Scheduler-reservations phase 4: namespace claim CRUD. Creating,
-    growing and shrinking a claim are admission decisions in their own
-    right -- a claim is a promise of capacity the cluster has to be able
-    to keep -- so each writes cluster_capacity and namespace_claims in
-    one transaction, in the canonical order, opening with a guarded
-    UPDATE. Creation also migrates the namespace's existing drawdown out
-    of the cluster's unclaimed sums and into the new claim (D3), and
-    deletion migrates it back. See
-    docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md.
+    """Namespace claim CRUD. Creating, growing and shrinking a claim are
+    admission decisions in their own right -- a claim is a promise of
+    capacity the cluster has to be able to keep -- so each writes
+    cluster_capacity and namespace_claims in one transaction, in the
+    canonical order, opening with a guarded UPDATE. Creation also
+    migrates the namespace's existing drawdown out of the cluster's
+    unclaimed sums and into the new claim, so usage from before the claim
+    existed is not counted twice, and deletion migrates it back.
     """
     GetNamespaceClaim: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceClaimRequest, _database_pb2.GetNamespaceClaimReply]  # type: ignore[assignment]
     GetNamespaceClaims: _aio.UnaryUnaryMultiCallable[_database_pb2.GetNamespaceClaimsRequest, _database_pb2.GetNamespaceClaimsReply]  # type: ignore[assignment]
@@ -954,9 +944,7 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         upgrade can still serve old clients. A new client never falls back
         to V1: an old server would ignore the extra key columns and fold on
         the first column alone, which is exactly the cross-node corruption
-        the new names exist to prevent. See
-        docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md
-        decision 1.
+        the new names exist to prevent.
         """
 
     @_abc_1.abstractmethod
@@ -1038,8 +1026,8 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
         """Event Storage (MariaDB)
-        Direct write path for batches of events; replaces the sf-eventlog
-        gRPC target in phase 2.
+        Direct write path for batches of events into MariaDB, so emitters
+        need no separate event log daemon to write through.
         """
 
     @_abc_1.abstractmethod
@@ -1055,9 +1043,7 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _database_pb2.GetObjectEventsRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.GetObjectEventsReply, _abc.Awaitable[_database_pb2.GetObjectEventsReply]]:
-        """Per-object read and delete paths replacing the legacy sqlite
-        EventLog backend in phase 4.
-        """
+        """Per-object read and delete paths for the events stored in MariaDB."""
 
     @_abc_1.abstractmethod
     def DeleteObjectEvents(
@@ -2598,13 +2584,12 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.ReconcileSchedulerCapacityReply, _abc.Awaitable[_database_pb2.ReconcileSchedulerCapacityReply]]:
         """Scheduler Capacity Operations (MariaDB)
-        Scheduler-reservations phase 2: the reconciler's single RPC. One
-        call expires stale namespace claims, refreshes per-node limits from
-        node_metrics, recomputes usage and expected demand from placement
-        ground truth, and rebuilds the cluster_capacity singleton. The
-        demand parameters ride in the request so the database daemon needs
-        no copy of the caller's scheduler configuration. See
-        docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
+        The scheduler capacity reconciler's single RPC. One call expires
+        stale namespace claims, refreshes per-node limits from node_metrics,
+        recomputes usage and expected demand from placement ground truth, and
+        rebuilds the cluster_capacity singleton. The demand parameters ride in
+        the request so the database daemon needs no copy of the caller's
+        scheduler configuration.
         """
 
     @_abc_1.abstractmethod
@@ -2613,16 +2598,18 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _database_pb2.AdmitInstancePlacementRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.AdmitInstancePlacementReply, _abc.Awaitable[_database_pb2.AdmitInstancePlacementReply]]:
-        """Scheduler-reservations phase 3: the atomicity primitive the plan
-        exists for (D1, D3). One transaction performs the guarded capacity
-        drawdown, the placement attribute write and the placement reference
-        rewrite, so two concurrent creates racing one remaining slot admit
-        exactly once and a stale duplicate placement row cannot be produced.
-        The scheduler configuration the guards need (the demand feedforward
-        term and the target load) rides in on the request, so the database
-        daemon needs no copy of it. Audit events are emitted by the caller
-        from the reply fields; sf-database emits none. See
-        docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
+        """The scheduler's atomicity primitive: capacity is consumed at
+        placement time by guarded UPDATEs on materialised counters, which
+        behave the same under READ COMMITTED and REPEATABLE READ where an
+        aggregate-guarded INSERT is wrong under one and livelocks under the
+        other. One transaction performs the guarded capacity drawdown, the
+        placement attribute write and the placement reference rewrite, so two
+        concurrent creates racing one remaining slot admit exactly once and a
+        stale duplicate placement row cannot be produced. The scheduler
+        configuration the guards need (the demand feedforward term and the
+        target load) rides in on the request, so the database daemon needs no
+        copy of it. Audit events are emitted by the caller from the reply
+        fields; sf-database emits none.
         """
 
     @_abc_1.abstractmethod
@@ -2639,9 +2626,8 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.GetSchedulerNodeCapacityReply, _abc.Awaitable[_database_pb2.GetSchedulerNodeCapacityReply]]:
         """Read the materialised per-node capacity counters. The admin resources
-        summary must publish what admission would actually allow, and since
-        phase 3 that is these counters rather than a Python walk over
-        placement rows.
+        summary must publish what admission would actually allow, and that
+        is these counters rather than a Python walk over placement rows.
         """
 
     @_abc_1.abstractmethod
@@ -2650,15 +2636,14 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _database_pb2.CreateNamespaceClaimRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.CreateNamespaceClaimReply, _abc.Awaitable[_database_pb2.CreateNamespaceClaimReply]]:
-        """Scheduler-reservations phase 4: namespace claim CRUD. Creating,
-        growing and shrinking a claim are admission decisions in their own
-        right -- a claim is a promise of capacity the cluster has to be able
-        to keep -- so each writes cluster_capacity and namespace_claims in
-        one transaction, in the canonical order, opening with a guarded
-        UPDATE. Creation also migrates the namespace's existing drawdown out
-        of the cluster's unclaimed sums and into the new claim (D3), and
-        deletion migrates it back. See
-        docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md.
+        """Namespace claim CRUD. Creating, growing and shrinking a claim are
+        admission decisions in their own right -- a claim is a promise of
+        capacity the cluster has to be able to keep -- so each writes
+        cluster_capacity and namespace_claims in one transaction, in the
+        canonical order, opening with a guarded UPDATE. Creation also
+        migrates the namespace's existing drawdown out of the cluster's
+        unclaimed sums and into the new claim, so usage from before the claim
+        existed is not counted twice, and deletion migrates it back.
         """
 
     @_abc_1.abstractmethod

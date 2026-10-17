@@ -120,9 +120,9 @@ def _validate_key_name(key_name):
     Namespace creation used to reject only the exact name
     'service_key' while key creation rejected only the '_service_key'
     prefix, which meant each path let through what the other blocked.
-    Both patterns are now rejected on both paths (phase 2 Decision 2
-    of the auth federation plan). Returns an error response, or None
-    if the name is acceptable.
+    Both patterns are now rejected on both paths, which changes
+    behaviour only for names nobody can have legitimately wanted.
+    Returns an error response, or None if the name is acceptable.
 
     The patterns themselves live in util.credentials, because a mapping
     rule's key_name_prefix has to be held to the same standard and
@@ -220,7 +220,7 @@ class AuthEndpoint(api_base.Resource):
                 if bcrypt.checkpw(key.encode('utf-8'), possible_key):
                     # One extra point read, and only on the successful
                     # match rather than per candidate key. The legacy
-                    # accessor shape above is pinned by the phase 2
+                    # accessor shape above is pinned by the namespace key
                     # behaviour preservation tests, so scopes are
                     # fetched here rather than widening it.
                     matched = namespace_from_db.lookup_key(keyname)
@@ -506,7 +506,8 @@ def _namespace_keys_putpost(ns=None, key_name=None, key=None, expiry=None,
     # family wildcard actively encourages) could mint an unscoped key
     # in its own namespace and re-authenticate carrying the wildcard.
     # In the system namespace that reaches cluster-admin, which would
-    # route straight around Decision 3.
+    # route straight around the rule that admin endpoints require the
+    # cluster-admin scope.
     #
     # None from caller_scopes() means the caller is unrestricted, which
     # is every operator holding a legacy key, so their keys keep being
@@ -658,9 +659,8 @@ class AuthNamespaceKeyEndpoint(api_base.Resource):
         # entry, and then passed the namespace name where a Namespace
         # object was expected. It also lacked the @arg_is_namespace
         # decorator which populates that object at all, so it has never
-        # worked. Fixed per phase 2 Decision 4 of the auth federation
-        # plan; there is no client which could depend on the old
-        # behaviour.
+        # worked. It was fixed rather than preserved because there is no
+        # client which could depend on the old behaviour.
         if key_name not in namespace_from_db.keys.get('nonced_keys', {}):
             return sf_api.error(404, 'key does not exist')
         namespace_from_db.add_event(
@@ -1101,7 +1101,8 @@ def _rule_arguments(issuer, bound_claims, scopes, key_ttl, key_name_prefix):
     # rule granting `*`, satisfy that rule's own bound claims with an
     # identity token from a trusted issuer, and exchange it for a
     # wildcard key. In the system namespace the wildcard reaches
-    # cluster-admin, routing straight around Decision 3. The exchange
+    # cluster-admin, routing straight around the rule that admin
+    # endpoints require the cluster-admin scope. The exchange
     # endpoint cannot catch it either, because by that point the rule
     # is indistinguishable from a legitimately authored one.
     #
@@ -1320,7 +1321,7 @@ class AuthNamespaceRuleEndpoint(api_base.Resource):
         return rule.external_view()
 
 
-# Namespace capacity claims (scheduler reservations phase 4).
+# Namespace capacity claims.
 #
 # A claim is a namespace's promise of aggregate cluster capacity, so
 # every verb here is a cluster administration operation even though the
@@ -1329,7 +1330,7 @@ class AuthNamespaceRuleEndpoint(api_base.Resource):
 # caller_is_admin, where the sibling key and rule endpoints are gated on
 # namespace ownership alone -- a namespace administering its own
 # credentials or its own federation affects nobody else. Delegated
-# (non-admin) claim creation is named as future work by D15 of
+# (non-admin) claim creation is named as future work in
 # docs/plans/PLAN-scheduler-reservations-phase-00-decisions.md.
 #
 # The scope family is the derived 'auth', deliberately not an override.
@@ -1883,11 +1884,10 @@ class AuthFederatedEndpoint(api_base.Resource):
           None)],
         requires_auth=False))
     def post(self, token=None, namespace=None, rule=None):
-        # The order below is the one in the phase 3 design section, and
-        # it is a security property rather than a style. Each step is
-        # cheaper than the one after it, and the expensive ones -- a
-        # JWKS fetch, a bcrypt hash -- sit behind checks that an
-        # anonymous caller cannot pass by guessing.
+        # The order below is a security property rather than a style.
+        # Each step is cheaper than the one after it, and the expensive
+        # ones -- a JWKS fetch, a bcrypt hash -- sit behind checks that
+        # an anonymous caller cannot pass by guessing.
 
         # 1. Size. The refusal that actually protects us is
         #    app.py's limit_federated_body_size hook, because by the

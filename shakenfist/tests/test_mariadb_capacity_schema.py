@@ -5,7 +5,7 @@
 
 """Tests for the scheduler-reservations capacity tables.
 
-Covers the three capacity tables added by scheduler-reservations phase 2
+Covers the three capacity tables
 (see docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md):
 column drift guards for each table definition, the version constants and
 their EXPECTED_SCHEMA_VERSIONS wiring, and the fresh-create / no-op
@@ -136,8 +136,8 @@ class CapacityTableDefinitionTestCase(base.ShakenFistTestCase):
         self.assertTrue(table.c['uuid'].primary_key)
 
         # The namespace column matches the namespaces table's name
-        # primary key exactly, and is indexed for the phase 3 admission
-        # lookup path.
+        # primary key exactly, and is indexed for the placement
+        # admission lookup path.
         namespaces = mariadb._get_namespaces_table()
         self.assertIsInstance(table.c['namespace'].type, sa.String)
         self.assertEqual(namespaces.c['name'].type.length,

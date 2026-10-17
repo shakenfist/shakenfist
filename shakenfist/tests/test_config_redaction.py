@@ -7,8 +7,8 @@ prints them before exiting. INFO and above is shipped off the node to
 Loki, so for as long as AUTH_SECRET_SEED and MARIADB_PASSWORD were
 plain strings the cluster's JWT signing seed and its database password
 were written into log aggregation on every sf-queues start. That was
-found while planning phase 6 of the auth federation plan, by querying
-Loki for the credential -- it had been happening on every node of every
+found while planning the secret-carrying types work, by querying Loki
+for the credential -- it had been happening on every node of every
 cluster, unnoticed, because the leak is nowhere near the authentication
 code.
 

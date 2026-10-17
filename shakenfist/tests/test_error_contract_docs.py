@@ -2,9 +2,9 @@
 
 """Pin the error contract's fixed facts against the documentation.
 
-Issue #4254, from the phase 8 push audit of PLAN-api-input-validation:
-the request-validation error contract is documented in four places
-written across four phases, and phase 6's enforcement of required-ness
+Issue #4254, from the push audit of PLAN-api-input-validation: the
+request-validation error contract is documented in four places written
+at different times, and the change which began enforcing required-ness
 corrected only some of them. `docs/operator_guide/logging.md` and one
 section of `docs/developer_guide/writing_an_endpoint.md` shipped
 saying a parameter declared required but not supplied is recorded and
@@ -72,9 +72,10 @@ SHAPE_BEARING_FILES = {
     os.path.join('release_notes', 'v07-v08.md'),
 }
 
-#: Phrasings which can only be the pre-phase-6 claim that some findings
-#: are exempt from enforcement. The exact regression this guards: both
-#: shipped in tree after phase 6 made missing-required enforceable.
+#: Phrasings which can only be the stale claim, from before required-ness
+#: was enforced, that some findings are exempt from enforcement. The exact
+#: regression this guards: both shipped in tree after missing-required
+#: became enforceable.
 STALE_CLAIMS = [
     ('that some findings are exempt from enforcement',
      re.compile(r'other than\s+`?missing-required')),
@@ -138,9 +139,9 @@ class StaleClaimTestCase(base.ShakenFistTestCase):
                     matched = pattern.search(text)
                     self.assertIsNone(
                         matched,
-                        '%s claims %s (%r), but required-ness has been '
-                        'enforced since phase 6 of PLAN-api-input-validation '
-                        '-- test_required_sweep.py proves the runtime fact'
+                        '%s claims %s (%r), but required-ness is enforced '
+                        'by validate_request -- test_required_sweep.py '
+                        'proves the runtime fact'
                         % (rel, what,
                            matched.group(0) if matched else None))
 

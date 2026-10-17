@@ -1,9 +1,10 @@
 # Copyright 2019 Michael Still and contributors
 """Rewrite each declared API parameter location to the derived one.
 
-Written as a one-shot migration for phase 1 of
-docs/plans/PLAN-api-input-validation.md, and kept as the corrector for a
-property CI enforces:
+Written as a one-shot migration correcting the declared locations of
+existing parameters (see
+docs/plans/PLAN-api-input-validation-phase-01-declaration-audit.md), and
+kept as the corrector for a property CI enforces:
 
     python3 tools/fix-api-parameter-locations.py            # report only
     python3 tools/fix-api-parameter-locations.py --apply    # rewrite

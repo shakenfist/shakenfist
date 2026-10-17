@@ -87,8 +87,7 @@ class ShakenFistTestCase(testtools.TestCase):
     def set_validation_mode(self, mode):
         """Run the rest of this test with API_VALIDATION_MODE at `mode`.
 
-        The mode defaults to 'enforce' since phase 4 of
-        PLAN-api-input-validation, which means several handlers' own
+        The mode defaults to 'enforce', which means several handlers' own
         input guards are no longer reachable in the default
         configuration -- request validation answers ahead of them. They
         are still what answers when an operator rolls back to 'warn',

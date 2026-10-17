@@ -1,11 +1,11 @@
 # Copyright 2026 Michael Still and contributors
 #
-# Tests for the cluster maintainer's reaction (phase 3 of node resource
-# health) to a node that sf-resources marked STATE_ERROR because its storage
-# is unhealthy: error the hosted instances (move to <state>-error, not delete)
-# when instance storage failed, and drop the node's blob locations +
-# re-replicate when the blob store failed -- both gated on the affected object
-# type read back from the diagnosis event.
+# Tests for the cluster maintainer's reaction to a node that sf-resources
+# marked STATE_ERROR because its storage is unhealthy: error the hosted
+# instances (move to <state>-error, not delete) when instance storage failed,
+# and drop the node's blob locations + re-replicate when the blob store
+# failed -- both gated on the affected object type read back from the
+# diagnosis event.
 
 from unittest import mock
 

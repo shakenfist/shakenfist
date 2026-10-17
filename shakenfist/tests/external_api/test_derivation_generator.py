@@ -2,8 +2,8 @@
 
 """Generate the derivation's input space rather than sampling it.
 
-Phase 1 of PLAN-api-input-validation took five review rounds, and four
-of them found a defect in the machinery added by the round before: the
+The declaration audit took five review rounds to build, and four of
+them found a defect in the machinery added by the round before: the
 Werkzeug converter regex, the ``flask.request.args`` fallback, the
 webargs scope leak, and an emptied parameter list. Every one was
 ``declarations.py`` misreading source, and every one was a shape which
@@ -12,10 +12,10 @@ the tree could have found them, and neither could mutating it, which
 only permutes shapes already present.
 
 While the declarations are documentation a misread costs a wrong line
-in the published API. Once phase 3 compiles them, the same misread
-rejects a valid request: a ``path`` parameter derived as ``body``
-produces a schema hunting the JSON body for a URL segment, and D6's
-query-string fallback is granted only to parameters derived as
+in the published API. Once they are compiled into request schemas, the
+same misread rejects a valid request: a ``path`` parameter derived as
+``body`` produces a schema hunting the JSON body for a URL segment, and
+the query-string fallback is granted only to parameters derived as
 ``query``. That is why this is a precondition for compiling rather
 than a step in it.
 
@@ -185,7 +185,7 @@ class DerivationGeneratorTestCase(base.ShakenFistTestCase):
             'class_level': class_level,
             'decorator': decorator + '    ' if decorator else '    ',
             'location': location,
-            # Phase 1's rule: a path parameter is always required.
+            # The derivation's rule: a path parameter is always required.
             'required': location == 'path',
             'body': body,
         })

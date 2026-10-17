@@ -1,9 +1,8 @@
 # Copyright 2026 Michael Still and contributors
 #
 # Tests for shakenfist.schema.operations.util.enqueue_cluster_operation,
-# the new high-level helper from phase 4 of the etcd-removal
-# ops-queues plan. The helper replaces base_mutations() + enqueue()
-# and wraps mariadb.create_and_enqueue_cluster_operation() +
+# the high-level helper which replaced base_mutations() + enqueue().
+# It wraps mariadb.create_and_enqueue_cluster_operation() +
 # eventlog.add_event_multi().
 
 from typing import ClassVar
@@ -187,9 +186,8 @@ class EnqueueClusterOperationTestCase(base.ShakenFistTestCase):
             self._metadata())
 
         self.mock_create_and_enqueue.assert_called_once()
-        # No audit event on failure -- phase 3's contract is that
-        # audit events are caller-side and only happen after the
-        # RPC returns True.
+        # No audit event on failure -- audit events are caller-side
+        # and only happen after the RPC returns True.
         self.mock_add_event_multi.assert_not_called()
 
     def test_rpc_failure_logs_actionable_diagnostics(self):

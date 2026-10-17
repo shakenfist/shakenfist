@@ -1,4 +1,6 @@
 # Copyright 2026 Michael Still and contributors
+# audit-ok: phase-reference-file -- this suite tests the plan tooling, so its fixtures are made of plan phase
+# numbers and must be written that way.
 
 """Tests for tools/check-plan-status.py.
 

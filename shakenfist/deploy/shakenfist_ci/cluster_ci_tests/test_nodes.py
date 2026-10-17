@@ -269,10 +269,9 @@ class TestNodes(base.BaseNamespacedTestCase):
         # A node's cpu_total_instance_vcpus metric counts only *running*
         # libvirt domains, so an instance which has been placed but has not
         # booted is invisible to it -- and stays invisible however promptly
-        # the metric is republished, which since
-        # PLAN-transient-capacity-refusals phase 3 is within about five
-        # seconds of the running-domain set changing. If
-        # admission trusted that measurement alone, a burst of creates
+        # the metric is republished, which is within about five seconds of
+        # the running-domain set changing. If admission trusted that
+        # measurement alone, a burst of creates
         # would all see the same idle node, all land on it, and push it
         # well past its hard maximum -- after which every later request
         # naming that node is refused with a 507 (issue 3498). Placement
@@ -303,9 +302,8 @@ class TestNodes(base.BaseNamespacedTestCase):
 
         try:
             # A node the capacity reconciler has not written a row for is
-            # admitted unguarded (P7): every placement onto it fails open
-            # and the node's ledger cannot be trusted. Since
-            # PLAN-transient-capacity-refusals phase 1, the elected loop's
+            # admitted unguarded: every placement onto it fails open and
+            # the node's ledger cannot be trusted. The elected loop's
             # maintenance pass forces a reconcile within about a minute of
             # any hypervisor's metrics becoming fresh
             # (`_force_capacity_reconcile_if_unguarded()`).
@@ -317,9 +315,9 @@ class TestNodes(base.BaseNamespacedTestCase):
             # publishing fresh metrics -- it says nothing about a
             # scheduler_node_capacity row, so clearing that gate does not
             # mean the row exists yet. Waiting out a window longer than
-            # the warm-up one still catches the regression this phase
-            # exists to prevent (a row which never arrives at all) while
-            # not failing on the warm-up itself.
+            # the warm-up one still catches the regression the forced
+            # reconcile exists to prevent (a row which never arrives at
+            # all) while not failing on the warm-up itself.
             deadline = time.time() + 120
             while True:
                 resources = self.system_client.get_cluster_resources()
@@ -382,8 +380,8 @@ class TestNodes(base.BaseNamespacedTestCase):
             pass
 
     def test_cluster_resources_measured_drops_after_delete(self):
-        # Regression coverage for PLAN-transient-capacity-refusals-phase-03
-        # ("metrics on change"). The CPU pre-filter charges
+        # Regression coverage for publishing metrics when the running-domain
+        # set changes. The CPU pre-filter charges
         # max(cpu_measured, cpu_committed): cpu_committed is released
         # inside the delete transaction, but cpu_measured used to be
         # published on a flat 60 s cadence, so a node kept refusing new

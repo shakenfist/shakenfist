@@ -72,8 +72,9 @@ class AgentOperationExpiryTestCase(base.ShakenFistTestCase):
         # The licensed use of the sentinel: no wall-clock deadline,
         # with a live progress timeout still bounding a stall. A NULL
         # progress timeout resolves to the live server default, so it
-        # licenses the sentinel too (second assertion) -- though no
-        # API server since phase 3 writes that combination.
+        # licenses the sentinel too (second assertion) -- though the
+        # API server resolves an omitted progress timeout to a number at
+        # request receipt, so only rows from older servers carry it.
         op = self._make_agentop(
             state=AgentOperation.STATE_QUEUED, deadline=0.0,
             progress_timeout=30.0)

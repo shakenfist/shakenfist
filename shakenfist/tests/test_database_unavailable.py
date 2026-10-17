@@ -339,7 +339,7 @@ class NamespaceAttributesFetchFailureTestCase(base.ShakenFistTestCase):
 
 
 class NamespaceKeyFetchFailureTestCase(base.ShakenFistTestCase):
-    """Issue 3522, post auth federation phase 2: the auth path reads
+    """Issue 3522, now that namespace keys are objects: the auth path reads
     keys via find_namespace_keys (/auth) and get_namespace_key_by_name
     (token validation), so those reads must also raise on failure
     rather than conflating an outage with "no such key"."""
@@ -512,8 +512,8 @@ class CheckDaemonStateTestCase(base.ShakenFistTestCase):
                 return_value=mock.Mock(value=daemon.Node.DAEMON_STATE_RUNNING))
     def test_does_not_fetch_the_node_object(
             self, mock_get_state, mock_this_node, mock_set_abort):
-        # The whole point of phase 1: reach the daemon-state row directly by
-        # UUID, never via Node.this_node() (which costs a get_node round trip).
+        # The whole point: reach the daemon-state row directly by UUID,
+        # never via Node.this_node() (which costs a get_node round trip).
         with mock.patch.object(daemon.config, 'NODE_UUID', self.NODE_UUID):
             self._daemon().check_daemon_state()
         mock_this_node.assert_not_called()
@@ -1187,7 +1187,7 @@ class ObjectIteratorFailedReadTestCase(base.ShakenFistTestCase):
         # Pinned as a known gap rather than asserted as correct: the
         # None shape does collapse to an empty iteration here, which is
         # safe only while every iterator caller iterates the result
-        # rather than complementing it. Named in phase 1 of
+        # rather than complementing it. The gap is recorded in
         # PLAN-grpc-bounded-replies.md.
         self.assertEqual([], list(self._make_iterator().get_iterator()))
 

@@ -1287,9 +1287,7 @@ class DatabaseServiceServicer:
         upgrade can still serve old clients. A new client never falls back
         to V1: an old server would ignore the extra key columns and fold on
         the first column alone, which is exactly the cross-node corruption
-        the new names exist to prevent. See
-        docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md
-        decision 1.
+        the new names exist to prevent.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1359,8 +1357,8 @@ class DatabaseServiceServicer:
 
     def RecordEventBatch(self, request, context):
         """Event Storage (MariaDB)
-        Direct write path for batches of events; replaces the sf-eventlog
-        gRPC target in phase 2.
+        Direct write path for batches of events into MariaDB, so emitters
+        need no separate event log daemon to write through.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1373,8 +1371,7 @@ class DatabaseServiceServicer:
         raise NotImplementedError('Method not implemented!')
 
     def GetObjectEvents(self, request, context):
-        """Per-object read and delete paths replacing the legacy sqlite
-        EventLog backend in phase 4.
+        """Per-object read and delete paths for the events stored in MariaDB.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2684,29 +2681,30 @@ class DatabaseServiceServicer:
 
     def ReconcileSchedulerCapacity(self, request, context):
         """Scheduler Capacity Operations (MariaDB)
-        Scheduler-reservations phase 2: the reconciler's single RPC. One
-        call expires stale namespace claims, refreshes per-node limits from
-        node_metrics, recomputes usage and expected demand from placement
-        ground truth, and rebuilds the cluster_capacity singleton. The
-        demand parameters ride in the request so the database daemon needs
-        no copy of the caller's scheduler configuration. See
-        docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
+        The scheduler capacity reconciler's single RPC. One call expires
+        stale namespace claims, refreshes per-node limits from node_metrics,
+        recomputes usage and expected demand from placement ground truth, and
+        rebuilds the cluster_capacity singleton. The demand parameters ride in
+        the request so the database daemon needs no copy of the caller's
+        scheduler configuration.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def AdmitInstancePlacement(self, request, context):
-        """Scheduler-reservations phase 3: the atomicity primitive the plan
-        exists for (D1, D3). One transaction performs the guarded capacity
-        drawdown, the placement attribute write and the placement reference
-        rewrite, so two concurrent creates racing one remaining slot admit
-        exactly once and a stale duplicate placement row cannot be produced.
-        The scheduler configuration the guards need (the demand feedforward
-        term and the target load) rides in on the request, so the database
-        daemon needs no copy of it. Audit events are emitted by the caller
-        from the reply fields; sf-database emits none. See
-        docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
+        """The scheduler's atomicity primitive: capacity is consumed at
+        placement time by guarded UPDATEs on materialised counters, which
+        behave the same under READ COMMITTED and REPEATABLE READ where an
+        aggregate-guarded INSERT is wrong under one and livelocks under the
+        other. One transaction performs the guarded capacity drawdown, the
+        placement attribute write and the placement reference rewrite, so two
+        concurrent creates racing one remaining slot admit exactly once and a
+        stale duplicate placement row cannot be produced. The scheduler
+        configuration the guards need (the demand feedforward term and the
+        target load) rides in on the request, so the database daemon needs no
+        copy of it. Audit events are emitted by the caller from the reply
+        fields; sf-database emits none.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2720,24 +2718,22 @@ class DatabaseServiceServicer:
 
     def GetSchedulerNodeCapacity(self, request, context):
         """Read the materialised per-node capacity counters. The admin resources
-        summary must publish what admission would actually allow, and since
-        phase 3 that is these counters rather than a Python walk over
-        placement rows.
+        summary must publish what admission would actually allow, and that
+        is these counters rather than a Python walk over placement rows.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def CreateNamespaceClaim(self, request, context):
-        """Scheduler-reservations phase 4: namespace claim CRUD. Creating,
-        growing and shrinking a claim are admission decisions in their own
-        right -- a claim is a promise of capacity the cluster has to be able
-        to keep -- so each writes cluster_capacity and namespace_claims in
-        one transaction, in the canonical order, opening with a guarded
-        UPDATE. Creation also migrates the namespace's existing drawdown out
-        of the cluster's unclaimed sums and into the new claim (D3), and
-        deletion migrates it back. See
-        docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md.
+        """Namespace claim CRUD. Creating, growing and shrinking a claim are
+        admission decisions in their own right -- a claim is a promise of
+        capacity the cluster has to be able to keep -- so each writes
+        cluster_capacity and namespace_claims in one transaction, in the
+        canonical order, opening with a guarded UPDATE. Creation also
+        migrates the namespace's existing drawdown out of the cluster's
+        unclaimed sums and into the new claim, so usage from before the claim
+        existed is not counted twice, and deletion migrates it back.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')

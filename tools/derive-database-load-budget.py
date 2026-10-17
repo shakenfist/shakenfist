@@ -182,7 +182,8 @@ DOC_COVERAGE_CAVEAT = (
     'that could not see daemons co-located with MariaDB, which on sfcbr '
     'was two nodes of six and the whole cluster daemon whenever the '
     'maintenance lock sat on one of them. Coefficients from before that '
-    'date undercount, and phase 6 spent a fortnight discovering it.')
+    'date undercount, and the apparent load regression that undercount '
+    'produced was chased for a fortnight as though it were real load.')
 
 # Why the inclusion cut sits where it does. A fact about this tool's
 # judgement rather than about any one measurement, so it is stated here and

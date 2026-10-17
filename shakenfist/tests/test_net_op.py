@@ -224,10 +224,11 @@ class CreateVXLANInterfaceFailedTestCase(base.ShakenFistTestCase):
 
 
 class RetiredHandlersTestCase(base.ShakenFistTestCase):
-    """Phase 6 retired _network_deploy, _network_destroy, and
-    _network_update_dnsmasq. The handlers stay so on-disk in-flight ops
-    parse, but dispatching them now raises InvalidStateForTask, which the
-    outer Exception handler converts to STATE_ERROR plus an ErrorReport.
+    """_network_deploy, _network_destroy, and _network_update_dnsmasq are
+    retired: no production code path enqueues them any more. The handlers
+    stay so on-disk in-flight ops parse, but dispatching them now raises
+    InvalidStateForTask, which the outer Exception handler converts to
+    STATE_ERROR plus an ErrorReport.
     """
 
     def setUp(self):

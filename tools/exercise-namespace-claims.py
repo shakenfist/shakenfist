@@ -3,8 +3,8 @@
 
 """Exercise the namespace capacity claim pathways against a live cluster.
 
-This is the phase 4 operator soak of PLAN-scheduler-reservations, run as
-a script rather than by hand because the interesting half of the
+This is an operator soak of the namespace capacity claims, run as a
+script rather than by hand because the interesting half of the
 behaviour is on a timer: a claim's coverage_state only flips to
 ``expired`` when the capacity reconciler next sweeps, so the timeout
 paths cannot be checked by a person watching a terminal without a lot of

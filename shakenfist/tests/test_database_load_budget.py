@@ -180,6 +180,7 @@ class DatabaseLoadBudgetTestCase(base.ShakenFistTestCase):
                     'method', 'base_term_caveat', 'coverage_caveat',
                     'rederive'):
             self.assertIn(key, doc)
-        # The coverage caveat is the expensive lesson from phase 6 and the
-        # reason a pre 2026-08-11 number cannot be reused.
+        # The coverage caveat is an expensive lesson: windows before #3708
+        # undercounted requests, so a pre 2026-08-11 number cannot be
+        # reused.
         self.assertIn('3708', doc['coverage_caveat'])

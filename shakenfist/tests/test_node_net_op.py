@@ -1,10 +1,10 @@
 # Copyright 2019 Michael Still and contributors
 """Tests for ``shakenfist.operations.node_net_op.NodeNetOp.dispatch_task``.
 
-Covers the step 5c dispatcher updates that route lifecycle operations
-through ``BridgedVXLanNetwork``, the new
-``network_apply_create_hypervisor`` task handler, and the newly-wired
-ErrorReport persistence on the outer ``except Exception`` branch.
+Covers the dispatcher routing of lifecycle operations through
+``BridgedVXLanNetwork``, the ``network_apply_create_hypervisor`` task
+handler, and the ErrorReport persistence on the outer ``except
+Exception`` branch.
 """
 
 from unittest import mock
@@ -105,9 +105,9 @@ class NetworkApplyCreateHypervisorTaskDispatchTestCase(base.ShakenFistTestCase):
 class GenericExceptionPersistsErrorReportTestCase(base.ShakenFistTestCase):
     """Exceptions in the dispatcher persist an ErrorReport before STATE_ERROR.
 
-    Step 5c added ErrorReport persistence to the outer ``except Exception``
-    branch of ``NodeNetOp.dispatch_task``. Before step 5c the branch only
-    set ``STATE_ERROR`` and did not record the failing exception in MariaDB.
+    The outer ``except Exception`` branch of ``NodeNetOp.dispatch_task``
+    persists an ErrorReport. It once only set ``STATE_ERROR`` and did not
+    record the failing exception in MariaDB.
     """
 
     def setUp(self):

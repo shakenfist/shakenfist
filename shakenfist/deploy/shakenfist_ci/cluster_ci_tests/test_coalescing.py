@@ -95,7 +95,8 @@ class TestCoalescing(base.BaseNamespacedTestCase):
     so a sibling for the fold to find only exists when two callers both
     missed that lookup.
 
-    The second test is about the per-node queues phase 11 opened up. It
+    The second test is about coalescing on the per-node queues, which
+    only became possible once the coalescing key grew a node column. It
     is narrower in what it looks for -- only signals which can have come
     from a ``{node_uuid}-network-*`` queue count -- and it goes on to
     assert that the vxlan mesh is still correct on every participating
@@ -229,8 +230,8 @@ class TestCoalescing(base.BaseNamespacedTestCase):
         Returns ``(folds, dedups)``: the worker-side folds and the
         enqueue-side dedups which can only have happened on a per-node
         ``{node_uuid}-network-*`` queue. Both are evidence that the two
-        column key matched a row for node-local work, which is the
-        thing phase 11 added and which nothing could do before it.
+        column key matched a row for node-local work, which nothing
+        could do before the key grew its node column.
 
         A dedup is per-node whenever its ``requested_task`` is the mesh
         task. That path only fires for a single task enqueue, and every
@@ -397,9 +398,9 @@ class TestCoalescing(base.BaseNamespacedTestCase):
         coalescing key grew a second column, because with the network
         alone hypervisor A's mesh op and hypervisor B's are identical to
         both dedup paths while doing different work on different hosts,
-        so folding them leaves one host's FDB stale. Phase 11 widened
-        the key to ``(network_uuid, node_uuid)`` and let the task back
-        into COALESCIBLE_TASKS.
+        so folding them leaves one host's FDB stale. Widening the key to
+        ``(network_uuid, node_uuid)`` is what let the task back into
+        COALESCIBLE_TASKS.
 
         The test therefore has two halves, and the second is the point.
         The first asserts that per-node coalescing matched a row at all,
@@ -460,7 +461,8 @@ class TestCoalescing(base.BaseNamespacedTestCase):
         # Pin the burst across the hypervisors round robin. Left to the
         # scheduler this test would assert nothing on a run where every
         # instance happened to land on one node, and "assert nothing"
-        # is the failure mode the whole of phase 9 was written about.
+        # is how coalescing stayed broken unnoticed for three months
+        # (#3878).
         instances = []
         create_errors = []
         for i in range(BURST):

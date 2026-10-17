@@ -304,8 +304,8 @@ class BlobTransferExternalViewTestCase(base.ShakenFistTestCase):
     audit events in blob.py, and the log fields in
     daemons/transfers/main.py. Events reach MariaDB and the log stream,
     and the log stream ships to Loki, so while the token was included a
-    live credential left the cluster on every blob transfer. Found by the
-    phase 6 sweep for secret-carrying fields; see
+    live credential left the cluster on every blob transfer. Found by a
+    sweep for secret-carrying fields; see
     docs/plans/PLAN-auth-federation-phase-06-secret-types.md.
     """
 

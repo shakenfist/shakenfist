@@ -60,7 +60,7 @@ class AgentOperation(BaseOperation):
     # The initial -> expired edge is permitted for completeness rather
     # than because a site walks it: an operation is only in initial for
     # the moments between new() and the API enqueuing it. Declaring it
-    # costs nothing and means a future enforcement point (phase 5's
+    # costs nothing and means a future enforcement point (the node-local
     # reaper is the obvious candidate) which does reach one does not
     # raise InvalidStateException.
     state_targets = {
@@ -286,8 +286,7 @@ class AgentOperation(BaseOperation):
         is that a legacy operation's budget restarts at each
         transition, which is accepted: it is still far tighter than
         the unbounded queue time plus 900 second executor backstop it
-        replaces. See decision 3 in
-        docs/plans/PLAN-agent-operation-deadlines-phase-04-enforcement.md.
+        replaces.
 
         Retry makes that cost larger, and it is worth being explicit
         about how much. A retry is two more transitions

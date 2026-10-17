@@ -1,20 +1,19 @@
 """Functional coverage of the agent operation timing budgets.
 
-Phases 1 to 5 of docs/plans/PLAN-agent-operation-deadlines.md replaced a
-hardcoded 900 second backstop in the sidechannel daemon with two budgets a
-caller can set per operation: a wall-clock deadline, and a progress timeout
-which only applies to commands which can actually report progress. Nothing
-in this suite exercised either of them, which is survey finding F5 of
-docs/plans/PLAN-agent-operation-deadlines-phase-07-docs-and-ci.md.
+The sidechannel daemon used to give every agent operation a hardcoded 900
+second backstop. It now has two budgets a caller can set per operation: a
+wall-clock deadline, and a progress timeout which only applies to commands
+which can actually report progress (see
+docs/plans/PLAN-agent-operation-deadlines.md). Until this suite existed,
+nothing in functional CI exercised either of them.
 
 Every assertion here is about a state, or about the presence and rough
 magnitude of an absolute timestamp. None of them is about how many seconds
 something took. CI hardware is contended and shared, so a test which asserts
 that an operation expired "within ten seconds" is a flake written on
-purpose; see decision 5 of that phase plan.
+purpose.
 
-The retry and attempt-bound tests were added by issue #4077, the plan's
-phase 8 push audit. Both stand on the same controlled stall: a get-file of
+The retry and attempt-bound tests were added by issue #4077. Both stand on the same controlled stall: a get-file of
 a FIFO wedges the agent's blocking open() in the guest kernel (the issue
 #3516 wedge shape), which stalls an attempt deterministically without this
 suite ever asserting an elapsed duration.
@@ -393,10 +392,11 @@ class TestAgentOperationDeadlines(base.BaseNamespacedTestCase):
             f'sleep {BLOCKER_SECONDS}')
 
     def test_stalled_transfer_is_retried_to_completion(self):
-        # Phase 5's central behavioural claim, previously only covered
-        # at the unit level (issue #4077): an attempt which stalls is
-        # requeued (the EXECUTING -> QUEUED edge) and a later dispatch
-        # of the same operation succeeds, from the same place in line.
+        # The central behavioural claim of retry, previously only
+        # covered at the unit level (issue #4077): an attempt which
+        # stalls is requeued (the EXECUTING -> QUEUED edge) and a later
+        # dispatch of the same operation succeeds, from the same place
+        # in line.
         inst = self._create_ready_instance('test-aop-deadline-retry')
 
         # Arm the guest with a get-file target which wedges exactly one
@@ -490,9 +490,9 @@ class TestAgentOperationDeadlines(base.BaseNamespacedTestCase):
         self._await_agentop_complete(
             inst['uuid'], armed, AGENTOP_STATE_TIMEOUT, f'mkfifo {target}')
 
-        # deadline_seconds=0 is the licensed sentinel (decision 3 of
-        # the plan): no wall-clock deadline at all, with the progress
-        # timeout still bounding each attempt. The attempt cap is
+        # deadline_seconds=0 is the API's documented sentinel for no
+        # wall-clock deadline at all, with the progress timeout still
+        # bounding each attempt. The attempt cap is
         # therefore the only thing standing between this operation and
         # retrying forever, which is exactly what this test is about --
         # with a deadline the retry loop would eventually be cut short

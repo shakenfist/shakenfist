@@ -1310,7 +1310,7 @@ class GrpcPruneEventsTestCase(base.ShakenFistTestCase):
 
 
 # ---------------------------------------------------------------------------
-# Phase 4 tests — direct get/delete object events helpers
+# Tests — direct get/delete object events helpers
 # ---------------------------------------------------------------------------
 
 _OBJ_UUID_X = 'ccccdddd-2222-4222-8222-222222222201'
@@ -1497,7 +1497,7 @@ class DirectGetObjectEventsTestCase(base.ShakenFistTestCase):
 
 
 # ---------------------------------------------------------------------------
-# Phase 4 tests — direct delete object events helper
+# Tests — direct delete object events helper
 # ---------------------------------------------------------------------------
 
 class DirectDeleteObjectEventsTestCase(base.ShakenFistTestCase):
@@ -1533,7 +1533,7 @@ class DirectDeleteObjectEventsTestCase(base.ShakenFistTestCase):
 
 
 # ---------------------------------------------------------------------------
-# Phase 4 tests — get_object_events routing
+# Tests — get_object_events routing
 # ---------------------------------------------------------------------------
 
 class GetObjectEventsRoutingTestCase(base.ShakenFistTestCase):
@@ -1602,7 +1602,7 @@ class GrpcGetObjectEventsFailureLoggingTestCase(base.ShakenFistTestCase):
 
 
 # ---------------------------------------------------------------------------
-# Phase 4 tests — delete_object_events routing
+# Tests — delete_object_events routing
 # ---------------------------------------------------------------------------
 
 class DeleteObjectEventsRoutingTestCase(base.ShakenFistTestCase):
@@ -1644,7 +1644,7 @@ class DeleteObjectEventsRoutingTestCase(base.ShakenFistTestCase):
 
 
 # ---------------------------------------------------------------------------
-# Phase 4 tests — hard_delete calls delete_object_events
+# Tests — hard_delete calls delete_object_events
 # ---------------------------------------------------------------------------
 
 class HardDeleteEventsCleanupTestCase(base.ShakenFistTestCase):

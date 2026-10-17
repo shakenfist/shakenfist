@@ -451,7 +451,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
     def test_structured_parameters_publish_their_real_shape(self):
         # Pinned against the published specification rather than
         # against the declarations, because the specification is what a
-        # client generator reads and what phase 3 will compile.
+        # client generator reads and what the request validator compiles.
         spec = self._fetch_spec()
         wrong = []
 
@@ -570,8 +570,7 @@ class OpenAPISpecificationTestCase(base.ShakenFistTestCase):
         self.assertEqual([], offenders, '\n'.join(offenders))
 
     def test_post_instances_507_describes_the_transient_contract(self):
-        # Phase 4 of PLAN-transient-capacity-refusals-phase-04-retry-after
-        # (D32): the three-tuple response declaration format has no way
+        # The three-tuple response declaration format has no way
         # to express a response header or a body schema, so the
         # ``Retry-After`` header and the ``stage``/``transient`` body
         # fields are published in prose rather than structurally. This

@@ -3,7 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 
-"""Tests for the namespace claim CRUD primitive (phase 4, D3 and D8).
+"""Tests for the namespace claim CRUD primitive.
 
 Covers the SQL layer of _direct_create_namespace_claim(),
 _direct_update_namespace_claim(), _direct_delete_namespace_claim() and

@@ -6,8 +6,8 @@
 # and wait for Loki to report ready. Runs on the target box (not over
 # SSH from a runner).
 #
-# This is the functional-CI Loki used to prove the phase-2 log shipper
-# end to end (see docs/plans/PLAN-remove-syslog-forwarding-phase-03-ci-loki.md).
+# This is the functional-CI Loki used to prove shakenfist's built-in Loki
+# log shipper end to end (see docs/plans/PLAN-remove-syslog-forwarding.md).
 # It is intentionally single-tenant and unauthenticated -- CI only.
 #
 # Usage:
@@ -19,9 +19,9 @@
 
 set -euo pipefail
 
-# Pinned Loki release. Any 3.x is fine for our purposes -- phase 2 puts
-# all identifiers in the JSON line body, not in structured metadata, so
-# there is no schema-version floor.
+# Pinned Loki release. Any 3.x is fine for our purposes -- the log shipper
+# puts all identifiers in the JSON line body, not in structured metadata,
+# so there is no schema-version floor.
 LOKI_VERSION="3.4.2"
 LOKI_ZIP="loki-linux-amd64.zip"
 LOKI_URL="https://github.com/grafana/loki/releases/download/v${LOKI_VERSION}/${LOKI_ZIP}"

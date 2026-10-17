@@ -26,7 +26,7 @@
 # - attribute/instance/{uuid}/kvm_pid -> kvm_pid
 # - attribute/instance/{uuid}/error -> error_message
 #
-# NOTE: metadata is stored in the shared object_metadata table (phase 14).
+# NOTE: metadata is stored in the shared object_metadata table.
 
 from typing import Annotated
 from typing import Any

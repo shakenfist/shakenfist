@@ -2684,16 +2684,18 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.ReconcileSchedulerCapacityRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.ReconcileSchedulerCapacityReply:
-        """Run one scheduler capacity reconcile pass (phase 2, D5).
+        """Run one scheduler capacity reconcile pass.
 
-        The client calls with a bounded deadline, so check the call is
-        still alive before starting what is deliberately one long
-        analytical query: a caller that has already given up should not
-        have a pass run on its behalf. Overlapping passes are benign in
-        this release regardless -- the reconciler is the sole writer and
-        every statement is an idempotent recompute from ground truth --
-        but that stops being true in phase 3, when guarded UPDATEs give
-        these counters a second writer, so do not lean on it.
+        A pass recomputes every capacity counter from ground truth,
+        corrects drift and expires lapsed claims. The client calls with
+        a bounded deadline, so check the call is still alive before
+        starting what is deliberately one long analytical query: a
+        caller that has already given up should not have a pass run on
+        its behalf. Every statement is an idempotent recompute from
+        ground truth, but the reconciler is not the only writer of these
+        counters -- the guarded UPDATEs of placement admission and
+        release are a second -- so do not lean on overlapping passes
+        being benign.
         """
         try:
             self.monitor.counters['reconcile_scheduler_capacity'].inc()
@@ -2729,7 +2731,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.AdmitInstancePlacementRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.AdmitInstancePlacementReply:
-        """Draw down capacity and write a placement, atomically (phase 3).
+        """Draw down capacity and write a placement, atomically.
 
         The whole point of this RPC is that the guarded capacity
         drawdown, the placement attribute write and the placement
@@ -2831,7 +2833,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         request: database_pb2.GetSchedulerNodeCapacityRequest,
         context: grpc.ServicerContext
     ) -> database_pb2.GetSchedulerNodeCapacityReply:
-        """Read the materialised per-node capacity counters (phase 3).
+        """Read the materialised per-node capacity counters.
 
         A read of a small table with no filtering, so an error is an
         empty reply: the caller is an admin summary which reports a
@@ -2841,7 +2843,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
         Every daemon except this one reaches the table over gRPC, so
         without it a MariaDB-side failure here would arrive at the
         scheduler as an empty table -- indistinguishable from a cluster
-        the reconciler has not populated yet (P7), and so silent where
+        the reconciler has not populated yet, and so silent where
         the whole point of the flag is that it is not. An exception
         escaping the direct read is degraded for the same reason.
         """
@@ -2861,12 +2863,12 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
     # =========================================================
     # Namespace Claim CRUD (MariaDB)
     #
-    # Scheduler-reservations phase 4. Creating and growing a claim are
-    # guarded admission decisions against the cluster_capacity
-    # singleton, so like the placement primitive above there is no
-    # Python-side composition to fall back to: each of these is one
-    # MariaDB transaction and nothing here does more than hand the
-    # request to the direct implementation and shape the reply.
+    # Creating and growing a claim are guarded admission decisions
+    # against the cluster_capacity singleton, so like the placement
+    # primitive above there is no Python-side composition to fall back
+    # to: each of these is one MariaDB transaction and nothing here does
+    # more than hand the request to the direct implementation and shape
+    # the reply.
     # =========================================================
 
     def _claim_message(

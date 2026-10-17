@@ -2,22 +2,21 @@
 
 """Ask every handler what an omission does.
 
-Step 1 of ``docs/plans/PLAN-api-input-validation-phase-06-required.md``.
-Finding F1 of that plan says every parameter declared ``required=True``
-outside a route segment is optional in fact -- the handler gives it a
-default, so Python has never raised for a single omission. Enforcing
-required-ness is therefore a contract change for all of them, and
-decision D32 says the declarations get corrected before enforcement is
-turned on rather than after.
+Every parameter declared ``required=True`` outside a route segment was
+optional in fact -- the handler gives it a default, so Python has never
+raised for a single omission. Enforcing required-ness is therefore a
+contract change for all of them, so the declarations were corrected
+before enforcement was turned on rather than after. The resulting table
+is published in
+``docs/plans/PLAN-api-input-validation-phase-06-required.md``.
 
 That correction needs to know, per declaration, what the server does
-today when the parameter is not supplied. This file asks, by sending
-the request: decision D36, and what
+today when the parameter is not supplied. This file asks by sending
+the request, which is what
 [#4167](https://github.com/shakenfist/shakenfist/issues/4167) asks for
-by name. Phase 5's finding F5 is why it is not done by reading the AST
--- the same family of analysis over the same declarations got the
-answer wrong last time by asking a well formed question about the
-wrong property.
+by name. It is not done by reading the AST because an earlier analysis
+of that kind over the same declarations got the answer wrong, by asking
+a well formed question about the wrong property.
 
 Three things make an answer here trustworthy, and all three are
 deliberate:
@@ -38,7 +37,7 @@ deliberate:
   which is what keeps the plan's evidence and the code agreeing while
   the remaining steps act on it.
 
-A verdict is one of three words, from the step 1 brief:
+A verdict is one of three words:
 
 ``guarded``
     the handler answers 4xx -- it already refuses the omission, so
@@ -50,7 +49,8 @@ A verdict is one of three words, from the step 1 brief:
     2xx or 3xx. The handler does something sensible without it, so the
     declaration is the thing that is wrong.
 
-Nothing here changes a declaration or a handler. Step 1 measures.
+Nothing here changes a declaration or a handler. This file only
+measures.
 """
 
 import json
@@ -416,8 +416,8 @@ RECIPES = {
     },
     ('NetworksEndpoint', 'delete'): {
         # Scoped to scratch for the same reason the other delete-alls
-        # are. 202 because phase 7 of PLAN-network-facade moved this
-        # endpoint to the acknowledge-and-poll contract.
+        # are. 202 because this endpoint follows the acknowledge-and-poll
+        # contract.
         'url': '/networks',
         'body': {'confirm': True, 'namespace': 'scratch'},
         'control': 202,
@@ -598,7 +598,7 @@ SWEEP = {
         (406, False, 'guarded'),
     ('NetworkDNSAddressEndpoint', 'post', 'name'):
         (406, False, 'guarded'),
-    # Was (200, False, 'accepted') when phase 6 measured it: the
+    # Was (200, False, 'accepted') when first measured: the
     # omission was stored as a DNS record pointing at null, which is
     # why the declaration kept required=True. The issue 4248 guard
     # refuses a non-string value in the handler -- the same value is
@@ -632,7 +632,7 @@ SWEEP = {
 class SweepFixtureTestCase(AuthenticatedStackTestCase):
     """The sweep's fixtures, carrying no tests of its own.
 
-    Split out in phase 7 for the same reason AuthenticatedStackTestCase
+    Split out for the same reason AuthenticatedStackTestCase
     carries no tests: a subclass which wants these fixtures at
     ``enforce`` -- test_nested_required_null.py is the first --
     inherits every test method too, and the sweep below is deliberately
@@ -899,23 +899,21 @@ class RequiredSweepTestCase(SweepFixtureTestCase):
 
     Inherits the whole decorator stack and a real authenticated client
     from AuthenticatedStackTestCase for the reason that class
-    documents: phase 3's review found a handler tested in isolation and
-    the deployed behaviour giving different answers.
+    documents: a handler tested in isolation and the deployed behaviour
+    were found to give different answers.
 
-    Runs at ``warn``, not ``enforce``. Step 3 deleted the filter that
-    used to keep a missing-required finding out of the enforceable
-    set, so an ``enforce`` run now answers a generic ``<parameter>:
-    declared required but not supplied`` for every omission before any
-    handler sees it -- the validation layer's answer, not the
-    handler's, and the opposite of what this file exists to measure.
-    ``warn`` still runs ``check()`` and still logs every finding
-    (decision D34: an operator's rollback keeps the same
-    observability), it just does not act on one, so a request reaches
-    its handler exactly as it did before this phase and the table
-    below still describes real handler behaviour. That also makes
-    this file definition-of-done item 5 for all 76 rows, not merely
-    the ``guarded`` and ``faults`` pair the step 3 brief names: every
-    row here is evidence that ``warn`` reproduces this phase's
+    Runs at ``warn``, not ``enforce``. A missing-required finding is no
+    longer filtered out of the enforceable set, so an ``enforce`` run
+    now answers a generic ``<parameter>: declared required but not
+    supplied`` for every omission before any handler sees it -- the
+    validation layer's answer, not the handler's, and the opposite of
+    what this file exists to measure. ``warn`` still runs ``check()``
+    and still logs every finding (so an operator who rolls back to it
+    keeps the same observability), it just does not act on one, so a
+    request reaches its handler exactly as it did before enforcement
+    and the table below still describes real handler behaviour. That
+    also makes every one of the 76 rows, not merely the ``guarded`` and
+    ``faults`` ones, evidence that ``warn`` reproduces the
     pre-enforcement answers.
 
     The fixtures are SweepFixtureTestCase's, which is that class's

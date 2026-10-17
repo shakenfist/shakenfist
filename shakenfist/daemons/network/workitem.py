@@ -124,7 +124,7 @@ class Job(util_concurrency.Job):
         #      for which state_targets has no edge. That is why
         #      NodeNetOp.network_apply_create_hypervisor is not
         #      coalescible even though its model already carries both key
-        #      columns. See decision 5 of
+        #      columns. The design record is in
         #      docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
         #
         # Additionally each queue is drained by exactly ONE dispatcher

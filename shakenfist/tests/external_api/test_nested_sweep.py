@@ -2,32 +2,34 @@
 
 """Every value inside a spec, asked of the server rather than of the schema.
 
-Step 5 of ``docs/plans/PLAN-api-input-validation-phase-07-structured.md``.
-Step 4 retyped the four structured declarations -- ``disk``,
-``network`` and ``video`` on ``POST /instances``, and ``network`` on
-``POST /instances/{ref}/interfaces`` -- so a diskspec, a networkspec
-and a videospec are now described to the validation layer rather than
-handed to the handler unexamined. That moved the contract for the
-twenty values findings F5 and F6 of the plan measured. This file pins
-the result.
+The four structured declarations -- ``disk``, ``network`` and
+``video`` on ``POST /instances``, and ``network`` on
+``POST /instances/{ref}/interfaces`` -- are typed, so a diskspec, a
+networkspec and a videospec are described to the validation layer
+rather than handed to the handler unexamined. That moved the contract
+for twenty nested values, which
+``docs/plans/PLAN-api-input-validation-phase-07-structured.md``
+measured as its findings F5 and F6 (the F and D codes in the row notes
+below are that plan's). This file pins the result.
 
-Three things make a row here worth having, and each is a habit the
-earlier phases had to learn the hard way:
+Three things make a row here worth having, and each is a habit learned
+the hard way:
 
 * **The answer is measured, not derived.** Every row drives a real
-  request through the whole authenticated decorator stack, because
-  phase 3's review found a handler tested in isolation and the
-  deployed behaviour giving different answers, and because phase 5's
-  finding F5 is what happens when a well formed question is asked of
-  the AST instead of the server.
+  request through the whole authenticated decorator stack, because a
+  handler tested in isolation and the deployed behaviour have been
+  found giving different answers, and because an AST survey once
+  counted handler parameters lacking a default while the real hazard
+  was a ``None`` default dereferenced without a type guard -- a well
+  formed question asked of the AST instead of the server.
 * **Refusal is paired with acceptance.** Every key in every spec
   carries at least one row which is still *accepted*
   (``test_every_key_has_an_accepted_value`` derives that from the table
   rather than trusting it). A sweep which only proves things are
   refused would pass just as well against a schema which refused
   everything, and "the schema is no narrower than the handler" is the
-  width rule phase 6 wrote down and this phase's two deliberate
-  narrowings (D50) are measured against.
+  width rule the table's two deliberate narrowings (D50) are measured
+  against.
 * **Both endpoints are swept.** A netdesc is declared twice, and the
   interface hotplug route has no scheduler in front of it: where
   instance create answers 507 for a request which survived every
@@ -132,14 +134,14 @@ ACCEPTED_ON_CREATE = Answer(
     507, False, 'No nodes remaining at scheduling stage is_hypervisor')
 ACCEPTED_ON_HOTPLUG = Answer(200, False, None)
 
-#: The phase 5 shape a caller used to get for a nested value the
-#: handler could not cope with: a bare ``server error``, an exception
-#: record under /srv/shakenfist/exceptions/, and nothing naming the key
-#: which caused it. Eleven rows of finding F5 answered this before the
-#: phase, and the warn column is where most still do -- the six
-#: non-string network_uuid rows answer a 404 there since the issue
-#: #4223 fix, whose guard sits in from_db_by_ref below the validation
-#: layer.
+#: What a caller used to get for a nested value the handler could not
+#: cope with: a bare ``server error`` (no 500 body carries exception
+#: detail), an exception record under /srv/shakenfist/exceptions/, and
+#: nothing naming the key which caused it. Eleven rows of finding F5
+#: answered this before the nested schemas existed, and the warn column
+#: is where most still do -- the six non-string network_uuid rows answer
+#: a 404 there since the issue #4223 fix, whose guard sits in
+#: from_db_by_ref below the validation layer.
 FAULTED = Answer(500, True, 'server error')
 
 
@@ -156,13 +158,13 @@ Case = namedtuple(
 # One row per (spec, key, sent value). `body` is an overlay onto the
 # route's minimal valid request, so each row says only what it changes.
 #
-# The notes name the plan's finding a row closes. F5 is the eleven
-# nested values which were a recorded 500; F6 is the nine which were
-# accepted in silence; D4x names a decision the row is the measurement
-# of. A row whose note says `width` is one this phase deliberately
-# still accepts, and the reason is on the row: a schema narrower than
-# its handler is a breaking change wearing the clothes of a
-# correctness fix (phase 6's width rule).
+# The notes name the finding a row closes in the structured-schemas
+# plan named in the module docstring. F5 is the eleven nested values
+# which were a recorded 500; F6 is the nine which were accepted in
+# silence; D4x names a decision the row is the measurement of. A row
+# whose note says `width` is one the schema deliberately still accepts,
+# and the reason is on the row: a schema narrower than its handler is a
+# breaking change wearing the clothes of a correctness fix.
 CASES = [
     # ---------------------------------------------------------------
     # The controls. Asserted first by the runner, because a request

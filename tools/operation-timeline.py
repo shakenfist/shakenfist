@@ -11,12 +11,13 @@ with ``defer_count == 1`` it is:
 
     (created -> first dequeue) + (the defer delay) + (redelivery -> start)
 
-and nothing on that event says which of those terms holds the time. Phase 9
-of ``docs/plans/PLAN-queue-performance.md`` observed roughly 400 of 823 first
-deferrals sitting at 15-17 seconds and could not explain them, because the
-#3916 back-off ladder means a first deferral now costs 0.1 seconds -- so the
-time is somewhere else. This tool finds out where, by joining two event
-streams which are already in Loki. No new instrumentation is required.
+and nothing on that event says which of those terms holds the time. A
+measurement for ``docs/plans/PLAN-queue-performance.md`` observed roughly 400
+of 823 first deferrals sitting at 15-17 seconds and could not explain them,
+because the #3916 back-off ladder means a first deferral now costs 0.1
+seconds -- so the time is somewhere else. This tool finds out where, by
+joining two event streams which are already in Loki. No new instrumentation
+is required.
 
 The join
 --------
@@ -28,8 +29,8 @@ this tool matches on the event messages and why grepping for ``Added event``
 finds nothing).
 
 * ``Execution deferred`` from ``BaseClusterOperation.defer()``, whose
-  ``extra`` carries ``waiting_on``, ``defer_count`` and (since step 10a of
-  PLAN-queue-performance-phase-10-defer-latency.md) ``delay``. Builds
+  ``extra`` carries ``waiting_on``, ``defer_count`` and, on newer builds
+  (PLAN-queue-performance-phase-10-defer-latency.md), ``delay``. Builds
   predating that field are still readable: the delay is interpolated into the
   message, and the parser falls back to it. That fallback is not optional
   garnish -- the retained history this tool was written to measure predates
@@ -160,9 +161,9 @@ DEFER_MESSAGE_PREFIX = 'Execution deferred'
 EXECUTION_MESSAGE = 'execution duration'
 
 # The delay as it appears in the defer event's message. Only used when
-# extra['delay'] is absent, which is every event emitted before step 10a of
-# PLAN-queue-performance-phase-10-defer-latency.md -- that is, all of the
-# retained history this tool was written to measure.
+# extra['delay'] is absent, which is every event emitted by a build predating
+# that field (PLAN-queue-performance-phase-10-defer-latency.md) -- that is,
+# all of the retained history this tool was written to measure.
 DEFER_DELAY_RE = re.compile(r'deferred for ([0-9]+(?:\.[0-9]+)?) seconds')
 
 # The log record's own fields, as emitted by shakenfist_utilities' pylogrus
@@ -511,8 +512,8 @@ def parse_defer_line(line):
         extra = {}
 
     # Prefer the field, fall back to the prose. The field only exists on
-    # builds carrying step 10a; every event older than that has the delay in
-    # the message and nowhere else.
+    # newer builds; every event older than that has the delay in the
+    # message and nowhere else.
     delay = extra.get('delay')
     from_message = False
     if not isinstance(delay, (int, float)) or isinstance(delay, bool):
@@ -1074,7 +1075,7 @@ def print_join_integrity(join, complete, incomplete, clipped, defer_window_start
     if join.delays_from_message:
         print(f'  {join.delays_from_message} defer delays were read from the '
               'message prose rather than extra["delay"] (a build predating '
-              'step 10a)')
+              'that field)')
     if join.delays_unknown:
         print(f'  {join.delays_unknown} defer events carry no readable delay '
               'at all; operations holding one are excluded from the summed '
@@ -1358,9 +1359,10 @@ def main(argv=None, client=None):
                   'nothing to decompose'),
         empty='(every operation in this window deferred)')
 
-    # Sorted numerically rather than by label: phase 9's finding was about
-    # first deferrals specifically, so the reader wants the counts in order
-    # and 'defer_count 10' sorts before 'defer_count 2' as a string.
+    # Sorted numerically rather than by label: the unexplained wait this
+    # tool exists for was in first deferrals specifically, so the reader
+    # wants the counts in order and 'defer_count 10' sorts before
+    # 'defer_count 2' as a string.
     by_count = sorted(grouped(complete, lambda o: o.defer_count),
                       key=lambda item: item[0])
     print_table(

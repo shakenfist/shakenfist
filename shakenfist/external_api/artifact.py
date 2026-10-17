@@ -434,7 +434,7 @@ class ArtifactsEndpoint(api_base.Resource):
         [
             ('url', 'body', 'url', 'The URL to fetch.', True),
             # Not required: the handler's signature is shared=False, which is a
-            # real default and creates an unshared artifact (phase 6 sweep).
+            # real default and creates an unshared artifact.
             ('shared', 'body', 'boolean',
              ('Should this artifact be shared? You must be authenticated against '
               'the system namespace to set this option to True.'), False),
@@ -836,8 +836,8 @@ class ArtifactVersionsEndpoint(api_base.Resource):
         # artifact.validated_max_versions() so that all three routes
         # which write this attribute -- here, label create and
         # instance snapshot -- refuse the same values. The declaration
-        # publishes minimum 0; this is the server backing it, rather
-        # than waiting for phase 4 to compile the bound.
+        # publishes minimum 0; this is the server backing it, so the
+        # bound holds even when API_VALIDATION_MODE is warn or off.
         try:
             mv = validated_max_versions(max_versions)
         except exceptions.InvalidMaxVersions as e:

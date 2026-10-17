@@ -207,9 +207,9 @@ class TestLoki(base.BaseNamespacedTestCase):
         # or we hit the eventual-consistency deadline.
         streams = self._await_loki_lines(net['uuid'], start_ns)
 
-        # Prove the label contract: the phase-2 shipper tags every stream
-        # with {job, daemon, host}. We queried by job already; assert the
-        # daemon label is present too.
+        # Prove the label contract: the in-process Loki shipper tags every
+        # stream with {job, daemon, host}. We queried by job already; assert
+        # the daemon label is present too.
         labels = streams[0].get('stream', {})
         self.assertIn(
             'daemon', labels,
@@ -315,12 +315,13 @@ class TestLoki(base.BaseNamespacedTestCase):
     def test_no_credential_reaches_loki(self):
         """No cluster-minted key secret may appear in the log stream.
 
-        This is the detector phase 7 exists to build. It is worth being
-        precise about why it is shaped the way it is: an assertion that
-        a query returned nothing is indistinguishable from an assertion
-        that the query was malformed, that the log shipper was down, or
-        that Loki was empty. Phase 6 emptied six leak guards in exactly
-        that way without one of them failing.
+        This is the runtime leak detector. It is worth being precise
+        about why it is shaped the way it is: an assertion that a query
+        returned nothing is indistinguishable from an assertion that the
+        query was malformed, that the log shipper was down, or that Loki
+        was empty. Six unit-test leak guards were once found silently
+        emptied in exactly that way (an assertIn on a SecretStr can never
+        fail), and not one of them had failed.
 
         So the test proves it can fire before it asserts that it did
         not. A control token of the credential shape is emitted and

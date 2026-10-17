@@ -66,7 +66,7 @@ NEW_COLUMNS = {
     os.environ.get(DSN_ENV),
     f'{DSN_ENV} not set; requires a disposable MariaDB database')
 class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
-    """Prove the phase 2 migration migrates, against a real MariaDB."""
+    """Prove the deadline migration migrates, against a real MariaDB."""
 
     def setUp(self):
         super().setUp()
@@ -112,7 +112,7 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
         return row[0] == 'YES'
 
     def _rewind(self):
-        """Make the database look like a pre-phase-2 deployment."""
+        """Make the database look like a deployment from before the deadline columns."""
         with self.engine.connect() as conn:
             for table_name, columns in NEW_COLUMNS.items():
                 for column in columns:
@@ -129,7 +129,7 @@ class AgentOperationMigrationLiveTestCase(base.ShakenFistTestCase):
                 self.assertNotIn(column, present)
 
     def _insert_legacy_rows(self, aop_uuid):
-        """Insert rows using only the columns a pre-phase-2 build knew.
+        """Insert rows using only the columns a pre-deadline build knew.
 
         Named explicitly rather than via the cached Table objects,
         which already carry the new columns.

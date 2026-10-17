@@ -2,18 +2,15 @@
 
 """The 507 capacity-refusal helper, standalone.
 
-Step 4a of
-``docs/plans/PLAN-transient-capacity-refusals-phase-04-retry-after.md``,
-as amended by the phase's first review round. This module exercises
-``capacity_error()`` directly rather than through a Flask app or a real
-endpoint; the wiring to the two create-path branches is tested in
-``tests/test_external_api.py``.
+This module exercises ``capacity_error()`` directly rather than through
+a Flask app or a real endpoint; the wiring to the two create-path
+branches is tested in ``tests/test_external_api.py``.
 
-D28 assembles the response body a second time, in this repository,
+The response body is assembled a second time, in this repository,
 because ``sf_api.error()`` itself lives in ``shakenfist-utilities`` (a
 pinned third-party dependency) and cannot be edited here.
 ``capacity_error()`` replaces ``sf_api.error()``'s body wholesale
-rather than patching it (D28's "re-serialise rather than patch"), so a
+rather than patching it, so a
 ``shakenfist-utilities`` upgrade that renames or restructures the
 ``error``/``status`` keys cannot drop our ``stage``/``transient``
 fields -- they are never derived from the upstream body in the first
@@ -53,7 +50,7 @@ class CapacityErrorTestCase(base.ShakenFistTestCase):
             resp.headers.get('Retry-After'))
 
         # Whole-body equality, not assertIn / per-key membership: see the
-        # module docstring and D28's risk note in the phase 4 plan.
+        # module docstring.
         self.assertEqual(
             {
                 'error': 'no nodes remaining at scheduling stage sufficient_idle_cpu',

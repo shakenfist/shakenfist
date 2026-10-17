@@ -101,7 +101,7 @@ class Monitor(daemon.Daemon):
         super().__init__(name)
         self.lock = None
         self.is_elected = False
-        # Nodes whose STATE_ERROR cascade (phase 3) has already run, so a
+        # Nodes whose STATE_ERROR cascade has already run, so a
         # persistently-errored node is not re-processed every maintenance
         # pass. Entries are dropped when the node is next seen out of error.
         self._cascaded_error_nodes = set()
@@ -621,17 +621,18 @@ class Monitor(daemon.Daemon):
         LOG.info('Cluster maintenance loop complete')
 
     def _cascade_errored_node(self, n):
-        # React to a node that phase 2 (sf-resources) marked STATE_ERROR
-        # because its storage is unhealthy. Mirrors the deleted-node cleanup
-        # above, but *errors* the hosted instances rather than deleting them
-        # (an errored instance is terminal-but-snapshottable, left for the
-        # operator), and both cascades are gated on which object type the
-        # failure actually affected (an uploads-only failure marks the node
-        # error but must not kill instances or drop blob replicas).
+        # React to a node that sf-resources' health evaluator marked
+        # STATE_ERROR because its storage is unhealthy. Mirrors the
+        # deleted-node cleanup above, but *errors* the hosted instances
+        # rather than deleting them (an errored instance is
+        # terminal-but-snapshottable, left for the operator), and both
+        # cascades are gated on which object type the failure actually
+        # affected (an uploads-only failure marks the node error but must
+        # not kill instances or drop blob replicas).
         #
         # Runs here, on the surviving cluster maintenance node, not on the
         # (possibly dying) affected node, which does only the one fast
-        # self-mark in phase 2.
+        # self-mark from sf-resources.
         if str(n.uuid) in self._cascaded_error_nodes:
             return
 

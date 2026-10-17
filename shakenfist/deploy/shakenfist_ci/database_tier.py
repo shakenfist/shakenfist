@@ -437,8 +437,8 @@ class DatabaseTierTestsMixin:
             % (per_get, INSTANCE_WALK_CEILING_PER_GET, measurement))
 
     def test_no_unbudgeted_fixed_rate_database_polling(self):
-        # Nothing in CI would have caught the load regression phase 6 spent
-        # a fortnight on. It ran for eleven days before anybody looked,
+        # Nothing in CI would have caught the August 2026 database load
+        # regression. It ran for eleven days before anybody looked,
         # because the only detector was a nightly job watching one
         # production cluster. This is the review-time version.
         #
@@ -539,8 +539,8 @@ class DatabaseTierTestsMixin:
         # part of the cluster and every "nothing is over budget"
         # conclusion below is vacuous. That is not hypothetical -- until
         # #3708 this counter could not see daemons co-located with MariaDB,
-        # which on our production cluster was two nodes of six, and phase 6
-        # spent a fortnight chasing the difference as though it were load.
+        # which on our production cluster was two nodes of six, and a
+        # fortnight went on chasing the difference as though it were load.
         daemon_nodes = lb.daemon_node_counts(nodes)
         self.assertNotEqual(
             {}, daemon_nodes,

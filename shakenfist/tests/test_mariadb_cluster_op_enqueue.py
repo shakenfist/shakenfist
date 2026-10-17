@@ -1,8 +1,7 @@
 # Copyright 2026 Michael Still and contributors
 #
-# Tests for _direct_create_and_enqueue_cluster_operation() from
-# phase 3 of the etcd-removal ops-queues plan. This is the only
-# multi-table atomic write in mariadb.py, so the tests focus on
+# Tests for _direct_create_and_enqueue_cluster_operation(). This is
+# the only multi-table atomic write in mariadb.py, so the tests focus on
 # proving the three inserts run inside a single connection
 # context and commit exactly once -- and that any failure rolls
 # the whole transaction back.

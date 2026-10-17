@@ -559,8 +559,7 @@ class CoalescibleKeyPair(_message.Message):
     NetOp carries no node_uuid, so it folds only the other cluster-wide
     ops. proto3 cannot tell an empty string from an unset field, so the
     flag is the only way to say it unambiguously -- when it is set the
-    server binds IS NULL and ignores ``uuid``. See decision 8 of
-    docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
+    server binds IS NULL and ignores ``uuid``.
     """
     uuid: _builtins.str
     is_null: _builtins.bool
@@ -1173,8 +1172,8 @@ Global___GetObjectEventsRequest: _TypeAlias = GetObjectEventsRequest  # noqa: Y0
 class EventReadRowProto(_message.Message):
     """EventReadRowProto carries one row of the GetObjectEvents reply.
     Named with the ``Proto`` suffix to avoid clashing with the pydantic
-    ``EventReadRow`` model in shakenfist.schema.event (same rename
-    convention as ``EventBatchEntry`` in phase 1b).
+    ``EventReadRow`` model in shakenfist.schema.event (the same rename
+    convention ``EventBatchEntry`` follows).
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -9167,9 +9166,7 @@ Global___ReapFederationReply: _TypeAlias = ReapFederationReply  # noqa: Y015
 @_typing.final
 class ReconcileSchedulerCapacityRequest(_message.Message):
     """Scheduler Capacity Operations (MariaDB)
-    Scheduler-reservations phase 2 (see docs/plans/
-    PLAN-scheduler-reservations-phase-02-capacity-tables.md). The demand
-    parameters come from the caller's configuration (D13): placement adds
+    The demand parameters come from the caller's configuration: placement adds
     vcpus x demand_per_vcpu of expected load, and the reconciler decays
     each placement's contribution linearly to zero over
     demand_decay_seconds of instance age.
@@ -9204,9 +9201,10 @@ Global___ReconcileSchedulerCapacityRequest: _TypeAlias = ReconcileSchedulerCapac
 @_typing.final
 class NodeCapacity(_message.Message):
     """One scheduler_node_capacity row after the pass. The delta_used_*
-    fields are the change relative to the row's previous values; until
-    phase 3 adds guarded-UPDATE drawdown they are ordinary between-pass
-    churn, after which they become the drift-detection signal (D5).
+    fields are the change relative to the row's previous values. Since
+    admission keeps the counters current with guarded-UPDATE drawdown, a
+    non-zero delta is drift between the counters and placement ground
+    truth, which indicates a bug and is logged loudly.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -9341,11 +9339,10 @@ Global___ReconcileSchedulerCapacityReply: _TypeAlias = ReconcileSchedulerCapacit
 @_typing.final
 class AdmitInstancePlacementRequest(_message.Message):
     """Scheduler placement admission and release (MariaDB)
-    Scheduler-reservations phase 3 (see docs/plans/
-    PLAN-scheduler-reservations-phase-03-primitive.md). Admission draws
-    down the materialised counters and writes the placement in one
-    transaction, in D1's canonical order: cluster_capacity, then
-    namespace_claims, then scheduler_node_capacity.
+    Admission draws down the materialised counters and writes the
+    placement in one transaction, locking rows in a canonical order to
+    avoid deadlocks: cluster_capacity, then namespace_claims, then
+    scheduler_node_capacity.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -9377,8 +9374,8 @@ class AdmitInstancePlacementRequest(_message.Message):
     disk_gb: _builtins.int
     """Virtual size summed from disk_spec"""
     demand_add: _builtins.float
-    """The D13 demand feedforward the placement adds to the node's
-    expected_demand, and the D13 target load the demand clause tests
+    """The demand feedforward the placement adds to the node's
+    expected_demand, and the target load the demand clause tests
     against. Both are computed by the caller from its own scheduler
     configuration (cpus x SCHEDULER_DEMAND_PER_VCPU, and
     SCHEDULER_TARGET_LOAD) so the database daemon needs no copy of it.
@@ -9449,11 +9446,12 @@ class CapacityDimensionDetail(_message.Message):
     """Set only on the demand dimension, whose used is the sum of two terms
     that mean different things: cpu_load_1 is measured ground truth (a
     high value means the node really is busy), expected_demand is the
-    D13 feedforward estimate (a high value on an idle node means the
-    estimator is wrong). Reported separately so a correct refusal can be
-    told from an estimator defect (issue 3913); used stays their sum.
-    optional so a reply from an sf-database predating these fields reads
-    as "no breakdown available" rather than a breakdown of zeroes.
+    feedforward estimate of recent placements (a high value on an idle
+    node means the estimator is wrong). Reported separately so a correct
+    refusal can be told from an estimator defect (issue 3913); used stays
+    their sum. optional so a reply from an sf-database predating these
+    fields reads as "no breakdown available" rather than a breakdown of
+    zeroes.
     """
     expected_demand: _builtins.float
     shortfall: _builtins.float
@@ -9584,7 +9582,7 @@ class AdmitInstancePlacementReply(_message.Message):
     node_used_disk_gb: _builtins.int
     node_expected_demand: _builtins.float
     claim_over_limit: _builtins.bool
-    """Advisory claim accounting (D5/D16). The admission was charged to a
+    """Advisory claim accounting. The admission was charged to a
     namespace claim and, read back inside the same transaction, that
     claim's used_* now stands above its limit_*. The placement was
     *admitted* -- claim ceilings are advisory for one release -- so this
@@ -9877,12 +9875,12 @@ Global___GetSchedulerNodeCapacityReply: _TypeAlias = GetSchedulerNodeCapacityRep
 @_typing.final
 class NamespaceClaim(_message.Message):
     """Namespace claim CRUD (MariaDB)
-    Scheduler-reservations phase 4 (see docs/plans/
-    PLAN-scheduler-reservations-phase-04-claims-api.md). Creating, growing
-    and shrinking a claim are themselves admission decisions against the
-    cluster_capacity singleton (D14's mirror guard), so each of them is one
-    transaction in D1's canonical order -- cluster_capacity, then
-    namespace_claims -- opening with a guarded UPDATE.
+    Creating, growing and shrinking a claim are themselves admission
+    decisions against the cluster_capacity singleton (claimed + delta must
+    fit in total - unclaimed_used, so claims can never oversubscribe the
+    cluster), so each of them is one transaction in the canonical lock
+    order -- cluster_capacity, then namespace_claims -- opening with a
+    guarded UPDATE.
 
     One namespace_claims row as its readers see it. The two timestamps are
     epoch seconds computed server side with UNIX_TIMESTAMP(), because the
@@ -9890,9 +9888,11 @@ class NamespaceClaim(_message.Message):
     reinterpreted it in its own timezone would report an expiry hours from
     the one the expiry sweep will actually use.
 
-    ``state`` is *coverage* ('active' or 'expired'), not object existence
-    (D2). The claim object's baseobject-managed state lives in
-    object_states like every other object's and is not carried here.
+    ``state`` is *coverage* ('active' or 'expired'), not object
+    existence, so the claim lookup on every admission reads it from the
+    claim row itself rather than joining object_states. The claim
+    object's baseobject-managed state lives in object_states like every
+    other object's and is not carried here.
     """
 
     DESCRIPTOR: _descriptor.Descriptor
@@ -10129,7 +10129,7 @@ Global___GetNamespaceClaimsReply: _TypeAlias = GetNamespaceClaimsReply  # noqa: 
 
 @_typing.final
 class UpdateNamespaceClaimRequest(_message.Message):
-    """D8: growing a dimension is an admission decision against the same
+    """Growing a dimension is an admission decision against the same
     mirror guard creation uses, shrinking one is permitted down to the
     claim's current used_* and no further, and one request may do both.
     ``fields`` is the field mask naming which of limit_cpus,

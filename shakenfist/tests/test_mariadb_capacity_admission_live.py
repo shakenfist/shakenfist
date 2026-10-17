@@ -3,7 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 
-"""Live-MariaDB tests for the placement admission primitive (phase 3).
+"""Live-MariaDB tests for the placement admission primitive.
 
 These tests run only when SF_MARIADB_TEST_DSN points at a disposable
 MariaDB database (CI provides one via tools/ci-enum-widening-test.sh,
@@ -702,7 +702,7 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         self.assertEqual(8, self._capacity(self.node_a).used_cpus)
 
     # ------------------------------------------------------------------
-    # Claims (dormant in production until phase 4)
+    # Claims
     # ------------------------------------------------------------------
 
     def test_an_active_claim_is_drawn_down_instead_of_the_cluster(self):
@@ -725,10 +725,10 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         self.assertEqual(str(claim_uuid), result['claim_uuid'])
 
     def test_a_claim_that_would_overflow_is_admitted_and_reported(self):
-        # D16: claim ceilings are advisory for one release. The
-        # over-limit admission has to *land* -- counters above the limit
-        # and all -- and say so, because phase 5 flips
-        # CLAIM_ENFORCEMENT_HARD and turns this into the refusal.
+        # Claim ceilings are advisory while CLAIM_ENFORCEMENT_HARD is
+        # False. The over-limit admission has to *land* -- counters above
+        # the limit and all -- and say so, because the pending hard
+        # ceiling flips that constant and turns this into the refusal.
         claim_uuid = self._add_claim(
             limit_cpus=8, used_cpus=6, limit_memory_mb=65536,
             used_memory_mb=0, limit_disk_gb=1000, used_disk_gb=0)
@@ -817,10 +817,12 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         self.assertEqual('', result['claim_uuid'])
 
     def test_the_claim_guard_binds_when_enforcement_is_turned_on(self):
-        # Phase 5's flip, exercised against a real server so its guard is
-        # known to bind before the constant moves. Also the live half of
-        # D6: the node here has a capacity row, so this says nothing
-        # about the fail-open -- the unit suite covers that half.
+        # The hard ceiling's flip of CLAIM_ENFORCEMENT_HARD, exercised
+        # against a real server so its guard is known to bind before the
+        # constant moves. Also the live half of the claim guard being
+        # independent of the node guard: the node here has a capacity
+        # row, so this says nothing about the fail-open -- the unit
+        # suite covers that half.
         self._add_claim(limit_cpus=8, used_cpus=6)
         with mock.patch.object(mariadb, 'CLAIM_ENFORCEMENT_HARD', True):
             result = self._admit(self.node_b, cpus=4)
@@ -1305,8 +1307,9 @@ class PlacementAdmissionConcurrencyLiveTestCase(_LiveCapacityFixture):
         UPDATE does when it collides: block and re-evaluate, or abort
         with ER_CHECKREAD (1020) for the caller to retry. A concurrency
         result that does not say which regime produced it is not a
-        result -- see the phase 0 findings' MariaDB caveats and the
-        step 6 notes in
+        result -- see the MariaDB caveats in
+        docs/plans/PLAN-scheduler-reservations-phase-00-findings.md and
+        the snapshot isolation notes in
         docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
         """
         with self.engine.connect() as conn:

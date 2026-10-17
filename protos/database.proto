@@ -22,9 +22,7 @@ service DatabaseService {
   // upgrade can still serve old clients. A new client never falls back
   // to V1: an old server would ignore the extra key columns and fold on
   // the first column alone, which is exactly the cross-node corruption
-  // the new names exist to prevent. See
-  // docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md
-  // decision 1.
+  // the new names exist to prevent.
   rpc ClaimCoalescibleSiblingsV2 (ClaimCoalescibleSiblingsV2Request) returns (ClaimCoalescibleSiblingsReply) {}
   rpc FindExistingCoalescibleOpV2 (FindExistingCoalescibleOpV2Request) returns (FindExistingCoalescibleOpReply) {}
 
@@ -42,12 +40,11 @@ service DatabaseService {
   rpc DeleteClusterConfig (DeleteClusterConfigRequest) returns (StatusReply) {}
 
   // Event Storage (MariaDB)
-  // Direct write path for batches of events; replaces the sf-eventlog
-  // gRPC target in phase 2.
+  // Direct write path for batches of events into MariaDB, so emitters
+  // need no separate event log daemon to write through.
   rpc RecordEventBatch (RecordEventBatchRequest) returns (StatusReply) {}
   rpc PruneEvents (PruneEventsRequest) returns (PruneEventsReply) {}
-  // Per-object read and delete paths replacing the legacy sqlite
-  // EventLog backend in phase 4.
+  // Per-object read and delete paths for the events stored in MariaDB.
   rpc GetObjectEvents (GetObjectEventsRequest) returns (GetObjectEventsReply) {}
   rpc DeleteObjectEvents (DeleteObjectEventsRequest) returns (StatusReply) {}
 
@@ -387,43 +384,42 @@ service DatabaseService {
   rpc ReapFederationRateLimits (ReapFederationRateLimitsRequest) returns (ReapFederationReply) {}
 
   // Scheduler Capacity Operations (MariaDB)
-  // Scheduler-reservations phase 2: the reconciler's single RPC. One
-  // call expires stale namespace claims, refreshes per-node limits from
-  // node_metrics, recomputes usage and expected demand from placement
-  // ground truth, and rebuilds the cluster_capacity singleton. The
-  // demand parameters ride in the request so the database daemon needs
-  // no copy of the caller's scheduler configuration. See
-  // docs/plans/PLAN-scheduler-reservations-phase-02-capacity-tables.md.
+  // The scheduler capacity reconciler's single RPC. One call expires
+  // stale namespace claims, refreshes per-node limits from node_metrics,
+  // recomputes usage and expected demand from placement ground truth, and
+  // rebuilds the cluster_capacity singleton. The demand parameters ride in
+  // the request so the database daemon needs no copy of the caller's
+  // scheduler configuration.
   rpc ReconcileSchedulerCapacity (ReconcileSchedulerCapacityRequest) returns (ReconcileSchedulerCapacityReply) {}
 
-  // Scheduler-reservations phase 3: the atomicity primitive the plan
-  // exists for (D1, D3). One transaction performs the guarded capacity
-  // drawdown, the placement attribute write and the placement reference
-  // rewrite, so two concurrent creates racing one remaining slot admit
-  // exactly once and a stale duplicate placement row cannot be produced.
-  // The scheduler configuration the guards need (the demand feedforward
-  // term and the target load) rides in on the request, so the database
-  // daemon needs no copy of it. Audit events are emitted by the caller
-  // from the reply fields; sf-database emits none. See
-  // docs/plans/PLAN-scheduler-reservations-phase-03-primitive.md.
+  // The scheduler's atomicity primitive: capacity is consumed at
+  // placement time by guarded UPDATEs on materialised counters, which
+  // behave the same under READ COMMITTED and REPEATABLE READ where an
+  // aggregate-guarded INSERT is wrong under one and livelocks under the
+  // other. One transaction performs the guarded capacity drawdown, the
+  // placement attribute write and the placement reference rewrite, so two
+  // concurrent creates racing one remaining slot admit exactly once and a
+  // stale duplicate placement row cannot be produced. The scheduler
+  // configuration the guards need (the demand feedforward term and the
+  // target load) rides in on the request, so the database daemon needs no
+  // copy of it. Audit events are emitted by the caller from the reply
+  // fields; sf-database emits none.
   rpc AdmitInstancePlacement (AdmitInstancePlacementRequest) returns (AdmitInstancePlacementReply) {}
   rpc ReleaseInstancePlacement (ReleaseInstancePlacementRequest) returns (ReleaseInstancePlacementReply) {}
 
   // Read the materialised per-node capacity counters. The admin resources
-  // summary must publish what admission would actually allow, and since
-  // phase 3 that is these counters rather than a Python walk over
-  // placement rows.
+  // summary must publish what admission would actually allow, and that
+  // is these counters rather than a Python walk over placement rows.
   rpc GetSchedulerNodeCapacity (GetSchedulerNodeCapacityRequest) returns (GetSchedulerNodeCapacityReply) {}
 
-  // Scheduler-reservations phase 4: namespace claim CRUD. Creating,
-  // growing and shrinking a claim are admission decisions in their own
-  // right -- a claim is a promise of capacity the cluster has to be able
-  // to keep -- so each writes cluster_capacity and namespace_claims in
-  // one transaction, in the canonical order, opening with a guarded
-  // UPDATE. Creation also migrates the namespace's existing drawdown out
-  // of the cluster's unclaimed sums and into the new claim (D3), and
-  // deletion migrates it back. See
-  // docs/plans/PLAN-scheduler-reservations-phase-04-claims-api.md.
+  // Namespace claim CRUD. Creating, growing and shrinking a claim are
+  // admission decisions in their own right -- a claim is a promise of
+  // capacity the cluster has to be able to keep -- so each writes
+  // cluster_capacity and namespace_claims in one transaction, in the
+  // canonical order, opening with a guarded UPDATE. Creation also
+  // migrates the namespace's existing drawdown out of the cluster's
+  // unclaimed sums and into the new claim, so usage from before the claim
+  // existed is not counted twice, and deletion migrates it back.
   rpc CreateNamespaceClaim (CreateNamespaceClaimRequest) returns (CreateNamespaceClaimReply) {}
   rpc GetNamespaceClaim (GetNamespaceClaimRequest) returns (GetNamespaceClaimReply) {}
   rpc GetNamespaceClaims (GetNamespaceClaimsRequest) returns (GetNamespaceClaimsReply) {}
@@ -582,8 +578,7 @@ message CoalescibleKeyPair {
   // NetOp carries no node_uuid, so it folds only the other cluster-wide
   // ops. proto3 cannot tell an empty string from an unset field, so the
   // flag is the only way to say it unambiguously -- when it is set the
-  // server binds IS NULL and ignores ``uuid``. See decision 8 of
-  // docs/plans/PLAN-queue-performance-phase-11-multi-column-key.md.
+  // server binds IS NULL and ignores ``uuid``.
   string column = 1;
   string uuid = 2;
   bool is_null = 3;
@@ -748,8 +743,8 @@ message GetObjectEventsRequest {
 
 // EventReadRowProto carries one row of the GetObjectEvents reply.
 // Named with the ``Proto`` suffix to avoid clashing with the pydantic
-// ``EventReadRow`` model in shakenfist.schema.event (same rename
-// convention as ``EventBatchEntry`` in phase 1b).
+// ``EventReadRow`` model in shakenfist.schema.event (the same rename
+// convention ``EventBatchEntry`` follows).
 message EventReadRowProto {
   string event_uuid = 1;
   string event_type = 2;
@@ -1354,7 +1349,7 @@ message NodeAttributesProto {
   // Which instances are placed on this node is queried live from the
   // instance_location rows in object_references; the legacy
   // node_attributes.instances JSON column, its dual-write and the union
-  // in Node.instances were removed in scheduler-reservations phase 3.
+  // in Node.instances were removed so the references are the only copy.
   // Tag reserved to prevent accidental reuse.
   reserved 9;
   reserved "instances_json";
@@ -1866,7 +1861,7 @@ message NetworkAttributesProto {
   string uuid = 1;                        // References networks.uuid
   string floating_gateway = 2;            // Floating IP gateway (empty = None)
   // Field tags 3 and 4 (networkinterfaces / networkinterfaces_initialized)
-  // were dropped in phase 7; the per-network NI list is queried live from
+  // were dropped; the per-network NI list is queried live from
   // network_interfaces. Tags reserved to prevent accidental reuse.
   reserved 3, 4;
   reserved "networkinterfaces", "networkinterfaces_initialized";
@@ -2364,7 +2359,7 @@ message InstanceAttributesProto {
   string ports_json = 4;               // JSON: {console_port, vdi_port, ...}
   string enforced_deletes_json = 5;    // JSON: {count}
   string block_devices_json = 6;       // JSON: {devices, extracommands, finalized}
-  // Tag 7 (interfaces_json) dropped in phase 7; the per-instance NI list
+  // Tag 7 (interfaces_json) was dropped; the per-instance NI list
   // is queried live from network_interfaces. Tag reserved.
   reserved 7;
   reserved "interfaces_json";
@@ -2717,9 +2712,7 @@ message ReapFederationReply {
 }
 
 // Scheduler Capacity Operations (MariaDB)
-// Scheduler-reservations phase 2 (see docs/plans/
-// PLAN-scheduler-reservations-phase-02-capacity-tables.md). The demand
-// parameters come from the caller's configuration (D13): placement adds
+// The demand parameters come from the caller's configuration: placement adds
 // vcpus x demand_per_vcpu of expected load, and the reconciler decays
 // each placement's contribution linearly to zero over
 // demand_decay_seconds of instance age.
@@ -2731,9 +2724,10 @@ message ReconcileSchedulerCapacityRequest {
 }
 
 // One scheduler_node_capacity row after the pass. The delta_used_*
-// fields are the change relative to the row's previous values; until
-// phase 3 adds guarded-UPDATE drawdown they are ordinary between-pass
-// churn, after which they become the drift-detection signal (D5).
+// fields are the change relative to the row's previous values. Since
+// admission keeps the counters current with guarded-UPDATE drawdown, a
+// non-zero delta is drift between the counters and placement ground
+// truth, which indicates a bug and is logged loudly.
 message NodeCapacity {
   string node_uuid = 1;  // Dashed uuid form
   int64 limit_cpus = 2;
@@ -2771,11 +2765,10 @@ message ReconcileSchedulerCapacityReply {
 }
 
 // Scheduler placement admission and release (MariaDB)
-// Scheduler-reservations phase 3 (see docs/plans/
-// PLAN-scheduler-reservations-phase-03-primitive.md). Admission draws
-// down the materialised counters and writes the placement in one
-// transaction, in D1's canonical order: cluster_capacity, then
-// namespace_claims, then scheduler_node_capacity.
+// Admission draws down the materialised counters and writes the
+// placement in one transaction, locking rows in a canonical order to
+// avoid deadlocks: cluster_capacity, then namespace_claims, then
+// scheduler_node_capacity.
 
 message AdmitInstancePlacementRequest {
   string instance_uuid = 1;   // Dashed uuid form
@@ -2788,8 +2781,8 @@ message AdmitInstancePlacementRequest {
   int64 cpus = 5;
   int64 memory_mb = 6;
   int64 disk_gb = 7;          // Virtual size summed from disk_spec
-  // The D13 demand feedforward the placement adds to the node's
-  // expected_demand, and the D13 target load the demand clause tests
+  // The demand feedforward the placement adds to the node's
+  // expected_demand, and the target load the demand clause tests
   // against. Both are computed by the caller from its own scheduler
   // configuration (cpus x SCHEDULER_DEMAND_PER_VCPU, and
   // SCHEDULER_TARGET_LOAD) so the database daemon needs no copy of it.
@@ -2821,11 +2814,12 @@ message CapacityDimensionDetail {
   // Set only on the demand dimension, whose used is the sum of two terms
   // that mean different things: cpu_load_1 is measured ground truth (a
   // high value means the node really is busy), expected_demand is the
-  // D13 feedforward estimate (a high value on an idle node means the
-  // estimator is wrong). Reported separately so a correct refusal can be
-  // told from an estimator defect (issue 3913); used stays their sum.
-  // optional so a reply from an sf-database predating these fields reads
-  // as "no breakdown available" rather than a breakdown of zeroes.
+  // feedforward estimate of recent placements (a high value on an idle
+  // node means the estimator is wrong). Reported separately so a correct
+  // refusal can be told from an estimator defect (issue 3913); used stays
+  // their sum. optional so a reply from an sf-database predating these
+  // fields reads as "no breakdown available" rather than a breakdown of
+  // zeroes.
   optional double cpu_load_1 = 6;
   optional double expected_demand = 7;
   // max(0, used + requested - limit) (or max(0, used - limit) on the
@@ -2879,7 +2873,7 @@ message AdmitInstancePlacementReply {
   int64 node_used_memory_mb = 9;
   int64 node_used_disk_gb = 10;
   double node_expected_demand = 11;
-  // Advisory claim accounting (D5/D16). The admission was charged to a
+  // Advisory claim accounting. The admission was charged to a
   // namespace claim and, read back inside the same transaction, that
   // claim's used_* now stands above its limit_*. The placement was
   // *admitted* -- claim ceilings are advisory for one release -- so this
@@ -3004,12 +2998,12 @@ message GetSchedulerNodeCapacityReply {
 }
 
 // Namespace claim CRUD (MariaDB)
-// Scheduler-reservations phase 4 (see docs/plans/
-// PLAN-scheduler-reservations-phase-04-claims-api.md). Creating, growing
-// and shrinking a claim are themselves admission decisions against the
-// cluster_capacity singleton (D14's mirror guard), so each of them is one
-// transaction in D1's canonical order -- cluster_capacity, then
-// namespace_claims -- opening with a guarded UPDATE.
+// Creating, growing and shrinking a claim are themselves admission
+// decisions against the cluster_capacity singleton (claimed + delta must
+// fit in total - unclaimed_used, so claims can never oversubscribe the
+// cluster), so each of them is one transaction in the canonical lock
+// order -- cluster_capacity, then namespace_claims -- opening with a
+// guarded UPDATE.
 
 // One namespace_claims row as its readers see it. The two timestamps are
 // epoch seconds computed server side with UNIX_TIMESTAMP(), because the
@@ -3017,9 +3011,11 @@ message GetSchedulerNodeCapacityReply {
 // reinterpreted it in its own timezone would report an expiry hours from
 // the one the expiry sweep will actually use.
 //
-// ``state`` is *coverage* ('active' or 'expired'), not object existence
-// (D2). The claim object's baseobject-managed state lives in
-// object_states like every other object's and is not carried here.
+// ``state`` is *coverage* ('active' or 'expired'), not object
+// existence, so the claim lookup on every admission reads it from the
+// claim row itself rather than joining object_states. The claim
+// object's baseobject-managed state lives in object_states like every
+// other object's and is not carried here.
 message NamespaceClaim {
   string uuid = 1;       // Dashed uuid form
   string namespace = 2;
@@ -3087,7 +3083,7 @@ message GetNamespaceClaimsReply {
   repeated NamespaceClaim claims = 1;
 }
 
-// D8: growing a dimension is an admission decision against the same
+// Growing a dimension is an admission decision against the same
 // mirror guard creation uses, shrinking one is permitted down to the
 // claim's current used_* and no further, and one request may do both.
 // ``fields`` is the field mask naming which of limit_cpus,

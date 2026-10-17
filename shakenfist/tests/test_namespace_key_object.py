@@ -1,9 +1,8 @@
 # Copyright 2019 Michael Still and contributors
 #
-# Unit tests for the NamespaceKey DatabaseBackedObject added by phase 2
-# of the auth federation plan. The behaviour-preservation tests for the
-# old JSON column implementation live in test_namespace_keys.py and are
-# deliberately left alone.
+# Unit tests for the NamespaceKey DatabaseBackedObject. The
+# behaviour-preservation tests for the old JSON column implementation
+# live in test_namespace_keys.py and are deliberately left alone.
 import base64
 import json
 from unittest import mock
@@ -68,9 +67,8 @@ class NamespaceKeyTestCase(base.ShakenFistTestCase):
         stays because unwrapping in one place beats unwrapping at every
         call site.
 
-        See docs/plans/PLAN-auth-federation-phase-06-secret-types.md,
-        Decision 7. test_the_secret_guard_detects_a_real_leak() proves
-        this helper still fails when a secret genuinely escapes.
+        test_the_secret_guard_detects_a_real_leak() proves this helper
+        still fails when a secret genuinely escapes.
         """
         for call in mock_add_event.call_args_list:
             self.assertNotIn(attrs.key.get_secret_value(), str(call))
@@ -312,7 +310,7 @@ class NamespaceKeyCreationTestCase(NamespaceKeyTestCase):
                 leaky, attrs)
 
     def test_a_masked_secret_is_not_mistaken_for_absence(self):
-        """The other half of Decision 7.
+        """The other half of proving the guard: the mask is not a leak.
 
         An event carrying the rendered form of a SecretStr contains
         '**********' and not the secret, so the guard must pass on it.
