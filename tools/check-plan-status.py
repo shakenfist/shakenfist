@@ -67,11 +67,11 @@ in the canonical block (which lives in shakenfist/development, at
 checker rejecting a status the template tells authors to write.
 
 Three plans predate the Execution-table convention and are counted by hand,
-and two more keep a table which is a placeholder rather than a phase list.
+and three more keep a table which is a placeholder rather than a phase list.
 They are named in `HAND_COUNTED` and `PROVISIONAL` rather than detected, so
 that a plan cannot join them by quietly omitting or stubbing its table:
 adding a name is a deliberate edit, and the index preamble names the same
-five for readers.
+six for readers.
 
 `order.yml` is registration, not navigation. Nothing in this repository
 renders it -- `mkdocs.yml.tmpl` lists the Plans nav by hand -- but the format
@@ -120,6 +120,7 @@ HAND_COUNTED = {
 PROVISIONAL = {
     'PLAN-qemu-futures.md',         # open-ended, table ends in an ellipsis row
     'PLAN-artifact-ux-rework.md',   # "0. Decisions pass" plus "(later phases)"
+    'PLAN-blob-containers.md',      # "0. Decisions pass" plus "(later phases)"
 }
 
 # The index status is asserted to follow the phase table, in the index
