@@ -25,6 +25,13 @@ repository non-compliant for a wiring that does run it. The pre-commit
 half is still checked independently, so a workflow running pre-commit
 against a config with no skillsaw hook does not pass.
 
+The `pre-commit run` is recognised however the command is spelled:
+bare, through a quoted path into a virtualenv
+(`"${RUNNER_TEMP}/venv/bin/pre-commit" run`, where the closing quote
+sits between the command and `run`), or as the module
+(`python -m pre_commit run`). Installing pre-commit, or running
+`pre-commit install`, runs no hook and does not count.
+
 A workflow that installs skillsaw from PyPI and then invokes the
 `skillsaw` command satisfies the second half as well, without naming
 the upstream repository anywhere. Where the command sits is not

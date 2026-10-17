@@ -206,7 +206,11 @@ make tag-release 0.2.0
 
 The script will:
 
-1. Fetch `origin/develop` and the latest tags.
+1. Fetch `origin/develop` and origin's tags, overwriting any
+   local tag of the same name. `sign-tag` (below) replaces each
+   release tag on origin with a signed one, so the clone that
+   tagged the previous release still holds the unsigned original,
+   and a plain `git fetch --tags` would refuse to update it.
 2. Verify no `v0.2.0` tag exists locally or on origin.
 3. Verify the `[workspace.package].version` on
    `origin/develop` is `0.2.0` (i.e. the release PR has

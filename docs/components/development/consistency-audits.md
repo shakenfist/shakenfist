@@ -228,14 +228,37 @@ Two properties matter when changing any of this.
 
 **Issue titles are the idempotency key.** They are
 `Consistency: <issue_title>`, from the check's `issue_title` class
-attribute, matched exactly to decide whether an issue already exists.
+attribute, built by `issue_title_for()` in `scripts/audit_common.py`
+and matched exactly to decide whether an issue already exists --
+exactly, because several titles are prefixes of others, and "Workflow
+standards" must not close a "Workflow standards (flake8wrap)" issue.
 Renaming one silently orphans every open issue for it and files a
 fresh set, so treat a check's `issue_title` as an interface, not a
-label. `FROZEN_ISSUE_TITLES` in `scripts/tests/test_metadata.py`
-holds every one as a literal, so a rename fails the tests until it is
-made there too, on purpose. (`ISSUE_TITLES` in
-`scripts/audit_common.py` is a view over the registry, not the place
-to change one.)
+label; retiring the old title, described under adding a criterion
+below, is what closes them. `FROZEN_ISSUE_TITLES` in
+`scripts/tests/test_metadata.py` holds every one as a literal, so a
+rename fails the tests until it is made there too, on purpose.
+(`ISSUE_TITLES` in `scripts/audit_common.py` is a view over the
+registry, not the place to change one.)
+
+**A failed listing is not an empty one.** Each repository's open
+`consistency` issues are listed once per run and matched by title in
+Python. If the listing fails, that repository's issues are not managed
+at all -- read as "no issues", every failing check would file a
+duplicate -- and `audit-manage-issues.py` carries on with the other
+repositories and exits non-zero at the end. On the compliance page the
+same failure renders the repository's Issue cells as `?` rather than
+`-`, which would claim that no issue is open.
+
+**A refused write fails the run.** A create, edit or close that GitHub
+refuses, or that times out, is counted, and once every repository has
+been managed the script exits non-zero and names them. An issue is
+closed before its closing comment is posted, so a close that fails
+leaves nothing behind for the next run to post again. A failed
+`manage-issues` does not hold back the compliance page: `update-docs`
+runs once it has finished, whatever its outcome, as long as every
+`audit` leg passed, because a refused write does not make a verdict
+wrong.
 
 **Repository renames are handled, but noisily on purpose.** Repo names
 are resolved to their canonical form before searching, because GitHub's
@@ -378,6 +401,31 @@ orphans every open issue for that criterion across the fleet. Adding a
 criterion adds a line to the frozen table; changing an existing line is
 meant to be difficult.
 
+Removing a criterion orphans its issues the same way: no later run
+measures it, so nothing would ever close them. Retire it instead, in
+one commit:
+
+1. Delete the check -- its class, its line in `CHECKS`, its lines in
+   the frozen tables, its specification and its row in
+   `docs/audits/README.md`.
+2. Add its `issue_title`, spelled exactly as it was and without the
+   `Consistency: ` prefix, to `RETIRED_ISSUE_TITLES` in
+   `scripts/audit_common.py`.
+
+Every later run of `audit-manage-issues.py` closes any open issue
+carrying a retired title, with a comment saying the criterion was
+retired. Leave the entry in place afterwards: it costs one comparison
+per repository, and a repository whose audit leg failed on the first
+run after the retirement is closed on a later one. Retirement only
+reaches repositories still in the audit matrix, since it runs over
+each run's results: issues in a repository dropped from scope have to
+be closed by hand, as its live criteria's issues do. A retired title can
+never be filed again by a live criterion, and
+`RetiredIssueTitlesTest` in `scripts/tests/test_metadata.py` fails if
+one is. Renaming a title safely is the second step on its own: change
+the `issue_title` and its frozen line, retire the old spelling, and the
+next run closes the old issues and files under the new title.
+
 The column heading is the part with history. Before it was a class
 attribute it was a fifth file to remember, and forgetting it broke the
 2026-08-12 run: `review-marks-pre-commit` joined the workflow-standards
@@ -460,11 +508,18 @@ import rather than measuring anything.
 Every test suite lives in `scripts/tests/`, including the suites for
 the scripts around the package -- `test_review_tracking.py`,
 `test_audit_update_docs.py`, `test_audit_snapshot.py`,
-`test_check_audit_smoke.py`, `test_issue_fix_extraction.py` and
+`test_check_audit_smoke.py`, `test_manage_issues.py`,
+`test_audit_clis.py`, `test_issue_fix_extraction.py` and
 `test_audit_seams.py`. They sat in `scripts/` until there were two
 directories with no rule telling them apart. A suite written anywhere
 else is a suite no hook runs, and `SuiteLocationTest` in
 `scripts/tests/test_hooks.py` fails on one.
+
+The issue scripts are tested against `FakeIssueTracker` in
+`scripts/tests/fake_issues.py`, which answers their `gh` invocations
+out of an in-memory tracker and records every write, so a test asserts
+what a run would do to a repository's issues rather than which helper
+it called.
 
 Two `local` pre-commit hooks run them. `audit-package-tests` discovers
 the directory and runs all of it, on a change to any Python file under
@@ -598,7 +653,9 @@ workflow's runtime assumptions -- the 2026-08-20 outage was a bare
 `pip install` meeting a runner that enforces PEP 668 -- so the smoke job
 asserts the audit *measured* rather than that it approved. Which checks
 fail against this repository is not its business; several fail here by
-design.
+design. A check reporting `error` has not measured anything -- it
+raised -- so the smoke job fails on one, as the scheduled run's
+`audit-raised.py` step would.
 
 ## Related
 

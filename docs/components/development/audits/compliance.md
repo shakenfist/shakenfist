@@ -7,7 +7,9 @@ committed by it, and it is the only generated file in `docs/audits/`
 changes only when a person changes it.
 
 Read a table here together with the criterion it belongs to. The
-table says who passes and which issue tracks each failure; the
+table says who passes and which issue tracks each failure -- `-` in
+the Issue column means none is open, and `?` that the lookup failed,
+so whether one is open is not known; the
 specification says what is checked and why, what the check
 deliberately does not cover, and which template implements it, and is
 what to read first when picking up an issue. [README.md](/components/development/audits/README/)

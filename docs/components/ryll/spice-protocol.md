@@ -50,7 +50,10 @@ keeping its old count, which could leave both ends waiting on each
 other. Channels without their own default (inputs, cursor, playback and
 the rest) still advertise the word they always have, without
 `AGENT_CONNECTED_TOKENS`, because capability bits mean different things
-on each channel type.
+on each channel type. On playback that word's bits 0 and 3 are
+`PLAYBACK_CELT_0_5_1` and `PLAYBACK_OPUS`; ryll plays only Opus and raw
+PCM, and does not advertise `PLAYBACK_VOLUME`, so a server sends it no
+`VOLUME` or `MUTE`.
 
 A proxy that must forward a real client's capabilities to the
 server instead uses `perform_link_with_caps`, or
@@ -258,10 +261,11 @@ and the kerbside SPICE proxy uses its link handshake to speak to clients as
 a server. The message types a server sends or receives therefore have both
 a reader and a writer, whichever direction ryll itself needs: the common
 and main channel messages, the vdagent messages, the cursor and inputs
-channels, and the display channel's surfaces, monitors config, streams and
-`DRAW_COPY`. They implement `WireType` (or `ClipboardWireType`), and each
-is tested against itself and against hand-written bytes laid out from
-spice.proto. The other draw operations (`SpiceFill`, `SpiceOpaque`,
+channels, the display channel's surfaces, monitors config, streams and
+`DRAW_COPY`, and the playback channel's `START`, `MODE`, `DATA`, `VOLUME`,
+`MUTE` and `LATENCY`. They implement `WireType` (or `ClipboardWireType`),
+and each is tested against itself and against hand-written bytes laid out
+from spice.proto. The other draw operations (`SpiceFill`, `SpiceOpaque`,
 `SpiceTransparent`, `SpiceAlphaBlend`, `SpiceBlackness` and the brushes)
 still have readers only, since only a client parses them.
 
