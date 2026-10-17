@@ -15232,6 +15232,14 @@ verbatim copies downstream, and this audit to catch drift.</p>
   a copy behind canonical means improvements have not propagated;
   re-run <code>tools/vendor.sh</code> from an up to date sfui checkout.</li>
 </ul>
+<p>The recorded commit must also be <strong>on the canonical default branch</strong>
+before anything is checked out. Running <code>tools/vendor.sh</code> at that commit
+is running code the audited repository chose, and a clone of sfui holds
+every pushed branch, so a commit that merely exists could be one nobody
+reviewed. A commit off the default branch fails without its script
+being run. None of the check's subprocesses inherits <code>GH_TOKEN</code> or
+<code>GITHUB_TOKEN</code>: the audit step holds a token that can file and close
+issues across the organisation, and cloning public sfui needs none.</p>
 <p>Repositories with no <code>.sfui-commit</code> are not applicable.</p>
 <p>private-ci, the first sfui consumer, is internal tooling excluded from
 the conventions audits, but this check runs against it anyway. It is in

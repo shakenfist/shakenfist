@@ -15384,6 +15384,13 @@ at the repo root).</p>
 <td>Complete</td>
 <td>(no phase files; single change)</td>
 </tr>
+<tr>
+<td>2026-10-13</td>
+<td><a href="/components/instar/plans/PLAN-543-merge-queue-path/">Cut the merge queue's critical path</a></td>
+<td>Stop the merge queue ejecting green pull requests at the 360-minute <code>check_response_timeout_minutes</code> by removing work from the gate rather than rearranging it (issue #543). Measurement after <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/private-ci/issues/66" title="GitHub Issue: shakenfist/private-ci #66">private-ci#66</a> made runner ordering fair found the cost is not fan-out or any fixed setup -- about three minutes of a 42-minute matrix leg is setup, and six Hyper-V and VirtualPC VHD conversion tests are half the suite's execute time and the cause of a single worker setting every leg's wall clock. Those six move to a nightly cross-distro job, stestr gets derived timing data so a future heavy test cannot silently recreate the imbalance, and the test-partition guard is extended to the merge queue and the nightly so nothing can fall off the gate unnoticed</td>
+<td>In progress</td>
+<td>(no phase files; single change)</td>
+</tr>
 </tbody>
 </table>
 

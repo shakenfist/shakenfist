@@ -16056,14 +16056,21 @@ Odd surfaces are ordinary: the browser asks the guest for
 that renders a desktop unreadable. <code>H264Encoder::new</code> derives a
 target from surface area and frame rate instead
 (<code>target_bitrate_bps</code>, ~2.4 Mbit/s at 1024x768<a class="magiclink magiclink-github magiclink-mention" href="https://github.com/30" title="GitHub User: 30">@30</a>), clamped to
-1–20 Mbit/s, and selects <code>UsageType::ScreenContentRealTime</code>. The
+1–20 Mbit/s, and encodes it as <code>H264Content::Screen</code>, openh264's
+<code>ScreenContentRealTime</code> usage. The
 quantiser range is set to 12–51 explicitly, because openh264
 silently narrows its default 0–51 to 26–35 for screen content,
 which makes most targets unreachable. Frames are one slice each,
 since browsers have not been tried with more. Rate control is openh264's
 quality mode with frame skipping on, as it always was here; a SPICE
 server using the compression crate's encoder directly gets bitrate
-mode and can change the bitrate and frame rate live.
+mode and can change the bitrate and frame rate live. A server
+streaming a moving picture should choose <code>H264Content::Video</code>
+(<code>CameraVideoRealTime</code>): in bitrate mode, screen content keeps
+P-frames at the bottom of the QP range and holds the target only by
+skipping frames, which turns a 25 fps video into about 7 fps. The
+numbers are on <code>H264Content</code> in
+<code>shakenfist-spice-compression/src/encode/h264.rs</code>.
 The derivation is <strong>open-loop</strong>: nothing feeds the receiver's
 bandwidth estimate (REMB/TWCC) back into the encoder, because
 <code>EncoderControl</code> carries only keyframe and stop. On a constrained
