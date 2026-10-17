@@ -171,6 +171,16 @@ This provides:
 - "What blobs use chunk C?" → `get_references_to(BLOB, C, relationship=CHUNK)`
 - Ref counting works naturally - chunk can't be deleted while referenced
 
+!!! warning "This shape cannot record a repeated chunk"
+
+    `object_references` is keyed on `(source_object_type, source_uuid, relationship,
+    target_object_type, target_uuid)`, and `relationship_value` is not part of that key
+    (`mariadb.py:3028-3031`). A duplicate insert keeps the first value. So a composite that holds
+    the same chunk at two positions, which disk images do constantly, can record only one of them.
+    [Blobs as containers](PLAN-blob-containers.md) found the same limitation for named entries,
+    and its open question 1 asks whether the two should share one positional parts table. Settle
+    that before this phase is planned.
+
 ---
 
 ### Phase 3: Content-Defined Chunking
