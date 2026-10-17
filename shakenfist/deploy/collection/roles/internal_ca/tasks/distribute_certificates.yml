@@ -6,6 +6,29 @@
 - name: Validate the role's parameters
   ansible.builtin.include_tasks: validate.yml
 
+# The default cert_group, kvm, is created by udev rather than by anything this
+# collection installs, and site.yml distributes the SPICE certificate to every
+# node, not only hypervisors. Without this a node lacking the group fails
+# partway through the copies below with a bare chgrp error. A numeric gid is
+# looked up by number and reported under its name, hence the check for any
+# missing entry rather than for cert_group by name.
+- name: Look up cert_group on the host
+  ansible.builtin.getent:
+    database: group
+    key: "{{ cert_group }}"
+    fail_key: false
+  register: cert_group_lookup
+
+- name: Check cert_group exists on the host
+  ansible.builtin.assert:
+    that:
+      - cert_group_lookup.ansible_facts.getent_group | dict2items | selectattr('value', 'none') | list | length == 0
+    fail_msg: >-
+      cert_group is {{ cert_group | to_json }}, but {{ inventory_hostname }}
+      has no such group. The default, kvm, is created by udev; install udev,
+      or pass a cert_group the host has and, on a hypervisor, QEMU belongs to.
+    quiet: true
+
 - name: Create /etc/pki/CA
   ansible.builtin.file:
     path: /etc/pki/CA
