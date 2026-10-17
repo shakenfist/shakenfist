@@ -15139,6 +15139,17 @@
   <code>LOG.with_fields({'instance_uuid': uuid})</code> rather than formatting it into
   the message</li>
 <li>Every file starts with <code># Copyright 2019 Michael Still and contributors</code></li>
+<li>Comments, docstrings, test names and log messages describe the code as
+  it is, not the plan that built it: no <code>added in phase 5</code>,
+  <code>per decision 3</code> or <code>pending step 5f</code>. Write the reason the citation
+  stood for. The
+  rule is the <code>plan-references-in-code</code> block in <code>PUSH-AUDIT.md</code>, and the
+  daily <a href="../../components/development/audits/plan-history-in-source/">plan history in source</a>
+  audit measures it out of band. A line where the shape is genuinely not
+  a plan reference carries <code># audit-ok: phase-reference</code>; a file made of
+  the shapes, such as a test suite for a plan-reference checker, carries
+  <code># audit-ok: phase-reference-file</code> once near the top, with a sentence
+  saying why</li>
 </ul>
 <p>This page is the style guide; <code>AGENTS.md</code> summarises it and links here.</p>
 <h2 id="attribute-updates-use-field-masks">Attribute updates use field masks<a class="headerlink" href="#attribute-updates-use-field-masks" title="Permanent link">&para;</a></h2>
