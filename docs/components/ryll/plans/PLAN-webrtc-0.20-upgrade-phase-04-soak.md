@@ -598,6 +598,9 @@ regressions**, and all of them invisible to the test suite:
    including every arrow.
 3. **Browser auto-repeat was forwarded**, stacking on the guest's
    own repeat. Latent, but the same failure mode by another route.
+   *Reversed in October 2026 by #561: forwarding repeats is correct,
+   and the guest does not stack its own on top. See
+   [design decision 24](/components/ryll/design-decisions/).*
 
 The first two are one root cause: the web frontend reimplemented an
 encoding that `make_scancode` already owned. Both existing unit

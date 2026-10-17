@@ -41,6 +41,8 @@ All blocking items from the original review have been resolved:
 1. ~~`app.rs` keyboard repeat filter dropped — auto-repeat
    double-fires.~~ Fixed by the contributor in `b14ccbd4`
    (restored `repeat: false` in the key-event match).
+   *Reversed in October 2026 by #561: repeats are now forwarded.
+   See [design decision 24](/components/ryll/design-decisions/).*
 2. ~~`main_channel.rs` `set_mouse_mode()` lacks request-loop
    guard.~~ Resolved by develop's `10f19477` introducing
    `mouse_mode_request_pending` and the second-rebase merge

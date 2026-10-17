@@ -307,7 +307,7 @@ Still open:
 | 2. CI-based audit runner | Complete | Not recoverable; see Phase 5 |
 | 3. Automatic review, and the fix/retest split | Complete | Not recoverable; see Phase 5 |
 | 4. Cleanup | Complete | Reconstructed; see Phase 5 |
-| 5. Push audit | Not started | |
+| 5. Push audit | In progress | |
 
 This table was added on 2026-10-16, when phases 2 and 3 were closed
 out; until then the phases were tracked only by the `-- DONE` suffix
@@ -498,7 +498,7 @@ nothing in the chain reads a secret.
    and a link -- which is what `llm-doc-structure` asks of them, and
    `AGENTS.md` is loaded into every session held here.
 
-### Phase 5: Push audit -- NOT STARTED
+### Phase 5: Push audit -- IN PROGRESS
 
 Run `PUSH-AUDIT.md` over the whole plan's work rather than over the
 last phase's diff alone -- the interactions between phases are most
@@ -838,6 +838,229 @@ there is a gate: the 5d Results table is reviewed and agreed first,
 because fixing a finding that should have been declined is cheap to
 propose and expensive to unwind across the fleet.
 
+#### Results
+
+Run on 2026-10-16 and 2026-10-17 against development `3240530` and
+actions `e0bb086`. The raw outputs of 5a, and the ten wave 2 reports,
+are not committed; this section is the record.
+
+**5a (wave 1).** Passed in both repositories.
+
+- development: `pre-commit` was clean. The five historical ranges
+  gave 641 hits. 113 were for text no longer on `main`. The rest were
+  accepted: stdlib imports, plan references inside the plan checks
+  themselves, and 502 spec table rows that now live only in the
+  generated `compliance.md`, which `PLAN-audit-compliance-split.md`
+  already dealt with.
+- The current-state pass ran the content greps over 117 owned files
+  (+46,571) and recorded the five change greps as not applicable, per
+  decision 2. Every hit was accepted, and the 12 files over 800 lines
+  went to 2a.
+- actions: `pre-commit` was clean, 510 unit tests passed, and gitleaks
+  (v8.18.4 in docker, because it is not installed on the host) passed
+  its positive control and scanned 535 commits clean.
+  `ansible-syntax-check` was not applicable, since no phase 3 path
+  touches `ansible/`.
+- Shellcheck at default severity found six unused variables in
+  `review-pr-with-claude.sh`; they went to triage as 5c-2a-4.
+- The decision 3 line counts were re-measured and had not moved, so
+  the planned split held.
+
+**5b and 5c (wave 2).** Ten agents ran in parallel, as the operator
+chose at the back brief. Every report reproduced its expected totals:
+
+| Agent | Files read | Totals |
+|-------|------------|--------|
+| 2a-i | `packaging.py`, `ci_workflows.py` | 2 files, +5,042 |
+| 2a-ii | the other `checks/` modules | 9 files, +6,340 |
+| 2a-iii | runner outside `checks/` | 23 files, +4,824 |
+| 2b | tests | 25 files, +22,065 |
+| 2c | `docs/consistency-audits.md`, `docs/audits/` | 58 files, +8,300 |
+| 2d | runner code | 34 files, +16,206 |
+| 5c-2a, 2b, 2c, 2d | actions phase 3 paths | 10 files, +3,152 each |
+
+One brief was narrowed before it ran. 2d's first file list also took
+in the tests (59 files, +38,271), so it was cut to the runner's own
+code, with the tests given as context. One wave 1 observation was
+withdrawn by 2b: `test_docs_content.py` and `test_llm_docs.py` do carry
+the plan-reference marker, at file scope.
+
+**Operator decisions taken at triage (2026-10-17):**
+
+1. **Fast-tracks.** Two findings were live exposures rather than audit
+   defects, and were fixed ahead of this table:
+   - 5c-2d-1, -2 and -3 in shakenfist/actions#168;
+   - 2d-1 in #263.
+2. **Tool failures report `error`.** When a check's own tooling fails
+   (a GitHub API error, a failed `git ls-files`), it reports `error`
+   rather than `fail` or `not_applicable`. `error` leaves issues
+   alone, and turns the leg red through `audit-raised.py`. The policy
+   is written down once, in `docs/consistency-audits.md`.
+3. **The reviewer's issue filing in actions is dropped.** That means
+   the filing step, the "Related Issues / Closes" section and the
+   `issues: write` requirement. Callers that keep granting it are
+   harmless.
+4. **The token split is taken in this phase.** The clone and audit
+   steps get a separate read-only fine-grained token, and
+   `AUDIT_TOKEN` stays only in `manage-issues` and `update-docs`. The
+   operator mints the new token; 5e does the workflow side.
+
+**Verdicts.** Each *fix* row names the fix group it lands in. The
+development groups land as one pull request per group, in 5e, and the
+actions groups the same way, in 5f:
+
+| Group | Repository | What |
+|-------|------------|------|
+| D1 | development | Every read of an audited repository's files goes through `Repo.read`, or one helper on `Repo.contains`, so nothing outside the clone is read, and a directory or dangling link is "no file" rather than an `error` |
+| D2 | development | The tool-failure policy (decision 2 above) |
+| D3 | development | The issue lifecycle: open issues fetched once per repository rather than searched per check, write failures counted and failing the job, and tests for every branch |
+| D4 | development | `consistency-audit.yml`: the token split, a `main`-only guard on the steps that write, `runner.temp` and `--clear`, a concurrency group, skillsaw in its own environment, `persist-credentials: false`, and the failure-report script moved to `tools/` |
+| D5 | development | Parser and matcher defects in individual checks, each with the test 2b found missing |
+| D6 | development | Duplicated helpers that have drifted |
+| D7 | development | Stale comments and documentation |
+| A1 | actions | Fixed in actions#168 |
+| A2 | actions | Drop review issue filing (decision 3 above) |
+| A3 | actions | Tests that execute the security guards rather than search their text |
+| A4 | actions | Review JSON extraction and validation |
+| A5 | actions | Documentation and comments |
+| T | development templates | `templates/ci-review-automation/`, which actions' `pr-re-review.yml` copies byte for byte; fixed in development, then re-synced |
+
+| ID | Location | Sev | Verdict | Group / reason |
+|----|----------|-----|---------|----------------|
+| 2a-i-1 | `ci_workflows.py:1290-1331` | med | fix | D5. Read `paths`/`paths-ignore` from the `pull_request` trigger, and test comments stripped |
+| 2a-i-2 | `packaging.py:1541-1557` | med | fix | D2: use `tracked_paths`, and report `error` when it fails |
+| 2a-i-3 | `packaging.py:531-540,727-737` | med | fix | D5: compare a glob's directory, and skip block scalars |
+| 2a-i-4 | `packaging.py:486,497` | low | fix | D5: one helper for a quoted boolean |
+| 2a-i-5 | `ci_workflows.py:1443` | low | fix | D5: flow-form `workflow_call`, read from the header |
+| 2a-i-6 | `ci_workflows.py:1993-1998` | low | fix | D5: a fuzz callee invoked from a `merge_group` workflow |
+| 2a-i-7 | `ci_workflows.py:687-711` | low | fix | D6: use `mapping_entries` |
+| 2a-i-8 | `packaging.py`, `ci_workflows.py` raw `open()` ×9 | low | fix | D1 |
+| 2a-i-9 | `ci_workflows.py:977-1002` | low | fix | D5: accumulate the docs-only findings, and use the constant. Tested by 2b-7 |
+| 2a-i-10 | `ci_workflows.py:162-230` | low | cross-reference | `PLAN-workflow-ref-trust.md`. Matching `@main` is that plan's to change when it moves callers to pins |
+| 2a-i-11 | `packaging.py:2671` | low | fix | D5: strip the comment before matching |
+| 2a-i-12 | `packaging.py:1039-1053` | low | fix | D5: read the arrays through `tomllib` |
+| 2a-i-13 | `ci_workflows.py:613-629` | low | fix | D7: narrow the docstring to what is measured |
+| 2a-i-14 | `ci_workflows.py:1957` | low | fix | D5 |
+| 2a-i-15 | `ci_workflows.py:153,957,964` | low | fix | D7 |
+| 2a-i-16 | `ci_workflows.py:236-259` | low | fix | D7: cut the survey narrative |
+| 2a-i-17 | `packaging.py:2460-2500` | low | fix | D5: hoist the masking out of the loop |
+| 2a-i-18 | file size, both files | adv | decline | The seams are real, but a split moves about 2,000 reviewed lines and re-stales their marks for no behaviour change. Future work below |
+| 2a-ii-1 | raw `open()` across five modules, `files.py` walkers | med | fix | D1. This is the same class as 2a-i-8, 2a-iii-10 and 2d-4, and here it was reproduced: a dangling link gives `error`, and a link out of the clone is quoted into an issue |
+| 2a-ii-2 | `github_config.py:169-210` | med | fix | D2. A failed or null security query is `error`, not pass |
+| 2a-ii-3 | tool-failure policy | med | fix | D2: decision 2 above |
+| 2a-ii-4 | `github_config.py:121-150` | low | fix | D2: the exemption moves to `applies()` |
+| 2a-ii-5 | `github_config.py:386-390`, `review.py:203-206` | low | fix | D7 |
+| 2a-ii-6 | four docstrings naming removed functions | low | fix | D7 |
+| 2a-ii-7 | `llm_docs.py:437-446` | low | fix | D5: report orphans even without skillsaw. Tested by 2b-3 |
+| 2a-ii-8 | `npm_dependencies.py:856-872` | low | fix | D2: use `tracked_paths` |
+| 2a-ii-9 | `plans.py:1148-1163` | low | fix | D6: `iter_lines_outside_fences` |
+| 2a-ii-10 | `docs_content.py:201-206` | low | fix | D6: `tracked_paths`, falling back to `WALK_SKIP` |
+| 2a-ii-11 | `npm_dependencies.py`, `packaging.py` result keys | low | fix | D6: move the lists to `findings=`, with a before/after snapshot |
+| 2a-ii-12 | two block-scalar regexes | low | fix | D6: one constant in `text/workflows.py` |
+| 2a-ii-13 | small duplicates and history in comments | low | fix | D7 |
+| 2a-ii-14 | `plans.py`, `npm_dependencies.py` size | adv | decline | As 2a-i-18 |
+| 2a-iii-1 | `audit_common.py:109-123` | med | fix | D3: fetch open issues once, and treat a failed listing as an error rather than as "none" |
+| 2a-iii-2 | `audit-manage-issues.py` writes | med | fix | D3: count write failures and exit non-zero; close before commenting |
+| 2a-iii-3 | `consistency-audit.yml:15` | med | fix | D4: `manage-issues` and `update-docs` run only from `refs/heads/main` |
+| 2a-iii-4 | `text/workflows.py:198` | med | fix | D5: any indentation deeper than `jobs:`, quoted keys, trailing comments, each tested |
+| 2a-iii-5 | `check-audit-smoke.py:258-264` | med | fix | D3: an `error` status fails the smoke run |
+| 2a-iii-6 | fixed `/tmp` paths | med | fix | D4, together with 2d-2 |
+| 2a-iii-7 | no concurrency group | low | fix | D4 |
+| 2a-iii-8 | `--limit 10` search | low | fix | D3: removed by fetching once |
+| 2a-iii-9 | issue helpers bypass `GitHubClient`; the title key is built twice | low | fix | D3: one `issue_title_for()`, and the helpers move onto the seam |
+| 2a-iii-10 | `files.py` primitives | low | fix | D1. This is the root of the class |
+| 2a-iii-11 | `NON_SOURCE_DIRS` | low | fix | D6 |
+| 2a-iii-12 | three more fence loops in `markdown.py` | low | fix | D6 |
+| 2a-iii-13 | retired checks leave issues open | low | fix | D3: a `RETIRED_ISSUE_TITLES` list that `manage-issues` closes, plus documentation |
+| 2a-iii-14 | `repo.py:23` | low | fix | D7: give cloudgood's override a reason |
+| 2a-iii-15 | nine stale cross-references | low | fix | D7 |
+| 2a-iii-16 | `consistency-audit.yml:261-303` | low | fix | D4: `tools/report-audit-failure.sh` |
+| 2a-iii-17 | `tomllib`, no stated floor | low | fix | D7: state Python 3.11 in `docs/consistency-audits.md`, and assert it in the workflow |
+| 2b-1 | issue lifecycle untested | high | fix | D3: the fail-create, pass-close, N/A-close and exact-title cases, including the ten prefix titles |
+| 2b-2 | `ExpensiveLanePathFilter` tests | med | fix | D5, with 2a-i-1 |
+| 2b-3 | `LlmContextLint` tests | med | fix | D5, with 2a-ii-7 |
+| 2b-4 | `GithubSecurity` with rc≠0 | med | fix | D2, with 2a-ii-2 |
+| 2b-5 | `VersionFileGitignoreTest` | med | fix | D5 |
+| 2b-6 | about 15 error paths never asserted | med | fix | D2: each becomes an `error` case |
+| 2b-7 | `CiReviewAutomation` docs-only fail | low | fix | D5, with 2a-i-9 |
+| 2b-8 | empty workflows directory, six checks | low | fix | D5 |
+| 2b-9 | stale "no handler" test comments | low | fix | D7 |
+| 2b-10 | `audit-raised.py`, `audit-check.py` CLIs | low | fix | D3: one subprocess test each |
+| 2c-1 | `review-coverage.md:45-47` | med | fix | D7 |
+| 2c-2 | `consistency-audits.md:384-385` | med | fix | D7: seed a missing `--page` from `COMPLIANCE_PAGE`, with a test |
+| 2c-3 | `workflow-standards.md`, `llm-tooling.md` | med | fix | D7: mark each rule Measured or Reviewed |
+| 2c-4 | `consistency-audits.md:424-431,86-88` | med | fix | D7: point at `NETWORK_CHECKS`. 5e relies on this before/after procedure, so this lands first in D7 |
+| 2c-5 | "Adding a criterion" file count | low | fix | D7: one list, which `PUSH-AUDIT.md` and `AGENTS.md` link to |
+| 2c-6 | "other 35 files" | low | fix | D7 |
+| 2c-7 | names `ISSUE_TITLES`, not `issue_title` | low | fix | D7 |
+| 2c-8 | whitespace claim | low | fix | D7 |
+| 2c-9 | artifact name | low | fix | D7, including `ARCHITECTURE.md` |
+| 2c-10 | hook trigger descriptions | low | fix | D7 |
+| 2c-11 | this plan's Future work, "four criteria unmeasured" | low | fix | Done already. The entry is updated in this commit (see Future work) |
+| 2c-12 | `'at the time of writing'` parse | low | fix | D7: a named constant, plus a line in `AGENTS.md` |
+| 2c-13 | stale comments | low | fix | D7, merged with 2a-iii-15 |
+| 2d-1 | `review.py:369-428` `SfuiVendor` | med | fix | Fast-tracked: #263 |
+| 2d-2 | `/tmp/audit-venv` reused and on `PATH` | med | fix | D4 |
+| 2d-3 | skillsaw dependencies unpinned in the token's interpreter | low | fix | D4: its own environment, and no token |
+| 2d-4 | about 45 unguarded `open()`, the `python_source.py:170` join | med | fix | D1 |
+| 2d-5 | regexes and reads controlled by the audited repository | low | fix | D5: patterns become literal or fnmatch where the spec allows; reads are size-capped |
+| 2d-6 | `defuse()` leaves mentions and markdown | low | fix | D5: `details` items rendered with `defuse_item`, and the comment corrected |
+| 2d-7 | `packaging.py:1608` no `--` | info | fix | D5 |
+| 2d-8 | tag-pinned actions; the audit checkout's credentials | info | cross-reference + fix | Pinning is `PLAN-workflow-ref-trust.md` phase 3. `persist-credentials: false` goes in D4 |
+| 5c-2a-1 | review issue filing never works | med | fix | A2 (decision 3 above) |
+| 5c-2a-2 | complete reviews labelled incomplete | med | fix | A4: a closed outermost object is complete, with tests for trailing prose, `}```` and `~~~` |
+| 5c-2a-3 | the fallback validator diverges | low | fix | A4: read the required fields and enums from `review-schema.json` with stdlib `json` |
+| 5c-2a-4 | unused variables; `ci_output` | low | fix | A5: delete them; `ci_output` writes `$GITHUB_OUTPUT` and the outputs are declared. SC2002 is already fixed in actions#168 |
+| 5c-2a-5 | about 115 lines of inline shell in `pr-re-review.yml` | med | fix | T: a composite action so the logic is tested once; then the fleet re-syncs |
+| 5c-2a-6 | `pr-re-review.yml` superseded copy | low | cross-reference | shakenfist/actions#126 |
+| 5c-2a-7 | the two lanes harden their checkouts differently | low | fix | A1: actions#168 |
+| 5c-2a-8 | the lanes do not share a concurrency group | low | fix | T: reword the comment. Mutual exclusion is not wanted, since the gate already prevents a second automatic review |
+| 5c-2a-9 | history in comments | low | fix | A5, and T for `pr-re-review.yml` |
+| 5c-2b-1 | no issue ever filed | high | fix | A2. Dropped rather than tested |
+| 5c-2b-2 | `check_origin`/`check_permission` never executed | high | fix | A3: run both shipped steps against a stub `gh` for each case |
+| 5c-2b-3 | no structural test of the review workflows' guards | high | fix | A3: every `claude-code` job carries a same-repository condition, `force` is routed as phase 3 item 2 says, and the bot-comment guard, `persist-credentials` and `hooksPath` are each present |
+| 5c-2b-4 | `review-pr-with-claude.sh` gate untested; it fails open on a `gh` error | med | fix | A3: the stub harness from actions#168 extended to the gate, max-turns and dedupe; a failed reviews query skips rather than reviews |
+| 5c-2b-5 | model-supplied `issue_number` trusted | med | fix | A2. Gone with issue filing; `additionalProperties: false` goes on the schema items |
+| 5c-2b-6 | resolve and confirm shell untested | med | fix | T, with 5c-2a-5 |
+| 5c-2b-7 | jsonschema branch not pinned | low | fix | A4: install it in CI and import it unconditionally in the test |
+| 5c-2c-1 | `docs/consuming.md:298-338` example | high | fix | A5: point at `templates/ci-review-automation/pr-retest.yml` |
+| 5c-2c-2 | "forks reviewed on human request" | med | fix | actions half in actions#168. The development half, `docs/audits/ci-review-automation.md:99-100`, goes in D7 |
+| 5c-2c-3 | the "will be closed when this PR merges" text | med | fix | A2 |
+| 5c-2c-4 | the diff-too-large advice | low | fix | A5 |
+| 5c-2c-5 | examples without timeouts | low | fix | A5 |
+| 5c-2c-6 | caller requirements missing | low | fix | A5. `issues: write` is no longer one, after A2 |
+| 5c-2c-7 | stale `pr-ref` descriptions | low | fix | A5 |
+| 5c-2c-8 | same-repository `pull_request` only | low | fix | A5 |
+| 5c-2c-9 | `ARCHITECTURE.md:62-63` | low | fix | A5 |
+| 5c-2c-10 | `docs/ci-review-automation.md:3-4,165` | low | fix | D7 |
+| 5c-2d-1 | reviewer with all tools and the token, on a shared pool | high | fix | Fast-tracked: actions#168 |
+| 5c-2d-2 | the PR tree's `.claude/settings.json` hooks ran | med | fix | Fast-tracked: actions#168. Confirmed on a scratch repository with CLI 2.1.301 |
+| 5c-2d-3 | `pr-auto-review.yml` checkout credentials | low | fix | Fast-tracked: actions#168 |
+| 5c-2d-4 | issue spam; mentions in the rendered review | low | fix | A2 removes the issues. Breaking mentions in `render-review.py` goes in A4 |
+| 5c-2d-5 | a fork PR can bring its own job to the self-hosted pool | info | cross-reference | An operator check, not code. Confirm org-wide approval for every outside collaborator, and that the `claude-code` runner group is restricted to selected workflows. Recorded for the operator before this phase closes |
+
+**Summary.** 111 findings:
+
+- 105 to fix:
+  - five in the fast-track pull requests, both merged on 2026-10-16:
+    2d-1 in #263, and 5c-2d-1, -2, -3 and 5c-2a-7 (group A1) in
+    actions#168;
+  - one, 2c-11, closed by this commit's Future work update;
+  - the remaining 99 spread across the twelve groups still to land:
+    D1-D7, A2-A5 and T. 5c-2c-2 is among them: its actions half
+    landed in actions#168, and its development half is in D7.
+- 1 split: 2d-8. Its pinning half is cross-referenced, and its
+  credential half is fixed in D4.
+- 2 declined: the advisory file-size splits.
+- 3 cross-referenced: `PLAN-workflow-ref-trust.md` (2a-i-10),
+  shakenfist/actions#126 (5c-2a-6), and the operator (5c-2d-5).
+
+No finding was declined for being out of scope without naming where it
+belongs.
+
+**Gate.** Per the back brief, 5e and 5f wait until this table is
+agreed.
+
 ## Administration and logistics
 
 ### Success criteria
@@ -864,12 +1087,23 @@ because the following statements will be true:
 
 * A fleet-wide compliance dashboard, per the open question above.
 
-* Machine checks for the four criteria `audit-check.py` does not
-  measure -- `security-sanitization`, `console-logging`,
-  `python-version` and `test-coverage`. These are the only audit files
-  with no marker block, so they are also the only criteria whose
-  per-project status is nobody's job to keep current. Either automate
-  them or say in each file that it is judged by hand.
+* ~~Machine checks for the four criteria `audit-check.py` does not
+  measure.~~ Done by 2026-10-16, as the phase 5 push audit found
+  (2c-11). `console-logging`, `security-sanitization` and
+  `python-version` are now registered checks, each spec marks its
+  measured and delegated halves, and `test-coverage.md` says it is
+  judged by hand. No spec carries a marker block any more.
+
+* Splitting the largest check modules along the seams the phase 5 push
+  audit named (2a-i-18, 2a-ii-14):
+  - from `packaging.py`, the release-artifact exclusion model and the
+    dependency criteria;
+  - from `ci_workflows.py`, fuzz reporting and review automation;
+  - from `plans.py`, the plan-structure parser, into `audit/text/`.
+
+  Each split moves reviewed lines and stales their marks for no change
+  in behaviour, so it is worth doing only alongside a change that
+  touches the module anyway.
 
 * Automatic assignment or triage of audit issues.
 
