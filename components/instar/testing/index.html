@@ -16523,10 +16523,142 @@ failure mode: it inspects known canary fixtures and hard-fails the job with
 an explicit "infrastructure problem, not a test regression" message if any is
 still a pointer, so a git-LFS outage can never be silently misattributed to
 instar (see GitHub issue #451 for the incident this guards against).</p>
-<p>Eight of the nine jobs that prepare testdata then run
-<strong><code>tools/ci/resparsify-testdata.sh &lt;tree&gt;</code></strong> — every one that runs the Python
-integration suite over the tree (five in <code>functional-tests.yml</code>, two in
-<code>nightly-matrix.yml</code>, one in <code>test-drift-fix.yml</code>). The exception is
+<p>Which of its two branches ran is part of its output, because the two leave the
+tree in materially different states and nothing else can tell them apart by
+looking. Beside <code>TESTDATA_PATH</code> it exports:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TESTDATA_SOURCE</code></td>
+<td><code>clone</code> (fresh), <code>cache</code> (the fleet's testdata disk, updated in place) or <code>unverified-cache</code> (some other tree already at the cache path, updated in place). A fresh clone writes every image out fully allocated, so the whole tree needs resparsifying; the disk needs only what the update changed. That narrower treatment assumes the tree was already sparse, which the script cannot check, so it is given only when <code>TESTDATA_REQUIRE_CACHE=1</code> has asserted the tree is the fleet's pre-built disk. Any other cache — a long-lived one on a static runner, say — is <code>unverified-cache</code> and resparsified whole.</td>
+</tr>
+<tr>
+<td><code>TESTDATA_CHANGED_FILES</code></td>
+<td>For <code>cache</code> only: a file listing the paths the update changed, one per line, for the narrow resparsify above. Derived here because the reset that changed them happens here — by the time a later step runs there is nothing left to diff.</td>
+</tr>
+</tbody>
+</table>
+<p>The list has three sources, and the last two are not obvious. Besides the
+diff between the two trees it carries every path whose index stat data was
+stale before the update, and every file that was still an LFS pointer before
+<code>git lfs pull</code>. Resparsifying is a <code>cp</code> and a <code>mv</code>, so the disk build's own
+resparsify leaves the index disagreeing with the files it rewrote, and
+<code>git reset --hard</code> then rewrites those entries even though their content is
+identical — measured, with the clean-stat control alongside it, in
+<code>tools/ci/test-testdata-changed-files.sh</code>. Under LFS they come back from the
+smudge filter fully allocated, and no diff of the two trees names them, so a
+list built from the diff alone would skip exactly the files the reset had just
+re-expanded. Including them costs nothing extra: the reset already wrote them
+into the overlay. The script emits a <code>::warning::</code> naming the count when it
+finds any, because the real fix belongs to whatever built the cache — a
+<code>git update-index --refresh</code> after its resparsify — and this is the only place
+the cost is visible. The warning carries two counts, and the first is the one
+to read: <code>git diff-files</code> reports every <em>tracked</em> path whose stat data
+differs, images or not, and instar-testdata tracks around 770,000 of them
+against a few thousand images. A total near the number of tracked files in the
+tree means something other than a missed refresh — the index stat data did not
+survive the trip from the disk build to the runner at all (a different uid, or
+inode numbers that changed on the way), so the narrow resparsify has quietly
+become a whole-tree one and the disk is saving nothing. That needs fixing in
+how the disk is built or mounted; a refresh at build time will not help. The
+second count, the in-scope images among them, is what the resparsify actually
+pays for.</p>
+<p>The pointers are the same kind of gap. <code>git lfs pull</code> writes each pointer out
+fully allocated and then refreshes the index for it, so nothing afterwards —
+not the tree diff, not a second <code>git diff-files</code> — names it; the script lists
+them with <code>git lfs ls-files</code> beforehand instead, and warns, because a disk that
+ships pointers was built without pulling them.</p>
+<p>Both are printed as well as written to <code>$GITHUB_ENV</code>, and running the script
+by hand with <code>$GITHUB_ENV</code> unset is fine.</p>
+<p><code>TESTDATA_REQUIRE_CACHE=1</code> turns a missing cache into an infra error instead
+of a 7.46 GiB fallback clone, in the same idiom as the pointer guard: a job
+that silently did the slow thing merely looks slow, which is the failure mode
+that goes unnoticed for weeks. The assertion names the contractual mount path
+(<code>/srv/ci/cached/instar-testdata</code>) literally rather than taking it from
+<code>TESTDATA_CACHE</code>, so a change to either side of that contract fails there
+instead of quietly following a defaulted path. <code>TESTDATA_CONTRACT_CACHE</code>
+relocates it, and exists only so <code>tools/ci/test-prepare-testdata.sh</code> can
+exercise both sides of the guard on a machine with no such disk; it is a
+different variable from <code>TESTDATA_CACHE</code> on purpose, so the two cannot be
+pointed at the same wrong place, and nothing under <code>.github/</code> sets it. What
+it detects is a <strong>path mismatch</strong> — the disk mounted somewhere else, or a
+runner advertising the disk's label without the disk. It cannot be a failed
+mount: that stops the fleet's userdata before the runner registers, so such a
+job stays queued and never runs this script at all.</p>
+<h3 id="the-instar-runner-label">The <code>instar</code> runner label<a class="headerlink" href="#the-instar-runner-label" title="Permanent link">&para;</a></h3>
+<p>Nine jobs prepare testdata. Two different eights are drawn from them below,
+and they are not the same eight: the set that asks for the disk here, and the
+set that resparsifies afterwards in the next section. Each lists its members,
+and <code>coverage-fuzz</code> and <code>test-and-fix</code> are what separate them —
+<code>coverage-fuzz</code> asks for the disk but does not resparsify, and <code>test-and-fix</code>
+resparsifies but cannot ask for the disk.</p>
+<p>All of them except <code>test-and-fix</code> ask the fleet for that disk with an extra
+<code>runs-on</code> label:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">self-hosted</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">debian-13</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">xl</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">instar</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p><code>instar</code> means "a runner carrying the pre-seeded instar-testdata dependencies
+disk". The conductor matches labels as a set, so the order does not matter,
+and it works with any size the conductor knows — but the arrangement is
+verified for <code>debian-13</code> only, because the disk is owned by the uid <code>debian</code>
+has on that image and a runner whose user has another uid fails at boot
+rather than running the job. The label must also be listed under
+<code>self-hosted-runner.labels</code> in <code>.github/actionlint.yaml</code>, or actionlint (which
+runs in pre-commit) rejects the <code>runs-on</code> before it can be committed.</p>
+<p>Those same eight jobs — call them the <strong>label set</strong> — also set
+<code>TESTDATA_REQUIRE_CACHE: '1'</code> on their prepare step. A job that asked for the
+disk and did not get it must say so, rather than quietly falling back to the
+clone the label exists to avoid. They are <code>package-matrix</code>,
+<code>integration-core</code>, <code>integration-convert-qcow2</code>, <code>integration-convert-vhd</code>
+and <code>oslo-crossval-master</code> in <code>functional-tests.yml</code>; <code>nightly-legs</code> and
+<code>measure</code> in <code>nightly-matrix.yml</code>; and <code>coverage-fuzz</code> in
+<code>coverage-fuzz.yml</code>.</p>
+<p>Nothing enforces that correspondence automatically. It was checked in both
+directions when the label was introduced, by parsing the finished YAML rather
+than reading the diff, and it is re-checked by hand when a job is added — but
+a new consumer that forgets the label pays for a 7.46 GiB clone it did not
+need, and a labelled non-consumer holds a scarce disk-bearing runner, and
+neither shows up as anything but a slow job. Issue #674 tracks turning it into
+a guard in <code>ci-tooling</code>.</p>
+<p>The ninth testdata consumer, <code>test-and-fix</code> in <code>test-drift-fix.yml</code>, carries
+neither, deliberately and permanently. It runs on <code>[self-hosted, claude-code]</code>
+— the <em>static</em> runner fleet, which the conductor only watches and never
+attaches a disk to, so no runner there will ever advertise <code>instar</code> and a
+labelled job would queue until GitHub cancelled it 24 hours later. It keeps
+cloning fresh. The reason is recorded next to that job as well as here,
+because a reader about to tidy the inconsistency away is looking at the
+workflow.</p>
+<h3 id="resparsifying">Resparsifying<a class="headerlink" href="#resparsifying" title="Permanent link">&para;</a></h3>
+<p>A different eight of those nine jobs — the <strong>resparsify set</strong>, which is the
+label set with <code>coverage-fuzz</code> taken out and <code>test-and-fix</code> put in — then
+resparsify the tree. They are every job that runs the Python integration
+suite over it: five in <code>functional-tests.yml</code>, two in <code>nightly-matrix.yml</code>,
+and <code>test-and-fix</code> in <code>test-drift-fix.yml</code>.</p>
+<p>Seven of them call <strong><code>tools/ci/resparsify-prepared-testdata.sh</code></strong>, which
+takes no arguments: it reads the <code>TESTDATA_SOURCE</code> and
+<code>TESTDATA_CHANGED_FILES</code> above and calls <code>tools/ci/resparsify-testdata.sh</code> in
+whichever of its two forms the tree needs — the whole tree for a fresh clone
+or an <code>unverified-cache</code>, and only the paths the update changed for the
+fleet's disk updated in place. An unset or unrecognised <code>TESTDATA_SOURCE</code> is
+an error there rather than a fall back to the whole tree, because the
+fallback is the expensive branch and taking it silently would cost the most
+on exactly the runner that was supposed to save.</p>
+<p><code>test-and-fix</code> is the eighth and calls <code>resparsify-testdata.sh</code> with its one
+positional argument instead, deliberately. That workflow runs from the
+default branch while the scripts it invokes come from the pull request's own
+checkout, so the two can be of different ages: a branch cut before the
+wrapper existed would fail on a missing file, and one cut before
+<code>prepare-testdata.sh</code> exported <code>TESTDATA_SOURCE</code> would have the wrapper
+refuse for want of it — breaking other people's pull requests, not this
+repository's own gates. The one-argument form is a cross-repository contract
+and exists on every branch. The job also loses nothing by it: on the static
+<code>claude-code</code> fleet it never meets the disk, so it always wants the whole
+tree resparsified anyway. The exception is
 <code>coverage-fuzz.yml</code>, which prepares the tree only to seed fuzz corpora and
 never asks <code>qemu-img info</code> for an allocated size, so the fully allocated
 tree costs it disk and nothing else. git and git-lfs write each file
@@ -16544,22 +16676,66 @@ instar-testdata dependencies-disk image build fetches it from instar's default
 branch over HTTPS and runs it against its own clone, outside GitHub Actions.
 So its one-argument call means "the whole tree" permanently, it reads no
 <code>GITHUB_*</code> variable, and it exits non-zero on failure so that a broken fetch
-fails their build rather than quietly shipping an unsparsified image. Anything
-narrower — resparsifying only the files a fetch changed, say — has to arrive as
-further optional arguments. <code>tools/ci/test-resparsify-testdata.sh</code> exercises
-exactly that calling convention, and measures allocated blocks before and
-after rather than trusting the exit status.</p>
+fails their build rather than quietly shipping an unsparsified image.
+<code>tools/ci/test-resparsify-testdata.sh</code> exercises exactly that calling
+convention, and measures allocated blocks before and after rather than
+trusting the exit status.</p>
+<p>Anything narrower therefore arrives as <strong>further optional arguments</strong> after
+the tree path:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>resparsify-testdata.sh &lt;tree&gt; [--files-from &lt;list&gt;]... [--] [&lt;file&gt;...]
+</code></pre></div>
+<p>The caller that needs this is a job whose tree came off a pre-built testdata
+dependencies disk: that tree is a copy-on-write overlay of an image which was
+resparsified when it was built, so rewriting all of it would write gigabytes
+into the overlay the disk exists to avoid — while skipping it altogether would
+leave the day's drift, which the job's own fetch and <code>lfs pull</code> land fully
+allocated. Only what the update changed needs it. Paths may be tree-relative
+or absolute inside the tree, and the two ways in differ on purpose:</p>
+<ul>
+<li><code>--files-from &lt;list&gt;</code> takes a newline-separated <strong>candidate</strong> list — a
+  changed-file list, which legitimately holds non-images, <code>custom/</code> fixtures
+  and paths the update deleted. Entries that are not in-scope images that
+  exist are dropped and counted, so the caller does not need a second copy of
+  the extension list to drift from. (<code>--list-extensions</code> publishes that list
+  for a caller that does want to filter.)</li>
+<li>Trailing positional paths are <strong>named deliberately</strong>, so anything the script
+  will not act on is refused instead.</li>
+</ul>
+<p>A path that resolves outside the tree is refused in both forms, and a refusal
+resparsifies nothing at all. An empty narrow set is success, unlike the
+whole-tree form: a cached tree whose update changed no image is the normal
+case, not a misconfiguration.</p>
+<p>That refusal is deliberate and its blast radius is worth knowing before you
+meet it. The <code>--files-from</code> list on the cache path comes from git, not from an
+operator, so a single instar-testdata commit adding a symlink under
+<code>downloaded/</code> with an image extension and a target outside the checkout would
+fail the resparsify step on <strong>all eight labelled jobs at once</strong>, and keep
+failing until that commit is fixed. Fleet-wide CI failure with
+<code>resparsify-testdata: refusing …: resolves outside …</code> in it is a testdata
+commit to look at, not an instar regression; the refusal message names the
+list file the entry came from for that reason. Refusing is still the right
+behaviour — the alternative is writing outside the tree — but it is the one
+failure here that is nobody's pull request.</p>
+<p>Everything else in a list is filtered rather than refused, and the filtering
+is done without resolving each entry: a candidate that is relative, free of
+<code>..</code>, and either outside <code>downloaded/</code> or not an image extension is dropped on
+the string alone. That matters because the list is not bounded by the number
+of images — its stat-dirty component names every tracked path, so a cache
+whose index did not survive the handoff names all ~770,000 — and a process per
+entry would turn the step into a job timeout, hiding the warning that
+diagnoses it. <code>tools/ci/test-resparsify-testdata.sh</code> counts the resolutions
+rather than timing the run.</p>
 <h2 id="expected-output-overrides">Expected Output Overrides<a class="headerlink" href="#expected-output-overrides" title="Permanent link">&para;</a></h2>
 <p>For malicious images where running <code>qemu-img</code> would be dangerous, store the
 expected output in <code>tests/expected_outputs/</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>tests/expected_outputs/
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>└── qcow2_backing_etc_passwd.txt
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>tests/expected_outputs/
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>└── qcow2_backing_etc_passwd.txt
 </code></pre></div>
 <p>Reference this file in the manifest:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="p">{</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">    </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"qcow2-backing-passwd"</span><span class="p">,</span>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="nt">"expected_override"</span><span class="p">:</span><span class="w"> </span><span class="s2">"expected_outputs/qcow2_backing_etc_passwd.txt"</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">{</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"qcow2-backing-passwd"</span><span class="p">,</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="nt">"expected_override"</span><span class="p">:</span><span class="w"> </span><span class="s2">"expected_outputs/qcow2_backing_etc_passwd.txt"</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="p">}</span>
 </code></pre></div>
 <h2 id="image-notes">Image Notes<a class="headerlink" href="#image-notes" title="Permanent link">&para;</a></h2>
 <p>The <code>docs/image_notes/</code> directory documents which test images exposed
@@ -16756,9 +16932,9 @@ per-version <code>qemu-img</code> builds at <code>qemu-img-binaries/x86_64/&lt;v
 covering 6.0.0 to 10.2.0. Run the real binary rather than reasoning
 from the version map or from qemu source — two of the three boundaries
 above were initially recorded wrongly from indirect evidence:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nv">TD</span><span class="o">=</span>../instar-testdata
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nv">$TD</span>/qemu-img-binaries/x86_64/8.1.5/qemu-img<span class="w"> </span>map<span class="w"> </span>--output<span class="o">=</span>json<span class="w"> </span>image.qcow2
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="nv">$TD</span>/qemu-img-binaries/x86_64/9.0.0/qemu-img<span class="w"> </span>snapshot<span class="w"> </span>-l<span class="w"> </span>image.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nv">TD</span><span class="o">=</span>../instar-testdata
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="nv">$TD</span>/qemu-img-binaries/x86_64/8.1.5/qemu-img<span class="w"> </span>map<span class="w"> </span>--output<span class="o">=</span>json<span class="w"> </span>image.qcow2
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="nv">$TD</span>/qemu-img-binaries/x86_64/9.0.0/qemu-img<span class="w"> </span>snapshot<span class="w"> </span>-l<span class="w"> </span>image.qcow2
 </code></pre></div>
 <p>Both <code>map</code> and <code>snapshot</code> accept <code>--qemu-version</code> (as <code>info</code> already
 did), so both sides of every boundary are exercisable on the dev host
@@ -16917,11 +17093,11 @@ unavailable. That is not true of every use of libvhdi in this suite;
 see the differencing oracle cross-check below, which CI treats as
 mandatory.</p>
 <h3 id="running-locally">Running locally<a class="headerlink" href="#running-locally" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span>--log-dir<span class="w"> </span>./fuzz-logs
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">    </span>--iterations<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span>--seed<span class="w"> </span><span class="m">42</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">    </span>--log-dir<span class="w"> </span>./fuzz-logs
 </code></pre></div>
 <h3 id="ci-integration">CI integration<a class="headerlink" href="#ci-integration" title="Permanent link">&para;</a></h3>
 <p>The fuzzer runs automatically via <code>.github/workflows/differential-fuzz.yml</code>
@@ -16963,11 +17139,11 @@ image attributes, and a reproduction command.</p>
 <h3 id="reproducing-a-divergence">Reproducing a divergence<a class="headerlink" href="#reproducing-a-divergence" title="Permanent link">&para;</a></h3>
 <p>Each divergence report includes the seed and iteration number. To
 reproduce:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">    </span>--iterations<span class="w"> </span>&lt;ITERATION<span class="w"> </span>+<span class="w"> </span><span class="m">1</span>&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">    </span>--seed<span class="w"> </span>&lt;SEED&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="w">    </span>--fail-fast
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>python3<span class="w"> </span>scripts/differential-fuzz.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">    </span>--instar<span class="w"> </span>src/target/release/instar<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">    </span>--iterations<span class="w"> </span>&lt;ITERATION<span class="w"> </span>+<span class="w"> </span><span class="m">1</span>&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">    </span>--seed<span class="w"> </span>&lt;SEED&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">    </span>--fail-fast
 </code></pre></div>
 <h2 id="coverage-guided-fuzzing">Coverage-guided fuzzing<a class="headerlink" href="#coverage-guided-fuzzing" title="Permanent link">&para;</a></h2>
 <p>Coverage-guided fuzzing uses <code>cargo-fuzz</code> (libFuzzer) to exercise the
@@ -17324,27 +17500,27 @@ invariants rather than the absence of a panic:</p>
    as the child alone.</li>
 </ol>
 <h3 id="running-locally_1">Running locally<a class="headerlink" href="#running-locally_1" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Inside the instar-build container:</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="c1"># Run a single target for 60 seconds</span>
-<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
-<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>
-<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="c1"># Run with specific corpus</span>
-<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>corpus/fuzz_qcow2_header/
-<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>
-<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="c1"># Minimize a crash</span>
-<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>tmin<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>artifacts/fuzz_qcow2_header/&lt;crash&gt;
-<a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a>
-<a id="__codelineno-15-13" name="__codelineno-15-13" href="#__codelineno-15-13"></a><span class="c1"># Generate coverage report</span>
-<a id="__codelineno-15-14" name="__codelineno-15-14" href="#__codelineno-15-14"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>coverage<span class="w"> </span>fuzz_qcow2_header
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Inside the instar-build container:</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="nb">cd</span><span class="w"> </span>src/fuzz
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1"># Run a single target for 60 seconds</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>--<span class="w"> </span>-max_total_time<span class="o">=</span><span class="m">60</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="c1"># Run with specific corpus</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>run<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>corpus/fuzz_qcow2_header/
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="c1"># Minimize a crash</span>
+<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>tmin<span class="w"> </span>fuzz_qcow2_header<span class="w"> </span>artifacts/fuzz_qcow2_header/&lt;crash&gt;
+<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>
+<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a><span class="c1"># Generate coverage report</span>
+<a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a>cargo<span class="w"> </span>fuzz<span class="w"> </span>coverage<span class="w"> </span>fuzz_qcow2_header
 </code></pre></div>
 <p>Per-function coverage — which functions a target actually reached, not
 just a total — comes from <code>make fuzz-coverage</code>, which runs the same
 coverage build inside the devcontainer and renders the report with
 <code>llvm-cov</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>make<span class="w"> </span>fuzz-coverage<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_vhd_parent
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>make<span class="w"> </span>fuzz-coverage<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_vhd_parent<span class="w"> </span><span class="nv">FUZZ_COVERAGE_FILTER</span><span class="o">=</span>locator
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>make<span class="w"> </span>fuzz-coverage<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_vhd_parent
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>make<span class="w"> </span>fuzz-coverage<span class="w"> </span><span class="nv">FUZZ_TARGET</span><span class="o">=</span>fuzz_vhd_parent<span class="w"> </span><span class="nv">FUZZ_COVERAGE_FILTER</span><span class="o">=</span>locator
 </code></pre></div>
 <p>A filter narrows the report to matching function names across every
 crate; <code>FUZZ_COVERAGE_SOURCES</code> narrows the files. This exists because a
@@ -17354,7 +17530,7 @@ does not use <code>cargo cov</code> to render: cargo-fuzz 0.12 passes
 <code>--no-default-features</code> to a clap parser that rejects it and panics.</p>
 <h3 id="corpus-seeding">Corpus seeding<a class="headerlink" href="#corpus-seeding" title="Permanent link">&para;</a></h3>
 <p>The seed corpus is extracted from <code>instar-testdata</code> using:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>python3<span class="w"> </span>scripts/extract-fuzz-corpus.py<span class="w"> </span>--testdata<span class="w"> </span>/path/to/instar-testdata
 </code></pre></div>
 <p>This copies test images into per-target corpus directories under
 <code>src/fuzz/corpus/</code>, filtered by format. Header-only targets receive
@@ -17511,9 +17687,9 @@ new issue every night. Issues filed before <code>dedup_key</code> existed are
 still matched on their <code>signature</code>.</p>
 <p>Run the reporter by hand against a downloaded <code>coverage-fuzz-logs</code>
 artifact to check what an issue would say, without filing anything:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>tools/ci/report-fuzz-crash.sh<span class="w"> </span>fuzz_rebase_planners<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">    </span>src/fuzz/artifacts/fuzz_rebase_planners/crash-&lt;hash&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">    </span>coverage-fuzz-logs/fuzz_rebase_planners.log<span class="w"> </span>--dry-run
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>tools/ci/report-fuzz-crash.sh<span class="w"> </span>fuzz_rebase_planners<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">    </span>src/fuzz/artifacts/fuzz_rebase_planners/crash-&lt;hash&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">    </span>coverage-fuzz-logs/fuzz_rebase_planners.log<span class="w"> </span>--dry-run
 </code></pre></div>
 <p><code>tools/ci/test-report-fuzz-crash.sh</code> exercises the reporter against
 synthetic logs — the 370KB single line, raw mutated bytes, a missing
@@ -17525,8 +17701,8 @@ tail-anchored excerpt look correct while on a real log it captured 28
 stack frames and no panic.</p>
 <p>Both suites run on pull requests in the <code>ci-tooling</code> job, and need only
 bash and <code>jq</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>tools/ci/test-report-fuzz-crash.sh
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>tools/ci/test-pick-fuzz-artifact.sh
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>tools/ci/test-report-fuzz-crash.sh
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>tools/ci/test-pick-fuzz-artifact.sh
 </code></pre></div>
 <h4 id="choosing-which-artifact-to-report">Choosing which artifact to report<a class="headerlink" href="#choosing-which-artifact-to-report" title="Permanent link">&para;</a></h4>
 <p><code>tools/ci/pick-fuzz-artifact.sh</code> decides which file in
@@ -17925,11 +18101,11 @@ of them together measured 1m51s on a warm tree.</p>
 rather than building them. On a machine that has neither, <code>make
 instar-devcontainer</code> and <code>make instar</code> build them first, and that is
 tens of minutes rather than minutes.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>tools/mutate-differencing.sh<span class="w">          </span><span class="c1"># every case</span>
-<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>tools/mutate-differencing.sh<span class="w"> </span>--list<span class="w">   </span><span class="c1"># the case names, run nothing</span>
-<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>tools/mutate-differencing.sh<span class="w"> </span>NAME...<span class="w">  </span><span class="c1"># only the named cases</span>
-<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>tools/mutate-differencing.sh<span class="w"> </span>--self-test<span class="w">        </span><span class="c1"># check the verdict classifier</span>
-<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>tools/mutate-differencing.sh<span class="w"> </span>--check-patterns<span class="w">  </span><span class="c1"># do the mutations still land?</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>tools/mutate-differencing.sh<span class="w">          </span><span class="c1"># every case</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>tools/mutate-differencing.sh<span class="w"> </span>--list<span class="w">   </span><span class="c1"># the case names, run nothing</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>tools/mutate-differencing.sh<span class="w"> </span>NAME...<span class="w">  </span><span class="c1"># only the named cases</span>
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>tools/mutate-differencing.sh<span class="w"> </span>--self-test<span class="w">        </span><span class="c1"># check the verdict classifier</span>
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>tools/mutate-differencing.sh<span class="w"> </span>--check-patterns<span class="w">  </span><span class="c1"># do the mutations still land?</span>
 </code></pre></div>
 <p>Three things run in the <code>ci-tooling</code> job, because a full run needs
 docker, testdata and <code>/dev/kvm</code> and so never runs on a pull request —
@@ -18265,28 +18441,28 @@ baseline is suspect, diff <code>profiles/</code> against <code>raw/</code> and c
 recorded <code>*_stdout_bytes</code> in each <code>.meta.json</code>, which is what
 <code>detect-profiles.py</code>'s <code>validate_profiles()</code> now does before it will
 commit anything.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># Set up test environment</span>
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>make<span class="w"> </span>test-venv
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>
-<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="c1"># Run safe integration tests</span>
-<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>make<span class="w"> </span><span class="nb">test</span>
-<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>
-<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a><span class="c1"># Run tests with verbose output (shows diffs on failure)</span>
-<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>make<span class="w"> </span>test-report
-<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>
-<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a><span class="c1"># Run all tests including malicious images (use with caution)</span>
-<a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>make<span class="w"> </span>test-malicious
-<a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a>
-<a id="__codelineno-21-13" name="__codelineno-21-13" href="#__codelineno-21-13"></a><span class="c1"># Run tests inside container (as CI does)</span>
-<a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a>make<span class="w"> </span>test-container
-<a id="__codelineno-21-15" name="__codelineno-21-15" href="#__codelineno-21-15"></a>
-<a id="__codelineno-21-16" name="__codelineno-21-16" href="#__codelineno-21-16"></a><span class="c1"># CI splits tests into three parallel jobs by format family:</span>
-<a id="__codelineno-21-17" name="__codelineno-21-17" href="#__codelineno-21-17"></a>make<span class="w"> </span>test-container-core<span class="w">              </span><span class="c1"># info, check, security, oslo-crossval</span>
-<a id="__codelineno-21-18" name="__codelineno-21-18" href="#__codelineno-21-18"></a>make<span class="w"> </span>test-container-convert-qcow2<span class="w">    </span><span class="c1"># QCOW2/VMDK/RAW convert + compare</span>
-<a id="__codelineno-21-19" name="__codelineno-21-19" href="#__codelineno-21-19"></a>make<span class="w"> </span>test-container-convert-vhd<span class="w">      </span><span class="c1"># VHD/VHDX convert (slowest)</span>
-<a id="__codelineno-21-20" name="__codelineno-21-20" href="#__codelineno-21-20"></a>
-<a id="__codelineno-21-21" name="__codelineno-21-21" href="#__codelineno-21-21"></a><span class="c1"># Clean test artifacts</span>
-<a id="__codelineno-21-22" name="__codelineno-21-22" href="#__codelineno-21-22"></a>make<span class="w"> </span>clean-tests
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># Set up test environment</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>make<span class="w"> </span>test-venv
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># Run safe integration tests</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>make<span class="w"> </span><span class="nb">test</span>
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="c1"># Run tests with verbose output (shows diffs on failure)</span>
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>make<span class="w"> </span>test-report
+<a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>
+<a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a><span class="c1"># Run all tests including malicious images (use with caution)</span>
+<a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a>make<span class="w"> </span>test-malicious
+<a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a>
+<a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a><span class="c1"># Run tests inside container (as CI does)</span>
+<a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a>make<span class="w"> </span>test-container
+<a id="__codelineno-23-15" name="__codelineno-23-15" href="#__codelineno-23-15"></a>
+<a id="__codelineno-23-16" name="__codelineno-23-16" href="#__codelineno-23-16"></a><span class="c1"># CI splits tests into three parallel jobs by format family:</span>
+<a id="__codelineno-23-17" name="__codelineno-23-17" href="#__codelineno-23-17"></a>make<span class="w"> </span>test-container-core<span class="w">              </span><span class="c1"># info, check, security, oslo-crossval</span>
+<a id="__codelineno-23-18" name="__codelineno-23-18" href="#__codelineno-23-18"></a>make<span class="w"> </span>test-container-convert-qcow2<span class="w">    </span><span class="c1"># QCOW2/VMDK/RAW convert + compare</span>
+<a id="__codelineno-23-19" name="__codelineno-23-19" href="#__codelineno-23-19"></a>make<span class="w"> </span>test-container-convert-vhd<span class="w">      </span><span class="c1"># VHD/VHDX convert (slowest)</span>
+<a id="__codelineno-23-20" name="__codelineno-23-20" href="#__codelineno-23-20"></a>
+<a id="__codelineno-23-21" name="__codelineno-23-21" href="#__codelineno-23-21"></a><span class="c1"># Clean test artifacts</span>
+<a id="__codelineno-23-22" name="__codelineno-23-22" href="#__codelineno-23-22"></a>make<span class="w"> </span>clean-tests
 </code></pre></div>
 <p><strong>Test structure:</strong>
 - <code>tests/manifest.json</code> - Defines test images and their safety levels
@@ -18391,19 +18567,19 @@ since qemu-img cannot inspect inside LUKS without a secret object.</p>
 <h2 id="testing-prototypes">Testing Prototypes<a class="headerlink" href="#testing-prototypes" title="Permanent link">&para;</a></h2>
 <p>Each prototype has its own devcontainer with the required toolchain. Use the
 Makefile for building and testing:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1"># Build a specific prototype</span>
-<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>make<span class="w"> </span>build-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
-<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>
-<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="c1"># Build the devcontainer for a prototype</span>
-<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>make<span class="w"> </span>build-prototype-devcontainer<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
-<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>
-<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a><span class="c1"># View run instructions</span>
-<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>make<span class="w"> </span>run-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># Build a specific prototype</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>make<span class="w"> </span>build-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="c1"># Build the devcontainer for a prototype</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>make<span class="w"> </span>build-prototype-devcontainer<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="c1"># View run instructions</span>
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>make<span class="w"> </span>run-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
 </code></pre></div>
 <p>For manual testing without the Makefile:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="nb">cd</span><span class="w"> </span>prototypes/&lt;prototype-name&gt;
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>./build.sh<span class="w">                           </span><span class="c1"># Build the prototype</span>
-<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>sudo<span class="w"> </span>./target/release/vmm<span class="w"> </span>guest.bin<span class="w">  </span><span class="c1"># Run (requires KVM)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="nb">cd</span><span class="w"> </span>prototypes/&lt;prototype-name&gt;
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>./build.sh<span class="w">                           </span><span class="c1"># Build the prototype</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>sudo<span class="w"> </span>./target/release/vmm<span class="w"> </span>guest.bin<span class="w">  </span><span class="c1"># Run (requires KVM)</span>
 </code></pre></div>
 <h2 id="testing-considerations">Testing Considerations<a class="headerlink" href="#testing-considerations" title="Permanent link">&para;</a></h2>
 <ul>

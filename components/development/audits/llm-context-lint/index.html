@@ -2181,6 +2181,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#how-skillsaw-is-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How skillsaw is run
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -15242,6 +15253,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#how-skillsaw-is-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How skillsaw is run
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -15340,6 +15362,14 @@ are allowed to sit beside skill directories.</p>
   should not arise; when it does, every row flipping to N/A at once is
   the signal.</li>
 </ul>
+<h3 id="how-skillsaw-is-run">How skillsaw is run<a class="headerlink" href="#how-skillsaw-is-run" title="Permanent link">&para;</a></h3>
+<p>The check runs the skillsaw that the <code>AUDIT_SKILLSAW</code> environment
+variable names, or <code>skillsaw</code> from <code>PATH</code> when it is unset, as it is
+for a run by hand. The workflow sets it, so that skillsaw's venv stays
+off <code>PATH</code> and its python3 is not the one the audit runs under. And
+skillsaw runs without <code>GH_TOKEN</code> or <code>GITHUB_TOKEN</code> in its environment:
+it reads the clone and nothing else, so it has no use for the audit's
+token.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template -- the fix is repository-specific. Skills move to
 <code>&lt;name&gt;/SKILL.md</code> with <code>name</code> and <code>description</code> frontmatter, or, if the

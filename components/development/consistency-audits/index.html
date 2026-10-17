@@ -1390,6 +1390,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Issues are the work tracking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-each-status-means" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each status means
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15248,6 +15265,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Issues are the work tracking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-each-status-means" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each status means
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15364,7 +15398,7 @@ why each rule exists, is in
 <tr>
 <td>Check</td>
 <td><code>scripts/audit/checks/&lt;family&gt;.py</code></td>
-<td>The runner. A <code>Check</code> subclass returning <code>self.ok()</code>, <code>self.fail()</code> or <code>self.skip()</code> with a reason, registered in <code>CHECKS</code> in <code>scripts/audit/registry.py</code>. <code>scripts/audit-check.py</code> is the entry point that runs the schedule and prints the results.</td>
+<td>The runner. A <code>Check</code> subclass returning <code>self.ok()</code>, <code>self.fail()</code> or <code>self.skip()</code> with a reason, or raising when it cannot measure (see <a href="#what-each-status-means">What each status means</a>), registered in <code>CHECKS</code> in <code>scripts/audit/registry.py</code>. <code>scripts/audit-check.py</code> is the entry point that runs the schedule and prints the results.</td>
 </tr>
 </tbody>
 </table>
@@ -15416,16 +15450,72 @@ close the issues the fix resolved.</p>
 <p><strong>1. <code>audit</code></strong> -- a matrix job per repository. Each leg shallow-clones
 the target with <code>gh repo clone</code>, installs a pinned <code>skillsaw</code> into a
 virtualenv, asserts that skillsaw answers at that pinned version, then
-runs <code>scripts/audit-check.py</code> and uploads the result as an
-<code>audit-result-&lt;repo&gt;.json</code> artifact.</p>
-<p>Most checks read files out of the clone. A few (default branch,
-security settings, repository visibility) query the GitHub API through
-<code>gh</code>, and the git-hygiene checks shell out to <code>git</code> inside the clone.
-Visibility is queried live rather than hardcoded because it changes.</p>
+runs <code>scripts/audit-check.py</code> and uploads its result,
+<code>audit-result-&lt;repo&gt;.json</code>, as an artifact named <code>audit-&lt;repo&gt;</code>. The
+two later jobs download every artifact matching <code>audit-*</code>, so that
+prefix is what ties a leg's result to them.</p>
+<p>Most checks read files out of the clone, several of them by asking
+<code>git</code> inside it what the index holds. A few reach the network instead:
+they query the GitHub API through <code>gh</code>, or clone another repository to
+compare against. That set is <code>NETWORK_CHECKS</code> in
+<code>scripts/audit_snapshot.py</code>, which a test keeps in step with the code
+(see <a href="#before-and-after-a-change-to-a-check">Before and after a change to a
+check</a>). Repository visibility
+is among what they query, live rather than hardcoded, because it
+changes.</p>
 <p>The skillsaw pin is deliberate, and so is the assertion next to it.
 <code>llm-context-lint</code> reports what skillsaw calls an error, and skillsaw's
 rule set moves between releases, so an unpinned upgrade would change the
-compliance page for reasons nobody chose.</p>
+compliance page for reasons nobody chose. skillsaw's venv is its own
+and stays off <code>PATH</code>: the audit step names the binary in
+<code>AUDIT_SKILLSAW</code>, so its unpinned dependencies never load into the
+interpreter running the checks (see
+<a href="/components/development/audits/llm-context-lint/">llm-context-lint</a>).</p>
+<p>The workflow holds two tokens, and the legs get the weaker one. The
+checks read files the audited repositories control, and some run
+programs over them, so the legs hold <code>AUDIT_READ_TOKEN</code>, a
+fine-grained personal access token that can read every repository in
+the organisation and write to none. <code>AUDIT_TOKEN</code>, which files and
+closes issues and pushes the compliance page, appears only in
+<code>manage-issues</code> and <code>update-docs</code>. <code>AUDIT_READ_TOKEN</code> is minted with
+the <code>shakenfist</code> organisation as its resource owner, access to all
+repositories, no organisation permissions, and these repository
+permissions, each read-only:</p>
+<ul>
+<li><strong>Metadata</strong> -- the repository itself (default branch, visibility),
+  its branch rules, and the organisation's repository listing.</li>
+<li><strong>Contents</strong> -- cloning the private repositories.</li>
+<li><strong>Actions</strong> -- the workflows and their runs, which
+  <code>scheduled-workflow-health</code> reads.</li>
+<li><strong>Administration</strong> -- <code>delete_branch_on_merge</code> and
+  <code>security_and_analysis</code>, which GitHub leaves out of the repository
+  for a caller without admin access.</li>
+</ul>
+<p>Each leg checks first that the read token is set -- an unset secret
+is an empty string, and <code>gh</code> with an empty <code>GH_TOKEN</code> falls back to
+whatever login the runner's user holds -- and that it can see those
+last two fields. Without them <code>delete-branch-on-merge</code> would fail
+every repository, and <code>github-security</code> would stop checking secret
+scanning without saying so, so a token that cannot see them fails
+every leg instead.</p>
+<p><code>AUDIT_READ_TOKEN</code> is a repository secret on this repository, and a
+fine-grained token always has an expiry date. When it lapses, every leg
+fails at "Check the read token" and <code>report-failure</code> files its issue
+pointing at the run. Mint a replacement with the permissions above and
+replace the secret, then dispatch a run of <code>main</code> to confirm it.</p>
+<p>The split is between jobs, not between hosts, and that bounds what it
+buys. Every job runs on the persistent <code>[self-hosted, static]</code>
+runners, as the same user, and only <code>runner.temp</code> is emptied between
+jobs. Code an audit leg runs -- skillsaw's unpinned dependencies, or
+anything an audited repository can steer -- could leave something in
+that user's home directory (a <code>.pth</code> file in the user site-packages,
+a <code>~/.gitconfig</code> hook) that <code>manage-issues</code> or <code>update-docs</code> then runs
+with <code>AUDIT_TOKEN</code>. Likewise skillsaw runs as the same user as
+<code>audit-check.py</code>, so taking the token out of its environment is
+defence in depth, not isolation: it could still read its parent's.
+What the split does do is keep <code>AUDIT_TOKEN</code> out of every process
+the legs start. Isolating the writing jobs properly needs runners
+nothing else uses, which is a runner change rather than a workflow one.</p>
 <p><strong>2. <code>manage-issues</code></strong> -- downloads every artifact and runs
 <code>scripts/audit-manage-issues.py</code>, which files, updates and closes issues. See
 <a href="#issues-are-the-work-tracking">Issues are the work tracking</a> below.</p>
@@ -15444,7 +15534,8 @@ every run and no review mark could survive it.</p>
 <p>The tables are therefore always a rendering of the most recent run.
 Never edit one by hand: the next run overwrites it.</p>
 <p><strong>4. <code>report-failure</code></strong> -- runs only when one of the above fails, and
-files or updates an issue labelled <code>audit-failure</code> on this repository.</p>
+files or updates an issue labelled <code>audit-failure</code> on this repository,
+with <code>tools/report-audit-failure.sh</code>.</p>
 <p>That last job exists because this pipeline's worst failure mode is a
 quiet one. A scheduled workflow that fails emails whoever pushed last,
 which is nobody's inbox in particular before anyone is up -- and while
@@ -15453,6 +15544,20 @@ verdicts, so the audit looks healthy from the outside. In August 2026
 that ran for a full day; on a weekly cadence the same failure would
 last a week. Nothing retries a failed run, so the issue says how to
 start one by hand once the cause is fixed.</p>
+<p>Only a run of <code>main</code> writes anything. Dispatched on another branch
+(<code>gh workflow run consistency-audit.yml --ref &lt;branch&gt;</code>), the audit
+matrix runs that branch's checks against the whole fleet and uploads
+its results as artifacts, and <code>manage-issues</code>, <code>update-docs</code> and
+<code>report-failure</code> are skipped. That is the way to measure a change to
+the checks against the fleet before merging it. The guard catches a
+dispatch of the wrong ref, not a determined branch: the read token can
+read every private repository in the organisation, and a branch
+controls the code that runs with it, including whether it names
+<code>AUDIT_TOKEN</code> at all. The trust boundary is push access to this
+repository, as it always was. Two runs of one ref never overlap: the
+second waits for the first to finish. Runs of different refs do not
+wait for each other, so a branch run can never hold up or displace the
+scheduled run of <code>main</code>.</p>
 <h2 id="issues-are-the-work-tracking">Issues are the work tracking<a class="headerlink" href="#issues-are-the-work-tracking" title="Permanent link">&para;</a></h2>
 <p><code>audit-manage-issues.py</code> files one issue per failing check, on the
 repository the work has to happen in, labelled <code>consistency</code> (the label
@@ -15472,10 +15577,15 @@ examples are <code>review-scope-completeness</code> and <code>eol-distro</code>.
 </code></pre></div>
 <p>Two properties matter when changing any of this.</p>
 <p><strong>Issue titles are the idempotency key.</strong> They are
-<code>Consistency: &lt;check name&gt;</code>, matched exactly to decide whether an issue
-already exists. Renaming a check name silently orphans every open issue
-for it and files a fresh set, so treat <code>ISSUE_TITLES</code> in
-<code>scripts/audit_common.py</code> as an interface, not a label.</p>
+<code>Consistency: &lt;issue_title&gt;</code>, from the check's <code>issue_title</code> class
+attribute, matched exactly to decide whether an issue already exists.
+Renaming one silently orphans every open issue for it and files a
+fresh set, so treat a check's <code>issue_title</code> as an interface, not a
+label. <code>FROZEN_ISSUE_TITLES</code> in <code>scripts/tests/test_metadata.py</code>
+holds every one as a literal, so a rename fails the tests until it is
+made there too, on purpose. (<code>ISSUE_TITLES</code> in
+<code>scripts/audit_common.py</code> is a view over the registry, not the place
+to change one.)</p>
 <p><strong>Repository renames are handled, but noisily on purpose.</strong> Repo names
 are resolved to their canonical form before searching, because GitHub's
 issue search does not follow renames while issue creation does -- so a
@@ -15487,37 +15597,91 @@ closed.</p>
 keeps failing, its issue's body is re-rendered from the latest result
 and rewritten with <code>gh issue edit</code> whenever it differs, so the counts,
 the per-item lists and the spec links stay current rather than
-remaining the snapshot taken at filing. Differences in line endings and
-trailing whitespace are ignored, so an unchanged result edits nothing.
+remaining the snapshot taken at filing. <code>body_is_current()</code> in
+<code>scripts/audit-manage-issues.py</code> ignores CRLF line endings and
+whitespace at the start or end of the whole body, which GitHub
+introduces without the content changing, so an unchanged result edits
+nothing. Any other difference, including trailing whitespace on a line
+inside the body, is an edit.
 Hand edits to a body are not preserved -- anything worth saying to the
 next reader belongs in a comment.</p>
+<h3 id="what-each-status-means">What each status means<a class="headerlink" href="#what-each-status-means" title="Permanent link">&para;</a></h3>
+<p>Every result carries one of four statuses. The first three are
+verdicts about the audited repository; the fourth is a statement about
+the audit.</p>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Means</th>
+<th>Effect on the criterion's issue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pass</code></td>
+<td>The repository meets the criterion.</td>
+<td>Closes an open one.</td>
+</tr>
+<tr>
+<td><code>fail</code></td>
+<td>The repository does not, and <code>details</code> says how.</td>
+<td>Files one, or refreshes the open one's body.</td>
+</tr>
+<tr>
+<td><code>not_applicable</code></td>
+<td>The criterion does not apply here, for the reason in <code>details</code>.</td>
+<td>Closes an open one.</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td>The audit could not reach a verdict.</td>
+<td>None.</td>
+</tr>
+</tbody>
+</table>
 <p>A check that starts passing closes its issue. A check that becomes
 <code>not_applicable</code> closes it too: "we decided this does not apply" and
 "this now complies" are both reasons not to keep a work item open.</p>
-<p>A check that raises is reported as <code>error</code>, which is not a verdict and
-touches no issue either way: filing one would blame the audited
-repository for a bug in the audit, and closing one would read as the
-repository having fixed it. <code>registry.run_check()</code> is the boundary --
-one raising criterion costs that criterion rather than all of them for
-the repository -- and prints the traceback to the audit step's log. The
-leg then fails on its <em>Fail if any check raised</em> step, after the
-results are uploaded, so <code>manage-issues</code> still manages every other
-criterion for that repository while <code>report-failure</code> makes the bug
-visible and <code>update-docs</code> holds back the compliance page until it is
-fixed. The tests call <code>run()</code> directly and assert a verdict, so a check
-that raises still fails them.</p>
+<p><code>error</code> means the audit failed rather than the repository, and it is
+not a verdict: it touches no issue either way. Filing one would blame
+the audited repository for a bug in the audit, and closing one would
+read as the repository having fixed it. A check never returns it.
+<code>registry.run_check()</code> reports it for a check that raised -- one
+raising criterion costs that criterion rather than all of them for
+the repository -- and prints the traceback to the audit step's log.
+The leg then fails on its <em>Fail if any check raised</em> step
+(<code>scripts/audit-raised.py</code>), after the results are uploaded, so
+<code>manage-issues</code> still manages every other criterion for that
+repository while <code>report-failure</code> makes the bug visible and
+<code>update-docs</code> holds back the compliance page until it is fixed.</p>
+<p><strong>When a check's own tooling fails, the status is <code>error</code>.</strong> That
+covers the GitHub API returning an error, <code>git ls-files</code> failing
+(<code>audit.files.tracked_paths()</code> returning <code>None</code>), a clone failing,
+and a subprocess timing out. The check has learned nothing about the
+repository, so it has no verdict to give: it raises, and
+<code>run_check()</code> reports <code>error</code>. It does not return <code>self.fail()</code>, and
+it does not return <code>self.skip()</code>. Each of those is a claim about the
+repository. A <code>fail</code> files an issue on it, under the bot's identity,
+for an outage on our side. A <code>not_applicable</code> closes the issue it
+already has, and does so for every repository the outage reached at
+once. The line is whether the tool answered: an answer is evidence a
+verdict can rest on, including an answer that the thing asked about
+does not exist, while a failure to answer is not.</p>
+<p>The tests call <code>run()</code> directly and assert a verdict, so a check that
+raises unexpectedly still fails them. A test of a tool-failure path
+asserts that <code>run()</code> raises instead.</p>
 <h2 id="adding-a-criterion">Adding a criterion<a class="headerlink" href="#adding-a-criterion" title="Permanent link">&para;</a></h2>
-<p>Two files: the check and its specification.</p>
+<p>Six files, all in this repository. This is the one list of them:
+<code>PUSH-AUDIT.md</code> and <code>AGENTS.md</code> link here rather than keep their own,
+so a step added to it reaches both.</p>
 <ol>
 <li><strong><code>scripts/audit/checks/&lt;family&gt;.py</code></strong> -- add a <code>Check</code> subclass to
    the module whose specifications it belongs with. It declares what it
    is as class attributes -- <code>id</code>, <code>spec</code>, <code>issue_title</code>, an optional
    <code>template</code>, and a <code>column</code> heading when it shares a specification
    page with another criterion -- and implements <code>run(repo)</code>, returning
-   <code>self.ok()</code>, <code>self.fail()</code> or <code>self.skip()</code>. Register the instance in
-   <code>CHECKS</code> in <code>scripts/audit/registry.py</code>, beside the rest of its
-   family -- that list is the order the results are reported in, and
-   there is no second table to add the id to.</li>
+   <code>self.ok()</code>, <code>self.fail()</code> or <code>self.skip()</code>.</li>
 </ol>
 <p>Put the applicability test in <code>applies(repo)</code> rather than at the top
    of <code>run()</code>. The scheduler asks the cheap question first, which is
@@ -15535,13 +15699,41 @@ that raises still fails them.</p>
    regular file inside the checkout, so a dangling or escaping symlink
    is skipped rather than raised on or followed.</p>
 <ol>
-<li><strong><code>docs/audits/&lt;check-id&gt;.md</code></strong> -- the specification, following the
-   structure in <code>docs/audits/README.md</code>, and a line for it in that
-   index. Under <code>## Projects</code>, link <code>compliance.md#&lt;check-id&gt;</code>; the
-   section appears there at the first run. Do not add a
-   <code>consistency-audit</code> marker block -- the tables live on the
-   compliance page so that every specification stays reviewable, and
-   <code>test_audit_update_docs.py</code> fails on a marker in a spec.</li>
+<li>
+<p><strong><code>scripts/audit/registry.py</code></strong> -- register the instance in
+   <code>CHECKS</code>, beside the rest of its family. That list is the order the
+   results are reported in, and there is no second table to add the id
+   to.</p>
+</li>
+<li>
+<p><strong><code>scripts/tests/test_&lt;family&gt;.py</code></strong> -- tests beside the check,
+   following the <code>CheckTestCase</code> convention in
+   <a href="#testing-a-change">Testing a change</a>. A criterion no test module
+   instantiates fails
+   <code>test_every_check_is_reachable_from_a_test_module</code> in
+   <code>scripts/tests/test_metadata.py</code>.</p>
+</li>
+<li>
+<p><strong><code>docs/audits/&lt;check-id&gt;.md</code></strong> -- the specification, following the
+   structure in <code>docs/audits/README.md</code>. Under <code>## Projects</code>, link
+   <code>compliance.md#&lt;check-id&gt;</code>; the section appears there at the first
+   run. Do not add a <code>consistency-audit</code> marker block -- the tables
+   live on the compliance page so that every specification stays
+   reviewable, and <code>test_audit_update_docs.py</code> fails on a marker in a
+   spec.</p>
+</li>
+<li>
+<p><strong><code>docs/audits/README.md</code></strong> -- a line for the specification in the
+   criterion index. <code>test_every_spec_file_is_named_in_the_index</code> in
+   <code>scripts/tests/test_audit_update_docs.py</code> fails on a spec the index
+   does not name.</p>
+</li>
+<li>
+<p><strong><code>scripts/tests/test_metadata.py</code></strong> -- the criterion's lines in
+   <code>FROZEN_METADATA</code> and <code>FROZEN_ISSUE_TITLES</code>, and in
+   <code>FROZEN_COLUMN_NAMES</code> when it declares a <code>column</code>. Why these are
+   frozen is below.</p>
+</li>
 </ol>
 <p><code>AUDIT_METADATA</code> and <code>ISSUE_TITLES</code> in <code>scripts/audit_common.py</code>, and
 <code>COLUMN_NAMES</code> in <code>scripts/audit-update-docs.py</code>, are views over the
@@ -15567,9 +15759,6 @@ publishes a bad label beats a run that publishes nothing;
 <code>test_criteria_sharing_a_spec_page_all_declare_a_column</code> in
 <code>scripts/tests/test_metadata.py</code> fails on it from the other direction,
 reading the registry rather than the documentation.</p>
-<p>Add tests beside the check, in <code>scripts/tests/test_&lt;family&gt;.py</code>. A
-criterion with no test module entry fails the contract tests in
-<code>scripts/tests/test_metadata.py</code>.</p>
 <p>A new criterion does not require a re-audit of anything else, and does
 not require touching any project repository. The next run measures it
 everywhere and files the issues; dispatch the workflow by hand if you
@@ -15614,6 +15803,12 @@ test.</p>
 <p>The full gate, which <code>ci.yml</code> also runs on every pull request:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pre-commit run --all-files
 </code></pre></div>
+<p>The scripts are standard library only and run on whatever <code>python3</code>
+is on the path, which has to be Python 3.11 or later: the audit and
+<code>review-tracking.py</code> read TOML with <code>tomllib</code>, which 3.11 added to the
+standard library. That floor applies to a local run and to the
+runners the workflows use alike, and an older interpreter fails at
+import rather than measuring anything.</p>
 <p>Every test suite lives in <code>scripts/tests/</code>, including the suites for
 the scripts around the package -- <code>test_review_tracking.py</code>,
 <code>test_audit_update_docs.py</code>, <code>test_audit_snapshot.py</code>,
@@ -15623,12 +15818,15 @@ directories with no rule telling them apart. A suite written anywhere
 else is a suite no hook runs, and <code>SuiteLocationTest</code> in
 <code>scripts/tests/test_hooks.py</code> fails on one.</p>
 <p>Two <code>local</code> pre-commit hooks run them. <code>audit-package-tests</code> discovers
-the directory and runs all of it, on any change under <code>scripts/</code>,
-<code>tools/</code>, <code>templates/</code>, the workflows, <code>.pre-commit-config.yaml</code> or
-any <code>.md</code>. <code>review-tracking-tests</code> runs that one suite again, on
-everything else: it is the only hook with <code>always_run</code>, because it
-asserts properties of the whole tree and a review-only commit matches
-nothing the other pattern names.</p>
+the directory and runs all of it, on a change to any Python file under
+<code>scripts/</code>, anything under <code>tools/</code> or <code>templates/</code>, a workflow,
+<code>.pre-commit-config.yaml</code> or any <code>.md</code>. <code>review-tracking-tests</code> runs
+that one suite again on every commit, whatever it touches: it is the
+only hook with <code>always_run</code>, because it asserts properties of the
+whole tree and a review-only commit matches nothing the other pattern
+names. A commit that matches both runs that suite twice. The patterns
+themselves are in <code>.pre-commit-config.yaml</code>, which is the authority
+when this paragraph and it disagree.</p>
 <p>One module at a time, which is quicker while iterating, and each runs
 standalone:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python3 -m unittest discover -s scripts/tests -t scripts
@@ -15665,22 +15863,27 @@ fixture first, by calling <code>self.fresh_fixture()</code>, or the first
 call's files are still on disk for the second.</p>
 <p>The tests cover the machinery, not what a check <em>decides</em> about a real
 repository. Test that half against local clones:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>python3 scripts/audit-check.py --repo-path ~/src/shakenfist/&lt;repo&gt; \
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    --repo-name &lt;repo&gt; &gt; /tmp/results/audit-result-&lt;repo&gt;.json
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>python3 scripts/audit-manage-issues.py --results-dir /tmp/results/ --dry-run
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>python3 scripts/audit-update-docs.py --results-dir /tmp/results/ \
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    --no-issues --page /tmp/compliance.md
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>mkdir -p /tmp/results
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>python3 scripts/audit-check.py --repo-path ~/src/shakenfist/&lt;repo&gt; \
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    --repo-name &lt;repo&gt; &gt; /tmp/results/audit-result-&lt;repo&gt;.json
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>python3 scripts/audit-manage-issues.py --results-dir /tmp/results/ --dry-run
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>python3 scripts/audit-update-docs.py --results-dir /tmp/results/ \
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    --no-issues --page /tmp/compliance.md
 </code></pre></div>
 <p>Always pass <code>--dry-run</code> to <code>audit-manage-issues.py</code>. Without it the
 script creates, edits and closes real issues on real repositories.</p>
-<p>Pass <code>--page</code> as well, as above. A locally generated page only covers
-the repositories you fed it, so it is never what you want to keep, and
-without <code>--page</code> the script rewrites the real
-<code>docs/audits/compliance.md</code> in place. The old advice here was to
-discard the result with <code>git restore docs/audits/</code>, which is now
-actively dangerous: the other 35 files in that directory are
-hand-written, and a <code>git restore</code> of the directory throws away
-whatever you were editing along with the generated page.</p>
+<p>Run them from the root of this repository, and pass <code>--page</code> as well,
+as above. A locally generated page only covers the repositories you
+fed it, so it is never what you want to keep, and without <code>--page</code> the
+script rewrites the real <code>docs/audits/compliance.md</code> in place. A
+<code>--page</code> that does not exist yet is seeded with a copy of the real
+page, because the generated block is spliced between markers the
+hand-written page carries; an existing one, such as the output of an
+earlier run, is rewritten.</p>
+<p>Do not discard a stray result with <code>git restore docs/audits/</code>. Every
+other file in that directory is hand-written, and a <code>git restore</code> of
+the directory throws away whatever you were editing along with the
+generated page.</p>
 <h3 id="before-and-after-a-change-to-a-check">Before and after a change to a check<a class="headerlink" href="#before-and-after-a-change-to-a-check" title="Permanent link">&para;</a></h3>
 <p>The tests and a one-repository run both answer "does this do what I
 meant". Neither answers "does everything else still say exactly what
@@ -15699,14 +15902,22 @@ every checkout in the directory, skipping git worktrees, and strips
 the <code>timestamp</code> field so that two runs of an unchanged tree compare
 equal. <code>--diff</code> exits non-zero if anything differs and prints the
 status and details on both sides.</p>
-<p>Six checks reach the network -- <code>default-branch-naming</code>,
-<code>github-security</code>, <code>delete-branch-on-merge</code>, <code>merge-queue-config</code>,
-<code>merge-group-cancellation</code> and <code>sfui-vendor</code> -- so they can differ
-between two runs because a repository setting changed rather than
-because the code did. They are reported under their own heading and do
-not affect the exit code. <code>scripts/tests/test_audit_snapshot.py</code>
-re-derives that list from <code>audit-check.py</code> and fails if a check grows
-a <code>gh</code> call without joining it.</p>
+<p>The checks in <code>NETWORK_CHECKS</code> in <code>scripts/audit_snapshot.py</code> reach
+the network, so they can differ between two runs because something
+outside the tree moved -- a repository setting, a workflow run, a new
+repository in the organisation -- rather than because the code did.
+They are reported under their own heading and do not affect the exit
+code. Read the list there rather than from a copy on this page, which
+is how this paragraph once fell two checks behind.</p>
+<p><code>NetworkCheckListTest</code> in <code>scripts/tests/test_audit_snapshot.py</code>
+keeps the list honest. It takes the schedule from <code>CHECKS</code> in
+<code>scripts/audit/registry.py</code>, and for each check follows its class
+body, its base classes and the helpers it calls under
+<code>scripts/audit/</code>, looking for the GitHub client (<code>_github()</code>,
+<code>repo.github</code>, <code>GhCli(</code>) or a <code>git clone</code>. It fails if the set it
+derives differs from <code>NETWORK_CHECKS</code> in either direction, so a check
+that grows a GitHub call has to join the list, and one that loses its
+last call has to leave it.</p>
 <p>The snapshots are not committed. Generated JSON under <code>scripts/</code> or
 <code>docs/</code> would land in review scope and sit permanently stale in the
 review queue; a scratch directory and a repeatable command give the

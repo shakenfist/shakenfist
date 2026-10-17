@@ -15352,9 +15352,9 @@ this file is configured via the <code>SOURCES_PATH</code> setting.</p>
   the Kerbside administrative interface.</p>
 </li>
 <li>
-<p><strong>Shaken Fist</strong>: Shaken Fist sources are also scraped regularly, but under a
-  <code>system</code> credential the scrape covers the whole cluster rather than a single
-  namespace. Access then goes through a token exchange rather than opening a
+<p><strong>Shaken Fist</strong>: Shaken Fist sources are also scraped regularly, but with a
+  <code>system</code> credential, so the scrape covers the whole cluster rather than a
+  single namespace. Access then goes through a token exchange rather than opening a
   console straight from the scraped table: Shaken Fist mints a short-lived,
   Ed25519-signed token that Kerbside verifies entirely offline at
   <code>/sf-console.vv</code>. See the <a href="#shaken-fist">Shaken Fist</a> section below.</p>
@@ -15408,11 +15408,16 @@ deletes it and its consoles on the next pass.</p>
 <p>Shaken Fist sources are periodically scraped for their available consoles, but
 both the scrape and the console-access flow differ from the other scraped
 source (oVirt), so they are described here in full.</p>
-<p><strong>Cluster-wide scrape.</strong> When the source's <code>username</code> is <code>system</code>, Kerbside
+<p><strong>Cluster-wide scrape.</strong> The source's <code>username</code> must be <code>system</code>, and Kerbside
 scrapes the <em>entire</em> cluster in one pass: every namespace's instances are
 enumerated, so all of the cluster's SPICE consoles become reachable through a
-single source. With any other <code>username</code>, only that namespace's instances are
-scraped. Each pass also refreshes the cluster's node list so a console can be
+single source. A source configured with any other namespace does not narrow
+the scrape to that namespace: only the instance listing uses the configured
+namespace, while the CA fetch, the signing-key fetch and the node listing are
+always made as <code>system</code> with the same key, so a credential that cannot
+authenticate as <code>system</code> fails at startup (see
+<a href="https://github.com/shakenfist/kerbside/issues/444">issue #444</a>). Each pass
+also refreshes the cluster's node list so a console can be
 associated with the hypervisor currently hosting it. An instance is only kept
 when it is in the <code>created</code> state and its VDI video model is a SPICE variant.</p>
 <p><strong>Token exchange.</strong> Unlike oVirt, a Shaken Fist console is not opened directly
@@ -15472,7 +15477,7 @@ optional <code>synthesize_host_subject</code> knob (below) lets an operator on t
 </tr>
 <tr>
 <td>username</td>
-<td>The Shaken Fist namespace to authenticate to; use <code>system</code> to scrape the whole cluster</td>
+<td>The Shaken Fist namespace to authenticate to; must be <code>system</code>, which scrapes the whole cluster</td>
 </tr>
 <tr>
 <td>password</td>

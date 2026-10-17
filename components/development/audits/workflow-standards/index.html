@@ -15512,16 +15512,33 @@
 
 <h1 id="audit-workflow-standards">Audit: Workflow standards<a class="headerlink" href="#audit-workflow-standards" title="Permanent link">&para;</a></h1>
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
+<p>These are the standards every workflow file is held to. Several
+checks measure parts of them, and each is a column in this
+criterion's section of the compliance page; the rest are not read by
+any check. Each rule below says which it is:</p>
+<ul>
+<li><strong>Measured</strong> names the check, and what it reads.</li>
+<li><strong>Reviewed, not measured</strong> is a rule no check reads. It holds as
+  far as review of the change holds it, and a repository breaking it
+  passes this criterion regardless.</li>
+</ul>
+<p>A rule is not measured because it is written here, so the labels are
+the place to look before relying on a green cell.</p>
 <h3 id="workflow-permissions">Workflow permissions<a class="headerlink" href="#workflow-permissions" title="Permanent link">&para;</a></h3>
-<p>Every workflow needs a top-level <code>permissions:</code> block restricting the
-default <code>GITHUB_TOKEN</code> scope; GitHub Advanced Security flags its
-absence. Read-only workflows use <code>permissions: contents: read</code>;
-mixed-need workflows use <code>permissions: {}</code> at the top with per-job
-overrides.</p>
+<p><strong>Measured</strong> by <code>workflow-permissions</code>. Every workflow needs a
+top-level <code>permissions:</code> block restricting the default <code>GITHUB_TOKEN</code>
+scope; GitHub Advanced Security flags its absence. The check reads
+each workflow for a line beginning <code>permissions:</code> at column zero.</p>
+<p><strong>Reviewed, not measured:</strong> what the block grants. Read-only
+workflows use <code>permissions: contents: read</code>; mixed-need workflows use
+<code>permissions: {}</code> at the top with per-job overrides. The check passes
+any top-level block, whatever its scopes.</p>
 <h3 id="workflow-and-job-naming">Workflow and job naming<a class="headerlink" href="#workflow-and-job-naming" title="Permanent link">&para;</a></h3>
-<p>Display names are English sentences with correct capitalisation, not
-kebab case. Job <strong>ids</strong> may be machine-friendly.</p>
+<p><strong>Reviewed, not measured.</strong> Display names are English sentences with
+correct capitalisation, not kebab case. Job <strong>ids</strong> may be
+machine-friendly.</p>
 <h3 id="runner-preferences">Runner preferences<a class="headerlink" href="#runner-preferences" title="Permanent link">&para;</a></h3>
+<p><strong>Measured</strong> by <code>self-hosted-runners</code>, except the last bullet.</p>
 <ul>
 <li>Use <code>self-hosted</code> runners. GitHub-provided minutes are limited per
   month, so jobs must not leak onto GitHub-hosted runners without a
@@ -15541,23 +15558,28 @@ kebab case. Job <strong>ids</strong> may be machine-friendly.</p>
   where a runner can actually be named -- after <code>runs-on:</code>, inside a
   <code>[...]</code> list, or as a <code>-</code> matrix item -- so the same text in an
   image label, a job name or an ssh command is not a finding.</li>
-<li>Claude Code automation jobs: <code>claude</code> runners only.</li>
+<li><strong>Reviewed, not measured:</strong> Claude Code automation jobs run on
+  <code>claude-code</code> runners only. No check reads which pool a Claude Code
+  job asks for.</li>
 </ul>
 <h3 id="static-runners-for-small-non-mutating-jobs">Static runners for small, non-mutating jobs<a class="headerlink" href="#static-runners-for-small-non-mutating-jobs" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Jobs that do not change the state of the runner -- linting, metadata
-  checks, audits, anything that installs no OS packages -- should use
-  <code>runs-on: [self-hosted, static]</code>. Static runners are a
-  pre-provisioned, long-lived pool and are much cheaper to start than a
-  fresh VM. Reserve <code>vm</code> runners for jobs that genuinely need a
-  throwaway machine.</li>
-<li>A static runner advertises exactly <code>self-hosted</code> and <code>static</code>, so a
-  <code>static</code> job must request those two labels <strong>only</strong>. Adding a size
-  (<code>s</code>, <code>l</code>), <code>vm</code>, or an OS (<code>debian-12</code>) asks for a runner that does
-  not exist, and the job waits forever. The check flags any <code>runs-on:</code>
-  combining <code>static</code> with additional labels.</li>
+<li><strong>Reviewed, not measured:</strong> jobs that do not change the state of
+  the runner -- linting, metadata checks, audits, anything that
+  installs no OS packages -- should use <code>runs-on: [self-hosted,
+  static]</code>. Static runners are a pre-provisioned, long-lived pool and
+  are much cheaper to start than a fresh VM. Reserve <code>vm</code> runners for
+  jobs that genuinely need a throwaway machine.</li>
+<li><strong>Measured</strong> by <code>static-runner-tags</code>: a static runner advertises
+  exactly <code>self-hosted</code> and <code>static</code>, so a <code>static</code> job must request
+  those two labels <strong>only</strong>. Adding a size (<code>s</code>, <code>l</code>), <code>vm</code>, or an OS
+  (<code>debian-12</code>) asks for a runner that does not exist, and the job
+  waits forever. The check flags any <code>runs-on:</code> combining <code>static</code>
+  with additional labels.</li>
 </ul>
 <h3 id="vm-runners-must-name-a-size">VM runners must name a size<a class="headerlink" href="#vm-runners-must-name-a-size" title="Permanent link">&para;</a></h3>
+<p><strong>Measured</strong> by <code>vm-runner-size</code>, including the bound-runner form at
+the end of the list.</p>
 <p>This is the exact complement of the rule above, and the two are easy to
 confuse: a <code>static</code> job must name <strong>no</strong> size because the static pool
 advertises none, and a <code>vm</code> job must name <strong>one</strong> because the conductor
@@ -15629,12 +15651,12 @@ free and no swap device, for months. The conductor's own sizing
 recommender could not see it either, because both its upsize triggers
 are swap-based and the image has no swap.</p>
 <h3 id="job-timeouts">Job timeouts<a class="headerlink" href="#job-timeouts" title="Permanent link">&para;</a></h3>
-<p>Every job must set <code>timeout-minutes</code>. GitHub's default is 360 minutes,
-which is never right on a self-hosted pool: a wedged job holds a runner
-nothing else can use until it expires. This matters most on the
-<code>claude-code</code> pool, where runners are few and an unattended Claude Code
-run has no natural upper bound -- <code>--max-turns</code> caps turns, not wall
-clock.</p>
+<p><strong>Reviewed, not measured.</strong> Every job must set <code>timeout-minutes</code>.
+GitHub's default is 360 minutes, which is never right on a self-hosted
+pool: a wedged job holds a runner nothing else can use until it
+expires. This matters most on the <code>claude-code</code> pool, where runners
+are few and an unattended Claude Code run has no natural upper bound
+-- <code>--max-turns</code> caps turns, not wall clock.</p>
 <p>Values used in the templates:</p>
 <ul>
 <li>Trigger / dispatch jobs making a few <code>gh</code> API calls (<code>pr-retest.yml</code>,
@@ -15646,11 +15668,14 @@ clock.</p>
   <code>test-drift-fix.yml</code>): 120 minutes.</li>
 </ul>
 <h3 id="functional-test-workflow-naming">Functional test workflow naming<a class="headerlink" href="#functional-test-workflow-naming" title="Permanent link">&para;</a></h3>
-<p>Functional testing lives in <code>functional-test.yml</code>, and must include
-<code>workflow_dispatch</code> as a trigger -- <code>pr-retest.yml</code> needs it.</p>
+<p><strong>Reviewed, not measured.</strong> Functional testing lives in
+<code>functional-tests.yml</code>, and must include <code>workflow_dispatch</code> as a
+trigger -- <code>pr-retest.yml</code> dispatches it. A repository whose test
+workflow has another name sets the <code>RETEST_WORKFLOW</code> repository
+variable instead; see <code>templates/ci-review-automation/README.md</code>.</p>
 <h3 id="pipestatus-for-piped-commands">PIPESTATUS for piped commands<a class="headerlink" href="#pipestatus-for-piped-commands" title="Permanent link">&para;</a></h3>
-<p>When piping through <code>tee</code> in a <code>run:</code> step, capture the upstream exit
-code with <code>${PIPESTATUS[0]}</code>:</p>
+<p><strong>Reviewed, not measured.</strong> When piping through <code>tee</code> in a <code>run:</code>
+step, capture the upstream exit code with <code>${PIPESTATUS[0]}</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Run something</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="no">set +e</span>
@@ -15667,7 +15692,8 @@ alone is unreliable on self-hosted runners. Exceptions: a pipeline
 whose failure is deliberately ignored (<code>command | tee log.txt || true</code>)
 and one whose upstream cannot fail (<code>echo ... | tee</code>).</p>
 <h3 id="flake8wrapsh-correctness">flake8wrap.sh correctness<a class="headerlink" href="#flake8wrapsh-correctness" title="Permanent link">&para;</a></h3>
-<p><code>tools/flake8wrap.sh</code> runs flake8 over the files changed in the current
+<p><strong>Measured</strong> by <code>flake8wrap</code>, in part, where <code>tools/flake8wrap.sh</code>
+exists. The script runs flake8 over the files changed in the current
 commit (via <code>tox -eflake8 -- -HEAD</code>), building a space-separated list
 in <code>filtered_files</code>. That variable must <strong>not</strong> be quoted on the
 diff/flake8 line: quoting makes the whole list one filename, which
@@ -15679,18 +15705,26 @@ breaks as soon as more than one Python file changed.</p>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># Wrong -- one argument named "a.py b.py".</span>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>diff<span class="w"> </span>-u<span class="w"> </span>--from-file<span class="w"> </span>/dev/null<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">filtered_files</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="nv">$FLAKE_COMMAND</span><span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">filtered_files</span><span class="si">}</span><span class="s2">"</span>
 </code></pre></div>
-<p>The <code>shellcheck disable=SC2086</code> directive is required, and its comment
-should say the splitting is intentional. The script should also filter
-to <code>.py</code> files, skip <code>_pb2</code> generated files, and handle paths in the
-diff that no longer exist on disk.</p>
+<p>The check reads the script for two things: that it names <code>SC2086</code>
+somewhere, and that no line mentioning both <code>filtered_files</code> and
+<code>diff</code> or flake8 quotes <code>"${filtered_files}"</code>.</p>
+<p><strong>Reviewed, not measured:</strong> that the directive's comment says the
+splitting is intentional, and that the script filters to <code>.py</code>
+files, skips <code>_pb2</code> generated files, and handles paths in the diff
+that no longer exist on disk.</p>
 <h3 id="ci-linting">CI linting<a class="headerlink" href="#ci-linting" title="Permanent link">&para;</a></h3>
 <p><code>actionlint</code>, <code>shellcheck</code>, and a <code>.pre-commit-config.yaml</code> that runs
 them; <code>kerbside</code> and <code>kerbside-patches</code> are the worked examples. Helper
 shell scripts should have shellcheck pre-commit hooks.</p>
+<p><strong>Measured</strong> by <code>pre-commit-config</code>, and only as far as the file
+existing: the check passes any <code>.pre-commit-config.yaml</code>. <strong>Reviewed,
+not measured:</strong> which hooks it runs, including whether actionlint and
+shellcheck are among them.</p>
 <h3 id="review-marks-excluded-from-pre-commit">Review marks excluded from pre-commit<a class="headerlink" href="#review-marks-excluded-from-pre-commit" title="Permanent link">&para;</a></h3>
-<p>Repositories with human review tracking deployed (those carrying
-<code>.vscode/review-scope.toml</code>) must exempt the weAudit state files from
-any pre-commit hook that rewrites the files it is given:</p>
+<p><strong>Measured</strong> by <code>review-marks-pre-commit</code>. Repositories with human
+review tracking deployed (those carrying <code>.vscode/review-scope.toml</code>)
+must exempt the weAudit state files from any pre-commit hook that
+rewrites the files it is given:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">end-of-file-fixer</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">exclude</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^\.vscode/.*\.weaudit</span>
 </code></pre></div>
@@ -15709,9 +15743,12 @@ top-level exclude still counts. Repositories without the tooling,
 without a <code>.pre-commit-config.yaml</code>, or running no rewriting hook are
 not applicable.</p>
 <h3 id="pypi-caching">PyPI caching<a class="headerlink" href="#pypi-caching" title="Permanent link">&para;</a></h3>
-<p>Self-hosted runners should use the devpi PyPI cache at
-<code>http://192.168.1.15:3141</code>. Any job pointing pip at it with
-<code>PIP_INDEX_URL</code> must set a pypi fallback in the <strong>same</strong> <code>env</code> block:</p>
+<p><strong>Reviewed, not measured:</strong> self-hosted runners should use the devpi
+PyPI cache at <code>http://192.168.1.15:3141</code>. No check asks whether a job
+that installs packages uses it.</p>
+<p><strong>Measured</strong> by <code>devpi-fallback</code>: any job pointing pip at the cache
+with <code>PIP_INDEX_URL</code> must set a pypi fallback in the <strong>same</strong> <code>env</code>
+block:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="w">    </span><span class="nt">env</span><span class="p">:</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">      </span><span class="nt">PIP_INDEX_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://192.168.1.15:3141/root/pypi/+simple/</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">      </span><span class="nt">PIP_EXTRA_INDEX_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://pypi.org/simple/</span>
@@ -15724,11 +15761,11 @@ requirement X (from versions: none)</code>. <code>PIP_INDEX_URL</code> replaces 
 entirely, so without <code>PIP_EXTRA_INDEX_URL</code> there is no fallback. The
 check flags any devpi-backed <code>env</code> block missing it.</p>
 <h3 id="retired-devpi-address">Retired devpi address<a class="headerlink" href="#retired-devpi-address" title="Permanent link">&para;</a></h3>
-<p>The cache moved from <code>192.168.1.4</code> to <code>192.168.1.15</code>. The old address
-no longer resolves to a running server, so a job still pointing at it
--- in <code>PIP_INDEX_URL</code>, <code>PIP_TRUSTED_HOST</code>, or anywhere else -- fails
-every install. The check flags any workflow line referencing
-<code>192.168.1.4</code>.</p>
+<p><strong>Measured</strong> by <code>devpi-stale-ip</code>. The cache moved from <code>192.168.1.4</code>
+to <code>192.168.1.15</code>. The old address no longer resolves to a running
+server, so a job still pointing at it -- in <code>PIP_INDEX_URL</code>,
+<code>PIP_TRUSTED_HOST</code>, or anywhere else -- fails every install. The check
+flags any workflow line referencing <code>192.168.1.4</code>.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No single template -- these are standards applied across all workflow
 files. See <code>templates/ci-review-automation/</code> for examples of correctly

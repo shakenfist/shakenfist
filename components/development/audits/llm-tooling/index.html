@@ -2201,6 +2201,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="What we check">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#agentsmd-and-architecturemd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AGENTS.md and ARCHITECTURE.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skills-for-repetitive-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skills for repetitive operations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15167,6 +15195,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="What we check">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#agentsmd-and-architecturemd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AGENTS.md and ARCHITECTURE.md
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skills-for-repetitive-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skills for repetitive operations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15214,11 +15270,20 @@
 
 <h1 id="audit-llm-tooling">Audit: LLM tooling<a class="headerlink" href="#audit-llm-tooling" title="Permanent link">&para;</a></h1>
 <h2 id="what-we-check">What we check<a class="headerlink" href="#what-we-check" title="Permanent link">&para;</a></h2>
-<p>Every project should have an <code>AGENTS.md</code> and an <code>ARCHITECTURE.md</code>.
-Repetitive operations should be covered by a Claude skill where one
-helps. Things that are likely to need a skill include remembering to
-write unit or functional tests, updating documentation for
-user-visible changes, and so forth.</p>
+<p>Two rules. One is measured; the other is a judgment call and is not.</p>
+<h3 id="agentsmd-and-architecturemd">AGENTS.md and ARCHITECTURE.md<a class="headerlink" href="#agentsmd-and-architecturemd" title="Permanent link">&para;</a></h3>
+<p><strong>Measured</strong> by <code>llm-tooling</code>. Every project should have an
+<code>AGENTS.md</code> and an <code>ARCHITECTURE.md</code>, and the check fails on either
+being missing from the repository root. It reads only whether they
+exist; their shape is
+<a href="/components/development/audits/llm-doc-structure/"><code>llm-doc-structure</code></a>'s to measure.</p>
+<h3 id="skills-for-repetitive-operations">Skills for repetitive operations<a class="headerlink" href="#skills-for-repetitive-operations" title="Permanent link">&para;</a></h3>
+<p><strong>Reviewed, not measured.</strong> Repetitive operations should be covered
+by a Claude skill where one helps. Things that are likely to need a
+skill include remembering to write unit or functional tests, updating
+documentation for user-visible changes, and so forth. Whether an
+operation is repetitive enough to earn one is a judgment no check
+makes, so a repository with no skills passes this criterion.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template -- these files are project-specific and must be written
 with knowledge of the project's architecture and workflows.</p>

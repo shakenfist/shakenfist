@@ -15456,8 +15456,8 @@
 
 <h1 id="ci-review-automation">CI Review Automation<a class="headerlink" href="#ci-review-automation" title="Permanent link">&para;</a></h1>
 <p>Shaken Fist projects use Claude Code-powered automation for PR
-reviews, test fixing, and comment addressing. This page describes
-the workflow templates and how to add them to a new project.</p>
+reviews and test fixing. This page describes the workflow templates
+and how to add them to a new project.</p>
 <h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
 <p>The automation consists of several GitHub Actions workflows that
 respond to PR events and bot commands:</p>
@@ -15624,10 +15624,14 @@ templates which provide <code>pr-fix-tests.yml</code> and
 <h3 id="step-2-add-automated-reviewer-to-ci">Step 2: Add Automated Reviewer to CI<a class="headerlink" href="#step-2-add-automated-reviewer-to-ci" title="Permanent link">&para;</a></h3>
 <p>Modify your main CI workflow (e.g. <code>functional-tests.yml</code>) to add:</p>
 <ol>
-<li>A top-level <code>permissions</code> block with <code>pull-requests: write</code></li>
 <li>A job calling the shared
    <code>shakenfist/actions/.github/workflows/pr-auto-review.yml@main</code>,
    with the project's test jobs in its <code>needs:</code> list</li>
+<li>A <code>permissions:</code> block on that calling job, granting what the
+   reviewer needs. A cross-repository reusable workflow cannot grant
+   itself more token scope than its caller has, so without the block
+   the reviewer cannot post. The template README's snippet is the
+   list to copy; it is not repeated here, so the two cannot disagree</li>
 </ol>
 <p>See the
 <a href="https://github.com/shakenfist/development/tree/main/templates/ci-review-automation/README.md">template README</a>

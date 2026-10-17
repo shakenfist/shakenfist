@@ -15899,11 +15899,17 @@ always a free choice:</p>
   hypervisors present publicly issued certificates must leave it empty
   for that source rather than set it to an unrelated CA.</li>
 </ul>
-<p>For Shaken Fist consoles the enforced <code>host_subject</code> is not configured on the
-proxy: it is pinned at scrape time from the hosting node's published SPICE
-server certificate subject (<code>spice_server_cert_subject</code>), and carried through
-to the proxy in the <code>AuthorizeConnection</code> <code>Target</code>. See
-<a href="/components/kerbside/console-sources/">Console Sources</a>.</p>
+<p>For Shaken Fist consoles the <code>host_subject</code> is not configured on the proxy:
+it is taken at scrape time from the hosting node's published SPICE server
+certificate subject (<code>spice_server_cert_subject</code>), and carried through to the
+proxy in the <code>AuthorizeConnection</code> <code>Target</code>. That pin is conditional. A node
+that publishes no subject (an older cluster, or a node without a SPICE
+certificate) yields no <code>host_subject</code>, and the backend leg for its consoles
+is then relayed without host-subject enforcement rather than refused
+(<code>backend.rs</code> maps an empty subject to none). The per-source
+<code>synthesize_host_subject</code> option substitutes <code>CN=&lt;node fqdn&gt;</code> in that case,
+which is only correct on the stock <code>cn=hostname</code> PKI and so is off by
+default. See <a href="/components/kerbside/console-sources/#shaken-fist">Console Sources</a>.</p>
 <h2 id="connection-state-machine">Connection State Machine<a class="headerlink" href="#connection-state-machine" title="Permanent link">&para;</a></h2>
 <p>Each accepted connection runs this sequence (<code>session.rs</code>, <code>backend.rs</code>,
 <code>relay.rs</code>):</p>
