@@ -192,6 +192,11 @@ decoded it, or whether the audio device actually consumed it. The
 snapshot surfaces:
 
 **Session metadata:**
+- `channel_linked` — whether a running playback channel has
+  published the snapshot; `false` in a build without the `audio`
+  feature, a session with no playback channel, or once the channel
+  has closed, which an all-zero snapshot
+  otherwise cannot be told apart from
 - `current_session` — populated while a playback session is active:
   when it started (`started_at_secs`), the multimedia clock value the
   server assigned at start (`mm_time_at_start`), and the negotiated

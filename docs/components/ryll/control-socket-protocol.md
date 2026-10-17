@@ -1,4 +1,4 @@
-# Control Socket Protocol — Version 1.5
+# Control Socket Protocol — Version 1.6
 
 This document specifies the wire protocol spoken between a Ryll session
 with no host window — `--headless` or `--web` — and any external driver
@@ -8,7 +8,7 @@ such as latency loadtests and Sextant scenario tests implement against
 this document. Read the whole document before writing a client or
 implementing a verb.
 
-Protocol version: **1.5**
+Protocol version: **1.6**
 
 Version history:
 
@@ -46,6 +46,12 @@ Version history:
   of it.  The `latency` event is unchanged: it was always the interval
   between the server's PINGs, which says little about the path when a
   server pings every 30 s.  Additive.
+- **1.6** — added a `playback` object to the `stats` result: the
+  playback channel's start, stop, packet, decode and byte counts and
+  the current audio stream's codec, rate and channels, so a test can
+  check that audio arrives and decodes.  It is absent when no playback
+  channel has linked, including in every build without the `audio`
+  feature.  Additive.
 
 ---
 
@@ -296,7 +302,7 @@ Parameters:
 ### Hello response — success
 
 ```json
-{"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.5", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed", "input_rtt"]}}
+{"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.6", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed", "input_rtt"]}}
 ```
 
 Result fields:
@@ -304,7 +310,7 @@ Result fields:
 | Field | Type | Description |
 |-------|------|-------------|
 | `server_name` | string | Always `"ryll"` in this implementation. |
-| `protocol_version` | string | The version the server will speak. In v1.x this is `"1.5"`; older servers reported `"1.0"`, `"1.1"`, `"1.2"`, `"1.3"` or `"1.4"`. Clients should not compare for exact equality — see the compat note below. |
+| `protocol_version` | string | The version the server will speak. In v1.x this is `"1.6"`; older servers reported `"1.0"`, `"1.1"`, `"1.2"`, `"1.3"`, `"1.4"` or `"1.5"`. Clients should not compare for exact equality — see the compat note below. |
 | `supported_methods` | array of string | The complete set of verb names the server recognises. Clients should use this list rather than hard-coding expectations, especially when connecting to a newer server. |
 | `supported_events` | array of string | The complete set of event names the server can emit. |
 
@@ -321,7 +327,7 @@ error and then **closes the connection**:
 The server writes the error line and then closes the socket. The client
 will see EOF immediately after reading that line.
 
-**Minor version mismatches are accepted in both directions.** A v1.5
+**Minor version mismatches are accepted in both directions.** A v1.6
 client connecting to a v1.0 server, or vice versa, is fine: the server
 responds with whatever minor version *it* speaks (e.g. `"1.0"` or
 `"1.1"`), and both sides behave according to the features they each
@@ -394,7 +400,7 @@ Worked example:
 
 ```
 → {"id": 1, "method": "hello", "params": {"client_name": "demo", "protocol_version": "1.1"}}
-← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.5", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed", "input_rtt"]}}
+← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.6", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed", "input_rtt"]}}
 ```
 
 ---
@@ -769,7 +775,9 @@ Added in v1.4.  Read the display channel's counters: what it has
 received, and the video streams the server has sent it. A test polls
 this to measure a server, for example its frame rate as the rate of
 `marks_received`, or to check that a video stream was created with the
-expected codec, decoded without failures, and was destroyed.
+expected codec, decoded without failures, and was destroyed. From v1.6
+it also reads the playback channel's counters, so a test can check
+that audio arrives and decodes.
 
 The counters are those the display channel last published, which it
 does after each batch of messages it reads, so they trail the wire by
@@ -782,7 +790,8 @@ backwards.
 
 Params: `{}` (none required)
 
-Result on success: an object with one field, `display`, holding:
+Result on success: an object with a `display` field and, from v1.6, an
+optional `playback` field. `display` holds:
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -820,6 +829,32 @@ at the second, with its codec and final counts, unless more than 16
 streams were destroyed in between. `streams_destroyed_total` says
 whether that happened.
 
+`playback` (v1.6) is present once a playback channel has linked and
+published its counters, which it does after each batch of messages
+and every 100 ms while the server is silent. It is absent, not zeroed,
+when the server offered no playback channel, before the channel links,
+after it closes, and always in a ryll built without the `audio` Cargo feature (the slim
+`--no-default-features` build), so a client can tell "no audio here"
+from "audio, but nothing played". The counters count from the channel
+linking and survive `STOP` and the next `START`. It holds:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `starts` | u64 | `PLAYBACK_START` messages received. |
+| `stops` | u64 | `PLAYBACK_STOP` messages received. |
+| `packets_received` | u64 | `PLAYBACK_DATA` messages received, decodable or not. |
+| `packets_decoded` | u64 | `DATA` packets decoded (Opus) or passed through (raw PCM). |
+| `decode_failures` | u64 | `DATA` packets the Opus decoder failed on. A packet in a mode ryll cannot play, or with no audio data, is in neither this nor `packets_decoded`. |
+| `bytes_received` | u64 | Bytes of audio data received in `DATA` packets, before decoding. |
+| `codec` | string or null | The current stream's codec: `"opus"`, `"raw"`, or `"mode_N"` for any other SPICE `audio_data_mode` number N. `null` when no stream has started or the last one stopped. |
+| `sample_rate` | u32 or null | The current stream's sample rate from `START`, in Hz; `null` as for `codec`. |
+| `channels` | u8 or null | The current stream's channel count from `START`, saturating at 255; `null` as for `codec`. |
+
+The codec is the data mode the server last sent in `PLAYBACK_MODE`.
+Decoding does not need a sound device: a ryll with `audio` and no
+device decodes into its ring and retries the device in the background,
+so these counters move on a headless test host too.
+
 Verb-specific error codes: none beyond the common set.
 
 Worked example, polled while an H.264 stream plays:
@@ -827,6 +862,13 @@ Worked example, polled while an H.264 stream plays:
 ```
 → {"id": 13, "method": "stats", "params": {}}
 ← {"id": 13, "ok": true, "result": {"display": {"channel_id": 0, "bytes_in": 48211953, "messages_received": 5120, "marks_received": 1474, "streams_active": 1, "streams_created_total": 1, "streams_destroyed_total": 0, "stream_data_orphan_count": 0, "stream_reports_sent_total": 92, "decodes": {"h264": {"decodes_total": 460, "decode_failures_total": 0}}, "streams": [{"stream_id": 0, "surface_id": 0, "codec": "h264", "codec_type": 3, "width": 1280, "height": 720, "frames_received": 460, "frames_decoded_ok": 460, "frames_decode_failed": 0, "created_at_secs": 31.42, "destroyed_at_secs": null}], "streams_recently_destroyed": []}}}
+```
+
+The same poll from a ryll with the `audio` feature, while Opus audio
+plays, also carries:
+
+```
+"playback": {"starts": 1, "stops": 0, "packets_received": 3120, "packets_decoded": 3120, "decode_failures": 0, "bytes_received": 411840, "codec": "opus", "sample_rate": 48000, "channels": 2}
 ```
 
 ---
@@ -1323,7 +1365,7 @@ Additional error codes may be added in future **minor** version bumps.
 Clients should treat any unrecognised `code` value as a generic error
 (print the `message` and fail the operation) rather than treating it as
 `internal_error`. This ensures forward compatibility when a client
-compiled against v1.0 connects to a v1.5 server that has added new
+compiled against v1.0 connects to a v1.6 server that has added new
 domain-specific codes.
 
 ---
@@ -1331,7 +1373,7 @@ domain-specific codes.
 ## Versioning
 
 The protocol version is a dotted `major.minor` string. The current
-version is **1.5**.
+version is **1.6**.
 
 Rules:
 
@@ -1372,8 +1414,9 @@ Version 1.0 was the first published version. Version 1.1 added the
 socket to `--web` mode and corrected `send_key`'s extended-scancode
 encoding. Version 1.3 added the clipboard and `resize` verbs and the
 `clipboard_changed` event. Version 1.4 added the `stats` verb. Version
-1.5 (the current version) added the `input_rtt` event; see the version
-history at the top of this document.
+1.5 added the `input_rtt` event. Version 1.6 (the current version)
+added the `stats` result's `playback` object; see the version history
+at the top of this document.
 
 ---
 
@@ -1386,7 +1429,7 @@ indicates the sender: `→` is client-to-server, `←` is server-to-client.
 
 ```
 → {"id": 1, "method": "hello", "params": {"client_name": "demo-client", "protocol_version": "1.0"}}
-← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.5", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed", "input_rtt"]}}
+← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.6", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed", "input_rtt"]}}
 → {"id": 2, "method": "status", "params": {}}
 ← {"id": 2, "ok": true, "result": {"spice_connected": true, "agent_connected": true, "surfaces": [{"channel_id": 1, "surface_id": 0, "width": 1024, "height": 768}]}}
 → {"id": 3, "method": "subscribe", "params": {"events": ["latency", "agent_connected", "paste_completed", "paste_failed"]}}
@@ -1410,7 +1453,7 @@ Key observations from this transcript:
 
 - The `hello` handshake always comes first and its response lists the
   full verb and event catalogue. Note the minor-version interop at
-  work: the client requested `"1.0"` and the v1.5 server accepted it,
+  work: the client requested `"1.0"` and the v1.6 server accepted it,
   responding with the version *it* speaks and advertising verbs and
   events this v1.0 client simply never uses.
 - `status` gives a snapshot of the session state at that instant. The
@@ -1490,9 +1533,13 @@ line and is immediately closed.
   without coupling `server.rs` to `session.rs` internals.
 - What the verbs act on arrives as one `SessionHandles` value: the
   inputs channel's queue, the surface mirror, the session's
-  clipboard, the main channel's display-size queue and the display
-  channel's published `DisplaySnapshot`, which `stats` reads. Each
-  client gets a clone.
+  clipboard, the main channel's display-size queue, and the display
+  and playback channels' published `DisplaySnapshot` and
+  `PlaybackSnapshot`, which `stats` reads. The playback snapshot's
+  `channel_linked` flag, set by a running playback channel and
+  cleared when it closes, decides whether `stats` includes
+  `playback`. Each client gets a
+  clone.
 - The clipboard is a `MemoryClipboard` (`clipboard.rs`), an
   implementation of the same `ClipboardBackend` trait the GUI's
   host clipboard implements. The mode creates it only when a control
