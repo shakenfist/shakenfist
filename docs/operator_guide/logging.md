@@ -122,6 +122,12 @@ The full set of JSON field names (the base fields plus the
 `with_fields` conventions) is documented as a stable contract in
 the `shakenfist_utilities` library, in
 [`docs/log-record-fields.md`](https://github.com/shakenfist/library-utilities/blob/develop/docs/log-record-fields.md).
+That document also covers how a field value that JSON cannot encode
+natively (raw bytes, an enum member, a model object such as a
+`State`) is rendered. Before shakenfist-utilities 0.8.9 such a value
+lost the whole record to a `--- Logging error ---` traceback on
+stderr, which accounted for about 650 missing records a day (issue
+4509).
 
 ## Buffering, backpressure and durability
 

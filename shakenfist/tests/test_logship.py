@@ -8,6 +8,7 @@ installed v0.8.4 the formatter is the fallback ``JsonFormatter``;
 under v0.9.0 it is the library's instance. We assert *type*
 (``JsonFormatter``), never identity.
 """
+import enum
 import json
 import logging
 import uuid
@@ -18,7 +19,12 @@ from shakenfist_utilities.logs import JsonFormatter
 
 from shakenfist import logship
 from shakenfist import logship_spool
+from shakenfist.schema.object_state import State
 from shakenfist.tests import base
+
+
+class _Task(enum.Enum):
+    collect_billing_statistics = 1
 
 
 class _SpoolRootMixin(base.SpoolRootMixin):
@@ -76,8 +82,9 @@ class HandlerEmitTestCase(_SpoolRootMixin, base.ShakenFistTestCase):
     def test_emit_ships_record_with_unserialisable_extra_fields(self):
         # Issue 3573: a raw uuid.UUID in the record's extra_fields made
         # format() raise TypeError, routing the record to handleError (a
-        # ~60 line raw traceback in syslog) and dropping it. The handler
-        # must instead stringify the offending field and ship the record.
+        # ~60 line raw traceback in syslog) and dropping it. The library
+        # formatter (shakenfist-utilities 0.8.9+) now renders the value, so
+        # the record ships.
         net_uuid = uuid.UUID('12345678-1234-5678-1234-567812345678')
         record = self._record('added event with uuid extra')
         record.extra_fields = {
@@ -98,8 +105,9 @@ class HandlerEmitTestCase(_SpoolRootMixin, base.ShakenFistTestCase):
 
     def test_emit_ships_record_when_default_str_also_fails(self):
         # A dict with a non-string key can't be encoded even with a
-        # default= fallback (keys don't pass through default). The last
-        # resort stringifies the whole field value; the record still ships.
+        # default= fallback (keys don't pass through default). The library
+        # formatter's last resort stringifies the whole field value; the
+        # record still ships.
         record = self._record('pathological extra')
         record.extra_fields = {'weird': {uuid.uuid4(): 'value'}}
 
@@ -112,6 +120,29 @@ class HandlerEmitTestCase(_SpoolRootMixin, base.ShakenFistTestCase):
         parsed = json.loads(batch[0][2])
         self.assertEqual('pathological extra', parsed['message'])
         self.assertIsInstance(parsed['weird'], str)
+
+    def test_emit_ships_record_with_issue_4509_field_types(self):
+        # Issue 4509: about 650 records a day were lost to a State, a
+        # task-model enum and privexec's raw stdout bytes. This pins the
+        # shakenfist-utilities version that renders them, so a pin
+        # downgrade cannot quietly bring the losses back.
+        record = self._record('Blocks namespace delete')
+        record.extra_fields = {
+            'state': State(value='created', update_time=1.5),
+            'stdout': b'command output',
+            'task': _Task.collect_billing_statistics,
+        }
+
+        with mock.patch.object(self.handler, 'handleError') as he:
+            self.handler.emit(record)
+        he.assert_not_called()
+
+        batch = logship_spool.get_spool().dequeue_batch(10)
+        self.assertEqual(1, len(batch))
+        parsed = json.loads(batch[0][2])
+        self.assertEqual('created', parsed['state']['value'])
+        self.assertEqual('command output', parsed['stdout'])
+        self.assertEqual('collect_billing_statistics', parsed['task'])
 
 
 class FormatterTestCase(_SpoolRootMixin, base.ShakenFistTestCase):
