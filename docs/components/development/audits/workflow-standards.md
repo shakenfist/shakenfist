@@ -2,20 +2,40 @@
 
 ## What we check
 
+These are the standards every workflow file is held to. Several
+checks measure parts of them, and each is a column in this
+criterion's section of the compliance page; the rest are not read by
+any check. Each rule below says which it is:
+
+* **Measured** names the check, and what it reads.
+* **Reviewed, not measured** is a rule no check reads. It holds as
+  far as review of the change holds it, and a repository breaking it
+  passes this criterion regardless.
+
+A rule is not measured because it is written here, so the labels are
+the place to look before relying on a green cell.
+
 ### Workflow permissions
 
-Every workflow needs a top-level `permissions:` block restricting the
-default `GITHUB_TOKEN` scope; GitHub Advanced Security flags its
-absence. Read-only workflows use `permissions: contents: read`;
-mixed-need workflows use `permissions: {}` at the top with per-job
-overrides.
+**Measured** by `workflow-permissions`. Every workflow needs a
+top-level `permissions:` block restricting the default `GITHUB_TOKEN`
+scope; GitHub Advanced Security flags its absence. The check reads
+each workflow for a line beginning `permissions:` at column zero.
+
+**Reviewed, not measured:** what the block grants. Read-only
+workflows use `permissions: contents: read`; mixed-need workflows use
+`permissions: {}` at the top with per-job overrides. The check passes
+any top-level block, whatever its scopes.
 
 ### Workflow and job naming
 
-Display names are English sentences with correct capitalisation, not
-kebab case. Job **ids** may be machine-friendly.
+**Reviewed, not measured.** Display names are English sentences with
+correct capitalisation, not kebab case. Job **ids** may be
+machine-friendly.
 
 ### Runner preferences
+
+**Measured** by `self-hosted-runners`, except the last bullet.
 
 * Use `self-hosted` runners. GitHub-provided minutes are limited per
   month, so jobs must not leak onto GitHub-hosted runners without a
@@ -36,23 +56,29 @@ kebab case. Job **ids** may be machine-friendly.
   where a runner can actually be named -- after `runs-on:`, inside a
   `[...]` list, or as a `- ` matrix item -- so the same text in an
   image label, a job name or an ssh command is not a finding.
-* Claude Code automation jobs: `claude` runners only.
+* **Reviewed, not measured:** Claude Code automation jobs run on
+  `claude-code` runners only. No check reads which pool a Claude Code
+  job asks for.
 
 ### Static runners for small, non-mutating jobs
 
-* Jobs that do not change the state of the runner -- linting, metadata
-  checks, audits, anything that installs no OS packages -- should use
-  `runs-on: [self-hosted, static]`. Static runners are a
-  pre-provisioned, long-lived pool and are much cheaper to start than a
-  fresh VM. Reserve `vm` runners for jobs that genuinely need a
-  throwaway machine.
-* A static runner advertises exactly `self-hosted` and `static`, so a
-  `static` job must request those two labels **only**. Adding a size
-  (`s`, `l`), `vm`, or an OS (`debian-12`) asks for a runner that does
-  not exist, and the job waits forever. The check flags any `runs-on:`
-  combining `static` with additional labels.
+* **Reviewed, not measured:** jobs that do not change the state of
+  the runner -- linting, metadata checks, audits, anything that
+  installs no OS packages -- should use `runs-on: [self-hosted,
+  static]`. Static runners are a pre-provisioned, long-lived pool and
+  are much cheaper to start than a fresh VM. Reserve `vm` runners for
+  jobs that genuinely need a throwaway machine.
+* **Measured** by `static-runner-tags`: a static runner advertises
+  exactly `self-hosted` and `static`, so a `static` job must request
+  those two labels **only**. Adding a size (`s`, `l`), `vm`, or an OS
+  (`debian-12`) asks for a runner that does not exist, and the job
+  waits forever. The check flags any `runs-on:` combining `static`
+  with additional labels.
 
 ### VM runners must name a size
+
+**Measured** by `vm-runner-size`, including the bound-runner form at
+the end of the list.
 
 This is the exact complement of the rule above, and the two are easy to
 confuse: a `static` job must name **no** size because the static pool
@@ -124,12 +150,12 @@ are swap-based and the image has no swap.
 
 ### Job timeouts
 
-Every job must set `timeout-minutes`. GitHub's default is 360 minutes,
-which is never right on a self-hosted pool: a wedged job holds a runner
-nothing else can use until it expires. This matters most on the
-`claude-code` pool, where runners are few and an unattended Claude Code
-run has no natural upper bound -- `--max-turns` caps turns, not wall
-clock.
+**Reviewed, not measured.** Every job must set `timeout-minutes`.
+GitHub's default is 360 minutes, which is never right on a self-hosted
+pool: a wedged job holds a runner nothing else can use until it
+expires. This matters most on the `claude-code` pool, where runners
+are few and an unattended Claude Code run has no natural upper bound
+-- `--max-turns` caps turns, not wall clock.
 
 Values used in the templates:
 
@@ -143,13 +169,16 @@ Values used in the templates:
 
 ### Functional test workflow naming
 
-Functional testing lives in `functional-test.yml`, and must include
-`workflow_dispatch` as a trigger -- `pr-retest.yml` needs it.
+**Reviewed, not measured.** Functional testing lives in
+`functional-tests.yml`, and must include `workflow_dispatch` as a
+trigger -- `pr-retest.yml` dispatches it. A repository whose test
+workflow has another name sets the `RETEST_WORKFLOW` repository
+variable instead; see `templates/ci-review-automation/README.md`.
 
 ### PIPESTATUS for piped commands
 
-When piping through `tee` in a `run:` step, capture the upstream exit
-code with `${PIPESTATUS[0]}`:
+**Reviewed, not measured.** When piping through `tee` in a `run:`
+step, capture the upstream exit code with `${PIPESTATUS[0]}`:
 
 ```yaml
 - name: Run something
@@ -171,7 +200,8 @@ and one whose upstream cannot fail (`echo ... | tee`).
 
 ### flake8wrap.sh correctness
 
-`tools/flake8wrap.sh` runs flake8 over the files changed in the current
+**Measured** by `flake8wrap`, in part, where `tools/flake8wrap.sh`
+exists. The script runs flake8 over the files changed in the current
 commit (via `tox -eflake8 -- -HEAD`), building a space-separated list
 in `filtered_files`. That variable must **not** be quoted on the
 diff/flake8 line: quoting makes the whole list one filename, which
@@ -186,10 +216,14 @@ diff -u --from-file /dev/null ${filtered_files} | $FLAKE_COMMAND ${filtered_file
 diff -u --from-file /dev/null "${filtered_files}" | $FLAKE_COMMAND "${filtered_files}"
 ```
 
-The `shellcheck disable=SC2086` directive is required, and its comment
-should say the splitting is intentional. The script should also filter
-to `.py` files, skip `_pb2` generated files, and handle paths in the
-diff that no longer exist on disk.
+The check reads the script for two things: that it names `SC2086`
+somewhere, and that no line mentioning both `filtered_files` and
+`diff` or flake8 quotes `"${filtered_files}"`.
+
+**Reviewed, not measured:** that the directive's comment says the
+splitting is intentional, and that the script filters to `.py`
+files, skips `_pb2` generated files, and handles paths in the diff
+that no longer exist on disk.
 
 ### CI linting
 
@@ -197,11 +231,17 @@ diff that no longer exist on disk.
 them; `kerbside` and `kerbside-patches` are the worked examples. Helper
 shell scripts should have shellcheck pre-commit hooks.
 
+**Measured** by `pre-commit-config`, and only as far as the file
+existing: the check passes any `.pre-commit-config.yaml`. **Reviewed,
+not measured:** which hooks it runs, including whether actionlint and
+shellcheck are among them.
+
 ### Review marks excluded from pre-commit
 
-Repositories with human review tracking deployed (those carrying
-`.vscode/review-scope.toml`) must exempt the weAudit state files from
-any pre-commit hook that rewrites the files it is given:
+**Measured** by `review-marks-pre-commit`. Repositories with human
+review tracking deployed (those carrying `.vscode/review-scope.toml`)
+must exempt the weAudit state files from any pre-commit hook that
+rewrites the files it is given:
 
 ```yaml
 - id: end-of-file-fixer
@@ -226,9 +266,13 @@ not applicable.
 
 ### PyPI caching
 
-Self-hosted runners should use the devpi PyPI cache at
-`http://192.168.1.15:3141`. Any job pointing pip at it with
-`PIP_INDEX_URL` must set a pypi fallback in the **same** `env` block:
+**Reviewed, not measured:** self-hosted runners should use the devpi
+PyPI cache at `http://192.168.1.15:3141`. No check asks whether a job
+that installs packages uses it.
+
+**Measured** by `devpi-fallback`: any job pointing pip at the cache
+with `PIP_INDEX_URL` must set a pypi fallback in the **same** `env`
+block:
 
 ```yaml
     env:
@@ -246,11 +290,11 @@ check flags any devpi-backed `env` block missing it.
 
 ### Retired devpi address
 
-The cache moved from `192.168.1.4` to `192.168.1.15`. The old address
-no longer resolves to a running server, so a job still pointing at it
--- in `PIP_INDEX_URL`, `PIP_TRUSTED_HOST`, or anywhere else -- fails
-every install. The check flags any workflow line referencing
-`192.168.1.4`.
+**Measured** by `devpi-stale-ip`. The cache moved from `192.168.1.4`
+to `192.168.1.15`. The old address no longer resolves to a running
+server, so a job still pointing at it -- in `PIP_INDEX_URL`,
+`PIP_TRUSTED_HOST`, or anywhere else -- fails every install. The check
+flags any workflow line referencing `192.168.1.4`.
 
 ## Template
 

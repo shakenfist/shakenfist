@@ -19,9 +19,9 @@ Kerbside handles different source types in different ways:
   available consoles. The consoles are stored in the database and presented in
   the Kerbside administrative interface.
 
-- **Shaken Fist**: Shaken Fist sources are also scraped regularly, but under a
-  `system` credential the scrape covers the whole cluster rather than a single
-  namespace. Access then goes through a token exchange rather than opening a
+- **Shaken Fist**: Shaken Fist sources are also scraped regularly, but with a
+  `system` credential, so the scrape covers the whole cluster rather than a
+  single namespace. Access then goes through a token exchange rather than opening a
   console straight from the scraped table: Shaken Fist mints a short-lived,
   Ed25519-signed token that Kerbside verifies entirely offline at
   `/sf-console.vv`. See the [Shaken Fist](#shaken-fist) section below.
@@ -82,11 +82,16 @@ Shaken Fist sources are periodically scraped for their available consoles, but
 both the scrape and the console-access flow differ from the other scraped
 source (oVirt), so they are described here in full.
 
-**Cluster-wide scrape.** When the source's `username` is `system`, Kerbside
+**Cluster-wide scrape.** The source's `username` must be `system`, and Kerbside
 scrapes the *entire* cluster in one pass: every namespace's instances are
 enumerated, so all of the cluster's SPICE consoles become reachable through a
-single source. With any other `username`, only that namespace's instances are
-scraped. Each pass also refreshes the cluster's node list so a console can be
+single source. A source configured with any other namespace does not narrow
+the scrape to that namespace: only the instance listing uses the configured
+namespace, while the CA fetch, the signing-key fetch and the node listing are
+always made as `system` with the same key, so a credential that cannot
+authenticate as `system` fails at startup (see
+[issue #444](https://github.com/shakenfist/kerbside/issues/444)). Each pass
+also refreshes the cluster's node list so a console can be
 associated with the hypervisor currently hosting it. An instance is only kept
 when it is in the `created` state and its VDI video model is a SPICE variant.
 
@@ -134,7 +139,7 @@ The following options are used to configure a Shaken Fist console source
 | source | The name of the source (used as an identifier) |
 | type | The type of the source: `shakenfist` |
 | url | The API URL for the Shaken Fist cluster |
-| username | The Shaken Fist namespace to authenticate to; use `system` to scrape the whole cluster |
+| username | The Shaken Fist namespace to authenticate to; must be `system`, which scrapes the whole cluster |
 | password | The API key/password to authenticate with |
 | ca_cert | Required: the SSL CA public key certificate to validate API and VDI connections against |
 | synthesize_host_subject | Optional (default false): when a node publishes no `spice_server_cert_subject`, synthesize `CN=<node>` so the proxy still enforces the backend host subject. Only correct on a stock `cn=hostname` PKI — a mismatch would wrongly reject the backend — so it is off by default. |

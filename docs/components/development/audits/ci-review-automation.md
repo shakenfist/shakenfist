@@ -94,10 +94,14 @@ fallback review be of a commit nobody validated. Measured rather than
 left to the template because every adopter copied the earlier one
 (shakenfist/development#172).
 
-**Same-repository pull requests only.** The reviewer runs Claude Code
-with `--dangerously-skip-permissions` while holding a write-capable
-token, and the diff is untrusted input. Fork PRs are reviewed on
-explicit human request.
+**Same-repository pull requests only.** The diff is untrusted input,
+and the reviewer reads it on a shared, long-lived runner pool in a job
+that holds a write-capable token. Claude Code runs there with
+read-only tools and without the token in its environment, but a
+fork's diff would reach it with nobody having read it first. So the
+bot never reviews a fork pull request, whoever asks. To have a fork's
+change reviewed, a maintainer pushes the branch to the repository and
+opens the pull request from there.
 
 **The shared trigger action is a security requirement.**
 `pr-bot-trigger` refuses fork pull requests; a hand-rolled copy does

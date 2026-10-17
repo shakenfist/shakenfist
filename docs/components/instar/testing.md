@@ -1007,10 +1007,146 @@ an explicit "infrastructure problem, not a test regression" message if any is
 still a pointer, so a git-LFS outage can never be silently misattributed to
 instar (see GitHub issue #451 for the incident this guards against).
 
-Eight of the nine jobs that prepare testdata then run
-**`tools/ci/resparsify-testdata.sh <tree>`** — every one that runs the Python
-integration suite over the tree (five in `functional-tests.yml`, two in
-`nightly-matrix.yml`, one in `test-drift-fix.yml`). The exception is
+Which of its two branches ran is part of its output, because the two leave the
+tree in materially different states and nothing else can tell them apart by
+looking. Beside `TESTDATA_PATH` it exports:
+
+| Variable | Meaning |
+|---|---|
+| `TESTDATA_SOURCE` | `clone` (fresh), `cache` (the fleet's testdata disk, updated in place) or `unverified-cache` (some other tree already at the cache path, updated in place). A fresh clone writes every image out fully allocated, so the whole tree needs resparsifying; the disk needs only what the update changed. That narrower treatment assumes the tree was already sparse, which the script cannot check, so it is given only when `TESTDATA_REQUIRE_CACHE=1` has asserted the tree is the fleet's pre-built disk. Any other cache — a long-lived one on a static runner, say — is `unverified-cache` and resparsified whole. |
+| `TESTDATA_CHANGED_FILES` | For `cache` only: a file listing the paths the update changed, one per line, for the narrow resparsify above. Derived here because the reset that changed them happens here — by the time a later step runs there is nothing left to diff. |
+
+The list has three sources, and the last two are not obvious. Besides the
+diff between the two trees it carries every path whose index stat data was
+stale before the update, and every file that was still an LFS pointer before
+`git lfs pull`. Resparsifying is a `cp` and a `mv`, so the disk build's own
+resparsify leaves the index disagreeing with the files it rewrote, and
+`git reset --hard` then rewrites those entries even though their content is
+identical — measured, with the clean-stat control alongside it, in
+`tools/ci/test-testdata-changed-files.sh`. Under LFS they come back from the
+smudge filter fully allocated, and no diff of the two trees names them, so a
+list built from the diff alone would skip exactly the files the reset had just
+re-expanded. Including them costs nothing extra: the reset already wrote them
+into the overlay. The script emits a `::warning::` naming the count when it
+finds any, because the real fix belongs to whatever built the cache — a
+`git update-index --refresh` after its resparsify — and this is the only place
+the cost is visible. The warning carries two counts, and the first is the one
+to read: `git diff-files` reports every *tracked* path whose stat data
+differs, images or not, and instar-testdata tracks around 770,000 of them
+against a few thousand images. A total near the number of tracked files in the
+tree means something other than a missed refresh — the index stat data did not
+survive the trip from the disk build to the runner at all (a different uid, or
+inode numbers that changed on the way), so the narrow resparsify has quietly
+become a whole-tree one and the disk is saving nothing. That needs fixing in
+how the disk is built or mounted; a refresh at build time will not help. The
+second count, the in-scope images among them, is what the resparsify actually
+pays for.
+
+The pointers are the same kind of gap. `git lfs pull` writes each pointer out
+fully allocated and then refreshes the index for it, so nothing afterwards —
+not the tree diff, not a second `git diff-files` — names it; the script lists
+them with `git lfs ls-files` beforehand instead, and warns, because a disk that
+ships pointers was built without pulling them.
+
+Both are printed as well as written to `$GITHUB_ENV`, and running the script
+by hand with `$GITHUB_ENV` unset is fine.
+
+`TESTDATA_REQUIRE_CACHE=1` turns a missing cache into an infra error instead
+of a 7.46 GiB fallback clone, in the same idiom as the pointer guard: a job
+that silently did the slow thing merely looks slow, which is the failure mode
+that goes unnoticed for weeks. The assertion names the contractual mount path
+(`/srv/ci/cached/instar-testdata`) literally rather than taking it from
+`TESTDATA_CACHE`, so a change to either side of that contract fails there
+instead of quietly following a defaulted path. `TESTDATA_CONTRACT_CACHE`
+relocates it, and exists only so `tools/ci/test-prepare-testdata.sh` can
+exercise both sides of the guard on a machine with no such disk; it is a
+different variable from `TESTDATA_CACHE` on purpose, so the two cannot be
+pointed at the same wrong place, and nothing under `.github/` sets it. What
+it detects is a **path mismatch** — the disk mounted somewhere else, or a
+runner advertising the disk's label without the disk. It cannot be a failed
+mount: that stops the fleet's userdata before the runner registers, so such a
+job stays queued and never runs this script at all.
+
+### The `instar` runner label
+
+Nine jobs prepare testdata. Two different eights are drawn from them below,
+and they are not the same eight: the set that asks for the disk here, and the
+set that resparsifies afterwards in the next section. Each lists its members,
+and `coverage-fuzz` and `test-and-fix` are what separate them —
+`coverage-fuzz` asks for the disk but does not resparsify, and `test-and-fix`
+resparsifies but cannot ask for the disk.
+
+All of them except `test-and-fix` ask the fleet for that disk with an extra
+`runs-on` label:
+
+```yaml
+runs-on: [self-hosted, debian-13, xl, instar]
+```
+
+`instar` means "a runner carrying the pre-seeded instar-testdata dependencies
+disk". The conductor matches labels as a set, so the order does not matter,
+and it works with any size the conductor knows — but the arrangement is
+verified for `debian-13` only, because the disk is owned by the uid `debian`
+has on that image and a runner whose user has another uid fails at boot
+rather than running the job. The label must also be listed under
+`self-hosted-runner.labels` in `.github/actionlint.yaml`, or actionlint (which
+runs in pre-commit) rejects the `runs-on` before it can be committed.
+
+Those same eight jobs — call them the **label set** — also set
+`TESTDATA_REQUIRE_CACHE: '1'` on their prepare step. A job that asked for the
+disk and did not get it must say so, rather than quietly falling back to the
+clone the label exists to avoid. They are `package-matrix`,
+`integration-core`, `integration-convert-qcow2`, `integration-convert-vhd`
+and `oslo-crossval-master` in `functional-tests.yml`; `nightly-legs` and
+`measure` in `nightly-matrix.yml`; and `coverage-fuzz` in
+`coverage-fuzz.yml`.
+
+Nothing enforces that correspondence automatically. It was checked in both
+directions when the label was introduced, by parsing the finished YAML rather
+than reading the diff, and it is re-checked by hand when a job is added — but
+a new consumer that forgets the label pays for a 7.46 GiB clone it did not
+need, and a labelled non-consumer holds a scarce disk-bearing runner, and
+neither shows up as anything but a slow job. Issue #674 tracks turning it into
+a guard in `ci-tooling`.
+
+The ninth testdata consumer, `test-and-fix` in `test-drift-fix.yml`, carries
+neither, deliberately and permanently. It runs on `[self-hosted, claude-code]`
+— the *static* runner fleet, which the conductor only watches and never
+attaches a disk to, so no runner there will ever advertise `instar` and a
+labelled job would queue until GitHub cancelled it 24 hours later. It keeps
+cloning fresh. The reason is recorded next to that job as well as here,
+because a reader about to tidy the inconsistency away is looking at the
+workflow.
+
+### Resparsifying
+
+A different eight of those nine jobs — the **resparsify set**, which is the
+label set with `coverage-fuzz` taken out and `test-and-fix` put in — then
+resparsify the tree. They are every job that runs the Python integration
+suite over it: five in `functional-tests.yml`, two in `nightly-matrix.yml`,
+and `test-and-fix` in `test-drift-fix.yml`.
+
+Seven of them call **`tools/ci/resparsify-prepared-testdata.sh`**, which
+takes no arguments: it reads the `TESTDATA_SOURCE` and
+`TESTDATA_CHANGED_FILES` above and calls `tools/ci/resparsify-testdata.sh` in
+whichever of its two forms the tree needs — the whole tree for a fresh clone
+or an `unverified-cache`, and only the paths the update changed for the
+fleet's disk updated in place. An unset or unrecognised `TESTDATA_SOURCE` is
+an error there rather than a fall back to the whole tree, because the
+fallback is the expensive branch and taking it silently would cost the most
+on exactly the runner that was supposed to save.
+
+`test-and-fix` is the eighth and calls `resparsify-testdata.sh` with its one
+positional argument instead, deliberately. That workflow runs from the
+default branch while the scripts it invokes come from the pull request's own
+checkout, so the two can be of different ages: a branch cut before the
+wrapper existed would fail on a missing file, and one cut before
+`prepare-testdata.sh` exported `TESTDATA_SOURCE` would have the wrapper
+refuse for want of it — breaking other people's pull requests, not this
+repository's own gates. The one-argument form is a cross-repository contract
+and exists on every branch. The job also loses nothing by it: on the static
+`claude-code` fleet it never meets the disk, so it always wants the whole
+tree resparsified anyway. The exception is
 `coverage-fuzz.yml`, which prepares the tree only to seed fuzz corpora and
 never asks `qemu-img info` for an allocated size, so the fully allocated
 tree costs it disk and nothing else. git and git-lfs write each file
@@ -1029,11 +1165,61 @@ instar-testdata dependencies-disk image build fetches it from instar's default
 branch over HTTPS and runs it against its own clone, outside GitHub Actions.
 So its one-argument call means "the whole tree" permanently, it reads no
 `GITHUB_*` variable, and it exits non-zero on failure so that a broken fetch
-fails their build rather than quietly shipping an unsparsified image. Anything
-narrower — resparsifying only the files a fetch changed, say — has to arrive as
-further optional arguments. `tools/ci/test-resparsify-testdata.sh` exercises
-exactly that calling convention, and measures allocated blocks before and
-after rather than trusting the exit status.
+fails their build rather than quietly shipping an unsparsified image.
+`tools/ci/test-resparsify-testdata.sh` exercises exactly that calling
+convention, and measures allocated blocks before and after rather than
+trusting the exit status.
+
+Anything narrower therefore arrives as **further optional arguments** after
+the tree path:
+
+```
+resparsify-testdata.sh <tree> [--files-from <list>]... [--] [<file>...]
+```
+
+The caller that needs this is a job whose tree came off a pre-built testdata
+dependencies disk: that tree is a copy-on-write overlay of an image which was
+resparsified when it was built, so rewriting all of it would write gigabytes
+into the overlay the disk exists to avoid — while skipping it altogether would
+leave the day's drift, which the job's own fetch and `lfs pull` land fully
+allocated. Only what the update changed needs it. Paths may be tree-relative
+or absolute inside the tree, and the two ways in differ on purpose:
+
+- `--files-from <list>` takes a newline-separated **candidate** list — a
+  changed-file list, which legitimately holds non-images, `custom/` fixtures
+  and paths the update deleted. Entries that are not in-scope images that
+  exist are dropped and counted, so the caller does not need a second copy of
+  the extension list to drift from. (`--list-extensions` publishes that list
+  for a caller that does want to filter.)
+- Trailing positional paths are **named deliberately**, so anything the script
+  will not act on is refused instead.
+
+A path that resolves outside the tree is refused in both forms, and a refusal
+resparsifies nothing at all. An empty narrow set is success, unlike the
+whole-tree form: a cached tree whose update changed no image is the normal
+case, not a misconfiguration.
+
+That refusal is deliberate and its blast radius is worth knowing before you
+meet it. The `--files-from` list on the cache path comes from git, not from an
+operator, so a single instar-testdata commit adding a symlink under
+`downloaded/` with an image extension and a target outside the checkout would
+fail the resparsify step on **all eight labelled jobs at once**, and keep
+failing until that commit is fixed. Fleet-wide CI failure with
+`resparsify-testdata: refusing …: resolves outside …` in it is a testdata
+commit to look at, not an instar regression; the refusal message names the
+list file the entry came from for that reason. Refusing is still the right
+behaviour — the alternative is writing outside the tree — but it is the one
+failure here that is nobody's pull request.
+
+Everything else in a list is filtered rather than refused, and the filtering
+is done without resolving each entry: a candidate that is relative, free of
+`..`, and either outside `downloaded/` or not an image extension is dropped on
+the string alone. That matters because the list is not bounded by the number
+of images — its stat-dirty component names every tracked path, so a cache
+whose index did not survive the handoff names all ~770,000 — and a process per
+entry would turn the step into a job timeout, hiding the warning that
+diagnoses it. `tools/ci/test-resparsify-testdata.sh` counts the resolutions
+rather than timing the run.
 
 ## Expected Output Overrides
 
