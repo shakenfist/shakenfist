@@ -11536,7 +11536,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.5
+    Control Socket Protocol — Version 1.6
   
 
     
@@ -15765,6 +15765,11 @@ not tell whether the server sent any audio data, whether the client
 decoded it, or whether the audio device actually consumed it. The
 snapshot surfaces:</p>
 <p><strong>Session metadata:</strong>
+- <code>channel_linked</code> — whether a running playback channel has
+  published the snapshot; <code>false</code> in a build without the <code>audio</code>
+  feature, a session with no playback channel, or once the channel
+  has closed, which an all-zero snapshot
+  otherwise cannot be told apart from
 - <code>current_session</code> — populated while a playback session is active:
   when it started (<code>started_at_secs</code>), the multimedia clock value the
   server assigned at start (<code>mm_time_at_start</code>), and the negotiated

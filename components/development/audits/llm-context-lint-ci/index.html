@@ -11394,7 +11394,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.5
+    Control Socket Protocol — Version 1.6
   
 
     
@@ -15234,6 +15234,12 @@ Requiring the linter to be named in a workflow as well would report a
 repository non-compliant for a wiring that does run it. The pre-commit
 half is still checked independently, so a workflow running pre-commit
 against a config with no skillsaw hook does not pass.</p>
+<p>The <code>pre-commit run</code> is recognised however the command is spelled:
+bare, through a quoted path into a virtualenv
+(<code>"${RUNNER_TEMP}/venv/bin/pre-commit" run</code>, where the closing quote
+sits between the command and <code>run</code>), or as the module
+(<code>python -m pre_commit run</code>). Installing pre-commit, or running
+<code>pre-commit install</code>, runs no hook and does not count.</p>
 <p>A workflow that installs skillsaw from PyPI and then invokes the
 <code>skillsaw</code> command satisfies the second half as well, without naming
 the upstream repository anywhere. Where the command sits is not

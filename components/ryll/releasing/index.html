@@ -11312,7 +11312,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.5
+    Control Socket Protocol — Version 1.6
   
 
     
@@ -15739,7 +15739,11 @@ this PR is the audit trail for the version bump itself.</p>
 </code></pre></div>
 <p>The script will:</p>
 <ol>
-<li>Fetch <code>origin/develop</code> and the latest tags.</li>
+<li>Fetch <code>origin/develop</code> and origin's tags, overwriting any
+   local tag of the same name. <code>sign-tag</code> (below) replaces each
+   release tag on origin with a signed one, so the clone that
+   tagged the previous release still holds the unsigned original,
+   and a plain <code>git fetch --tags</code> would refuse to update it.</li>
 <li>Verify no <code>v0.2.0</code> tag exists locally or on origin.</li>
 <li>Verify the <code>[workspace.package].version</code> on
    <code>origin/develop</code> is <code>0.2.0</code> (i.e. the release PR has

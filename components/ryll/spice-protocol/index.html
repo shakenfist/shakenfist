@@ -11312,7 +11312,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.5
+    Control Socket Protocol — Version 1.6
   
 
     
@@ -15797,7 +15797,10 @@ keeping its old count, which could leave both ends waiting on each
 other. Channels without their own default (inputs, cursor, playback and
 the rest) still advertise the word they always have, without
 <code>AGENT_CONNECTED_TOKENS</code>, because capability bits mean different things
-on each channel type.</p>
+on each channel type. On playback that word's bits 0 and 3 are
+<code>PLAYBACK_CELT_0_5_1</code> and <code>PLAYBACK_OPUS</code>; ryll plays only Opus and raw
+PCM, and does not advertise <code>PLAYBACK_VOLUME</code>, so a server sends it no
+<code>VOLUME</code> or <code>MUTE</code>.</p>
 <p>A proxy that must forward a real client's capabilities to the
 server instead uses <code>perform_link_with_caps</code>, or
 <code>SpiceClient::connect_channel_with_caps</code>, which take the common
@@ -16054,10 +16057,11 @@ and the kerbside SPICE proxy uses its link handshake to speak to clients as
 a server. The message types a server sends or receives therefore have both
 a reader and a writer, whichever direction ryll itself needs: the common
 and main channel messages, the vdagent messages, the cursor and inputs
-channels, and the display channel's surfaces, monitors config, streams and
-<code>DRAW_COPY</code>. They implement <code>WireType</code> (or <code>ClipboardWireType</code>), and each
-is tested against itself and against hand-written bytes laid out from
-spice.proto. The other draw operations (<code>SpiceFill</code>, <code>SpiceOpaque</code>,
+channels, the display channel's surfaces, monitors config, streams and
+<code>DRAW_COPY</code>, and the playback channel's <code>START</code>, <code>MODE</code>, <code>DATA</code>, <code>VOLUME</code>,
+<code>MUTE</code> and <code>LATENCY</code>. They implement <code>WireType</code> (or <code>ClipboardWireType</code>),
+and each is tested against itself and against hand-written bytes laid out
+from spice.proto. The other draw operations (<code>SpiceFill</code>, <code>SpiceOpaque</code>,
 <code>SpiceTransparent</code>, <code>SpiceAlphaBlend</code>, <code>SpiceBlackness</code> and the brushes)
 still have readers only, since only a client parses them.</p>
 <p><code>DRAW_COPY</code> is the one message whose layout is not a flat sequence of
