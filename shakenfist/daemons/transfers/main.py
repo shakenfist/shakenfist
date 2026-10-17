@@ -33,6 +33,13 @@ class TransferJob(util_concurrency.Job):
             server.settimeout(30)
             server.bind((config.NODE_MESH_IP, 0))
 
+            # Listen before publishing the port: the requesting node connects
+            # as soon as it sees the CREATED row, and a SYN arriving at a
+            # socket that is bound but not yet listening is refused. Once we
+            # are listening the kernel queues the connection until accept().
+            # See issue #4515.
+            server.listen()
+
             # Update MariaDB with where we are listening
             mariadb.update_blob_transfer(
                 self.transfer.source_node,
@@ -41,7 +48,6 @@ class TransferJob(util_concurrency.Job):
                 port=server.getsockname()[1])
 
             log.info('Awaiting transfer connection')
-            server.listen()
 
             try:
                 conn, addr = server.accept()
