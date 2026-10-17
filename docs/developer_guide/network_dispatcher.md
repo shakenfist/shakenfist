@@ -49,12 +49,36 @@ seconds. The defer cycle is:
 
 1. The op is dequeued.
 2. The dispatcher checks each entry in `op.depends_on`.
-3. If any dependency is still in `initial`, `queued`, or `preflight`, the op is
-   deferred with a delay drawn from the back-off map and the loop moves on.
-4. If a dependency is in `error`, `deleted`, or `abort`, the op itself is
-   transitioned to `abort` or `error` and removed from the map.
+3. If any dependency is still in `initial`, `queued`, `preflight`, or
+   `executing`, the op is deferred with a delay drawn from the back-off map and
+   the loop moves on. Once the op has been deferred
+   `DEPENDENCY_DEFER_BUDGET` (30) times, about six minutes, the wait is
+   abandoned instead (`abandon_dependency_wait()`) and the op is aborted.
+4. If a dependency no longer exists the op goes to `error`
+   (`cancel_for_missing_dependency()`); if it is in `error`, `deleted`, or
+   `abort` the op goes to `abort` (`abort_for_unsuitable_dependency()`).
+   In both cases, as for an abandoned wait, the op's map entry is dropped.
 5. When all dependencies are satisfied the op executes normally and its map
    entry is dropped.
+
+Each of the three ways a dependency ends an op in steps 3 and 4 also calls the
+op's `_dependency_failed()` hook, provided the op is still `queued` and so has
+never run. Ending the op alone tells a client watching its target nothing, so
+an op class whose targets would be left half-built overrides the hook.
+`NodeInstNetdescOp` (instance preflight, start and create) errors its instance,
+which would otherwise sit in `initial` indefinitely (issue 4542). The base class
+does nothing. These methods live on `BaseClusterOperation` so that `sf-queues`
+and `sf-network` share one implementation.
+
+The hook runs before the op's state is written, not after. Both dispatchers
+skip an op that is already terminal before looking at its dependencies (a work
+item the stuck-row reaper re-queues can name an op that has already finished),
+so a hook that raised after the op had gone terminal would never be retried.
+Raising `DatabaseUnavailable` or `StateWriteFailed` while the op is still
+`queued` leaves the work item to the reaper, and the retry calls the hook again.
+Overrides must therefore be idempotent. Any other exception from the hook is
+recorded as an audit event and the op is ended anyway: the dispatchers resolve
+the work item for those, so an op left `queued` would have nothing to retry it.
 
 ## Exponential back-off map
 

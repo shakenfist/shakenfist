@@ -13,7 +13,6 @@ from shakenfist.daemons import daemon
 from shakenfist.daemons.daemon import IdlePollBackoff
 from shakenfist import mariadb
 from shakenfist.exceptions import DatabaseUnavailable
-from shakenfist.exceptions import InvalidStateException
 from shakenfist.exceptions import StateWriteFailed
 from shakenfist.config import config
 from shakenfist.operations.baseoperation import BaseClusterOperation
@@ -387,33 +386,16 @@ class Job(util_concurrency.Job):
         for dep in op.depends_on:
             dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
             if not dep_op:
-                op.add_event(
-                    EVENT_TYPE_AUDIT,
-                    'cancelling operation, as dependency does not exist',
-                    extra={
-                        'dep_object_type': dep['op_type'],
-                        'dep_object_uuid': dep['op_uuid']
-                    })
-                op.state = BaseClusterOperation.STATE_ERROR
+                op.cancel_for_missing_dependency(dep)
+                self._drop_defer_entry(str(op.uuid), defer_delays)
                 return
 
             dep_op_state = dep_op.state.value
             if dep_op_state in [BaseClusterOperation.STATE_ERROR,
                                 BaseClusterOperation.STATE_DELETED,
                                 BaseClusterOperation.STATE_ABORT]:
-                op.add_event(
-                    EVENT_TYPE_AUDIT,
-                    'aborting operation, as dependency is unsuitable',
-                    extra={
-                        'dep_object_type': dep_op.object_type,
-                        'dep_object_uuid': dep_op.uuid,
-                        'dep_object_state': dep_op_state
-                    })
-
-                try:
-                    op.state = BaseClusterOperation.STATE_ABORT
-                except InvalidStateException:
-                    op.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
+                op.abort_for_unsuitable_dependency(dep_op)
+                self._drop_defer_entry(str(op.uuid), defer_delays)
                 return
 
             if dep_op_state in [BaseClusterOperation.STATE_INITIAL,

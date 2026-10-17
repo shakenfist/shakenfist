@@ -158,6 +158,14 @@ Instances in the `error` state are not removed like those in the `deleted` state
 as we assume a caller must acknowledge an error occurred. To remove them, delete
 the instance in `error` state.
 
+An instance whose start can never run is errored the same way. If the
+operation carrying its preflight, start and create tasks is ended by a
+`depends_on` dependency that is missing, failed, or never reaches a terminal
+state, the instance moves to `initial-error` (and then `error`) with the reason
+`instance start abandoned: ...`, rather than staying in `initial` indefinitely.
+See [dependency waiting](network_dispatcher.md#dependency-waiting-and-deferred-re-queue)
+for when that happens.
+
 The state model also permits a `creating` or `created` instance to move directly
 to `error`, and any of the `*-error` transition states to move on to `delete-wait`
 or `deleted` as well as to `error`. An instance in `error` (or one of the

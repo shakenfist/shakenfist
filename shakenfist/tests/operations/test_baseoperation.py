@@ -7,6 +7,7 @@ from shakenfist.operations.baseoperation import BaseClusterOperation
 from shakenfist.operations.baseoperation import CannotDeferUnqueued
 from shakenfist.operations.baseoperation import DEPENDENCY_DEFER_BUDGET
 from shakenfist.operations.net_op import NetOp
+from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations import artifact_fetch_op as fetch_schema
 from shakenfist.schema.operations import net_op as net_op_schema
@@ -197,6 +198,13 @@ class AbandonDependencyWaitTestCase(base.ShakenFistTestCase):
         self.mock_add_event_multi = self.add_event_multi_patcher.start()
         self.addCleanup(self.add_event_multi_patcher.stop)
 
+        self.get_state_patcher = mock.patch(
+            'shakenfist.mariadb.get_state',
+            return_value=State(value=BaseClusterOperation.STATE_QUEUED,
+                               update_time=0))
+        self.mock_get_state = self.get_state_patcher.start()
+        self.addCleanup(self.get_state_patcher.stop)
+
     def _make_op(self):
         op = NetOp(_make_net_op_static_values(['network_ensure_mesh']))
         op.current_defer_count = DEPENDENCY_DEFER_BUDGET
@@ -258,6 +266,227 @@ class AbandonDependencyWaitTestCase(base.ShakenFistTestCase):
 
         references = self.mock_add_event_multi.call_args.args[1]
         self.assertEqual([(str(ObjectType.NET_OP), OP_UUID)], references)
+
+    def test_targets_are_told_when_the_wait_is_abandoned(self):
+        """Issue 4542: aborting the operation alone left its instance in
+        initial forever, so the targets must hear about it too."""
+        op = self._make_op()
+        with mock.patch.object(NetOp, '_dependency_failed') as mock_failed:
+            op.abandon_dependency_wait(self._make_dep_op())
+
+        mock_failed.assert_called_once_with(
+            f'gave up waiting for dependency net_op {DEP_UUID}, which was '
+            f'still {BaseClusterOperation.STATE_QUEUED}')
+
+    def test_targets_are_told_even_when_the_abort_fails(self):
+        self.mock_state_update.side_effect = exceptions.InvalidStateException(
+            'no such transition')
+
+        op = self._make_op()
+        with mock.patch.object(NetOp, '_dependency_failed') as mock_failed:
+            op.abandon_dependency_wait(self._make_dep_op())
+
+        mock_failed.assert_called_once()
+
+    def test_targets_are_told_before_the_abort(self):
+        """Both dispatchers skip a terminal op, so a hook which raised
+        after the abort would never be retried. Told first, a raise
+        leaves the op queued for the stuck-row reaper."""
+        op = self._make_op()
+        with mock.patch.object(NetOp, '_dependency_failed') as mock_failed:
+            mock_failed.side_effect = (
+                lambda reason: self.mock_state_update.assert_not_called())
+            op.abandon_dependency_wait(self._make_dep_op())
+
+        mock_failed.assert_called_once()
+        self.mock_state_update.assert_called_once_with(
+            BaseClusterOperation.STATE_ABORT)
+
+    def test_hook_raising_leaves_the_operation_queued(self):
+        op = self._make_op()
+        with mock.patch.object(NetOp, '_dependency_failed') as mock_failed:
+            mock_failed.side_effect = exceptions.DatabaseUnavailable('gone')
+            self.assertRaises(
+                exceptions.DatabaseUnavailable,
+                op.abandon_dependency_wait, self._make_dep_op())
+
+        self.mock_state_update.assert_not_called()
+
+    def test_retryable_hook_failure_leaves_the_operation_queued(self):
+        """Both dispatchers hand these two to the stuck-row reaper."""
+        for exc in [exceptions.DatabaseUnavailable('gone'),
+                    exceptions.StateWriteFailed('lost')]:
+            with self.subTest(exc=type(exc).__name__):
+                self.mock_state_update.reset_mock()
+                op = self._make_op()
+                with mock.patch.object(
+                        NetOp, '_dependency_failed', side_effect=exc):
+                    self.assertRaises(
+                        type(exc), op.abandon_dependency_wait,
+                        self._make_dep_op())
+
+                self.mock_state_update.assert_not_called()
+
+    def test_other_hook_failure_still_ends_the_operation(self):
+        """Any other exception would resolve the work item with the op
+        still queued and nothing left to retry it, so the op must end
+        anyway. A concurrent delete makes the instance hook raise
+        InvalidStateException from enqueue_delete_due_error."""
+        op = self._make_op()
+        with mock.patch.object(
+                NetOp, '_dependency_failed',
+                side_effect=exceptions.InvalidStateException('moved')):
+            op.abandon_dependency_wait(self._make_dep_op())
+
+        self.mock_state_update.assert_called_once_with(
+            BaseClusterOperation.STATE_ABORT)
+        self.mock_add_event.assert_called_once_with(
+            EVENT_TYPE_AUDIT,
+            'failed to tell targets the operation will never run',
+            extra={'error': 'moved'})
+
+    def test_started_operation_does_not_tell_targets(self):
+        """Only a queued op has never run. One already executing, or
+        finished, was not prevented from running by its dependency."""
+        for state in [BaseClusterOperation.STATE_EXECUTING,
+                      BaseClusterOperation.STATE_COMPLETE,
+                      BaseClusterOperation.STATE_ABORT,
+                      BaseClusterOperation.STATE_ERROR]:
+            with self.subTest(state=state):
+                self.mock_get_state.return_value = State(
+                    value=state, update_time=0)
+                op = self._make_op()
+                with mock.patch.object(
+                        NetOp, '_dependency_failed') as mock_failed:
+                    op.abandon_dependency_wait(self._make_dep_op())
+
+                mock_failed.assert_not_called()
+
+
+class DependencyFailedTestCase(base.ShakenFistTestCase):
+    """The two other ways a depends_on dependency ends an operation.
+
+    A dependency which is missing, or which errored, aborted or was
+    deleted, ends the waiting operation just as an abandoned wait does,
+    and must tell the operation's targets in the same way (issue 4542).
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        self.state_patcher = mock.patch.object(
+            BaseClusterOperation, '_state_update')
+        self.mock_state_update = self.state_patcher.start()
+        self.addCleanup(self.state_patcher.stop)
+
+        self.add_event_patcher = mock.patch.object(
+            BaseClusterOperation, 'add_event')
+        self.mock_add_event = self.add_event_patcher.start()
+        self.addCleanup(self.add_event_patcher.stop)
+
+        self.failed_patcher = mock.patch.object(NetOp, '_dependency_failed')
+        self.mock_failed = self.failed_patcher.start()
+        self.addCleanup(self.failed_patcher.stop)
+
+        self.get_state_patcher = mock.patch(
+            'shakenfist.mariadb.get_state',
+            return_value=State(value=BaseClusterOperation.STATE_QUEUED,
+                               update_time=0))
+        self.mock_get_state = self.get_state_patcher.start()
+        self.addCleanup(self.get_state_patcher.stop)
+
+    def _make_op(self):
+        return NetOp(_make_net_op_static_values(['network_ensure_mesh']))
+
+    def _make_dep_op(self, state):
+        dep_op = mock.MagicMock()
+        dep_op.object_type = 'net_op'
+        dep_op.uuid = DEP_UUID
+        dep_op.state.value = state
+        return dep_op
+
+    def test_unsuitable_dependency_aborts_and_tells_the_targets(self):
+        op = self._make_op()
+        op.abort_for_unsuitable_dependency(
+            self._make_dep_op(BaseClusterOperation.STATE_ERROR))
+
+        self.mock_add_event.assert_called_once_with(
+            EVENT_TYPE_AUDIT,
+            'aborting operation, as dependency is unsuitable',
+            extra={
+                'dep_object_type': 'net_op',
+                'dep_object_uuid': DEP_UUID,
+                'dep_object_state': BaseClusterOperation.STATE_ERROR
+            })
+        self.mock_state_update.assert_called_once_with(
+            BaseClusterOperation.STATE_ABORT)
+        self.mock_failed.assert_called_once_with(
+            f'dependency net_op {DEP_UUID} is '
+            f'{BaseClusterOperation.STATE_ERROR}')
+
+    def test_unsuitable_dependency_failed_abort_is_recorded_not_raised(self):
+        self.mock_state_update.side_effect = exceptions.InvalidStateException(
+            'no such transition')
+
+        op = self._make_op()
+        op.abort_for_unsuitable_dependency(
+            self._make_dep_op(BaseClusterOperation.STATE_ABORT))
+
+        self.mock_add_event.assert_called_with(
+            EVENT_TYPE_AUDIT, 'failed to abort operation')
+        self.mock_failed.assert_called_once()
+
+    def test_missing_dependency_errors_and_tells_the_targets(self):
+        op = self._make_op()
+        op.cancel_for_missing_dependency(
+            {'op_type': 'net_op', 'op_uuid': DEP_UUID})
+
+        self.mock_add_event.assert_called_once_with(
+            EVENT_TYPE_AUDIT,
+            'cancelling operation, as dependency does not exist',
+            extra={
+                'dep_object_type': 'net_op',
+                'dep_object_uuid': DEP_UUID
+            })
+        self.mock_state_update.assert_called_once_with(
+            BaseClusterOperation.STATE_ERROR)
+        self.mock_failed.assert_called_once_with(
+            f'dependency net_op {DEP_UUID} does not exist')
+
+    def test_missing_dependency_failed_error_is_recorded_not_raised(self):
+        self.mock_state_update.side_effect = exceptions.InvalidStateException(
+            'no such transition')
+
+        op = self._make_op()
+        op.cancel_for_missing_dependency(
+            {'op_type': 'net_op', 'op_uuid': DEP_UUID})
+
+        self.mock_add_event.assert_called_with(
+            EVENT_TYPE_AUDIT, 'failed to mark operation as errored')
+        self.mock_failed.assert_called_once()
+
+    def test_started_operation_does_not_tell_targets(self):
+        """A COMPLETE instance_create re-dispatched after a failed
+        resolve, whose dependency has since been deleted, must not error
+        the instance it already started."""
+        paths = {
+            'unsuitable': lambda op: op.abort_for_unsuitable_dependency(
+                self._make_dep_op(BaseClusterOperation.STATE_DELETED)),
+            'missing': lambda op: op.cancel_for_missing_dependency(
+                {'op_type': 'net_op', 'op_uuid': DEP_UUID}),
+        }
+        for state in [BaseClusterOperation.STATE_EXECUTING,
+                      BaseClusterOperation.STATE_COMPLETE,
+                      BaseClusterOperation.STATE_ABORT,
+                      BaseClusterOperation.STATE_ERROR]:
+            for name, call in paths.items():
+                with self.subTest(state=state, path=name):
+                    self.mock_failed.reset_mock()
+                    self.mock_get_state.return_value = State(
+                        value=state, update_time=0)
+                    call(self._make_op())
+
+                    self.mock_failed.assert_not_called()
 
 
 class CoalescingExecuteTestCase(base.ShakenFistTestCase):
