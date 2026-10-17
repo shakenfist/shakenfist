@@ -74,7 +74,7 @@ keeps making progress is never expired by the ceiling.
 
 ## Where the budgets are enforced
 
-Three points enforce these budgets, so an operation that has run out
+Four points enforce these budgets, so an operation that has run out
 of time is retired wherever it happens to be sitting rather than only
 when something next looks at it directly:
 
@@ -87,6 +87,12 @@ when something next looks at it directly:
    `agent/put`) also checks the deadline either side of that work.
 3. **Inside the executor** -- once running, the executor checks both
    budgets roughly once a second.
+4. **By the node-local reaper, for an operation never queued** -- if
+   the preflight task never runs at all (its cluster operation was
+   lost, say), nothing in points 1 to 3 ever sees the operation, and
+   every later operation on the instance waits behind it. The reaper
+   described [below](#retry-and-the-executor-reaper) expires such an
+   operation once its deadline is a minute past.
 
 `agent/execute` never goes through preflight at all; the endpoint
 queues it directly. So if you see an expired `execute` operation, it
@@ -162,7 +168,7 @@ pass and resolves operations that the queue itself cannot tell are
 stuck. Nothing in the queue can distinguish a live executor from a
 dead one, but the node the instance is placed on can, because the
 executor is a thread in that node's own process. The reaper recovers
-three situations:
+four situations:
 
 - **An executor thread that died without resolving its operation** --
   the sidechannel daemon restarted while an operation was executing
@@ -182,6 +188,19 @@ three situations:
   from the outside, purely on the deadline having passed, and
   `expire()`s the operation before aborting the wedged executor
   thread.
+- **An operation still in `initial` or `preflight` at the head of the
+  queue, a minute past its deadline.** The preflight task runs on the
+  same node and checks the deadline itself just before it promotes
+  the operation to `queued`, so an operation still unpromoted that
+  long after its deadline belongs to a preflight task which is never
+  going to run -- its cluster operation was lost, or the API server
+  died part way through queueing it. Until something moves it, every
+  later operation on that instance waits behind it. The reaper
+  `expire()`s it with the `deadline` budget, the same outcome the
+  preflight task records when it runs late. An operation created with
+  `deadline_seconds=0` has no deadline to measure from, so here it is
+  bounded by `AGENT_OPERATION_MAX_DEADLINE` from when it entered its
+  current state instead.
 
 The reaper is rate-limited to once every 30 seconds per instance, and
 cannot help in two situations by design: an instance with no live

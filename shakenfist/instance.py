@@ -3002,7 +3002,9 @@ class Instance(dbowo):
         so work the caller has already abandoned never occupies the
         executor. Heads in the initial or preflight states are left
         alone: they are mid-creation, and their enforcement point is
-        NodeAgentopOp._preflight().
+        NodeAgentopOp._preflight(). One whose preflight never runs is
+        expired by the node-local reaper instead, and then retired
+        here like any other terminal head.
         """
         # First check cheaply if there are any agent operations queued. This is
         # likely to be the case 99% of the time.
@@ -3061,16 +3063,15 @@ class Instance(dbowo):
                     # deadline may well have passed: expiring a head
                     # whose preflight task is running would race that
                     # task, and preflight enforces the deadline itself
-                    # (NodeAgentopOp._preflight). The gap that leaves is
-                    # a preflight task which never runs at all -- the
-                    # node it was scheduled onto died, or the cluster
-                    # operation was lost -- which wedges this queue
-                    # indefinitely. That is pre-existing, out of scope
-                    # here, and belongs to the node-local reaper in
-                    # phase 5 of
-                    # docs/plans/PLAN-agent-operation-deadlines.md,
-                    # which can apply a grace period without racing a
-                    # live task.
+                    # (NodeAgentopOp._preflight). A preflight task which
+                    # never runs at all -- its cluster operation was
+                    # lost, or the API server died mid-enqueue -- is
+                    # instead caught by the node-local reaper, which
+                    # waits out a grace period past the deadline so as
+                    # not to race a live task, and expires the head (see
+                    # expire_unpromoted_head() in the sidechannel
+                    # daemon, and issue #4539). The next call here then
+                    # retires it.
                     break
 
                 if state.value == AgentOperation.STATE_EXECUTING:

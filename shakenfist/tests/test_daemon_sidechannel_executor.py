@@ -12,14 +12,16 @@ from shakenfist import constants
 from shakenfist import exceptions
 from shakenfist.config import SFConfig
 from shakenfist.daemons.sidechannel import main as sidechannel
+from shakenfist.operations import node_aop_op
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 
 
 class _FakeState:
-    def __init__(self, value):
+    def __init__(self, value, update_time=0.0):
         self.value = value
+        self.update_time = update_time
 
 
 class _FakeAgentOp:
@@ -1817,6 +1819,28 @@ class _ReaperMonitor:
         self.monitor_attempts = {}
 
 
+class _UnpromotedAgentOp(_FakeAgentOp):
+    """A never-queued operation whose resolved deadline is settable.
+
+    effective_deadline() is what the reaper consults for an initial or
+    preflight head, so the fake stands in for its result directly; how
+    the real method resolves NULL and 0.0 deadlines is tested in
+    test_agent_operation_expiry.py. The State each call was handed is
+    recorded, because passing the already-read one is what keeps a
+    NULL deadline's anchor from costing a second read.
+    """
+
+    def __init__(self, state_value, deadline, update_time=0.0):
+        super().__init__(state_value)
+        self._state.update_time = update_time
+        self._effective_deadline = deadline
+        self.anchor_states = []
+
+    def effective_deadline(self, state=None):
+        self.anchor_states.append(state)
+        return self._effective_deadline
+
+
 class ExecutorReaperTestCase(base.ShakenFistTestCase):
     """The reaper is what turns terminal-only pop back into a drain.
 
@@ -2055,18 +2079,125 @@ class ExecutorReaperTestCase(base.ShakenFistTestCase):
         abort.assert_not_called()
         self.assertIn(self.INSTANCE, mon.executors)
 
-    def test_a_head_which_is_not_executing_is_left_alone(self):
-        # A queued head belongs to the dispatcher, and a preflight or
-        # initial one to the operation which is still creating it.
-        for state in (AgentOperation.STATE_QUEUED,
-                      AgentOperation.STATE_PREFLIGHT):
-            agentop = _FakeAgentOp(state)
+    def test_a_queued_head_is_left_alone(self):
+        # A queued head belongs to the dispatcher, which enforces its
+        # deadline in Instance.agent_operation_next().
+        agentop = _FakeAgentOp(
+            AgentOperation.STATE_QUEUED, deadline_passed=True)
+        mon, _ = self._monitor(queue=['an-operation'])
+
+        _, abort = self._reap(mon, agentop)
+
+        self.assertEqual(AgentOperation.STATE_QUEUED, agentop.state.value)
+        abort.assert_not_called()
+
+    def test_a_never_queued_head_past_its_grace_is_expired(self):
+        # Issue #4539. A preflight head whose preflight task never runs
+        # -- its cluster operation was lost -- or an initial one whose
+        # API server died mid-enqueue is left alone by
+        # agent_operation_next() and touched by nothing else, so every
+        # later operation on the instance waited behind it forever.
+        # Expired is what that method retires, so this drains the
+        # queue on the next dispatch check.
+        reasons = {
+            AgentOperation.STATE_INITIAL:
+                'the operation deadline passed and its enqueue never '
+                'completed',
+            AgentOperation.STATE_PREFLIGHT:
+                'the operation deadline passed and no preflight task '
+                'promoted it',
+        }
+        for state, reason in reasons.items():
+            agentop = _UnpromotedAgentOp(
+                state,
+                time.time() - sidechannel.UNPROMOTED_HEAD_GRACE - 5)
             mon, _ = self._monitor(queue=['an-operation'])
 
             _, abort = self._reap(mon, agentop)
 
-            self.assertEqual(state, agentop.state.value)
+            self.assertEqual(
+                AgentOperation.STATE_EXPIRED, agentop.state.value)
+            self.assertEqual(reason, agentop.expired_reason)
+
+            # The deadline budget, matching what _preflight() records
+            # when it runs late: in both cases the caller's wall clock
+            # is what ran out, and a client branching on expiry_reason
+            # should not be able to tell which of the two noticed.
+            self.assertEqual(
+                AgentOperation.EXPIRY_REASON_DEADLINE, agentop.expired_budget)
+
+            # Anchored on the State already read, not a second read.
+            self.assertEqual(1, len(agentop.anchor_states))
+            self.assertIsNotNone(agentop.anchor_states[0])
+
+            # There is no executor for a never-queued operation, so
+            # nothing to abort.
             abort.assert_not_called()
+
+    def test_a_never_queued_head_inside_its_grace_is_left_alone(self):
+        # The preflight task runs on this node and checks the deadline
+        # immediately before it promotes, so a head only just past its
+        # deadline may belong to a task which is about to expire it
+        # itself, or is mid blob copy and will find it expired. Acting
+        # inside the grace would race that task for nothing: the
+        # outcome is the same either way.
+        now = time.time()
+        for deadline in (now + 300, now - sidechannel.UNPROMOTED_HEAD_GRACE + 5):
+            agentop = _UnpromotedAgentOp(
+                AgentOperation.STATE_PREFLIGHT, deadline)
+            mon, _ = self._monitor(queue=['an-operation'])
+
+            self._reap(mon, agentop)
+
+            self.assertEqual(
+                AgentOperation.STATE_PREFLIGHT, agentop.state.value)
+            self.assertIsNone(agentop.expired_reason)
+
+    def test_a_never_queued_head_with_no_deadline_uses_the_backstop(self):
+        # deadline_seconds=0 alongside a live progress timeout has no
+        # wall-clock deadline, and its progress timeout is only applied
+        # by an executor this operation never reached. Without a
+        # backstop it would wedge the queue exactly as before, so it is
+        # bounded by AGENT_OPERATION_MAX_DEADLINE from its last
+        # transition, the same backstop effective_deadline() gives an
+        # operation with neither budget.
+        now = time.time()
+        backstop = (sidechannel.config.AGENT_OPERATION_MAX_DEADLINE
+                    + sidechannel.UNPROMOTED_HEAD_GRACE)
+
+        young = _UnpromotedAgentOp(
+            AgentOperation.STATE_PREFLIGHT, None,
+            update_time=now - backstop + 60)
+        mon, _ = self._monitor(queue=['an-operation'])
+        self._reap(mon, young)
+        self.assertEqual(AgentOperation.STATE_PREFLIGHT, young.state.value)
+
+        old = _UnpromotedAgentOp(
+            AgentOperation.STATE_PREFLIGHT, None,
+            update_time=now - backstop - 60)
+        mon, _ = self._monitor(queue=['an-operation'])
+        self._reap(mon, old)
+        self.assertEqual(AgentOperation.STATE_EXPIRED, old.state.value)
+        self.assertEqual(
+            AgentOperation.EXPIRY_REASON_DEADLINE, old.expired_budget)
+
+    def test_a_late_preflight_does_not_clobber_the_expiry(self):
+        # The other half of the race the grace guards: a preflight task
+        # which does eventually run, after the reaper expired its
+        # operation, must leave the verdict alone rather than promote
+        # an operation the caller has been told is finished.
+        agentop = _UnpromotedAgentOp(
+            AgentOperation.STATE_PREFLIGHT,
+            time.time() - sidechannel.UNPROMOTED_HEAD_GRACE - 5)
+        mon, _ = self._monitor(queue=['an-operation'])
+        self._reap(mon, agentop)
+        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
+        reason = agentop.expired_reason
+
+        node_aop_op.NodeAgentopOp._preflight(mock.Mock(), agentop)
+
+        self.assertEqual(AgentOperation.STATE_EXPIRED, agentop.state.value)
+        self.assertEqual(reason, agentop.expired_reason)
 
     def test_the_peek_is_rate_limited(self):
         # The reaper runs at the top of every dispatcher pass, so an
