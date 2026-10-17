@@ -11312,7 +11312,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.4
+    Control Socket Protocol — Version 1.5
   
 
     
@@ -11490,6 +11490,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Bug Report Assembly">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rylls-own-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ryll's own interface
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -11503,6 +11520,17 @@
   
     <nav class="md-nav" aria-label="Bug Report Dialog">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#report-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Report size
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#display-region-selection" class="md-nav__link">
@@ -15342,6 +15370,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Bug Report Assembly">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rylls-own-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ryll's own interface
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15355,6 +15400,17 @@
   
     <nav class="md-nav" aria-label="Bug Report Dialog">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#report-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Report size
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#display-region-selection" class="md-nav__link">
@@ -15512,16 +15568,27 @@ a directory.</p>
   The window keeps the most recent 120 timestamps for an accurate
   short-term reading.</li>
 <li><strong>Bytes in/out</strong>: Network throughput per channel</li>
+<li><strong>RTT</strong>: Round trip on the inputs channel, in milliseconds, shown in
+  the status bar as <code>RTT</code> once the pointer has moved. SPICE has no
+  client-originated probe (<code>SPICE_MSG_PING</code> is server→client only), but
+  the server acknowledges every fourth pointer message with
+  <code>MOUSE_MOTION_ACK</code>. The inputs channel times each bunch from sending
+  its fourth message to the ack for it (<code>MotionRoundTrip</code> in
+  <code>shakenfist-spice-renderer/src/channels/inputs.rs</code>) and emits
+  <code>ChannelEvent::InputRoundTrip</code>. It includes the server's time to read
+  and answer, and is only sampled while the pointer moves. Recorded as
+  <code>last_input_rtt_ms</code> in <code>session.json</code>, <code>last_round_trip_ms</code> in the
+  inputs channel's state, and the control socket's <code>input_rtt</code> event.</li>
 <li><strong>PING interval</strong>: Client-observed interval between server PINGs on the
   main channel, in milliseconds, shown in the status bar under that
-  label. SPICE has no client-originated probe (<code>SPICE_MSG_PING</code>
-  is server→client only), so ryll cannot measure absolute network RTT.
-  Instead, the main-channel PING handler records <code>Instant::now()</code> and
-  emits the gap to the previous PING as a sample. The number includes
-  the server's send cadence and the client's receive turnaround;
-  spikes indicate a network or server stall. Sparkline mirrors the
-  bandwidth one (60-sample rolling history, amber bars). Implemented
-  via <code>LatencyTracker</code> in <code>ryll/src/app/stats.rs</code>.</li>
+  label. It is not a round trip: the main-channel PING handler records
+  <code>Instant::now()</code> and emits the gap to the previous PING as
+  <code>ChannelEvent::PingInterval</code>. The number is mostly the server's send
+  cadence: about 30 000 ms against andris, which pings every 30 s.
+  Spikes beyond the cadence indicate a network or server stall.
+  Sparkline mirrors the bandwidth one (60-sample rolling history, amber
+  bars). Implemented via <code>LatencyTracker</code> in <code>ryll/src/app/stats.rs</code>,
+  and recorded as <code>last_ping_interval_ms</code> in <code>session.json</code>.</li>
 <li><strong>Bandwidth sparkline</strong>: A rolling 60-sample history of bytes/sec is
   displayed in the status bar as a small bar chart. Channel read loops
   increment a shared <code>AtomicU64</code> byte counter; the <code>BandwidthTracker</code>
@@ -15717,25 +15784,35 @@ zip contains:</p>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│                         #   platform, target, timestamp
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│                         #   (submit), triggered_at (dialog-open),
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│                         #   session_uptime_secs (submit),
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│                         #   triggered_uptime_secs (dialog-open)
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>├── session.json          # AppSnapshot (FPS, bandwidth, surfaces,
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│                         #   held keys and recent key events)
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>├── channel-state.json    # snapshot of the affected channel
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>├── traffic.pcap          # ring buffer pcap (capture feature only)
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>├── screenshot.png        # trigger-time full surface (Display only)
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>├── screenshot-region.png # submit-time crop at the selected region
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│                         #   (Display only, when a region was drawn)
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>└── runtime-metrics.json  # process and per-thread CPU%, RSS, VmSize
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>                          #   sampled over a 2-second window at
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>                          #   report-creation time (Linux only;
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>                          #   non-Linux platforms record
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>                          #   available:false with a reason)
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│                         #   triggered_uptime_secs (dialog-open),
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│                         #   traffic_capture (what traffic.pcap
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│                         #   holds and what was left out)
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>├── session.json          # AppSnapshot (FPS, bandwidth, surfaces,
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>│                         #   held keys and recent key events,
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│                         #   ryll's open panels, menus and dialogs)
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>├── channel-state.json    # snapshot of the affected channel
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>├── traffic.pcap          # newest ring buffer traffic, within the
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│                         #   report's size budget (capture feature
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│                         #   only)
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>├── screenshot.png        # trigger-time full surface (Display only)
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>├── screenshot-region.png # submit-time crop at the selected region
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│                         #   (Display only, when a region was drawn)
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>├── window-screenshot.png # ryll's whole window as the report's first
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│                         #   frame drew it (Ui only)
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>└── runtime-metrics.json  # process and per-thread CPU%, RSS, VmSize
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>                          #   sampled over a 2-second window at
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>                          #   report-creation time (Linux only;
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>                          #   non-Linux platforms record
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>                          #   available:false with a reason)
 </code></pre></div>
 <p>Report types are <code>Display</code>, <code>Input</code>, <code>Cursor</code>, <code>Connection</code>, <code>Usb</code>,
-<code>Audio</code>, and <code>Pedantic</code>, each mapping to one SPICE channel or the
+<code>Audio</code>, <code>Ui</code>, and <code>Pedantic</code>, each mapping to one SPICE channel or the
 --pedantic observer path. <code>Connection</code> covers the main channel only;
 an audio problem needs <code>Audio</code>, whose <code>channel-state.json</code> is the
-playback snapshot.  <code>BugReport::new()</code> samples runtime
+playback snapshot. <code>Ui</code> is for a problem in ryll's own interface (a
+panel or menu that opened unasked, say); it carries the inputs
+channel's traffic and state, since the interface usually misbehaves
+after a key or click.  <code>BugReport::new()</code> samples runtime
 metrics over a 2-second window (blocking the caller), then gathers
 and serialises all data synchronously.  <code>BugReport::write_zip()</code>
 writes the zip to the capture directory's <code>bug-reports/</code>
@@ -15766,6 +15843,35 @@ two images are deliberately different moments in time.</p>
 captured — the dialog captures unconditionally on open (so an
 artefact doesn't fade while the user decides what to submit), but
 only includes the PNG when the user actually submits as Display.</p>
+<h3 id="rylls-own-interface">ryll's own interface<a class="headerlink" href="#rylls-own-interface" title="Permanent link">&para;</a></h3>
+<p>The guest-surface PNG cannot show what ryll draws over it, so every
+GUI report's <code>session.json</code> has a <code>ui</code> section, kept by
+<code>UiStateTracker</code> in <code>ryll/src/app/ui_state.rs</code>. At the end of each
+frame it is told which panels, menus and dialogs are open
+(<code>notifications_panel</code>, <code>menu_or_popup</code>, <code>traffic_viewer</code>,
+<code>usb_panel</code>, <code>folders_panel</code>, <code>protocol_gaps</code>, <code>bug_report_dialog</code>,
+<code>region_select</code>, <code>paste_error_dialog</code>, <code>connection_modal</code>) and what
+egui claims of the input. It records:</p>
+<ul>
+<li><code>now</code>: what is open, each with the time it opened, plus
+  <code>egui_wants_keyboard</code>, <code>egui_wants_pointer</code> and <code>focused_widget</code>.
+  ryll drops egui's keyboard focus every frame unless the bug report
+  dialog is open (#535), so <code>egui_wants_keyboard</code> should otherwise be
+  false.</li>
+<li><code>at_report_trigger</code>: the same, as of the frame before the report's
+  dialog appeared, so it shows what the report is about rather than
+  the dialog.</li>
+<li><code>recent_changes</code>: the last 64 openings and closings.</li>
+</ul>
+<p>Times are seconds since session start, the clock of the key log in
+<code>keyboard</code>, the inputs channel's <code>recent_events</code> and the pcap, so a
+panel that opened unasked can be lined up with the key before it.</p>
+<p>When a report starts, ryll also asks eframe for a screenshot of the
+whole window (<code>ViewportCommand::Screenshot</code>). The dialog is not drawn
+until the screenshot arrives, normally the next frame and at most
+500 ms later, so the screenshot shows the window as the user saw it.
+It is PNG-encoded on a worker thread and written as
+<code>window-screenshot.png</code> in <code>Ui</code> reports only.</p>
 <h2 id="bug-report-dialog">Bug Report Dialog<a class="headerlink" href="#bug-report-dialog" title="Permanent link">&para;</a></h2>
 <p>Pressing <strong>F12</strong> or using <strong>Menu → Report</strong> opens a
 centred modal dialog for generating bug reports.  The
@@ -15773,7 +15879,7 @@ dialog contains:</p>
 <ol>
 <li>A privacy warning about sensitive data in reports.</li>
 <li>Radio buttons to select the report type (Display, Input,
-   Cursor, Connection, USB, Audio).</li>
+   Cursor, Connection, USB, Audio, and ryll itself).</li>
 <li>An optional description text field.</li>
 <li>Capture and Cancel buttons.</li>
 </ol>
@@ -15786,6 +15892,74 @@ action into a local variable, then the action is executed on <code>self</code>
 after the closure returns.</p>
 <p>After a successful report, a transient status message ("Bug report
 saved to ...") is displayed in the status bar for 5 seconds.</p>
+<h3 id="report-size">Report size<a class="headerlink" href="#report-size" title="Permanent link">&para;</a></h3>
+<p>A report is only useful if it can be attached to an issue, and
+GitHub limits attachments to 25 MB. The display ring alone is 32 MB,
+and its payloads are mostly compressed images that the zip can't
+shrink (entries are stored, not deflated), so a Display report taken
+after a busy minute used to come out at 32 MB.</p>
+<p><code>BugReport::assemble</code> therefore builds the pcap last and gives it
+what the other files leave of a 24 MB target
+(<code>REPORT_TARGET_BYTES</code>), less 256 KB for <code>metadata.json</code>, any
+<code>disconnect-cause.json</code> and the zip's headers. It keeps the
+<strong>newest</strong> traffic, the run-up to whatever the report is about, and
+leaves out the oldest. The cut never falls inside a SPICE message
+that was split into several TCP segments. A pcap is never given less
+than 4 MB, so a report with an unusually large screenshot can still
+come out over the limit. When a report saved from the GUI is over
+25 MB, a warning notification says so.</p>
+<p>The budget applies to every report: manual, notification,
+disconnect, <code>--pedantic</code> and auto-snapshot. The ring buffers
+themselves are unchanged, and <code>--capture</code> still writes complete
+per-channel pcaps, which is the way to keep everything.</p>
+<p><code>metadata.json</code>'s <code>traffic_capture</code> records the result:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>budget_bytes</code></td>
+<td>Bytes the pcap was allowed to use</td>
+</tr>
+<tr>
+<td><code>written_bytes</code></td>
+<td>Size of <code>traffic.pcap</code></td>
+</tr>
+<tr>
+<td><code>packets_written</code></td>
+<td>TCP segments in the pcap</td>
+</tr>
+<tr>
+<td><code>packets_omitted</code></td>
+<td>Older segments in the ring that were left out</td>
+</tr>
+<tr>
+<td><code>bytes_omitted</code></td>
+<td>Frame bytes of those segments</td>
+</tr>
+<tr>
+<td><code>oldest_packet_secs</code></td>
+<td>Session uptime of the oldest packet kept: the capture runs from here to the report</td>
+</tr>
+<tr>
+<td><code>truncated</code></td>
+<td><code>true</code> when older traffic was left out</td>
+</tr>
+</tbody>
+</table>
+<p>It is <code>null</code> in a build without the <code>capture</code> feature, which writes
+no pcap, and when the pcap writer failed, which is logged and leaves
+<code>traffic.pcap</code> out of the report.</p>
+<p>Report pcaps and <code>--capture</code> pcaps use a 262144-byte snaplen, as
+tcpdump does. With pcap-file's default of 65535, the writer refused
+the first segment of any SPICE message over 64 KB (a full segment is
+65549 bytes with its Ethernet header), so both used to lose part of
+every large display message. A <code>--capture</code> pcap that still refuses a
+frame logs a warning, once per channel.</p>
 <h3 id="display-region-selection">Display region selection<a class="headerlink" href="#display-region-selection" title="Permanent link">&para;</a></h3>
 <p>When the user selects "Display" and clicks "Capture", the dialog
 closes and the app enters <strong>region selection mode</strong>:</p>
@@ -15953,12 +16127,54 @@ or <code>ChannelEvent::Disconnected</code> triggers a best-effort
 auto-snapshot via <code>BugReport::write_disconnect</code>. The
 zip carries a <code>disconnect-cause.json</code> record alongside
 the usual pcap / channel-state / metadata files. The
-record names the channel that fired, captures whether
-the main-channel client-side keepalive timeout fired
-(distinguishing "we timed ourselves out" from a server
-RST), and embeds a per-channel diagnostics map so a
-maintainer can compare the dropped channel against the
-others' last-known traffic state. ryll sends no
+record names the channel that fired and says how its
+connection ended in <code>disconnect_kind</code>:</p>
+<table>
+<thead>
+<tr>
+<th><code>disconnect_kind</code></th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ServerClosed</code></td>
+<td>A read returned no bytes: the server closed the socket cleanly</td>
+</tr>
+<tr>
+<td><code>ServerAnnounced</code></td>
+<td>The server sent the main channel's <code>DISCONNECTING</code></td>
+</tr>
+<tr>
+<td><code>KeepaliveTimeout</code></td>
+<td>The main channel heard nothing for its keepalive timeout, and ryll gave up</td>
+</tr>
+<tr>
+<td><code>Error</code></td>
+<td>The channel failed; <code>error_message</code> says how (a reset, for example)</td>
+</tr>
+<tr>
+<td><code>ConnectFailed</code></td>
+<td>A connection attempt failed</td>
+</tr>
+</tbody>
+</table>
+<p>It also captures whether the main-channel client-side
+keepalive timeout fired, and embeds a per-channel
+diagnostics map so a maintainer can compare the dropped
+channel against the others' last-known traffic state.
+Each entry's <code>state</code> is <code>ended</code> (with <code>ended_by</code>, a
+<code>disconnect_kind</code>, and <code>ended_at_secs</code>), <code>open</code> (no end
+reported yet), or <code>no_traffic</code> (no end reported and
+nothing ever received, usually a channel the server never
+offered). The report is written once the UI frame's
+queued channel events have been handled, so every channel
+whose end reached the app in that frame shows as ended,
+not just the one that named the report. A channel that
+noticed the same failure a few milliseconds later, in
+the next frame, still shows as <code>open</code>: read <code>open</code> as
+"no end reported when the report was written", not as
+"survived the disconnect". ryll sends no
 application-level keepalive on any channel: an idle
 channel is kept alive by TCP keepalive on the socket and
 by answering the server's PINGs.</p>
@@ -16014,8 +16230,10 @@ like audio silences that last only 30 seconds.</p>
   <code>channel_name()</code> returns <code>"all"</code>. This causes <code>BugReport::
   assemble</code> to embed a merged JSON object in <code>channel-state.json</code>
   containing every channel's snapshot (display, inputs, cursor,
-  main, playback, usbredir, webdav). The traffic pcap also covers
-  all channels via <code>TrafficBuffers::drain_all_pcap_bytes()</code>.</li>
+  main, playback, usbredir, webdav). The traffic pcap merges all
+  channels via <code>TrafficBuffers::drain_all_pcap_within()</code>, keeping
+  the newest traffic that fits the report's size budget (see
+  <a href="#report-size">Report size</a>).</li>
 <li><code>AutoSnapshotState</code> in <code>ryll/src/auto_snapshot.rs</code> bundles the
   Arc handles the task needs (traffic, channel snapshots, app
   snapshot, notifications, target, output dir, cap,

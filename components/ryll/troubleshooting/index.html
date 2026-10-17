@@ -11312,7 +11312,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.4
+    Control Socket Protocol — Version 1.5
   
 
     
@@ -16994,6 +16994,12 @@ the client's state at the moment you observe a problem.</p>
 <li><strong>Cursor</strong> — captures the cursor cache and position.</li>
 <li><strong>Connection</strong> — captures session info and main channel traffic.</li>
 <li><strong>USB</strong> — captures usbredir channel and device state.</li>
+<li><strong>Audio</strong> — captures the playback channel and output device.</li>
+<li><strong>ryll itself</strong> — for a problem in ryll's own window rather
+     than the guest's (a panel or menu that opened by itself, say):
+     captures a screenshot of the whole window, which panels, menus
+     and dialogs were open and when they opened, and recent
+     keyboard and mouse events.</li>
 <li>Optionally enter a brief <strong>description</strong> of what you observed.</li>
 <li>Click <strong>Capture</strong>.</li>
 </ol>
@@ -17013,16 +17019,22 @@ report is written without a region.</p>
 <a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>│                           (dialog-open), submitted uptime
 <a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>│                           and triggered uptime
 <a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>├── session.json          — FPS, bandwidth, surfaces, uptime,
-<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>│                           keyboard state and recent key events
-<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>├── channel-state.json    — snapshot of the affected channel
-<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>├── traffic.pcap          — recent protocol traffic (pcap format)
-<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>├── screenshot.png        — full display surface captured at the
-<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>│                           moment the dialog opened (Display
-<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a>│                           reports only)
-<a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a>├── screenshot-region.png — crop of the submit-time surface at
-<a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a>│                           the selected region (Display reports
-<a id="__codelineno-19-16" name="__codelineno-19-16" href="#__codelineno-19-16"></a>│                           only, when a region was drawn)
-<a id="__codelineno-19-17" name="__codelineno-19-17" href="#__codelineno-19-17"></a>└── runtime-metrics.json  — process and per-thread CPU / RSS
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>│                           keyboard state and recent key events,
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>│                           ryll's open panels, menus and dialogs
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>├── channel-state.json    — snapshot of the affected channel
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>├── traffic.pcap          — recent protocol traffic (pcap format),
+<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>│                           trimmed so the zip fits GitHub's
+<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a>│                           25 MB attachment limit
+<a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a>├── screenshot.png        — full display surface captured at the
+<a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a>│                           moment the dialog opened (Display
+<a id="__codelineno-19-16" name="__codelineno-19-16" href="#__codelineno-19-16"></a>│                           reports only)
+<a id="__codelineno-19-17" name="__codelineno-19-17" href="#__codelineno-19-17"></a>├── screenshot-region.png — crop of the submit-time surface at
+<a id="__codelineno-19-18" name="__codelineno-19-18" href="#__codelineno-19-18"></a>│                           the selected region (Display reports
+<a id="__codelineno-19-19" name="__codelineno-19-19" href="#__codelineno-19-19"></a>│                           only, when a region was drawn)
+<a id="__codelineno-19-20" name="__codelineno-19-20" href="#__codelineno-19-20"></a>├── window-screenshot.png — ryll's whole window, panels and menus
+<a id="__codelineno-19-21" name="__codelineno-19-21" href="#__codelineno-19-21"></a>│                           included, as it was when the report
+<a id="__codelineno-19-22" name="__codelineno-19-22" href="#__codelineno-19-22"></a>│                           started ("ryll itself" reports only)
+<a id="__codelineno-19-23" name="__codelineno-19-23" href="#__codelineno-19-23"></a>└── runtime-metrics.json  — process and per-thread CPU / RSS
 </code></pre></div>
 <p><strong>Mac-specific verification.</strong> If you are debugging the
 runtime-metrics output specifically on a Mac, see

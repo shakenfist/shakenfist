@@ -3355,15 +3355,15 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#phase-5-push-audit-not-started" class="md-nav__link">
+  <a href="#phase-5-push-audit-in-progress" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Phase 5: Push audit -- NOT STARTED
+        Phase 5: Push audit -- IN PROGRESS
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Phase 5: Push audit -- NOT STARTED">
+    <nav class="md-nav" aria-label="Phase 5: Push audit -- IN PROGRESS">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3459,6 +3459,17 @@
     <span class="md-ellipsis">
       
         Back brief
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
       
     </span>
   </a>
@@ -11726,7 +11737,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.4
+    Control Socket Protocol — Version 1.5
   
 
     
@@ -15674,15 +15685,15 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#phase-5-push-audit-not-started" class="md-nav__link">
+  <a href="#phase-5-push-audit-in-progress" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Phase 5: Push audit -- NOT STARTED
+        Phase 5: Push audit -- IN PROGRESS
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Phase 5: Push audit -- NOT STARTED">
+    <nav class="md-nav" aria-label="Phase 5: Push audit -- IN PROGRESS">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -15778,6 +15789,17 @@
     <span class="md-ellipsis">
       
         Back brief
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
       
     </span>
   </a>
@@ -16200,7 +16222,7 @@ scripts themselves could live in <code>actions/</code> as composite actions:</p>
 </tr>
 <tr>
 <td>5. Push audit</td>
-<td>Not started</td>
+<td>In progress</td>
 <td></td>
 </tr>
 </tbody>
@@ -16432,7 +16454,7 @@ nothing in the chain reads a secret.</p>
    and a link -- which is what <code>llm-doc-structure</code> asks of them, and
    <code>AGENTS.md</code> is loaded into every session held here.</li>
 </ol>
-<h3 id="phase-5-push-audit-not-started">Phase 5: Push audit -- NOT STARTED<a class="headerlink" href="#phase-5-push-audit-not-started" title="Permanent link">&para;</a></h3>
+<h3 id="phase-5-push-audit-in-progress">Phase 5: Push audit -- IN PROGRESS<a class="headerlink" href="#phase-5-push-audit-in-progress" title="Permanent link">&para;</a></h3>
 <p>Run <code>PUSH-AUDIT.md</code> over the whole plan's work rather than over the
 last phase's diff alone -- the interactions between phases are most
 of what a whole-plan audit is for. Planned on 2026-10-16, after
@@ -16823,6 +16845,994 @@ Before 5e and 5f,
 there is a gate: the 5d Results table is reviewed and agreed first,
 because fixing a finding that should have been declined is cheap to
 propose and expensive to unwind across the fleet.</p>
+<h4 id="results">Results<a class="headerlink" href="#results" title="Permanent link">&para;</a></h4>
+<p>Run on 2026-10-16 and 2026-10-17 against development <code>3240530</code> and
+actions <code>e0bb086</code>. The raw outputs of 5a, and the ten wave 2 reports,
+are not committed; this section is the record.</p>
+<p><strong>5a (wave 1).</strong> Passed in both repositories.</p>
+<ul>
+<li>development: <code>pre-commit</code> was clean. The five historical ranges
+  gave 641 hits. 113 were for text no longer on <code>main</code>. The rest were
+  accepted: stdlib imports, plan references inside the plan checks
+  themselves, and 502 spec table rows that now live only in the
+  generated <code>compliance.md</code>, which <code>PLAN-audit-compliance-split.md</code>
+  already dealt with.</li>
+<li>The current-state pass ran the content greps over 117 owned files
+  (+46,571) and recorded the five change greps as not applicable, per
+  decision 2. Every hit was accepted, and the 12 files over 800 lines
+  went to 2a.</li>
+<li>actions: <code>pre-commit</code> was clean, 510 unit tests passed, and gitleaks
+  (v8.18.4 in docker, because it is not installed on the host) passed
+  its positive control and scanned 535 commits clean.
+  <code>ansible-syntax-check</code> was not applicable, since no phase 3 path
+  touches <code>ansible/</code>.</li>
+<li>Shellcheck at default severity found six unused variables in
+  <code>review-pr-with-claude.sh</code>; they went to triage as 5c-2a-4.</li>
+<li>The decision 3 line counts were re-measured and had not moved, so
+  the planned split held.</li>
+</ul>
+<p><strong>5b and 5c (wave 2).</strong> Ten agents ran in parallel, as the operator
+chose at the back brief. Every report reproduced its expected totals:</p>
+<table>
+<thead>
+<tr>
+<th>Agent</th>
+<th>Files read</th>
+<th>Totals</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2a-i</td>
+<td><code>packaging.py</code>, <code>ci_workflows.py</code></td>
+<td>2 files, +5,042</td>
+</tr>
+<tr>
+<td>2a-ii</td>
+<td>the other <code>checks/</code> modules</td>
+<td>9 files, +6,340</td>
+</tr>
+<tr>
+<td>2a-iii</td>
+<td>runner outside <code>checks/</code></td>
+<td>23 files, +4,824</td>
+</tr>
+<tr>
+<td>2b</td>
+<td>tests</td>
+<td>25 files, +22,065</td>
+</tr>
+<tr>
+<td>2c</td>
+<td><code>docs/consistency-audits.md</code>, <code>docs/audits/</code></td>
+<td>58 files, +8,300</td>
+</tr>
+<tr>
+<td>2d</td>
+<td>runner code</td>
+<td>34 files, +16,206</td>
+</tr>
+<tr>
+<td>5c-2a, 2b, 2c, 2d</td>
+<td>actions phase 3 paths</td>
+<td>10 files, +3,152 each</td>
+</tr>
+</tbody>
+</table>
+<p>One brief was narrowed before it ran. 2d's first file list also took
+in the tests (59 files, +38,271), so it was cut to the runner's own
+code, with the tests given as context. One wave 1 observation was
+withdrawn by 2b: <code>test_docs_content.py</code> and <code>test_llm_docs.py</code> do carry
+the plan-reference marker, at file scope.</p>
+<p><strong>Operator decisions taken at triage (2026-10-17):</strong></p>
+<ol>
+<li><strong>Fast-tracks.</strong> Two findings were live exposures rather than audit
+   defects, and were fixed ahead of this table:</li>
+<li>5c-2d-1, -2 and -3 in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/168" title="GitHub Issue: shakenfist/actions #168">actions#168</a>;</li>
+<li>2d-1 in #263.</li>
+<li><strong>Tool failures report <code>error</code>.</strong> When a check's own tooling fails
+   (a GitHub API error, a failed <code>git ls-files</code>), it reports <code>error</code>
+   rather than <code>fail</code> or <code>not_applicable</code>. <code>error</code> leaves issues
+   alone, and turns the leg red through <code>audit-raised.py</code>. The policy
+   is written down once, in <code>docs/consistency-audits.md</code>.</li>
+<li><strong>The reviewer's issue filing in actions is dropped.</strong> That means
+   the filing step, the "Related Issues / Closes" section and the
+   <code>issues: write</code> requirement. Callers that keep granting it are
+   harmless.</li>
+<li><strong>The token split is taken in this phase.</strong> The clone and audit
+   steps get a separate read-only fine-grained token, and
+   <code>AUDIT_TOKEN</code> stays only in <code>manage-issues</code> and <code>update-docs</code>. The
+   operator mints the new token; 5e does the workflow side.</li>
+</ol>
+<p><strong>Verdicts.</strong> Each <em>fix</em> row names the fix group it lands in. The
+development groups land as one pull request per group, in 5e, and the
+actions groups the same way, in 5f:</p>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Repository</th>
+<th>What</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>D1</td>
+<td>development</td>
+<td>Every read of an audited repository's files goes through <code>Repo.read</code>, or one helper on <code>Repo.contains</code>, so nothing outside the clone is read, and a directory or dangling link is "no file" rather than an <code>error</code></td>
+</tr>
+<tr>
+<td>D2</td>
+<td>development</td>
+<td>The tool-failure policy (decision 2 above)</td>
+</tr>
+<tr>
+<td>D3</td>
+<td>development</td>
+<td>The issue lifecycle: open issues fetched once per repository rather than searched per check, write failures counted and failing the job, and tests for every branch</td>
+</tr>
+<tr>
+<td>D4</td>
+<td>development</td>
+<td><code>consistency-audit.yml</code>: the token split, a <code>main</code>-only guard on the steps that write, <code>runner.temp</code> and <code>--clear</code>, a concurrency group, skillsaw in its own environment, <code>persist-credentials: false</code>, and the failure-report script moved to <code>tools/</code></td>
+</tr>
+<tr>
+<td>D5</td>
+<td>development</td>
+<td>Parser and matcher defects in individual checks, each with the test 2b found missing</td>
+</tr>
+<tr>
+<td>D6</td>
+<td>development</td>
+<td>Duplicated helpers that have drifted</td>
+</tr>
+<tr>
+<td>D7</td>
+<td>development</td>
+<td>Stale comments and documentation</td>
+</tr>
+<tr>
+<td>A1</td>
+<td>actions</td>
+<td>Fixed in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/168" title="GitHub Issue: shakenfist/actions #168">actions#168</a></td>
+</tr>
+<tr>
+<td>A2</td>
+<td>actions</td>
+<td>Drop review issue filing (decision 3 above)</td>
+</tr>
+<tr>
+<td>A3</td>
+<td>actions</td>
+<td>Tests that execute the security guards rather than search their text</td>
+</tr>
+<tr>
+<td>A4</td>
+<td>actions</td>
+<td>Review JSON extraction and validation</td>
+</tr>
+<tr>
+<td>A5</td>
+<td>actions</td>
+<td>Documentation and comments</td>
+</tr>
+<tr>
+<td>T</td>
+<td>development templates</td>
+<td><code>templates/ci-review-automation/</code>, which actions' <code>pr-re-review.yml</code> copies byte for byte; fixed in development, then re-synced</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Location</th>
+<th>Sev</th>
+<th>Verdict</th>
+<th>Group / reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2a-i-1</td>
+<td><code>ci_workflows.py:1290-1331</code></td>
+<td>med</td>
+<td>fix</td>
+<td>D5. Read <code>paths</code>/<code>paths-ignore</code> from the <code>pull_request</code> trigger, and test comments stripped</td>
+</tr>
+<tr>
+<td>2a-i-2</td>
+<td><code>packaging.py:1541-1557</code></td>
+<td>med</td>
+<td>fix</td>
+<td>D2: use <code>tracked_paths</code>, and report <code>error</code> when it fails</td>
+</tr>
+<tr>
+<td>2a-i-3</td>
+<td><code>packaging.py:531-540,727-737</code></td>
+<td>med</td>
+<td>fix</td>
+<td>D5: compare a glob's directory, and skip block scalars</td>
+</tr>
+<tr>
+<td>2a-i-4</td>
+<td><code>packaging.py:486,497</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D5: one helper for a quoted boolean</td>
+</tr>
+<tr>
+<td>2a-i-5</td>
+<td><code>ci_workflows.py:1443</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D5: flow-form <code>workflow_call</code>, read from the header</td>
+</tr>
+<tr>
+<td>2a-i-6</td>
+<td><code>ci_workflows.py:1993-1998</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D5: a fuzz callee invoked from a <code>merge_group</code> workflow</td>
+</tr>
+<tr>
+<td>2a-i-7</td>
+<td><code>ci_workflows.py:687-711</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D6: use <code>mapping_entries</code></td>
+</tr>
+<tr>
+<td>2a-i-8</td>
+<td><code>packaging.py</code>, <code>ci_workflows.py</code> raw <code>open()</code> ×9</td>
+<td>low</td>
+<td>fix</td>
+<td>D1</td>
+</tr>
+<tr>
+<td>2a-i-9</td>
+<td><code>ci_workflows.py:977-1002</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D5: accumulate the docs-only findings, and use the constant. Tested by 2b-7</td>
+</tr>
+<tr>
+<td>2a-i-10</td>
+<td><code>ci_workflows.py:162-230</code></td>
+<td>low</td>
+<td>cross-reference</td>
+<td><code>PLAN-workflow-ref-trust.md</code>. Matching <code>@main</code> is that plan's to change when it moves callers to pins</td>
+</tr>
+<tr>
+<td>2a-i-11</td>
+<td><code>packaging.py:2671</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D5: strip the comment before matching</td>
+</tr>
+<tr>
+<td>2a-i-12</td>
+<td><code>packaging.py:1039-1053</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D5: read the arrays through <code>tomllib</code></td>
+</tr>
+<tr>
+<td>2a-i-13</td>
+<td><code>ci_workflows.py:613-629</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D7: narrow the docstring to what is measured</td>
+</tr>
+<tr>
+<td>2a-i-14</td>
+<td><code>ci_workflows.py:1957</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D5</td>
+</tr>
+<tr>
+<td>2a-i-15</td>
+<td><code>ci_workflows.py:153,957,964</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D7</td>
+</tr>
+<tr>
+<td>2a-i-16</td>
+<td><code>ci_workflows.py:236-259</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D7: cut the survey narrative</td>
+</tr>
+<tr>
+<td>2a-i-17</td>
+<td><code>packaging.py:2460-2500</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D5: hoist the masking out of the loop</td>
+</tr>
+<tr>
+<td>2a-i-18</td>
+<td>file size, both files</td>
+<td>adv</td>
+<td>decline</td>
+<td>The seams are real, but a split moves about 2,000 reviewed lines and re-stales their marks for no behaviour change. Future work below</td>
+</tr>
+<tr>
+<td>2a-ii-1</td>
+<td>raw <code>open()</code> across five modules, <code>files.py</code> walkers</td>
+<td>med</td>
+<td>fix</td>
+<td>D1. This is the same class as 2a-i-8, 2a-iii-10 and 2d-4, and here it was reproduced: a dangling link gives <code>error</code>, and a link out of the clone is quoted into an issue</td>
+</tr>
+<tr>
+<td>2a-ii-2</td>
+<td><code>github_config.py:169-210</code></td>
+<td>med</td>
+<td>fix</td>
+<td>D2. A failed or null security query is <code>error</code>, not pass</td>
+</tr>
+<tr>
+<td>2a-ii-3</td>
+<td>tool-failure policy</td>
+<td>med</td>
+<td>fix</td>
+<td>D2: decision 2 above</td>
+</tr>
+<tr>
+<td>2a-ii-4</td>
+<td><code>github_config.py:121-150</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D2: the exemption moves to <code>applies()</code></td>
+</tr>
+<tr>
+<td>2a-ii-5</td>
+<td><code>github_config.py:386-390</code>, <code>review.py:203-206</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D7</td>
+</tr>
+<tr>
+<td>2a-ii-6</td>
+<td>four docstrings naming removed functions</td>
+<td>low</td>
+<td>fix</td>
+<td>D7</td>
+</tr>
+<tr>
+<td>2a-ii-7</td>
+<td><code>llm_docs.py:437-446</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D5: report orphans even without skillsaw. Tested by 2b-3</td>
+</tr>
+<tr>
+<td>2a-ii-8</td>
+<td><code>npm_dependencies.py:856-872</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D2: use <code>tracked_paths</code></td>
+</tr>
+<tr>
+<td>2a-ii-9</td>
+<td><code>plans.py:1148-1163</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D6: <code>iter_lines_outside_fences</code></td>
+</tr>
+<tr>
+<td>2a-ii-10</td>
+<td><code>docs_content.py:201-206</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D6: <code>tracked_paths</code>, falling back to <code>WALK_SKIP</code></td>
+</tr>
+<tr>
+<td>2a-ii-11</td>
+<td><code>npm_dependencies.py</code>, <code>packaging.py</code> result keys</td>
+<td>low</td>
+<td>fix</td>
+<td>D6: move the lists to <code>findings=</code>, with a before/after snapshot</td>
+</tr>
+<tr>
+<td>2a-ii-12</td>
+<td>two block-scalar regexes</td>
+<td>low</td>
+<td>fix</td>
+<td>D6: one constant in <code>text/workflows.py</code></td>
+</tr>
+<tr>
+<td>2a-ii-13</td>
+<td>small duplicates and history in comments</td>
+<td>low</td>
+<td>fix</td>
+<td>D7</td>
+</tr>
+<tr>
+<td>2a-ii-14</td>
+<td><code>plans.py</code>, <code>npm_dependencies.py</code> size</td>
+<td>adv</td>
+<td>decline</td>
+<td>As 2a-i-18</td>
+</tr>
+<tr>
+<td>2a-iii-1</td>
+<td><code>audit_common.py:109-123</code></td>
+<td>med</td>
+<td>fix</td>
+<td>D3: fetch open issues once, and treat a failed listing as an error rather than as "none"</td>
+</tr>
+<tr>
+<td>2a-iii-2</td>
+<td><code>audit-manage-issues.py</code> writes</td>
+<td>med</td>
+<td>fix</td>
+<td>D3: count write failures and exit non-zero; close before commenting</td>
+</tr>
+<tr>
+<td>2a-iii-3</td>
+<td><code>consistency-audit.yml:15</code></td>
+<td>med</td>
+<td>fix</td>
+<td>D4: <code>manage-issues</code> and <code>update-docs</code> run only from <code>refs/heads/main</code></td>
+</tr>
+<tr>
+<td>2a-iii-4</td>
+<td><code>text/workflows.py:198</code></td>
+<td>med</td>
+<td>fix</td>
+<td>D5: any indentation deeper than <code>jobs:</code>, quoted keys, trailing comments, each tested</td>
+</tr>
+<tr>
+<td>2a-iii-5</td>
+<td><code>check-audit-smoke.py:258-264</code></td>
+<td>med</td>
+<td>fix</td>
+<td>D3: an <code>error</code> status fails the smoke run</td>
+</tr>
+<tr>
+<td>2a-iii-6</td>
+<td>fixed <code>/tmp</code> paths</td>
+<td>med</td>
+<td>fix</td>
+<td>D4, together with 2d-2</td>
+</tr>
+<tr>
+<td>2a-iii-7</td>
+<td>no concurrency group</td>
+<td>low</td>
+<td>fix</td>
+<td>D4</td>
+</tr>
+<tr>
+<td>2a-iii-8</td>
+<td><code>--limit 10</code> search</td>
+<td>low</td>
+<td>fix</td>
+<td>D3: removed by fetching once</td>
+</tr>
+<tr>
+<td>2a-iii-9</td>
+<td>issue helpers bypass <code>GitHubClient</code>; the title key is built twice</td>
+<td>low</td>
+<td>fix</td>
+<td>D3: one <code>issue_title_for()</code>, and the helpers move onto the seam</td>
+</tr>
+<tr>
+<td>2a-iii-10</td>
+<td><code>files.py</code> primitives</td>
+<td>low</td>
+<td>fix</td>
+<td>D1. This is the root of the class</td>
+</tr>
+<tr>
+<td>2a-iii-11</td>
+<td><code>NON_SOURCE_DIRS</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D6</td>
+</tr>
+<tr>
+<td>2a-iii-12</td>
+<td>three more fence loops in <code>markdown.py</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D6</td>
+</tr>
+<tr>
+<td>2a-iii-13</td>
+<td>retired checks leave issues open</td>
+<td>low</td>
+<td>fix</td>
+<td>D3: a <code>RETIRED_ISSUE_TITLES</code> list that <code>manage-issues</code> closes, plus documentation</td>
+</tr>
+<tr>
+<td>2a-iii-14</td>
+<td><code>repo.py:23</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D7: give cloudgood's override a reason</td>
+</tr>
+<tr>
+<td>2a-iii-15</td>
+<td>nine stale cross-references</td>
+<td>low</td>
+<td>fix</td>
+<td>D7</td>
+</tr>
+<tr>
+<td>2a-iii-16</td>
+<td><code>consistency-audit.yml:261-303</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D4: <code>tools/report-audit-failure.sh</code></td>
+</tr>
+<tr>
+<td>2a-iii-17</td>
+<td><code>tomllib</code>, no stated floor</td>
+<td>low</td>
+<td>fix</td>
+<td>D7: state Python 3.11 in <code>docs/consistency-audits.md</code>, and assert it in the workflow</td>
+</tr>
+<tr>
+<td>2b-1</td>
+<td>issue lifecycle untested</td>
+<td>high</td>
+<td>fix</td>
+<td>D3: the fail-create, pass-close, N/A-close and exact-title cases, including the ten prefix titles</td>
+</tr>
+<tr>
+<td>2b-2</td>
+<td><code>ExpensiveLanePathFilter</code> tests</td>
+<td>med</td>
+<td>fix</td>
+<td>D5, with 2a-i-1</td>
+</tr>
+<tr>
+<td>2b-3</td>
+<td><code>LlmContextLint</code> tests</td>
+<td>med</td>
+<td>fix</td>
+<td>D5, with 2a-ii-7</td>
+</tr>
+<tr>
+<td>2b-4</td>
+<td><code>GithubSecurity</code> with rc≠0</td>
+<td>med</td>
+<td>fix</td>
+<td>D2, with 2a-ii-2</td>
+</tr>
+<tr>
+<td>2b-5</td>
+<td><code>VersionFileGitignoreTest</code></td>
+<td>med</td>
+<td>fix</td>
+<td>D5</td>
+</tr>
+<tr>
+<td>2b-6</td>
+<td>about 15 error paths never asserted</td>
+<td>med</td>
+<td>fix</td>
+<td>D2: each becomes an <code>error</code> case</td>
+</tr>
+<tr>
+<td>2b-7</td>
+<td><code>CiReviewAutomation</code> docs-only fail</td>
+<td>low</td>
+<td>fix</td>
+<td>D5, with 2a-i-9</td>
+</tr>
+<tr>
+<td>2b-8</td>
+<td>empty workflows directory, six checks</td>
+<td>low</td>
+<td>fix</td>
+<td>D5</td>
+</tr>
+<tr>
+<td>2b-9</td>
+<td>stale "no handler" test comments</td>
+<td>low</td>
+<td>fix</td>
+<td>D7</td>
+</tr>
+<tr>
+<td>2b-10</td>
+<td><code>audit-raised.py</code>, <code>audit-check.py</code> CLIs</td>
+<td>low</td>
+<td>fix</td>
+<td>D3: one subprocess test each</td>
+</tr>
+<tr>
+<td>2c-1</td>
+<td><code>review-coverage.md:45-47</code></td>
+<td>med</td>
+<td>fix</td>
+<td>D7</td>
+</tr>
+<tr>
+<td>2c-2</td>
+<td><code>consistency-audits.md:384-385</code></td>
+<td>med</td>
+<td>fix</td>
+<td>D7: seed a missing <code>--page</code> from <code>COMPLIANCE_PAGE</code>, with a test</td>
+</tr>
+<tr>
+<td>2c-3</td>
+<td><code>workflow-standards.md</code>, <code>llm-tooling.md</code></td>
+<td>med</td>
+<td>fix</td>
+<td>D7: mark each rule Measured or Reviewed</td>
+</tr>
+<tr>
+<td>2c-4</td>
+<td><code>consistency-audits.md:424-431,86-88</code></td>
+<td>med</td>
+<td>fix</td>
+<td>D7: point at <code>NETWORK_CHECKS</code>. 5e relies on this before/after procedure, so this lands first in D7</td>
+</tr>
+<tr>
+<td>2c-5</td>
+<td>"Adding a criterion" file count</td>
+<td>low</td>
+<td>fix</td>
+<td>D7: one list, which <code>PUSH-AUDIT.md</code> and <code>AGENTS.md</code> link to</td>
+</tr>
+<tr>
+<td>2c-6</td>
+<td>"other 35 files"</td>
+<td>low</td>
+<td>fix</td>
+<td>D7</td>
+</tr>
+<tr>
+<td>2c-7</td>
+<td>names <code>ISSUE_TITLES</code>, not <code>issue_title</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D7</td>
+</tr>
+<tr>
+<td>2c-8</td>
+<td>whitespace claim</td>
+<td>low</td>
+<td>fix</td>
+<td>D7</td>
+</tr>
+<tr>
+<td>2c-9</td>
+<td>artifact name</td>
+<td>low</td>
+<td>fix</td>
+<td>D7, including <code>ARCHITECTURE.md</code></td>
+</tr>
+<tr>
+<td>2c-10</td>
+<td>hook trigger descriptions</td>
+<td>low</td>
+<td>fix</td>
+<td>D7</td>
+</tr>
+<tr>
+<td>2c-11</td>
+<td>this plan's Future work, "four criteria unmeasured"</td>
+<td>low</td>
+<td>fix</td>
+<td>Done already. The entry is updated in this commit (see Future work)</td>
+</tr>
+<tr>
+<td>2c-12</td>
+<td><code>'at the time of writing'</code> parse</td>
+<td>low</td>
+<td>fix</td>
+<td>D7: a named constant, plus a line in <code>AGENTS.md</code></td>
+</tr>
+<tr>
+<td>2c-13</td>
+<td>stale comments</td>
+<td>low</td>
+<td>fix</td>
+<td>D7, merged with 2a-iii-15</td>
+</tr>
+<tr>
+<td>2d-1</td>
+<td><code>review.py:369-428</code> <code>SfuiVendor</code></td>
+<td>med</td>
+<td>fix</td>
+<td>Fast-tracked: #263</td>
+</tr>
+<tr>
+<td>2d-2</td>
+<td><code>/tmp/audit-venv</code> reused and on <code>PATH</code></td>
+<td>med</td>
+<td>fix</td>
+<td>D4</td>
+</tr>
+<tr>
+<td>2d-3</td>
+<td>skillsaw dependencies unpinned in the token's interpreter</td>
+<td>low</td>
+<td>fix</td>
+<td>D4: its own environment, and no token</td>
+</tr>
+<tr>
+<td>2d-4</td>
+<td>about 45 unguarded <code>open()</code>, the <code>python_source.py:170</code> join</td>
+<td>med</td>
+<td>fix</td>
+<td>D1</td>
+</tr>
+<tr>
+<td>2d-5</td>
+<td>regexes and reads controlled by the audited repository</td>
+<td>low</td>
+<td>fix</td>
+<td>D5: patterns become literal or fnmatch where the spec allows; reads are size-capped</td>
+</tr>
+<tr>
+<td>2d-6</td>
+<td><code>defuse()</code> leaves mentions and markdown</td>
+<td>low</td>
+<td>fix</td>
+<td>D5: <code>details</code> items rendered with <code>defuse_item</code>, and the comment corrected</td>
+</tr>
+<tr>
+<td>2d-7</td>
+<td><code>packaging.py:1608</code> no <code>--</code></td>
+<td>info</td>
+<td>fix</td>
+<td>D5</td>
+</tr>
+<tr>
+<td>2d-8</td>
+<td>tag-pinned actions; the audit checkout's credentials</td>
+<td>info</td>
+<td>cross-reference + fix</td>
+<td>Pinning is <code>PLAN-workflow-ref-trust.md</code> phase 3. <code>persist-credentials: false</code> goes in D4</td>
+</tr>
+<tr>
+<td>5c-2a-1</td>
+<td>review issue filing never works</td>
+<td>med</td>
+<td>fix</td>
+<td>A2 (decision 3 above)</td>
+</tr>
+<tr>
+<td>5c-2a-2</td>
+<td>complete reviews labelled incomplete</td>
+<td>med</td>
+<td>fix</td>
+<td>A4: a closed outermost object is complete, with tests for trailing prose, <code>}```` and</code>~~~`</td>
+</tr>
+<tr>
+<td>5c-2a-3</td>
+<td>the fallback validator diverges</td>
+<td>low</td>
+<td>fix</td>
+<td>A4: read the required fields and enums from <code>review-schema.json</code> with stdlib <code>json</code></td>
+</tr>
+<tr>
+<td>5c-2a-4</td>
+<td>unused variables; <code>ci_output</code></td>
+<td>low</td>
+<td>fix</td>
+<td>A5: delete them; <code>ci_output</code> writes <code>$GITHUB_OUTPUT</code> and the outputs are declared. SC2002 is already fixed in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/168" title="GitHub Issue: shakenfist/actions #168">actions#168</a></td>
+</tr>
+<tr>
+<td>5c-2a-5</td>
+<td>about 115 lines of inline shell in <code>pr-re-review.yml</code></td>
+<td>med</td>
+<td>fix</td>
+<td>T: a composite action so the logic is tested once; then the fleet re-syncs</td>
+</tr>
+<tr>
+<td>5c-2a-6</td>
+<td><code>pr-re-review.yml</code> superseded copy</td>
+<td>low</td>
+<td>cross-reference</td>
+<td><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/126" title="GitHub Issue: shakenfist/actions #126">actions#126</a></td>
+</tr>
+<tr>
+<td>5c-2a-7</td>
+<td>the two lanes harden their checkouts differently</td>
+<td>low</td>
+<td>fix</td>
+<td>A1: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/168" title="GitHub Issue: shakenfist/actions #168">actions#168</a></td>
+</tr>
+<tr>
+<td>5c-2a-8</td>
+<td>the lanes do not share a concurrency group</td>
+<td>low</td>
+<td>fix</td>
+<td>T: reword the comment. Mutual exclusion is not wanted, since the gate already prevents a second automatic review</td>
+</tr>
+<tr>
+<td>5c-2a-9</td>
+<td>history in comments</td>
+<td>low</td>
+<td>fix</td>
+<td>A5, and T for <code>pr-re-review.yml</code></td>
+</tr>
+<tr>
+<td>5c-2b-1</td>
+<td>no issue ever filed</td>
+<td>high</td>
+<td>fix</td>
+<td>A2. Dropped rather than tested</td>
+</tr>
+<tr>
+<td>5c-2b-2</td>
+<td><code>check_origin</code>/<code>check_permission</code> never executed</td>
+<td>high</td>
+<td>fix</td>
+<td>A3: run both shipped steps against a stub <code>gh</code> for each case</td>
+</tr>
+<tr>
+<td>5c-2b-3</td>
+<td>no structural test of the review workflows' guards</td>
+<td>high</td>
+<td>fix</td>
+<td>A3: every <code>claude-code</code> job carries a same-repository condition, <code>force</code> is routed as phase 3 item 2 says, and the bot-comment guard, <code>persist-credentials</code> and <code>hooksPath</code> are each present</td>
+</tr>
+<tr>
+<td>5c-2b-4</td>
+<td><code>review-pr-with-claude.sh</code> gate untested; it fails open on a <code>gh</code> error</td>
+<td>med</td>
+<td>fix</td>
+<td>A3: the stub harness from <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/168" title="GitHub Issue: shakenfist/actions #168">actions#168</a> extended to the gate, max-turns and dedupe; a failed reviews query skips rather than reviews</td>
+</tr>
+<tr>
+<td>5c-2b-5</td>
+<td>model-supplied <code>issue_number</code> trusted</td>
+<td>med</td>
+<td>fix</td>
+<td>A2. Gone with issue filing; <code>additionalProperties: false</code> goes on the schema items</td>
+</tr>
+<tr>
+<td>5c-2b-6</td>
+<td>resolve and confirm shell untested</td>
+<td>med</td>
+<td>fix</td>
+<td>T, with 5c-2a-5</td>
+</tr>
+<tr>
+<td>5c-2b-7</td>
+<td>jsonschema branch not pinned</td>
+<td>low</td>
+<td>fix</td>
+<td>A4: install it in CI and import it unconditionally in the test</td>
+</tr>
+<tr>
+<td>5c-2c-1</td>
+<td><code>docs/consuming.md:298-338</code> example</td>
+<td>high</td>
+<td>fix</td>
+<td>A5: point at <code>templates/ci-review-automation/pr-retest.yml</code></td>
+</tr>
+<tr>
+<td>5c-2c-2</td>
+<td>"forks reviewed on human request"</td>
+<td>med</td>
+<td>fix</td>
+<td>actions half in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/168" title="GitHub Issue: shakenfist/actions #168">actions#168</a>. The development half, <code>docs/audits/ci-review-automation.md:99-100</code>, goes in D7</td>
+</tr>
+<tr>
+<td>5c-2c-3</td>
+<td>the "will be closed when this PR merges" text</td>
+<td>med</td>
+<td>fix</td>
+<td>A2</td>
+</tr>
+<tr>
+<td>5c-2c-4</td>
+<td>the diff-too-large advice</td>
+<td>low</td>
+<td>fix</td>
+<td>A5</td>
+</tr>
+<tr>
+<td>5c-2c-5</td>
+<td>examples without timeouts</td>
+<td>low</td>
+<td>fix</td>
+<td>A5</td>
+</tr>
+<tr>
+<td>5c-2c-6</td>
+<td>caller requirements missing</td>
+<td>low</td>
+<td>fix</td>
+<td>A5. <code>issues: write</code> is no longer one, after A2</td>
+</tr>
+<tr>
+<td>5c-2c-7</td>
+<td>stale <code>pr-ref</code> descriptions</td>
+<td>low</td>
+<td>fix</td>
+<td>A5</td>
+</tr>
+<tr>
+<td>5c-2c-8</td>
+<td>same-repository <code>pull_request</code> only</td>
+<td>low</td>
+<td>fix</td>
+<td>A5</td>
+</tr>
+<tr>
+<td>5c-2c-9</td>
+<td><code>ARCHITECTURE.md:62-63</code></td>
+<td>low</td>
+<td>fix</td>
+<td>A5</td>
+</tr>
+<tr>
+<td>5c-2c-10</td>
+<td><code>docs/ci-review-automation.md:3-4,165</code></td>
+<td>low</td>
+<td>fix</td>
+<td>D7</td>
+</tr>
+<tr>
+<td>5c-2d-1</td>
+<td>reviewer with all tools and the token, on a shared pool</td>
+<td>high</td>
+<td>fix</td>
+<td>Fast-tracked: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/168" title="GitHub Issue: shakenfist/actions #168">actions#168</a></td>
+</tr>
+<tr>
+<td>5c-2d-2</td>
+<td>the PR tree's <code>.claude/settings.json</code> hooks ran</td>
+<td>med</td>
+<td>fix</td>
+<td>Fast-tracked: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/168" title="GitHub Issue: shakenfist/actions #168">actions#168</a>. Confirmed on a scratch repository with CLI 2.1.301</td>
+</tr>
+<tr>
+<td>5c-2d-3</td>
+<td><code>pr-auto-review.yml</code> checkout credentials</td>
+<td>low</td>
+<td>fix</td>
+<td>Fast-tracked: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/168" title="GitHub Issue: shakenfist/actions #168">actions#168</a></td>
+</tr>
+<tr>
+<td>5c-2d-4</td>
+<td>issue spam; mentions in the rendered review</td>
+<td>low</td>
+<td>fix</td>
+<td>A2 removes the issues. Breaking mentions in <code>render-review.py</code> goes in A4</td>
+</tr>
+<tr>
+<td>5c-2d-5</td>
+<td>a fork PR can bring its own job to the self-hosted pool</td>
+<td>info</td>
+<td>cross-reference</td>
+<td>An operator check, not code. Confirm org-wide approval for every outside collaborator, and that the <code>claude-code</code> runner group is restricted to selected workflows. Recorded for the operator before this phase closes</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Summary.</strong> 111 findings:</p>
+<ul>
+<li>105 to fix:</li>
+<li>five in the fast-track pull requests, both merged on 2026-10-16:
+    2d-1 in #263, and 5c-2d-1, -2, -3 and 5c-2a-7 (group A1) in
+    <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/168" title="GitHub Issue: shakenfist/actions #168">actions#168</a>;</li>
+<li>one, 2c-11, closed by this commit's Future work update;</li>
+<li>the remaining 99 spread across the twelve groups still to land:
+    D1-D7, A2-A5 and T. 5c-2c-2 is among them: its actions half
+    landed in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/168" title="GitHub Issue: shakenfist/actions #168">actions#168</a>, and its development half is in D7.</li>
+<li>1 split: 2d-8. Its pinning half is cross-referenced, and its
+  credential half is fixed in D4.</li>
+<li>2 declined: the advisory file-size splits.</li>
+<li>3 cross-referenced: <code>PLAN-workflow-ref-trust.md</code> (2a-i-10),
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/126" title="GitHub Issue: shakenfist/actions #126">actions#126</a> (5c-2a-6), and the operator (5c-2d-5).</li>
+</ul>
+<p>No finding was declined for being out of scope without naming where it
+belongs.</p>
+<p><strong>Gate.</strong> Per the back brief, 5e and 5f wait until this table is
+agreed.</p>
 <h2 id="administration-and-logistics">Administration and logistics<a class="headerlink" href="#administration-and-logistics" title="Permanent link">&para;</a></h2>
 <h3 id="success-criteria">Success criteria<a class="headerlink" href="#success-criteria" title="Permanent link">&para;</a></h3>
 <p>We will know when this plan has been successfully implemented
@@ -16855,13 +17865,26 @@ because the following statements will be true:</p>
 <p>A fleet-wide compliance dashboard, per the open question above.</p>
 </li>
 <li>
-<p>Machine checks for the four criteria <code>audit-check.py</code> does not
-  measure -- <code>security-sanitization</code>, <code>console-logging</code>,
-  <code>python-version</code> and <code>test-coverage</code>. These are the only audit files
-  with no marker block, so they are also the only criteria whose
-  per-project status is nobody's job to keep current. Either automate
-  them or say in each file that it is judged by hand.</p>
+<p>~~Machine checks for the four criteria <code>audit-check.py</code> does not
+  measure.~~ Done by 2026-10-16, as the phase 5 push audit found
+  (2c-11). <code>console-logging</code>, <code>security-sanitization</code> and
+  <code>python-version</code> are now registered checks, each spec marks its
+  measured and delegated halves, and <code>test-coverage.md</code> says it is
+  judged by hand. No spec carries a marker block any more.</p>
 </li>
+<li>
+<p>Splitting the largest check modules along the seams the phase 5 push
+  audit named (2a-i-18, 2a-ii-14):</p>
+</li>
+<li>from <code>packaging.py</code>, the release-artifact exclusion model and the
+    dependency criteria;</li>
+<li>from <code>ci_workflows.py</code>, fuzz reporting and review automation;</li>
+<li>from <code>plans.py</code>, the plan-structure parser, into <code>audit/text/</code>.</li>
+</ul>
+<p>Each split moves reviewed lines and stales their marks for no change
+  in behaviour, so it is worth doing only alongside a change that
+  touches the module anyway.</p>
+<ul>
 <li>
 <p>Automatic assignment or triage of audit issues.</p>
 </li>

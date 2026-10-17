@@ -11312,7 +11312,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.4
+    Control Socket Protocol — Version 1.5
   
 
     
@@ -15392,7 +15392,9 @@ above and capture the remaining items here.</p>
 <ol>
 <li>~~<code>app.rs</code> keyboard repeat filter dropped — auto-repeat
    double-fires.~~ Fixed by the contributor in <code>b14ccbd4</code>
-   (restored <code>repeat: false</code> in the key-event match).</li>
+   (restored <code>repeat: false</code> in the key-event match).
+   <em>Reversed in October 2026 by #561: repeats are now forwarded.
+   See <a href="/components/ryll/design-decisions/">design decision 24</a>.</em></li>
 <li>~~<code>main_channel.rs</code> <code>set_mouse_mode()</code> lacks request-loop
    guard.~~ Resolved by develop's <code>10f19477</code> introducing
    <code>mouse_mode_request_pending</code> and the second-rebase merge

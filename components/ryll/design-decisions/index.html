@@ -11312,7 +11312,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.4
+    Control Socket Protocol — Version 1.5
   
 
     
@@ -15408,6 +15408,23 @@ no snapshot exists.</p>
     <code>delete-this-file</code> and <code>ticket-valid-until</code> keys; the policy
     short-circuits the state machine straight to the matching
     Modal when retry would be doomed.</p>
+</li>
+<li>
+<p><strong>Key auto-repeat is the client's job</strong> - While a key is held, ryll
+    sends each host (or browser) auto-repeat to the guest as another
+    press of the same key, with no release in between. That is what a
+    PS/2 keyboard puts on the wire, and what spice-gtk does. Servers
+    that inject keys through XTest, such as andris, never repeat a
+    key themselves, so dropping repeats left keys unable to repeat
+    there (#561). On a QEMU guest the repeated make code does not
+    double the repeat rate: the guest kernel reports it as a repeat,
+    and X servers, libinput and Wayland compositors discard kernel
+    repeats and run their own timer. ryll's held-key set, not the
+    toolkit's <code>repeat</code> flag, decides what counts as a repeat, and on
+    macOS a repeat while Cmd is down is withheld like any other Cmd
+    chord. Earlier plans record dropping repeats as a fix (the PR 31
+    follow-up and the WebRTC soak's input findings); this entry
+    reverses them.</p>
 </li>
 </ol>
 

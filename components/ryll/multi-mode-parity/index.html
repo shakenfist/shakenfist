@@ -11312,7 +11312,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.4
+    Control Socket Protocol — Version 1.5
   
 
     
@@ -15753,10 +15753,16 @@ around it.</p>
 <td>partial (no graph; the control socket's <code>stats</code> verb works as in headless)</td>
 </tr>
 <tr>
-<td>Latency sparkline (inter-PING interval graph)</td>
+<td>PING interval sparkline (inter-PING interval graph)</td>
 <td>available</td>
-<td>partial (no graph; raw latency samples are reachable as control-socket <code>latency</code> events)</td>
+<td>partial (no graph; raw samples are reachable as control-socket <code>latency</code> events)</td>
 <td>missing (out of MVP scope)</td>
+</tr>
+<tr>
+<td>Inputs round trip (<code>RTT</code> in the status bar)</td>
+<td>available</td>
+<td>missing (headless sends no pointer input, and a round trip is only measured from pointer messages)</td>
+<td>partial (no stats panel; the browser's pointer drives control-socket <code>input_rtt</code> events)</td>
 </tr>
 <tr>
 <td>Periodic stats to stdout (headless only)</td>

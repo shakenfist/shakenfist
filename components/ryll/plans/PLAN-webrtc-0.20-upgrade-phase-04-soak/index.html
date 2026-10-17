@@ -11304,7 +11304,7 @@
   <span class="md-ellipsis">
     
   
-    Control Socket Protocol — Version 1.4
+    Control Socket Protocol — Version 1.5
   
 
     
@@ -15836,7 +15836,10 @@ regressions</strong>, and all of them invisible to the test suite:</p>
 <li><strong>Extended scancodes had their bytes reversed</strong> — 19 keys dead,
    including every arrow.</li>
 <li><strong>Browser auto-repeat was forwarded</strong>, stacking on the guest's
-   own repeat. Latent, but the same failure mode by another route.</li>
+   own repeat. Latent, but the same failure mode by another route.
+   <em>Reversed in October 2026 by #561: forwarding repeats is correct,
+   and the guest does not stack its own on top. See
+   <a href="/components/ryll/design-decisions/">design decision 24</a>.</em></li>
 </ol>
 <p>The first two are one root cause: the web frontend reimplemented an
 encoding that <code>make_scancode</code> already owned. Both existing unit
