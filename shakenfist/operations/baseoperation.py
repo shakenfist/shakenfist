@@ -12,6 +12,7 @@ from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.operations.error_report import ErrorReport
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.util import exceptions as util_exceptions
 
 
 class BaseOperationException(Exception):
@@ -844,11 +845,27 @@ class BaseClusterOperation(BaseOperation):
         still queued leaves the work item to the stuck-row reaper, and
         the retry calls the hook again.
 
+        That only holds for the two exceptions the dispatchers hand to
+        the reaper. Any other exception from the hook would resolve the
+        work item with the operation still queued and nothing behind it
+        -- stuck forever, which is the outcome the hook exists to
+        prevent -- so it is recorded and the state write goes ahead.
+
         A transition which is no longer legal is recorded, not raised:
         the operation has already ended some other way.
         """
         if self.state.value == BaseClusterOperation.STATE_QUEUED:
-            self._dependency_failed(reason)
+            try:
+                self._dependency_failed(reason)
+            except (exceptions.DatabaseUnavailable,
+                    exceptions.StateWriteFailed):
+                raise
+            except Exception as e:
+                util_exceptions.ignore_exception('dependency_failed', e)
+                self.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'failed to tell targets the operation will never run',
+                    extra={'error': str(e)})
 
         try:
             self.state = new_state  # type: ignore[misc]

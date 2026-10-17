@@ -57,6 +57,7 @@ seconds. The defer cycle is:
 4. If a dependency no longer exists the op goes to `error`
    (`cancel_for_missing_dependency()`); if it is in `error`, `deleted`, or
    `abort` the op goes to `abort` (`abort_for_unsuitable_dependency()`).
+   In both cases, as for an abandoned wait, the op's map entry is dropped.
 5. When all dependencies are satisfied the op executes normally and its map
    entry is dropped.
 
@@ -73,8 +74,11 @@ The hook runs before the op's state is written, not after. Both dispatchers
 skip an op that is already terminal before looking at its dependencies (a work
 item the stuck-row reaper re-queues can name an op that has already finished),
 so a hook that raised after the op had gone terminal would never be retried.
-Raising while the op is still `queued` leaves the work item to the reaper, and
-the retry calls the hook again. Overrides must therefore be idempotent.
+Raising `DatabaseUnavailable` or `StateWriteFailed` while the op is still
+`queued` leaves the work item to the reaper, and the retry calls the hook again.
+Overrides must therefore be idempotent. Any other exception from the hook is
+recorded as an audit event and the op is ended anyway: the dispatchers resolve
+the work item for those, so an op left `queued` would have nothing to retry it.
 
 ## Exponential back-off map
 

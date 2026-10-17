@@ -387,6 +387,7 @@ class Job(util_concurrency.Job):
             dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
             if not dep_op:
                 op.cancel_for_missing_dependency(dep)
+                self._drop_defer_entry(str(op.uuid), defer_delays)
                 return
 
             dep_op_state = dep_op.state.value
@@ -394,6 +395,7 @@ class Job(util_concurrency.Job):
                                 BaseClusterOperation.STATE_DELETED,
                                 BaseClusterOperation.STATE_ABORT]:
                 op.abort_for_unsuitable_dependency(dep_op)
+                self._drop_defer_entry(str(op.uuid), defer_delays)
                 return
 
             if dep_op_state in [BaseClusterOperation.STATE_INITIAL,

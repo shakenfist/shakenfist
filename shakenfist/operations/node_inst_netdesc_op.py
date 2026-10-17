@@ -117,7 +117,14 @@ class NodeInstNetdescOp(BaseClusterOperation):
         # fetch dependency which failed has normally errored the
         # instance already, so leave a terminal instance alone rather
         # than erroring it twice. That check is also what makes this
-        # idempotent, as _dependency_failed requires.
+        # idempotent, as _dependency_failed requires -- but only partly.
+        # A retry after enqueue_delete_due_error errored the instance and
+        # then failed to enqueue its delete finds a terminal instance and
+        # returns, so the delete is never queued. Instance state does not
+        # say whether a delete is queued, so that cannot be told apart from
+        # an instance an artifact fetch already errored and deleted. The
+        # client still sees the error rather than initial, and deleting
+        # the errored instance cleans it up.
         inst = Instance.from_db(self.instance_uuid, suppress_failure_audit=True)
         if not inst or inst.state.value in Instance.TERMINAL_STATES:
             return
