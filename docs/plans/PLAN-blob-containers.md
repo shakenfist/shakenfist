@@ -24,8 +24,10 @@ All planning documents should go into `docs/plans/`.
 
 Consult `ARCHITECTURE.md` for the system architecture
 overview, object types, and daemon structure. Consult
-`CLAUDE.md` for build commands, project conventions, and
-database access patterns. Consult `GOALS.md` for current
+`AGENTS.md` for build commands and project conventions, and
+through it `docs/developer_guide/standards.md` and
+`docs/developer_guide/database_internals.md` for coding
+standards and database access patterns. Consult `GOALS.md` for current
 development priorities. Key references inside the repo
 include `shakenfist/blob.py` (blob lifecycle, references and
 deletion), `shakenfist/mariadb.py` (three-layer database
@@ -175,23 +177,30 @@ These are leanings from the discussion that produced this placeholder. The
 decisions pass confirms or overturns them.
 
 1. **Entries live in their own table, not in `object_references`.** Roughly
-   `(container_blob_uuid, name, member_blob_uuid, offset, length)`, keyed on
-   `(container_blob_uuid, name)`, with the name sized for 1024-byte S3 keys
+   `(container_blob_uuid, namespace, name, member_blob_uuid, offset, length)`,
+   keyed on `(container_blob_uuid, namespace, name)` (see point 5), with the
+   name sized for 1024-byte S3 keys
    and indexed for prefix queries. `Blob.ref_count` counts entries that point
    at the blob. This avoids the primary-key, 64-character and rolling-upgrade
    problems above.
-2. **Containers are always blobs, so they are always immutable.** An entry
-   set is written once and never edited. Mutability lives where it already
-   does, in artifact versions.
+2. **Containers are always blobs, so they are always immutable.** Their
+   entries are append-only: an entry is added by an extraction and is
+   never changed or removed while its container exists. Entries arrive
+   one extraction at a time, so a reader can see a partial set (open
+   question 8). Mutability lives where it already does, in artifact
+   versions.
 3. **Extraction is the only way to create an entry.** A client can name an
    entry but cannot claim one, so the containment record cannot lie. The
    proposed shape is `POST /blobs/<uuid>/extract` with `offset`, `length`
    and `name`. It runs as a cluster operation on a node that holds the
    container, because extracting a 10 GB member is a real copy. The new
-   blob reports `creating` until it is done, as uploads do. The server
-   checks that the range lies inside the blob. Repeating an extraction with
-   the same name and range returns the existing entry; the same name with a
-   different range is a conflict.
+   blob reports `creating` until it is done, as uploads do, and the entry
+   is written only once the member is `created`, so a failed copy never
+   leaves an entry pointing at a half-made blob (open question 10 covers
+   what reaps that blob). The server checks that the range lies inside the
+   blob. Repeating an extraction with the same name and range in the same
+   namespace returns the existing entry; the same name with a different
+   range is a conflict.
 4. **Extraction is one storage-layer primitive.** It is implemented as a
    function such as `Blob.from_range(container, offset, length)`, not as a
    file copy inside an API handler. Today it copies bytes. Under
@@ -199,10 +208,21 @@ decisions pass confirms or overturns them.
    makes at most two new edge chunks, with no API change. That is a
    requirement this plan hands to the blob storage roadmap, not a dependency
    on it.
-5. **Only an owner may add entries.** Reading entries follows the blob model
-   (knowing the UUID implies access). Adding an entry is a write that puts
-   names into someone else's container, so it should need ownership of an
-   artifact whose versions reference the container blob, or a system caller.
+5. **Entry names belong to the namespace that extracted them.** An
+   ownership test cannot work here: blobs have no namespace, and anyone
+   who knows a blob's UUID can wrap it in an artifact of their own with
+   `blob_uuid=`, so "owns an artifact that references the container" is a
+   test an outsider passes. Recording a creating namespace on the blob
+   would not work either, because identical uploads are deduplicated by
+   sha512 and a second namespace legitimately reuses the first one's
+   blob. So entries are keyed on `(container, namespace, name)`: any
+   caller who can read the container may extract from it, the entry's
+   bytes are still true by construction, and the names a namespace gives
+   are visible to that namespace (and to system callers) and to nobody
+   else. A second namespace cannot claim `disk1.vmdk` in somebody else's
+   OVA before its owner does, because it can only claim it in its own
+   view. The member blob itself may be shared between namespaces, since
+   identical ranges give identical bytes.
 6. **Every deletion path clears entries.** `cascading_delete`, the per-blob
    `STATE_DELETED` path, the expiry path and `hard_delete` all remove the
    entries a deleted container holds. The fix for
@@ -250,6 +270,24 @@ before any implementation phase is cut:
 7. **What happens in a rolling upgrade?** The capability token can be visible
    one deploy early, so an extraction might be routed to an old node. How is
    that refused cleanly?
+8. **Does a container need to be marked complete?** Entries arrive one
+   extraction at a time, so a listing can show a partial set. Is that
+   acceptable to clients such as a future "boot this stored appliance"
+   path, or does a namespace need to mark its view of a container as
+   fully extracted?
+9. **How does a re-import find the earlier one?** For a re-import to
+   upload nothing, the client must find the existing container blob before
+   it uploads, by the `other` artifact's name or a label, or by checksum.
+   Checksum lookup (`/blob_checksums/<algorithm>/<hash>`) exists, but the
+   client must hash the whole OVA first. If neither is good enough, the
+   success criterion narrows to "extracts nothing", and upload
+   deduplication is left to the blob storage roadmap.
+10. **What happens to a member whose extraction fails, or whose container
+    is deleted mid-copy?** Point 3 writes the entry only after the copy, so
+    a failed copy leaves a `creating` blob with no reference. Does the
+    existing reaper collect it, and on what timer? A container deleted
+    during the copy must not gain an entry afterwards: the entry write has
+    to check that the container still exists in the same transaction.
 
 ## Execution
 
@@ -311,12 +349,14 @@ We will know this plan has been successfully implemented when:
 * An OVA imported with the plugin is one `other` artifact. Its descriptor,
   manifest, certificate and disks are blobs recorded as its entries, and each
   disk is also a bootable `image` artifact.
-* Re-importing the same OVA uploads nothing and extracts nothing.
+* Re-importing the same OVA extracts nothing, and, if open question 9 finds
+  a mechanism, uploads nothing.
 * No deletion path leaves entries, or other references, behind a deleted blob,
   and a test proves it for each path.
 * A failed reference count never deletes a blob, and a test proves it.
-* Extraction is refused for a range outside the blob, and for a caller who
-  does not own an artifact that references the container.
+* Extraction is refused for a range outside the blob.
+* A second namespace extracting from the same container cannot add, change
+  or see the first namespace's entry names, and a test proves it.
 * The code passes `pre-commit run --all-files` (flake8, stestr unit tests,
   mypy).
 * New code follows existing patterns: object lifecycle in `baseobject.py`,
@@ -351,8 +391,8 @@ outlive a deleted blob),
 [#4559](https://github.com/shakenfist/shakenfist/issues/4559) (over-long
 `relationship_value` breaks reads) and
 [client-python#430](https://github.com/shakenfist/client-python/issues/430)
-(`artifact_type` is never sent). It also reported an authorisation gap in the
-blob metadata endpoints privately, as a draft security advisory.
+(`artifact_type` is never sent). One further finding was reported
+privately.
 
 ### Documentation index maintenance
 
