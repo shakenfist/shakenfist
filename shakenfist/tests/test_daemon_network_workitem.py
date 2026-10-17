@@ -443,21 +443,24 @@ class DependencyDeferBudgetTest(base.ShakenFistTestCase):
                       BaseClusterOperation.STATE_ABORT,
                       BaseClusterOperation.STATE_DELETED]:
             with self.subTest(state=state):
-                mock_op, mock_dep_op, _ = self._run(
+                mock_op, mock_dep_op, defer_delays = self._run(
                     0, 'depends_on', dep_state=state)
 
                 mock_op.abort_for_unsuitable_dependency.assert_called_once_with(
                     mock_dep_op)
                 mock_op.defer.assert_not_called()
                 mock_op.execute.assert_not_called()
+                self.assertNotIn(str(OP_UUID), defer_delays)
 
     def test_missing_dependency_cancels_through_the_operation(self):
-        mock_op, _, _ = self._run(0, 'depends_on', dep_missing=True)
+        mock_op, _, defer_delays = self._run(
+            0, 'depends_on', dep_missing=True)
 
         mock_op.cancel_for_missing_dependency.assert_called_once_with(
             {'op_type': 'net_op', 'op_uuid': 'dep-uuid'})
         mock_op.defer.assert_not_called()
         mock_op.execute.assert_not_called()
+        self.assertNotIn(str(OP_UUID), defer_delays)
 
     def test_depends_on_below_budget_still_defers(self):
         mock_op, mock_dep_op, _ = self._run(

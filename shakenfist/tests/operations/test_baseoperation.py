@@ -267,7 +267,7 @@ class AbandonDependencyWaitTestCase(base.ShakenFistTestCase):
         references = self.mock_add_event_multi.call_args.args[1]
         self.assertEqual([(str(ObjectType.NET_OP), OP_UUID)], references)
 
-    def test_targets_are_told_after_the_abort(self):
+    def test_targets_are_told_when_the_wait_is_abandoned(self):
         """Issue 4542: aborting the operation alone left its instance in
         initial forever, so the targets must hear about it too."""
         op = self._make_op()
@@ -311,6 +311,39 @@ class AbandonDependencyWaitTestCase(base.ShakenFistTestCase):
                 op.abandon_dependency_wait, self._make_dep_op())
 
         self.mock_state_update.assert_not_called()
+
+    def test_retryable_hook_failure_leaves_the_operation_queued(self):
+        """Both dispatchers hand these two to the stuck-row reaper."""
+        for exc in [exceptions.DatabaseUnavailable('gone'),
+                    exceptions.StateWriteFailed('lost')]:
+            with self.subTest(exc=type(exc).__name__):
+                self.mock_state_update.reset_mock()
+                op = self._make_op()
+                with mock.patch.object(
+                        NetOp, '_dependency_failed', side_effect=exc):
+                    self.assertRaises(
+                        type(exc), op.abandon_dependency_wait,
+                        self._make_dep_op())
+
+                self.mock_state_update.assert_not_called()
+
+    def test_other_hook_failure_still_ends_the_operation(self):
+        """Any other exception would resolve the work item with the op
+        still queued and nothing left to retry it, so the op must end
+        anyway. A concurrent delete makes the instance hook raise
+        InvalidStateException from enqueue_delete_due_error."""
+        op = self._make_op()
+        with mock.patch.object(
+                NetOp, '_dependency_failed',
+                side_effect=exceptions.InvalidStateException('moved')):
+            op.abandon_dependency_wait(self._make_dep_op())
+
+        self.mock_state_update.assert_called_once_with(
+            BaseClusterOperation.STATE_ABORT)
+        self.mock_add_event.assert_called_once_with(
+            EVENT_TYPE_AUDIT,
+            'failed to tell targets the operation will never run',
+            extra={'error': 'moved'})
 
     def test_started_operation_does_not_tell_targets(self):
         """Only a queued op has never run. One already executing, or
