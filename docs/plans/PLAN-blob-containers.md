@@ -111,7 +111,9 @@ Surveyed at 33be36b8aa on 2026-10-17. These facts constrain the design.
   meeting a new type returns `[]` or INTERNAL
   (`daemons/database/main.py:1544-1547, 1600-1607`). An unknown relationship
   *filter* silently becomes an unfiltered query (`main.py:1519-1522`). A
-  separate table avoids all of this.
+  separate table avoids these read failures. It does not remove the
+  upgrade risk, though, which moves into garbage collection instead (open
+  question 7).
 * **Garbage collection would leak a deleted container's members.**
   `Blob.ref_count` counts every reference except `BLOB_LOCATION`
   (`blob.py:438-449`), so anything a container points at stays alive. Only
@@ -145,8 +147,9 @@ Surveyed at 33be36b8aa on 2026-10-17. These facts constrain the design.
 
 Let a blob be a container. Specifically:
 
-* A record that blob Y is the entry named `n` inside container blob X, at
-  bytes `[offset, offset + length)`. Each container can list its entries, a
+* A record that blob Y is the entry named `n`, in one namespace's view,
+  inside container blob X, at bytes `[offset, offset + length)` (sketch
+  point 5 explains the namespace). Each container can list its entries, a
   prefix query over the names. Entries keep their members alive exactly as
   long as the container exists.
 * A server-side extraction call: "cut this byte range of blob X into a new
@@ -227,7 +230,10 @@ decisions pass confirms or overturns them.
    `STATE_DELETED` path, the expiry path and `hard_delete` all remove the
    entries a deleted container holds. The fix for
    [#4558](https://github.com/shakenfist/shakenfist/issues/4558) is the
-   natural home for that.
+   natural home for that. Deleting a namespace removes that namespace's
+   entries too. Otherwise a deleted namespace's entries would keep
+   members, and their storage, alive for as long as somebody else's
+   container lives.
 7. **A failed count must not read as zero.** `count_references_to`, or the
    cluster pass's use of it, treats an error as "in use". This is an existing
    defect that this plan makes acute, so the plan fixes it rather than
@@ -258,18 +264,35 @@ before any implementation phase is cut:
 4. **Should an extracted member with the same sha512 as an existing blob
    reuse that blob?** That is deduplication by another route, and it
    overlaps the roadmap's lazy deduplication. It may be better left to that
-   plan.
+   plan. A narrower form needs no hashing at all, and could be adopted
+   even if sha512 reuse is not: an extraction that exactly matches an
+   existing `(container, offset, length)` reuses that member blob,
+   whatever the name or namespace. The bytes are identical by
+   construction, and this is the common case, where every namespace that
+   imports the same public appliance would otherwise copy every disk.
 5. **What does the API show?** Probably an `entries` listing on
    `GET /blobs/<uuid>` with a name-prefix filter and paging, a
-   `contained_by` view on the member, and client-python accessors. How it
-   pages should follow the
+   `contained_by` view on the member, and client-python accessors. Both the
+   listing and `contained_by` filter by the caller's namespace (system
+   callers excepted), using the existing visibility rules. A member blob
+   can be shared between namespaces, so an unfiltered `contained_by` would
+   reveal other namespaces' names and containers. How it pages should
+   follow the
    [API query batching roadmap](api-query-batching-roadmap.md).
 6. **Name rules.** What is the maximum length, is the name bytes or UTF-8,
    and are `/`-separated paths given meaning, or left for S3 and the
    filesystem to interpret?
 7. **What happens in a rolling upgrade?** The capability token can be visible
    one deploy early, so an extraction might be routed to an old node. How is
-   that refused cleanly?
+   that refused cleanly? There is a worse case. An old cluster daemon's
+   `Blob.ref_count` counts only `object_references`. It would see a member
+   kept alive only by an entry (an OVA's descriptor, manifest or
+   certificate, which never become image artifacts) as unreferenced, and
+   delete it once the grace period had passed. That is silent data loss.
+   Possible answers: offer extraction, and its capability token, only once
+   every node runs the new code, through the existing upgrade gating; or
+   have an extracted member carry an `expires_at` or `last_used` refresh
+   that old code respects until the upgrade completes.
 8. **Does a container need to be marked complete?** Entries arrive one
    extraction at a time, so a listing can show a partial set. Is that
    acceptable to clients such as a future "boot this stored appliance"
@@ -288,6 +311,14 @@ before any implementation phase is cut:
     existing reaper collect it, and on what timer? A container deleted
     during the copy must not gain an entry afterwards: the entry write has
     to check that the container still exists in the same transaction.
+11. **What limits extraction?** Any reader of a container may extract
+    from it, and until chunking lands every extraction is a full copy.
+    One caller could ask for the same 10 GB range under many names, or
+    for many overlapping ranges, and fill the cluster with blobs that
+    live as long as somebody else's container. The options are to count
+    extracted bytes against the extracting namespace's quota, cap the
+    entries per (container, namespace), make exact-range reuse (question
+    4) mandatory, or rate-limit the operation.
 
 ## Execution
 
@@ -351,8 +382,9 @@ We will know this plan has been successfully implemented when:
   disk is also a bootable `image` artifact.
 * Re-importing the same OVA extracts nothing, and, if open question 9 finds
   a mechanism, uploads nothing.
-* No deletion path leaves entries, or other references, behind a deleted blob,
-  and a test proves it for each path.
+* No deletion path leaves entries, or other references, behind a deleted blob
+  or a deleted namespace, and a test proves it for each path.
+* Extraction beyond whatever limit open question 11 sets is refused.
 * A failed reference count never deletes a blob, and a test proves it.
 * Extraction is refused for a range outside the blob.
 * A second namespace extracting from the same container cannot add, change
