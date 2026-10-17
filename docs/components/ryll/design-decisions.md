@@ -288,3 +288,18 @@ produced.
     short-circuits the state machine straight to the matching
     Modal when retry would be doomed.
 
+24. **Key auto-repeat is the client's job** - While a key is held, ryll
+    sends each host (or browser) auto-repeat to the guest as another
+    press of the same key, with no release in between. That is what a
+    PS/2 keyboard puts on the wire, and what spice-gtk does. Servers
+    that inject keys through XTest, such as andris, never repeat a
+    key themselves, so dropping repeats left keys unable to repeat
+    there (#561). On a QEMU guest the repeated make code does not
+    double the repeat rate: the guest kernel reports it as a repeat,
+    and X servers, libinput and Wayland compositors discard kernel
+    repeats and run their own timer. ryll's held-key set, not the
+    toolkit's `repeat` flag, decides what counts as a repeat, and on
+    macOS a repeat while Cmd is down is withheld like any other Cmd
+    chord. Earlier plans record dropping repeats as a fix (the PR 31
+    follow-up and the WebRTC soak's input findings); this entry
+    reverses them.

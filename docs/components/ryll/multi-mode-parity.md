@@ -144,7 +144,8 @@ around it.
 | **Statistics and Instrumentation** | | | |
 | FPS tracking (sliding window from DisplayMark) | available | partial (no FPS is computed; the control socket's `stats` verb returns `marks_received`, whose rate between polls is the GUI's measure) | partial (no stats panel in the browser MVP; the control socket's `stats` verb works as in headless) |
 | Bandwidth sparkline (rolling bytes/sec graph) | available | partial (no graph; the control socket's `stats` verb returns the display channel's `bytes_in`, whose rate between polls is its bandwidth) | partial (no graph; the control socket's `stats` verb works as in headless) |
-| Latency sparkline (inter-PING interval graph) | available | partial (no graph; raw latency samples are reachable as control-socket `latency` events) | missing (out of MVP scope) |
+| PING interval sparkline (inter-PING interval graph) | available | partial (no graph; raw samples are reachable as control-socket `latency` events) | missing (out of MVP scope) |
+| Inputs round trip (`RTT` in the status bar) | available | missing (headless sends no pointer input, and a round trip is only measured from pointer messages) | partial (no stats panel; the browser's pointer drives control-socket `input_rtt` events) |
 | Periodic stats to stdout (headless only) | n/a — intrinsic (GUI shows live stats in status bar) | available (every 10 s: DISPLAY_MARKs, image draws, and bytes in and out across every channel) | n/a — intrinsic (browser context) |
 | `--latency-file` latency measurements export | missing (`Args::latency_file` in `ryll/src/config.rs` — flag declared but never read or acted upon anywhere in the codebase) | missing (same — flag is declared but unused; control-socket `latency` events are the working alternative) | missing (out of MVP scope) |
 | Channel state snapshots (for bug reports) | available | available | missing (out of MVP scope) |

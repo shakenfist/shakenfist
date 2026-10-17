@@ -1,4 +1,4 @@
-# Control Socket Protocol — Version 1.4
+# Control Socket Protocol — Version 1.5
 
 This document specifies the wire protocol spoken between a Ryll session
 with no host window — `--headless` or `--web` — and any external driver
@@ -8,7 +8,7 @@ such as latency loadtests and Sextant scenario tests implement against
 this document. Read the whole document before writing a client or
 implementing a verb.
 
-Protocol version: **1.4**
+Protocol version: **1.5**
 
 Version history:
 
@@ -41,6 +41,11 @@ Version history:
   channel's byte, message and `DISPLAY_MARK` counts and its video
   stream counters, so a test can measure a server's frame rate and
   check its video streams.  Additive.
+- **1.5** — added the `input_rtt` event, a round trip measured on the
+  inputs channel from a pointer message to the server's acknowledgement
+  of it.  The `latency` event is unchanged: it was always the interval
+  between the server's PINGs, which says little about the path when a
+  server pings every 30 s.  Additive.
 
 ---
 
@@ -79,12 +84,12 @@ Version history:
 - Setting and reading the session's clipboard, which ryll syncs with
   the guest's through the SPICE vdagent, and asking the guest for a
   display size.
-- Subscribing to an asynchronous stream of events: SPICE latency
-  samples, agent connect/disconnect transitions, paste completion
-  notifications, text the guest copied, per-draw surface
-  notifications, decoded
-  visual-digest updates (on `digest-decode` builds, in both
-  `--headless` and `--web`), and queue-overflow notifications.
+- Subscribing to an asynchronous stream of events: the server's PING
+  interval and inputs-channel round trips, agent connect/disconnect
+  transitions, paste completion notifications, text the guest copied,
+  per-draw surface notifications, decoded visual-digest updates (on
+  `digest-decode` builds, in both `--headless` and `--web`), and
+  queue-overflow notifications.
 - Negotiating the protocol version at connection time so clients and
   servers can evolve independently within a major version.
 
@@ -291,7 +296,7 @@ Parameters:
 ### Hello response — success
 
 ```json
-{"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.4", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed"]}}
+{"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.5", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed", "input_rtt"]}}
 ```
 
 Result fields:
@@ -299,7 +304,7 @@ Result fields:
 | Field | Type | Description |
 |-------|------|-------------|
 | `server_name` | string | Always `"ryll"` in this implementation. |
-| `protocol_version` | string | The version the server will speak. In v1.x this is `"1.4"`; older servers reported `"1.0"`, `"1.1"`, `"1.2"` or `"1.3"`. Clients should not compare for exact equality — see the compat note below. |
+| `protocol_version` | string | The version the server will speak. In v1.x this is `"1.5"`; older servers reported `"1.0"`, `"1.1"`, `"1.2"`, `"1.3"` or `"1.4"`. Clients should not compare for exact equality — see the compat note below. |
 | `supported_methods` | array of string | The complete set of verb names the server recognises. Clients should use this list rather than hard-coding expectations, especially when connecting to a newer server. |
 | `supported_events` | array of string | The complete set of event names the server can emit. |
 
@@ -316,7 +321,7 @@ error and then **closes the connection**:
 The server writes the error line and then closes the socket. The client
 will see EOF immediately after reading that line.
 
-**Minor version mismatches are accepted in both directions.** A v1.4
+**Minor version mismatches are accepted in both directions.** A v1.5
 client connecting to a v1.0 server, or vice versa, is fine: the server
 responds with whatever minor version *it* speaks (e.g. `"1.0"` or
 `"1.1"`), and both sides behave according to the features they each
@@ -389,7 +394,7 @@ Worked example:
 
 ```
 → {"id": 1, "method": "hello", "params": {"client_name": "demo", "protocol_version": "1.1"}}
-← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.4", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed"]}}
+← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.5", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed", "input_rtt"]}}
 ```
 
 ---
@@ -934,7 +939,8 @@ disk in headless mode, but is currently declared and unused — this
 event stream is the working way to collect samples.)
 
 The field names are unchanged, so this is a correction to the
-description rather than a change to the wire contract.
+description rather than a change to the wire contract. For a round trip
+that measures the path, subscribe to [`input_rtt`](#input_rtt).
 
 High-frequency callers (e.g. a latency loadtest) should subscribe to
 this event and accumulate samples client-side rather than polling with
@@ -951,6 +957,34 @@ Worked example:
 
 ```
 ← {"event": "latency", "data": {"sample_ms": 0.83, "wallclock_us": 1717000000456789}}
+```
+
+---
+
+### `input_rtt`
+
+Added in v1.5. Emitted for each round trip measured on the SPICE inputs
+channel.
+
+The server acknowledges every fourth pointer message (`MOUSE_POSITION`
+or `MOUSE_MOTION`) with a `MOUSE_MOTION_ACK`. Ryll times each bunch from
+sending its fourth message to receiving the ack for it, so the sample is
+the network path in both directions plus the server's time to read and
+answer. It is only sampled while the pointer moves: a session with no
+pointer input, such as a headless one driven only by `send_key`, emits
+none.
+
+Data fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `rtt_ms` | f64 | Round trip, in milliseconds. Always non-negative. |
+| `wallclock_us` | u64 | Unix timestamp in microseconds at the moment Ryll emitted the sample, just after the ack arrived. |
+
+Worked example:
+
+```
+← {"event": "input_rtt", "data": {"rtt_ms": 1.7, "wallclock_us": 1717000000456789}}
 ```
 
 ---
@@ -1289,7 +1323,7 @@ Additional error codes may be added in future **minor** version bumps.
 Clients should treat any unrecognised `code` value as a generic error
 (print the `message` and fail the operation) rather than treating it as
 `internal_error`. This ensures forward compatibility when a client
-compiled against v1.0 connects to a v1.4 server that has added new
+compiled against v1.0 connects to a v1.5 server that has added new
 domain-specific codes.
 
 ---
@@ -1297,7 +1331,7 @@ domain-specific codes.
 ## Versioning
 
 The protocol version is a dotted `major.minor` string. The current
-version is **1.4**.
+version is **1.5**.
 
 Rules:
 
@@ -1337,8 +1371,9 @@ Version 1.0 was the first published version. Version 1.1 added the
 `surface_drawn` and `digest_updated` events. Version 1.2 extended the
 socket to `--web` mode and corrected `send_key`'s extended-scancode
 encoding. Version 1.3 added the clipboard and `resize` verbs and the
-`clipboard_changed` event. Version 1.4 (the current version) added the
-`stats` verb; see the version history at the top of this document.
+`clipboard_changed` event. Version 1.4 added the `stats` verb. Version
+1.5 (the current version) added the `input_rtt` event; see the version
+history at the top of this document.
 
 ---
 
@@ -1351,7 +1386,7 @@ indicates the sender: `→` is client-to-server, `←` is server-to-client.
 
 ```
 → {"id": 1, "method": "hello", "params": {"client_name": "demo-client", "protocol_version": "1.0"}}
-← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.4", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed"]}}
+← {"id": 1, "ok": true, "result": {"server_name": "ryll", "protocol_version": "1.5", "supported_methods": ["hello", "status", "send_key", "paste", "screenshot", "subscribe", "unsubscribe", "clipboard_set", "clipboard_get", "resize", "stats"], "supported_events": ["latency", "agent_connected", "paste_completed", "paste_failed", "dropped", "surface_drawn", "clipboard_changed", "input_rtt"]}}
 → {"id": 2, "method": "status", "params": {}}
 ← {"id": 2, "ok": true, "result": {"spice_connected": true, "agent_connected": true, "surfaces": [{"channel_id": 1, "surface_id": 0, "width": 1024, "height": 768}]}}
 → {"id": 3, "method": "subscribe", "params": {"events": ["latency", "agent_connected", "paste_completed", "paste_failed"]}}
@@ -1375,7 +1410,7 @@ Key observations from this transcript:
 
 - The `hello` handshake always comes first and its response lists the
   full verb and event catalogue. Note the minor-version interop at
-  work: the client requested `"1.0"` and the v1.4 server accepted it,
+  work: the client requested `"1.0"` and the v1.5 server accepted it,
   responding with the version *it* speaks and advertising verbs and
   events this v1.0 client simply never uses.
 - `status` gives a snapshot of the session state at that instant. The
