@@ -88,11 +88,17 @@ always a free choice:
   hypervisors present publicly issued certificates must leave it empty
   for that source rather than set it to an unrelated CA.
 
-For Shaken Fist consoles the enforced `host_subject` is not configured on the
-proxy: it is pinned at scrape time from the hosting node's published SPICE
-server certificate subject (`spice_server_cert_subject`), and carried through
-to the proxy in the `AuthorizeConnection` `Target`. See
-[Console Sources](/components/kerbside/console-sources/).
+For Shaken Fist consoles the `host_subject` is not configured on the proxy:
+it is taken at scrape time from the hosting node's published SPICE server
+certificate subject (`spice_server_cert_subject`), and carried through to the
+proxy in the `AuthorizeConnection` `Target`. That pin is conditional. A node
+that publishes no subject (an older cluster, or a node without a SPICE
+certificate) yields no `host_subject`, and the backend leg for its consoles
+is then relayed without host-subject enforcement rather than refused
+(`backend.rs` maps an empty subject to none). The per-source
+`synthesize_host_subject` option substitutes `CN=<node fqdn>` in that case,
+which is only correct on the stock `cn=hostname` PKI and so is off by
+default. See [Console Sources](/components/kerbside/console-sources/#shaken-fist).
 
 ## Connection State Machine
 

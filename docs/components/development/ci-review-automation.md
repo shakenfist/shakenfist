@@ -1,8 +1,8 @@
 # CI Review Automation
 
 Shaken Fist projects use Claude Code-powered automation for PR
-reviews, test fixing, and comment addressing. This page describes
-the workflow templates and how to add them to a new project.
+reviews and test fixing. This page describes the workflow templates
+and how to add them to a new project.
 
 ## How It Works
 
@@ -162,10 +162,14 @@ cp /path/to/development/templates/test-drift-fix/test-drift-fix.yml \
 
 Modify your main CI workflow (e.g. `functional-tests.yml`) to add:
 
-1. A top-level `permissions` block with `pull-requests: write`
-2. A job calling the shared
+1. A job calling the shared
    `shakenfist/actions/.github/workflows/pr-auto-review.yml@main`,
    with the project's test jobs in its `needs:` list
+2. A `permissions:` block on that calling job, granting what the
+   reviewer needs. A cross-repository reusable workflow cannot grant
+   itself more token scope than its caller has, so without the block
+   the reviewer cannot post. The template README's snippet is the
+   list to copy; it is not repeated here, so the two cannot disagree
 
 See the
 [template README](https://github.com/shakenfist/development/tree/main/templates/ci-review-automation/README.md)

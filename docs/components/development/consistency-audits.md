@@ -21,7 +21,7 @@ A criterion exists in two places, and both have to agree.
 | Layer | Lives in | Audience |
 |-------|----------|----------|
 | Specification | `docs/audits/<check-id>.md` | Humans and agents. Why the rule exists, what is checked, what it does not cover, which template implements it, and a link to its section of the compliance page. Hand-written throughout. |
-| Check | `scripts/audit/checks/<family>.py` | The runner. A `Check` subclass returning `self.ok()`, `self.fail()` or `self.skip()` with a reason, registered in `CHECKS` in `scripts/audit/registry.py`. `scripts/audit-check.py` is the entry point that runs the schedule and prints the results. |
+| Check | `scripts/audit/checks/<family>.py` | The runner. A `Check` subclass returning `self.ok()`, `self.fail()` or `self.skip()` with a reason, or raising when it cannot measure (see [What each status means](#what-each-status-means)), registered in `CHECKS` in `scripts/audit/registry.py`. `scripts/audit-check.py` is the entry point that runs the schedule and prints the results. |
 
 The split is deliberate. The specification is where a rule explains
 itself, and it is what an agent or a person reads when they pick up an
@@ -80,18 +80,77 @@ The audit workflow has four jobs.
 **1. `audit`** -- a matrix job per repository. Each leg shallow-clones
 the target with `gh repo clone`, installs a pinned `skillsaw` into a
 virtualenv, asserts that skillsaw answers at that pinned version, then
-runs `scripts/audit-check.py` and uploads the result as an
-`audit-result-<repo>.json` artifact.
+runs `scripts/audit-check.py` and uploads its result,
+`audit-result-<repo>.json`, as an artifact named `audit-<repo>`. The
+two later jobs download every artifact matching `audit-*`, so that
+prefix is what ties a leg's result to them.
 
-Most checks read files out of the clone. A few (default branch,
-security settings, repository visibility) query the GitHub API through
-`gh`, and the git-hygiene checks shell out to `git` inside the clone.
-Visibility is queried live rather than hardcoded because it changes.
+Most checks read files out of the clone, several of them by asking
+`git` inside it what the index holds. A few reach the network instead:
+they query the GitHub API through `gh`, or clone another repository to
+compare against. That set is `NETWORK_CHECKS` in
+`scripts/audit_snapshot.py`, which a test keeps in step with the code
+(see [Before and after a change to a
+check](#before-and-after-a-change-to-a-check)). Repository visibility
+is among what they query, live rather than hardcoded, because it
+changes.
 
 The skillsaw pin is deliberate, and so is the assertion next to it.
 `llm-context-lint` reports what skillsaw calls an error, and skillsaw's
 rule set moves between releases, so an unpinned upgrade would change the
-compliance page for reasons nobody chose.
+compliance page for reasons nobody chose. skillsaw's venv is its own
+and stays off `PATH`: the audit step names the binary in
+`AUDIT_SKILLSAW`, so its unpinned dependencies never load into the
+interpreter running the checks (see
+[llm-context-lint](/components/development/audits/llm-context-lint/)).
+
+The workflow holds two tokens, and the legs get the weaker one. The
+checks read files the audited repositories control, and some run
+programs over them, so the legs hold `AUDIT_READ_TOKEN`, a
+fine-grained personal access token that can read every repository in
+the organisation and write to none. `AUDIT_TOKEN`, which files and
+closes issues and pushes the compliance page, appears only in
+`manage-issues` and `update-docs`. `AUDIT_READ_TOKEN` is minted with
+the `shakenfist` organisation as its resource owner, access to all
+repositories, no organisation permissions, and these repository
+permissions, each read-only:
+
+* **Metadata** -- the repository itself (default branch, visibility),
+  its branch rules, and the organisation's repository listing.
+* **Contents** -- cloning the private repositories.
+* **Actions** -- the workflows and their runs, which
+  `scheduled-workflow-health` reads.
+* **Administration** -- `delete_branch_on_merge` and
+  `security_and_analysis`, which GitHub leaves out of the repository
+  for a caller without admin access.
+
+Each leg checks first that the read token is set -- an unset secret
+is an empty string, and `gh` with an empty `GH_TOKEN` falls back to
+whatever login the runner's user holds -- and that it can see those
+last two fields. Without them `delete-branch-on-merge` would fail
+every repository, and `github-security` would stop checking secret
+scanning without saying so, so a token that cannot see them fails
+every leg instead.
+
+`AUDIT_READ_TOKEN` is a repository secret on this repository, and a
+fine-grained token always has an expiry date. When it lapses, every leg
+fails at "Check the read token" and `report-failure` files its issue
+pointing at the run. Mint a replacement with the permissions above and
+replace the secret, then dispatch a run of `main` to confirm it.
+
+The split is between jobs, not between hosts, and that bounds what it
+buys. Every job runs on the persistent `[self-hosted, static]`
+runners, as the same user, and only `runner.temp` is emptied between
+jobs. Code an audit leg runs -- skillsaw's unpinned dependencies, or
+anything an audited repository can steer -- could leave something in
+that user's home directory (a `.pth` file in the user site-packages,
+a `~/.gitconfig` hook) that `manage-issues` or `update-docs` then runs
+with `AUDIT_TOKEN`. Likewise skillsaw runs as the same user as
+`audit-check.py`, so taking the token out of its environment is
+defence in depth, not isolation: it could still read its parent's.
+What the split does do is keep `AUDIT_TOKEN` out of every process
+the legs start. Isolating the writing jobs properly needs runners
+nothing else uses, which is a runner change rather than a workflow one.
 
 **2. `manage-issues`** -- downloads every artifact and runs
 `scripts/audit-manage-issues.py`, which files, updates and closes issues. See
@@ -115,7 +174,8 @@ The tables are therefore always a rendering of the most recent run.
 Never edit one by hand: the next run overwrites it.
 
 **4. `report-failure`** -- runs only when one of the above fails, and
-files or updates an issue labelled `audit-failure` on this repository.
+files or updates an issue labelled `audit-failure` on this repository,
+with `tools/report-audit-failure.sh`.
 
 That last job exists because this pipeline's worst failure mode is a
 quiet one. A scheduled workflow that fails emails whoever pushed last,
@@ -125,6 +185,21 @@ verdicts, so the audit looks healthy from the outside. In August 2026
 that ran for a full day; on a weekly cadence the same failure would
 last a week. Nothing retries a failed run, so the issue says how to
 start one by hand once the cause is fixed.
+
+Only a run of `main` writes anything. Dispatched on another branch
+(`gh workflow run consistency-audit.yml --ref <branch>`), the audit
+matrix runs that branch's checks against the whole fleet and uploads
+its results as artifacts, and `manage-issues`, `update-docs` and
+`report-failure` are skipped. That is the way to measure a change to
+the checks against the fleet before merging it. The guard catches a
+dispatch of the wrong ref, not a determined branch: the read token can
+read every private repository in the organisation, and a branch
+controls the code that runs with it, including whether it names
+`AUDIT_TOKEN` at all. The trust boundary is push access to this
+repository, as it always was. Two runs of one ref never overlap: the
+second waits for the first to finish. Runs of different refs do not
+wait for each other, so a branch run can never hold up or displace the
+scheduled run of `main`.
 
 ## Issues are the work tracking
 
@@ -152,10 +227,15 @@ gh search issues 'org:shakenfist label:consistency is:open'
 Two properties matter when changing any of this.
 
 **Issue titles are the idempotency key.** They are
-`Consistency: <check name>`, matched exactly to decide whether an issue
-already exists. Renaming a check name silently orphans every open issue
-for it and files a fresh set, so treat `ISSUE_TITLES` in
-`scripts/audit_common.py` as an interface, not a label.
+`Consistency: <issue_title>`, from the check's `issue_title` class
+attribute, matched exactly to decide whether an issue already exists.
+Renaming one silently orphans every open issue for it and files a
+fresh set, so treat a check's `issue_title` as an interface, not a
+label. `FROZEN_ISSUE_TITLES` in `scripts/tests/test_metadata.py`
+holds every one as a literal, so a rename fails the tests until it is
+made there too, on purpose. (`ISSUE_TITLES` in
+`scripts/audit_common.py` is a view over the registry, not the place
+to change one.)
 
 **Repository renames are handled, but noisily on purpose.** Repo names
 are resolved to their canonical form before searching, because GitHub's
@@ -169,41 +249,75 @@ closed.
 keeps failing, its issue's body is re-rendered from the latest result
 and rewritten with `gh issue edit` whenever it differs, so the counts,
 the per-item lists and the spec links stay current rather than
-remaining the snapshot taken at filing. Differences in line endings and
-trailing whitespace are ignored, so an unchanged result edits nothing.
+remaining the snapshot taken at filing. `body_is_current()` in
+`scripts/audit-manage-issues.py` ignores CRLF line endings and
+whitespace at the start or end of the whole body, which GitHub
+introduces without the content changing, so an unchanged result edits
+nothing. Any other difference, including trailing whitespace on a line
+inside the body, is an edit.
 Hand edits to a body are not preserved -- anything worth saying to the
 next reader belongs in a comment.
+
+### What each status means
+
+Every result carries one of four statuses. The first three are
+verdicts about the audited repository; the fourth is a statement about
+the audit.
+
+| Status | Means | Effect on the criterion's issue |
+|--------|-------|---------------------------------|
+| `pass` | The repository meets the criterion. | Closes an open one. |
+| `fail` | The repository does not, and `details` says how. | Files one, or refreshes the open one's body. |
+| `not_applicable` | The criterion does not apply here, for the reason in `details`. | Closes an open one. |
+| `error` | The audit could not reach a verdict. | None. |
 
 A check that starts passing closes its issue. A check that becomes
 `not_applicable` closes it too: "we decided this does not apply" and
 "this now complies" are both reasons not to keep a work item open.
 
-A check that raises is reported as `error`, which is not a verdict and
-touches no issue either way: filing one would blame the audited
-repository for a bug in the audit, and closing one would read as the
-repository having fixed it. `registry.run_check()` is the boundary --
-one raising criterion costs that criterion rather than all of them for
-the repository -- and prints the traceback to the audit step's log. The
-leg then fails on its *Fail if any check raised* step, after the
-results are uploaded, so `manage-issues` still manages every other
-criterion for that repository while `report-failure` makes the bug
-visible and `update-docs` holds back the compliance page until it is
-fixed. The tests call `run()` directly and assert a verdict, so a check
-that raises still fails them.
+`error` means the audit failed rather than the repository, and it is
+not a verdict: it touches no issue either way. Filing one would blame
+the audited repository for a bug in the audit, and closing one would
+read as the repository having fixed it. A check never returns it.
+`registry.run_check()` reports it for a check that raised -- one
+raising criterion costs that criterion rather than all of them for
+the repository -- and prints the traceback to the audit step's log.
+The leg then fails on its *Fail if any check raised* step
+(`scripts/audit-raised.py`), after the results are uploaded, so
+`manage-issues` still manages every other criterion for that
+repository while `report-failure` makes the bug visible and
+`update-docs` holds back the compliance page until it is fixed.
+
+**When a check's own tooling fails, the status is `error`.** That
+covers the GitHub API returning an error, `git ls-files` failing
+(`audit.files.tracked_paths()` returning `None`), a clone failing,
+and a subprocess timing out. The check has learned nothing about the
+repository, so it has no verdict to give: it raises, and
+`run_check()` reports `error`. It does not return `self.fail()`, and
+it does not return `self.skip()`. Each of those is a claim about the
+repository. A `fail` files an issue on it, under the bot's identity,
+for an outage on our side. A `not_applicable` closes the issue it
+already has, and does so for every repository the outage reached at
+once. The line is whether the tool answered: an answer is evidence a
+verdict can rest on, including an answer that the thing asked about
+does not exist, while a failure to answer is not.
+
+The tests call `run()` directly and assert a verdict, so a check that
+raises unexpectedly still fails them. A test of a tool-failure path
+asserts that `run()` raises instead.
 
 ## Adding a criterion
 
-Two files: the check and its specification.
+Six files, all in this repository. This is the one list of them:
+`PUSH-AUDIT.md` and `AGENTS.md` link here rather than keep their own,
+so a step added to it reaches both.
 
 1. **`scripts/audit/checks/<family>.py`** -- add a `Check` subclass to
    the module whose specifications it belongs with. It declares what it
    is as class attributes -- `id`, `spec`, `issue_title`, an optional
    `template`, and a `column` heading when it shares a specification
    page with another criterion -- and implements `run(repo)`, returning
-   `self.ok()`, `self.fail()` or `self.skip()`. Register the instance in
-   `CHECKS` in `scripts/audit/registry.py`, beside the rest of its
-   family -- that list is the order the results are reported in, and
-   there is no second table to add the id to.
+   `self.ok()`, `self.fail()` or `self.skip()`.
 
    Put the applicability test in `applies(repo)` rather than at the top
    of `run()`. The scheduler asks the cheap question first, which is
@@ -222,13 +336,35 @@ Two files: the check and its specification.
    regular file inside the checkout, so a dangling or escaping symlink
    is skipped rather than raised on or followed.
 
-2. **`docs/audits/<check-id>.md`** -- the specification, following the
-   structure in `docs/audits/README.md`, and a line for it in that
-   index. Under `## Projects`, link `compliance.md#<check-id>`; the
-   section appears there at the first run. Do not add a
-   `consistency-audit` marker block -- the tables live on the
-   compliance page so that every specification stays reviewable, and
-   `test_audit_update_docs.py` fails on a marker in a spec.
+2. **`scripts/audit/registry.py`** -- register the instance in
+   `CHECKS`, beside the rest of its family. That list is the order the
+   results are reported in, and there is no second table to add the id
+   to.
+
+3. **`scripts/tests/test_<family>.py`** -- tests beside the check,
+   following the `CheckTestCase` convention in
+   [Testing a change](#testing-a-change). A criterion no test module
+   instantiates fails
+   `test_every_check_is_reachable_from_a_test_module` in
+   `scripts/tests/test_metadata.py`.
+
+4. **`docs/audits/<check-id>.md`** -- the specification, following the
+   structure in `docs/audits/README.md`. Under `## Projects`, link
+   `compliance.md#<check-id>`; the section appears there at the first
+   run. Do not add a `consistency-audit` marker block -- the tables
+   live on the compliance page so that every specification stays
+   reviewable, and `test_audit_update_docs.py` fails on a marker in a
+   spec.
+
+5. **`docs/audits/README.md`** -- a line for the specification in the
+   criterion index. `test_every_spec_file_is_named_in_the_index` in
+   `scripts/tests/test_audit_update_docs.py` fails on a spec the index
+   does not name.
+
+6. **`scripts/tests/test_metadata.py`** -- the criterion's lines in
+   `FROZEN_METADATA` and `FROZEN_ISSUE_TITLES`, and in
+   `FROZEN_COLUMN_NAMES` when it declares a `column`. Why these are
+   frozen is below.
 
 `AUDIT_METADATA` and `ISSUE_TITLES` in `scripts/audit_common.py`, and
 `COLUMN_NAMES` in `scripts/audit-update-docs.py`, are views over the
@@ -256,10 +392,6 @@ publishes a bad label beats a run that publishes nothing;
 `test_criteria_sharing_a_spec_page_all_declare_a_column` in
 `scripts/tests/test_metadata.py` fails on it from the other direction,
 reading the registry rather than the documentation.
-
-Add tests beside the check, in `scripts/tests/test_<family>.py`. A
-criterion with no test module entry fails the contract tests in
-`scripts/tests/test_metadata.py`.
 
 A new criterion does not require a re-audit of anything else, and does
 not require touching any project repository. The next run measures it
@@ -318,6 +450,13 @@ The full gate, which `ci.yml` also runs on every pull request:
 pre-commit run --all-files
 ```
 
+The scripts are standard library only and run on whatever `python3`
+is on the path, which has to be Python 3.11 or later: the audit and
+`review-tracking.py` read TOML with `tomllib`, which 3.11 added to the
+standard library. That floor applies to a local run and to the
+runners the workflows use alike, and an older interpreter fails at
+import rather than measuring anything.
+
 Every test suite lives in `scripts/tests/`, including the suites for
 the scripts around the package -- `test_review_tracking.py`,
 `test_audit_update_docs.py`, `test_audit_snapshot.py`,
@@ -328,12 +467,15 @@ else is a suite no hook runs, and `SuiteLocationTest` in
 `scripts/tests/test_hooks.py` fails on one.
 
 Two `local` pre-commit hooks run them. `audit-package-tests` discovers
-the directory and runs all of it, on any change under `scripts/`,
-`tools/`, `templates/`, the workflows, `.pre-commit-config.yaml` or
-any `.md`. `review-tracking-tests` runs that one suite again, on
-everything else: it is the only hook with `always_run`, because it
-asserts properties of the whole tree and a review-only commit matches
-nothing the other pattern names.
+the directory and runs all of it, on a change to any Python file under
+`scripts/`, anything under `tools/` or `templates/`, a workflow,
+`.pre-commit-config.yaml` or any `.md`. `review-tracking-tests` runs
+that one suite again on every commit, whatever it touches: it is the
+only hook with `always_run`, because it asserts properties of the
+whole tree and a review-only commit matches nothing the other pattern
+names. A commit that matches both runs that suite twice. The patterns
+themselves are in `.pre-commit-config.yaml`, which is the authority
+when this paragraph and it disagree.
 
 One module at a time, which is quicker while iterating, and each runs
 standalone:
@@ -378,6 +520,7 @@ The tests cover the machinery, not what a check *decides* about a real
 repository. Test that half against local clones:
 
 ```
+mkdir -p /tmp/results
 python3 scripts/audit-check.py --repo-path ~/src/shakenfist/<repo> \
     --repo-name <repo> > /tmp/results/audit-result-<repo>.json
 python3 scripts/audit-manage-issues.py --results-dir /tmp/results/ --dry-run
@@ -388,14 +531,19 @@ python3 scripts/audit-update-docs.py --results-dir /tmp/results/ \
 Always pass `--dry-run` to `audit-manage-issues.py`. Without it the
 script creates, edits and closes real issues on real repositories.
 
-Pass `--page` as well, as above. A locally generated page only covers
-the repositories you fed it, so it is never what you want to keep, and
-without `--page` the script rewrites the real
-`docs/audits/compliance.md` in place. The old advice here was to
-discard the result with `git restore docs/audits/`, which is now
-actively dangerous: the other 35 files in that directory are
-hand-written, and a `git restore` of the directory throws away
-whatever you were editing along with the generated page.
+Run them from the root of this repository, and pass `--page` as well,
+as above. A locally generated page only covers the repositories you
+fed it, so it is never what you want to keep, and without `--page` the
+script rewrites the real `docs/audits/compliance.md` in place. A
+`--page` that does not exist yet is seeded with a copy of the real
+page, because the generated block is spliced between markers the
+hand-written page carries; an existing one, such as the output of an
+earlier run, is rewritten.
+
+Do not discard a stray result with `git restore docs/audits/`. Every
+other file in that directory is hand-written, and a `git restore` of
+the directory throws away whatever you were editing along with the
+generated page.
 
 ### Before and after a change to a check
 
@@ -421,14 +569,23 @@ the `timestamp` field so that two runs of an unchanged tree compare
 equal. `--diff` exits non-zero if anything differs and prints the
 status and details on both sides.
 
-Six checks reach the network -- `default-branch-naming`,
-`github-security`, `delete-branch-on-merge`, `merge-queue-config`,
-`merge-group-cancellation` and `sfui-vendor` -- so they can differ
-between two runs because a repository setting changed rather than
-because the code did. They are reported under their own heading and do
-not affect the exit code. `scripts/tests/test_audit_snapshot.py`
-re-derives that list from `audit-check.py` and fails if a check grows
-a `gh` call without joining it.
+The checks in `NETWORK_CHECKS` in `scripts/audit_snapshot.py` reach
+the network, so they can differ between two runs because something
+outside the tree moved -- a repository setting, a workflow run, a new
+repository in the organisation -- rather than because the code did.
+They are reported under their own heading and do not affect the exit
+code. Read the list there rather than from a copy on this page, which
+is how this paragraph once fell two checks behind.
+
+`NetworkCheckListTest` in `scripts/tests/test_audit_snapshot.py`
+keeps the list honest. It takes the schedule from `CHECKS` in
+`scripts/audit/registry.py`, and for each check follows its class
+body, its base classes and the helpers it calls under
+`scripts/audit/`, looking for the GitHub client (`_github()`,
+`repo.github`, `GhCli(`) or a `git clone`. It fails if the set it
+derives differs from `NETWORK_CHECKS` in either direction, so a check
+that grows a GitHub call has to join the list, and one that loses its
+last call has to leave it.
 
 The snapshots are not committed. Generated JSON under `scripts/` or
 `docs/` would land in review scope and sit permanently stale in the

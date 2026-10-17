@@ -56,6 +56,16 @@ are allowed to sit beside skill directories.
   should not arise; when it does, every row flipping to N/A at once is
   the signal.
 
+### How skillsaw is run
+
+The check runs the skillsaw that the `AUDIT_SKILLSAW` environment
+variable names, or `skillsaw` from `PATH` when it is unset, as it is
+for a run by hand. The workflow sets it, so that skillsaw's venv stays
+off `PATH` and its python3 is not the one the audit runs under. And
+skillsaw runs without `GH_TOKEN` or `GITHUB_TOKEN` in its environment:
+it reads the clone and nothing else, so it has no use for the audit's
+token.
+
 ## Template
 
 No template -- the fix is repository-specific. Skills move to

@@ -42,9 +42,11 @@ Expect routine churn near the threshold: a single feature PR can
 touch five in-scope files, so the issue this audit files acts as a
 standing work-queue nudge -- it lists the files needing review,
 and closes automatically once a review session brings the backlog
-back under the threshold. That list is written when the issue is
-filed and is not refreshed afterwards, so a long-lived issue
-understates the backlog it names (shakenfist/development#138).
+back under the threshold. The list is re-rendered on every run
+while the issue stays open, like every consistency issue's body (see
+[Issues are the work tracking](/components/development/consistency-audits/#issues-are-the-work-tracking)),
+so it names the backlog as of the latest run rather than as of
+filing.
 
 ## Template
 
