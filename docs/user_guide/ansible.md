@@ -283,9 +283,64 @@ Delete a network:
 | uuid<br/>*string* | The UUID for the instance. Either `name` or `uuid` must be included in all requests with `state: absent`. If you specify a UUID and the instance does not exist in the Shaken Fist cluster, this argument will be ignored as UUIDs are randomly assigned on network creation. |
 | await<br/>*boolean* | Whether to wait for the instance to be created. Only works for when state is `present`. Default is `false`. The wait is bounded by `await_timeout`, as is the creation which precedes it. |
 | await_timeout<br/>*integer* | How many seconds an `await` may take, counted from the start of the operation rather than from the start of the wait. Where an instance is being replaced, the time spent deleting the old one and creating the new one is deducted from this number before the wait begins. It is a budget rather than a hard deadline: a deletion or creation already underway is not interrupted, and a `shakenfist-client` of v0.8.3 or earlier cannot be told not to wait while creating. Defaults to 600. |
+| capacity_wait<br/>*integer* | How many seconds to keep replaying a create which the cluster refused for lack of capacity. Defaults to 0, which turns the wait off: the task then fails on the first refusal. Only refusals which waiting can clear are replayed: a 507 from the create which is marked transient, and (only with `await`) an instance which preflight aborted with the error message `Unable to find suitable node` or `Too many start attempts`. Any other refusal fails at once. A refused create leaves an instance record in state `error` which holds the name, so before each replay the module deletes that record (by UUID) and waits for it to be deleted. Replays are at least 60 seconds apart, plus up to 15 seconds of jitter, so a value under 60 never replays. This budget is separate from `await_timeout`, not taken out of it, so a task's worst case is `capacity_wait` plus `await_timeout`. See [Waiting for capacity](#waiting-for-capacity). |
 | api_url<br/>*string* | The base URL of the Shaken Fist API, for example `http://sf-1:13000`. Optional: when it is not supplied the module discovers the API from the environment and `sfrc` exactly like the `sf-client` CLI. `api_url`, `namespace` and `key` must be supplied together or not at all -- see [Authentication](#authentication). |
 | namespace<br/>*string* | The namespace the instance belongs to, which is also the namespace to authenticate as. May be supplied on its own, which means "work in this namespace and discover the credentials the usual way" -- but supplying `api_url` or `key` requires all three. See [Authentication](#authentication). |
 | key<br/>*string* | The key to authenticate with. Optional, and carries the same all-or-nothing rule as `api_url` -- see [Authentication](#authentication). |
+
+### Return value
+
+With `state: present`, an instance task returns `capacity_waited`, whether or not `capacity_wait` is set, and also when the task fails because the wait ran out.
+
+| **Field** | **Comments** |
+|---|---|
+| capacity_waited.seconds<br/>*integer* | Seconds spent waiting for capacity, rounded up, from the start of the first refused attempt to the start of the accepted one (or to the moment the wait gave up). 0 when nothing was refused. |
+| capacity_waited.attempts<br/>*integer* | How many creates the task sent. 0 when no create was needed. |
+| capacity_waited.outcome<br/>*string* | `not_refused` when no create was refused, `placed` when a replay was accepted, or `exhausted` when the budget ran out. |
+| capacity_waited.refusals<br/>*list* | One entry per refusal, each with `at` (UTC, ISO 8601), `kind` (`api` for a 507 from the create, `preflight` for a preflight abort), `stage` (the 507 body's stage, or null) and `message`. |
+| capacity_waited.namespace_instances<br/>*integer* | How many other active instances the namespace held at the first refusal, or null when nothing was refused or the listing failed. |
+
+### Waiting for capacity
+
+When the budget runs out, the task fails with the server's last refusal followed by how long it waited and how many attempts it made. `capacity_wait` bounds one task. To bound a whole play, give each create what is left of a run-wide budget and add up what each one reports in `capacity_waited.seconds`:
+
+```yaml
+- name: Start with nothing spent of a one hour budget
+  ansible.builtin.set_fact:
+    capacity_spent: 0
+
+- name: Create the first worker
+  shakenfist.shakenfist.sf_instance:
+    name: "ci-worker-1"
+    cpu: 2
+    ram: 2048
+    disks:
+    - "20@debian:12"
+    await: true
+    capacity_wait: "{{ [3600 - (capacity_spent | int), 0] | max }}"
+  register: worker_1
+
+- name: Account for the time spent waiting
+  ansible.builtin.set_fact:
+    capacity_spent: "{{ (capacity_spent | int) + worker_1.capacity_waited.seconds }}"
+
+- name: Create the second worker
+  shakenfist.shakenfist.sf_instance:
+    name: "ci-worker-2"
+    cpu: 2
+    ram: 2048
+    disks:
+    - "20@debian:12"
+    await: true
+    capacity_wait: "{{ [3600 - (capacity_spent | int), 0] | max }}"
+  register: worker_2
+
+- name: Account for the time spent waiting
+  ansible.builtin.set_fact:
+    capacity_spent: "{{ (capacity_spent | int) + worker_2.capacity_waited.seconds }}"
+```
+
+A `capacity_wait` of 0 turns the wait off, so once the budget is spent the remaining creates fail on their first refusal rather than waiting. Each task can still take up to its `capacity_wait` plus its `await_timeout`.
 
 ### Examples
 
