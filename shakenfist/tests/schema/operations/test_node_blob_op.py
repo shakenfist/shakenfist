@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
+from shakenfist import mariadb
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
 from shakenfist.schema.operations.node_blob_op import create_and_enqueue
@@ -87,14 +88,24 @@ class NodeBlobOpTestCase(base.ShakenFistTestCase):
     def test_create_and_enqueue(self, _mock_time, _mock_id):
         node_uuid = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
         blob_uuid = '5c61e63d-8bd7-4d14-9af2-fa946ae9b1e7'
-        op_type, op_uuid = create_and_enqueue(
-            node_uuid, blob_uuid, [
-                model_tasks.ensure_local,
-                model_tasks.verify_size_and_checksum
-            ],
-            PRIORITY.background_high_io
-        )
+        with mock.patch(
+                'shakenfist.mariadb.create_and_enqueue_cluster_operation',
+                wraps=mariadb.create_and_enqueue_cluster_operation
+        ) as mock_enqueue:
+            op_type, op_uuid = create_and_enqueue(
+                node_uuid, blob_uuid, [
+                    model_tasks.ensure_local,
+                    model_tasks.verify_size_and_checksum
+                ],
+                PRIORITY.background_high_io
+            )
         self.assertEqual(ObjectType.NODE_BLOB_OP, op_type)
+
+        # The blob target is written in the enqueue transaction itself, so
+        # it must be handed to the atomic call.
+        self.assertEqual(
+            [(ObjectType.BLOB, blob_uuid)],
+            mock_enqueue.call_args.kwargs['targets'])
 
         self.assertEqual(
             {
@@ -127,8 +138,7 @@ class NodeBlobOpTestCase(base.ShakenFistTestCase):
                 '-clusteroperation-background_high_io')
         )
 
-        # Verify that create_and_enqueue records the blob as the operation
-        # target in MariaDB cluster_operation_targets table
+        # And the resulting cluster_operation_targets row names the blob
         target = self.mock_mariadb.cluster_operation_targets.get(op_uuid)
         self.assertIsNotNone(target)
         self.assertEqual('node_blob_op', target.operation_type)

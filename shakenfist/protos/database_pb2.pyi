@@ -8139,37 +8139,6 @@ class ClusterOperationTargetProto(_message.Message):
 Global___ClusterOperationTargetProto: _TypeAlias = ClusterOperationTargetProto  # noqa: Y015
 
 @_typing.final
-class CreateClusterOperationTargetRequest(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
-
-    OPERATION_UUID_FIELD_NUMBER: _builtins.int
-    OPERATION_TYPE_FIELD_NUMBER: _builtins.int
-    TARGET_OBJECT_TYPE_FIELD_NUMBER: _builtins.int
-    TARGET_UUID_FIELD_NUMBER: _builtins.int
-    CREATED_AT_FIELD_NUMBER: _builtins.int
-    operation_uuid: _builtins.str
-    operation_type: _builtins.str
-    target_object_type: _shakenfist_enums_pb2.ObjectType.ValueType
-    target_uuid: _builtins.str
-    created_at: _builtins.float
-    def __init__(
-        self,
-        *,
-        operation_uuid: _builtins.str = ...,
-        operation_type: _builtins.str = ...,
-        target_object_type: _shakenfist_enums_pb2.ObjectType.ValueType = ...,
-        target_uuid: _builtins.str = ...,
-        created_at: _builtins.float = ...,
-    ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["created_at", b"created_at", "operation_type", b"operation_type", "operation_uuid", b"operation_uuid", "target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
-
-Global___CreateClusterOperationTargetRequest: _TypeAlias = CreateClusterOperationTargetRequest  # noqa: Y015
-
-@_typing.final
 class GetClusterOperationTargetRequest(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 

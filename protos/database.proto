@@ -331,7 +331,6 @@ service DatabaseService {
 
   // Cluster Operation Target Operations (MariaDB)
   // Track which operations target which objects, with sequence ordering.
-  rpc CreateClusterOperationTarget (CreateClusterOperationTargetRequest) returns (StatusReply) {}
   rpc GetClusterOperationTarget (GetClusterOperationTargetRequest) returns (GetClusterOperationTargetReply) {}
   rpc GetClusterOperationTargetsForObject (GetClusterOperationTargetsForObjectRequest) returns (GetClusterOperationTargetsForObjectReply) {}
   rpc GetLatestClusterOperationTarget (GetLatestClusterOperationTargetRequest) returns (GetClusterOperationTargetReply) {}
@@ -2453,14 +2452,6 @@ message ClusterOperationTargetProto {
   string target_uuid = 4;
   int64 sequence_number = 5;
   double created_at = 6;
-}
-
-message CreateClusterOperationTargetRequest {
-  string operation_uuid = 1;
-  string operation_type = 2;
-  ObjectType target_object_type = 3;
-  string target_uuid = 4;
-  double created_at = 5;
 }
 
 message GetClusterOperationTargetRequest {

@@ -790,30 +790,6 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
         return mariadb.has_pending_cluster_operation_target(
             self.object_type, str(self.uuid))
 
-    def _set_last_cluster_operation(self, op_type, op_uuid):
-        if not self.in_memory_only:
-            success = mariadb.create_cluster_operation_target(
-                operation_uuid=str(op_uuid),
-                operation_type=str(op_type),
-                target_object_type=self.object_type,
-                target_uuid=str(self.uuid),
-                created_at=time.time()
-            )
-            if not success:
-                LOG.with_fields({
-                    'object_type': self.object_type,
-                    'object_uuid': str(self.uuid),
-                    'op_type': str(op_type),
-                    'op_uuid': str(op_uuid),
-                }).error(
-                    'Failed to write cluster operation target '
-                    'to MariaDB'
-                )
-                raise RuntimeError(
-                    f'Failed to write cluster operation target for '
-                    f'{self.object_type}/{self.uuid} op {op_type}/{op_uuid}'
-                )
-
     def get_cluster_operations(self, outstanding_only=True):
         # All ``from_db`` lookups here are best-effort: an op can be
         # hard-deleted between when we read its target row (or its

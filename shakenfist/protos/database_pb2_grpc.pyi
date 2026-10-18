@@ -343,11 +343,10 @@ class DatabaseServiceStub:
     """
     SetMetadata: _grpc.UnaryUnaryMultiCallable[_database_pb2.SetMetadataRequest, _database_pb2.StatusReply]
     DeleteObjectMetadata: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteObjectMetadataRequest, _database_pb2.StatusReply]
-    CreateClusterOperationTarget: _grpc.UnaryUnaryMultiCallable[_database_pb2.CreateClusterOperationTargetRequest, _database_pb2.StatusReply]
+    GetClusterOperationTarget: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationTargetRequest, _database_pb2.GetClusterOperationTargetReply]
     """Cluster Operation Target Operations (MariaDB)
     Track which operations target which objects, with sequence ordering.
     """
-    GetClusterOperationTarget: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationTargetRequest, _database_pb2.GetClusterOperationTargetReply]
     GetClusterOperationTargetsForObject: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationTargetsForObjectRequest, _database_pb2.GetClusterOperationTargetsForObjectReply]
     GetLatestClusterOperationTarget: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetLatestClusterOperationTargetRequest, _database_pb2.GetClusterOperationTargetReply]
     HasPendingClusterOperationTarget: _grpc.UnaryUnaryMultiCallable[_database_pb2.HasPendingClusterOperationTargetRequest, _database_pb2.HasPendingClusterOperationTargetReply]
@@ -756,11 +755,10 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     """
     SetMetadata: _aio.UnaryUnaryMultiCallable[_database_pb2.SetMetadataRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     DeleteObjectMetadata: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteObjectMetadataRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
-    CreateClusterOperationTarget: _aio.UnaryUnaryMultiCallable[_database_pb2.CreateClusterOperationTargetRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
+    GetClusterOperationTarget: _aio.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationTargetRequest, _database_pb2.GetClusterOperationTargetReply]  # type: ignore[assignment]
     """Cluster Operation Target Operations (MariaDB)
     Track which operations target which objects, with sequence ordering.
     """
-    GetClusterOperationTarget: _aio.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationTargetRequest, _database_pb2.GetClusterOperationTargetReply]  # type: ignore[assignment]
     GetClusterOperationTargetsForObject: _aio.UnaryUnaryMultiCallable[_database_pb2.GetClusterOperationTargetsForObjectRequest, _database_pb2.GetClusterOperationTargetsForObjectReply]  # type: ignore[assignment]
     GetLatestClusterOperationTarget: _aio.UnaryUnaryMultiCallable[_database_pb2.GetLatestClusterOperationTargetRequest, _database_pb2.GetClusterOperationTargetReply]  # type: ignore[assignment]
     HasPendingClusterOperationTarget: _aio.UnaryUnaryMultiCallable[_database_pb2.HasPendingClusterOperationTargetRequest, _database_pb2.HasPendingClusterOperationTargetReply]  # type: ignore[assignment]
@@ -2368,21 +2366,14 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
     ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]: ...
 
     @_abc_1.abstractmethod
-    def CreateClusterOperationTarget(
-        self,
-        request: _database_pb2.CreateClusterOperationTargetRequest,
-        context: _ServicerContext,
-    ) -> _typing.Union[_database_pb2.StatusReply, _abc.Awaitable[_database_pb2.StatusReply]]:
-        """Cluster Operation Target Operations (MariaDB)
-        Track which operations target which objects, with sequence ordering.
-        """
-
-    @_abc_1.abstractmethod
     def GetClusterOperationTarget(
         self,
         request: _database_pb2.GetClusterOperationTargetRequest,
         context: _ServicerContext,
-    ) -> _typing.Union[_database_pb2.GetClusterOperationTargetReply, _abc.Awaitable[_database_pb2.GetClusterOperationTargetReply]]: ...
+    ) -> _typing.Union[_database_pb2.GetClusterOperationTargetReply, _abc.Awaitable[_database_pb2.GetClusterOperationTargetReply]]:
+        """Cluster Operation Target Operations (MariaDB)
+        Track which operations target which objects, with sequence ordering.
+        """
 
     @_abc_1.abstractmethod
     def GetClusterOperationTargetsForObject(

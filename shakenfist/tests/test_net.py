@@ -470,12 +470,6 @@ class NetworkEnsureMeshEnqueueTestCase(NetworkTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        # The util.enqueue_cluster_operation helper also references
-        # the cluster_operation_targets writer; the MockMariaDB fixture
-        # already mocks the underlying mariadb calls, but it does not
-        # mock the target writer. Patch it inert so calls succeed.
-        self.mock_create_target = mock.patch(
-            'shakenfist.mariadb.create_cluster_operation_target').start()
         self.addCleanup(mock.patch.stopall)
 
         # Guard the test against any accidental host mutation: the old
@@ -1050,10 +1044,6 @@ class NetworkFloatingIPEnqueueTestCase(NetworkTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        # Inert mock for the cluster_operation_targets writer; the
-        # enqueue path calls it during ``enqueue_cluster_operation``.
-        self.mock_create_target = mock.patch(
-            'shakenfist.mariadb.create_cluster_operation_target').start()
         self.addCleanup(mock.patch.stopall)
 
         # Guards against any accidental host mutation from inside
@@ -1239,10 +1229,6 @@ class NetworkDnsmasqEnqueueTestCase(NetworkTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        # Inert mock for the cluster_operation_targets writer; the
-        # enqueue path calls it during ``enqueue_cluster_operation``.
-        self.mock_create_target = mock.patch(
-            'shakenfist.mariadb.create_cluster_operation_target').start()
         self.addCleanup(mock.patch.stopall)
 
         # Guard against any accidental dnsmasq host mutation. The
@@ -1549,10 +1535,6 @@ class NetworkLifecycleEnqueueTestCase(NetworkTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        # Inert mock for the cluster_operation_targets writer; the
-        # enqueue path calls it during ``enqueue_cluster_operation``.
-        self.mock_create_target = mock.patch(
-            'shakenfist.mariadb.create_cluster_operation_target').start()
         self.addCleanup(mock.patch.stopall)
 
     def _make_network(self, provide_dhcp=True, provide_dns=True,
@@ -1719,8 +1701,6 @@ class NetworkInternalSiblingCallsTestCase(NetworkTestCase):
         self.mock_config = self.config.start()
         self.addCleanup(self.config.stop)
 
-        self.mock_create_target = mock.patch(
-            'shakenfist.mariadb.create_cluster_operation_target').start()
         self.addCleanup(mock.patch.stopall)
 
     def _make_network(self, provide_dhcp=True, provide_dns=True,

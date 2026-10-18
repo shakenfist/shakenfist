@@ -5454,37 +5454,6 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             created_at=data.created_at
         )
 
-    def CreateClusterOperationTarget(
-        self,
-        request: database_pb2.CreateClusterOperationTargetRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.StatusReply:
-        """Record a cluster operation targeting an object."""
-        try:
-            self.monitor.counters[
-                'create_cluster_operation_target'].inc()
-            target_object_type = ObjectType.from_proto_id(
-                request.target_object_type)
-            if target_object_type is None:
-                return database_pb2.StatusReply(
-                    success=False,
-                    error='Invalid target_object_type')
-            success = (
-                mariadb._direct_create_cluster_operation_target(
-                    request.operation_uuid,
-                    request.operation_type,
-                    target_object_type,
-                    request.target_uuid,
-                    request.created_at))
-            return database_pb2.StatusReply(
-                success=success, error='')
-        except Exception as e:
-            util_exceptions.ignore_exception(
-                'database CreateClusterOperationTarget failed',
-                e)
-            return database_pb2.StatusReply(
-                success=False, error=str(e))
-
     def RecordEventBatch(
         self,
         request: database_pb2.RecordEventBatchRequest,
@@ -6563,7 +6532,6 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_object_metadata', 'set_metadata',
             'delete_object_metadata',
             # MariaDB cluster operation target operations
-            'create_cluster_operation_target',
             'get_cluster_operation_target',
             'get_cluster_operation_targets_for_object',
             'get_latest_cluster_operation_target',

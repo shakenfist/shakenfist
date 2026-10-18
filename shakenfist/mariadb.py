@@ -4894,58 +4894,6 @@ def delete_object_metadata(
 # Track which cluster operations target which objects, with sequence ordering.
 # =============================================================================
 
-def _direct_create_cluster_operation_target(
-    operation_uuid: str,
-    operation_type: str,
-    target_object_type: ObjectType,
-    target_uuid: str,
-    created_at: float
-) -> bool:
-    """Insert a cluster operation target row directly into MariaDB.
-
-    The sequence_number is assigned automatically by AUTO_INCREMENT.
-    """
-    engine = _get_engine()
-    table = _get_cluster_operation_targets_table()
-
-    try:
-        with engine.connect() as conn:
-            stmt = sa.insert(table).values(
-                operation_uuid=operation_uuid,
-                operation_type=operation_type,
-                target_object_type=target_object_type,
-                target_uuid=target_uuid,
-                created_at=created_at
-            )
-            conn.execute(stmt)
-            conn.commit()
-            return True
-    except IntegrityError as e:
-        # The only IntegrityError we want to treat as success is the
-        # composite UNIQUE on (operation_uuid, target_object_type,
-        # target_uuid) tripping -- the same op-target pair already
-        # exists, which is the idempotency case. Any other integrity
-        # violation (NOT NULL, type-check, foreign-key) is a real
-        # bug and must surface.
-        #
-        # MariaDB names the constraint in the error text. SQLite does
-        # not, so we also accept its fixed "UNIQUE constraint failed"
-        # phrase; the table only carries this one composite UNIQUE so
-        # the fallback cannot misclassify a different uniqueness rule.
-        msg = str(e).lower()
-        if 'uq_cot_op_target' in msg or 'unique constraint failed' in msg:
-            return True
-        LOG.warning(
-            f'Non-uniqueness IntegrityError writing '
-            f'cluster_operation_targets row for op {operation_uuid}: {e}')
-        return False
-    except OperationalError as e:
-        LOG.warning(
-            f'MariaDB write failed for cluster_operation_targets '
-            f'{operation_uuid}: {e}')
-        return False
-
-
 def _direct_get_cluster_operation_target(
     operation_uuid: str
 ) -> Optional[ClusterOperationTargetData]:
@@ -5251,34 +5199,6 @@ def _direct_delete_stale_cluster_operation_targets(
 
 # gRPC client functions for cluster operation targets
 
-def _grpc_create_cluster_operation_target(
-    operation_uuid: str,
-    operation_type: str,
-    target_object_type: ObjectType,
-    target_uuid: str,
-    created_at: float
-) -> bool:
-    """Insert a cluster operation target via the database microservice."""
-    try:
-        stub = _get_database_stub()
-        request = database_pb2.CreateClusterOperationTargetRequest(
-            operation_uuid=operation_uuid,
-            operation_type=operation_type,
-            target_object_type=cast(
-                shakenfist_enums_pb2.ObjectType.ValueType,
-                target_object_type.proto_id),
-            target_uuid=target_uuid,
-            created_at=created_at
-        )
-        reply = _grpc_call(stub.CreateClusterOperationTarget, request)
-        return bool(reply.success)
-    except grpc.RpcError as e:
-        LOG.error(
-            f'gRPC CreateClusterOperationTarget failed for '
-            f'{operation_uuid}: {e}')
-        return False
-
-
 def _target_from_proto(
     t: 'database_pb2.ClusterOperationTargetProto'
 ) -> ClusterOperationTargetData:
@@ -5471,34 +5391,6 @@ def _grpc_delete_stale_cluster_operation_targets(max_age: float) -> int:
 
 
 # Public API functions for cluster operation targets
-
-def create_cluster_operation_target(
-    operation_uuid: str,
-    operation_type: str,
-    target_object_type: ObjectType,
-    target_uuid: str,
-    created_at: float
-) -> bool:
-    """Record that a cluster operation targets an object.
-
-    Args:
-        operation_uuid: UUID of the cluster operation.
-        operation_type: The operation type string.
-        target_object_type: The ObjectType of the target object.
-        target_uuid: UUID of the target object.
-        created_at: Unix timestamp when the operation was enqueued.
-
-    Returns:
-        True if the row was created, False on duplicate or error.
-    """
-    if _use_database_service():
-        return _grpc_create_cluster_operation_target(
-            operation_uuid, operation_type, target_object_type,
-            target_uuid, created_at)
-    return _direct_create_cluster_operation_target(
-        operation_uuid, operation_type, target_object_type,
-        target_uuid, created_at)
-
 
 def get_cluster_operation_target(
     operation_uuid: str

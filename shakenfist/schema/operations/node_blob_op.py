@@ -1,4 +1,3 @@
-import time
 from enum import Enum
 from typing import ClassVar
 from typing import List
@@ -12,7 +11,6 @@ from pydantic import UUID4
 from pydantic import ValidationError
 from shakenfist_utilities import logs  # noreorder
 
-from shakenfist import mariadb
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations.baseclusteroperation import _convert_deps
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
@@ -90,15 +88,5 @@ def create_and_enqueue(node_uuid, blob_uuid, tasks, priority, request_id=None,
 
     enqueue_cluster_operation(
         object_type, m.model_dump(mode='json'), model_class=model)
-
-    # Record that this operation targets the blob in MariaDB so that
-    # scheduled_tasks can discover pending blob operations without etcd.
-    mariadb.create_cluster_operation_target(
-        operation_uuid=operation_uuid,
-        operation_type=object_type.value,
-        target_object_type=ObjectType.BLOB,
-        target_uuid=str(blob_uuid),
-        created_at=time.time()
-    )
 
     return object_type, operation_uuid

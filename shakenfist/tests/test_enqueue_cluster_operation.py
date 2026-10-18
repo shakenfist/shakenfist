@@ -255,9 +255,7 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
     transaction as the operation. These tests exercise the four
     cases called out in the phase plan: single-target,
     multi-target, nullable, and missing-declaration. They also
-    assert the retired non-atomic writer
-    (mariadb.create_cluster_operation_target) is never called
-    from this path.
+    assert the targets travel in the atomic enqueue call.
     """
 
     def setUp(self):
@@ -266,10 +264,6 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
             'shakenfist.mariadb.create_and_enqueue_cluster_operation'
         ).start()
         self.mock_create_and_enqueue.return_value = (True, '')
-
-        self.mock_create_target = mock.patch(
-            'shakenfist.mariadb.create_cluster_operation_target'
-        ).start()
 
         self.mock_add_event_multi = mock.patch(
             'shakenfist.schema.operations.util.eventlog'
@@ -306,8 +300,6 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             [(ObjectType.NETWORK, NETWORK_UUID)],
             self._targets_arg())
-        # The retired non-atomic writer must not be used any more.
-        self.mock_create_target.assert_not_called()
 
     def test_multi_target_writes_three_rows(self):
         util.enqueue_cluster_operation(
@@ -324,7 +316,6 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
              (ObjectType.NETWORK, NETWORK_UUID),
              (ObjectType.INTERFACE, INTERFACE_UUID)},
             set(self._targets_arg()))
-        self.mock_create_target.assert_not_called()
 
     def test_nullable_target_field_is_skipped(self):
         # instance_uuid present in metadata but None -- should be
@@ -335,7 +326,6 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
             model_class=_NullableTargetModel)
 
         self.assertEqual([], self._targets_arg())
-        self.mock_create_target.assert_not_called()
 
     def test_missing_declaration_is_a_noop(self):
         # A model class without target_fields must not crash --
@@ -346,7 +336,6 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
             model_class=_NoDeclarationModel)
 
         self.assertEqual([], self._targets_arg())
-        self.mock_create_target.assert_not_called()
 
     def test_no_model_class_argument_is_a_noop(self):
         # Backwards compatibility: a caller that does not pass
@@ -356,7 +345,6 @@ class EnqueueClusterOperationAutoTargetTestCase(base.ShakenFistTestCase):
             self._metadata(instance_uuid=INSTANCE_UUID))
 
         self.assertEqual([], self._targets_arg())
-        self.mock_create_target.assert_not_called()
 
 
 class EnqueueClusterOperationFamilyTestCase(base.ShakenFistTestCase):
@@ -375,10 +363,6 @@ class EnqueueClusterOperationFamilyTestCase(base.ShakenFistTestCase):
             'shakenfist.mariadb.create_and_enqueue_cluster_operation'
         ).start()
         self.mock_create_and_enqueue.return_value = (True, '')
-
-        self.mock_create_target = mock.patch(
-            'shakenfist.mariadb.create_cluster_operation_target'
-        ).start()
 
         self.mock_add_event_multi = mock.patch(
             'shakenfist.schema.operations.util.eventlog'
@@ -476,4 +460,3 @@ class EnqueueClusterOperationFamilyTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             [(ObjectType.NETWORK, NETWORK_UUID)],
             self.mock_create_and_enqueue.call_args.kwargs['targets'])
-        self.mock_create_target.assert_not_called()
