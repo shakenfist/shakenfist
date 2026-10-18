@@ -178,7 +178,7 @@ dependencies = [
     "urllib3==2.8.0",
     "wrapt==2.4.1",
     "zope.event==6.2",
-    "zope.interface==8.6",
+    "zope.interface==8.7",
     # END_OF_INDIRECT_DEPS
 ]
 
