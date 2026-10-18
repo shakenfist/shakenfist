@@ -277,31 +277,44 @@ Every operation schema's `model` class declares its target objects via a
 `cluster_operation_targets` row per non-None target field. Callers have
 no per-target bookkeeping obligation — targets are recorded automatically.
 
-The setter `_set_last_cluster_operation` is private and used only by the
-internal enqueue plumbing. It is not a public API and should not be called
-directly.
+Each target row also carries an `observational` flag (schema v3), derived
+at enqueue time by `is_observational()` in `schema/operations/util.py`. A
+model may declare `observational_tasks: ClassVar[frozenset[...]]` beside
+`target_fields`; an operation is observational only if it has tasks and every
+one of them is in that set, so a single mutating task makes the whole
+operation mutating. No model declares any yet. See
+[the master plan](../plans/PLAN-cluster-op-visibility.md) for the
+rationale.
 
 `DatabaseBackedObjectWithOperations` exposes two read shapes over the
 history:
 
-- **`last_cluster_operation` (property)**: returns the most recent target
-  row regardless of its state. Consumed by `external_view()` projections
+- **`last_cluster_operation` (property)**: returns the most recent
+  non-observational target row regardless of its state. Consumed by `external_view()` projections
   and `runs_after=[...]` chains, which want the latest pointer
   independent of whether it has reached a terminal state.
 - **`has_pending_cluster_operation()` (method)**: returns `True` if any
-  target row's operation is in `{queued, preflight, executing}`. Consumed
+  non-observational target row's operation is in `{queued, preflight, executing}`. Consumed
   by `Network.is_okay()` and any future history-aware gate. The query
   joins `cluster_operation_targets` against `object_states`, so a later
   terminal operation cannot mask an earlier in-flight one.
 
-Because the table is append-only it is bounded by a periodic prune in the
-cluster daemon, alongside the existing `delete_stale_transfers` cleanup.
+As a backstop for rows that outlive their operation, the table is bounded by
+a periodic prune in the cluster daemon, alongside the existing
+`delete_stale_transfers` cleanup.
 The prune removes rows older than `CLUSTER_OPERATION_TARGET_RETENTION`
 seconds whose operation has already reached a terminal state. In-flight
 operations (`queued`/`preflight`/`executing`) are never pruned regardless
 of age. Because the cluster daemon already runs cluster-wide cleanup
 under `ClusterLock` election, no additional locking or master-node
 gating is required.
+
+Only these two readers ignore observational rows. The other by-target
+readers (for example `get_cluster_operation_targets_for_object()`, which the
+per-blob sweep uses to avoid queueing a duplicate checksum op, and the
+by-target listing) deliberately see everything. Rows normally disappear when
+their operation is hard-deleted, about thirty seconds after it goes
+terminal, so the prune is a backstop.
 
 ## Cluster Operation Storage and Work Queues
 

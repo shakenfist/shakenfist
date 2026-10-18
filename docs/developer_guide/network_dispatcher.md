@@ -393,7 +393,7 @@ For each network with detected drift, `mariadb.has_pending_cluster_operation(
 target_object_type='network', target_uuid=n.uuid)` is called. This queries the
 `cluster_operation_targets` table (history-aware, not a single-pointer) and
 returns `True` if any in-flight op (`queued`, `preflight`, or `executing`) is
-already targeting this network. If `True`, the network is skipped for this pass:
+already targeting this network (observational ops are ignored). If `True`, the network is skipped for this pass:
 the in-flight op will fix the drift when it executes.
 
 #### Guard 3 — Cooldown

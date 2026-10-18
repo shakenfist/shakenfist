@@ -286,6 +286,43 @@ Operations enqueued after the migration completes record all of
 their targets correctly, so the gate behaves as designed once the
 in-flight v1 ops drain.
 
+#### cluster_operation_targets v2 to v3
+
+The v3 migration adds an `observational` column
+(`BOOLEAN NOT NULL DEFAULT 0`) and widens the `idx_cot_target` index from
+`(target_object_type, target_uuid)` to `(target_object_type, target_uuid,
+observational)`. The two "current state" readers
+(`last_cluster_operation` and the pending-operation check) will ignore
+observational rows. Until a later release classifies any task as
+observational, no row is marked observational, so behaviour is unchanged by
+this migration. See
+[the master plan](../plans/PLAN-cluster-op-visibility.md) for the
+rationale.
+
+Run `sf-ctl ensure-mariadb-schema` before rolling the daemons. Only the
+database gateway (`sf-database`) checks schema versions at startup, via
+`verify_schema_versions()`; it refuses to start if
+`cluster_operation_targets` is below v3. Other daemons do not check, but
+they reach the table only through a gateway.
+
+The migration is online. Adding the column is an instant metadata change,
+and the index is rebuilt in place over a small table, because operations
+delete their target rows about thirty seconds after going terminal. It took
+under half a second for 50,000 rows in testing. The migration is a single
+`ALTER TABLE` and is safe to re-run if interrupted: the re-run just rebuilds
+the index.
+
+Older daemons still running during a rolling upgrade do not know about the
+column, so the rows they write take the default and are treated as
+mutating, which is how every row was treated before v3.
+
+The `CreateClusterOperationTarget` RPC has been removed, because the atomic
+enqueue already writes the target rows. An older node daemon that still
+makes the call during the roll gets an `UNIMPLEMENTED` error from an
+upgraded gateway and may log a failed `CreateClusterOperationTarget` call.
+This is expected and harmless: the row was already written by the enqueue,
+and the caller ignores the result.
+
 #### object_states v2 to v3
 
 The v3 migration adds a standalone index `idx_object_states_uuid` on

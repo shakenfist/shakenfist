@@ -692,7 +692,7 @@ constraints. These get dedicated tables optimized for their access patterns:
 | `ipam_reservations` | IP address allocations with uniqueness constraints |
 | `cluster_operations` | Full cluster operation metadata with indexed `node_uuid`, `instance_uuid`, `network_uuid` and `priority` columns extracted from JSON for dispatch-time filtering |
 | `work_queue` | Per-job queue row with `queue_name`, `scheduled_at`, `claimed_at`, `claimed_by`, `attempts` and `payload`. Dequeue uses `SELECT ... FOR UPDATE SKIP LOCKED` |
-| `cluster_operation_targets` | Operation-to-object targeting with AUTO_INCREMENT ordering |
+| `cluster_operation_targets` | Operation-to-object targeting with AUTO_INCREMENT ordering, plus an `observational` flag per row (schema v3). Holds in-flight operations and the last ~30 seconds of terminal ones, not a full history |
 | `cluster_operation_errors` | One row per failed cluster operation, keyed by `op_uuid`. Stores the structured `ErrorReport` (code, message, details, origin_class, traceback) JSON. Cleaned up alongside the `cluster_operations` row by `BaseClusterOperation.hard_delete()` when the cluster cleaner reaps a terminal-state op |
 | `node_metrics` | Ephemeral per-node resource metrics with semi-schemaless JSON payload, plus typed nullable columns projecting the capacity-relevant fields and the node's hypervisor role |
 | `node_daemon_states` | Per-`(node, daemon)` state rows; atomic upsert per daemon, no Python-side coarse lock |
@@ -1043,15 +1043,21 @@ repaired to.
 
 Cluster operation targets are stored separately because:
 
-- **Append-only history**: Every operation enqueued against an object creates
-  a row, giving full operation history per target
+- **Per-target ordering of live operations**: Every operation enqueued against
+  an object creates a row, giving the operations in flight (and those that
+  finished in the last half minute) per target. The row is deleted when its
+  operation is hard-deleted, so this is not a long-term history
 - **Automatic ordering**: AUTO_INCREMENT sequence_number replaces the implicit
   dependency chain traversal
 - **Indexed queries**: Efficient lookups for "latest operation on this instance"
   and "all operations on this object in order"
 
-Because the table is append-only, it is bounded by a periodic prune in the
-cluster daemon (alongside the existing `delete_stale_transfers` cleanup).
+Target rows live only until their operation is hard-deleted, which happens
+about thirty seconds after the operation goes terminal, so the table holds
+in-flight operations plus the last half minute of finished ones. As a
+backstop for rows that outlive their operation, the table is also bounded by
+a periodic prune in the cluster daemon (alongside the existing
+`delete_stale_transfers` cleanup).
 The cluster daemon runs cluster-wide cleanup under `ClusterLock` election,
 so the prune naturally runs from a single node at a time. The prune
 removes rows whose `created_at` is older than
@@ -1066,27 +1072,44 @@ entirely (the default is 7 days).
 The `cluster_operation_targets` table holds one row per (operation, target
 object) pair. Each row carries the target's object type and UUID, plus the
 `operation_uuid` and an `AUTO_INCREMENT` `sequence_number` that gives
-total ordering per target.
+total ordering per target. The table is at schema v3.
+
+Since v3 each row also carries an `observational` column
+(`BOOLEAN NOT NULL DEFAULT 0`). It is set when the operation is enqueued,
+from the operation's tasks, and is true only when the operation merely
+observes its targets (for example a periodic statistics or checksum sweep)
+rather than changing them. Every row of an operation carries the same value.
+Rows written without the column, including those from daemons that predate
+v3, default to `0` (mutating). The table's lookup index `idx_cot_target`
+covers `(target_object_type, target_uuid, observational)`; its first two
+columns still serve readers that do not filter on the flag.
 
 Two query shapes are exposed to the rest of the system:
 
 - **`get_latest_cluster_operation_target`**: returns the highest-sequence
-  row for a given `(object_type, uuid)` pair, regardless of state. Used
+  mutating row for a given `(object_type, uuid)` pair, regardless of state. Used
   by the `last_cluster_operation` property and `external_view()`
   projections to provide the familiar "which op ran last?" answer.
-- **`has_pending_cluster_operation_target`**: returns `True` if any row
-  for the object references an operation whose state is `queued`,
+  Observational rows are ignored, so a background sweep never becomes
+  an object's last operation.
+- **`has_pending_cluster_operation_target`**: returns `True` if any mutating
+  row for the object references an operation whose state is `queued`,
   `preflight`, or `executing`. Used by `Network.is_okay()` and any other
   gate that must defer while work is in flight. Because it checks all
   rows rather than only the latest one, a later terminal operation cannot
-  mask an earlier in-flight one.
+  mask an earlier in-flight one. Observational rows are ignored here too,
+  so a background sweep never makes an object look busy.
 
 Rows are written automatically by `enqueue_cluster_operation`; operators
-do not need to manage them. Pruning is performed by the cluster daemon
-under `ClusterLock` election via
-`_direct_delete_stale_cluster_operation_targets`: rows older than
-`CLUSTER_OPERATION_TARGET_RETENTION` whose operation has reached a
-terminal state are removed; in-flight operations are never pruned.
+do not need to manage them. Normally a row is removed when its operation is
+hard-deleted, about thirty seconds after the operation goes terminal. The
+cluster daemon's prune, performed under `ClusterLock` election via
+`_direct_delete_stale_cluster_operation_targets`, is a backstop: rows older
+than `CLUSTER_OPERATION_TARGET_RETENTION` (7 days by default) whose
+operation has reached a terminal state are removed; in-flight operations are
+never pruned. The by-target listing (`GET /clusteroperations?target_*`)
+still reports observational operations, with an `observational` key per
+operation.
 
 #### Per-Type Static Value Tables
 
