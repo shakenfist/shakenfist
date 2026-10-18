@@ -12,9 +12,12 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import OperationalError
 
+from shakenfist.daemons.database import main as database_main
 from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.config import BaseSettings
+from shakenfist.protos import database_pb2
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 
 
@@ -131,6 +134,55 @@ class CreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
         # and its target rows visible together.
         self.assertEqual(mock_conn.execute.call_count, 5)
         mock_conn.commit.assert_called_once()
+
+    def _target_row_params(self, mock_get_engine, **kwargs):
+        """Enqueue with two targets, returning each target insert's params."""
+        mock_engine, mock_conn = _make_mock_engine()
+        mock_get_engine.return_value = mock_engine
+
+        success, _ = mariadb._direct_create_and_enqueue_cluster_operation(
+            UUID(OP_UUID_STR),
+            'node_inst_net_iface_op',
+            _make_metadata(),
+            1000.0,
+            'node-clusteroperation-user_waiting',
+            targets=[
+                (ObjectType.INSTANCE, INSTANCE_UUID_STR),
+                (ObjectType.NETWORK, NETWORK_UUID_STR),
+            ],
+            **kwargs)
+        self.assertTrue(success)
+
+        # The first three inserts are cluster_operations, object_states
+        # and work_queue; the rest are the target rows, all before the
+        # single commit.
+        self.assertEqual(mock_conn.execute.call_count, 5)
+        mock_conn.commit.assert_called_once()
+        return [
+            c[0][0].compile().params
+            for c in mock_conn.execute.call_args_list[3:]]
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_observational_flag_stamped_on_every_target_row(
+            self, mock_get_engine):
+        rows = self._target_row_params(
+            mock_get_engine, observational=True)
+        self.assertEqual(
+            [INSTANCE_UUID_STR, NETWORK_UUID_STR],
+            [r['target_uuid'] for r in rows])
+        self.assertEqual([True, True], [r['observational'] for r in rows])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_mutating_flag_stamped_on_every_target_row(
+            self, mock_get_engine):
+        rows = self._target_row_params(
+            mock_get_engine, observational=False)
+        self.assertEqual([False, False], [r['observational'] for r in rows])
+
+    @mock.patch('shakenfist.mariadb._get_engine')
+    def test_observational_defaults_to_mutating(self, mock_get_engine):
+        rows = self._target_row_params(mock_get_engine)
+        self.assertEqual([False, False], [r['observational'] for r in rows])
 
     @mock.patch(
         'shakenfist.mariadb._direct_get_cluster_operation',
@@ -599,3 +651,104 @@ class GrpcCreateAndEnqueueClusterOperationTestCase(base.ShakenFistTestCase):
 
         self.assertFalse(success)
         self.assertIn('service unavailable', error)
+
+
+class CreateAndEnqueueObservationalWireTestCase(base.ShakenFistTestCase):
+    """The observational flag crosses the gRPC hop intact.
+
+    It is one field on CreateAndEnqueueClusterOperationRequest, set by
+    the client wrapper and handed to the direct writer by the database
+    service handler, which stamps it on every target row.
+    """
+
+    def _wrapper_request(self, **kwargs):
+        with mock.patch('shakenfist.mariadb._get_database_stub'), \
+                mock.patch('shakenfist.mariadb._grpc_call') as mock_call:
+            mock_call.return_value = mock.Mock(success=True, error='')
+            success, _ = mariadb._grpc_create_and_enqueue_cluster_operation(
+                UUID(OP_UUID_STR),
+                'node_inst_op',
+                _make_metadata(),
+                1000.0,
+                'node-clusteroperation-user_waiting',
+                targets=[(ObjectType.INSTANCE, INSTANCE_UUID_STR)],
+                **kwargs)
+        self.assertTrue(success)
+        return mock_call.call_args[0][1]
+
+    def test_wrapper_sends_observational(self):
+        request = self._wrapper_request(observational=True)
+        self.assertTrue(request.observational)
+        self.assertEqual(1, len(request.targets))
+
+    def test_wrapper_sends_mutating_by_default(self):
+        request = self._wrapper_request()
+        self.assertFalse(request.observational)
+
+    def test_public_function_passes_observational_to_grpc(self):
+        with mock.patch(
+                'shakenfist.mariadb._use_database_service',
+                return_value=True), \
+                mock.patch(
+                    'shakenfist.mariadb'
+                    '._grpc_create_and_enqueue_cluster_operation',
+                    return_value=(True, '')) as mock_grpc:
+            mariadb.create_and_enqueue_cluster_operation(
+                OP_UUID_STR, 'node_inst_op', _make_metadata(), 1000.0,
+                'node-clusteroperation-user_waiting',
+                observational=True)
+        self.assertIs(True, mock_grpc.call_args.kwargs['observational'])
+
+    def test_public_function_passes_observational_to_direct(self):
+        with mock.patch(
+                'shakenfist.mariadb._use_database_service',
+                return_value=False), \
+                mock.patch(
+                    'shakenfist.mariadb'
+                    '._direct_create_and_enqueue_cluster_operation',
+                    return_value=(True, '')) as mock_direct:
+            mariadb.create_and_enqueue_cluster_operation(
+                OP_UUID_STR, 'node_inst_op', _make_metadata(), 1000.0,
+                'node-clusteroperation-user_waiting',
+                observational=True)
+        self.assertIs(True, mock_direct.call_args.kwargs['observational'])
+
+    def _handler_direct_call(self, request):
+        servicer = database_main.DatabaseService.__new__(
+            database_main.DatabaseService)
+        servicer.monitor = mock.MagicMock()
+        with mock.patch(
+                'shakenfist.mariadb'
+                '._direct_create_and_enqueue_cluster_operation',
+                return_value=(True, '')) as mock_direct:
+            reply = servicer.CreateAndEnqueueClusterOperation(
+                request, mock.MagicMock())
+        self.assertTrue(reply.success)
+        mock_direct.assert_called_once()
+        return mock_direct.call_args
+
+    def _request(self, **kwargs):
+        return database_pb2.CreateAndEnqueueClusterOperationRequest(
+            uuid=OP_UUID_STR,
+            operation_type='node_inst_op',
+            created_at=1000.0,
+            queue_name='node-clusteroperation-user_waiting',
+            metadata_json='{}',
+            targets=[
+                database_pb2.CreateAndEnqueueClusterOperationTarget(
+                    target_object_type=ObjectType.INSTANCE.proto_id,
+                    target_uuid=INSTANCE_UUID_STR),
+            ],
+            **kwargs)
+
+    def test_handler_passes_observational_through(self):
+        call = self._handler_direct_call(self._request(observational=True))
+        self.assertIs(True, call.kwargs['observational'])
+        self.assertEqual(
+            [(ObjectType.INSTANCE, INSTANCE_UUID_STR)], call.args[6])
+
+    def test_handler_treats_older_client_as_mutating(self):
+        # An older client does not set the field, so the handler sees
+        # the proto3 default -- false, the conservative value.
+        call = self._handler_direct_call(self._request())
+        self.assertIs(False, call.kwargs['observational'])

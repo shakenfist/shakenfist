@@ -5,6 +5,7 @@
 # It wraps mariadb.create_and_enqueue_cluster_operation() +
 # eventlog.add_event_multi().
 
+from enum import Enum
 from typing import ClassVar
 from unittest import mock
 
@@ -46,6 +47,28 @@ class _NullableTargetModel(BaseModel):
 
 class _NoDeclarationModel(BaseModel):
     pass
+
+
+# A stand-in task enum and models for the observational tests. Two
+# tasks only observe, one mutates.
+class _Tasks(Enum):
+    check_a = 1
+    check_b = 2
+    mutate = 3
+
+
+class _ObservingModel(BaseModel):
+    target_fields: ClassVar[dict[str, ObjectType]] = {
+        'instance_uuid': ObjectType.INSTANCE,
+    }
+    observational_tasks: ClassVar[frozenset[_Tasks]] = frozenset({
+        _Tasks.check_a,
+        _Tasks.check_b,
+    })
+
+
+class _EmptyObservingModel(BaseModel):
+    observational_tasks: ClassVar[frozenset[_Tasks]] = frozenset()
 
 
 OP_UUID = '11111111-1111-4111-8111-111111111111'
@@ -113,6 +136,7 @@ class EnqueueClusterOperationTestCase(base.ShakenFistTestCase):
             queue_name=(
                 f'{NODE_UUID}-clusteroperation-user_waiting'),
             targets=[],
+            observational=False,
         )
 
         self.mock_add_event_multi.assert_called_once()
@@ -216,6 +240,7 @@ class EnqueueClusterOperationTestCase(base.ShakenFistTestCase):
             fields['queue_name'])
         self.assertEqual(
             [f'instance:{INSTANCE_UUID}'], fields['targets'])
+        self.assertFalse(fields['observational'])
         self.assertEqual('MariaDB error: deadlock', fields['error'])
         mock_log.with_fields.return_value.error.assert_called_once_with(
             'Failed to enqueue cluster operation')
@@ -460,3 +485,126 @@ class EnqueueClusterOperationFamilyTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             [(ObjectType.NETWORK, NETWORK_UUID)],
             self.mock_create_and_enqueue.call_args.kwargs['targets'])
+
+
+class IsObservationalTestCase(base.ShakenFistTestCase):
+    """The truth table for util.is_observational().
+
+    An op is observational only if it has at least one task and every
+    task is in its model's observational_tasks. Anything else --
+    including every way of not having the information -- is mutating,
+    the conservative answer.
+    """
+
+    def test_no_model_class_is_mutating(self):
+        self.assertFalse(util.is_observational(None, ['check_a']))
+
+    def test_no_tasks_is_mutating(self):
+        self.assertFalse(util.is_observational(_ObservingModel, []))
+        self.assertFalse(util.is_observational(_ObservingModel, None))
+
+    def test_model_without_declaration_is_mutating(self):
+        self.assertFalse(
+            util.is_observational(_NoDeclarationModel, ['check_a']))
+
+    def test_model_with_empty_declaration_is_mutating(self):
+        self.assertFalse(
+            util.is_observational(_EmptyObservingModel, ['check_a']))
+
+    def test_all_tasks_observational(self):
+        self.assertTrue(
+            util.is_observational(_ObservingModel, ['check_a']))
+        self.assertTrue(
+            util.is_observational(_ObservingModel, ['check_a', 'check_b']))
+
+    def test_mixed_tasks_are_mutating(self):
+        # One mutating task makes the whole op mutating, whatever its
+        # position in the list.
+        self.assertFalse(
+            util.is_observational(_ObservingModel, ['check_a', 'mutate']))
+        self.assertFalse(
+            util.is_observational(_ObservingModel, ['mutate', 'check_b']))
+
+    def test_unknown_task_names_are_mutating(self):
+        self.assertFalse(
+            util.is_observational(_ObservingModel, ['no_such_task']))
+        self.assertFalse(
+            util.is_observational(
+                _ObservingModel, ['check_a', 'no_such_task']))
+
+    def test_enum_members_are_accepted(self):
+        self.assertTrue(
+            util.is_observational(
+                _ObservingModel, [_Tasks.check_a, _Tasks.check_b]))
+        self.assertFalse(
+            util.is_observational(
+                _ObservingModel, [_Tasks.check_a, _Tasks.mutate]))
+
+
+class EnqueueClusterOperationObservationalTestCase(
+        base.ShakenFistTestCase):
+    """enqueue_cluster_operation() derives and passes the flag.
+
+    The flag is computed from the serialised task names in
+    metadata['tasks'] and handed to the atomic enqueue, which stamps
+    it on every target row.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_create_and_enqueue = mock.patch(
+            'shakenfist.mariadb.create_and_enqueue_cluster_operation'
+        ).start()
+        self.mock_create_and_enqueue.return_value = (True, '')
+
+        mock.patch(
+            'shakenfist.schema.operations.util.eventlog'
+            '.add_event_multi'
+        ).start()
+        mock.patch(
+            'shakenfist.schema.operations.util.time.time',
+            return_value=4000.0,
+        ).start()
+
+        self.addCleanup(mock.patch.stopall)
+
+    def _enqueue(self, tasks, model_class=_ObservingModel):
+        util.enqueue_cluster_operation(
+            _FakeObjectType('NODE_INST_OP'),
+            {
+                'uuid': OP_UUID,
+                'node_uuid': NODE_UUID,
+                'instance_uuid': INSTANCE_UUID,
+                'priority': 'background',
+                'tasks': tasks,
+            },
+            model_class=model_class)
+        return self.mock_create_and_enqueue.call_args.kwargs
+
+    def test_all_observational_tasks_pass_true(self):
+        kwargs = self._enqueue(['check_a', 'check_b'])
+        self.assertIs(True, kwargs['observational'])
+        self.assertEqual(
+            [(ObjectType.INSTANCE, INSTANCE_UUID)], kwargs['targets'])
+
+    def test_mixed_tasks_pass_false(self):
+        kwargs = self._enqueue(['check_a', 'mutate'])
+        self.assertIs(False, kwargs['observational'])
+
+    def test_no_model_class_passes_false(self):
+        kwargs = self._enqueue(['check_a'], model_class=None)
+        self.assertIs(False, kwargs['observational'])
+
+    def test_passes_what_the_helper_returns(self):
+        # The flag reaching the database is exactly the helper's
+        # answer for this model and these task names, not something
+        # enqueue_cluster_operation() works out for itself.
+        with mock.patch(
+                'shakenfist.schema.operations.util.is_observational',
+                return_value=True) as mock_helper:
+            kwargs = self._enqueue(
+                ['mutate'], model_class=_NoDeclarationModel)
+
+        mock_helper.assert_called_once_with(
+            _NoDeclarationModel, ['mutate'])
+        self.assertIs(True, kwargs['observational'])

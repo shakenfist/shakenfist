@@ -6041,10 +6041,12 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
     ) -> database_pb2.StatusReply:
         """Atomically create a cluster operation and enqueue its work item.
 
-        Writes cluster_operations, object_states and work_queue in a
-        single MariaDB transaction. Audit events are not written by
-        this RPC -- callers emit them via the eventlog service after
-        the RPC returns successfully.
+        Writes cluster_operations, object_states, work_queue and
+        cluster_operation_targets in a single MariaDB transaction,
+        stamping every target row with the request's observational
+        flag. Audit events are not written by this RPC -- callers emit
+        them via the eventlog service after the RPC returns
+        successfully.
         """
         try:
             self.monitor.counters[
@@ -6073,6 +6075,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     request.queue_name,
                     request.delay,
                     targets,
+                    observational=request.observational,
                 )
             )
             return database_pb2.StatusReply(

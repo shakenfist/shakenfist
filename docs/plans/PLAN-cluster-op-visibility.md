@@ -410,7 +410,13 @@ and when to mark a task observational, lands here, because
 this is when the distinction first means something.
 `last_cluster_operation` in the instance external view stops
 reporting sweep ops once this phase lands, and the release
-notes should say so.
+notes should say so. Watch one trap, found in phase 2:
+`observational_tasks` must be annotated `ClassVar`. Without the
+annotation, pydantic turns it into a field, the class attribute
+the helper reads disappears, and the classification silently
+does nothing. The phase 2 inertness test checks
+`model.model_fields` for this, and its replacement must keep an
+equivalent check.
 
 ### Phase 4: API surface (plan at high effort)
 

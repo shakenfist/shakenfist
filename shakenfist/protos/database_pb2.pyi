@@ -8812,6 +8812,7 @@ class CreateAndEnqueueClusterOperationRequest(_message.Message):
     DELAY_FIELD_NUMBER: _builtins.int
     METADATA_JSON_FIELD_NUMBER: _builtins.int
     TARGETS_FIELD_NUMBER: _builtins.int
+    OBSERVATIONAL_FIELD_NUMBER: _builtins.int
     uuid: _builtins.str
     """Operation UUID as string"""
     operation_type: _builtins.str
@@ -8824,6 +8825,12 @@ class CreateAndEnqueueClusterOperationRequest(_message.Message):
     """Seconds to defer before the job is eligible"""
     metadata_json: _builtins.str
     """Full operation metadata dict as JSON"""
+    observational: _builtins.bool
+    """Whether the operation only observes its targets. One flag per
+    operation, copied onto each target row it writes. False (mutating)
+    is the conservative value, and is what an older client that does
+    not know this field sends.
+    """
     @_builtins.property
     def targets(self) -> _containers.RepeatedCompositeFieldContainer[Global___CreateAndEnqueueClusterOperationTarget]:
         """cluster_operation_targets rows written atomically with the op so a
@@ -8840,10 +8847,11 @@ class CreateAndEnqueueClusterOperationRequest(_message.Message):
         delay: _builtins.float = ...,
         metadata_json: _builtins.str = ...,
         targets: _abc.Iterable[Global___CreateAndEnqueueClusterOperationTarget] | None = ...,
+        observational: _builtins.bool = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["created_at", b"created_at", "delay", b"delay", "metadata_json", b"metadata_json", "operation_type", b"operation_type", "queue_name", b"queue_name", "targets", b"targets", "uuid", b"uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["created_at", b"created_at", "delay", b"delay", "metadata_json", b"metadata_json", "observational", b"observational", "operation_type", b"operation_type", "queue_name", b"queue_name", "targets", b"targets", "uuid", b"uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

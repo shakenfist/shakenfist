@@ -21436,7 +21436,9 @@ def _direct_create_and_enqueue_cluster_operation(
         created_at: float,
         queue_name: str,
         delay: float = 0.0,
-        targets: Optional[list[tuple[ObjectType, str]]] = None) -> tuple[bool, str]:
+        targets: Optional[list[tuple[ObjectType, str]]] = None,
+        *,
+        observational: bool = False) -> tuple[bool, str]:
     """Atomically create a cluster operation and enqueue its work item.
 
     Writes the following rows in a single MariaDB transaction:
@@ -21461,7 +21463,11 @@ def _direct_create_and_enqueue_cluster_operation(
        enqueued -- previously the target rows were written by a
        separate, non-transactional loop in the schema layer, so a
        reader in the gap saw an enqueued op with no target rows and
-       concluded, wrongly, that nothing targeted the object.
+       concluded, wrongly, that nothing targeted the object. Every
+       row is stamped with the same ``observational`` flag: an
+       operation has one classification, copied onto each of its
+       target rows so the by-target filters need no JOIN back to
+       cluster_operations (see docs/plans/PLAN-cluster-op-visibility.md).
 
     This is the only function in mariadb.py that writes to more
     than one table in a single transaction. The existing
@@ -21555,6 +21561,7 @@ def _direct_create_and_enqueue_cluster_operation(
                     target_object_type=target_object_type,
                     target_uuid=target_uuid,
                     created_at=created_at,
+                    observational=observational,
                 )
                 conn.execute(target_stmt)
 
@@ -21911,8 +21918,13 @@ def _grpc_create_and_enqueue_cluster_operation(
         created_at: float,
         queue_name: str,
         delay: float = 0.0,
-        targets: Optional[list[tuple[ObjectType, str]]] = None) -> tuple[bool, str]:
+        targets: Optional[list[tuple[ObjectType, str]]] = None,
+        *,
+        observational: bool = False) -> tuple[bool, str]:
     """Atomic create+enqueue via the database microservice.
+
+    ``observational`` is sent once per operation, not per target;
+    the database service copies it onto every target row.
 
     Returns (success, error) where ``error`` is the failure detail
     reported by the database service (or the gRPC exception), so
@@ -21939,6 +21951,7 @@ def _grpc_create_and_enqueue_cluster_operation(
                 delay=delay,
                 metadata_json=_json_dumps(metadata),
                 targets=target_msgs,
+                observational=observational,
             )
         )
         reply = _grpc_call(
@@ -22509,7 +22522,9 @@ def create_and_enqueue_cluster_operation(
         created_at: float,
         queue_name: str,
         delay: float = 0.0,
-        targets: Optional[list[tuple[ObjectType, str]]] = None) -> tuple[bool, str]:
+        targets: Optional[list[tuple[ObjectType, str]]] = None,
+        *,
+        observational: bool = False) -> tuple[bool, str]:
     """Atomically create a cluster operation and enqueue its job.
 
     Writes the cluster_operations header, an object_states row
@@ -22526,8 +22541,10 @@ def create_and_enqueue_cluster_operation(
     enqueue_cluster_operation() should normally be preferred -- it
     derives the ``targets`` list from each schema's ``target_fields``
     ClassVar and passes it here so the target rows are written
-    atomically with the operation. Callers using this function
-    directly own the ``targets`` argument themselves.
+    atomically with the operation, and derives ``observational`` from
+    the operation's tasks via is_observational(). Callers using this
+    function directly own the ``targets`` and ``observational``
+    arguments themselves.
 
     Args:
         op_uuid: The operation's UUID (str or UUID).
@@ -22540,6 +22557,10 @@ def create_and_enqueue_cluster_operation(
         targets: Optional list of ``(ObjectType, target_uuid)`` pairs
             recording every object this operation targets. Written to
             cluster_operation_targets in the same transaction.
+        observational: Whether the operation only observes its
+            targets. Stamped on every target row; the default, False,
+            is the conservative value (mutating), which is also what
+            an older client that does not send the flag gets.
 
     Returns:
         A (success, error) tuple. (True, '') on success, including
@@ -22553,10 +22574,10 @@ def create_and_enqueue_cluster_operation(
     if _use_database_service():
         return _grpc_create_and_enqueue_cluster_operation(
             u, operation_type, metadata, created_at,
-            queue_name, delay, targets)
+            queue_name, delay, targets, observational=observational)
     return _direct_create_and_enqueue_cluster_operation(
         u, operation_type, metadata, created_at,
-        queue_name, delay, targets)
+        queue_name, delay, targets, observational=observational)
 
 
 def set_cluster_operation_error(

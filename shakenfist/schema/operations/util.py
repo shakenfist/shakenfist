@@ -1,6 +1,7 @@
 import copy
+from enum import Enum
 import time
-from typing import Any, Optional, Type
+from typing import Any, Iterable, Optional, Type
 
 from pydantic import BaseModel
 from shakenfist_utilities import logs  # noreorder
@@ -14,6 +15,57 @@ from shakenfist.schema.operations.baseclusteroperation import ClusterOperation
 
 
 LOG, _ = logs.setup(__name__)
+
+
+def is_observational(
+        model_class: Optional[Type[BaseModel]],
+        tasks: Optional[Iterable[Any]]) -> bool:
+    """Decide whether an operation only observes its targets.
+
+    An observational operation reads or checks its targets without
+    changing them (a checksum verification, a health check). Its
+    cluster_operation_targets rows are stamped observational so that
+    the "current state" by-target queries (get_latest and has_pending)
+    can ignore them, and a background sweep cannot shadow the
+    mutating op a caller is waiting on. See
+    docs/plans/PLAN-cluster-op-visibility.md for the rationale.
+
+    The classification is declared per *task*, not per operation
+    model, because several models carry both kinds of work
+    (node_inst_op has health_check_kvm_process and instance_delete).
+    A model declares its observational tasks beside target_fields:
+
+        observational_tasks: ClassVar[frozenset[model_tasks]] = frozenset({
+            model_tasks.health_check_kvm_process,
+        })
+
+    A model that does not declare observational_tasks has none.
+
+    The operation is observational only if it has at least one task
+    and *every* task is in that set. One mutating task makes the whole
+    operation mutating, so a mixed operation fails conservatively: the
+    worst case is that it still shadows the pointer, never that
+    mutating work becomes invisible to has_pending. This is also why
+    the flag is derived from the tasks rather than passed by each
+    caller -- a caller that added a mutating task to a sweep's task
+    list could not then forget to clear the flag.
+
+    ``tasks`` is normally the list of serialised task *names* that
+    metadata['tasks'] holds after model_dump(mode='json') (the models'
+    tasks field_serializer emits ``t.name``). Enum members are
+    accepted too and compared by name. A name that is not a member of
+    the model's task enum is not observational.
+    """
+    if model_class is None or not tasks:
+        return False
+    observational_tasks = getattr(model_class, 'observational_tasks', None)
+    if not observational_tasks:
+        return False
+
+    observational_names = {t.name for t in observational_tasks}
+    return all(
+        (t.name if isinstance(t, Enum) else t) in observational_names
+        for t in tasks)
 
 
 def enqueue_cluster_operation(
@@ -72,6 +124,11 @@ def enqueue_cluster_operation(
                 continue
             op_targets.append((target_object_type, target_uuid))
 
+    # Whether this op only observes its targets, derived from its tasks
+    # so the stored flag cannot disagree with the work the op does. It
+    # is stamped on every target row in the same transaction.
+    observational = is_observational(model_class, metadata.get('tasks'))
+
     success, error = mariadb.create_and_enqueue_cluster_operation(
         op_uuid=metadata['uuid'],
         operation_type=object_type_str,
@@ -79,6 +136,7 @@ def enqueue_cluster_operation(
         created_at=creation_time,
         queue_name=queue_name,
         targets=op_targets,
+        observational=observational,
     )
 
     if not success:
@@ -88,6 +146,7 @@ def enqueue_cluster_operation(
             'queue_name': queue_name,
             'targets': [
                 f'{ot.name.lower()}:{u}' for ot, u in op_targets],
+            'observational': observational,
             'error': error,
         }).error('Failed to enqueue cluster operation')
         raise exceptions.ClusterOperationEnqueueFailed(

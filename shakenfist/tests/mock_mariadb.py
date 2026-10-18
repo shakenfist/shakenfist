@@ -3650,7 +3650,8 @@ class MockMariaDB():
 
     def _mariadb_create_and_enqueue_cluster_operation(
             self, op_uuid, operation_type, metadata,
-            created_at, queue_name, delay=0.0, targets=None):
+            created_at, queue_name, delay=0.0, targets=None, *,
+            observational=False):
         """Mock implementation of the atomic create+enqueue path.
 
         Mirrors the real function's contract: insert-only on
@@ -3660,6 +3661,10 @@ class MockMariaDB():
         cluster_operation_targets row per target in the same call,
         matching the real function which now writes them in the
         same transaction as the operation.
+
+        ``observational`` is accepted so callers passing it keep
+        working, but is not yet recorded: ClusterOperationTargetData
+        has no field to hold it until the read path carries the flag.
         """
         key = str(op_uuid)
         if key in self.cluster_operations_store:

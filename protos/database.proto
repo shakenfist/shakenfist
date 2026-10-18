@@ -2615,6 +2615,11 @@ message CreateAndEnqueueClusterOperationRequest {
   // cluster_operation_targets rows written atomically with the op so a
   // by-target query never sees an enqueued op without its target rows.
   repeated CreateAndEnqueueClusterOperationTarget targets = 7;
+  // Whether the operation only observes its targets. One flag per
+  // operation, copied onto each target row it writes. False (mutating)
+  // is the conservative value, and is what an older client that does
+  // not know this field sends.
+  bool observational = 8;
 }
 
 message SetClusterOperationErrorRequest {
