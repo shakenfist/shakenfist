@@ -6,8 +6,11 @@
 # client-python's shakenfist_client/commandline/ansible.py.
 from __future__ import annotations
 
+import datetime
 import inspect
 import json
+import math
+import random
 import time
 
 from ansible.module_utils.basic import AnsibleModule
@@ -142,6 +145,42 @@ options:
     required: false
     default: 600
     type: int
+  capacity_wait:
+    description:
+      - How long, in seconds, to keep replaying a create which the cluster
+        refused for lack of capacity. The default of 0 turns the wait off,
+        and the module then fails on the first refusal exactly as it
+        always has.
+      - Two refusals are replayed, and nothing else. The first is a 507
+        from the create whose JSON body has C(transient) set to true,
+        which the server sends only for a scheduler stage that waiting
+        can clear. The second, only when O(await) is true, is an instance
+        which preflight aborted with the error message C(Unable to find
+        suitable node) or C(Too many start attempts). A 507 without the
+        marker (for example an exhausted address pool), a C(transient)
+        false 507, a body which is not JSON, a 409, an affinity failure
+        and every other error fail at once.
+      - A refused create still leaves an instance record behind, which
+        the server parks in state C(error) and which keeps its name until
+        someone deletes it. Before each replay the module waits for that
+        record to reach C(error), deletes it, and waits for it to reach
+        C(deleted), so that the replay can reuse the name without making a
+        lookup by name ambiguous. The time this takes is part of the
+        wait.
+      - Replays are at least 60 seconds apart, plus up to 15 seconds of
+        random jitter, so a value under 60 never replays at all.
+      - This is separate from O(await_timeout) rather than taken out of
+        it. The capacity clock starts with the first refused attempt and
+        stops when an attempt is accepted, and the accepted instance's
+        wait still gets the whole of O(await_timeout). A task's worst case
+        is therefore O(capacity_wait) plus O(await_timeout), plus the
+        deletion of any instance being replaced.
+      - When the budget runs out the task fails with the server's last
+        refusal, followed by how long it waited and how many attempts it
+        made. RV(capacity_waited) says what happened either way.
+    required: false
+    default: 0
+    type: int
   state:
     description: Whether the instance should be present or absent.
     required: false
@@ -212,6 +251,40 @@ log:
   returned: always
   type: list
   elements: str
+capacity_waited:
+  description:
+    - What O(capacity_wait) did. Returned on success whether or not it is
+      enabled, and with a failure caused by the wait running out.
+  returned: when state is present
+  type: dict
+  contains:
+    seconds:
+      description:
+        - Seconds spent waiting for capacity, rounded up. This runs from
+          the start of the first refused attempt to the start of the
+          accepted one, or to the moment the wait gave up. It is 0 when
+          nothing was refused.
+      type: int
+    attempts:
+      description: The number of creates this task sent. 0 when no create was needed.
+      type: int
+    outcome:
+      description:
+        - C(not_refused) when no create was refused, C(placed) when a
+          replay was accepted, and C(exhausted) when the budget ran out.
+      type: str
+    refusals:
+      description:
+        - One entry per refusal, each with C(at) (UTC, ISO 8601), C(kind)
+          (C(api) for a 507 from the create, C(preflight) for a preflight
+          abort), C(stage) (the 507 body's stage, or null) and C(message).
+      type: list
+      elements: dict
+    namespace_instances:
+      description:
+        - How many other active instances the namespace held at the first
+          refusal, or null when nothing was refused or the listing failed.
+      type: int
 '''
 
 
@@ -219,6 +292,55 @@ log:
 # supplied, and which therefore must not contribute to the dirtiness
 # comparison. See the comment at the comparison itself in _check_instance().
 SERVER_POPULATED_DISK_KEYS = ['blob_uuid', 'disk_base']
+
+# The pacing of capacity_wait's replays, in seconds. The spacing is not the
+# 15 second Retry-After the server sends with a transient 507: that figure
+# is a fixed constant rather than a forecast, and every replay creates an
+# instance record and allocates addresses before it is refused, so a wait
+# of half an hour at 15 seconds would cost a refusing cluster about 120
+# dead records rather than about 28. The jitter stops the creates of a
+# fleet of builds which were refused together from arriving together again.
+CAPACITY_REPLAY_SPACING = 60
+CAPACITY_REPLAY_JITTER = 15
+
+# How often to look for the refused instance's record while waiting for it
+# to be deleted. The same cadence the client's own await uses.
+CAPACITY_RECORD_POLL = 5
+
+# The two preflight abort messages which mean "no node had room". The
+# server records a preflight abort on the instance only as a message string
+# -- preflight's LowResourceException carries a stage, but AbortInstanceStart
+# discards it -- so this is string matching, and a server change which
+# rewords either message quietly stops these aborts being replayed. That is
+# the safe direction to fail in: they then fail the task as they always
+# did. The affinity and "Requested node ..." aborts are different strings,
+# deliberately absent: waiting does not satisfy an affinity rule or free a
+# node the caller pinned to.
+PREFLIGHT_CAPACITY_MESSAGES = (
+    'Unable to find suitable node',
+    'Too many start attempts',
+)
+
+# The states a preflight-aborted instance can be read back in. preflight
+# calls enqueue_delete_due_error(), which moves the instance to
+# preflight-error and queues a delete, and the delete of an instance in an
+# -error state ends in state error rather than deleted. That delete is
+# usually done within seconds, so by the time the client's await has seen
+# the error and this module reads the instance again, error is the likelier
+# of the two. The message, not the state, is what identifies the abort.
+PREFLIGHT_ABORT_STATES = ('preflight-error', 'error')
+
+# The capacity wait's sleep, jitter source and wall clock. They are module
+# level names so that the tests can replace them and run a half hour wait
+# in no real time. The wait's durations are read from time.monotonic(), the
+# clock the operation budget already reads, so that the two can never
+# disagree about how long something took.
+_sleep = time.sleep
+_jitter = random.uniform
+
+
+def _utcnow():
+    return datetime.datetime.now(datetime.timezone.utc)
 
 
 class InstanceCreationException(Exception):
@@ -246,7 +368,7 @@ def _create_accepts_timeout(client):
     return 'timeout' in signature.parameters
 
 
-def _fail_api_error(module, log, action, error):
+def _fail_api_error(module, log, action, error, **extra):
     """Fail through fail_json() so the accumulated log survives.
 
     The log carries the dirtiness reasoning -- the only record of why the
@@ -255,10 +377,321 @@ def _fail_api_error(module, log, action, error):
     is exactly when it is most needed: a create failure is usually the
     consequence of a dirtiness decision the operator did not expect
     (issue 4060).
+
+    extra is passed through to fail_json() as further return values. Only
+    an exhausted capacity wait uses it, to return what it waited.
     """
     msg = '%s: %s' % (action, error)
     log.append(msg)
-    module.fail_json(msg=msg, meta=None, log=log)
+    module.fail_json(msg=msg, meta=None, log=log, **extra)
+
+
+def _refusal_body(e):
+    """The JSON object a 507 carries, or None.
+
+    Read from e.text, which every client release back to v0.8.3 sets.
+    e.headers would carry the Retry-After as well, but it exists only on
+    clients newer than any release, and the collection requires
+    shakenfist-client unpinned -- so the body is the only part of the
+    response this module can rely on. A proxy's HTML 507, a truncated body,
+    or JSON which is not an object is not a body the server wrote, and
+    reads as None.
+    """
+    try:
+        body = json.loads(getattr(e, 'text', None))
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(body, dict):
+        return None
+    return body
+
+
+def _transient_refusal(e):
+    """Did the server say this refusal is worth waiting out?
+
+    Only a 507 whose body has transient set to exactly true. The server
+    sets it only for a scheduler stage a wait can clear, so this leaves out
+    the permanent stages (a request for more vCPUs than any node has), the
+    unmarked 507s an exhausted address pool returns, and a 507 from an
+    older server which predates the marker. The exception class alone is
+    not enough: every one of those is an InsufficientResourcesException
+    too (shakenfist/shakenfist#4474 is the same mistake in the functional
+    suite).
+    """
+    if not isinstance(e, apiclient.InsufficientResourcesException):
+        return False
+    body = _refusal_body(e)
+    return body is not None and body.get('transient') is True
+
+
+def _preflight_capacity_abort(instance):
+    """Did preflight abort this instance because no node had room?
+
+    See PREFLIGHT_CAPACITY_MESSAGES and PREFLIGHT_ABORT_STATES for why this
+    is a match on the exact message.
+    """
+    if not instance:
+        return False
+    return (instance.get('state') in PREFLIGHT_ABORT_STATES and
+            instance.get('error_message') in PREFLIGHT_CAPACITY_MESSAGES)
+
+
+def _is_error_state(state):
+    # The same test the client's await applies: the -error transition
+    # states and the terminal error state all mean the instance will never
+    # be ready.
+    return bool(state) and (state == 'error' or state.endswith('-error'))
+
+
+def _await_record_gone(client, log, ref, namespace, deadline):
+    """Wait for a refused create's instance record to stop holding its name.
+
+    ref is the instance's name for a 507 (the response carries no uuid,
+    although the server did create a record before refusing it) and its
+    uuid for a preflight abort. Returns True once a lookup reports the
+    record not found or deleted, and False if deadline (a time.monotonic()
+    value) passes first. Nothing else counts as gone.
+
+    A record left by a refusal does not go away on its own. The server
+    moves it to an -error state and queues a delete, but the delete of an
+    instance in an -error state ends in state error, not deleted, and the
+    instance stays there until a caller deletes it again: an error is kept
+    for the caller to acknowledge. error is one of the states a lookup by
+    name searches, so until then a second instance of the same name makes
+    every lookup by that name fail as ambiguous -- and the playbooks which
+    wait for capacity find their instances by name. So this acknowledges
+    the refused record with a delete of its own, by uuid, and then waits
+    for that delete to finish.
+
+    The acknowledgement waits for state error, rather than being sent as
+    soon as the record is found in a transitional -error state. A delete
+    request aborts the instance's outstanding operations, so sent while the
+    server's own delete was still queued it would cancel that delete, take
+    its place, and itself end in state error -- needing a third. Sent once
+    the server's delete has finished, one is enough.
+
+    It only deletes a record in an error state. Anything healthy which a
+    lookup by name finds is some other instance, and is left alone; it is
+    not the refused record either, so it never counts as gone, and the
+    wait runs out rather than creating a second instance of that name.
+    Within this module that cannot happen -- the module only creates when
+    no instance of the name exists, or after deleting the one which did --
+    short of another caller creating the same name concurrently, or a task
+    which identifies its instance by uuid while another of the same name
+    exists.
+
+    An APIException other than not found is raised to the caller: a failed
+    lookup is not a refusal, and must not be replayed.
+    """
+    # Once the record has been found, follow it by uuid: a lookup by name
+    # cannot tell it from anything else which takes the name afterwards.
+    uuid = None
+    acknowledged = False
+    while True:
+        try:
+            if uuid:
+                i = client.get_instance(uuid)
+            else:
+                i = client.get_instance(ref, namespace=namespace)
+        except apiclient.ResourceNotFoundException:
+            return True
+        if not i or i.get('state') == 'deleted':
+            return True
+
+        state = i.get('state')
+        if not uuid and _is_error_state(state):
+            uuid = i['uuid']
+        if uuid and state == 'error' and not acknowledged:
+            acknowledged = True
+            log.append('Deleting the refused instance %s so that its name '
+                       'can be reused' % uuid)
+            try:
+                # async_request for the reason _delete_and_wait() gives:
+                # without it the client polls for up to an hour itself.
+                client.delete_instance(uuid, async_request=True)
+            except apiclient.ResourceNotFoundException:
+                return True
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        _sleep(min(CAPACITY_RECORD_POLL, remaining))
+
+
+class _CapacityWait:
+    """The bounded wait for capacity which capacity_wait asks for.
+
+    One of these exists for every state=present run. With a budget of 0 it
+    reads no clock, makes no API call and changes no message: it counts the
+    creates it is told about, and reports that nothing was refused.
+
+    The capacity clock is separate from await_timeout, and the two never
+    share seconds. It starts with the first refused attempt and stops at
+    the start of the attempt which is accepted. Between those it counts the
+    pauses between replays, the waits for each refused record to be
+    deleted, the creates which were refused, and every await which ended in
+    a preflight capacity abort. run_module() deducts what it counted from
+    the time it charges to await_timeout, so the accepted instance's await
+    is budgeted exactly as if it had been the first attempt. A task's worst
+    case is therefore capacity_wait plus await_timeout: a replay is never
+    sent after the capacity budget has run out, and the last one sent can
+    still spend a whole await.
+    """
+
+    def __init__(self, module, client, log, budget, name, namespace):
+        self.module = module
+        self.client = client
+        self.log = log
+        self.budget = max(0, budget or 0)
+        self.name = name
+        self.namespace = namespace
+
+        self.attempts = 0
+        self.refusals = []
+        self.namespace_instances = None
+        self.exhausted = False
+
+        # time.monotonic() values, read only when the budget is not 0.
+        self.attempt_started = None
+        self.first_refused = None
+
+        # Capacity seconds counted so far; see the class docstring.
+        self.seconds = 0
+
+    def start_attempt(self):
+        """Note that a create is about to be sent."""
+        self.attempts += 1
+        if not self.budget:
+            return
+        self.attempt_started = time.monotonic()
+        if self.first_refused is not None:
+            self.seconds = self.attempt_started - self.first_refused
+
+    def replayable_api_refusal(self, e):
+        return bool(self.budget) and _transient_refusal(e)
+
+    def preflight_abort(self, instance_uuid):
+        """Read an instance whose await failed, if this wait might replay it.
+
+        Returns the instance when preflight aborted it for capacity, and
+        None otherwise. The client's await raises the same exception for
+        every error state, and preflight carries no machine readable reason
+        onto the instance, so the instance has to be read again to tell a
+        capacity abort from anything else. A failed read is not grounds for
+        a replay: the caller reports the await's own failure instead.
+        """
+        if not self.budget:
+            return None
+        try:
+            instance = self.client.get_instance(instance_uuid)
+        except apiclient.APIException as e:
+            self.log.append('Reading the instance back after its await '
+                            'failed did not work: %s' % e)
+            return None
+        if _preflight_capacity_abort(instance):
+            return instance
+        return None
+
+    def refused(self, kind, stage, message, ref, ref_namespace, action, error):
+        """Record a refusal, then either wait to replay it or fail the task.
+
+        Returns when the replay may be sent. Otherwise fails the task
+        through _fail_api_error(), with action and error as the failure
+        would have read without a wait, so the server's own words lead
+        the message (kerbside-patches' automatic retry of infrastructure
+        failures matches on them).
+        """
+        if self.first_refused is None:
+            self.first_refused = self.attempt_started
+            self._count_namespace_instances()
+        self.refusals.append({
+            'at': _utcnow().isoformat(),
+            'kind': kind,
+            'stage': stage,
+            'message': message,
+        })
+        self.log.append('Attempt %d was refused for capacity (%s, stage %s): '
+                        '%s' % (self.attempts, kind, stage, message))
+
+        deadline = self.first_refused + self.budget
+        next_attempt = (self.attempt_started + CAPACITY_REPLAY_SPACING +
+                        _jitter(0, CAPACITY_REPLAY_JITTER))
+        if next_attempt > deadline:
+            self._exhaust(action, error,
+                          'the next replay would have been sent after the '
+                          'capacity_wait budget of %d seconds ran out'
+                          % self.budget)
+
+        try:
+            gone = _await_record_gone(
+                self.client, self.log, ref, ref_namespace, deadline)
+        except apiclient.APIException as e:
+            _fail_api_error(
+                self.module, self.log,
+                'Waiting for the refused instance to be deleted failed', e)
+        if not gone:
+            self._exhaust(action, error,
+                          'the refused instance %s still held its name when '
+                          'the capacity_wait budget of %d seconds ran out'
+                          % (ref, self.budget))
+
+        pause = next_attempt - time.monotonic()
+        if pause > 0:
+            _sleep(pause)
+        self.log.append('Replaying the create, %d seconds after the first '
+                        'refusal' % (time.monotonic() - self.first_refused))
+
+    def _count_namespace_instances(self):
+        # How many instances the build already held when it was refused,
+        # which is what deciding whether a build should ask for all of its
+        # instances at once needs to know. Counted once: it is a property
+        # of the build, not of each replay. Diagnostic only, so a failure
+        # is logged rather than failing the task. GET /instances lists
+        # what the caller's namespace can see, which for the system
+        # namespace is every namespace, so filter when the task names one.
+        # The refused record is the only active instance of this name (see
+        # _await_record_gone()), so leaving the name out leaves it out.
+        try:
+            instances = self.client.get_instances()
+        except apiclient.APIException as e:
+            self.log.append('Counting the instances in the namespace '
+                            'failed: %s' % e)
+            return
+        count = 0
+        for i in instances or []:
+            if i.get('name') == self.name:
+                continue
+            if self.namespace and i.get('namespace') != self.namespace:
+                continue
+            count += 1
+        self.namespace_instances = count
+        self.log.append('The namespace held %d other instances at the first '
+                        'capacity refusal' % count)
+
+    def _exhaust(self, action, error, why):
+        self.exhausted = True
+        self.seconds = time.monotonic() - self.first_refused
+        self.log.append('Giving up waiting for capacity: %s' % why)
+        _fail_api_error(
+            self.module, self.log, action,
+            '%s (waited %d seconds for capacity over %d attempts)'
+            % (error, math.ceil(self.seconds), self.attempts),
+            capacity_waited=self.report())
+
+    def report(self):
+        if self.exhausted:
+            outcome = 'exhausted'
+        elif self.refusals:
+            outcome = 'placed'
+        else:
+            outcome = 'not_refused'
+        return {
+            'seconds': math.ceil(self.seconds),
+            'attempts': self.attempts,
+            'outcome': outcome,
+            'refusals': list(self.refusals),
+            'namespace_instances': self.namespace_instances,
+        }
 
 
 def _check_instance(client, existing, params, log):
@@ -557,6 +990,7 @@ def run_module():
         'metadata': {'required': False, 'type': 'dict'},
         'await': {'required': False, 'type': 'bool', 'default': False},
         'await_timeout': {'required': False, 'type': 'int', 'default': 600},
+        'capacity_wait': {'required': False, 'type': 'int', 'default': 0},
         'state': {
             'default': 'present',
             'choices': ['present', 'absent'],
@@ -606,9 +1040,14 @@ def run_module():
             _fail_api_error(
                 module, log, 'Comparing against the existing instance failed', e)
 
+        capacity = _CapacityWait(
+            module, client, log, module.params.get('capacity_wait'),
+            module.params.get('name'), namespace)
+
         if module.check_mode:
             module.exit_json(
-                changed=needs_replacement, meta=(i or None), log=log)
+                changed=needs_replacement, meta=(i or None), log=log,
+                capacity_waited=capacity.report())
 
         # The budget starts here rather than at the create, because a
         # replacement deletes the old instance first and that time is
@@ -673,19 +1112,43 @@ def run_module():
                            'the create will wait and what it spends is '
                            'deducted from the await budget instead')
 
-            try:
-                i = client.create_instance(*instance_args, **instance_kwargs)
-            except apiclient.APIException as e:
-                _fail_api_error(module, log, 'Instance creation failed', e)
+        # Each pass is one create and its await. A pass ends in a replay
+        # only when capacity_wait is set and the cluster refused the
+        # create for capacity; _CapacityWait.refused() either returns when
+        # the replay may go, or fails the task. Every replay goes through
+        # the same instance_kwargs, so a create which was told not to wait
+        # (timeout=0) is told so on every attempt.
+        while True:
+            if needs_replacement:
+                capacity.start_attempt()
+                try:
+                    i = client.create_instance(
+                        *instance_args, **instance_kwargs)
+                except apiclient.APIException as e:
+                    # Only the create's own refusal is replayed. The
+                    # lookups and the await are outside this clause, so a
+                    # failure of one of those is never mistaken for one.
+                    if not capacity.replayable_api_refusal(e):
+                        _fail_api_error(
+                            module, log, 'Instance creation failed', e)
+                    body = _refusal_body(e)
+                    capacity.refused(
+                        'api', body.get('stage'), body.get('error'),
+                        module.params.get('name'), namespace,
+                        'Instance creation failed', e)
+                    continue
 
-        if not module.params.get('await'):
-            log.append('Not awaiting instance')
-        else:
+            if not module.params.get('await'):
+                log.append('Not awaiting instance')
+                break
+
             # Whatever the delete and the create already spent comes out
             # of the budget, so await_timeout bounds the sequence rather
-            # than each leg of it.
+            # than each leg of it. Time spent waiting for capacity does
+            # not: it has a budget of its own (see _CapacityWait), and is
+            # always 0 when capacity_wait is.
             await_timeout = module.params.get('await_timeout')
-            elapsed = time.monotonic() - operation_started
+            elapsed = time.monotonic() - operation_started - capacity.seconds
             await_budget = max(0, await_timeout - elapsed)
             log.append('Awaiting instance %s for %d seconds (%d already '
                        'spent)' % (i['uuid'], await_budget, elapsed))
@@ -696,6 +1159,19 @@ def run_module():
                 # reported as created rather than as a timeout.
                 client.await_instance_create(i['uuid'], timeout=await_budget)
             except Exception as e:
+                # Only an instance this task created can be replayed: one
+                # which needed no replacement was not refused by anything
+                # this task did.
+                aborted = None
+                if needs_replacement:
+                    aborted = capacity.preflight_abort(i['uuid'])
+                if aborted:
+                    capacity.refused(
+                        'preflight', None, aborted['error_message'],
+                        i['uuid'], None, 'Waiting for instance failed',
+                        aborted['error_message'])
+                    continue
+
                 if await_budget <= 0:
                     # The client's own message would name a zero second
                     # timeout, which is the symptom rather than the
@@ -708,12 +1184,14 @@ def run_module():
                     msg = 'Waiting for instance failed: %s' % e
                 log.append(msg)
                 module.fail_json(msg=msg, meta=None, log=log)
+            break
 
         try:
             meta = client.get_instance(i['uuid'])
         except apiclient.APIException as e:
             _fail_api_error(module, log, 'Fetching the created instance failed', e)
-        module.exit_json(changed=needs_replacement, meta=meta, log=log)
+        module.exit_json(changed=needs_replacement, meta=meta, log=log,
+                         capacity_waited=capacity.report())
 
     # state == 'absent'
     try:

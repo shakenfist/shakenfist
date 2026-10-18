@@ -1,5 +1,7 @@
 # Copyright 2019 Michael Still and contributors
+import datetime
 import itertools
+import json
 from unittest import mock
 
 from shakenfist.tests import ansible_module_loader
@@ -818,3 +820,650 @@ class SfInstanceCreateTimeoutDetectionTestCase(base.ShakenFistTestCase):
         # A MagicMock does not raise from inspect.signature() -- it
         # reports (*args, **kwargs), which has no timeout parameter.
         self.assertFalse(sf_instance._create_accepts_timeout(mock.MagicMock()))
+
+
+# The body the server sends with a 507 a wait can clear (capacity_error()
+# in shakenfist/external_api/base.py).
+TRANSIENT_BODY = {
+    'error': 'No nodes remaining at scheduling stage sufficient_idle_cpu',
+    'status': 507,
+    'stage': 'sufficient_idle_cpu',
+    'transient': True,
+}
+
+
+def _refusal(body, exception='InsufficientResourcesException'):
+    """A refusal as the client raises it, with body as the response text.
+
+    The real APIException takes (message, method, url, status_code, text)
+    and stores text as an attribute; the stub's exceptions are bare, so
+    the attribute is set by hand. A dict body is serialised as the server
+    would; anything else is used as the text unchanged.
+    """
+    text = json.dumps(body) if isinstance(body, dict) else body
+    e = getattr(sf_instance.apiclient, exception)(
+        'API request failed', 'POST', 'http://localhost:13000/instances',
+        507, text)
+    e.text = text
+    return e
+
+
+class _FakeClock:
+    """A monotonic clock which moves only when the code under test sleeps."""
+
+    def __init__(self):
+        self.now = 0
+        self.reads = 0
+        self.sleeps = []
+
+    def monotonic(self):
+        self.reads += 1
+        return self.now
+
+    def sleep(self, seconds):
+        self.sleeps.append(seconds)
+        self.now += seconds
+
+
+class SfInstanceTransientRefusalTestCase(base.ShakenFistTestCase):
+    """Only a 507 the server marked transient is worth waiting out.
+
+    The same four bodies the functional suite's wrapper is tested on
+    (shakenfist/shakenfist#4474): the two copies of this rule must agree.
+    """
+
+    def test_transient_true_is_transient(self):
+        self.assertTrue(sf_instance._transient_refusal(_refusal(TRANSIENT_BODY)))
+
+    def test_transient_false_is_not_transient(self):
+        body = dict(TRANSIENT_BODY, transient=False)
+        self.assertFalse(sf_instance._transient_refusal(_refusal(body)))
+
+    def test_no_transient_field_is_not_transient(self):
+        # An address pool which is full answers 507 with only error and
+        # status, and so does a server which predates the marker.
+        body = {'error': 'network is congested', 'status': 507}
+        self.assertFalse(sf_instance._transient_refusal(_refusal(body)))
+
+    def test_a_non_json_body_is_not_transient(self):
+        self.assertFalse(sf_instance._transient_refusal(
+            _refusal('<html>507 Insufficient Storage</html>')))
+
+    def test_a_truthy_transient_which_is_not_true_is_not_transient(self):
+        # Exactly True, as the server writes it, rather than anything a
+        # proxy or a future server might send that happens to be truthy.
+        body = dict(TRANSIENT_BODY, transient='yes')
+        self.assertFalse(sf_instance._transient_refusal(_refusal(body)))
+
+    def test_a_json_body_which_is_not_an_object_is_not_transient(self):
+        self.assertFalse(sf_instance._transient_refusal(_refusal('[true]')))
+
+    def test_another_status_is_never_transient(self):
+        # A 409 carrying the same body is still not a capacity refusal.
+        e = _refusal(TRANSIENT_BODY, exception='ResourceStateConflictException')
+        self.assertFalse(sf_instance._transient_refusal(e))
+
+    def test_an_exception_without_text_is_not_transient(self):
+        self.assertFalse(sf_instance._transient_refusal(
+            sf_instance.apiclient.InsufficientResourcesException()))
+
+
+class SfInstancePreflightCapacityAbortTestCase(base.ShakenFistTestCase):
+    """The two exact preflight abort messages which mean "no room".
+
+    The strings are named here on purpose: a server change which rewords
+    either should fail this test, not quietly stop the wait engaging.
+    """
+
+    def test_both_capacity_messages_in_both_states_match(self):
+        for message in ('Unable to find suitable node', 'Too many start attempts'):
+            for state in ('preflight-error', 'error'):
+                self.assertTrue(
+                    sf_instance._preflight_capacity_abort(
+                        {'state': state, 'error_message': message}),
+                    '%s in %s should match' % (message, state))
+
+    def test_other_preflight_aborts_do_not_match(self):
+        for message in (
+                'No node satisfies the requested affinity constraints: x',
+                'Too many start attempts, and no node satisfies the '
+                'requested affinity constraints: x',
+                'Requested node lacks resources',
+                'Requested node is not currently an active node',
+                'scheduling failed', None):
+            self.assertFalse(
+                sf_instance._preflight_capacity_abort(
+                    {'state': 'error', 'error_message': message}),
+                '%s should not match' % message)
+
+    def test_a_healthy_or_missing_instance_does_not_match(self):
+        self.assertFalse(sf_instance._preflight_capacity_abort(
+            {'state': 'created',
+             'error_message': 'Unable to find suitable node'}))
+        self.assertFalse(sf_instance._preflight_capacity_abort(None))
+        self.assertFalse(sf_instance._preflight_capacity_abort({}))
+
+
+class SfInstanceAwaitRecordGoneTestCase(base.ShakenFistTestCase):
+    """_await_record_gone() treats only not found and deleted as gone."""
+
+    def _run(self, lookups, deadline=600):
+        clock = _FakeClock()
+        log = []
+        client = mock.MagicMock()
+        client.get_instance.side_effect = lookups
+        with mock.patch.object(
+                sf_instance.time, 'monotonic', side_effect=clock.monotonic), \
+                mock.patch.object(sf_instance, '_sleep', clock.sleep):
+            gone = sf_instance._await_record_gone(
+                client, log, 'test', 'ns', deadline)
+        return gone, client, clock
+
+    def test_not_found_is_gone(self):
+        gone, client, _ = self._run(
+            sf_instance.apiclient.ResourceNotFoundException())
+        self.assertTrue(gone)
+        client.delete_instance.assert_not_called()
+
+    def test_an_error_record_is_deleted_by_uuid_and_followed_to_deleted(self):
+        gone, client, _ = self._run([
+            {'uuid': 'refused', 'state': 'error'},
+            {'uuid': 'refused', 'state': 'error'},
+            {'uuid': 'refused', 'state': 'deleted'}])
+        self.assertTrue(gone)
+        client.delete_instance.assert_called_once_with(
+            'refused', async_request=True)
+        self.assertEqual(
+            [mock.call('test', namespace='ns'), mock.call('refused'),
+             mock.call('refused')],
+            client.get_instance.call_args_list)
+
+    def test_a_transitional_error_record_is_not_deleted_until_it_settles(self):
+        # A delete request aborts the instance's outstanding operations,
+        # so sent while the server's own delete is queued it would cancel
+        # that delete and itself end in state error.
+        gone, client, _ = self._run([
+            {'uuid': 'refused', 'state': 'initial-error'},
+            {'uuid': 'refused', 'state': 'initial-error'},
+            {'uuid': 'refused', 'state': 'error'},
+            {'uuid': 'refused', 'state': 'deleted'}])
+        self.assertTrue(gone)
+        self.assertEqual(1, client.delete_instance.call_count)
+        # Three lookups had happened when the delete was sent.
+        self.assertEqual(4, client.get_instance.call_count)
+
+    def test_a_healthy_instance_of_the_name_is_never_deleted_or_gone(self):
+        # Some other instance holds the name. Replaying would create a
+        # second, so the wait runs out instead -- and it must not delete
+        # an instance it did not create.
+        gone, client, clock = self._run(
+            itertools.repeat({'uuid': 'other', 'state': 'created'}),
+            deadline=60)
+        self.assertFalse(gone)
+        client.delete_instance.assert_not_called()
+        self.assertEqual(60, clock.now)
+
+    def test_a_record_which_never_goes_is_not_gone_at_the_deadline(self):
+        gone, _, clock = self._run(
+            itertools.repeat({'uuid': 'refused', 'state': 'error'}),
+            deadline=60)
+        self.assertFalse(gone)
+        self.assertEqual(60, clock.now)
+        # Polled every five seconds, not spun.
+        self.assertEqual(12, len(clock.sleeps))
+
+
+class SfInstanceCapacityWaitTestCase(base.ShakenFistTestCase):
+    """capacity_wait replays a create refused for capacity, and only that.
+
+    Phase 0 of the placeable claims plan found that every in-job capacity
+    refusal failed its build outright, although most would have been
+    placed within half an hour. The module now waits, when asked to, for a
+    507 the server marked transient and for a preflight abort for capacity
+    -- and with capacity_wait at its default of 0 behaves exactly as it
+    did before the option existed.
+    """
+
+    PARAMS = dict(SfInstanceCreateBudgetTestCase.PARAMS)
+    WHEN = datetime.datetime(2026, 10, 18, tzinfo=datetime.timezone.utc)
+
+    # The refused record a 507 leaves behind, as a lookup by name finds it
+    # once the server's own delete has parked it in state error.
+    REFUSED = {'uuid': 'refused', 'name': 'test', 'state': 'error'}
+    DELETED = {'uuid': 'refused', 'name': 'test', 'state': 'deleted'}
+
+    def _created(self, uuid='created'):
+        return {'uuid': uuid, 'name': 'test', 'state': 'created'}
+
+    def _run(self, creates, lookups=None, capacity_wait=1800,
+             await_instance=False, awaits=None, instances=None, jitter=0,
+             create_seconds=0, expect_failure=False):
+        """Run the module against a scripted client and a fake clock.
+
+        creates and awaits are the outcomes of successive
+        create_instance() and await_instance_create() calls, an exception
+        to raise or a value to return. lookups maps an instance reference
+        to the outcomes of successive get_instance() calls for it; the
+        last repeats. Every client call is recorded, in order, in
+        self.calls, with the fake clock's time for creates.
+        """
+        params = dict(self.PARAMS)
+        params['await'] = await_instance
+        params['await_timeout'] = 600
+        params['capacity_wait'] = capacity_wait
+
+        module = mock.MagicMock()
+        module.params = params
+        module.check_mode = False
+        module.exit_json.side_effect = _Succeeded
+        module.fail_json.side_effect = _Failed
+
+        clock = _FakeClock()
+        calls = []
+        creates = list(creates)
+        awaits = list(awaits or [])
+        lookups = {ref: list(outcomes)
+                   for ref, outcomes in (lookups or {}).items()}
+        lookups.setdefault(
+            'test', [sf_instance.apiclient.ResourceNotFoundException()])
+        lookups.setdefault('created', [self._created()])
+
+        def outcome(value):
+            if isinstance(value, Exception):
+                raise value
+            return value
+
+        # A real function, so that _create_accepts_timeout() sees the
+        # timeout argument and an awaited create is passed timeout=0.
+        def create_instance(*args, timeout=None, **kwargs):
+            calls.append(('create', clock.now, timeout))
+            clock.now += create_seconds
+            return outcome(creates.pop(0))
+
+        def get_instance(ref, namespace=None):
+            calls.append(('get', ref, namespace))
+            responses = lookups[ref]
+            return outcome(
+                responses.pop(0) if len(responses) > 1 else responses[0])
+
+        def await_instance_create(uuid, timeout=None):
+            calls.append(('await', uuid, timeout))
+            return outcome(awaits.pop(0) if awaits else None)
+
+        def get_instances(*args, **kwargs):
+            calls.append(('get_instances', ))
+            return instances or []
+
+        def delete_instance(ref, **kwargs):
+            calls.append(('delete', ref, kwargs))
+
+        client = mock.MagicMock()
+        client.create_instance = mock.create_autospec(
+            create_instance, side_effect=create_instance)
+        client.get_instance.side_effect = get_instance
+        client.await_instance_create.side_effect = await_instance_create
+        client.get_instances.side_effect = get_instances
+        client.delete_instance.side_effect = delete_instance
+
+        self.jitter = mock.MagicMock(return_value=jitter)
+        with mock.patch.object(
+                sf_instance, 'AnsibleModule', return_value=module), \
+                mock.patch.object(
+                    sf_instance, 'make_client', return_value=client), \
+                mock.patch.object(
+                    sf_instance.time, 'monotonic',
+                    side_effect=clock.monotonic), \
+                mock.patch.object(sf_instance, '_sleep', clock.sleep), \
+                mock.patch.object(sf_instance, '_jitter', self.jitter), \
+                mock.patch.object(
+                    sf_instance, '_utcnow', return_value=self.WHEN):
+            self.assertRaises(
+                _Failed if expect_failure else _Succeeded,
+                sf_instance.run_module)
+
+        self.module = module
+        self.clock = clock
+        self.calls = calls
+        return module
+
+    def _calls(self, kind):
+        return [c for c in self.calls if c[0] == kind]
+
+    def _waited(self):
+        if self.module.exit_json.called:
+            return self.module.exit_json.call_args[1]['capacity_waited']
+        return self.module.fail_json.call_args[1]['capacity_waited']
+
+    def _fails_at_once(self, refusal):
+        module = self._run([refusal], expect_failure=True)
+        kwargs = module.fail_json.call_args[1]
+        self.assertEqual('Instance creation failed: %s' % refusal,
+                         kwargs['msg'])
+        self.assertEqual(1, len(self._calls('create')))
+        self.assertEqual([], self._calls('get_instances'))
+        self.assertEqual([], self._calls('delete'))
+        self.assertNotIn('capacity_waited', kwargs)
+
+    def test_capacity_wait_zero_fails_a_transient_507_at_once_as_before(self):
+        refusal = _refusal(TRANSIENT_BODY)
+        module = self._run([refusal], capacity_wait=0, expect_failure=True)
+
+        # The same call, with the same arguments, as before the option
+        # existed -- and nothing else asked of the server or the clock.
+        module.fail_json.assert_called_once_with(
+            msg='Instance creation failed: %s' % refusal, meta=None,
+            log=mock.ANY)
+        self.assertEqual(
+            [('get', 'test', 'ns'), ('create', 0, None)], self.calls)
+        self.assertEqual(1, self.clock.reads)
+        self.assertEqual([], self.clock.sleeps)
+        self.jitter.assert_not_called()
+
+    def test_capacity_wait_zero_does_not_read_back_a_preflight_abort(self):
+        failure = Exception('failed to start (marked as error state, ...)')
+        module = self._run(
+            [{'uuid': 'aborted', 'state': 'initial'}], capacity_wait=0,
+            await_instance=True, awaits=[failure], expect_failure=True)
+
+        module.fail_json.assert_called_once_with(
+            msg='Waiting for instance failed: %s' % failure, meta=None,
+            log=mock.ANY)
+        self.assertEqual(
+            [('get', 'test', 'ns'), ('create', 0, 0),
+             ('await', 'aborted', 600)], self.calls)
+        self.assertEqual(2, self.clock.reads)
+
+    def test_a_transient_507_then_success_replays_once_and_reports_placed(self):
+        self._run(
+            [_refusal(TRANSIENT_BODY), self._created()],
+            lookups={
+                'test': [sf_instance.apiclient.ResourceNotFoundException(),
+                         self.REFUSED],
+                'refused': [self.DELETED],
+            },
+            instances=[
+                {'name': 'test', 'namespace': 'ns'},
+                {'name': 'sf1', 'namespace': 'ns'},
+                {'name': 'sf2', 'namespace': 'ns'},
+                {'name': 'elsewhere', 'namespace': 'other'},
+            ])
+
+        self.assertEqual(2, len(self._calls('create')))
+        self.assertTrue(self.module.exit_json.call_args[1]['changed'])
+        self.assertEqual({
+            'seconds': 60,
+            'attempts': 2,
+            'outcome': 'placed',
+            'refusals': [{
+                'at': '2026-10-18T00:00:00+00:00',
+                'kind': 'api',
+                'stage': 'sufficient_idle_cpu',
+                'message': TRANSIENT_BODY['error'],
+            }],
+            # The refused record, and the instance in another namespace,
+            # are not the build's.
+            'namespace_instances': 2,
+        }, self._waited())
+
+    def test_an_unmarked_507_fails_at_once(self):
+        self._fails_at_once(
+            _refusal({'error': 'network is congested', 'status': 507}))
+
+    def test_a_transient_false_507_fails_at_once(self):
+        self._fails_at_once(_refusal(dict(TRANSIENT_BODY, transient=False)))
+
+    def test_a_non_json_507_fails_at_once(self):
+        self._fails_at_once(_refusal('<html>507 Insufficient Storage</html>'))
+
+    def test_a_409_fails_at_once(self):
+        self._fails_at_once(
+            _refusal(TRANSIENT_BODY,
+                     exception='ResourceStateConflictException'))
+
+    def test_replays_are_at_least_60_seconds_apart(self):
+        refusal = _refusal(TRANSIENT_BODY)
+        self._run(
+            [refusal, refusal, refusal, self._created()],
+            lookups={
+                'test': [sf_instance.apiclient.ResourceNotFoundException(),
+                         self.REFUSED],
+                'refused': [self.DELETED],
+            },
+            jitter=7)
+
+        times = [c[1] for c in self._calls('create')]
+        self.assertEqual([0, 67, 134, 201], times)
+        for earlier, later in zip(times, times[1:]):
+            self.assertGreaterEqual(later - earlier, 60)
+        self.jitter.assert_called_with(0, 15)
+        self.assertEqual(3, self.jitter.call_count)
+
+    def test_the_namespace_is_counted_once_at_the_first_refusal(self):
+        refusal = _refusal(TRANSIENT_BODY)
+        self._run(
+            [refusal, refusal, self._created()],
+            lookups={
+                'test': [sf_instance.apiclient.ResourceNotFoundException(),
+                         self.REFUSED],
+                'refused': [self.DELETED],
+            })
+        self.assertEqual(1, len(self._calls('get_instances')))
+
+    def test_the_refused_record_is_awaited_by_name_before_the_replay(self):
+        self._run(
+            [_refusal(TRANSIENT_BODY), self._created()],
+            lookups={
+                'test': [sf_instance.apiclient.ResourceNotFoundException(),
+                         {'uuid': 'refused', 'state': 'initial-error'}],
+                'refused': [{'uuid': 'refused', 'state': 'error'},
+                            self.DELETED],
+            })
+
+        # A 507 names no uuid, so the record is found by name, followed by
+        # the uuid that lookup returned, acknowledged with a delete once
+        # the server's own delete has parked it in state error, and gone
+        # before the replay is sent.
+        self.assertEqual([
+            ('get', 'test', 'ns'),
+            ('create', 0, None),
+            ('get_instances', ),
+            ('get', 'test', 'ns'),
+            ('get', 'refused', None),
+            ('delete', 'refused', {'async_request': True}),
+            ('get', 'refused', None),
+            ('create', 60, None),
+            ('get', 'created', None),
+        ], self.calls)
+
+    def test_a_preflight_abort_record_is_awaited_by_uuid_before_the_replay(self):
+        aborted = {'uuid': 'aborted', 'name': 'test', 'state': 'error',
+                   'error_message': 'Unable to find suitable node'}
+        self._run(
+            [{'uuid': 'aborted', 'state': 'initial'},
+             {'uuid': 'created', 'state': 'initial'}],
+            lookups={'aborted': [aborted, aborted, dict(aborted, state='deleted')]},
+            await_instance=True,
+            awaits=[Exception('failed to start (marked as error state, ...)')])
+
+        self.assertEqual([
+            ('get', 'test', 'ns'),
+            ('create', 0, 0),
+            ('await', 'aborted', 600),
+            # Read back to tell a capacity abort from any other error.
+            ('get', 'aborted', None),
+            ('get_instances', ),
+            # Then the record, by its uuid -- never by name.
+            ('get', 'aborted', None),
+            ('delete', 'aborted', {'async_request': True}),
+            ('get', 'aborted', None),
+            ('create', 60, 0),
+            ('await', 'created', 600),
+            ('get', 'created', None),
+        ], self.calls)
+
+    def test_a_preflight_unable_to_find_suitable_node_is_replayed(self):
+        aborted = {'uuid': 'aborted', 'name': 'test',
+                   'state': 'preflight-error',
+                   'error_message': 'Unable to find suitable node'}
+        self._run(
+            [{'uuid': 'aborted', 'state': 'initial'},
+             {'uuid': 'created', 'state': 'initial'}],
+            lookups={'aborted': [aborted, dict(aborted, state='error'),
+                                 dict(aborted, state='deleted')]},
+            await_instance=True,
+            awaits=[Exception('failed to start (marked as error state, ...)')])
+
+        self.assertEqual(2, len(self._calls('create')))
+        waited = self._waited()
+        self.assertEqual('placed', waited['outcome'])
+        self.assertEqual(
+            [{'at': '2026-10-18T00:00:00+00:00', 'kind': 'preflight',
+              'stage': None, 'message': 'Unable to find suitable node'}],
+            waited['refusals'])
+
+    def test_a_preflight_affinity_abort_is_not_replayed(self):
+        aborted = {'uuid': 'aborted', 'name': 'test', 'state': 'error',
+                   'error_message': 'No node satisfies the requested '
+                                    'affinity constraints: x'}
+        failure = Exception('failed to start (marked as error state, ...)')
+        module = self._run(
+            [{'uuid': 'aborted', 'state': 'initial'}],
+            lookups={'aborted': [aborted]},
+            await_instance=True, awaits=[failure], expect_failure=True)
+
+        kwargs = module.fail_json.call_args[1]
+        self.assertEqual('Waiting for instance failed: %s' % failure,
+                         kwargs['msg'])
+        self.assertNotIn('capacity_waited', kwargs)
+        self.assertEqual(1, len(self._calls('create')))
+        self.assertEqual([], self._calls('delete'))
+
+    def test_an_exhausted_wait_message_starts_with_the_server_text(self):
+        refusal = _refusal(TRANSIENT_BODY)
+        module = self._run(
+            [refusal] * 20, capacity_wait=600,
+            lookups={
+                'test': [sf_instance.apiclient.ResourceNotFoundException(),
+                         self.REFUSED],
+                'refused': [self.DELETED],
+            },
+            expect_failure=True)
+
+        # What the module said before the wait existed, unchanged, and
+        # then what the wait did. kerbside-patches' automatic retry of
+        # infrastructure failures matches the server's text in job logs.
+        msg = module.fail_json.call_args[1]['msg']
+        self.assertTrue(
+            msg.startswith('Instance creation failed: %s' % refusal), msg)
+        self.assertIn('No nodes remaining at scheduling stage', msg)
+        self.assertTrue(
+            msg.endswith('(waited 600 seconds for capacity over 11 attempts)'),
+            msg)
+
+        # No replay is sent after the budget: one every 60 seconds from 0
+        # up to and including 600, and no twelfth at 660.
+        times = [c[1] for c in self._calls('create')]
+        self.assertEqual(list(range(0, 601, 60)), times)
+
+        waited = self._waited()
+        self.assertEqual('exhausted', waited['outcome'])
+        self.assertEqual(11, waited['attempts'])
+        self.assertEqual(600, waited['seconds'])
+        self.assertEqual(11, len(waited['refusals']))
+
+    def test_an_exhausted_preflight_wait_reports_the_abort_message(self):
+        aborted = {'uuid': 'aborted', 'name': 'test', 'state': 'error',
+                   'error_message': 'Too many start attempts'}
+        module = self._run(
+            [{'uuid': 'aborted', 'state': 'initial'}], capacity_wait=30,
+            lookups={'aborted': [aborted]},
+            await_instance=True,
+            awaits=[Exception('failed to start (marked as error state, ...)')],
+            expect_failure=True)
+
+        self.assertEqual(
+            'Waiting for instance failed: Too many start attempts (waited 0 '
+            'seconds for capacity over 1 attempts)',
+            module.fail_json.call_args[1]['msg'])
+
+    def test_a_budget_shorter_than_the_spacing_never_replays(self):
+        module = self._run(
+            [_refusal(TRANSIENT_BODY)], capacity_wait=59,
+            expect_failure=True)
+        self.assertEqual(1, len(self._calls('create')))
+        self.assertEqual([], self._calls('delete'))
+        self.assertEqual('exhausted', self._waited()['outcome'])
+        self.assertIn('the next replay would have been sent after',
+                      ' '.join(module.fail_json.call_args[1]['log']))
+
+    def test_a_record_which_never_goes_exhausts_the_wait(self):
+        module = self._run(
+            [_refusal(TRANSIENT_BODY)], capacity_wait=600,
+            lookups={
+                'test': [sf_instance.apiclient.ResourceNotFoundException(),
+                         {'uuid': 'refused', 'state': 'initial-error'}],
+                'refused': [{'uuid': 'refused', 'state': 'initial-error'}],
+            },
+            expect_failure=True)
+
+        # The name is never reused while the record still holds it.
+        self.assertEqual(1, len(self._calls('create')))
+        self.assertEqual(600, self._waited()['seconds'])
+        self.assertIn('still held its name',
+                      ' '.join(module.fail_json.call_args[1]['log']))
+
+    def test_a_failed_record_lookup_is_not_replayed(self):
+        # Only the create's own refusal is replayed: a failure of any
+        # other call fails the task, as it always did.
+        module = self._run(
+            [_refusal(TRANSIENT_BODY)],
+            lookups={
+                'test': [sf_instance.apiclient.ResourceNotFoundException(),
+                         sf_instance.apiclient.APIException('boom')],
+            },
+            expect_failure=True)
+
+        self.assertEqual(
+            'Waiting for the refused instance to be deleted failed: boom',
+            module.fail_json.call_args[1]['msg'])
+        self.assertEqual(1, len(self._calls('create')))
+
+    def test_the_final_await_gets_the_full_await_timeout(self):
+        # Each create takes five seconds. The refused attempt and the
+        # wait after it come out of the capacity budget, not the await's;
+        # only the accepted create's own five seconds are charged to
+        # await_timeout, as they would have been without a refusal.
+        self._run(
+            [_refusal(TRANSIENT_BODY), {'uuid': 'created', 'state': 'initial'}],
+            lookups={
+                'test': [sf_instance.apiclient.ResourceNotFoundException(),
+                         self.REFUSED],
+                'refused': [self.DELETED],
+            },
+            await_instance=True, create_seconds=5)
+
+        self.assertEqual([('await', 'created', 595)], self._calls('await'))
+        self.assertEqual(60, self._waited()['seconds'])
+
+    def test_every_replay_is_told_not_to_wait(self):
+        refusal = _refusal(TRANSIENT_BODY)
+        self._run(
+            [refusal, refusal, {'uuid': 'created', 'state': 'initial'}],
+            lookups={
+                'test': [sf_instance.apiclient.ResourceNotFoundException(),
+                         self.REFUSED],
+                'refused': [self.DELETED],
+            },
+            await_instance=True)
+        self.assertEqual([0, 0, 0], [c[2] for c in self._calls('create')])
+
+    def test_capacity_waited_is_returned_on_success_as_not_refused(self):
+        self._run([self._created()])
+        self.assertEqual({
+            'seconds': 0,
+            'attempts': 1,
+            'outcome': 'not_refused',
+            'refusals': [],
+            'namespace_instances': None,
+        }, self._waited())
+        self.assertEqual([], self._calls('get_instances'))
