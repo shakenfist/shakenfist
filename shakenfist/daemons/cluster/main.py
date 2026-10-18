@@ -1199,6 +1199,7 @@ class Monitor(daemon.Daemon):
             # firing against work it is no longer doing.
             scheduled_tasks.clear_scheduler_capacity_metrics()
             scheduled_tasks.clear_sweep_failure_metrics()
+            scheduled_tasks.clear_deleted_object_metrics()
 
         # Stop being the cluster maintenance node if we were. Release
         # may raise LockNotHeld if our lease has lapsed -- swallow it,

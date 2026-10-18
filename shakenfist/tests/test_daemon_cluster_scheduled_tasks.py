@@ -1,4 +1,5 @@
 # Copyright 2019 Michael Still and contributors
+import collections
 import time
 from unittest import mock
 
@@ -1079,6 +1080,210 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(1, processed)
         self.assertFalse(young.hard_deleted)
+
+
+UUID_GONE = 'a0000000-0000-4000-8000-000000000001'
+UUID_NOT_FINAL = 'a0000000-0000-4000-8000-000000000002'
+UUID_TOO_YOUNG = 'a0000000-0000-4000-8000-000000000003'
+UUID_HARD_DELETED = 'a0000000-0000-4000-8000-000000000004'
+UUID_FAILED = 'a0000000-0000-4000-8000-000000000005'
+
+
+class DeletedObjectSweepMixedQueueTestCase(base.ShakenFistTestCase):
+    """One queue entry for each way a deleted-object entry can end."""
+
+    def setUp(self):
+        super().setUp()
+        while not st.DELETED_OBJECTS_QUEUE.empty():
+            st.DELETED_OBJECTS_QUEUE.get(block=False)
+        st._DELETED_OBJECTS_DEPTH.clear()
+        st.CLUSTER_DELETED_OBJECT_QUEUE_DEPTH.clear()
+        _reset_sweep_failure_state()
+
+    def _fixtures(self, calls):
+        """Return a from_db side effect which records its calls in order."""
+        def make(label, **kwargs):
+            obj = FakeFinalStateObject(**kwargs)
+            real = obj.hard_delete
+
+            def hard_delete():
+                calls.append(('hard_delete', label))
+                real()
+            obj.hard_delete = hard_delete
+            return obj
+
+        objs = {
+            UUID_NOT_FINAL: make(UUID_NOT_FINAL, state_value='created'),
+            UUID_TOO_YOUNG: make(UUID_TOO_YOUNG, age=1.0),
+            UUID_HARD_DELETED: make(UUID_HARD_DELETED),
+        }
+
+        def from_db(obj_uuid, suppress_failure_audit=False):
+            calls.append(('from_db', obj_uuid, suppress_failure_audit))
+            if obj_uuid == UUID_GONE:
+                return None
+            if obj_uuid == UUID_FAILED:
+                raise RuntimeError('database exploded')
+            return objs[obj_uuid]
+        return from_db, objs
+
+    def _queue_mixed(self):
+        for obj_uuid in (UUID_GONE, UUID_NOT_FINAL, UUID_TOO_YOUNG,
+                         UUID_HARD_DELETED, UUID_FAILED):
+            st.DELETED_OBJECTS_QUEUE.put(('network', obj_uuid))
+            st._DELETED_OBJECTS_DEPTH['network'] += 1
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    def test_call_order_is_unchanged(self, mock_get_class):
+        # Instrumenting the sweep must not change what it does: the same
+        # calls, in the same order, with the same arguments (D6).
+        calls = []
+        from_db, objs = self._fixtures(calls)
+        mock_get_class.return_value.from_db.side_effect = from_db
+        self._queue_mixed()
+
+        processed = st._process_per_deleted_object_queue(execution_limit=5)
+
+        self.assertEqual(5, processed)
+        self.assertEqual(
+            [('from_db', UUID_GONE, True),
+             ('from_db', UUID_NOT_FINAL, True),
+             ('from_db', UUID_TOO_YOUNG, True),
+             ('from_db', UUID_HARD_DELETED, True),
+             ('hard_delete', UUID_HARD_DELETED),
+             ('from_db', UUID_FAILED, True)],
+            calls)
+        self.assertEqual(
+            [('network',)] * 5,
+            [(c.args[0],) for c in mock_get_class.call_args_list])
+
+    def _sample_counts(self):
+        return {
+            outcome: REGISTRY.get_sample_value(
+                'cluster_deleted_object_seconds_count',
+                {'object_type': 'network', 'outcome': outcome}) or 0
+            for outcome in st.DELETED_OBJECT_OUTCOMES}
+
+    def _depth(self, objtype):
+        return REGISTRY.get_sample_value(
+            'cluster_deleted_object_queue_depth', {'object_type': objtype})
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    def test_one_histogram_sample_per_outcome(self, mock_get_class):
+        calls = []
+        from_db, objs = self._fixtures(calls)
+        mock_get_class.return_value.from_db.side_effect = from_db
+        self._queue_mixed()
+        before = self._sample_counts()
+
+        outcomes = collections.Counter()
+        processed = st._process_per_deleted_object_queue(
+            execution_limit=5, outcomes=outcomes)
+
+        after = self._sample_counts()
+        self.assertEqual(5, processed)
+        self.assertEqual({outcome: 1 for outcome in st.DELETED_OBJECT_OUTCOMES},
+                         {o: after[o] - before[o] for o in after})
+        self.assertEqual({outcome: 1 for outcome in st.DELETED_OBJECT_OUTCOMES},
+                         dict(outcomes))
+        self.assertEqual(0, st._DELETED_OBJECTS_DEPTH['network'])
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    def test_outcomes_parameter_is_optional(self, mock_get_class):
+        calls = []
+        from_db, objs = self._fixtures(calls)
+        mock_get_class.return_value.from_db.side_effect = from_db
+        self._queue_mixed()
+
+        self.assertEqual(
+            5, st._process_per_deleted_object_queue(execution_limit=5))
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    @mock.patch('shakenfist.mariadb.get_objects_by_state')
+    def test_depth_gauge_tracks_fill_and_processing(
+            self, mock_get_by_state, mock_get_class):
+        def by_state(objtype, states, updated_before=None):
+            if objtype == ObjectType.NETWORK:
+                return [BLOB_UUID_1, BLOB_UUID_2]
+            if objtype == ObjectType.BLOB:
+                return [BLOB_UUID_1]
+            return []
+        mock_get_by_state.side_effect = by_state
+        mock_get_class.return_value.from_db.return_value = None
+
+        st._fill_per_deleted_object_queue()
+        st._publish_deleted_object_depth()
+
+        self.assertEqual(2, self._depth('network'))
+        self.assertEqual(1, self._depth('blob'))
+
+        # Take one entry only, by way of a limit which expires at once.
+        # The module's clock is replaced, not the global one: start and
+        # first limit check at t=0, every later check well past the limit.
+        clock = iter([0.0, 0.0])
+        with mock.patch('shakenfist.daemons.cluster.scheduled_tasks.time') as fake_time:
+            fake_time.time.side_effect = lambda: next(clock, 100.0)
+            fake_time.monotonic.return_value = 0.0
+            st._process_per_deleted_object_queue(execution_limit=10)
+        st._publish_deleted_object_depth()
+        # Which type comes off first is the fill order's business.
+        self.assertEqual(
+            3 - 1, (self._depth('network') or 0) + (self._depth('blob') or 0))
+        self.assertEqual(2, st.DELETED_OBJECTS_QUEUE.qsize())
+
+        st._process_per_deleted_object_queue()
+        st._publish_deleted_object_depth()
+        # Emptied types lose their label set rather than exporting zero.
+        self.assertIsNone(self._depth('network'))
+        self.assertIsNone(self._depth('blob'))
+        self.assertEqual({}, dict(st._DELETED_OBJECTS_DEPTH))
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks._process_per_deleted_object_queue')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.time')
+    @mock.patch('shakenfist.mariadb.get_objects_by_state')
+    def test_gauge_set_when_fill_exceeds_budget(
+            self, mock_get_by_state, mock_time, mock_process):
+        def by_state(objtype, states, updated_before=None):
+            return [BLOB_UUID_1, BLOB_UUID_2] if objtype == ObjectType.NETWORK else []
+        mock_get_by_state.side_effect = by_state
+        # per_deleted_object_checks() reads the clock first; every later
+        # read is a minute on, so the fill looks like it took a minute.
+        clock = iter([0.0])
+        mock_time.time.side_effect = lambda: next(clock, 60.0)
+
+        st.per_deleted_object_checks()
+
+        mock_process.assert_not_called()
+        self.assertEqual(2, self._depth('network'))
+
+    def test_clear_drops_gauge_but_not_counter(self):
+        st.DELETED_OBJECTS_QUEUE.put(('network', BLOB_UUID_1))
+        st._DELETED_OBJECTS_DEPTH['network'] += 1
+        st._publish_deleted_object_depth()
+        self.assertEqual(1, self._depth('network'))
+
+        st.clear_deleted_object_metrics()
+
+        self.assertIsNone(self._depth('network'))
+        self.assertEqual({'network': 1}, dict(st._DELETED_OBJECTS_DEPTH))
+        self.assertEqual(1, st.DELETED_OBJECTS_QUEUE.qsize())
+
+        # Emptying a type after a clear must not trip over the label set
+        # having gone already.
+        st._DELETED_OBJECTS_DEPTH['network'] = 0
+        st._publish_deleted_object_depth()
+        self.assertEqual({}, dict(st._DELETED_OBJECTS_DEPTH))
+
+    def test_next_pass_republishes_after_clear(self):
+        st.DELETED_OBJECTS_QUEUE.put(('network', BLOB_UUID_1))
+        st._DELETED_OBJECTS_DEPTH['network'] += 1
+        st._publish_deleted_object_depth()
+        st.clear_deleted_object_metrics()
+        self.assertIsNone(self._depth('network'))
+
+        st._publish_deleted_object_depth()
+
+        self.assertEqual(1, self._depth('network'))
 
 
 class ReconcileOrphanedObjectsTestCase(base.ShakenFistTestCase):
