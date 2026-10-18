@@ -9,7 +9,9 @@ merges. This keeps repositories free of stale merged branches.
 
 The check queries the `delete_branch_on_merge` repository setting
 via the GitHub API. Note that the API only exposes this setting to
-tokens with push access to the repository.
+tokens with push access to the repository: to any other it answers
+null, which the check reports as `error` rather than as a failure,
+because it says nothing about the setting.
 
 ## Template
 

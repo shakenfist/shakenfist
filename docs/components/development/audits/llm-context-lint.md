@@ -49,12 +49,15 @@ are allowed to sit beside skill directories.
 ### Not applicable
 
 * Repositories with no agent context files at all.
-* A missing skillsaw binary. That is the audit harness's problem, not
-  the audited repository's, and failing would file an issue against
-  every project in the fleet for something none of them can fix. The
-  consistency-audit workflow installs a pinned skillsaw, so the state
-  should not arise; when it does, every row flipping to N/A at once is
-  the signal.
+
+A missing skillsaw binary, or one whose output is not its JSON
+report, is not N/A but `error`. That is the audit harness's problem,
+not the audited repository's: failing would file an issue against
+every project in the fleet for something none of them can fix, and
+N/A would close every open one at once. The consistency-audit
+workflow installs a pinned skillsaw and checks its version before the
+audit runs, so the state should not arise. See "What each status
+means" in [docs/consistency-audits.md](/components/development/consistency-audits/).
 
 ### How skillsaw is run
 

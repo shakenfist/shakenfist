@@ -31,12 +31,14 @@ one before recording it (unless explicitly told not to with
 reviewed files were imported, when any were, so that coverage
 arriving by import is not mistaken for a review session.
 
-A run that cannot be started at all -- an unusable checkout, an
-interpreter that will not execute -- is reported as a failure of
-this criterion against that repository, naming the error. It is
-not allowed to raise, because the audit runs every criterion for a
-repository in one process and an exception would take every other
-criterion for that repository down with it.
+A run of `review-tracking.py` that does not answer -- an unusable
+checkout, an interpreter that will not execute, a timeout, a non-zero
+exit or output that is not its JSON -- is reported as `error`, naming
+what went wrong, rather than as a failure of this criterion against
+that repository. The tool failed, not the repository, so there is no
+verdict: the open issue, if there is one, is left as it is. See "What
+each status means" in
+[docs/consistency-audits.md](/components/development/consistency-audits/).
 
 Expect routine churn near the threshold: a single feature PR can
 touch five in-scope files, so the issue this audit files acts as a

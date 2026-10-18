@@ -85,15 +85,22 @@ directly rather than assuming, and says which of five things happened:
   and the finding says to check the token, because a listing that
   cannot see part of the organisation cannot answer the first question
   either.
-- **It could not be resolved either way** -- an expired token, rate
-  limiting, a timeout, or a 404 this token cannot interpret (see
-  below). Reported as exactly that. "Gone" is the one conclusion whose
-  suggested fix is destructive, so nothing arrives at it by accident.
+- **It could not be resolved either way** -- a 404 this token cannot
+  interpret (see below). Reported as exactly that. "Gone" is the one
+  conclusion whose suggested fix is destructive, so nothing arrives at
+  it by accident.
 
-Each name is resolved on its own, and a failure on one is recorded
-against that name rather than abandoning the run. The undecided
-question needs no API access at all, and it is the half of the check
-that matters: a slow call must not discard it.
+GitHub not answering at all is not one of the five. An expired token,
+rate limiting, a timeout or an empty reply, on the listing or on any
+one name, makes the check report `error` rather than a verdict, as
+every criterion does when its tooling fails (see "What each status
+means" in [docs/consistency-audits.md](/components/development/consistency-audits/)). So
+does a listing that comes back empty, malformed, or as long as the
+limit asked for, which may have been cut. That costs the undecided
+finding for the run, which needs no API access; but an `error` leaves
+the open issue as it is, so a finding already filed survives an
+outage, and the alternative was filing an issue on `development` for
+GitHub being unreachable.
 
 ## The 404 that means nothing
 
