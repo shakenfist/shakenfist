@@ -15838,9 +15838,13 @@
   released, set it to a version or to a wheel built from a git checkout. With
   no <code>kerbside</code> group nothing changes, though ansible prints a harmless
   <code>Could not match supplied host pattern, ignoring: kerbside</code> warning, which an
-  empty <code>kerbside:</code> group in your inventory silences. This role is new and has
-  not yet run in CI against a real cluster; its cluster test arrives with the
-  merge-queue lane. See the
+  empty <code>kerbside:</code> group in your inventory silences. If <code>kerbside_public_fqdn</code>
+  is an IP address, the proxy certificate now carries it as an IP SAN rather
+  than a DNS SAN. The <code>debian-13-slim-tier</code> merge row deploys Kerbside on a
+  hypervisor against a real cluster, and proves the deploy, migrations,
+  restart-on-change across a no-op redeploy, readiness, the token exchange and
+  the proxy's TLS endpoint. See the
+  <a href="/developer_guide/ci/#deploy-profiles">CI developer guide</a> and the
   <a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/deploy/collection/README.md#kerbside">collection README</a>.</li>
 <li>There are now API calls for managing trusted issuers
   (<code>GET</code>/<code>POST /auth/issuers</code>, <code>GET</code>/<code>PUT</code>/<code>DELETE /auth/issuers/...issuerref...</code>).

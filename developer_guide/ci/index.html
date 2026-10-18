@@ -15141,6 +15141,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#deploy-profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploy profiles
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deploy profiles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-kerbside-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Kerbside profile
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ci-cloud-sizing-and-headroom" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15725,6 +15753,50 @@ tests planned in
 <a href="../../plans/PLAN-ci-cloud-sizing/">PLAN-ci-cloud-sizing</a> are expected to
 need the marker too, to assert that a genuinely full cluster refuses
 rather than have the refusal waited away.</p>
+<h2 id="deploy-profiles">Deploy profiles<a class="headerlink" href="#deploy-profiles" title="Permanent link">&para;</a></h2>
+<p>A cluster job can deploy more than the default stack without that change
+living in <code>shakenfist/actions</code>. It names a deploy profile, a Jinja2 template
+in this repository that the actions render against the topology's facts. A
+profile can do five things, all optional:</p>
+<ul>
+<li>add inventory groups, with group variables, for hosts named in the
+  topology;</li>
+<li>pass extra variables to <code>site.yml</code>;</li>
+<li>run MariaDB SQL once on the primary before the deploy;</li>
+<li>ask for a second deploy straight afterwards, after which no unit matching
+  a given pattern may have restarted (compared by systemd <code>InvocationID</code>,
+  which changes on every start); and</li>
+<li>export environment variables into the functional test run.</li>
+</ul>
+<p>The profile schema, the facts it renders against and the validation rules
+are in the
+<a href="https://github.com/shakenfist/actions/blob/main/docs/consuming.md#deploy-profiles">actions consuming guide</a>.
+Profiles live in <code>tools/ci-deploy-profiles/</code> and are named
+<code>&lt;purpose&gt;-&lt;topology&gt;.yml.j2</code>.</p>
+<h3 id="the-kerbside-profile">The Kerbside profile<a class="headerlink" href="#the-kerbside-profile" title="Permanent link">&para;</a></h3>
+<p><code>tools/ci-deploy-profiles/kerbside-slim-tier.yml.j2</code> is used by the
+<code>debian-13-slim-tier</code> merge row. It deploys Kerbside on <code>sf2</code>, a hypervisor
+outside the database tier, scraping the primary's <code>sf-api</code> across hosts. It
+creates Kerbside's database on the primary's MariaDB, sets throwaway CI
+credentials, and exports <code>SF_CI_EXPECT_VDI_CONSOLE_PROXY</code> into the test run.
+It leaves <code>kerbside_package</code> at the role's default, so this row needs a
+Kerbside release satisfying <code>kerbside&gt;=0.7.0</code>. Kerbside is addressed by IP
+because CI nodes have no DNS, so its certificate carries an IP SAN.</p>
+<p>The redeploy check runs straight after the first deploy, before anything
+restarts <code>sf-api</code> on purpose and before the tests. It asserts that a second
+<code>site.yml</code> run restarts none of the <code>sf-*</code> or <code>kerbside-*</code> units on any node,
+and a failure names the host and unit. This is the restart-on-change guarantee
+for all three node roles and for Kerbside.</p>
+<p>Kerbside's tests skip on clusters without it. On this row
+<code>SF_CI_EXPECT_VDI_CONSOLE_PROXY</code> turns those skips into failures, so a deploy
+that silently stopped enabling Kerbside cannot go green. The tests that run
+there are <code>test_vdi_tokens.py</code> (minting and verifying a console token) and
+<code>test_vdi_kerbside_exchange.py</code> (exchanging a token for a console file at
+Kerbside, replay rejection, the proxy's TLS endpoint, and a check that no
+daemon holds the signing key in its environment).</p>
+<p>Profiles are checked offline, without a cluster, by
+<code>shakenfist/tests/test_ci_deploy_profiles.py</code>. It renders every profile and
+checks the result against the roles' own validation rules.</p>
 <h2 id="ci-cloud-sizing-and-headroom">CI cloud sizing and headroom<a class="headerlink" href="#ci-cloud-sizing-and-headroom" title="Permanent link">&para;</a></h2>
 <p>CI's clouds are sized against the scheduler's admission ledger rather
 than against real CPU, because the ledger is what the scheduler

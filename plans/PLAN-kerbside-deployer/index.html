@@ -15259,7 +15259,7 @@ cluster with <code>KERBSIDE_URL</code> set does three things:</p>
 <li>advertises the <code>vdi-console-proxy</code> capability (<code>external_api/app.py:438-442</code>);</li>
 <li>mints short-lived Ed25519 tokens at
   <code>GET /instances/&lt;ref&gt;/vdiconsoleproxy</code>
-  (<code>external_api/instance.py:2114-2134</code>);</li>
+  (<code>external_api/instance.py:2129-2195</code>);</li>
 <li>causes <code>sf-client instance vdiconsolefile</code> to fetch a
   Kerbside-routed <code>.vv</code> instead of a direct one
   (client-python, <code>commandline/instance.py:705, 786</code>).</li>
@@ -15314,7 +15314,7 @@ the mint test to run somewhere. #4367 notes that Kerbside's deploy
 lane has no headroom instrumentation. #4097 and #4367 are open.</p>
 <h1 id="4093-was-closed-on-2026-10-03-by-the-merge-of-this-plans-own-pull">4093 was closed on 2026-10-03 by the merge of this plan's own pull<a class="headerlink" href="#4093-was-closed-on-2026-10-03-by-the-merge-of-this-plans-own-pull" title="Permanent link">&para;</a></h1>
 <p>request, #4420, whose phase table said phase 4 "closes" it. GitHub
-read that as a closing keyword. It was reopened the same day, since
+read that as a closing keyword. It was reopened on 2026-10-04, since
 nothing makes the mint test run yet (phase 2's survey, S7).</p>
 <h3 id="what-deploying-kerbside-involves">What deploying Kerbside involves<a class="headerlink" href="#what-deploying-kerbside-involves" title="Permanent link">&para;</a></h3>
 <p>All references below are to the Kerbside repository unless marked
@@ -15674,18 +15674,18 @@ every phase has been completed, abandoned or superseded.</p>
 <tr>
 <td>3. A <code>kerbside</code> role and the <code>kerbside</code> group in <code>site.yml</code></td>
 <td><a href="../PLAN-kerbside-deployer-phase-03-kerbside-role/">PLAN-kerbside-deployer-phase-03-kerbside-role.md</a></td>
+<td>Complete</td>
+<td><code>b85005f0e</code> (#4465)</td>
+</tr>
+<tr>
+<td>4. A merge-queue lane with the feature on</td>
+<td><a href="../PLAN-kerbside-deployer-phase-04-ci/">PLAN-kerbside-deployer-phase-04-ci.md</a></td>
 <td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
-<td>4. A merge-queue lane with the feature on</td>
-<td>PLAN-kerbside-deployer-phase-04-ci.md</td>
-<td>Proposed</td>
-<td>—</td>
-</tr>
-<tr>
-<td>5. Kerbside's sf-e2e lane deploys through the collection</td>
-<td>PLAN-kerbside-deployer-phase-05-kerbside-lane.md</td>
+<td>5. The <code>kerbside</code> role moves into Kerbside, and Kerbside's sf-e2e lane deploys through it</td>
+<td>PLAN-kerbside-deployer-phase-05-role-to-kerbside.md</td>
 <td>Proposed</td>
 <td>—</td>
 </tr>
@@ -15715,9 +15715,11 @@ phase has not landed.</p>
   credential it writes into <code>sources.yaml</code>.</li>
 <li>Phase 4 needs phase 3, and an operator push to
   <code>shakenfist/actions</code>.</li>
-<li>Phase 5 needs phase 4. It moves Kerbside's lane onto a deploy
-  path SF's merge queue already proves, rather than onto one only
-  Kerbside exercises.</li>
+<li>Phase 5 needs phase 4, and a Kerbside release that includes
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/533" title="GitHub Issue: shakenfist/kerbside #533">kerbside#533</a>. It moves the role to Kerbside only once SF's merge
+  queue proves the role works, so the move changes the role's home
+  and not its behaviour. Phase 4's lane then keeps proving the
+  integration from SF's side.</li>
 <li>Phase 6 is the last implementation phase, and phase 7 audits
   them all.</li>
 </ul>
@@ -15860,58 +15862,143 @@ restart-on-change has to be right for a service whose failure
 mode (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/313" title="GitHub Issue: shakenfist/kerbside #313">kerbside#313</a>, a malformed INI exits 0) defeats systemd's
 <code>Restart=on-failure</code>.</p>
 <h3 id="phase-4-a-merge-queue-lane-with-the-feature-on">Phase 4 -- A merge-queue lane with the feature on<a class="headerlink" href="#phase-4-a-merge-queue-lane-with-the-feature-on" title="Permanent link">&para;</a></h3>
-<p>The changes to <code>shakenfist/actions</code>, handed to the operator as a
-reviewed diff:</p>
+<p>Planned in
+<a href="../PLAN-kerbside-deployer-phase-04-ci/">PLAN-kerbside-deployer-phase-04-ci.md</a>.
+Its survey corrected several claims this section used to make; the
+summary below reflects them.</p>
+<p>This repository cannot add an inventory group or a deploy variable to
+the CI deploy. Inventory groups come from three hardcoded role flags in
+<code>shakenfist/actions</code>, and <code>deploy-collection.sh</code> passes one fixed
+extra-vars string. Phase 4 therefore adds a generic <strong>deploy profile</strong>
+to actions, handed to the operator as a reviewed branch:</p>
 <ul>
-<li>a <code>kerbside</code> group in a topology. The default is <code>slim-tier</code>,
-  with Kerbside on a tier node that is not the first database
-  host, so the scrape crosses hosts;</li>
-<li>an extra-vars file in <code>deploy-collection.sh</code>, replacing the
-  growing list of positional arguments;</li>
-<li>the database and user creation, mirroring
-  <code>deploy-kerbside.sh:93-99</code>;</li>
-<li>a second <code>site.yml</code> run, after which no <code>sf-*</code> or <code>kerbside-*</code>
-  unit may have restarted (#4459: restart-on-change has never been
-  tested).</li>
+<li>an optional <code>deploy_profile</code> input on <code>smoke-cluster.yml</code>, naming a
+  Jinja2 file in the caller's checkout;</li>
+<li>the profile can do the following:</li>
+<li>add inventory groups and group variables;</li>
+<li>supply extra variables;</li>
+<li>create databases on the CI MariaDB;</li>
+<li>export variables to the test run;</li>
+<li>ask for a second <code>site.yml</code> run after which no listed unit's
+    <code>InvocationID</code> may change (#4459);</li>
+<li><code>kerbside-*</code> units added to the per-node checks (including a non-zero
+  <code>NRestarts</code>, because <code>Restart=always</code> hides a crash loop) and to the
+  failure log bundle.</li>
 </ul>
-<p>Before it can run, a Kerbside release that stops returning source
-passwords must exist, because phase 3's <code>kerbside_package</code> default
-requires it.</p>
 <p>In this repository:</p>
 <ul>
-<li>a merge-queue job that turns the feature on, with
-  <code>headroom_gate: false</code> until it is measured (#4367);</li>
-<li><code>test_vdi_tokens.py</code>'s mint test un-skipped when the capability
-  is advertised (#4093);</li>
-<li>a new exchange test that does all of the following:</li>
-<li>fetches a <code>.vv</code> through <code>vdiconsoleproxy</code> and Kerbside's
-    exchange;</li>
-<li>asserts it names Kerbside, not the hypervisor;</li>
-<li>asserts its <code>host-subject</code> equals the proxy certificate's;</li>
-<li>completes a TLS handshake to the proxy port against the
-    embedded CA.</li>
+<li>a <code>kerbside</code> profile used by the <strong>existing</strong> <code>debian-13-slim-tier</code>
+  merge row, not a new cluster. Kerbside goes on <code>sf2</code>, which is a
+  hypervisor outside the database tier. <code>api_url</code> is set to the
+  primary, so the scrape crosses hosts; with the default loopback
+  <code>api_url</code> it would not. The headroom band measures the vCPU ledger,
+  which Kerbside does not touch, so the row's gate is unchanged;</li>
+<li>an IP SAN on the proxy certificate when <code>kerbside_public_fqdn</code> is an
+  address, which every CI Kerbside host is;</li>
+<li><code>test_vdi_tokens.py</code>'s mint test is un-skipped when the capability is
+  advertised (#4093). It fails, rather than skips, when the lane
+  expects the capability and does not see it;</li>
+<li>a new exchange test does all of the following:</li>
+<li>fetches a <code>.vv</code> through <code>vdiconsoleproxy</code> and Kerbside's exchange;</li>
+<li>asserts it names Kerbside rather than the hypervisor;</li>
+<li>completes a host-name-checked TLS handshake to the proxy port
+    against the <code>.vv</code>'s CA;</li>
+<li>asserts the certificate's subject equals <code>host-subject</code>;</li>
+<li>asserts a replay is refused;</li>
+<li>
+<h1 id="4097s-live-check-that-the-signing-key-is-in-no-daemons">4097's live check that the signing key is in no daemon's<a class="headerlink" href="#4097s-live-check-that-the-signing-key-is-in-no-daemons" title="Permanent link">&para;</a></h1>
+  environment.</li>
 </ul>
 <p>That closes #4097 item 4, because the variable is now read by a
-running <code>sf-api</code> in CI. Driving a SPICE session through it stays
-in Kerbside's lane, which already has ryll and the drivers.</p>
-<p>Planned at high effort: it crosses repositories, and the headroom
-and load-budget instruments have seams that a new armed or
-unarmed call site must declare (<code>test_headroom_gate_workflow_seams.py</code>).</p>
-<h3 id="phase-5-kerbsides-lane-deploys-through-the-collection">Phase 5 -- Kerbside's lane deploys through the collection<a class="headerlink" href="#phase-5-kerbsides-lane-deploys-through-the-collection" title="Permanent link">&para;</a></h3>
-<p>Kerbside's <code>sf-e2e-functional.yml</code> stops running
-<code>deploy-kerbside-on-shakenfist</code>. Instead it deploys the smoke
-cluster with a <code>kerbside</code> group and the PR's proxy wheel as
-<code>kerbside_proxy_package</code>, then runs its existing drivers
-unchanged. The composite action and Kerbside's
-<code>tools/sf-e2e/{provision-sf.sh,deploy-kerbside.sh,gen-sources.py}</code>
-are then retired, or reduced to whatever the drivers still need.</p>
-<p>The lane stops testing a deploy shape no real operator would use.
-It also becomes an early warning for collection changes that
-break Kerbside.</p>
-<p>Planned at medium-high effort. The drivers are untouched, but the
-lane is currently failing nightly (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/482" title="GitHub Issue: shakenfist/kerbside #482">kerbside#482</a>), and that must be
-understood before it is moved. Otherwise the move will be blamed
-for it.</p>
+running <code>sf-api</code> in CI. Driving a SPICE session through it stays in
+Kerbside's lane, which already has ryll and the drivers.</p>
+<p>The actions branch must merge before this repository's pull request
+is enqueued. Kerbside 0.7.0 must also be on PyPI by then, because phase
+3's <code>kerbside_package</code> default requires it.</p>
+<p>Planned at high effort: it crosses repositories, and it changes what
+the slowest merge row deploys.</p>
+<h3 id="phase-5-the-kerbside-role-moves-into-kerbside">Phase 5 -- The <code>kerbside</code> role moves into Kerbside<a class="headerlink" href="#phase-5-the-kerbside-role-moves-into-kerbside" title="Permanent link">&para;</a></h3>
+<p><em>Amended 2026-10-10.</em> This phase was originally "Kerbside's lane
+deploys through the collection": Kerbside's sf-e2e lane would have
+reached into SF's collection for the role. Kerbside's
+<a href="https://github.com/shakenfist/kerbside/issues/546">deployment options plan</a>
+(<code>docs/plans/PLAN-deployment-options.md</code> in Kerbside) reframes
+Kerbside as a "front door" that can sit in front of several
+clouds and is deployed independently of any one of them. A role
+that lives in SF's collection and writes exactly one <code>type:
+shakenfist</code> source is in the wrong repository for that framing.
+Iterating on the role in Kerbside's CI is also faster than in
+SF's. Kerbside's plan records its Ansible documentation phase as
+blocked on this phase.</p>
+<p>The role moves to the Kerbside repository as an Ansible
+collection. Its systemd units and helper scripts move with it,
+which settles open question 2's long-term answer.</p>
+<p>What stays in SF's <code>site.yml</code>:</p>
+<ul>
+<li>the <code>kerbside</code> group;</li>
+<li>the certificate plays (<code>internal_ca</code>);</li>
+<li>the validate play and the shadow guard;</li>
+<li>the node role's credential and key minting.</li>
+</ul>
+<p>The role already reads no inventory group names and no other
+host's facts, which is the seam the move needs.</p>
+<p>In scope:</p>
+<ul>
+<li><strong>Sources become a list.</strong> <code>templates/sources.yaml</code> stops
+  hard-coding one Shaken Fist source and renders a
+  <code>kerbside_sources</code> list variable. SF's <code>site.yml</code> computes its
+  own entry (name, <code>api_url</code>, the <code>system</code> credential, the CA) and
+  passes it. An operator can append others (oVirt, OpenStack,
+  static). The role validates every entry, not just SF's. The
+  data-not-strings rendering and its quoting guarantees carry over
+  unchanged.</li>
+<li><strong>The cross-repository dependency.</strong> SF's collection, or SF's
+  <code>site.yml</code> users, depend on Kerbside's collection. The phase
+  plan designs and verifies all of the following:</li>
+<li>how the dependency is declared and resolved: Galaxy, a git
+    source in <code>requirements.yml</code>, or what CI builds from a
+    checkout;</li>
+<li>whether it is hard (<code>galaxy.yml</code> <code>dependencies</code>) or soft (a
+    <code>requirements.yml</code> needed only when the <code>kerbside</code> group is
+    non-empty);</li>
+<li>Kerbside's collection release step;</li>
+<li>how SF's merge lane pins a version.</li>
+</ul>
+<p>It is expected to prefer a soft dependency, so that a cluster
+  without Kerbside does not install it. Whatever it chooses, it
+  must check each claim about <code>ansible-galaxy</code> against the
+  installed version rather than the documentation.
+- <strong>SF-side tests that reach into the role</strong> follow it or are
+  replaced:
+  - <code>test_kerbside_host_subject.py</code> pins
+    <code>files/kerbside-host-subject.py</code> to <code>node.py</code>'s subject
+    rendering, and a cross-repository pin needs a new shape;
+  - <code>test_ci_deploy_profiles.py</code> checks profiles against the
+    role's argument specs;
+  - <code>tools/ci-test-kerbside-role.sh</code> runs the role itself.
+- <strong>Kerbside's sf-e2e lane exercises the role directly.</strong>
+  <code>sf-e2e-functional.yml</code> stops running
+  <code>deploy-kerbside-on-shakenfist</code>. It deploys the smoke cluster
+  with a <code>kerbside</code> group, the PR's role and the PR's proxy wheel,
+  then runs its existing drivers unchanged. The composite action
+  and Kerbside's
+  <code>tools/sf-e2e/{provision-sf.sh,deploy-kerbside.sh,gen-sources.py}</code>
+  are then retired, or reduced to whatever the drivers still need.
+  The lane stops testing a deploy shape no real operator would
+  use, and becomes the early warning for role changes. Phase 4's
+  slim-tier row keeps proving the integration from SF's side
+  against a released version of the role.</p>
+<p>Out of scope: any non-SF source in CI. A second source type only
+needs the list variable to accept it. Testing one is Kerbside's
+deployment options plan's business.</p>
+<p>Most of the work lands in the Kerbside repository. The <code>Merged</code>
+cell records both sides.</p>
+<p>Planned at high effort. The phase crosses two repositories and a
+release boundary, and the dependency mechanism is cheap to propose
+and expensive to redo, so its shape is a back-brief gate. The lane
+was failing nightly (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/482" title="GitHub Issue: shakenfist/kerbside #482">kerbside#482</a>); phase 4's survey found it
+green, and the phase confirms that before moving the lane, so the
+move is not blamed for an old failure.</p>
 <h3 id="phase-6-documentation-and-close-out">Phase 6 -- Documentation and close-out<a class="headerlink" href="#phase-6-documentation-and-close-out" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>docs/operator_guide/vdi_console_tokens.md</code> loses its "manual
@@ -16027,11 +16114,9 @@ codebase, can be planned at medium effort.</p>
 
 <div class="admonition note">
 <p class="admonition-title">In this project</p>
-<p>Phases 1, 2, 3 and 4 are planned at high effort, for the
-reasons given in each phase's section. Phase 5 is planned at
-medium-high effort, because the lane's existing nightly
-failure has to be understood first. Phase 6 is planned at
-medium effort.</p>
+<p>Phases 1 to 5 are planned at high effort, for the reasons
+given in each phase's section. Phase 6 is planned at medium
+effort.</p>
 </div>
 <h3 id="step-level-guidance">Step-level guidance<a class="headerlink" href="#step-level-guidance" title="Permanent link">&para;</a></h3>
 <!-- shared-block: subagent-step-guidance v1 -->
@@ -16270,8 +16355,9 @@ chosen to defer to here, so that we do not forget them.</p>
   API behind a private CA needs that CA in the Kerbside host's
   system trust store. The deployer could install it, but the
   right fix is in Kerbside.</li>
-<li><strong>Ship the systemd units from Kerbside</strong>, and switch the
-  collection to them (open question 2).</li>
+<li>~~<strong>Ship the systemd units from Kerbside</strong>, and switch the
+  collection to them (open question 2).~~ Taken into phase 5,
+  which moves the whole role, units included, to Kerbside.</li>
 <li><strong>Automated signing-key rotation</strong>, carried over from the
   tokens plan.</li>
 <li><strong>More than one Kerbside host, tested</strong>, behind a TCP
@@ -16299,6 +16385,9 @@ while planning it.</p>
   with a link here.</li>
 <li><strong>#4093</strong> (open): the mint test never runs in SF CI. Phase 4
   closes it.</li>
+<li><strong>#4099</strong> (merged): keeps the signing key out of daemon environments.
+  #4097's 2026-09-06 comment asks for a live check of that, which phase
+  4 adds.</li>
 <li><strong>#4459</strong> (open): restart-on-change in the node role has never
   been tested (found while planning phase 3). Phase 4 adds the
   second-deploy check.</li>
@@ -16309,11 +16398,14 @@ while planning it.</p>
 <li><strong>#4097</strong> (open): uncovered cross-repository seams. Phase 4
   closes item 4. Items 1-3 and 5-6 are mostly on the Kerbside
   side and stay with that issue.</li>
-<li><strong>#4367</strong> (open): no headroom instrumentation on Kerbside's
-  deploy lane. Phase 4's job is unarmed until it is measured,
-  and phase 5 moves the lane onto instrumented infrastructure.</li>
-<li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/482" title="GitHub Issue: shakenfist/kerbside #482">kerbside#482</a></strong> (open): the nightly sf-e2e lane is failing.
-  It must be understood before phase 5 moves the lane.</li>
+<li><strong>#4367</strong> (open): Kerbside's deploy lane, and node lifecycle's, call
+  <code>build-smoke-cluster</code> directly and so get no headroom probe. Phase 4
+  adds no such job: it uses the existing slim-tier row. Phase 5 moves
+  Kerbside's lane onto <code>smoke-cluster.yml</code>, which is instrumented.</li>
+<li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/482" title="GitHub Issue: shakenfist/kerbside #482">kerbside#482</a></strong> (open): the nightly sf-e2e lane was failing. Phase
+  4's survey found the last ten nightly runs (2026-09-27 to
+  2026-10-06) green, so the issue is stale. Phase 5 confirms that
+  before it moves the lane.</li>
 <li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/131" title="GitHub Issue: shakenfist/kerbside #131">kerbside#131</a>, #313, #465</strong> (open): a forgeable default seed,
   a malformed INI that exits 0, and a malformed <code>sources.yaml</code>
   that crash-loops the daemon. Phase 3 guards each at deploy
