@@ -38,9 +38,7 @@ on-node access. Tracked in
 ``docs/plans/PLAN-remove-syslog-forwarding.md`` (Future work) and
 the OpenTelemetry thread.
 """
-import json
 import logging
-from typing import Any
 
 from shakenfist_utilities import logs
 from shakenfist_utilities.logs import JsonFormatter
@@ -62,26 +60,6 @@ LOG, _ = logs.setup(__name__)
 # library to expose it directly. It now does, so there is no longer a
 # copy that can drift out of step with the field-name contract in the
 # library's docs/log-record-fields.md.
-
-
-def _json_safe_fields(fields: dict[str, Any]) -> dict[str, Any]:
-    """Return fields with any unserialisable values stringified.
-
-    Values that already encode cleanly pass through untouched; anything
-    else is round-tripped through ``json.dumps(default=str)`` (or, as a
-    last resort, ``str()``) so the record as a whole always encodes.
-    """
-    safe = {}
-    for key, value in fields.items():
-        try:
-            json.dumps(value)
-            safe[key] = value
-        except (TypeError, ValueError):
-            try:
-                safe[key] = json.loads(json.dumps(value, default=str))
-            except (TypeError, ValueError):
-                safe[key] = str(value)
-    return safe
 
 
 # Module-level singletons. ``start()`` is idempotent and guards
@@ -110,20 +88,11 @@ class LokiHandler(logging.Handler):
             # callers that merely import ``logship``.
             from shakenfist import logship_spool
 
-            try:
-                line = self.format(record)
-            except (TypeError, ValueError):
-                # Defence in depth: a caller attached a field that is not
-                # JSON serialisable (issue 3573: raw uuid.UUID values in
-                # event 'extra'). Losing the record to handleError dumps a
-                # raw multi-line traceback to stderr/syslog instead, so
-                # stringify the offending fields and retry -- a slightly
-                # lossy field beats a dropped record.
-                extra_fields = getattr(record, 'extra_fields', None)
-                if isinstance(extra_fields, dict):
-                    setattr(record, 'extra_fields',
-                            _json_safe_fields(extra_fields))
-                line = self.format(record)
+            # A field value that is not JSON serialisable no longer reaches
+            # handleError: since shakenfist-utilities 0.8.9 the library's
+            # JsonFormatter renders such values itself rather than raising
+            # (issues 3573 and 4509), so there is no retry here.
+            line = self.format(record)
             ts_ns = int(record.created * 1_000_000_000)
             logship_spool.enqueue(ts_ns, line)
         except Exception:

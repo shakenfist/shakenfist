@@ -36,8 +36,8 @@ def command_helper(*command, failure_is_error=True):
     stdout, stderr = obj.communicate(None, timeout=None)
     log = LOG.with_fields({
             'command': command,
-            'stdout': stdout,
-            'stderr': stderr,
+            'stdout': stdout.decode('utf-8', errors='replace'),
+            'stderr': stderr.decode('utf-8', errors='replace'),
             'exit_code': obj.returncode
     })
     if failure_is_error and obj.returncode != 0:
