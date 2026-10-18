@@ -1,3 +1,4 @@
+import collections
 import queue
 import time
 from typing import NamedTuple
@@ -5,6 +6,7 @@ from typing import Optional
 
 from prometheus_client import Counter
 from prometheus_client import Gauge
+from prometheus_client import Histogram
 from shakenfist_utilities import logs                 # noreorder
 
 from shakenfist.config import config
@@ -40,6 +42,33 @@ LOG, _ = logs.setup(__name__)
 BLOB_CHECKS_QUEUE = queue.Queue()
 INSTANCE_CHECKS_QUEUE = queue.Queue()
 DELETED_OBJECTS_QUEUE = queue.Queue()
+
+# How many entries of each object type are in DELETED_OBJECTS_QUEUE.
+# queue.Queue cannot be counted by type without draining it, so this
+# moves in step with the queue: incremented beside every put() and
+# decremented after every successful get(). It is deliberately not
+# cleared when this node is demoted, because the queue is not -- a
+# demoted node keeps its stale entries and would drain them if it were
+# re-elected, so the counts must keep describing them. Only the gauge
+# derived from it is cleared (clear_deleted_object_metrics()).
+_DELETED_OBJECTS_DEPTH: collections.Counter[str] = collections.Counter()
+DELETED_OBJECT_OUTCOMES = (
+    'gone', 'not_final', 'too_young', 'hard_deleted', 'failed')
+
+# What the deleted-object sweep costs and how far behind it is (#4473).
+# The histogram is per dequeued entry; the RPCs inside each entry are timed
+# separately by mariadb.rpc_timing_scope(), so the difference between the two
+# is time spent outside the database. Both are leader-only, like the streak
+# gauge below.
+CLUSTER_DELETED_OBJECT_SECONDS = Histogram(
+    'cluster_deleted_object_seconds',
+    'Wall time spent on one entry of the per-deleted-object queue, by '
+    'object type and how the entry ended.', ['object_type', 'outcome'],
+    buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10))
+CLUSTER_DELETED_OBJECT_QUEUE_DEPTH = Gauge(
+    'cluster_deleted_object_queue_depth',
+    'Entries waiting in the per-deleted-object queue, by object type.',
+    ['object_type'])
 
 REAPER_REQUEUED = Counter(
     'cluster_op_reaper_requeued_total',
@@ -236,6 +265,23 @@ def clear_sweep_failure_metrics() -> None:
     """
     SWEEP_WORK_LIST_FAILURE_STREAK.clear()
     _SWEEP_FAILURE_STREAK.clear()
+
+
+def clear_deleted_object_metrics() -> None:
+    """Drop the deleted-object queue depth gauge when this node is demoted.
+
+    Only the elected cluster maintainer fills and drains the queue, so a
+    node that held the lock and then lost it would otherwise keep
+    exporting the depth it last saw forever -- nothing on that node will
+    ever run the publishing code again. The newly elected node
+    repopulates on its first pass. This is the same reasoning as
+    ``clear_sweep_failure_metrics()``.
+
+    Only the gauge goes. The counter behind it describes the queue, which
+    a demotion does not empty, so it must keep matching it. The next pass
+    on this node, if it is re-elected, republishes the gauge from it.
+    """
+    CLUSTER_DELETED_OBJECT_QUEUE_DEPTH.clear()
 
 
 # Scheduler capacity reconciler metrics. Per-node gauges are labelled by node
@@ -812,11 +858,47 @@ def per_deleted_object_checks():
 
     queue_fill_cost = time.time() - start_time
     if queue_fill_cost > 10:
+        # A pass that only filled is exactly the one that reports the
+        # backlog, so the gauge is published on this path too.
+        _publish_deleted_object_depth()
         return
 
+    outcomes: collections.Counter[str] = collections.Counter()
+    process_start = time.time()
     processed = _process_per_deleted_object_queue(
-        execution_limit=(10 - queue_fill_cost))
-    LOG.info(f'Processed {processed} items from per-deleted-object queue')
+        execution_limit=(10 - queue_fill_cost), outcomes=outcomes)
+    process_seconds = time.time() - process_start
+    _publish_deleted_object_depth()
+
+    fields: dict[str, object] = {
+        'total': processed,
+        'remaining': sum(_DELETED_OBJECTS_DEPTH.values()),
+        'elapsed_seconds': round(process_seconds, 3)
+    }
+    for outcome in DELETED_OBJECT_OUTCOMES:
+        fields[outcome] = outcomes[outcome]
+    LOG.with_fields(fields).info(
+        f'Processed {processed} items from per-deleted-object queue')
+
+
+def _publish_deleted_object_depth() -> None:
+    """Set the depth gauge from _DELETED_OBJECTS_DEPTH.
+
+    A type whose count has reached zero loses its label set rather than
+    exporting zero forever, and is dropped from the counter.
+    """
+    for objtype in list(_DELETED_OBJECTS_DEPTH):
+        depth = _DELETED_OBJECTS_DEPTH[objtype]
+        if depth > 0:
+            CLUSTER_DELETED_OBJECT_QUEUE_DEPTH.labels(objtype).set(depth)
+            continue
+
+        try:
+            CLUSTER_DELETED_OBJECT_QUEUE_DEPTH.remove(objtype)
+        except KeyError:
+            # Never published, or cleared by a demotion.
+            pass
+        del _DELETED_OBJECTS_DEPTH[objtype]
 
 
 def _fill_per_deleted_object_queue():
@@ -874,11 +956,19 @@ def _fill_per_deleted_object_queue():
 
         for obj_uuid in work.uuids:
             DELETED_OBJECTS_QUEUE.put((objtype, obj_uuid))
+            _DELETED_OBJECTS_DEPTH[objtype] += 1
     else:
         _record_sweep_completed('per_deleted_object')
 
 
-def _process_per_deleted_object_queue(execution_limit=10):
+def _process_per_deleted_object_queue(
+        execution_limit=10,
+        outcomes: Optional[collections.Counter[str]] = None) -> int:
+    """Work through the queue, returning how many entries were taken.
+
+    If ``outcomes`` is given it is filled with how many entries ended in
+    each of DELETED_OBJECT_OUTCOMES.
+    """
     processed = 0
     start_time = time.time()
     while True:
@@ -891,32 +981,51 @@ def _process_per_deleted_object_queue(execution_limit=10):
         except queue.Empty:
             return processed
 
+        # Must follow the get() immediately, before anything can skip
+        # past it, to keep the depth in step with the queue.
+        _DELETED_OBJECTS_DEPTH[objtype] -= 1
+
         processed += 1
+
+        # Which way this entry ended, for the histogram and the pass
+        # summary. 'too_young' is the implicit else of the age check.
+        outcome = 'too_young'
+        entry_start = time.monotonic()
 
         # A failure to hard delete one object must only cost that one
         # object, not the rest of the pass (and the other scheduled
         # tasks sharing the run_pending() invocation).
         try:
-            # The object row may have been hard-deleted by a concurrent
-            # cleaner between the state query and this lookup; suppress
-            # the failure audit so that race does not show up as an
-            # ERROR event in the logs.
-            obj = get_object_class(objtype).from_db(
-                obj_uuid, suppress_failure_audit=True)
-            if not obj:
-                continue
+            with mariadb.rpc_timing_scope('per_deleted_object', objtype):
+                # The object row may have been hard-deleted by a
+                # concurrent cleaner between the state query and this
+                # lookup; suppress the failure audit so that race does
+                # not show up as an ERROR event in the logs.
+                obj = get_object_class(objtype).from_db(
+                    obj_uuid, suppress_failure_audit=True)
+                if not obj:
+                    outcome = 'gone'
+                    continue
 
-            # Queue entries can be old by the time we get to them, so
-            # re-check the state before acting on it.
-            if obj.state.value not in FINAL_OBJECT_STATES:
-                continue
+                # Queue entries can be old by the time we get to them, so
+                # re-check the state before acting on it.
+                if obj.state.value not in FINAL_OBJECT_STATES:
+                    outcome = 'not_final'
+                    continue
 
-            if (time.time() - obj.state.update_time >
-                    _deleted_object_delay(objtype)):
-                obj.hard_delete()
+                if (time.time() - obj.state.update_time >
+                        _deleted_object_delay(objtype)):
+                    obj.hard_delete()
+                    outcome = 'hard_deleted'
         except Exception as e:
+            outcome = 'failed'
             util_exceptions.ignore_exception(
                 f'hard delete of {objtype} {obj_uuid}', e)
+        finally:
+            CLUSTER_DELETED_OBJECT_SECONDS.labels(objtype, outcome).observe(
+                time.monotonic() - entry_start)
+            if outcomes is not None:
+                outcomes[outcome] += 1
 
 
 # Orphan reconciliation (issue 3534). Zombie repair is excluded for nodes
