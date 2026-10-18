@@ -49,3 +49,4 @@
 - PLAN-power-state-correctness.md: Truthful instance power state
 - PLAN-kerbside-deployer.md: Deploy Kerbside from the ansible collection
 - PLAN-zombie-repair-live-credentials.md: Zombie repair must not delete a live credential
+- PLAN-blob-containers.md: Blobs as containers
