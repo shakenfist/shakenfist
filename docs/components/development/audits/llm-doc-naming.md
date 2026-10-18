@@ -71,13 +71,12 @@ A repository with no such file passes, including one with no agent
 context at all -- "nothing here is named for a vendor" is true of it,
 and whether it should have an `AGENTS.md` is `llm-tooling`'s question.
 
-A directory `git` cannot list is N/A. Without the index the check
-cannot say anything either way, and what is missing is the audit
-harness's `git` rather than anything about the audited repository, so
-failing would file an issue nobody on that repository could fix. This
-is the reading `llm-context-lint` takes of a missing skillsaw, and it
-carries the same signal: every row flipping to N/A at once is how a
-broken runner announces itself.
+A directory `git` cannot list is an `error`. Without the index the
+check cannot say anything either way, and what is missing is the audit
+harness's `git` rather than anything about the audited repository:
+failing would file an issue nobody on that repository could fix, and
+N/A would close the one it has. See "What each status means" in
+[docs/consistency-audits.md](/components/development/consistency-audits/).
 
 So is a directory that is not the *root* of a checkout. `git ls-files`
 exits cleanly anywhere inside a work tree, listing whatever the

@@ -28,6 +28,14 @@ to bring a repository into scope. Read it before adding a file here --
 a new criterion is a check class and this specification, and a
 specification on its own does not measure anything.
 
+Every criterion reads an audited repository the same way, so the
+specifications do not repeat it. A path that is not a regular file
+inside the repository once symlinks are followed -- a dangling link, a
+directory, a link pointing out of the clone -- is absent, and so is a
+file over 2 MiB, which is declined rather than judged on a prefix. A
+repository can therefore neither point the audit at a file it does not
+contain nor make it read without end.
+
 ## File structure
 
 Each audit file follows this structure:

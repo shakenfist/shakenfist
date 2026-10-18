@@ -115,6 +115,15 @@ a base-branch key would alias several live entries, cancelling ones
 still wanted -- the key would have to narrow to something unique per
 entry.
 
+When GitHub does not answer that question, the workflow files decide
+the result if they can. A repository the files already fail on still
+fails, without the queue's line, because those findings stand whatever
+the queue is set to. The outage is reported by
+[merge-queue-config](/components/development/audits/merge-queue-config/), which asks GitHub the same
+question. A repository the files pass on reports `error` instead,
+because then the queue is the only thing left to decide, and the audit
+could not ask about it.
+
 The same reasoning puts lane distinctness here. An ejected pull request
 is what the serial queue protects against, and it is exactly what a
 self-cancelling matrix produces at the job level.

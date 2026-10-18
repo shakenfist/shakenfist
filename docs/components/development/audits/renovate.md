@@ -65,6 +65,12 @@ with no `.pre-commit-config.yaml`, or one whose hooks are all
 `repo: local`, passes without the manager. `sfui`'s
 `"pre-commit": {"enabled": true}` is the form the template carries.
 
+Enabling the manager is not enough for the shellcheck hook:
+shellcheck-py's four-part tags need the template's regex versioning
+rule, or the lookup fails on the dependency dashboard and the hook is
+never bumped. This check does not look for that rule; see
+[the template README](https://github.com/shakenfist/development/blob/main/templates/renovate/README.md#shellcheck-pys-four-part-tags).
+
 ### Repositories that ship workflow templates
 
 Renovate's `github-actions` manager only reads

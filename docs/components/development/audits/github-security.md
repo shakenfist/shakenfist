@@ -19,6 +19,12 @@ Additionally recommended:
 |---------|-------------|
 | Allow auto-merge | Enabled |
 
+The settings are read from the API's `security_and_analysis`, which
+GitHub returns only to a token with admin access. A query that fails,
+or answers without them, is reported as `error` rather than as a pass
+or a failure: no verdict about the settings rests on not having seen
+them.
+
 Delete branch on merge is required rather than recommended, and is
 checked by its own audit: see
 [delete-branch-on-merge.md](/components/development/audits/delete-branch-on-merge/).
