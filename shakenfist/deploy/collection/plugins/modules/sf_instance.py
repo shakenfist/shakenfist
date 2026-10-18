@@ -176,8 +176,10 @@ options:
         is therefore O(capacity_wait) plus O(await_timeout), plus the
         deletion of any instance being replaced.
       - When the budget runs out the task fails with the server's last
-        refusal, followed by how long it waited and how many attempts it
-        made. RV(capacity_waited) says what happened either way.
+        refusal, followed by how long it waited, how many attempts it made
+        and why it stopped. RV(capacity_waited) says what happened either
+        way, and is returned too when a task fails for another reason after
+        a refusal.
     required: false
     default: 0
     type: int
@@ -254,16 +256,20 @@ log:
 capacity_waited:
   description:
     - What O(capacity_wait) did. Returned on success whether or not it is
-      enabled, and with a failure caused by the wait running out.
-  returned: when state is present
+      enabled, and with any failure which comes after a refused create.
+      A failure with no refusal before it does not return it.
+  returned: on success when state is present, and on failure once a create was refused
   type: dict
   contains:
     seconds:
       description:
         - Seconds spent waiting for capacity, rounded up. This runs from
           the start of the first refused attempt to the start of the
-          accepted one, or to the moment the wait gave up. It is 0 when
-          nothing was refused.
+          accepted one, or to the moment the wait gave up. When the task
+          failed for another reason, it runs to the start of the last
+          attempt, or to the failure itself if it came while waiting for
+          the refused record to be deleted. It is 0 when nothing was
+          refused.
       type: int
     attempts:
       description: The number of creates this task sent. 0 when no create was needed.
@@ -271,7 +277,12 @@ capacity_waited:
     outcome:
       description:
         - C(not_refused) when no create was refused, C(placed) when a
-          replay was accepted, and C(exhausted) when the budget ran out.
+          replay was accepted, C(exhausted) when the budget ran out, and
+          C(failed) when a create was refused and the task then failed for
+          some other reason. C(failed) covers both a replay which was
+          accepted and then failed, and a replay refused for a reason
+          waiting cannot clear, so it is not evidence that capacity was
+          still short; the failure message gives the cause.
       type: str
     refusals:
       description:
@@ -316,6 +327,16 @@ CAPACITY_RECORD_POLL = 5
 # did. The affinity and "Requested node ..." aborts are different strings,
 # deliberately absent: waiting does not satisfy an affinity rule or free a
 # node the caller pinned to.
+#
+# The match is not exact about the cause, though. Too many start attempts
+# is preflight's limit on placement attempts, which it checks before
+# anything else, so it ends any instance which has been placed too often --
+# including one whose attempts failed because a node could not schedule for
+# itself, and one pinned to a node, which would otherwise have ended with a
+# "Requested node" message. Those are replayed too. That is accepted rather
+# than worked around: this module cannot pin an instance to a node, a node
+# which cannot schedule is as likely to recover within the wait as a full
+# one is to drain, and the replays are bounded by the budget either way.
 PREFLIGHT_CAPACITY_MESSAGES = (
     'Unable to find suitable node',
     'Too many start attempts',
@@ -379,7 +400,8 @@ def _fail_api_error(module, log, action, error, **extra):
     (issue 4060).
 
     extra is passed through to fail_json() as further return values. Only
-    an exhausted capacity wait uses it, to return what it waited.
+    the capacity wait uses it, to return what it waited once a create has
+    been refused.
     """
     msg = '%s: %s' % (action, error)
     log.append(msg)
@@ -478,7 +500,11 @@ def _await_record_gone(client, log, ref, namespace, deadline):
     no instance of the name exists, or after deleting the one which did --
     short of another caller creating the same name concurrently, or a task
     which identifies its instance by uuid while another of the same name
-    exists.
+    exists. A record which an interrupted earlier run left in state error
+    never reaches here: the task's first lookup by name finds it, and the
+    task either replaces it, deleting it before the create, or adopts it
+    and fails in the await. Two such records make that first lookup
+    ambiguous, and the task fails there instead.
 
     An APIException other than not found is raised to the caller: a failed
     lookup is not a refusal, and must not be replayed.
@@ -626,9 +652,12 @@ class _CapacityWait:
             gone = _await_record_gone(
                 self.client, self.log, ref, ref_namespace, deadline)
         except apiclient.APIException as e:
+            # Failed inside the wait, so the wait ran until now.
+            self.seconds = time.monotonic() - self.first_refused
             _fail_api_error(
                 self.module, self.log,
-                'Waiting for the refused instance to be deleted failed', e)
+                'Waiting for the refused instance to be deleted failed', e,
+                **self.failure())
         if not gone:
             self._exhaust(action, error,
                           'the refused instance %s still held its name when '
@@ -674,13 +703,31 @@ class _CapacityWait:
         self.log.append('Giving up waiting for capacity: %s' % why)
         _fail_api_error(
             self.module, self.log, action,
-            '%s (waited %d seconds for capacity over %d attempts)'
-            % (error, math.ceil(self.seconds), self.attempts),
+            '%s (waited %d seconds for capacity over %d %s: %s)'
+            % (error, math.ceil(self.seconds), self.attempts,
+               'attempt' if self.attempts == 1 else 'attempts', why),
             capacity_waited=self.report())
 
-    def report(self):
+    def failure(self):
+        """The return values a task failing for another reason adds.
+
+        An empty dict unless a create was refused, so that a failure with
+        no refusal before it -- and every failure with capacity_wait at 0 --
+        returns exactly what it did before the option existed. Once one
+        was, what the wait did is returned with the failure, which is the
+        run that most needs it. seconds runs to the start of the last
+        attempt, or to now when the failure came inside the wait itself.
+        Changes nothing, so it is safe to call more than once.
+        """
+        if not self.refusals:
+            return {}
+        return {'capacity_waited': self.report(failed=True)}
+
+    def report(self, failed=False):
         if self.exhausted:
             outcome = 'exhausted'
+        elif failed:
+            outcome = 'failed'
         elif self.refusals:
             outcome = 'placed'
         else:
@@ -1130,7 +1177,8 @@ def run_module():
                     # failure of one of those is never mistaken for one.
                     if not capacity.replayable_api_refusal(e):
                         _fail_api_error(
-                            module, log, 'Instance creation failed', e)
+                            module, log, 'Instance creation failed', e,
+                            **capacity.failure())
                     body = _refusal_body(e)
                     capacity.refused(
                         'api', body.get('stage'), body.get('error'),
@@ -1183,13 +1231,15 @@ def run_module():
                 else:
                     msg = 'Waiting for instance failed: %s' % e
                 log.append(msg)
-                module.fail_json(msg=msg, meta=None, log=log)
+                module.fail_json(msg=msg, meta=None, log=log,
+                                 **capacity.failure())
             break
 
         try:
             meta = client.get_instance(i['uuid'])
         except apiclient.APIException as e:
-            _fail_api_error(module, log, 'Fetching the created instance failed', e)
+            _fail_api_error(module, log, 'Fetching the created instance failed', e,
+                            **capacity.failure())
         module.exit_json(changed=needs_replacement, meta=meta, log=log,
                          capacity_waited=capacity.report())
 
