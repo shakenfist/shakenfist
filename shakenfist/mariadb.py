@@ -437,7 +437,12 @@ OBJECT_METADATA_VERSION = 3
 # idempotency (same target written twice) without truncating multi-
 # target ops. A non-unique idx_cot_operation index keeps lookups by
 # operation_uuid fast.
-CLUSTER_OPERATION_TARGETS_VERSION = 2
+# v3: adds observational BOOLEAN NOT NULL DEFAULT 0, and widens
+# idx_cot_target to (target_object_type, target_uuid, observational) so
+# the "current state" readers can skip observational ops (background
+# sweeps that do not change the object) without a row lookup. See
+# docs/plans/PLAN-cluster-op-visibility.md.
+CLUSTER_OPERATION_TARGETS_VERSION = 3
 # v1: schema creation. v2: etcd data-import marker (historical).
 # v3: adds 15 typed nullable capacity columns projected from
 # metrics_json at upsert time, for the capacity reconciler to read.
@@ -1729,6 +1734,19 @@ def _get_cluster_operation_targets_table() -> sa.Table:
             # alone (the v1 schema) silently truncated multi-target ops.
             # idx_cot_operation keeps single-column operation_uuid
             # lookups fast.
+            #
+            # observational is true when every task of the operation
+            # only observes the target (a checksum sweep, a health
+            # probe) rather than changing it. The "current state"
+            # readers (get_latest and has_pending) skip those rows so a
+            # background sweep cannot shadow a mutating op; every other
+            # reader sees them. The server default is false, so a row
+            # written without the column (an older daemon during a
+            # rolling upgrade) counts as mutating. observational is the
+            # last column of idx_cot_target so the filtered readers are
+            # served by the index, while its two-column prefix still
+            # serves the unfiltered ones. See
+            # docs/plans/PLAN-cluster-op-visibility.md.
             _cluster_operation_targets_table = sa.Table(
                 'cluster_operation_targets',
                 metadata,
@@ -1740,11 +1758,14 @@ def _get_cluster_operation_targets_table() -> sa.Table:
                           nullable=False),
                 sa.Column('target_uuid', sa.String(36), nullable=False),
                 sa.Column('created_at', sa.Double(), nullable=False),
+                sa.Column('observational', sa.Boolean(), nullable=False,
+                          server_default=sa.false()),
                 sa.UniqueConstraint(
                     'operation_uuid', 'target_object_type', 'target_uuid',
                     name='uq_cot_op_target'),
                 # Indexes for common query patterns
-                sa.Index('idx_cot_target', 'target_object_type', 'target_uuid'),
+                sa.Index('idx_cot_target', 'target_object_type', 'target_uuid',
+                         'observational'),
                 sa.Index('idx_cot_operation', 'operation_uuid'),
                 sa.Index('idx_cot_created', 'created_at'),
             )
@@ -1819,6 +1840,59 @@ def _ensure_cluster_operation_targets_schema(
                 f'ON {table_name} (operation_uuid)'))
             conn.commit()
         current_ver = 2
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 3:
+        # Add the observational flag (see
+        # docs/plans/PLAN-cluster-op-visibility.md): true when every
+        # task of the operation only observes its targets, so the
+        # "current state" readers can skip it. The default is the
+        # conservative value. Existing rows, and any row an older
+        # daemon writes during a rolling upgrade (it does not know the
+        # column), read as mutating, which is exactly how they were
+        # treated before this column existed.
+        #
+        # idx_cot_target is replaced by a wider index rather than
+        # joined by a second one. The filtered readers ask for
+        # WHERE type = ? AND uuid = ? AND observational = 0, and
+        # get_latest adds ORDER BY sequence_number DESC LIMIT 1;
+        # InnoDB secondary indexes carry the primary key, so the
+        # three-column index serves both the filter and the ordering,
+        # with no sort and no rows read beyond the one returned. Its
+        # two-column prefix still serves every unfiltered reader, so a
+        # second index would be redundant, and every index costs a
+        # write on the busiest insert in the cluster.
+        #
+        # The ADD INDEX deliberately has no IF NOT EXISTS. MariaDB
+        # evaluates IF NOT EXISTS against the table as it was before
+        # the ALTER, so "DROP INDEX IF EXISTS x, ADD INDEX IF NOT
+        # EXISTS x" drops the old index and then skips the add (note
+        # 1061), leaving no index at all -- verified against 10.11 and
+        # 11.8. DROP IF EXISTS followed by an unconditional ADD of the
+        # same name is valid in one statement and is still restartable:
+        # if a crash lands after the ALTER but before
+        # _set_table_version, the re-run drops and rebuilds the
+        # three-column index. A fresh install creates the table from
+        # the current definition and also passes through here, which
+        # rebuilds the index on an empty table.
+        #
+        # The column add is instant on MariaDB 10.3 and later, and the
+        # index rebuild is in place over a table bounded by in-flight
+        # work, since operations hard-delete their target rows shortly
+        # after going terminal.
+        LOG.info(
+            f'Upgrading {table_name} from v{current_ver} to v3: adding '
+            'observational and widening idx_cot_target.')
+        with engine.connect() as conn:
+            conn.execute(sa.text(
+                f'ALTER TABLE {table_name} '
+                f'ADD COLUMN IF NOT EXISTS observational '
+                f'BOOLEAN NOT NULL DEFAULT 0, '
+                f'DROP INDEX IF EXISTS idx_cot_target, '
+                f'ADD INDEX idx_cot_target '
+                f'(target_object_type, target_uuid, observational)'))
+            conn.commit()
+        current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
     return {

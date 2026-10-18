@@ -386,6 +386,8 @@ class DirectHasPendingClusterOperationTargetTestCase(
             sa.Column('operation_uuid', sa.String(36), primary_key=True),
             sa.Column('target_object_type', sa.String(32)),
             sa.Column('target_uuid', sa.String(36)),
+            sa.Column('observational', sa.Boolean(), nullable=False,
+                      server_default=sa.false()),
         )
         states_table = sa.Table(
             'object_states',
@@ -621,6 +623,8 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
                       nullable=False),
             sa.Column('target_uuid', sa.String(36), nullable=False),
             sa.Column('created_at', sa.Double(), nullable=False),
+            sa.Column('observational', sa.Boolean(), nullable=False,
+                      server_default=sa.false()),
             sa.UniqueConstraint(
                 'operation_uuid', 'target_object_type', 'target_uuid',
                 name='uq_cot_op_target'),
@@ -880,6 +884,8 @@ class GetRecentTerminalOpStatesForTargetTestCase(base.ShakenFistTestCase):
                       nullable=False),
             sa.Column('target_uuid', sa.String(36), nullable=False),
             sa.Column('created_at', sa.Double(), nullable=False),
+            sa.Column('observational', sa.Boolean(), nullable=False,
+                      server_default=sa.false()),
         )
         self._states_table = sa.Table(
             'object_states',
@@ -1127,6 +1133,8 @@ class DirectListClusterOperationsForTargetTestCase(
                       nullable=False),
             sa.Column('target_uuid', sa.String(36), nullable=False),
             sa.Column('created_at', sa.Double(), nullable=False),
+            sa.Column('observational', sa.Boolean(), nullable=False,
+                      server_default=sa.false()),
         )
         # cluster_operations.uuid is a uuid_column_type() column exactly as in
         # production. An earlier version of this fixture used String(36)
@@ -1294,6 +1302,8 @@ class DirectListClusterOperationsForTargetTestCase(
             sa.Column('operation_uuid', sa.String(36), primary_key=True),
             sa.Column('target_object_type', sa.String(64)),
             sa.Column('target_uuid', sa.String(36)),
+            sa.Column('observational', sa.Boolean(), nullable=False,
+                      server_default=sa.false()),
         )
         ops_table = sa.Table(
             'cluster_operations_err',
