@@ -260,11 +260,11 @@ recommends today.
 6. **Does the hard-delete audit event outlive the object?**
    (Phase 1.) `DatabaseBackedObject.hard_delete()` deletes the
    object's `event_objects` rows and then calls `add_event(...,
-   'hard deleted object')`, which as far as the code shows writes a
-   fresh `event_objects` row for the object it has just deleted. If
-   the events prune does not remove those rows by age, every hard
-   delete leaks one. Check this, then either record it as harmless or
-   fix it in phase 3.
+   'hard deleted object')`, which writes a fresh `event_objects` row
+   for the object it has just deleted. **Answered while planning
+   phase 1: harmless.** Stage A of the daily events prune deletes
+   `event_objects` rows by the age of their event, so that row expires
+   with ordinary retention. It is bounded, not a leak.
 
 ## Execution
 
@@ -312,7 +312,7 @@ shape of phases 2 and 3, so only their scope is fixed here.
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 1. Measure the sweep | PLAN-deleted-object-sweep-phase-01-measure.md | Not started | — |
+| 1. Measure the sweep | [PLAN-deleted-object-sweep-phase-01-measure.md](PLAN-deleted-object-sweep-phase-01-measure.md) | In progress | — |
 | 2. A fair, bounded drain | PLAN-deleted-object-sweep-phase-02-fair-drain.md | Not started | — |
 | 3. Cheaper hard deletes | PLAN-deleted-object-sweep-phase-03-throughput.md | Not started | — |
 | 4. Drain sfcbr and keep it drained | PLAN-deleted-object-sweep-phase-04-drain.md | Not started | — |
@@ -334,16 +334,20 @@ needs the same signals to prove the drain:
   base deletes, the event) to answer open question 1. A DEBUG-level
   structured log line per object, sampled, is acceptable for the
   per-step part if a histogram per step is too many series.
-- A one-off count of the backlog per type straight from
-  `object_states` (`GROUP BY object_type, state`), run on sfcbr.
-  #4473 says this needs a direct database read and was not done.
+- The per-type backlog count #4473 could not get without a direct
+  database read. The fill already reads one list per type, so the
+  depth gauge at the first pass after a fill *is* that count, and no
+  one-off SQL query is needed (corrected while planning phase 1).
 
 Then deploy to sfcbr, collect at least 24 hours, and write the numbers
-into this plan's Situation section. Answer open questions 1 and 6, and
-check #4399 against the result.
+into this plan's Situation section. Answer open question 1 and check
+#4399 against the result. Open question 6 was answered while planning
+phase 1.
 
-Definition of done: the numbers are in this file, and phase 2's and
-phase 3's scope has been revised to match them.
+Definition of done: the instrumentation has merged and is publishing
+from sfcbr's leader. The measurement can only start after the phase
+lands, so the numbers, and the revision of phase 2's and phase 3's
+scope to match them, are recorded by phase 2's planning commit.
 
 ### Phase 2: a fair, bounded drain
 
@@ -394,9 +398,9 @@ Planning effort: medium.
   behind is reported rather than discovered: an entry in the 33fl
   infra report reading phase 1's gauge, or an alert, whichever matches
   how comparable signals are already reported.
-- Document the sweep, its metric and its tuning in
-  `docs/operator_guide/` (find the page that covers the cluster
-  maintainer's scheduled jobs; create one if there is none).
+- Document the sweep's tuning, and the regression guard, in
+  `docs/operator_guide/database.md`, beside the metrics phase 1
+  documents in "Watching for sweeps that silently do nothing".
 
 Definition of done: the per-type gauge on sfcbr has stayed near the
 arrival rate times the delay for a week, and #4473 is closed.
