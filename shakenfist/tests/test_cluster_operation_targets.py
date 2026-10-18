@@ -131,6 +131,21 @@ class ClusterOperationTargetDataTestCase(base.ShakenFistTestCase):
         self.assertEqual(view['target_uuid'], TEST_UUID)
         self.assertEqual(view['sequence_number'], 1)
         self.assertEqual(view['created_at'], 1000.0)
+        # Unset, the flag is the conservative (mutating) value.
+        self.assertIs(False, view['observational'])
+
+    def test_external_view_carries_observational(self):
+        data = ClusterOperationTargetData(
+            operation_uuid=OP_UUID,
+            operation_type='node_blob_op',
+            target_object_type='blob',
+            target_uuid=TEST_UUID,
+            sequence_number=1,
+            created_at=1000.0,
+            observational=True
+        )
+        self.assertIs(True, data.observational)
+        self.assertIs(True, data.external_view()['observational'])
 
 
 class DirectDeleteStaleClusterOperationTargetsTestCase(
@@ -1201,15 +1216,20 @@ class DirectListClusterOperationsForTargetTestCase(
             ))
 
     def _insert_target(self, op_uuid, op_type, target_type,
-                       target_uuid, created_at):
+                       target_uuid, created_at, observational=None):
+        values = {
+            'operation_uuid': op_uuid,
+            'operation_type': op_type,
+            'target_object_type': target_type,
+            'target_uuid': target_uuid,
+            'created_at': created_at,
+        }
+        # None leaves the column to its server default, as an older
+        # daemon's INSERT does.
+        if observational is not None:
+            values['observational'] = observational
         with self._engine.begin() as conn:
-            conn.execute(self._targets_table.insert().values(
-                operation_uuid=op_uuid,
-                operation_type=op_type,
-                target_object_type=target_type,
-                target_uuid=target_uuid,
-                created_at=created_at,
-            ))
+            conn.execute(self._targets_table.insert().values(**values))
 
     def test_empty_when_no_matches(self):
         """Empty list when no target rows exist for the given uuid."""
@@ -1276,6 +1296,33 @@ class DirectListClusterOperationsForTargetTestCase(
         self.assertEqual(str(LIST_OP_UUID_2), results[0]['uuid'])
         self.assertEqual(str(LIST_OP_UUID_3), results[1]['uuid'])
         self.assertEqual(str(LIST_OP_UUID_1), results[2]['uuid'])
+
+    def test_includes_observational_ops_and_reports_the_flag(self):
+        """Unlike has_pending and get_latest, the listing is unfiltered,
+        and each op carries the flag stored on its target row."""
+        self._insert_op(LIST_OP_UUID_1, 'node_blob_op', 1000.0,
+                        metadata={'tasks': ['verify_size_and_checksum']})
+        self._insert_op(LIST_OP_UUID_2, 'node_blob_op', 2000.0)
+        self._insert_op(LIST_OP_UUID_3, 'node_blob_op', 3000.0)
+        self._insert_target(
+            LIST_OP_UUID_1, 'node_blob_op', 'blob',
+            LIST_TARGET_UUID, 1000.0, observational=True)
+        self._insert_target(
+            LIST_OP_UUID_2, 'node_blob_op', 'blob',
+            LIST_TARGET_UUID, 2000.0, observational=False)
+        self._insert_target(
+            LIST_OP_UUID_3, 'node_blob_op', 'blob',
+            LIST_TARGET_UUID, 3000.0)
+
+        results = (
+            self._mariadb._direct_list_cluster_operations_for_target(
+                'blob', LIST_TARGET_UUID))
+        self.assertEqual(
+            [(LIST_OP_UUID_3, False), (LIST_OP_UUID_2, False),
+             (LIST_OP_UUID_1, True)],
+            [(r['uuid'], r['observational']) for r in results])
+        # The op's own metadata is still flattened in alongside it.
+        self.assertEqual(['verify_size_and_checksum'], results[2]['tasks'])
 
     @mock.patch('shakenfist.mariadb._get_cluster_operations_table')
     @mock.patch('shakenfist.mariadb._get_cluster_operation_targets_table')

@@ -2452,6 +2452,9 @@ message ClusterOperationTargetProto {
   string target_uuid = 4;
   int64 sequence_number = 5;
   double created_at = 6;
+  // True if every task of the operation only observes the target. An
+  // older database service never sets it, which reads as false (mutating).
+  bool observational = 7;
 }
 
 message GetClusterOperationTargetRequest {
@@ -2560,6 +2563,11 @@ message ClusterOperationData {
   string operation_type = 2; // e.g. "instance_preflight"
   double created_at = 3;     // Unix timestamp of operation creation
   string metadata_json = 4;  // Full operation metadata dict as JSON
+  // The observational flag stored on the operation's target row. Set
+  // only by ListClusterOperationsForTarget, the one RPC that reads it
+  // from a target row; every other RPC leaves it unset rather than
+  // reporting a misleading false.
+  optional bool observational = 5;
 }
 
 message CreateClusterOperationRequest {

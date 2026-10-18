@@ -3420,12 +3420,14 @@ class MockMariaDB():
 
     def seed_cluster_operation_target(
             self, operation_uuid, operation_type,
-            target_object_type, target_uuid, created_at):
+            target_object_type, target_uuid, created_at,
+            observational=False):
         """Record a cluster_operation_targets row in the mock store.
 
         The real rows are written inside the atomic enqueue transaction;
         this is called by the create_and_enqueue mock and by tests that
-        need to seed rows directly.
+        need to seed rows directly. ``observational`` defaults to False,
+        the column's server default.
         """
         from shakenfist.schema.cluster_operation_target import (
             ClusterOperationTargetData)
@@ -3445,7 +3447,8 @@ class MockMariaDB():
                 target_object_type=str(target_object_type),
                 target_uuid=target_uuid,
                 sequence_number=seq,
-                created_at=created_at
+                created_at=created_at,
+                observational=observational
             ))
         self._trace(
             f'MockMariaDB.seed_cluster_operation_target'
@@ -3479,9 +3482,15 @@ class MockMariaDB():
 
     def _mariadb_get_latest_cluster_operation_target(
             self, target_object_type, target_uuid):
-        """Mock implementation of mariadb.get_latest_cluster_operation_target()"""
-        results = self._mariadb_get_cluster_operation_targets_for_object(
-            target_object_type, target_uuid)
+        """Mock implementation of mariadb.get_latest_cluster_operation_target()
+
+        Skips observational rows, as the real query does.
+        """
+        results = [
+            d for d in self._mariadb_get_cluster_operation_targets_for_object(
+                target_object_type, target_uuid)
+            if not d.observational
+        ]
         if not results:
             return None
         return results[-1]
@@ -3662,9 +3671,8 @@ class MockMariaDB():
         matching the real function which now writes them in the
         same transaction as the operation.
 
-        ``observational`` is accepted so callers passing it keep
-        working, but is not yet recorded: ClusterOperationTargetData
-        has no field to hold it until the read path carries the flag.
+        ``observational`` is stamped on every target row, as the real
+        function does.
         """
         key = str(op_uuid)
         if key in self.cluster_operations_store:
@@ -3716,6 +3724,7 @@ class MockMariaDB():
                 target_object_type=target_object_type,
                 target_uuid=target_uuid,
                 created_at=created_at,
+                observational=observational,
             )
 
         self._trace(

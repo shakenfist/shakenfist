@@ -31,6 +31,7 @@ Never point SF_MARIADB_TEST_DSN at a real deployment.
 import os
 import time
 import unittest
+from unittest import mock
 from uuid import uuid4
 
 import sqlalchemy as sa
@@ -307,7 +308,11 @@ class ClusterOperationTargetsMigrationLiveTestCase(base.ShakenFistTestCase):
     os.environ.get(DSN_ENV),
     f'{DSN_ENV} not set; requires a disposable MariaDB database')
 class ClusterOperationTargetsIndexLiveTestCase(base.ShakenFistTestCase):
-    """The filtered "current state" queries are served by idx_cot_target."""
+    """The filtered "current state" queries are served by idx_cot_target.
+
+    EXPLAINs the statements the production readers actually send, so a
+    change to either query that stops it using the index fails here.
+    """
 
     TARGETS = 100
     OPS_PER_TARGET = 8
@@ -371,14 +376,39 @@ class ClusterOperationTargetsIndexLiveTestCase(base.ShakenFistTestCase):
             conn.commit()
             conn.exec_driver_sql(f'ANALYZE TABLE {TABLE}, object_states').fetchall()
 
-    def _explain(self, stmt):
-        sql = str(stmt.compile(
-            dialect=self.engine.dialect,
-            compile_kwargs={'literal_binds': True}))
+    def _production_statement(self, fn, *args):
+        """Run a production reader and capture the SQL it sends.
+
+        The statement is taken from the cursor, after SQLAlchemy has
+        compiled it for this dialect, so what is EXPLAINed below is
+        exactly what the function issues -- not a copy of its query
+        that could drift from it.
+        """
+        captured = []
+
+        def _capture(conn, cursor, statement, parameters, context,
+                     executemany):
+            if TABLE in statement:
+                captured.append((statement, parameters))
+
+        sa.event.listen(self.engine, 'before_cursor_execute', _capture)
+        try:
+            with mock.patch('shakenfist.mariadb._get_engine',
+                            return_value=self.engine):
+                result = fn(*args)
+        finally:
+            sa.event.remove(self.engine, 'before_cursor_execute', _capture)
+        self.assertEqual(1, len(captured), captured)
+        statement, parameters = captured[0]
+        return result, statement, parameters
+
+    def _explain(self, statement, parameters):
         with self.engine.connect() as conn:
-            rows = conn.exec_driver_sql(f'EXPLAIN {sql}').mappings().fetchall()
+            rows = conn.exec_driver_sql(
+                f'EXPLAIN {statement}', parameters).mappings().fetchall()
         plan = [dict(r) for r in rows]
-        self.addDetail('explain', text_content(f'{sql}\n\n{plan}'))
+        self.addDetail('explain', text_content(
+            f'{statement}\n{parameters}\n\n{plan}'))
         return plan
 
     def _plan_for_targets_table(self, plan):
@@ -386,45 +416,66 @@ class ClusterOperationTargetsIndexLiveTestCase(base.ShakenFistTestCase):
         self.assertEqual(1, len(found), plan)
         return found[0]
 
-    def test_get_latest_uses_idx_cot_target(self):
-        # The shape _direct_get_latest_cluster_operation_target emits
-        # once step 2d adds the observational predicate. Built the same
-        # way so 2d can later swap this for the production statement.
-        table = self.table
-        stmt = sa.select(table).where(
-            sa.and_(
-                table.c.target_object_type == ObjectType.INSTANCE,
-                table.c.target_uuid == self.target_uuids[7],
-                table.c.observational == sa.false()
-            )
-        ).order_by(table.c.sequence_number.desc()).limit(1)
+    def _rows_for(self, target_uuid):
+        with self.engine.connect() as conn:
+            return conn.execute(
+                sa.select(self.table).where(
+                    self.table.c.target_uuid == target_uuid)
+            ).fetchall()
 
-        row = self._plan_for_targets_table(self._explain(stmt))
+    def test_get_latest_uses_idx_cot_target(self):
+        target_uuid = self.target_uuids[7]
+        latest, statement, parameters = self._production_statement(
+            mariadb._direct_get_latest_cluster_operation_target,
+            ObjectType.INSTANCE, target_uuid)
+
+        # The statement really carries the observational predicate, and
+        # gives the newest mutating row for the target.
+        self.assertIn('observational', statement)
+        mutating = [r for r in self._rows_for(target_uuid)
+                    if not r.observational]
+        self.assertIsNotNone(latest)
+        self.assertFalse(latest.observational)
+        self.assertEqual(
+            max(r.sequence_number for r in mutating), latest.sequence_number)
+
+        row = self._plan_for_targets_table(self._explain(statement, parameters))
         self.assertEqual('idx_cot_target', row['key'], row)
         # The ordering comes from the primary key carried in the index,
         # not from a sort.
         self.assertNotIn('filesort', row['Extra'] or '', row)
 
     def test_has_pending_uses_idx_cot_target(self):
-        # The shape _direct_has_pending_cluster_operation_target emits
-        # once step 2d adds the observational predicate.
-        table = self.table
-        states_table = self.states_table
-        inner = sa.select(sa.literal(1)).select_from(
-            table.join(
-                states_table,
-                table.c.operation_uuid == states_table.c.object_uuid
-            )
-        ).where(
-            sa.and_(
-                table.c.target_object_type == ObjectType.INSTANCE,
-                table.c.target_uuid == self.target_uuids[7],
-                table.c.observational == sa.false(),
-                states_table.c.state_value.in_(
-                    mariadb._ACTIVE_OPERATION_STATES)
-            )
-        )
-        stmt = sa.select(inner.exists())
+        # A target whose only in-flight op is observational, beside a
+        # mutating op which has completed, so the answer depends on the
+        # predicate. has_pending fails closed (True) on a database error,
+        # so the False also proves the statement ran.
+        target_uuid = str(uuid4())
+        now = time.time()
+        with self.engine.connect() as conn:
+            for observational, state in ((True, 'queued'),
+                                         (False, 'complete')):
+                op_uuid = str(uuid4())
+                conn.execute(self.table.insert().values(
+                    operation_uuid=op_uuid,
+                    operation_type='node_inst_op',
+                    target_object_type=ObjectType.INSTANCE,
+                    target_uuid=target_uuid,
+                    created_at=now,
+                    observational=observational))
+                conn.execute(self.states_table.insert().values(
+                    object_uuid=op_uuid,
+                    object_type=ObjectType.NODE_INST_OP,
+                    state_value=state,
+                    update_time=now,
+                    message=None))
+            conn.commit()
 
-        row = self._plan_for_targets_table(self._explain(stmt))
+        pending, statement, parameters = self._production_statement(
+            mariadb._direct_has_pending_cluster_operation_target,
+            ObjectType.INSTANCE, target_uuid)
+        self.assertIn('observational', statement)
+        self.assertFalse(pending)
+
+        row = self._plan_for_targets_table(self._explain(statement, parameters))
         self.assertEqual('idx_cot_target', row['key'], row)

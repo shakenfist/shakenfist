@@ -51,12 +51,21 @@ class MariaDBTableFixture:
         for name, value in self._saved_mariadb_state.items():
             setattr(mariadb, name, value)
 
-    def build_engine(self, table_getters, json_shims=False):
+    def build_engine(self, table_getters, json_shims=False,
+                     autoincrement_bigint_keys=False):
         """Build an in-memory sqlite engine holding the named tables.
 
         ``table_getters`` is a list of mariadb's ``_get_*_table``
         functions. Their caches are cleared first so the tables are
         rebuilt against a fresh ``MetaData``.
+
+        ``autoincrement_bigint_keys`` makes sqlite assign the BIGINT
+        AUTO_INCREMENT primary keys (work_queue.id,
+        cluster_operation_targets.sequence_number) the way MariaDB does,
+        so production INSERTs which leave them out run unmodified. sqlite
+        only autoincrements a column declared INTEGER PRIMARY KEY, so such
+        a key is narrowed to Integer on this test's private copy of the
+        table. Every other column keeps its production type.
         """
         for name in self._saved_mariadb_state:
             if name != '_metadata':
@@ -67,6 +76,12 @@ class MariaDBTableFixture:
         if json_shims:
             register_mariadb_json_shims(engine)
         built = [getter() for getter in table_getters]
+        if autoincrement_bigint_keys:
+            for table in built:
+                keys = list(table.primary_key.columns)
+                if (len(keys) == 1 and isinstance(keys[0].type, sa.BigInteger)
+                        and keys[0].autoincrement in (True, 'auto')):
+                    keys[0].type = sa.Integer()
         built[0].metadata.create_all(engine, tables=built)
         return engine
 

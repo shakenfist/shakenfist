@@ -5451,7 +5451,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 proto_id),
             target_uuid=data.target_uuid,
             sequence_number=data.sequence_number or 0,
-            created_at=data.created_at
+            created_at=data.created_at,
+            observational=data.observational
         )
 
     def RecordEventBatch(
@@ -6003,11 +6004,19 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 ._direct_list_cluster_operations_for_target(
                     target_object_type,
                     request.target_uuid))
+            # The observational flag travels in its own proto field, not
+            # in metadata_json, so metadata_json stays the same shape
+            # every other cluster operation RPC returns.
+            protos = []
+            for d in items:
+                op = dict(d)
+                observational = op.pop('observational', None)
+                proto = self._cluster_operation_to_proto(op)
+                if observational is not None:
+                    proto.observational = observational
+                protos.append(proto)
             return database_pb2.ListClusterOperationsForTargetReply(
-                items=[
-                    self._cluster_operation_to_proto(d)
-                    for d in items
-                ])
+                items=protos)
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database ListClusterOperationsForTarget failed', e)

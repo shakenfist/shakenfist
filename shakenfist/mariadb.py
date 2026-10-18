@@ -4990,7 +4990,8 @@ def _direct_get_cluster_operation_target(
                 target_object_type=result.target_object_type.value,
                 target_uuid=result.target_uuid,
                 sequence_number=result.sequence_number,
-                created_at=result.created_at
+                created_at=result.created_at,
+                observational=result.observational
             )
     except OperationalError as e:
         LOG.warning(
@@ -5003,12 +5004,18 @@ def _direct_get_cluster_operation_targets_for_object(
     target_object_type: ObjectType,
     target_uuid: str
 ) -> list[ClusterOperationTargetData]:
-    """Get all cluster operation targets for an object, ordered by sequence."""
+    """Get all cluster operation targets for an object, ordered by sequence.
+
+    Observational operations are included, and each row carries its flag.
+    """
     engine = _get_engine()
     table = _get_cluster_operation_targets_table()
 
     try:
         with engine.connect() as conn:
+            # Deliberately not filtered on observational: the per-blob
+            # sweep's duplicate-op guard (daemons/cluster/scheduled_tasks.py)
+            # must see the observational checksum ops it has already queued.
             stmt = sa.select(table).where(
                 sa.and_(
                     table.c.target_object_type == target_object_type,
@@ -5023,7 +5030,8 @@ def _direct_get_cluster_operation_targets_for_object(
                     target_object_type=r.target_object_type.value,
                     target_uuid=r.target_uuid,
                     sequence_number=r.sequence_number,
-                    created_at=r.created_at
+                    created_at=r.created_at,
+                    observational=r.observational
                 )
                 for r in results
             ]
@@ -5038,7 +5046,11 @@ def _direct_get_latest_cluster_operation_target(
     target_object_type: ObjectType,
     target_uuid: str
 ) -> Optional[ClusterOperationTargetData]:
-    """Get the most recent cluster operation target for an object."""
+    """Get the most recent mutating cluster operation target for an object.
+
+    Observational operations are excluded, so a background sweep cannot
+    shadow the mutating operation a caller is waiting on.
+    """
     engine = _get_engine()
     table = _get_cluster_operation_targets_table()
 
@@ -5047,7 +5059,11 @@ def _direct_get_latest_cluster_operation_target(
             stmt = sa.select(table).where(
                 sa.and_(
                     table.c.target_object_type == target_object_type,
-                    table.c.target_uuid == target_uuid
+                    table.c.target_uuid == target_uuid,
+                    # An observational op (a checksum sweep, a health
+                    # probe) must not become last_cluster_operation. See
+                    # docs/plans/PLAN-cluster-op-visibility.md.
+                    table.c.observational == sa.false()
                 )
             ).order_by(table.c.sequence_number.desc()).limit(1)
             result = conn.execute(stmt).fetchone()
@@ -5060,7 +5076,8 @@ def _direct_get_latest_cluster_operation_target(
                 target_object_type=result.target_object_type.value,
                 target_uuid=result.target_uuid,
                 sequence_number=result.sequence_number,
-                created_at=result.created_at
+                created_at=result.created_at,
+                observational=result.observational
             )
     except OperationalError as e:
         LOG.warning(
@@ -5080,7 +5097,11 @@ def _direct_has_pending_cluster_operation_target(
     target_object_type: ObjectType,
     target_uuid: str
 ) -> bool:
-    """True if any in-flight cluster operation targets this object."""
+    """True if any in-flight mutating cluster operation targets this object.
+
+    Observational operations are excluded: an in-flight checksum sweep or
+    health probe does not make an object busy.
+    """
     engine = _get_engine()
     table = _get_cluster_operation_targets_table()
     states_table = _get_object_states_table()
@@ -5096,6 +5117,10 @@ def _direct_has_pending_cluster_operation_target(
                 sa.and_(
                     table.c.target_object_type == target_object_type,
                     table.c.target_uuid == target_uuid,
+                    # An observational op must not count as pending, or a
+                    # background sweep would defer the work gated on this.
+                    # See docs/plans/PLAN-cluster-op-visibility.md.
+                    table.c.observational == sa.false(),
                     states_table.c.state_value.in_(_ACTIVE_OPERATION_STATES)
                 )
             )
@@ -5138,6 +5163,9 @@ def _direct_get_recent_terminal_op_states_for_target(
     table = _get_cluster_operation_targets_table()
     states_table = _get_object_states_table()
 
+    # Deliberately not filtered on observational: the only callers ask
+    # about net_op on networks, which is never observational, and a circuit
+    # breaker wants every failure anyway.
     conditions = [
         table.c.target_object_type == target_object_type,
         table.c.target_uuid == target_uuid,
@@ -5284,7 +5312,8 @@ def _target_from_proto(
         target_object_type=ot.value if ot else 'unknown',
         target_uuid=t.target_uuid,
         sequence_number=t.sequence_number if t.sequence_number else None,
-        created_at=t.created_at
+        created_at=t.created_at,
+        observational=t.observational
     )
 
 
@@ -5485,6 +5514,9 @@ def get_cluster_operation_targets_for_object(
 ) -> list[ClusterOperationTargetData]:
     """Get all cluster operation targets for an object, ordered by sequence.
 
+    Observational operations are included; each row carries its
+    ``observational`` flag.
+
     Returns:
         List of target data ordered by sequence_number ascending.
     """
@@ -5499,10 +5531,14 @@ def get_latest_cluster_operation_target(
     target_object_type: ObjectType,
     target_uuid: str
 ) -> Optional[ClusterOperationTargetData]:
-    """Get the most recent cluster operation target for an object.
+    """Get the most recent mutating cluster operation target for an object.
+
+    Observational operations (every task only observes the target) are
+    excluded, so a background sweep cannot shadow last_cluster_operation.
+    See docs/plans/PLAN-cluster-op-visibility.md.
 
     Returns:
-        The most recent target data, or None if no operations exist.
+        The most recent mutating target data, or None if there is none.
     """
     if _use_database_service():
         return _grpc_get_latest_cluster_operation_target(
@@ -5515,13 +5551,17 @@ def has_pending_cluster_operation_target(
     target_object_type: ObjectType,
     target_uuid: str
 ) -> bool:
-    """True if any in-flight cluster operation targets this object.
+    """True if any in-flight mutating cluster operation targets this object.
 
     "In flight" means the operation's row in object_states is in
     {queued, preflight, executing}. Any later operation against the same
     object that has reached a terminal state does NOT mask an earlier
     in-flight operation, fixing the latest-only race in the legacy
     single-pointer last_cluster_operation gating.
+
+    Observational operations (every task only observes the target) are
+    excluded, so an in-flight background sweep does not make the object
+    busy. See docs/plans/PLAN-cluster-op-visibility.md.
     """
     if _use_database_service():
         return _grpc_has_pending_cluster_operation_target(
@@ -21370,6 +21410,10 @@ def _direct_list_cluster_operations_for_target(
     Namespace scoping is the caller's responsibility (handled in the REST
     layer by validating access to the target object before issuing the
     query).
+
+    Each dict also carries an ``observational`` key: the flag stored on
+    the operation's target row, which is what decides whether
+    has_pending and get_latest see the operation.
     """
     engine = _get_engine()
     targets_table = _get_cluster_operation_targets_table()
@@ -21377,6 +21421,10 @@ def _direct_list_cluster_operations_for_target(
 
     try:
         with engine.connect() as conn:
+            # Deliberately not filtered on observational: this is the
+            # "what touched this object" view, so it reports every
+            # operation and says which ones were observational.
+            #
             # Two steps rather than a single JOIN.
             # cluster_operation_targets.operation_uuid is a String(36)
             # holding the dashed UUID form, but cluster_operations.uuid
@@ -21388,7 +21436,10 @@ def _direct_list_cluster_operations_for_target(
             # processor, which converts it to the column's storage form so
             # the comparison matches.
             target_rows = conn.execute(
-                sa.select(targets_table.c.operation_uuid).where(
+                sa.select(
+                    targets_table.c.operation_uuid,
+                    targets_table.c.observational
+                ).where(
                     sa.and_(
                         targets_table.c.target_object_type
                         == target_object_type,
@@ -21399,12 +21450,24 @@ def _direct_list_cluster_operations_for_target(
             if not target_rows:
                 return []
 
-            op_uuids = [UUID(r.operation_uuid) for r in target_rows]
+            # uq_cot_op_target allows only one row per (operation, target),
+            # so each operation_uuid appears here once and its flag is
+            # unambiguous. (An operation stamps every one of its target
+            # rows with the same flag anyway.)
+            observational = {
+                UUID(r.operation_uuid): bool(r.observational)
+                for r in target_rows
+            }
             stmt = sa.select(ops_table).where(
-                ops_table.c.uuid.in_(op_uuids)
+                ops_table.c.uuid.in_(list(observational))
             ).order_by(ops_table.c.created_at.desc())
             result = conn.execute(stmt).fetchall()
-            return [_cluster_operation_row_to_dict(row) for row in result]
+            ops = []
+            for row in result:
+                op = _cluster_operation_row_to_dict(row)
+                op['observational'] = observational[row.uuid]
+                ops.append(op)
+            return ops
     except OperationalError as e:
         LOG.warning(
             f'MariaDB query failed for list_cluster_operations_for_target '
@@ -21885,11 +21948,16 @@ def _grpc_list_cluster_operations_for_target(
         )
         reply = _grpc_call(
             stub.ListClusterOperationsForTarget, request)
-        return [
-            json.loads(item.metadata_json)
-            if item.metadata_json else {}
-            for item in reply.items
-        ]
+        ops = []
+        for item in reply.items:
+            op = json.loads(item.metadata_json) if item.metadata_json else {}
+            # Only this RPC sets observational, and an older database
+            # service does not set it at all. Leave the key out rather
+            # than report a flag nobody read from the row.
+            if item.HasField('observational'):
+                op['observational'] = item.observational
+            ops.append(op)
+        return ops
     except grpc.RpcError as e:
         LOG.warning(
             f'gRPC ListClusterOperationsForTarget failed for '
@@ -22485,6 +22553,11 @@ def list_cluster_operations_for_target(
     that consumes this helper validates the caller's access to the
     target object before issuing the query, so this function does no
     namespace filtering itself.
+
+    Unlike has_pending and get_latest, this includes observational
+    operations. Each dict carries an ``observational`` key holding the
+    flag stored on the operation's target row, except when an older
+    database service did not report it, in which case the key is absent.
 
     Args:
         target_object_type: The ObjectType of the target object.
