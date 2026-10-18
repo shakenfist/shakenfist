@@ -1008,6 +1008,55 @@ log for `could not read its work list` to see which shape of failure it
 is — an unreachable database tier, or a reply too large for the client's
 receive cap.
 
+A deleted-object sweep which reads its work list fine can still fall
+behind, so three further metrics say how far behind it is and what each
+object costs. All are published by the elected cluster maintainer only.
+
+- **`cluster_deleted_object_queue_depth`** — a gauge on
+  `CLUSTER_METRICS_PORT`, labelled by `object_type`: the number of
+  entries waiting in the sweep's queue. It is set every pass from a count
+  kept beside the queue, and like the failure streak gauge it is dropped
+  when the node loses the election. The value right after a fill (which
+  today means right after an sf-cluster restart) is the per-type
+  backlog. A depth that grows pass over pass means the sweep is not
+  keeping up with arrivals. A type with an empty queue has no label set.
+- **`cluster_deleted_object_seconds`** — a histogram on the same port,
+  labelled by `object_type` and `outcome`, observed once per dequeued
+  entry. The outcomes are:
+  - `gone`: the object row was already hard deleted by something else.
+  - `not_final`: the object was no longer in a final state when the
+    entry was reached, so it was left alone.
+  - `too_young`: the object is in a final state but has not yet been
+    there for its grace period.
+  - `hard_deleted`: the object was hard deleted.
+  - `failed`: an exception was raised, which costs only that one entry.
+- **`database_client_rpc_seconds`** — a histogram from the shared
+  database client, labelled by `sweep`, `object_type` and `operation`
+  (the RPC name). It is observed only while a timing scope is active,
+  which today is only the deleted-object sweep (`sweep` is
+  `per_deleted_object`), so most daemons export no samples for it. Each
+  observation is the wall time of one call including its retries, and
+  failed calls are observed too. Subtracting its `_sum` from
+  `cluster_deleted_object_seconds`'s `_sum` gives the time spent outside
+  the database.
+
+The per-pass log line `Processed N items from per-deleted-object queue`
+also carries structured fields: a count for each outcome, the remaining
+depth (`remaining`) and the seconds spent processing (`elapsed_seconds`).
+
+Mean seconds per hard delete, by object type:
+
+```
+sum by (object_type) (rate(cluster_deleted_object_seconds_sum{outcome="hard_deleted"}[24h]))
+  / sum by (object_type) (rate(cluster_deleted_object_seconds_count{outcome="hard_deleted"}[24h]))
+```
+
+The RPCs which take the most total time, by object type:
+
+```
+topk(20, sum by (object_type, operation) (rate(database_client_rpc_seconds_sum[24h])))
+```
+
 Two related skips have no metric of their own and are visible only in
 logs. The cleaner's blob maintenance pass skips reclaiming disk on that
 node when either of its two reads fails — grep for `could not read the
