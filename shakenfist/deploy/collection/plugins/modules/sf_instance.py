@@ -265,8 +265,11 @@ capacity_waited:
       description:
         - Seconds spent waiting for capacity, rounded up. This runs from
           the start of the first refused attempt to the start of the
-          accepted one, or to the moment the wait gave up. It is 0 when
-          nothing was refused.
+          accepted one, or to the moment the wait gave up. When the task
+          failed for another reason, it runs to the start of the last
+          attempt, or to the failure itself if it came while waiting for
+          the refused record to be deleted. It is 0 when nothing was
+          refused.
       type: int
     attempts:
       description: The number of creates this task sent. 0 when no create was needed.
@@ -276,7 +279,10 @@ capacity_waited:
         - C(not_refused) when no create was refused, C(placed) when a
           replay was accepted, C(exhausted) when the budget ran out, and
           C(failed) when a create was refused and the task then failed for
-          some other reason.
+          some other reason. C(failed) covers both a replay which was
+          accepted and then failed, and a replay refused for a reason
+          waiting cannot clear, so it is not evidence that capacity was
+          still short; the failure message gives the cause.
       type: str
     refusals:
       description:
@@ -570,7 +576,6 @@ class _CapacityWait:
         self.refusals = []
         self.namespace_instances = None
         self.exhausted = False
-        self.failed = False
 
         # time.monotonic() values, read only when the budget is not 0.
         self.attempt_started = None
@@ -706,22 +711,22 @@ class _CapacityWait:
     def failure(self):
         """The return values a task failing for another reason adds.
 
-        None unless a create was refused, so that a failure with no refusal
-        before it -- and every failure with capacity_wait at 0 -- returns
-        exactly what it did before the option existed. Once one was, what
-        the wait did is returned with the failure, which is the run that
-        most needs it. seconds runs to the start of the last attempt, or to
-        now when the failure came inside the wait itself.
+        An empty dict unless a create was refused, so that a failure with
+        no refusal before it -- and every failure with capacity_wait at 0 --
+        returns exactly what it did before the option existed. Once one
+        was, what the wait did is returned with the failure, which is the
+        run that most needs it. seconds runs to the start of the last
+        attempt, or to now when the failure came inside the wait itself.
+        Changes nothing, so it is safe to call more than once.
         """
         if not self.refusals:
             return {}
-        self.failed = True
-        return {'capacity_waited': self.report()}
+        return {'capacity_waited': self.report(failed=True)}
 
-    def report(self):
+    def report(self, failed=False):
         if self.exhausted:
             outcome = 'exhausted'
-        elif self.failed:
+        elif failed:
             outcome = 'failed'
         elif self.refusals:
             outcome = 'placed'

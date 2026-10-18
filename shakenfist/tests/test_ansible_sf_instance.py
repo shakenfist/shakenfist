@@ -1511,6 +1511,43 @@ class SfInstanceCapacityWaitTestCase(base.ShakenFistTestCase):
         self.assertEqual(['preflight'],
                          [r['kind'] for r in waited['refusals']])
 
+    def test_a_replay_left_no_await_budget_returns_the_wait(self):
+        # Each create takes the whole await_timeout. The refused one's
+        # time is the capacity wait's, but the accepted one's leaves the
+        # await nothing, which fails on the zero budget branch. The
+        # replay is long past its spacing, so it goes as soon as the
+        # refused record's deletion (five seconds) has been seen.
+        failure = Exception('timed out')
+        module = self._run(
+            [_refusal(TRANSIENT_BODY), {'uuid': 'created', 'state': 'initial'}],
+            lookups={
+                'test': [sf_instance.apiclient.ResourceNotFoundException(),
+                         self.REFUSED],
+                'refused': [self.DELETED],
+            },
+            await_instance=True, awaits=[failure], create_seconds=600,
+            expect_failure=True)
+
+        self.assertEqual([('await', 'created', 0)], self._calls('await'))
+        msg = module.fail_json.call_args[1]['msg']
+        self.assertTrue(msg.startswith(
+            'The entire await_timeout budget of 600 seconds was consumed'),
+            msg)
+        waited = self._waited()
+        self.assertEqual('failed', waited['outcome'])
+        self.assertEqual(2, waited['attempts'])
+        self.assertEqual(605, waited['seconds'])
+
+    def test_failure_changes_nothing(self):
+        # failure() only describes a failure; it must not make a later
+        # report() on the success path say the task failed.
+        capacity = sf_instance._CapacityWait(
+            mock.MagicMock(), mock.MagicMock(), [], 1800, 'test', None)
+        capacity.refusals.append({'kind': 'api'})
+        self.assertEqual('failed',
+                         capacity.failure()['capacity_waited']['outcome'])
+        self.assertEqual('placed', capacity.report()['outcome'])
+
     def test_the_final_await_gets_the_full_await_timeout(self):
         # Each create takes five seconds. The refused attempt and the
         # wait after it come out of the capacity budget, not the await's;

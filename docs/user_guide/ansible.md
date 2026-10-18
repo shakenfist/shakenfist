@@ -294,9 +294,9 @@ With `state: present`, an instance task returns `capacity_waited`, whether or no
 
 | **Field** | **Comments** |
 |---|---|
-| capacity_waited.seconds<br/>*integer* | Seconds spent waiting for capacity, rounded up, from the start of the first refused attempt to the start of the accepted one (or to the moment the wait gave up, or to the start of the last attempt when the task failed for another reason). 0 when nothing was refused. |
+| capacity_waited.seconds<br/>*integer* | Seconds spent waiting for capacity, rounded up, from the start of the first refused attempt to the start of the accepted one (or to the moment the wait gave up). When the task failed for another reason, it runs to the start of the last attempt, or to the failure itself if that came while waiting for the refused record to be deleted. 0 when nothing was refused. |
 | capacity_waited.attempts<br/>*integer* | How many creates the task sent. 0 when no create was needed. |
-| capacity_waited.outcome<br/>*string* | `not_refused` when no create was refused, `placed` when a replay was accepted, `exhausted` when the budget ran out, or `failed` when a create was refused and the task then failed for some other reason. |
+| capacity_waited.outcome<br/>*string* | `not_refused` when no create was refused, `placed` when a replay was accepted, `exhausted` when the budget ran out, or `failed` when a create was refused and the task then failed for some other reason. `failed` covers both a replay which was accepted and then failed, and a replay refused for a reason waiting cannot clear, so it is not evidence that capacity was still short: the failure message gives the cause. |
 | capacity_waited.refusals<br/>*list* | One entry per refusal, each with `at` (UTC, ISO 8601), `kind` (`api` for a 507 from the create, `preflight` for a preflight abort), `stage` (the 507 body's stage, or null) and `message`. |
 | capacity_waited.namespace_instances<br/>*integer* | How many other active instances the namespace held at the first refusal, or null when nothing was refused or the listing failed. |
 
