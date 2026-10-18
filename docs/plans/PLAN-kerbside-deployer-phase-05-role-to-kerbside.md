@@ -1282,6 +1282,89 @@ There are three gates:
 3. **D before E.** E is not opened until D has merged and one nightly
    run of the new lane has passed.
 
+## Execution notes
+
+**Back brief (2026-10-19, Australia/Sydney).** The operator:
+* confirmed D2's soft dependency;
+* will add `ANSIBLE_GALAXY_TOKEN` to the Kerbside repository and cut
+  0.8.0 once pull request A merges;
+* allowed this session to push and open pull requests A and B.
+
+**Steps 1-3: pull request A, shakenfist/kerbside#580.**
+
+* Step 1 committed as two commits: `2cb4592` (the verbatim copy;
+  `diff -r` against `0016c5dad` is empty) and `c79df10` (tests and CI).
+  * The role README went into the second commit, because
+    galaxy-importer refuses a role without one, and adding it to the
+    first would have broken the byte-identical copy.
+  * The `check-yaml` exclusion for the Jinja templates was staged with
+    the copy, so that commit is green on its own.
+* Step 2 is `6484565`. It departs from brief 2 in three ways:
+  * `kerbside_sources` defaults to `[]`, and validate refuses an empty
+    list. The argument specs share one anchor, so `required: true` would
+    break validate's empty-hosts path.
+  * `kerbside_url` is required only when a source is
+    `type: shakenfist`.
+  * It adds `kerbside_proxy_cert_name`, `kerbside_proxy_key_name` and
+    `kerbside_proxy_cacert_name`, which D4 implies.
+* Step 3 is `17c3cdf`. `publish-collection` waits on `publish-pypi`, so
+  the pinned Kerbside exists on PyPI before the collection naming it is
+  public.
+* CI's credential scan flagged the role test's invented oVirt password.
+  `38d032e` allowlists it by text, following `.gitleaks.toml`'s own
+  convention.
+* Three automated review rounds followed: `8372bc6`, `1d539e1` and
+  `664068f`.
+
+  | Round | fix | document | consider |
+  |-------|-----|----------|----------|
+  | 1 | 3 | 2 | 5 |
+  | 2 | 3 | 1 | 5 |
+  | 3 | 0 | 2 | 6 |
+
+  Every round targeted the role as copied, not code added in earlier
+  rounds. Round 2's critical item is a real bug the copy brought over:
+  * The role doubled every `%` in `kerbside.ini`, but Kerbside has read
+    that file with interpolation off since 0.7.0 (Kerbside `00dbc36`,
+    issue #551).
+  * So a percent-encoded `kerbside_sql_url` password reached Kerbside
+    doubled. Shaken Fist develop's copy of the role has the same bug
+    until step 5 deletes it.
+  * Phase 4's CI password has no `%`, so nothing caught it.
+* Round 3 also made validate check `kerbside_sources` as typed JSON. An
+  operator's unquoted numeric credential, already a number by the time
+  Ansible hands it over, is now refused rather than silently changed.
+  The collection check now builds through the release script, so every
+  pull request exercises the stamps.
+
+**Step 4: pull request B, shakenfist/actions#181.** Committed as
+`a61b3ff`. It departs from brief 4 in three ways:
+* the install uses `--force`, since a static runner can keep an earlier
+  job's copy, which would otherwise win over a `dir` source;
+* it refuses two inputs beyond the brief, a non-string version and a
+  bare-string entry;
+* it runs 14 mutations.
+
+**Step 4's trial departed from D7.** actions' canary takes no deploy
+profile. Instead:
+* Shaken Fist's merge matrix ran against a trial branch of B. Like phase
+  4's, it carried one "TRIAL: do not merge" commit in each repository,
+  pointing `smoke-cluster.yml`'s composite actions and checkout at the
+  branch.
+* The slim-tier profile listed `shakenfist.k3s`, a real Galaxy
+  collection.
+* [Run 39158491769](https://github.com/shakenfist/shakenfist/actions/runs/39158491769)
+  passed:
+  * the collection installed once, before the first deploy;
+  * the deploys took 330 s and 181 s, with 43 units unchanged and none
+    restarted;
+  * 147 tests passed and none failed;
+  * the rows without a profile passed unchanged.
+* The trial branches and worktree are deleted.
+
+**Steps 5-9 have not started.** Step 5 needs A merged and
+`shakenfist.kerbside` 0.8.0 on Galaxy (back-brief gate 2).
+
 ## Future work
 
 * **Publish `shakenfist.shakenfist` to Galaxy.** `release.yml`'s
