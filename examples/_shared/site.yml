@@ -834,8 +834,16 @@
         hostname: "{{ inventory_hostname }}"
         cert_name: "{{ inventory_hostname }}-kerbside"
         cert_cn: "{{ kerbside_public_fqdn }}"
-        cert_san_dns:
-          - "{{ kerbside_public_fqdn }}"
+        # An address belongs in an IP SAN, and a name in a DNS SAN: a client
+        # which checks the host name matches an address only against the
+        # former. A dotted quad is an IPv4 address, and anything with a colon
+        # is IPv6 (a DNS name never contains one), which avoids depending on
+        # ansible.utils, which this collection does not require.
+        kerbside_cert_fqdn_is_address: >-
+          {{ kerbside_public_fqdn is match('^[0-9]{1,3}(\.[0-9]{1,3}){3}$')
+             or ':' in kerbside_public_fqdn }}
+        cert_san_dns: "{{ [] if kerbside_cert_fqdn_is_address else [kerbside_public_fqdn] }}"
+        cert_san_ip: "{{ [kerbside_public_fqdn] if kerbside_cert_fqdn_is_address else [] }}"
         cert_dest_dir: "{{ kerbside_pki_dir | default((kerbside_config_dir | default('/etc/kerbside')) ~ '/pki') }}"
         cert_owner: "{{ kerbside_file_owner | default('root') }}"
         cert_group: "{{ kerbside_group | default('kerbside') }}"
