@@ -680,6 +680,17 @@ class _WrapperHarness(ci_base.BaseTestCase):
         raise AssertionError(message)
 
 
+# What the server's 507 carries for a stage a wait can clear.
+def transient_body(error='No nodes remaining at scheduling stage '
+                         'sufficient_idle_cpu'):
+    return json.dumps({
+        'error': error, 'status': 507, 'stage': 'sufficient_idle_cpu',
+        'transient': True})
+
+
+TRANSIENT_BODY = transient_body()
+
+
 class FakeInstanceClient:
     """Answers create_instance() from a script, and records what it saw.
 
@@ -775,15 +786,16 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
         self.assertIsNone(harness.failure)
 
     def test_a_retried_create_uses_a_fresh_name(self):
-        """The refused instance holds the caller's name until it is gone.
+        """The refused instance keeps the caller's name.
 
         A refusal creates the instance and then enqueues a delete for
-        it, which completes asynchronously, so re-issuing under the
-        same name races the delete for a duplicate-name refusal that
-        has nothing to do with capacity.
+        it, which leaves the record in the error state. That state is
+        active, so the name stays taken until a caller deletes the
+        record, and re-issuing under the same name would leave two
+        records which a lookup by name cannot tell apart.
         """
         refusal = ci_apiclient.InsufficientResourcesException(
-            'no node has 4 cpus', status_code=507, text='no node has 4 cpus')
+            'no node has 4 cpus', status_code=507, text=TRANSIENT_BODY)
         client = FakeInstanceClient([refusal, {'uuid': 'inst-2'}])
         harness = _WrapperHarness(client)
 
@@ -805,7 +817,7 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
         self.assertEqual(
             'retried-uniq0001', client.calls[1][0],
             'The retry reused the refused instance\'s name, which is '
-            'still in use until its error delete completes.')
+            'still held by its error record.')
 
         # The wait watches the node the create was pinned to, and asks
         # for the whole size the create asked for -- all three dimensions
@@ -833,7 +845,7 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
         suite's control.
         """
         refusal = ci_apiclient.InsufficientResourcesException(
-            'full', status_code=507, text='full')
+            'full', status_code=507, text=TRANSIENT_BODY)
         client = FakeInstanceClient([refusal, {'uuid': 'inst-7'}])
         harness = _WrapperHarness(client)
 
@@ -862,7 +874,7 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
         """A genuinely too-small cloud must still fail, and say what was full."""
         refusal = ci_apiclient.InsufficientResourcesException(
             'no node has 4 cpus', status_code=507,
-            text='instance could not be placed')
+            text=transient_body('instance could not be placed'))
         client = FakeInstanceClient([refusal])
         # Inside the deadline for the first check, past it for the second,
         # which is what makes the wrapper give up rather than loop.
@@ -895,7 +907,7 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
         the wrapper concluding anything from it.
         """
         refusal = ci_apiclient.InsufficientResourcesException(
-            'full', status_code=507, text='full')
+            'full', status_code=507, text=TRANSIENT_BODY)
         client = FakeInstanceClient([refusal, {'uuid': 'inst-3'}])
         harness = _WrapperHarness(client)
 
@@ -933,7 +945,7 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
         and the clock really moves between them.
         """
         refusal = ci_apiclient.InsufficientResourcesException(
-            'full', status_code=507, text='no node would take it')
+            'full', status_code=507, text=transient_body('no node would take it'))
         client = FakeInstanceClient([refusal], repeat_last=True)
         harness = _WrapperHarness(client, clock=[0.0], advancing=True)
 
@@ -971,7 +983,7 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
         reader at the predicate instead.
         """
         refusal = ci_apiclient.InsufficientResourcesException(
-            'full', status_code=507, text='no node would take it')
+            'full', status_code=507, text=transient_body('no node would take it'))
         client = FakeInstanceClient([refusal], repeat_last=True)
         harness = _WrapperHarness(client, clock=[0.0], advancing=True)
 
@@ -993,7 +1005,7 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
         _does_not_busy_loop.
         """
         refusal = ci_apiclient.InsufficientResourcesException(
-            'full', status_code=507, text='full')
+            'full', status_code=507, text=TRANSIENT_BODY)
         client = FakeInstanceClient(
             [refusal, refusal, {'uuid': 'inst-6'}],
             resources=roster({'n1': node(64, cpu_limit=64)}))
@@ -1009,6 +1021,57 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
             [ci_base.CAPACITY_POLL_INTERVAL], harness.slept,
             'The first wait is free and every later one is paced, so two '
             'retries cost exactly one interval.')
+
+    def _refused_with(self, text):
+        refusal = ci_apiclient.InsufficientResourcesException(
+            'refused', status_code=507, text=text)
+        client = FakeInstanceClient([refusal, {'uuid': 'inst-7'}])
+        harness = _WrapperHarness(client, clock=[0.0], advancing=True)
+        return client, harness
+
+    def _assert_raised_at_once(self, text):
+        client, harness = self._refused_with(text)
+        with mock.patch.object(ci_base.retries, 'wait_for_capacity') as waiter:
+            self.assertRaises(
+                ci_apiclient.InsufficientResourcesException,
+                harness.create_instance,
+                'unmarked', 1, 1024, None, [], None, None)
+        self.assertEqual(
+            1, len(client.calls),
+            'The 507 was retried although the server did not mark it '
+            'transient.')
+        waiter.assert_not_called()
+        self.assertEqual([], harness.slept)
+        self.assertIsNone(harness.failure)
+
+    def test_a_refusal_marked_transient_is_waited_out(self):
+        client, harness = self._refused_with(TRANSIENT_BODY)
+        inst = harness.create_instance(
+            'marked', 1, 1024, None, [], None, None)
+        self.assertEqual({'uuid': 'inst-7'}, inst)
+        self.assertEqual(2, len(client.calls))
+
+    def test_a_refusal_marked_not_transient_is_raised_at_once(self):
+        self._assert_raised_at_once(json.dumps({
+            'error': 'No nodes remaining at scheduling stage '
+                     'sufficient_idle_cpu',
+            'status': 507, 'stage': 'sufficient_idle_cpu',
+            'transient': False}))
+
+    def test_a_refusal_with_no_transient_field_is_raised_at_once(self):
+        self._assert_raised_at_once(json.dumps({
+            'error': 'No nodes remaining at scheduling stage cpu',
+            'status': 507}))
+
+    def test_a_refusal_whose_body_is_not_json_is_raised_at_once(self):
+        self._assert_raised_at_once('<html>507 Insufficient Storage</html>')
+
+    def test_a_transient_which_is_not_exactly_true_is_raised_at_once(self):
+        self._assert_raised_at_once(json.dumps({'transient': 'true'}))
+        self._assert_raised_at_once(json.dumps({'transient': 1}))
+
+    def test_a_refusal_body_which_is_not_an_object_is_raised_at_once(self):
+        self._assert_raised_at_once(json.dumps([{'transient': True}]))
 
     def test_recording_a_wait_may_never_fail_the_test_it_measures(self):
         """An instrument which breaks the run is worse than no instrument."""
@@ -1031,7 +1094,7 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
         out.
         """
         refusal = ci_apiclient.InsufficientResourcesException(
-            'full', status_code=507, text='full')
+            'full', status_code=507, text=TRANSIENT_BODY)
         client = FakeInstanceClient([refusal, {'uuid': 'inst-4'}])
         harness = _WrapperHarness(client)
 
@@ -1083,7 +1146,7 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
         outside CI rather than an exotic one.
         """
         refusal = ci_apiclient.InsufficientResourcesException(
-            'full', status_code=507, text='full')
+            'full', status_code=507, text=TRANSIENT_BODY)
         client = FakeInstanceClient([refusal, {'uuid': 'inst-5'}])
         harness = _WrapperHarness(client)
 
@@ -1121,7 +1184,7 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
         wait cannot show a lookup missing.
         """
         refusal = ci_apiclient.InsufficientResourcesException(
-            'full', status_code=507, text='no room on sf-2')
+            'full', status_code=507, text=TRANSIENT_BODY)
         uuid = '7f1c9e26-5a0e-4b76-9a7f-2d4f0a1b3c5d'
         client = FakeInstanceClient(
             [refusal, {'uuid': 'inst-9'}],
@@ -1158,7 +1221,7 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
         a cluster whose capacity mapping could not be read.
         """
         refusal = ci_apiclient.InsufficientResourcesException(
-            'full', status_code=507, text='full')
+            'full', status_code=507, text=TRANSIENT_BODY)
         uuid = '7f1c9e26-5a0e-4b76-9a7f-2d4f0a1b3c5d'
         client = FakeInstanceClient(
             [refusal, {'uuid': 'inst-10'}],
@@ -1205,7 +1268,7 @@ class CreateInstanceWrapperTestCase(test_base.ShakenFistTestCase):
     def test_a_refused_create_resolves_its_pin_once(self):
         """And only once, however many times it is refused."""
         refusal = ci_apiclient.InsufficientResourcesException(
-            'full', status_code=507, text='full')
+            'full', status_code=507, text=TRANSIENT_BODY)
         uuid = '7f1c9e26-5a0e-4b76-9a7f-2d4f0a1b3c5d'
         client = FakeInstanceClient(
             [refusal, refusal, {'uuid': 'inst-12'}],

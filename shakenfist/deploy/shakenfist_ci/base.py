@@ -158,6 +158,39 @@ class RetryException(Exception):
     pass
 
 
+def _refusal_body(e):
+    """The JSON object a 507 carries, or None.
+
+    Read from e.text, which every client release sets. A proxy's HTML 507, a
+    truncated body, or JSON which is not an object is not a body the server
+    wrote, and reads as None.
+    """
+    try:
+        body = json.loads(getattr(e, 'text', None))
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(body, dict):
+        return None
+    return body
+
+
+def _transient_refusal(e):
+    """Did the server say this 507 is worth waiting out?
+
+    Only a body whose transient field is exactly true. The server sets it
+    only for a scheduler stage a wait can clear, so this leaves out the
+    permanent stages (a request for more vCPUs than any node has), the
+    unmarked 507s an exhausted address pool returns, and a 507 from an older
+    server which predates the marker. The exception class alone is not
+    enough, as every one of those is an InsufficientResourcesException too
+    (shakenfist/shakenfist#4474). This mirrors the rule in the sf_instance
+    Ansible module, deliberately duplicated because the suite does not import
+    from the collection.
+    """
+    body = _refusal_body(e)
+    return body is not None and body.get('transient') is True
+
+
 def namespace_names(namespaces):
     """The name of each namespace in a get_namespaces() result.
 
@@ -328,7 +361,15 @@ class BaseTestCase(testtools.TestCase):
 
         So a 507 is waited out for up to CLUSTER_HEADROOM_WAIT, and
         only a 507 -- see retries.wait_for_capacity() for what "there
-        is room now" is read against. In particular the 409 from an
+        is room now" is read against. Even a 507 is waited out only
+        when its body parses to a JSON object whose ``transient``
+        field is exactly true, which is the server's statement that
+        the scheduler stage which refused can clear. A 507 with no such
+        marker (a request larger than any node, an exhausted address
+        pool, or a server which predates the marker) is re-raised at
+        once, because no wait will change the answer and the exception
+        class alone cannot tell those apart (shakenfist/shakenfist#4474).
+        In particular the 409 from an
         unsatisfiable affinity constraint is not caught here. Server
         side that refusal is raised by a *subclass* of the low resource
         exception and is kept distinct only by the ordering of two
@@ -372,11 +413,15 @@ class BaseTestCase(testtools.TestCase):
                 attempt_name = name
             else:
                 # The refused instance was created and then
-                # enqueue_delete_due_error'd, so the name the caller
-                # chose stays in use until that delete completes. Retry
-                # under a fresh one; the caller only ever learns of it
-                # from a failure message or a wait record, both of
-                # which state it.
+                # enqueue_delete_due_error'd. That delete takes it to
+                # the error state, not to deleted, and error is an
+                # active state, so the record keeps the caller's name
+                # until someone deletes it explicitly -- nothing here
+                # does, and a second record under the same name would
+                # make lookups by name ambiguous. Retry under a fresh
+                # name instead; the caller only ever learns of it from
+                # a failure message or a wait record, both of which
+                # state it.
                 attempt_name = '%s-%s' % (
                     name[:MAX_INSTANCE_NAME_LENGTH - RETRY_SUFFIX_LENGTH],
                     self._uniquifier())
@@ -389,6 +434,8 @@ class BaseTestCase(testtools.TestCase):
                     userdata, force_placement=force_placement, **kwargs)
 
             except apiclient.InsufficientResourcesException as e:
+                if not _transient_refusal(e):
+                    raise
                 refusal = e
 
             if self._now() > deadline:
