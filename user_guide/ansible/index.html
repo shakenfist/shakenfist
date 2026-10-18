@@ -16182,7 +16182,7 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 </tbody>
 </table>
 <h3 id="return-value_2">Return value<a class="headerlink" href="#return-value_2" title="Permanent link">&para;</a></h3>
-<p>With <code>state: present</code>, an instance task returns <code>capacity_waited</code>, whether or not <code>capacity_wait</code> is set, and also when the task fails because the wait ran out.</p>
+<p>With <code>state: present</code>, an instance task returns <code>capacity_waited</code>, whether or not <code>capacity_wait</code> is set. A failed task returns it only once a create has been refused, whether the wait ran out or the task then failed for some other reason.</p>
 <table>
 <thead>
 <tr>
@@ -16193,7 +16193,7 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 <tbody>
 <tr>
 <td>capacity_waited.seconds<br/><em>integer</em></td>
-<td>Seconds spent waiting for capacity, rounded up, from the start of the first refused attempt to the start of the accepted one (or to the moment the wait gave up). 0 when nothing was refused.</td>
+<td>Seconds spent waiting for capacity, rounded up, from the start of the first refused attempt to the start of the accepted one (or to the moment the wait gave up). When the task failed for another reason, it runs to the start of the last attempt, or to the failure itself if that came while waiting for the refused record to be deleted. 0 when nothing was refused.</td>
 </tr>
 <tr>
 <td>capacity_waited.attempts<br/><em>integer</em></td>
@@ -16201,7 +16201,7 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 </tr>
 <tr>
 <td>capacity_waited.outcome<br/><em>string</em></td>
-<td><code>not_refused</code> when no create was refused, <code>placed</code> when a replay was accepted, or <code>exhausted</code> when the budget ran out.</td>
+<td><code>not_refused</code> when no create was refused, <code>placed</code> when a replay was accepted, <code>exhausted</code> when the budget ran out, or <code>failed</code> when a create was refused and the task then failed for some other reason. <code>failed</code> covers both a replay which was accepted and then failed, and a replay refused for a reason waiting cannot clear, so it is not evidence that capacity was still short: the failure message gives the cause.</td>
 </tr>
 <tr>
 <td>capacity_waited.refusals<br/><em>list</em></td>
@@ -16214,7 +16214,7 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 </tbody>
 </table>
 <h3 id="waiting-for-capacity">Waiting for capacity<a class="headerlink" href="#waiting-for-capacity" title="Permanent link">&para;</a></h3>
-<p>When the budget runs out, the task fails with the server's last refusal followed by how long it waited and how many attempts it made. <code>capacity_wait</code> bounds one task. To bound a whole play, give each create what is left of a run-wide budget and add up what each one reports in <code>capacity_waited.seconds</code>:</p>
+<p>When the budget runs out, the task fails with the server's last refusal followed by how long it waited, how many attempts it made and why it stopped. <code>capacity_wait</code> bounds one task. To bound a whole play, give each create what is left of a run-wide budget and add up what each one reports in <code>capacity_waited.seconds</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Start with nothing spent of a one hour budget</span>
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">ansible.builtin.set_fact</span><span class="p">:</span>
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">capacity_spent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
