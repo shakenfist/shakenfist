@@ -162,7 +162,12 @@ operator:
   the targets table.
 
 Useful implementation reference points collected during
-forensics:
+forensics. **These line numbers are stale.** Phase 2's survey
+(2026-10-18) re-located all of them; use the *What the survey
+found* section of
+[the phase 2 plan](PLAN-cluster-op-visibility-phase-02-observational-schema.md)
+instead. Two of the facts below were also wrong by then, and are
+corrected inline.
 
 * Targets table definition:
   `mariadb._get_cluster_operation_targets_table()`
@@ -178,13 +183,21 @@ forensics:
   `ClusterOperationTargetProto` at `database.proto:1850`.
   Handlers in `daemons/database/main.py`. Regenerate stubs
   with `tox -e genprotos`.
-* The **only** writer of target rows is the auto-write loop
-  in `enqueue_cluster_operation()`
-  (`schema/operations/util.py:17`), driven by
-  `model_class.target_fields`.
-  `baseobject._set_last_cluster_operation()`
-  (`baseobject.py:698`) has no remaining callers and is dead
-  code.
+* *(Corrected in phase 2.)* Target rows are written inside
+  the atomic enqueue transaction
+  (`_direct_create_and_enqueue_cluster_operation`), from the
+  `targets` list that `enqueue_cluster_operation()` derives
+  from `model_class.target_fields`. Before phase 2 there were
+  two more writers: a redundant post-enqueue write in
+  `node_blob_op.create_and_enqueue()`, and the dead
+  `baseobject._set_last_cluster_operation()`. Phase 2 deletes
+  both.
+* *(Added in phase 2.)* Terminal operations are hard-deleted
+  about thirty seconds after going terminal (#3864), and their
+  target rows go with them
+  (`BaseClusterOperation.hard_delete()`). The table holds
+  in-flight ops plus recently terminal ones, not a full
+  history.
 * The pending query joins `object_states` and filters on
   `_ACTIVE_OPERATION_STATES` (`mariadb.py:3682`); it fails
   closed (returns True) on DB errors.
@@ -217,40 +230,38 @@ every consumer, so that:
 
 ## Open questions
 
-* **Classification sweep.** Which enqueue sites are
-  observational? Known candidates: the per-instance
-  billing/health sweep
-  (`daemons/cluster/scheduled_tasks.py:215`) and the blob
-  checksum verification sweep (`verify_size_and_checksum`,
-  same file). Phase 3 must audit every `create_and_enqueue()`
-  caller and classify each with a comment. Anything that
+* **Classification sweep.** Which *tasks* are observational?
+  Known candidates: `collect_billing_statistics` and
+  `health_check_kvm_process` (the per-instance sweep in
+  `daemons/cluster/scheduled_tasks.py`), and
+  `verify_size_and_checksum` (the blob checksum sweep, same
+  file). Phase 3 must audit every task of every operation
+  model and classify each one with a comment. Anything that
   mutates guest-visible or cluster state is mutating.
-* **Where does the flag live?** Preferred: a per-op-model
-  class-level marker (alongside `target_fields`) so
-  classification is declared once in
-  `shakenfist/schema/operations/*_op.py`, plus a column on
-  `cluster_operation_targets` denormalising it for the SQL
-  filters. Confirm during phase 2 detailed planning whether
-  the flag is per *operation model* (simplest, preferred) or
-  needs to be per enqueue call. Note
-  `node_inst_op` mixes task types -- billing/health tasks are
-  observational but the same op type may carry mutating tasks
-  elsewhere; if so, the flag must be per enqueue call, passed
-  through `create_and_enqueue()` -> `enqueue_cluster_operation()`.
+* **Where does the flag live?** *Resolved in phase 2.* Not
+  per model: `node_inst_op` and `node_blob_op` both mix
+  observational and mutating tasks. Not per call either, which
+  would let a caller mislabel the work. Each model declares
+  `observational_tasks` beside `target_fields`, and an op is
+  observational only if every one of its tasks is. The result
+  is stored per row in a column on `cluster_operation_targets`.
+  See decision 1 of the phase 2 plan.
 * **Capability naming.** Proposed: `object-pending-operations`
   for the `has_pending_operations` field, following the
   existing kebab-case convention.
-* **`all=true` semantics.** Once
-  `get_cluster_operations(outstanding_only=False)` is
-  history-aware, `/operations?all=true` returns genuinely
-  full history. Confirm response-size expectations are
-  acceptable (long-lived instances accumulate sweep rows) or
-  whether a limit parameter is needed.
-* **Should `hard_delete` of ops prune target rows?** The
-  cleaner already hard-deletes old terminal ops
-  (`delete_stale_cluster_operation_targets` exists). Verify
-  retention interacts sanely with "full history" claims in
-  the docs.
+* **`all=true` semantics.** *Resolved by the phase 2
+  survey.* Since #3864, terminal ops are hard-deleted about
+  thirty seconds after going terminal, so `/operations?all=true`
+  can only ever return in-flight and recently terminal ops. It
+  is not a full history and cannot grow without bound. No
+  limit parameter is needed, but phase 4 must not document it
+  as history.
+* **Should `hard_delete` of ops prune target rows?** *Resolved
+  by the phase 2 survey.* It already does:
+  `BaseClusterOperation.hard_delete()` deletes the op's target
+  rows first. The `CLUSTER_OPERATION_TARGET_RETENTION` prune
+  is a backstop. Phase 2 corrects the operator docs that still
+  call the table an append-only history.
 
 ## Execution
 
@@ -258,8 +269,8 @@ every consumer, so that:
 |-------|------|--------|--------|
 | 1. CI await helper deflake | [PLAN-cluster-op-visibility-phase-01-ci-deflake.md](PLAN-cluster-op-visibility-phase-01-ci-deflake.md) | Complete | `bc7c119bf` (#3465) |
 | 1b. Atomic target writes + by-target JOIN fix | (folded into phase 1 PR; see below) | Complete | `bc7c119bf` (#3465) |
-| 2. Observational flag: schema and query layer | PLAN-cluster-op-visibility-phase-02-observational-schema.md | Not started | — |
-| 3. Classify and mark observational enqueue sites | PLAN-cluster-op-visibility-phase-03-mark-observational.md | Not started | — |
+| 2. Observational flag: schema and query layer | [PLAN-cluster-op-visibility-phase-02-observational-schema.md](PLAN-cluster-op-visibility-phase-02-observational-schema.md) | In progress | — |
+| 3. Classify and mark observational tasks | PLAN-cluster-op-visibility-phase-03-mark-observational.md | Not started | — |
 | 4. API surface: has_pending_operations and truthful outstanding ops | PLAN-cluster-op-visibility-phase-04-api-surface.md | Not started | — |
 | 5. CI helper simplification, functional coverage, documentation | PLAN-cluster-op-visibility-phase-05-coverage-docs.md | Not started | — |
 | 6. Push audit | PLAN-cluster-op-visibility-phase-06-push-audit.md | Not started | — |
@@ -336,7 +347,14 @@ verification.
 
 Add the mutating/observational distinction to storage and
 queries, default everything to mutating (no behaviour
-change until phase 3):
+change until phase 3). The detailed plan's survey changed
+the shape of this phase: the flag is derived from each op's
+tasks, the writer is the atomic enqueue (the
+`create_cluster_operation_target` path is deleted rather
+than extended), and the operator schema and upgrade docs
+ship here rather than in phase 5. See
+[the phase 2 plan](PLAN-cluster-op-visibility-phase-02-observational-schema.md).
+The original outline follows.
 
 * `cluster_operation_targets` v3 migration: add
   `observational` boolean (server default false) in
@@ -351,7 +369,8 @@ change until phase 3):
   `ClusterOperationTargetProto` in `protos/database.proto`,
   the database daemon handler, and the auto-write loop in
   `enqueue_cluster_operation()`. Regenerate with
-  `tox -e genprotos`.
+  `tox -e genprotos`. *(Superseded: the flag rides
+  `CreateAndEnqueueClusterOperationRequest`.)*
 * Exclude observational rows in
   `get_latest_cluster_operation_target()` and
   `has_pending_cluster_operation_target()` (both direct and
@@ -368,20 +387,30 @@ change until phase 3):
   rows without the column are fine (server default false =
   mutating, the conservative value).
 
-### Phase 3: Classify and mark observational enqueue sites (plan at medium effort)
+### Phase 3: Classify and mark observational tasks (plan at medium effort)
 
-Audit every `create_and_enqueue()` caller (see the file list
-in the phase plan), classify each as mutating or
-observational with a short justification comment, and mark
-the observational ones. Known observational: the
-per-instance billing/health sweep and the blob checksum
-verification sweep in `daemons/cluster/scheduled_tasks.py`.
-Everything else is expected to stay mutating; the deliverable
-includes the audit table in the phase plan so the decision
-trail survives. Add a unit test asserting that an
-observational op does not change
-`last_cluster_operation` and does not make
-`has_pending_cluster_operation()` true.
+Audit every task of every operation model in
+`shakenfist/schema/operations/*_op.py`, classify each as
+mutating or observational with a short justification
+comment, and declare the observational ones in that model's
+`observational_tasks` (the mechanism phase 2 built). Also
+check every `create_and_enqueue()` caller, so that no caller
+combines an observational task with a mutating one by
+accident. Known observational tasks:
+`collect_billing_statistics` and `health_check_kvm_process`
+in `node_inst_op`, and `verify_size_and_checksum` in
+`node_blob_op`. Everything else is expected to stay
+mutating. The deliverable includes the audit table in the
+phase plan, so the decision trail survives. Phase 2 already
+added the unit test that proves the filter, and a test that
+no model declares observational tasks. This phase replaces
+that second test with one pinning the classification table.
+The developer-guide account of mutating vs observational ops,
+and when to mark a task observational, lands here, because
+this is when the distinction first means something.
+`last_cluster_operation` in the instance external view stops
+reporting sweep ops once this phase lands, and the release
+notes should say so.
 
 ### Phase 4: API surface (plan at high effort)
 
@@ -402,6 +431,12 @@ observational op does not change
   `/instances|networks|artifacts/<ref>/operations` endpoints
   report all outstanding ops, not just the latest chain.
   Keep newest-first ordering.
+* *(Added by the phase 2 survey.)* The instance delete path
+  (`Instance` around `instance.py:2773`) picks which
+  outstanding ops to cancel by walking the dependency tree of
+  `self.last_cluster_operation`. That is the same pointer
+  race. Rebuild it on the same all-pending-targets walk as
+  `get_cluster_operations()`.
 * client-python (sibling repo): add
   `get_instance()`-adjacent accessors as needed, a
   `has_pending_operations`-aware helper, and capability
@@ -418,9 +453,10 @@ observational op does not change
   await helper genuinely blocks until the attach lands even
   when a billing sweep fires (can be provoked by simply
   waiting through a sweep period during the await).
-* Documentation: `docs/operator_guide/database.md` (schema
-  change), `docs/developer_guide/` (mutating vs observational
-  ops, when to mark an op observational),
+* Documentation: (the `docs/operator_guide/` schema and
+  upgrade notes ship in phase 2, and the developer-guide
+  account of mutating vs observational ops in phase 3; check
+  that both are still accurate)
   `ARCHITECTURE.md`/`AGENTS.md`/`CLAUDE.md` storage notes
   for the new column and field, `docs/plans/index.md`
   status updates.
