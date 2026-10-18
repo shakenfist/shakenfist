@@ -21454,8 +21454,14 @@ def _direct_list_cluster_operations_for_target(
             # so each operation_uuid appears here once and its flag is
             # unambiguous. (An operation stamps every one of its target
             # rows with the same flag anyway.)
+            #
+            # Both sides of the lookup are normalised through
+            # UUID(str(...)): what a Uuid column hands back has changed
+            # under us before (SQLAlchemy 2.1 returned plain strings, see
+            # uuid_column_type()), and a key that drifted would raise
+            # KeyError here rather than OperationalError.
             observational = {
-                UUID(r.operation_uuid): bool(r.observational)
+                UUID(str(r.operation_uuid)): bool(r.observational)
                 for r in target_rows
             }
             stmt = sa.select(ops_table).where(
@@ -21465,7 +21471,7 @@ def _direct_list_cluster_operations_for_target(
             ops = []
             for row in result:
                 op = _cluster_operation_row_to_dict(row)
-                op['observational'] = observational[row.uuid]
+                op['observational'] = observational[UUID(str(row.uuid))]
                 ops.append(op)
             return ops
     except OperationalError as e:

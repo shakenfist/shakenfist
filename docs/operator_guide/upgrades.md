@@ -314,7 +314,13 @@ the index.
 
 Older daemons still running during a rolling upgrade do not know about the
 column, so the rows they write take the default and are treated as
-mutating, which is how every row was treated before v3.
+mutating, which is how every row was treated before v3. The same holds in
+the other direction: a newer daemon whose enqueue reaches a gateway that
+predates v3 sends the flag, but that gateway drops it and writes the row as
+mutating. Nothing breaks, but once tasks are classified as observational a
+background sweep can still shadow `last_cluster_operation` until every
+gateway is upgraded, so roll the `sf-database` gateways before the other
+daemons.
 
 The `CreateClusterOperationTarget` RPC has been removed, because the atomic
 enqueue already writes the target rows. An older node daemon that still

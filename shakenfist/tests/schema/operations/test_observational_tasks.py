@@ -6,6 +6,7 @@
 import importlib
 import pkgutil
 
+from shakenfist.operations.clusteroperationmapping import OPERATION_NAMES_TO_CLASSES
 from shakenfist.schema import operations
 from shakenfist.tests import base
 
@@ -38,10 +39,11 @@ class ObservationalTasksInertTestCase(base.ShakenFistTestCase):
     def test_operation_models_are_found(self):
         # Guard against an import-path mistake making the test below
         # pass vacuously over an empty set of models.
+        # Derived rather than counted: every operation type the
+        # dispatcher knows must have a schema model the scan found.
         models = _operation_models()
-        self.assertGreaterEqual(len(models), 14, sorted(models))
-        self.assertIn('node_inst_op', models)
-        self.assertIn('node_blob_op', models)
+        self.assertEqual(
+            set(OPERATION_NAMES_TO_CLASSES), set(models), sorted(models))
 
     def test_no_model_declares_observational_tasks(self):
         for name, model in _operation_models().items():

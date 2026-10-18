@@ -290,12 +290,14 @@ rationale.
 history:
 
 - **`last_cluster_operation` (property)**: returns the most recent
-  non-observational target row regardless of its state. Consumed by `external_view()` projections
-  and `runs_after=[...]` chains, which want the latest pointer
-  independent of whether it has reached a terminal state.
+  non-observational target row regardless of its state. Consumed by
+  `external_view()` projections and `runs_after=[...]` chains, which
+  want the latest pointer independent of whether it has reached a
+  terminal state.
 - **`has_pending_cluster_operation()` (method)**: returns `True` if any
-  non-observational target row's operation is in `{queued, preflight, executing}`. Consumed
-  by `Network.is_okay()` and any future history-aware gate. The query
+  non-observational target row's operation is in
+  `{queued, preflight, executing}`. Consumed by `Network.is_okay()` and
+  any future history-aware gate. The query
   joins `cluster_operation_targets` against `object_states`, so a later
   terminal operation cannot mask an earlier in-flight one.
 

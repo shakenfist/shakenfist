@@ -442,7 +442,12 @@ equivalent check.
   outstanding ops to cancel by walking the dependency tree of
   `self.last_cluster_operation`. That is the same pointer
   race. Rebuild it on the same all-pending-targets walk as
-  `get_cluster_operations()`.
+  `get_cluster_operations()`, and decide explicitly whether
+  delete cancels in-flight observational ops. Once phase 3
+  lands they are no longer the pointer, so the current walk
+  skips them. That is probably right, since a health check
+  against a deleting instance does no harm, but it is a
+  behaviour change, so state it.
 * client-python (sibling repo): add
   `get_instance()`-adjacent accessors as needed, a
   `has_pending_operations`-aware helper, and capability

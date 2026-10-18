@@ -119,6 +119,11 @@ class ObservationalCurrentStateTestCase(
                            return_value=self.engine),
                 mock.patch('shakenfist.mariadb._use_database_service',
                            return_value=False),
+                # This only takes effect because mariadb.py resolves
+                # sa.dialects.mysql.insert at call time. If that ever
+                # becomes a module-level "from ... import insert", patch
+                # the name mariadb.py binds instead, or the test fails
+                # with a sqlite compile error rather than a clear message.
                 mock.patch('sqlalchemy.dialects.mysql.insert', _SqliteUpsert),
                 mock.patch('shakenfist.schema.operations.util.eventlog'
                            '.add_event_multi')]:
