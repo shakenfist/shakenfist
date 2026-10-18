@@ -355,9 +355,24 @@ so a step added to it reaches both.
    otherwise C-quotes any non-ASCII path into a name that opens
    nothing, and it returns `None` for a listing that failed, which is
    not the same answer as an empty index. `repo.read()` is how to open
-   a repository file: it returns `None` for anything that is not a
-   regular file inside the checkout, so a dangling or escaping symlink
-   is skipped rather than raised on or followed.
+   a repository file, and the only way: it returns `None` for anything
+   that is not a regular file inside the checkout once symlinks are
+   followed -- a dangling link, a directory, a link out of the clone,
+   a device -- and for anything over `READ_MAX_BYTES` (2 MiB), so none
+   of them is raised on, followed or read in part. `repo.isfile()`
+   asks the same question without wanting the content,
+   `repo.exists()` allows a directory but not a link out of the clone,
+   and `repo.workflows()` lists only workflows `repo.workflow()` will
+   read. A tree walk hands what it finds to `repo.read()` through
+   `repo.relative()` rather than opening it.
+   `scripts/tests/test_containment.py` runs every scheduled check with
+   the files it read replaced by links out of the checkout, dangling
+   links and directories, and fails on any `open()` of the checkout
+   that did not come through that one guard. It also parses the
+   package for any call that opens a file -- `open()`, `os.open()`,
+   `Path.read_text()` and the like -- outside a short allowlist, which
+   covers the branches no fixture reaches. A read is decoded as UTF-8
+   whatever the runner's locale.
 
 2. **`scripts/audit/registry.py`** -- register the instance in
    `CHECKS`, beside the rest of its family. That list is the order the
