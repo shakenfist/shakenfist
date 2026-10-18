@@ -15855,6 +15855,16 @@ itself, and #3089 finished the residual etcd usage in the scheduled tasks.</p>
 - "What chunks make up blob X?" → <code>get_references_from(BLOB, X, relationship=CHUNK)</code>
 - "What blobs use chunk C?" → <code>get_references_to(BLOB, C, relationship=CHUNK)</code>
 - Ref counting works naturally - chunk can't be deleted while referenced</p>
+<div class="admonition warning">
+<p class="admonition-title">This shape cannot record a repeated chunk</p>
+<p><code>object_references</code> is keyed on <code>(source_object_type, source_uuid, relationship,
+target_object_type, target_uuid)</code>, and <code>relationship_value</code> is not part of that key
+(<code>mariadb.py:3028-3031</code>). A duplicate insert keeps the first value. So a composite that holds
+the same chunk at two positions, which disk images do constantly, can record only one of them.
+<a href="../PLAN-blob-containers/">Blobs as containers</a> found the same limitation for named entries,
+and its open question 1 asks whether the two should share one positional parts table. Settle
+that before this phase is planned.</p>
+</div>
 <hr />
 <h3 id="phase-3-content-defined-chunking">Phase 3: Content-Defined Chunking<a class="headerlink" href="#phase-3-content-defined-chunking" title="Permanent link">&para;</a></h3>
 <p><strong>Goal</strong>: Break large blobs into variable-sized chunks based on content boundaries, enabling cross-blob deduplication.</p>
