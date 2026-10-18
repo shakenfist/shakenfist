@@ -290,19 +290,19 @@ Delete a network:
 
 ### Return value
 
-With `state: present`, an instance task returns `capacity_waited`, whether or not `capacity_wait` is set, and also when the task fails because the wait ran out.
+With `state: present`, an instance task returns `capacity_waited`, whether or not `capacity_wait` is set. A failed task returns it only once a create has been refused, whether the wait ran out or the task then failed for some other reason.
 
 | **Field** | **Comments** |
 |---|---|
-| capacity_waited.seconds<br/>*integer* | Seconds spent waiting for capacity, rounded up, from the start of the first refused attempt to the start of the accepted one (or to the moment the wait gave up). 0 when nothing was refused. |
+| capacity_waited.seconds<br/>*integer* | Seconds spent waiting for capacity, rounded up, from the start of the first refused attempt to the start of the accepted one (or to the moment the wait gave up, or to the start of the last attempt when the task failed for another reason). 0 when nothing was refused. |
 | capacity_waited.attempts<br/>*integer* | How many creates the task sent. 0 when no create was needed. |
-| capacity_waited.outcome<br/>*string* | `not_refused` when no create was refused, `placed` when a replay was accepted, or `exhausted` when the budget ran out. |
+| capacity_waited.outcome<br/>*string* | `not_refused` when no create was refused, `placed` when a replay was accepted, `exhausted` when the budget ran out, or `failed` when a create was refused and the task then failed for some other reason. |
 | capacity_waited.refusals<br/>*list* | One entry per refusal, each with `at` (UTC, ISO 8601), `kind` (`api` for a 507 from the create, `preflight` for a preflight abort), `stage` (the 507 body's stage, or null) and `message`. |
 | capacity_waited.namespace_instances<br/>*integer* | How many other active instances the namespace held at the first refusal, or null when nothing was refused or the listing failed. |
 
 ### Waiting for capacity
 
-When the budget runs out, the task fails with the server's last refusal followed by how long it waited and how many attempts it made. `capacity_wait` bounds one task. To bound a whole play, give each create what is left of a run-wide budget and add up what each one reports in `capacity_waited.seconds`:
+When the budget runs out, the task fails with the server's last refusal followed by how long it waited, how many attempts it made and why it stopped. `capacity_wait` bounds one task. To bound a whole play, give each create what is left of a run-wide budget and add up what each one reports in `capacity_waited.seconds`:
 
 ```yaml
 - name: Start with nothing spent of a one hour budget

@@ -1357,7 +1357,9 @@ class SfInstanceCapacityWaitTestCase(base.ShakenFistTestCase):
             msg.startswith('Instance creation failed: %s' % refusal), msg)
         self.assertIn('No nodes remaining at scheduling stage', msg)
         self.assertTrue(
-            msg.endswith('(waited 600 seconds for capacity over 11 attempts)'),
+            msg.endswith('(waited 600 seconds for capacity over 11 attempts: '
+                         'the next replay would have been sent after the '
+                         'capacity_wait budget of 600 seconds ran out)'),
             msg)
 
         # No replay is sent after the budget: one every 60 seconds from 0
@@ -1381,9 +1383,12 @@ class SfInstanceCapacityWaitTestCase(base.ShakenFistTestCase):
             awaits=[Exception('failed to start (marked as error state, ...)')],
             expect_failure=True)
 
+        # One attempt, in the singular, and the reason no replay was sent
+        # in the message itself rather than only in the log.
         self.assertEqual(
             'Waiting for instance failed: Too many start attempts (waited 0 '
-            'seconds for capacity over 1 attempts)',
+            'seconds for capacity over 1 attempt: the next replay would have '
+            'been sent after the capacity_wait budget of 30 seconds ran out)',
             module.fail_json.call_args[1]['msg'])
 
     def test_a_budget_shorter_than_the_spacing_never_replays(self):
@@ -1419,7 +1424,8 @@ class SfInstanceCapacityWaitTestCase(base.ShakenFistTestCase):
             [_refusal(TRANSIENT_BODY)],
             lookups={
                 'test': [sf_instance.apiclient.ResourceNotFoundException(),
-                         sf_instance.apiclient.APIException('boom')],
+                         {'uuid': 'refused', 'state': 'initial-error'}],
+                'refused': [sf_instance.apiclient.APIException('boom')],
             },
             expect_failure=True)
 
@@ -1427,6 +1433,83 @@ class SfInstanceCapacityWaitTestCase(base.ShakenFistTestCase):
             'Waiting for the refused instance to be deleted failed: boom',
             module.fail_json.call_args[1]['msg'])
         self.assertEqual(1, len(self._calls('create')))
+
+        # What the wait did is still returned, and the five seconds it
+        # spent polling the record before the lookup failed are counted.
+        waited = self._waited()
+        self.assertEqual('failed', waited['outcome'])
+        self.assertEqual(5, waited['seconds'])
+        self.assertEqual(1, waited['attempts'])
+        self.assertEqual(1, len(waited['refusals']))
+
+    def test_a_replay_refused_for_another_reason_returns_the_wait(self):
+        unmarked = _refusal({'error': 'network is congested', 'status': 507})
+        module = self._run(
+            [_refusal(TRANSIENT_BODY), unmarked],
+            lookups={
+                'test': [sf_instance.apiclient.ResourceNotFoundException(),
+                         self.REFUSED],
+                'refused': [self.DELETED],
+            },
+            expect_failure=True)
+
+        # The failure reads as it would have without a wait, and what the
+        # wait did before it comes with it.
+        self.assertEqual('Instance creation failed: %s' % unmarked,
+                         module.fail_json.call_args[1]['msg'])
+        self.assertEqual({
+            'seconds': 60,
+            'attempts': 2,
+            'outcome': 'failed',
+            'refusals': [{
+                'at': '2026-10-18T00:00:00+00:00',
+                'kind': 'api',
+                'stage': 'sufficient_idle_cpu',
+                'message': TRANSIENT_BODY['error'],
+            }],
+            'namespace_instances': 0,
+        }, self._waited())
+
+    def test_a_placed_replay_whose_read_back_fails_returns_the_wait(self):
+        module = self._run(
+            [_refusal(TRANSIENT_BODY), self._created()],
+            lookups={
+                'test': [sf_instance.apiclient.ResourceNotFoundException(),
+                         self.REFUSED],
+                'refused': [self.DELETED],
+                'created': [sf_instance.apiclient.APIException('boom')],
+            },
+            expect_failure=True)
+
+        self.assertEqual('Fetching the created instance failed: boom',
+                         module.fail_json.call_args[1]['msg'])
+        self.assertEqual('failed', self._waited()['outcome'])
+        self.assertEqual(60, self._waited()['seconds'])
+
+    def test_a_replay_whose_await_fails_otherwise_returns_the_wait(self):
+        aborted = {'uuid': 'aborted', 'name': 'test', 'state': 'error',
+                   'error_message': 'Unable to find suitable node'}
+        affinity = {'uuid': 'created', 'name': 'test', 'state': 'error',
+                    'error_message': 'No node satisfies the requested '
+                                     'affinity constraints: x'}
+        failure = Exception('failed to start (marked as error state, ...)')
+        module = self._run(
+            [{'uuid': 'aborted', 'state': 'initial'},
+             {'uuid': 'created', 'state': 'initial'}],
+            lookups={'aborted': [aborted, aborted,
+                                 dict(aborted, state='deleted')],
+                     'created': [affinity]},
+            await_instance=True, awaits=[failure, failure],
+            expect_failure=True)
+
+        self.assertEqual('Waiting for instance failed: %s' % failure,
+                         module.fail_json.call_args[1]['msg'])
+        waited = self._waited()
+        self.assertEqual('failed', waited['outcome'])
+        self.assertEqual(2, waited['attempts'])
+        self.assertEqual(60, waited['seconds'])
+        self.assertEqual(['preflight'],
+                         [r['kind'] for r in waited['refusals']])
 
     def test_the_final_await_gets_the_full_await_timeout(self):
         # Each create takes five seconds. The refused attempt and the
