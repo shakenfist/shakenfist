@@ -15278,13 +15278,12 @@ it is not a file the merge advice can send anybody to.</p>
 <p>A repository with no such file passes, including one with no agent
 context at all -- "nothing here is named for a vendor" is true of it,
 and whether it should have an <code>AGENTS.md</code> is <code>llm-tooling</code>'s question.</p>
-<p>A directory <code>git</code> cannot list is N/A. Without the index the check
-cannot say anything either way, and what is missing is the audit
-harness's <code>git</code> rather than anything about the audited repository, so
-failing would file an issue nobody on that repository could fix. This
-is the reading <code>llm-context-lint</code> takes of a missing skillsaw, and it
-carries the same signal: every row flipping to N/A at once is how a
-broken runner announces itself.</p>
+<p>A directory <code>git</code> cannot list is an <code>error</code>. Without the index the
+check cannot say anything either way, and what is missing is the audit
+harness's <code>git</code> rather than anything about the audited repository:
+failing would file an issue nobody on that repository could fix, and
+N/A would close the one it has. See "What each status means" in
+<a href="/components/development/consistency-audits/">docs/consistency-audits.md</a>.</p>
 <p>So is a directory that is not the <em>root</em> of a checkout. <code>git ls-files</code>
 exits cleanly anywhere inside a work tree, listing whatever the
 enclosing index holds below the directory it was pointed at -- usually

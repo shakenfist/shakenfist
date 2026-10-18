@@ -15390,6 +15390,11 @@ cargo, dockerfile and github-actions dependencies were current.</p>
 with no <code>.pre-commit-config.yaml</code>, or one whose hooks are all
 <code>repo: local</code>, passes without the manager. <code>sfui</code>'s
 <code>"pre-commit": {"enabled": true}</code> is the form the template carries.</p>
+<p>Enabling the manager is not enough for the shellcheck hook:
+shellcheck-py's four-part tags need the template's regex versioning
+rule, or the lookup fails on the dependency dashboard and the hook is
+never bumped. This check does not look for that rule; see
+<a href="https://github.com/shakenfist/development/blob/main/templates/renovate/README.md#shellcheck-pys-four-part-tags">the template README</a>.</p>
 <h3 id="repositories-that-ship-workflow-templates">Repositories that ship workflow templates<a class="headerlink" href="#repositories-that-ship-workflow-templates" title="Permanent link">&para;</a></h3>
 <p>Renovate's <code>github-actions</code> manager only reads
 <code>.github/workflows</code>, <code>.github/actions</code> and <code>workflow-templates</code>. A

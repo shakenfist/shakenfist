@@ -15310,6 +15310,11 @@ Settings &gt; Code security and analysis:</p>
 </tr>
 </tbody>
 </table>
+<p>The settings are read from the API's <code>security_and_analysis</code>, which
+GitHub returns only to a token with admin access. A query that fails,
+or answers without them, is reported as <code>error</code> rather than as a pass
+or a failure: no verdict about the settings rests on not having seen
+them.</p>
 <p>Delete branch on merge is required rather than recommended, and is
 checked by its own audit: see
 <a href="/components/development/audits/delete-branch-on-merge/">delete-branch-on-merge.md</a>.</p>

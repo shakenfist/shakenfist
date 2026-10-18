@@ -15355,13 +15355,15 @@ are allowed to sit beside skill directories.</p>
 <h3 id="not-applicable">Not applicable<a class="headerlink" href="#not-applicable" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Repositories with no agent context files at all.</li>
-<li>A missing skillsaw binary. That is the audit harness's problem, not
-  the audited repository's, and failing would file an issue against
-  every project in the fleet for something none of them can fix. The
-  consistency-audit workflow installs a pinned skillsaw, so the state
-  should not arise; when it does, every row flipping to N/A at once is
-  the signal.</li>
 </ul>
+<p>A missing skillsaw binary, or one whose output is not its JSON
+report, is not N/A but <code>error</code>. That is the audit harness's problem,
+not the audited repository's: failing would file an issue against
+every project in the fleet for something none of them can fix, and
+N/A would close every open one at once. The consistency-audit
+workflow installs a pinned skillsaw and checks its version before the
+audit runs, so the state should not arise. See "What each status
+means" in <a href="/components/development/consistency-audits/">docs/consistency-audits.md</a>.</p>
 <h3 id="how-skillsaw-is-run">How skillsaw is run<a class="headerlink" href="#how-skillsaw-is-run" title="Permanent link">&para;</a></h3>
 <p>The check runs the skillsaw that the <code>AUDIT_SKILLSAW</code> environment
 variable names, or <code>skillsaw</code> from <code>PATH</code> when it is unset, as it is

@@ -15503,19 +15503,50 @@ fine-grained token always has an expiry date. When it lapses, every leg
 fails at "Check the read token" and <code>report-failure</code> files its issue
 pointing at the run. Mint a replacement with the permissions above and
 replace the secret, then dispatch a run of <code>main</code> to confirm it.</p>
-<p>The split is between jobs, not between hosts, and that bounds what it
-buys. Every job runs on the persistent <code>[self-hosted, static]</code>
-runners, as the same user, and only <code>runner.temp</code> is emptied between
-jobs. Code an audit leg runs -- skillsaw's unpinned dependencies, or
-anything an audited repository can steer -- could leave something in
-that user's home directory (a <code>.pth</code> file in the user site-packages,
-a <code>~/.gitconfig</code> hook) that <code>manage-issues</code> or <code>update-docs</code> then runs
-with <code>AUDIT_TOKEN</code>. Likewise skillsaw runs as the same user as
-<code>audit-check.py</code>, so taking the token out of its environment is
+<p><code>AUDIT_TOKEN</code> is not a repository secret. It is an environment secret
+in the <code>audit-write</code> environment, whose deployment branch policy
+allows only <code>main</code>, and <code>manage-issues</code> and <code>update-docs</code> are the only
+jobs that name that environment (<code>test_audit_workflow.py</code> pins both).
+A repository secret goes to every run that names it, including a
+dispatch of any branch; an environment secret goes only to a job the
+environment admits. So a branch that edits the <code>main</code>-only condition
+out of its copy of a writing job fails at the deployment check, and
+one that names <code>AUDIT_TOKEN</code> in an audit leg gets an empty string. The
+environment is set up once, by a repository admin:</p>
+<ol>
+<li>Settings, Environments, New environment, named <code>audit-write</code>.</li>
+<li>Deployment branches and tags: Selected branches and tags, with the
+   single rule <code>main</code> (a branch rule, not a tag rule).</li>
+<li>Add the token as the environment secret <code>AUDIT_TOKEN</code>. GitHub
+   cannot copy a secret from one scope to another, so this means
+   pasting the token again, or minting a replacement.</li>
+<li>Delete the repository secret <code>AUDIT_TOKEN</code>, so that nothing outside
+   the environment can name it.</li>
+</ol>
+<p>Do the first three before merging a change that adds the
+<code>environment:</code> lines, and the fourth after: in between, both copies
+exist and the workflow works whichever one it reads. Dispatch a run of
+<code>main</code> to confirm, and check that a dispatch of a branch still shows
+the writing jobs as skipped. Leave out required reviewers and wait
+timers: the scheduled run has nobody to approve it.</p>
+<p>The split between jobs is also a split between hosts. The audit legs
+run on the persistent <code>[self-hosted, static]</code> runners, as one user,
+and only <code>runner.temp</code> is emptied between jobs. Code an audit leg runs
+-- skillsaw's unpinned dependencies, or anything an audited repository
+can steer -- could leave something in that user's home directory (a
+<code>.pth</code> file in the user site-packages, a <code>~/.gitconfig</code> hook) for a
+later job there to run. So <code>manage-issues</code> and <code>update-docs</code> run on
+ephemeral <code>[self-hosted, vm, debian-13, s]</code> runners instead: each
+starts from the image and is thrown away after one job, so nothing a
+leg wrote reaches a job holding <code>AUDIT_TOKEN</code>. The image has no <code>gh</code>,
+so both jobs install it from Debian first.
+<code>scripts/tests/test_audit_workflow.py</code> fails if either job moves back
+to <code>static</code>.</p>
+<p>Within a leg, the isolation is weaker. skillsaw runs as the same user
+as <code>audit-check.py</code>, so taking the token out of its environment is
 defence in depth, not isolation: it could still read its parent's.
-What the split does do is keep <code>AUDIT_TOKEN</code> out of every process
-the legs start. Isolating the writing jobs properly needs runners
-nothing else uses, which is a runner change rather than a workflow one.</p>
+That token is <code>AUDIT_READ_TOKEN</code>, though, and the split keeps
+<code>AUDIT_TOKEN</code> out of every process the legs start.</p>
 <p><strong>2. <code>manage-issues</code></strong> -- downloads every artifact and runs
 <code>scripts/audit-manage-issues.py</code>, which files, updates and closes issues. See
 <a href="#issues-are-the-work-tracking">Issues are the work tracking</a> below.</p>
@@ -15549,11 +15580,13 @@ start one by hand once the cause is fixed.</p>
 matrix runs that branch's checks against the whole fleet and uploads
 its results as artifacts, and <code>manage-issues</code>, <code>update-docs</code> and
 <code>report-failure</code> are skipped. That is the way to measure a change to
-the checks against the fleet before merging it. The guard catches a
-dispatch of the wrong ref, not a determined branch: the read token can
-read every private repository in the organisation, and a branch
-controls the code that runs with it, including whether it names
-<code>AUDIT_TOKEN</code> at all. The trust boundary is push access to this
+the checks against the fleet before merging it. The <code>main</code>-only
+condition catches a dispatch of the wrong ref; the <code>audit-write</code>
+environment above is what keeps <code>AUDIT_TOKEN</code> from a branch that edits
+the condition out. The read token is another matter: a branch run
+needs it to measure anything, and a branch controls the code that runs
+with it, so a branch can read every private repository in the
+organisation. For reading, the trust boundary is push access to this
 repository, as it always was. Two runs of one ref never overlap: the
 second waits for the first to finish. Runs of different refs do not
 wait for each other, so a branch run can never hold up or displace the
@@ -15689,9 +15722,36 @@ already has, and does so for every repository the outage reached at
 once. The line is whether the tool answered: an answer is evidence a
 verdict can rest on, including an answer that the thing asked about
 does not exist, while a failure to answer is not.</p>
+<p>The exception a check raises for this is <code>audit.check.ToolFailure</code>,
+whose message becomes the <code>details</code> of the <code>error</code> result -- so it
+says what could not be asked and why, without the traceback a bug
+gets, and the result carries <code>tool_failure: true</code>. Three helpers raise
+it so a check does not have to: <code>require_tracked_paths()</code> in
+<code>audit/files.py</code> for the index, <code>answer()</code> and <code>api_answer()</code> on the
+GitHub client for a call whose every failure is GitHub not answering,
+and <code>run_tool()</code> in <code>audit/check.py</code> for any other subprocess, which
+raises for a timeout or a tool that cannot start and leaves the exit
+status to the caller, since only the caller knows which statuses are
+answers. <code>check-audit-smoke.py</code>, which runs in CI without a token,
+excuses a <code>tool_failure</code> from the checks that ask GitHub and nothing
+else.</p>
+<p>The scheduled run excuses the same results, and only those
+(<code>github_did_not_answer()</code> in <code>scripts/audit_snapshot.py</code> is the one
+rule both scripts use). For a network check whose tooling could not
+ask GitHub, <em>Fail if any check raised</em> prints a workflow warning and
+does not fail the leg. A failed leg holds back the compliance page for
+the whole fleet, which one transient 502 or rate limit in one
+repository is not worth. The page shows that cell as a check error
+saying what could not be asked, and the criterion's issue is left as it
+was. An outage that lasts is not hidden by this. A token that has
+expired or lost access fails every leg at <em>Check the read token</em>,
+before anything is measured. A tool failure from any other check is
+the runner's own git, skillsaw or <code>review-tracking.py</code> not answering,
+which the next run would meet too, so it still fails the leg.</p>
 <p>The tests call <code>run()</code> directly and assert a verdict, so a check that
 raises unexpectedly still fails them. A test of a tool-failure path
-asserts that <code>run()</code> raises instead.</p>
+asserts that <code>run()</code> raises ToolFailure instead, with
+<code>CheckTestCase.assert_tool_failure()</code>.</p>
 <h2 id="adding-a-criterion">Adding a criterion<a class="headerlink" href="#adding-a-criterion" title="Permanent link">&para;</a></h2>
 <p>Six files, all in this repository. This is the one list of them:
 <code>PUSH-AUDIT.md</code> and <code>AGENTS.md</code> link here rather than keep their own,
@@ -15716,9 +15776,24 @@ so a step added to it reaches both.</p>
    otherwise C-quotes any non-ASCII path into a name that opens
    nothing, and it returns <code>None</code> for a listing that failed, which is
    not the same answer as an empty index. <code>repo.read()</code> is how to open
-   a repository file: it returns <code>None</code> for anything that is not a
-   regular file inside the checkout, so a dangling or escaping symlink
-   is skipped rather than raised on or followed.</p>
+   a repository file, and the only way: it returns <code>None</code> for anything
+   that is not a regular file inside the checkout once symlinks are
+   followed -- a dangling link, a directory, a link out of the clone,
+   a device -- and for anything over <code>READ_MAX_BYTES</code> (2 MiB), so none
+   of them is raised on, followed or read in part. <code>repo.isfile()</code>
+   asks the same question without wanting the content,
+   <code>repo.exists()</code> allows a directory but not a link out of the clone,
+   and <code>repo.workflows()</code> lists only workflows <code>repo.workflow()</code> will
+   read. A tree walk hands what it finds to <code>repo.read()</code> through
+   <code>repo.relative()</code> rather than opening it.
+   <code>scripts/tests/test_containment.py</code> runs every scheduled check with
+   the files it read replaced by links out of the checkout, dangling
+   links and directories, and fails on any <code>open()</code> of the checkout
+   that did not come through that one guard. It also parses the
+   package for any call that opens a file -- <code>open()</code>, <code>os.open()</code>,
+   <code>Path.read_text()</code> and the like -- outside a short allowlist, which
+   covers the branches no fixture reaches. A read is decoded as UTF-8
+   whatever the runner's locale.</p>
 <ol>
 <li>
 <p><strong><code>scripts/audit/registry.py</code></strong> -- register the instance in

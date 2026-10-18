@@ -15359,6 +15359,14 @@ serial and fails if it is not. Raise <code>max_entries_to_build</code> above 1 a
 a base-branch key would alias several live entries, cancelling ones
 still wanted -- the key would have to narrow to something unique per
 entry.</p>
+<p>When GitHub does not answer that question, the workflow files decide
+the result if they can. A repository the files already fail on still
+fails, without the queue's line, because those findings stand whatever
+the queue is set to. The outage is reported by
+<a href="/components/development/audits/merge-queue-config/">merge-queue-config</a>, which asks GitHub the same
+question. A repository the files pass on reports <code>error</code> instead,
+because then the queue is the only thing left to decide, and the audit
+could not ask about it.</p>
 <p>The same reasoning puts lane distinctness here. An ejected pull request
 is what the serial queue protects against, and it is exactly what a
 self-cancelling matrix produces at the job level.</p>

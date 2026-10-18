@@ -16933,8 +16933,11 @@ the plan-reference marker, at file scope.</p>
 <li><strong>Tool failures report <code>error</code>.</strong> When a check's own tooling fails
    (a GitHub API error, a failed <code>git ls-files</code>), it reports <code>error</code>
    rather than <code>fail</code> or <code>not_applicable</code>. <code>error</code> leaves issues
-   alone, and turns the leg red through <code>audit-raised.py</code>. The policy
-   is written down once, in <code>docs/consistency-audits.md</code>.</li>
+   alone, and turns the leg red through <code>audit-raised.py</code>. The one
+   exception is a network check that could not ask GitHub. That is a
+   warning, so that one transient 502 does not hold back the page (#279
+   review, confirmed by Michael). The policy is written down once, in
+   <code>docs/consistency-audits.md</code>.</li>
 <li><strong>The reviewer's issue filing in actions is dropped.</strong> That means
    the filing step, the "Related Issues / Closes" section and the
    <code>issues: write</code> requirement. Callers that keep granting it are

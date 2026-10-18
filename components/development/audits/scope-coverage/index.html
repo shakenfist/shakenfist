@@ -15420,15 +15420,22 @@ directly rather than assuming, and says which of five things happened:</p>
   and the finding says to check the token, because a listing that
   cannot see part of the organisation cannot answer the first question
   either.</li>
-<li><strong>It could not be resolved either way</strong> -- an expired token, rate
-  limiting, a timeout, or a 404 this token cannot interpret (see
-  below). Reported as exactly that. "Gone" is the one conclusion whose
-  suggested fix is destructive, so nothing arrives at it by accident.</li>
+<li><strong>It could not be resolved either way</strong> -- a 404 this token cannot
+  interpret (see below). Reported as exactly that. "Gone" is the one
+  conclusion whose suggested fix is destructive, so nothing arrives at
+  it by accident.</li>
 </ul>
-<p>Each name is resolved on its own, and a failure on one is recorded
-against that name rather than abandoning the run. The undecided
-question needs no API access at all, and it is the half of the check
-that matters: a slow call must not discard it.</p>
+<p>GitHub not answering at all is not one of the five. An expired token,
+rate limiting, a timeout or an empty reply, on the listing or on any
+one name, makes the check report <code>error</code> rather than a verdict, as
+every criterion does when its tooling fails (see "What each status
+means" in <a href="/components/development/consistency-audits/">docs/consistency-audits.md</a>). So
+does a listing that comes back empty, malformed, or as long as the
+limit asked for, which may have been cut. That costs the undecided
+finding for the run, which needs no API access; but an <code>error</code> leaves
+the open issue as it is, so a finding already filed survives an
+outage, and the alternative was filing an issue on <code>development</code> for
+GitHub being unreachable.</p>
 <h2 id="the-404-that-means-nothing">The 404 that means nothing<a class="headerlink" href="#the-404-that-means-nothing" title="Permanent link">&para;</a></h2>
 <p>GitHub answers 404, not 403, for a private repository the token cannot
 see, so one name at a time a blind token is indistinguishable from a
