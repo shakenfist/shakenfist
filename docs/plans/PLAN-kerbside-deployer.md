@@ -564,7 +564,7 @@ spelling above is the one to write.
 | 1. `internal_ca` issues certificates to any host at caller-chosen paths, and renews them | [PLAN-kerbside-deployer-phase-01-internal-ca.md](PLAN-kerbside-deployer-phase-01-internal-ca.md) | Complete | `12441652b` (#4430) |
 | 2. Shaken Fist side: signing key, Kerbside credential, token duration, shadow guard | [PLAN-kerbside-deployer-phase-02-sf-side.md](PLAN-kerbside-deployer-phase-02-sf-side.md) | Complete | `80292df08` (#4442) |
 | 3. A `kerbside` role and the `kerbside` group in `site.yml` | [PLAN-kerbside-deployer-phase-03-kerbside-role.md](PLAN-kerbside-deployer-phase-03-kerbside-role.md) | Complete | `b85005f0e` (#4465) |
-| 4. A merge-queue lane with the feature on | [PLAN-kerbside-deployer-phase-04-ci.md](PLAN-kerbside-deployer-phase-04-ci.md) | In progress | — |
+| 4. A merge-queue lane with the feature on | [PLAN-kerbside-deployer-phase-04-ci.md](PLAN-kerbside-deployer-phase-04-ci.md) | Complete | `0016c5dad` (#4479) |
 | 5. The `kerbside` role moves into Kerbside, and Kerbside's sf-e2e lane deploys through it | PLAN-kerbside-deployer-phase-05-role-to-kerbside.md | Proposed | — |
 | 6. Documentation and close-out | PLAN-kerbside-deployer-phase-06-docs.md | Proposed | — |
 | 7. Push audit | PLAN-kerbside-deployer-phase-07-push-audit.md | Proposed | — |
@@ -1264,6 +1264,13 @@ chosen to defer to here, so that we do not forget them.
   which moves the whole role, units included, to Kerbside.
 - **Automated signing-key rotation**, carried over from the
   tokens plan.
+- **Every develop commit restarts every daemon** (#4483, open).
+  The node role's restart-on-change hash covers `_version.py`, which
+  setuptools_scm rewrites on every commit, so a docs-only commit
+  restarts every `sf-*` unit, contrary to the role's own comment.
+  Phase 4's trial found it beside the `build-collection.py` dirty-tree
+  bug, which phase 4 fixed. Whether to keep the behaviour and fix the
+  comment, or exclude the file from the hash, is the operator's call.
 - **More than one Kerbside host, tested**, behind a TCP
   passthrough load balancer.
 - **Homelab adoption.** sfcbr, the report that prompted this
