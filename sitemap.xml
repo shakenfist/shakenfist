@@ -285,6 +285,10 @@
          <lastmod>2026-10-19</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/development/audits/release-environment-protection/</loc>
+         <lastmod>2026-10-19</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/development/audits/release-process/</loc>
          <lastmod>2026-10-19</lastmod>
     </url>
@@ -401,6 +405,10 @@
          <lastmod>2026-10-19</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/development/plans/PLAN-release-gating/</loc>
+         <lastmod>2026-10-19</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/development/plans/PLAN-renovate-cadence/</loc>
          <lastmod>2026-10-19</lastmod>
     </url>
@@ -430,6 +438,22 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/development/plans/PLAN-workflow-ref-trust/</loc>
+         <lastmod>2026-10-19</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/hunkydory/</loc>
+         <lastmod>2026-10-19</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/hunkydory/ambiguity/</loc>
+         <lastmod>2026-10-19</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/hunkydory/hunk-format/</loc>
+         <lastmod>2026-10-19</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/hunkydory/testing/</loc>
          <lastmod>2026-10-19</lastmod>
     </url>
     <url>
