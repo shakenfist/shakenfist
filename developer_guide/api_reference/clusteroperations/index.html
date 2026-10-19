@@ -15228,7 +15228,12 @@ networks.</p>
   List all cluster operations that targeted a given object. The
   <code>target_object_type</code> query parameter is a Shaken Fist object type
   string (e.g. <code>network</code>, <code>instance</code>, <code>artifact</code>). The caller's
-  namespace must own the target object, or the caller must be admin.</li>
+  namespace must own the target object, or the caller must be admin.
+  Each op in the response carries an <code>observational</code> boolean: true
+  when every task of the op only observes the target (a checksum or
+  health check) rather than changing it. Observational ops are
+  listed here but do not count towards the object's
+  <code>last_cluster_operation</code> or its pending operations.</li>
 </ul>
 </details>
 <h2 id="polling-an-asynchronous-operation">Polling an asynchronous operation<a class="headerlink" href="#polling-an-asynchronous-operation" title="Permanent link">&para;</a></h2>

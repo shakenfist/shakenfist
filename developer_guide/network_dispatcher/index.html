@@ -16678,8 +16678,9 @@ head-of-line blocking without improving convergence speed.</p>
 target_object_type='network', target_uuid=n.uuid)</code> is called. This queries the
 <code>cluster_operation_targets</code> table (history-aware, not a single-pointer) and
 returns <code>True</code> if any in-flight op (<code>queued</code>, <code>preflight</code>, or <code>executing</code>) is
-already targeting this network. If <code>True</code>, the network is skipped for this pass:
-the in-flight op will fix the drift when it executes.</p>
+already targeting this network (observational ops are ignored). If <code>True</code>,
+the network is skipped for this pass: the in-flight op will fix the drift
+when it executes.</p>
 <h4 id="guard-3-cooldown">Guard 3 — Cooldown<a class="headerlink" href="#guard-3-cooldown" title="Permanent link">&para;</a></h4>
 <p><code>mariadb.get_recent_terminal_op_states_for_target('network', n.uuid, limit=1)</code>
 returns the most recent terminal op for the network as a

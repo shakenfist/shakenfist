@@ -15465,30 +15465,44 @@ object static values now live in MariaDB.</p>
 <code>cluster_operations</code> row, it reads that declaration and writes one
 <code>cluster_operation_targets</code> row per non-None target field. Callers have
 no per-target bookkeeping obligation — targets are recorded automatically.</p>
-<p>The setter <code>_set_last_cluster_operation</code> is private and used only by the
-internal enqueue plumbing. It is not a public API and should not be called
-directly.</p>
+<p>Each target row also carries an <code>observational</code> flag (schema v3), derived
+at enqueue time by <code>is_observational()</code> in <code>schema/operations/util.py</code>. A
+model may declare <code>observational_tasks: ClassVar[frozenset[...]]</code> beside
+<code>target_fields</code>; an operation is observational only if it has tasks and every
+one of them is in that set, so a single mutating task makes the whole
+operation mutating. No model declares any yet. See
+<a href="../../plans/PLAN-cluster-op-visibility/">the master plan</a> for the
+rationale.</p>
 <p><code>DatabaseBackedObjectWithOperations</code> exposes two read shapes over the
 history:</p>
 <ul>
-<li><strong><code>last_cluster_operation</code> (property)</strong>: returns the most recent target
-  row regardless of its state. Consumed by <code>external_view()</code> projections
-  and <code>runs_after=[...]</code> chains, which want the latest pointer
-  independent of whether it has reached a terminal state.</li>
+<li><strong><code>last_cluster_operation</code> (property)</strong>: returns the most recent
+  non-observational target row regardless of its state. Consumed by
+  <code>external_view()</code> projections and <code>runs_after=[...]</code> chains, which
+  want the latest pointer independent of whether it has reached a
+  terminal state.</li>
 <li><strong><code>has_pending_cluster_operation()</code> (method)</strong>: returns <code>True</code> if any
-  target row's operation is in <code>{queued, preflight, executing}</code>. Consumed
-  by <code>Network.is_okay()</code> and any future history-aware gate. The query
+  non-observational target row's operation is in
+  <code>{queued, preflight, executing}</code>. Consumed by <code>Network.is_okay()</code> and
+  any future history-aware gate. The query
   joins <code>cluster_operation_targets</code> against <code>object_states</code>, so a later
   terminal operation cannot mask an earlier in-flight one.</li>
 </ul>
-<p>Because the table is append-only it is bounded by a periodic prune in the
-cluster daemon, alongside the existing <code>delete_stale_transfers</code> cleanup.
+<p>As a backstop for rows that outlive their operation, the table is bounded by
+a periodic prune in the cluster daemon, alongside the existing
+<code>delete_stale_transfers</code> cleanup.
 The prune removes rows older than <code>CLUSTER_OPERATION_TARGET_RETENTION</code>
 seconds whose operation has already reached a terminal state. In-flight
 operations (<code>queued</code>/<code>preflight</code>/<code>executing</code>) are never pruned regardless
 of age. Because the cluster daemon already runs cluster-wide cleanup
 under <code>ClusterLock</code> election, no additional locking or master-node
 gating is required.</p>
+<p>Only these two readers ignore observational rows. The other by-target
+readers (for example <code>get_cluster_operation_targets_for_object()</code>, which the
+per-blob sweep uses to avoid queueing a duplicate checksum op, and the
+by-target listing) deliberately see everything. Rows normally disappear when
+their operation is hard-deleted, about thirty seconds after it goes
+terminal, so the prune is a backstop.</p>
 <h2 id="cluster-operation-storage-and-work-queues">Cluster Operation Storage and Work Queues<a class="headerlink" href="#cluster-operation-storage-and-work-queues" title="Permanent link">&para;</a></h2>
 <p>Cluster operation headers and the per-node work queues both live in
 MariaDB. The <code>cluster_operations</code> table stores the full operation

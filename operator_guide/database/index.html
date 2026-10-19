@@ -17243,7 +17243,7 @@ constraints. These get dedicated tables optimized for their access patterns:</p>
 </tr>
 <tr>
 <td><code>cluster_operation_targets</code></td>
-<td>Operation-to-object targeting with AUTO_INCREMENT ordering</td>
+<td>Operation-to-object targeting with AUTO_INCREMENT ordering, plus an <code>observational</code> flag per row (schema v3). Holds in-flight operations and the last ~30 seconds of terminal ones, not a full history</td>
 </tr>
 <tr>
 <td><code>cluster_operation_errors</code></td>
@@ -17633,15 +17633,21 @@ event against the repaired object, which says which state it was
 repaired to.</p>
 <p>Cluster operation targets are stored separately because:</p>
 <ul>
-<li><strong>Append-only history</strong>: Every operation enqueued against an object creates
-  a row, giving full operation history per target</li>
+<li><strong>Per-target ordering of live operations</strong>: Every operation enqueued against
+  an object creates a row, giving the operations in flight (and those that
+  finished in the last half minute) per target. The row is deleted when its
+  operation is hard-deleted, so this is not a long-term history</li>
 <li><strong>Automatic ordering</strong>: AUTO_INCREMENT sequence_number replaces the implicit
   dependency chain traversal</li>
 <li><strong>Indexed queries</strong>: Efficient lookups for "latest operation on this instance"
   and "all operations on this object in order"</li>
 </ul>
-<p>Because the table is append-only, it is bounded by a periodic prune in the
-cluster daemon (alongside the existing <code>delete_stale_transfers</code> cleanup).
+<p>Target rows live only until their operation is hard-deleted, which happens
+about thirty seconds after the operation goes terminal, so the table holds
+in-flight operations plus the last half minute of finished ones. As a
+backstop for rows that outlive their operation, the table is also bounded by
+a periodic prune in the cluster daemon (alongside the existing
+<code>delete_stale_transfers</code> cleanup).
 The cluster daemon runs cluster-wide cleanup under <code>ClusterLock</code> election,
 so the prune naturally runs from a single node at a time. The prune
 removes rows whose <code>created_at</code> is older than
@@ -17654,26 +17660,42 @@ entirely (the default is 7 days).</p>
 <p>The <code>cluster_operation_targets</code> table holds one row per (operation, target
 object) pair. Each row carries the target's object type and UUID, plus the
 <code>operation_uuid</code> and an <code>AUTO_INCREMENT</code> <code>sequence_number</code> that gives
-total ordering per target.</p>
+total ordering per target. The table is at schema v3.</p>
+<p>Since v3 each row also carries an <code>observational</code> column
+(<code>BOOLEAN NOT NULL DEFAULT 0</code>). It is set when the operation is enqueued,
+from the operation's tasks, and is true only when the operation merely
+observes its targets (for example a periodic statistics or checksum sweep)
+rather than changing them. Every row of an operation carries the same value.
+Rows written without the column, including those from daemons that predate
+v3, default to <code>0</code> (mutating). The table's lookup index <code>idx_cot_target</code>
+covers <code>(target_object_type, target_uuid, observational)</code>; its first two
+columns still serve readers that do not filter on the flag.</p>
 <p>Two query shapes are exposed to the rest of the system:</p>
 <ul>
 <li><strong><code>get_latest_cluster_operation_target</code></strong>: returns the highest-sequence
-  row for a given <code>(object_type, uuid)</code> pair, regardless of state. Used
+  mutating row for a given <code>(object_type, uuid)</code> pair, regardless of state. Used
   by the <code>last_cluster_operation</code> property and <code>external_view()</code>
-  projections to provide the familiar "which op ran last?" answer.</li>
-<li><strong><code>has_pending_cluster_operation_target</code></strong>: returns <code>True</code> if any row
-  for the object references an operation whose state is <code>queued</code>,
+  projections to provide the familiar "which op ran last?" answer.
+  Observational rows are ignored, so a background sweep never becomes
+  an object's last operation.</li>
+<li><strong><code>has_pending_cluster_operation_target</code></strong>: returns <code>True</code> if any mutating
+  row for the object references an operation whose state is <code>queued</code>,
   <code>preflight</code>, or <code>executing</code>. Used by <code>Network.is_okay()</code> and any other
   gate that must defer while work is in flight. Because it checks all
   rows rather than only the latest one, a later terminal operation cannot
-  mask an earlier in-flight one.</li>
+  mask an earlier in-flight one. Observational rows are ignored here too,
+  so a background sweep never makes an object look busy.</li>
 </ul>
 <p>Rows are written automatically by <code>enqueue_cluster_operation</code>; operators
-do not need to manage them. Pruning is performed by the cluster daemon
-under <code>ClusterLock</code> election via
-<code>_direct_delete_stale_cluster_operation_targets</code>: rows older than
-<code>CLUSTER_OPERATION_TARGET_RETENTION</code> whose operation has reached a
-terminal state are removed; in-flight operations are never pruned.</p>
+do not need to manage them. Normally a row is removed when its operation is
+hard-deleted, about thirty seconds after the operation goes terminal. The
+cluster daemon's prune, performed under <code>ClusterLock</code> election via
+<code>_direct_delete_stale_cluster_operation_targets</code>, is a backstop: rows older
+than <code>CLUSTER_OPERATION_TARGET_RETENTION</code> (7 days by default) whose
+operation has reached a terminal state are removed; in-flight operations are
+never pruned. The by-target listing (<code>GET /clusteroperations?target_*</code>)
+still reports observational operations, with an <code>observational</code> key per
+operation.</p>
 <h4 id="per-type-static-value-tables">Per-Type Static Value Tables<a class="headerlink" href="#per-type-static-value-tables" title="Permanent link">&para;</a></h4>
 <p>Each concrete object type that is migrated gets its own table for static
 values (immutable data set at creation time):</p>

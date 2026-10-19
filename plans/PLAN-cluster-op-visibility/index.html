@@ -15158,10 +15158,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#phase-3-classify-and-mark-observational-enqueue-sites-plan-at-medium-effort" class="md-nav__link">
+  <a href="#phase-3-classify-and-mark-observational-tasks-plan-at-medium-effort" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Phase 3: Classify and mark observational enqueue sites (plan at medium effort)
+        Phase 3: Classify and mark observational tasks (plan at medium effort)
       
     </span>
   </a>
@@ -15515,7 +15515,12 @@ operator:</p>
   the targets table.</li>
 </ul>
 <p>Useful implementation reference points collected during
-forensics:</p>
+forensics. <strong>These line numbers are stale.</strong> Phase 2's survey
+(2026-10-18) re-located all of them; use the <em>What the survey
+found</em> section of
+<a href="../PLAN-cluster-op-visibility-phase-02-observational-schema/">the phase 2 plan</a>
+instead. Two of the facts below were also wrong by then, and are
+corrected inline.</p>
 <ul>
 <li>Targets table definition:
   <code>mariadb._get_cluster_operation_targets_table()</code>
@@ -15531,13 +15536,21 @@ forensics:</p>
   <code>ClusterOperationTargetProto</code> at <code>database.proto:1850</code>.
   Handlers in <code>daemons/database/main.py</code>. Regenerate stubs
   with <code>tox -e genprotos</code>.</li>
-<li>The <strong>only</strong> writer of target rows is the auto-write loop
-  in <code>enqueue_cluster_operation()</code>
-  (<code>schema/operations/util.py:17</code>), driven by
-  <code>model_class.target_fields</code>.
-  <code>baseobject._set_last_cluster_operation()</code>
-  (<code>baseobject.py:698</code>) has no remaining callers and is dead
-  code.</li>
+<li><em>(Corrected in phase 2.)</em> Target rows are written inside
+  the atomic enqueue transaction
+  (<code>_direct_create_and_enqueue_cluster_operation</code>), from the
+  <code>targets</code> list that <code>enqueue_cluster_operation()</code> derives
+  from <code>model_class.target_fields</code>. Before phase 2 there were
+  two more writers: a redundant post-enqueue write in
+  <code>node_blob_op.create_and_enqueue()</code>, and the dead
+  <code>baseobject._set_last_cluster_operation()</code>. Phase 2 deletes
+  both.</li>
+<li><em>(Added in phase 2.)</em> Terminal operations are hard-deleted
+  about thirty seconds after going terminal (#3864), and their
+  target rows go with them
+  (<code>BaseClusterOperation.hard_delete()</code>). The table holds
+  in-flight ops plus recently terminal ones, not a full
+  history.</li>
 <li>The pending query joins <code>object_states</code> and filters on
   <code>_ACTIVE_OPERATION_STATES</code> (<code>mariadb.py:3682</code>); it fails
   closed (returns True) on DB errors.</li>
@@ -15569,40 +15582,38 @@ every consumer, so that:</p>
 </ul>
 <h2 id="open-questions">Open questions<a class="headerlink" href="#open-questions" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Classification sweep.</strong> Which enqueue sites are
-  observational? Known candidates: the per-instance
-  billing/health sweep
-  (<code>daemons/cluster/scheduled_tasks.py:215</code>) and the blob
-  checksum verification sweep (<code>verify_size_and_checksum</code>,
-  same file). Phase 3 must audit every <code>create_and_enqueue()</code>
-  caller and classify each with a comment. Anything that
+<li><strong>Classification sweep.</strong> Which <em>tasks</em> are observational?
+  Known candidates: <code>collect_billing_statistics</code> and
+  <code>health_check_kvm_process</code> (the per-instance sweep in
+  <code>daemons/cluster/scheduled_tasks.py</code>), and
+  <code>verify_size_and_checksum</code> (the blob checksum sweep, same
+  file). Phase 3 must audit every task of every operation
+  model and classify each one with a comment. Anything that
   mutates guest-visible or cluster state is mutating.</li>
-<li><strong>Where does the flag live?</strong> Preferred: a per-op-model
-  class-level marker (alongside <code>target_fields</code>) so
-  classification is declared once in
-  <code>shakenfist/schema/operations/*_op.py</code>, plus a column on
-  <code>cluster_operation_targets</code> denormalising it for the SQL
-  filters. Confirm during phase 2 detailed planning whether
-  the flag is per <em>operation model</em> (simplest, preferred) or
-  needs to be per enqueue call. Note
-  <code>node_inst_op</code> mixes task types -- billing/health tasks are
-  observational but the same op type may carry mutating tasks
-  elsewhere; if so, the flag must be per enqueue call, passed
-  through <code>create_and_enqueue()</code> -&gt; <code>enqueue_cluster_operation()</code>.</li>
+<li><strong>Where does the flag live?</strong> <em>Resolved in phase 2.</em> Not
+  per model: <code>node_inst_op</code> and <code>node_blob_op</code> both mix
+  observational and mutating tasks. Not per call either, which
+  would let a caller mislabel the work. Each model declares
+  <code>observational_tasks</code> beside <code>target_fields</code>, and an op is
+  observational only if every one of its tasks is. The result
+  is stored per row in a column on <code>cluster_operation_targets</code>.
+  See decision 1 of the phase 2 plan.</li>
 <li><strong>Capability naming.</strong> Proposed: <code>object-pending-operations</code>
   for the <code>has_pending_operations</code> field, following the
   existing kebab-case convention.</li>
-<li><strong><code>all=true</code> semantics.</strong> Once
-  <code>get_cluster_operations(outstanding_only=False)</code> is
-  history-aware, <code>/operations?all=true</code> returns genuinely
-  full history. Confirm response-size expectations are
-  acceptable (long-lived instances accumulate sweep rows) or
-  whether a limit parameter is needed.</li>
-<li><strong>Should <code>hard_delete</code> of ops prune target rows?</strong> The
-  cleaner already hard-deletes old terminal ops
-  (<code>delete_stale_cluster_operation_targets</code> exists). Verify
-  retention interacts sanely with "full history" claims in
-  the docs.</li>
+<li><strong><code>all=true</code> semantics.</strong> <em>Resolved by the phase 2
+  survey.</em> Since #3864, terminal ops are hard-deleted about
+  thirty seconds after going terminal, so <code>/operations?all=true</code>
+  can only ever return in-flight and recently terminal ops. It
+  is not a full history and cannot grow without bound. No
+  limit parameter is needed, but phase 4 must not document it
+  as history.</li>
+<li><strong>Should <code>hard_delete</code> of ops prune target rows?</strong> <em>Resolved
+  by the phase 2 survey.</em> It already does:
+  <code>BaseClusterOperation.hard_delete()</code> deletes the op's target
+  rows first. The <code>CLUSTER_OPERATION_TARGET_RETENTION</code> prune
+  is a backstop. Phase 2 corrects the operator docs that still
+  call the table an append-only history.</li>
 </ul>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <table>
@@ -15629,12 +15640,12 @@ every consumer, so that:</p>
 </tr>
 <tr>
 <td>2. Observational flag: schema and query layer</td>
-<td>PLAN-cluster-op-visibility-phase-02-observational-schema.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-cluster-op-visibility-phase-02-observational-schema/">PLAN-cluster-op-visibility-phase-02-observational-schema.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
-<td>3. Classify and mark observational enqueue sites</td>
+<td>3. Classify and mark observational tasks</td>
 <td>PLAN-cluster-op-visibility-phase-03-mark-observational.md</td>
 <td>Not started</td>
 <td>—</td>
@@ -15723,7 +15734,14 @@ verification.</p>
 <h3 id="phase-2-observational-flag-schema-and-query-layer-plan-at-high-effort">Phase 2: Observational flag -- schema and query layer (plan at high effort)<a class="headerlink" href="#phase-2-observational-flag-schema-and-query-layer-plan-at-high-effort" title="Permanent link">&para;</a></h3>
 <p>Add the mutating/observational distinction to storage and
 queries, default everything to mutating (no behaviour
-change until phase 3):</p>
+change until phase 3). The detailed plan's survey changed
+the shape of this phase: the flag is derived from each op's
+tasks, the writer is the atomic enqueue (the
+<code>create_cluster_operation_target</code> path is deleted rather
+than extended), and the operator schema and upgrade docs
+ship here rather than in phase 5. See
+<a href="../PLAN-cluster-op-visibility-phase-02-observational-schema/">the phase 2 plan</a>.
+The original outline follows.</p>
 <ul>
 <li><code>cluster_operation_targets</code> v3 migration: add
   <code>observational</code> boolean (server default false) in
@@ -15738,7 +15756,8 @@ change until phase 3):</p>
   <code>ClusterOperationTargetProto</code> in <code>protos/database.proto</code>,
   the database daemon handler, and the auto-write loop in
   <code>enqueue_cluster_operation()</code>. Regenerate with
-  <code>tox -e genprotos</code>.</li>
+  <code>tox -e genprotos</code>. <em>(Superseded: the flag rides
+  <code>CreateAndEnqueueClusterOperationRequest</code>.)</em></li>
 <li>Exclude observational rows in
   <code>get_latest_cluster_operation_target()</code> and
   <code>has_pending_cluster_operation_target()</code> (both direct and
@@ -15755,19 +15774,35 @@ change until phase 3):</p>
   rows without the column are fine (server default false =
   mutating, the conservative value).</li>
 </ul>
-<h3 id="phase-3-classify-and-mark-observational-enqueue-sites-plan-at-medium-effort">Phase 3: Classify and mark observational enqueue sites (plan at medium effort)<a class="headerlink" href="#phase-3-classify-and-mark-observational-enqueue-sites-plan-at-medium-effort" title="Permanent link">&para;</a></h3>
-<p>Audit every <code>create_and_enqueue()</code> caller (see the file list
-in the phase plan), classify each as mutating or
-observational with a short justification comment, and mark
-the observational ones. Known observational: the
-per-instance billing/health sweep and the blob checksum
-verification sweep in <code>daemons/cluster/scheduled_tasks.py</code>.
-Everything else is expected to stay mutating; the deliverable
-includes the audit table in the phase plan so the decision
-trail survives. Add a unit test asserting that an
-observational op does not change
-<code>last_cluster_operation</code> and does not make
-<code>has_pending_cluster_operation()</code> true.</p>
+<h3 id="phase-3-classify-and-mark-observational-tasks-plan-at-medium-effort">Phase 3: Classify and mark observational tasks (plan at medium effort)<a class="headerlink" href="#phase-3-classify-and-mark-observational-tasks-plan-at-medium-effort" title="Permanent link">&para;</a></h3>
+<p>Audit every task of every operation model in
+<code>shakenfist/schema/operations/*_op.py</code>, classify each as
+mutating or observational with a short justification
+comment, and declare the observational ones in that model's
+<code>observational_tasks</code> (the mechanism phase 2 built). Also
+check every <code>create_and_enqueue()</code> caller, so that no caller
+combines an observational task with a mutating one by
+accident. Known observational tasks:
+<code>collect_billing_statistics</code> and <code>health_check_kvm_process</code>
+in <code>node_inst_op</code>, and <code>verify_size_and_checksum</code> in
+<code>node_blob_op</code>. Everything else is expected to stay
+mutating. The deliverable includes the audit table in the
+phase plan, so the decision trail survives. Phase 2 already
+added the unit test that proves the filter, and a test that
+no model declares observational tasks. This phase replaces
+that second test with one pinning the classification table.
+The developer-guide account of mutating vs observational ops,
+and when to mark a task observational, lands here, because
+this is when the distinction first means something.
+<code>last_cluster_operation</code> in the instance external view stops
+reporting sweep ops once this phase lands, and the release
+notes should say so. Watch one trap, found in phase 2:
+<code>observational_tasks</code> must be annotated <code>ClassVar</code>. Without the
+annotation, pydantic turns it into a field, the class attribute
+the helper reads disappears, and the classification silently
+does nothing. The phase 2 inertness test checks
+<code>model.model_fields</code> for this, and its replacement must keep an
+equivalent check.</p>
 <h3 id="phase-4-api-surface-plan-at-high-effort">Phase 4: API surface (plan at high effort)<a class="headerlink" href="#phase-4-api-surface-plan-at-high-effort" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Add <code>has_pending_operations</code> to <code>external_view()</code> for
@@ -15787,6 +15822,17 @@ observational op does not change
   <code>/instances|networks|artifacts/&lt;ref&gt;/operations</code> endpoints
   report all outstanding ops, not just the latest chain.
   Keep newest-first ordering.</li>
+<li><em>(Added by the phase 2 survey.)</em> The instance delete path
+  (<code>Instance</code> around <code>instance.py:2773</code>) picks which
+  outstanding ops to cancel by walking the dependency tree of
+  <code>self.last_cluster_operation</code>. That is the same pointer
+  race. Rebuild it on the same all-pending-targets walk as
+  <code>get_cluster_operations()</code>, and decide explicitly whether
+  delete cancels in-flight observational ops. Once phase 3
+  lands they are no longer the pointer, so the current walk
+  skips them. That is probably right, since a health check
+  against a deleting instance does no harm, but it is a
+  behaviour change, so state it.</li>
 <li>client-python (sibling repo): add
   <code>get_instance()</code>-adjacent accessors as needed, a
   <code>has_pending_operations</code>-aware helper, and capability
@@ -15803,9 +15849,10 @@ observational op does not change
   await helper genuinely blocks until the attach lands even
   when a billing sweep fires (can be provoked by simply
   waiting through a sweep period during the await).</li>
-<li>Documentation: <code>docs/operator_guide/database.md</code> (schema
-  change), <code>docs/developer_guide/</code> (mutating vs observational
-  ops, when to mark an op observational),
+<li>Documentation: (the <code>docs/operator_guide/</code> schema and
+  upgrade notes ship in phase 2, and the developer-guide
+  account of mutating vs observational ops in phase 3; check
+  that both are still accurate)
   <code>ARCHITECTURE.md</code>/<code>AGENTS.md</code>/<code>CLAUDE.md</code> storage notes
   for the new column and field, <code>docs/plans/index.md</code>
   status updates.</li>
