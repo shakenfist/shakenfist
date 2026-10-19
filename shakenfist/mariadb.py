@@ -22,6 +22,8 @@
 # because enum growth changes no table version and so cannot be caught by
 # the version gate.
 
+import contextlib
+import contextvars
 import decimal
 from ipaddress import IPv4Address
 import json
@@ -29,7 +31,7 @@ import math
 import random
 import time
 import threading
-from typing import (Any, Callable, cast, Dict, List, NamedTuple, NotRequired,
+from typing import (Any, Callable, cast, Dict, Iterator, List, NamedTuple, NotRequired,
                     Optional, TypedDict, TypeVar)
 from uuid import UUID
 from uuid import uuid4
@@ -37,6 +39,7 @@ from uuid import uuid4
 import grpc
 from prometheus_client import Counter
 from prometheus_client import Gauge
+from prometheus_client import Histogram
 from pydantic import SecretStr
 import sqlalchemy as sa
 from sqlalchemy import event as sa_event
@@ -137,6 +140,46 @@ ORPHAN_EVENTS_PRUNED = Counter(
     'Events rows pruned because no event_objects row '
     'referenced them.'
 )
+
+# Client-side attribution of database time. rpc_timing_scope() sets this for
+# the duration of a block of work; _grpc_call() reads it once per call and, if
+# it is set, observes the call's wall time. It holds a (sweep, object_type)
+# tuple, or None outside any scope.
+_RPC_TIMING_SCOPE: contextvars.ContextVar[Optional[tuple[str, str]]] = contextvars.ContextVar(
+    'sf_rpc_timing_scope', default=None)
+
+DATABASE_CLIENT_RPC_SECONDS = Histogram(
+    'database_client_rpc_seconds',
+    'Wall time of database gRPC calls (including retries) made from inside '
+    'an rpc_timing_scope(), by sweep, object type and RPC name. Only '
+    'observed inside a scope, so most daemons export no samples for it.',
+    ['sweep', 'object_type', 'operation'],
+    buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10))
+
+
+@contextlib.contextmanager
+def rpc_timing_scope(sweep: str, object_type: str) -> Iterator[None]:
+    """Attribute the database time of the enclosed block to a sweep.
+
+    The server-side counters cannot say which sweep or object type a
+    request belonged to, and a sweep's own wall time includes time spent
+    outside the database. Inside this scope every _grpc_call() observes
+    its wall time on database_client_rpc_seconds, labelled with the sweep,
+    the object type and the RPC name, so a sweep's database time can be
+    subtracted from its total.
+
+    The scope is held in a ContextVar, so it is per thread (and per
+    asyncio task): work on other threads is not attributed to it. Scopes
+    nest by replacement, not by stacking: an inner scope replaces the
+    outer one for its duration, and the outer one is restored on exit,
+    including when the body raises.
+    """
+    token = _RPC_TIMING_SCOPE.set((sweep, object_type))
+    try:
+        yield
+    finally:
+        _RPC_TIMING_SCOPE.reset(token)
+
 
 # Sentinel node name used during migration when the original node is unknown.
 # This uses a name that cannot conflict with real hostnames.
@@ -812,98 +855,113 @@ def _grpc_call(
         raw_method = raw_method.decode()
     method_name = raw_method.rsplit('/', 1)[-1] or None
 
-    last_error: BaseException = grpc.RpcError()
-    attempt = 0
-    slow_failures = 0
-    for attempt in range(GRPC_UNAVAILABLE_RETRIES):
-        # Pet the watchdog before each attempt: the call below can
-        # legitimately block for the full deadline, and a daemon main loop
-        # correctly waiting out a slow database must not be SIGABRT-killed
-        # for it (issue 3789). The petter rate-limits itself, so fast
-        # attempts cost nothing.
-        if _watchdog_petter is not None:
-            _watchdog_petter()
-        try:
-            if attempt > 0 and method_name:
-                stub = _get_database_stub()
-                method = getattr(stub, method_name)
-            return method(request, timeout=timeout)
-        except grpc.RpcError as e:
-            last_error = e
-            if e.code() not in retryable_codes:
-                raise
-            if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
-                # Each of these burned the full GRPC_TIMEOUT before failing;
-                # cap them separately so the fast-failing UNAVAILABLE budget
-                # cannot stretch the caller's worst case to minutes.
-                slow_failures += 1
-                if slow_failures >= max_slow_failures:
-                    break
-            if attempt < GRPC_UNAVAILABLE_RETRIES - 1:
-                # Whether to rebuild the channel depends on *why* we failed.
-                # DEADLINE_EXCEEDED is the wedged-subchannel signature: the
-                # transport accepted the call but cygrpc never routed it (see
-                # the wait_for_ready note above), and round_robin still
-                # believes that subchannel is READY, so a plain retry can
-                # re-pick the wedged backend -- rebuilding the channel is
-                # what sheds it. UNAVAILABLE is the opposite: the backend
-                # refused the connection or is unreachable, round_robin
-                # already knows not to route there, so we keep the channel
-                # and let a surviving peer serve the retry while the failed
-                # subchannel reconnects in the background. Rebuilding on
-                # every UNAVAILABLE was actively harmful -- it discarded a
-                # warm round_robin channel (including the healthy subchannel
-                # to a still-serving gateway) for a cold one whose own first
-                # RPC fails UNAVAILABLE too, amplifying a single gateway's
-                # rolling restart into a client-wide outage (#3430).
-                # CANCELLED goes with DEADLINE_EXCEEDED: the channel our call
-                # was riding on has been closed or deallocated under us, so
-                # reusing it would only earn a "Cannot invoke RPC on closed
-                # channel!" ValueError on every remaining attempt (#3605).
-                #
-                # This cascade can still silently consume up to
-                # GRPC_RETRIES * GRPC_TIMEOUT seconds of the caller's time
-                # (a DEADLINE_EXCEEDED attempt blocks for the full deadline
-                # before we get here), so always log each retry.
-                rebuild = e.code() in rebuild_codes
-                LOG.warning(
-                    f'gRPC {method_name or "call"} failed with '
-                    f'{e.code().name}, retrying'
-                    f'{" with a fresh channel" if rebuild else ""} '
-                    f'(attempt {attempt + 1} of {GRPC_UNAVAILABLE_RETRIES})')
-                time.sleep(GRPC_RETRY_DELAY * (attempt + 1))
-                if rebuild:
-                    _reset_database_stub()
-        except ValueError as e:
-            if 'closed channel' not in str(e):
-                raise
-            last_error = e
-            if attempt < GRPC_UNAVAILABLE_RETRIES - 1:
-                LOG.warning(
-                    f'gRPC {method_name or "call"} invoked on a channel '
-                    f'closed by a concurrent retry, retrying with a fresh '
-                    f'channel (attempt {attempt + 1} of '
-                    f'{GRPC_UNAVAILABLE_RETRIES})')
-                time.sleep(GRPC_RETRY_DELAY * (attempt + 1))
-                _reset_database_stub()
+    # Read the timing scope once, at entry (see rpc_timing_scope()). Outside
+    # a scope this is the only cost: one ContextVar lookup.
+    timing_scope = _RPC_TIMING_SCOPE.get()
+    started = time.monotonic() if timing_scope is not None else 0.0
 
-    attempts_made = attempt + 1
-    # Say *why* we gave up. Without this the log records only that a call
-    # failed, with exception_class and stack_trace both null, so an
-    # operator cannot tell a deadline from a resource limit from a
-    # cancellation -- and cannot tell that "after 1 attempts" is the
-    # bounded budget working as designed rather than a broken retry loop
-    # (issue 3607). Both facts are cheap to state, so state them.
-    summary = (
-        f'gRPC {method_name or "call"} failed after {attempts_made} '
-        f'attempts (deadline {timeout}s, slow attempt budget '
-        f'{max_slow_failures}): {_describe_rpc_error(last_error)}')
-    LOG.error(summary)
-    # Raise a non-RpcError so the client wrappers below, which translate
-    # RpcError into "object not found" return values, let an exhausted
-    # outage propagate to the caller instead (issue 3373).
-    raise exceptions.DatabaseUnavailable(
-        f'database service unreachable: {summary}') from last_error
+    # The try/finally wraps the whole retry loop and the final raise so that
+    # a failed call is observed as well as a successful one: a call which
+    # exhausts its retries is exactly the expensive case being measured.
+    try:
+        last_error: BaseException = grpc.RpcError()
+        attempt = 0
+        slow_failures = 0
+        for attempt in range(GRPC_UNAVAILABLE_RETRIES):
+            # Pet the watchdog before each attempt: the call below can
+            # legitimately block for the full deadline, and a daemon main loop
+            # correctly waiting out a slow database must not be SIGABRT-killed
+            # for it (issue 3789). The petter rate-limits itself, so fast
+            # attempts cost nothing.
+            if _watchdog_petter is not None:
+                _watchdog_petter()
+            try:
+                if attempt > 0 and method_name:
+                    stub = _get_database_stub()
+                    method = getattr(stub, method_name)
+                return method(request, timeout=timeout)
+            except grpc.RpcError as e:
+                last_error = e
+                if e.code() not in retryable_codes:
+                    raise
+                if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+                    # Each of these burned the full GRPC_TIMEOUT before failing;
+                    # cap them separately so the fast-failing UNAVAILABLE budget
+                    # cannot stretch the caller's worst case to minutes.
+                    slow_failures += 1
+                    if slow_failures >= max_slow_failures:
+                        break
+                if attempt < GRPC_UNAVAILABLE_RETRIES - 1:
+                    # Whether to rebuild the channel depends on *why* we failed.
+                    # DEADLINE_EXCEEDED is the wedged-subchannel signature: the
+                    # transport accepted the call but cygrpc never routed it (see
+                    # the wait_for_ready note above), and round_robin still
+                    # believes that subchannel is READY, so a plain retry can
+                    # re-pick the wedged backend -- rebuilding the channel is
+                    # what sheds it. UNAVAILABLE is the opposite: the backend
+                    # refused the connection or is unreachable, round_robin
+                    # already knows not to route there, so we keep the channel
+                    # and let a surviving peer serve the retry while the failed
+                    # subchannel reconnects in the background. Rebuilding on
+                    # every UNAVAILABLE was actively harmful -- it discarded a
+                    # warm round_robin channel (including the healthy subchannel
+                    # to a still-serving gateway) for a cold one whose own first
+                    # RPC fails UNAVAILABLE too, amplifying a single gateway's
+                    # rolling restart into a client-wide outage (#3430).
+                    # CANCELLED goes with DEADLINE_EXCEEDED: the channel our call
+                    # was riding on has been closed or deallocated under us, so
+                    # reusing it would only earn a "Cannot invoke RPC on closed
+                    # channel!" ValueError on every remaining attempt (#3605).
+                    #
+                    # This cascade can still silently consume up to
+                    # GRPC_RETRIES * GRPC_TIMEOUT seconds of the caller's time
+                    # (a DEADLINE_EXCEEDED attempt blocks for the full deadline
+                    # before we get here), so always log each retry.
+                    rebuild = e.code() in rebuild_codes
+                    LOG.warning(
+                        f'gRPC {method_name or "call"} failed with '
+                        f'{e.code().name}, retrying'
+                        f'{" with a fresh channel" if rebuild else ""} '
+                        f'(attempt {attempt + 1} of {GRPC_UNAVAILABLE_RETRIES})')
+                    time.sleep(GRPC_RETRY_DELAY * (attempt + 1))
+                    if rebuild:
+                        _reset_database_stub()
+            except ValueError as e:
+                if 'closed channel' not in str(e):
+                    raise
+                last_error = e
+                if attempt < GRPC_UNAVAILABLE_RETRIES - 1:
+                    LOG.warning(
+                        f'gRPC {method_name or "call"} invoked on a channel '
+                        f'closed by a concurrent retry, retrying with a fresh '
+                        f'channel (attempt {attempt + 1} of '
+                        f'{GRPC_UNAVAILABLE_RETRIES})')
+                    time.sleep(GRPC_RETRY_DELAY * (attempt + 1))
+                    _reset_database_stub()
+
+        attempts_made = attempt + 1
+        # Say *why* we gave up. Without this the log records only that a call
+        # failed, with exception_class and stack_trace both null, so an
+        # operator cannot tell a deadline from a resource limit from a
+        # cancellation -- and cannot tell that "after 1 attempts" is the
+        # bounded budget working as designed rather than a broken retry loop
+        # (issue 3607). Both facts are cheap to state, so state them.
+        summary = (
+            f'gRPC {method_name or "call"} failed after {attempts_made} '
+            f'attempts (deadline {timeout}s, slow attempt budget '
+            f'{max_slow_failures}): {_describe_rpc_error(last_error)}')
+        LOG.error(summary)
+        # Raise a non-RpcError so the client wrappers below, which translate
+        # RpcError into "object not found" return values, let an exhausted
+        # outage propagate to the caller instead (issue 3373).
+        raise exceptions.DatabaseUnavailable(
+            f'database service unreachable: {summary}') from last_error
+    finally:
+        if timing_scope is not None:
+            DATABASE_CLIENT_RPC_SECONDS.labels(
+                sweep=timing_scope[0], object_type=timing_scope[1],
+                operation=method_name or 'unknown').observe(
+                    time.monotonic() - started)
 
 
 # =============================================================================
