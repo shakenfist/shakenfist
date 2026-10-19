@@ -331,7 +331,6 @@ service DatabaseService {
 
   // Cluster Operation Target Operations (MariaDB)
   // Track which operations target which objects, with sequence ordering.
-  rpc CreateClusterOperationTarget (CreateClusterOperationTargetRequest) returns (StatusReply) {}
   rpc GetClusterOperationTarget (GetClusterOperationTargetRequest) returns (GetClusterOperationTargetReply) {}
   rpc GetClusterOperationTargetsForObject (GetClusterOperationTargetsForObjectRequest) returns (GetClusterOperationTargetsForObjectReply) {}
   rpc GetLatestClusterOperationTarget (GetLatestClusterOperationTargetRequest) returns (GetClusterOperationTargetReply) {}
@@ -2453,14 +2452,9 @@ message ClusterOperationTargetProto {
   string target_uuid = 4;
   int64 sequence_number = 5;
   double created_at = 6;
-}
-
-message CreateClusterOperationTargetRequest {
-  string operation_uuid = 1;
-  string operation_type = 2;
-  ObjectType target_object_type = 3;
-  string target_uuid = 4;
-  double created_at = 5;
+  // True if every task of the operation only observes the target. An
+  // older database service never sets it, which reads as false (mutating).
+  bool observational = 7;
 }
 
 message GetClusterOperationTargetRequest {
@@ -2569,6 +2563,11 @@ message ClusterOperationData {
   string operation_type = 2; // e.g. "instance_preflight"
   double created_at = 3;     // Unix timestamp of operation creation
   string metadata_json = 4;  // Full operation metadata dict as JSON
+  // The observational flag stored on the operation's target row. Set
+  // only by ListClusterOperationsForTarget, the one RPC that reads it
+  // from a target row; every other RPC leaves it unset rather than
+  // reporting a misleading false.
+  optional bool observational = 5;
 }
 
 message CreateClusterOperationRequest {
@@ -2624,6 +2623,11 @@ message CreateAndEnqueueClusterOperationRequest {
   // cluster_operation_targets rows written atomically with the op so a
   // by-target query never sees an enqueued op without its target rows.
   repeated CreateAndEnqueueClusterOperationTarget targets = 7;
+  // Whether the operation only observes its targets. One flag per
+  // operation, copied onto each target row it writes. False (mutating)
+  // is the conservative value, and is what an older client that does
+  // not know this field sends.
+  bool observational = 8;
 }
 
 message SetClusterOperationErrorRequest {

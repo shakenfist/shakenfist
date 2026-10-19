@@ -8114,12 +8114,17 @@ class ClusterOperationTargetProto(_message.Message):
     TARGET_UUID_FIELD_NUMBER: _builtins.int
     SEQUENCE_NUMBER_FIELD_NUMBER: _builtins.int
     CREATED_AT_FIELD_NUMBER: _builtins.int
+    OBSERVATIONAL_FIELD_NUMBER: _builtins.int
     operation_uuid: _builtins.str
     operation_type: _builtins.str
     target_object_type: _shakenfist_enums_pb2.ObjectType.ValueType
     target_uuid: _builtins.str
     sequence_number: _builtins.int
     created_at: _builtins.float
+    observational: _builtins.bool
+    """True if every task of the operation only observes the target. An
+    older database service never sets it, which reads as false (mutating).
+    """
     def __init__(
         self,
         *,
@@ -8129,45 +8134,15 @@ class ClusterOperationTargetProto(_message.Message):
         target_uuid: _builtins.str = ...,
         sequence_number: _builtins.int = ...,
         created_at: _builtins.float = ...,
+        observational: _builtins.bool = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["created_at", b"created_at", "operation_type", b"operation_type", "operation_uuid", b"operation_uuid", "sequence_number", b"sequence_number", "target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["created_at", b"created_at", "observational", b"observational", "operation_type", b"operation_type", "operation_uuid", b"operation_uuid", "sequence_number", b"sequence_number", "target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___ClusterOperationTargetProto: _TypeAlias = ClusterOperationTargetProto  # noqa: Y015
-
-@_typing.final
-class CreateClusterOperationTargetRequest(_message.Message):
-    DESCRIPTOR: _descriptor.Descriptor
-
-    OPERATION_UUID_FIELD_NUMBER: _builtins.int
-    OPERATION_TYPE_FIELD_NUMBER: _builtins.int
-    TARGET_OBJECT_TYPE_FIELD_NUMBER: _builtins.int
-    TARGET_UUID_FIELD_NUMBER: _builtins.int
-    CREATED_AT_FIELD_NUMBER: _builtins.int
-    operation_uuid: _builtins.str
-    operation_type: _builtins.str
-    target_object_type: _shakenfist_enums_pb2.ObjectType.ValueType
-    target_uuid: _builtins.str
-    created_at: _builtins.float
-    def __init__(
-        self,
-        *,
-        operation_uuid: _builtins.str = ...,
-        operation_type: _builtins.str = ...,
-        target_object_type: _shakenfist_enums_pb2.ObjectType.ValueType = ...,
-        target_uuid: _builtins.str = ...,
-        created_at: _builtins.float = ...,
-    ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
-    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["created_at", b"created_at", "operation_type", b"operation_type", "operation_uuid", b"operation_uuid", "target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]  # noqa: Y015
-    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
-
-Global___CreateClusterOperationTargetRequest: _TypeAlias = CreateClusterOperationTargetRequest  # noqa: Y015
 
 @_typing.final
 class GetClusterOperationTargetRequest(_message.Message):
@@ -8617,6 +8592,7 @@ class ClusterOperationData(_message.Message):
     OPERATION_TYPE_FIELD_NUMBER: _builtins.int
     CREATED_AT_FIELD_NUMBER: _builtins.int
     METADATA_JSON_FIELD_NUMBER: _builtins.int
+    OBSERVATIONAL_FIELD_NUMBER: _builtins.int
     uuid: _builtins.str
     """Operation UUID as string"""
     operation_type: _builtins.str
@@ -8625,6 +8601,12 @@ class ClusterOperationData(_message.Message):
     """Unix timestamp of operation creation"""
     metadata_json: _builtins.str
     """Full operation metadata dict as JSON"""
+    observational: _builtins.bool
+    """The observational flag stored on the operation's target row. Set
+    only by ListClusterOperationsForTarget, the one RPC that reads it
+    from a target row; every other RPC leaves it unset rather than
+    reporting a misleading false.
+    """
     def __init__(
         self,
         *,
@@ -8632,12 +8614,15 @@ class ClusterOperationData(_message.Message):
         operation_type: _builtins.str = ...,
         created_at: _builtins.float = ...,
         metadata_json: _builtins.str = ...,
+        observational: _builtins.bool | None = ...,
     ) -> None: ...
-    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    _HasFieldArgType: _TypeAlias = _typing.Literal["_observational", b"_observational", "observational", b"observational"]  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["created_at", b"created_at", "metadata_json", b"metadata_json", "operation_type", b"operation_type", "uuid", b"uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["_observational", b"_observational", "created_at", b"created_at", "metadata_json", b"metadata_json", "observational", b"observational", "operation_type", b"operation_type", "uuid", b"uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
-    def WhichOneof(self, oneof_group: _Never) -> None: ...
+    _WhichOneofReturnType__observational: _TypeAlias = _typing.Literal["observational"]  # noqa: Y015
+    _WhichOneofArgType__observational: _TypeAlias = _typing.Literal["_observational", b"_observational"]  # noqa: Y015
+    def WhichOneof(self, oneof_group: _WhichOneofArgType__observational) -> _WhichOneofReturnType__observational | None: ...
 
 Global___ClusterOperationData: _TypeAlias = ClusterOperationData  # noqa: Y015
 
@@ -8843,6 +8828,7 @@ class CreateAndEnqueueClusterOperationRequest(_message.Message):
     DELAY_FIELD_NUMBER: _builtins.int
     METADATA_JSON_FIELD_NUMBER: _builtins.int
     TARGETS_FIELD_NUMBER: _builtins.int
+    OBSERVATIONAL_FIELD_NUMBER: _builtins.int
     uuid: _builtins.str
     """Operation UUID as string"""
     operation_type: _builtins.str
@@ -8855,6 +8841,12 @@ class CreateAndEnqueueClusterOperationRequest(_message.Message):
     """Seconds to defer before the job is eligible"""
     metadata_json: _builtins.str
     """Full operation metadata dict as JSON"""
+    observational: _builtins.bool
+    """Whether the operation only observes its targets. One flag per
+    operation, copied onto each target row it writes. False (mutating)
+    is the conservative value, and is what an older client that does
+    not know this field sends.
+    """
     @_builtins.property
     def targets(self) -> _containers.RepeatedCompositeFieldContainer[Global___CreateAndEnqueueClusterOperationTarget]:
         """cluster_operation_targets rows written atomically with the op so a
@@ -8871,10 +8863,11 @@ class CreateAndEnqueueClusterOperationRequest(_message.Message):
         delay: _builtins.float = ...,
         metadata_json: _builtins.str = ...,
         targets: _abc.Iterable[Global___CreateAndEnqueueClusterOperationTarget] | None = ...,
+        observational: _builtins.bool = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["created_at", b"created_at", "delay", b"delay", "metadata_json", b"metadata_json", "operation_type", b"operation_type", "queue_name", b"queue_name", "targets", b"targets", "uuid", b"uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["created_at", b"created_at", "delay", b"delay", "metadata_json", b"metadata_json", "observational", b"observational", "operation_type", b"operation_type", "queue_name", b"queue_name", "targets", b"targets", "uuid", b"uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

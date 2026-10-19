@@ -428,20 +428,27 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
             '/auth', data=json.dumps({'namespace': 'system', 'key': 'bar'}))
         self.admin_token = 'Bearer %s' % resp.get_json()['access_token']
 
-    def _patch_list_and_hydrate(self, op_records):
+    def _patch_list_and_hydrate(self, op_records, observational=None):
         """Patch list_cluster_operations_for_target and op hydration.
 
         ``op_records``: list of (uuid, operation_type, created_at) tuples
         in the order list_cluster_operations_for_target should return.
+
+        ``observational``: optional dict of uuid to the flag the listing
+        reports for that op. An op not in it has no ``observational``
+        key, as when an older database service did not report one.
         """
-        records = [
-            {
+        observational = observational or {}
+        records = []
+        for u, op_type, created_at in op_records:
+            record = {
                 'uuid': u,
                 'operation_type': op_type,
                 'created_at': created_at,
             }
-            for u, op_type, created_at in op_records
-        ]
+            if u in observational:
+                record['observational'] = observational[u]
+            records.append(record)
         fakes = {
             u: _fake_op(u, op_type, created_at=created_at)
             for u, op_type, created_at in op_records
@@ -500,6 +507,44 @@ class ClusterOperationsForTargetTestCase(base.ShakenFistTestCase):
         self.assertEqual(200, resp.status_code)
         self.assertEqual(
             [op_uuid], [entry['uuid'] for entry in resp.get_json()])
+
+    def test_body_params_response_carries_observational(self):
+        # Drive the endpoint as a real client does -- parameters in a
+        # JSON body, injected as kwargs by log_request -- and check each
+        # op reports the observational flag its target row carries.
+        observing_uuid = str(uuid4())
+        mutating_uuid = str(uuid4())
+        self._patch_list_and_hydrate(
+            [(observing_uuid, 'node_blob_op', 2.0),
+             (mutating_uuid, 'node_blob_op', 1.0)],
+            observational={observing_uuid: True, mutating_uuid: False})
+
+        resp = self.client.get(
+            '/clusteroperations',
+            json={'target_object_type': 'network',
+                  'target_uuid': self.network_uuid},
+            headers={'Authorization': self.foo_token})
+        self.assertEqual(200, resp.status_code)
+        self.assertEqual(
+            [(observing_uuid, True), (mutating_uuid, False)],
+            [(entry['uuid'], entry['observational'])
+             for entry in resp.get_json()])
+
+    def test_observational_omitted_when_not_reported(self):
+        # An older database service does not report the flag. Omit it
+        # rather than claim the op is mutating.
+        op_uuid = str(uuid4())
+        self._patch_list_and_hydrate([(op_uuid, 'net_op', 1.0)])
+
+        resp = self.client.get(
+            '/clusteroperations',
+            json={'target_object_type': 'network',
+                  'target_uuid': self.network_uuid},
+            headers={'Authorization': self.foo_token})
+        self.assertEqual(200, resp.status_code)
+        body = resp.get_json()
+        self.assertEqual([op_uuid], [entry['uuid'] for entry in body])
+        self.assertNotIn('observational', body[0])
 
     def test_non_admin_foreign_namespace_returns_403(self):
         # No hydration patches needed -- the access check fails before

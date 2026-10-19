@@ -43,6 +43,11 @@ networks.
       `target_object_type` query parameter is a Shaken Fist object type
       string (e.g. `network`, `instance`, `artifact`). The caller's
       namespace must own the target object, or the caller must be admin.
+      Each op in the response carries an `observational` boolean: true
+      when every task of the op only observes the target (a checksum or
+      health check) rather than changing it. Observational ops are
+      listed here but do not count towards the object's
+      `last_cluster_operation` or its pending operations.
 
 ## Polling an asynchronous operation
 

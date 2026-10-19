@@ -50,38 +50,6 @@ class LastClusterOperationWithTargetsTestCase(base.ShakenFistTestCase):
             d.object_type, TEST_UUID)
 
 
-class SetLastClusterOperationWithTargetsTestCase(base.ShakenFistTestCase):
-    """Test _set_last_cluster_operation writes to cluster_operation_targets."""
-
-    @mock.patch('shakenfist.mariadb.create_cluster_operation_target',
-                return_value=True)
-    @mock.patch('shakenfist.baseobject.time')
-    def test_set_lco_writes_to_targets_only(
-            self, mock_time, mock_create_target):
-        mock_time.time.return_value = 1234.5
-
-        d = DatabaseBackedObjectWithOperations(TEST_UUID)
-        d._set_last_cluster_operation('instance_preflight', OP_UUID)
-
-        # Verify cluster_operation_targets write
-        mock_create_target.assert_called_once_with(
-            operation_uuid=OP_UUID,
-            operation_type='instance_preflight',
-            target_object_type=d.object_type,
-            target_uuid=TEST_UUID,
-            created_at=1234.5
-        )
-
-    @mock.patch('shakenfist.mariadb.create_cluster_operation_target')
-    def test_set_lco_in_memory_skips_mariadb(
-            self, mock_create_target):
-        d = DatabaseBackedObjectWithOperations(
-            TEST_UUID, in_memory_only=True)
-        d._set_last_cluster_operation('net_op', OP_UUID)
-
-        mock_create_target.assert_not_called()
-
-
 class HardDeleteWithTargetsTestCase(base.ShakenFistTestCase):
     """Test hard_delete cleans up cluster_operation_targets."""
 
@@ -163,6 +131,21 @@ class ClusterOperationTargetDataTestCase(base.ShakenFistTestCase):
         self.assertEqual(view['target_uuid'], TEST_UUID)
         self.assertEqual(view['sequence_number'], 1)
         self.assertEqual(view['created_at'], 1000.0)
+        # Unset, the flag is the conservative (mutating) value.
+        self.assertIs(False, view['observational'])
+
+    def test_external_view_carries_observational(self):
+        data = ClusterOperationTargetData(
+            operation_uuid=OP_UUID,
+            operation_type='node_blob_op',
+            target_object_type='blob',
+            target_uuid=TEST_UUID,
+            sequence_number=1,
+            created_at=1000.0,
+            observational=True
+        )
+        self.assertIs(True, data.observational)
+        self.assertIs(True, data.external_view()['observational'])
 
 
 class DirectDeleteStaleClusterOperationTargetsTestCase(
@@ -299,19 +282,19 @@ class MockDeleteStaleClusterOperationTargetsTestCase(
         now = time.time()
 
         # Three target rows: old+terminal, old+active, recent.
-        mariadb.create_cluster_operation_target(
+        self.mock_mariadb.seed_cluster_operation_target(
             operation_uuid=OP_UUID_OLD,
             operation_type='instance_preflight',
             target_object_type='instance',
             target_uuid=TEST_UUID,
             created_at=now - 7_200)
-        mariadb.create_cluster_operation_target(
+        self.mock_mariadb.seed_cluster_operation_target(
             operation_uuid=OP_UUID_ACTIVE,
             operation_type='instance_preflight',
             target_object_type='instance',
             target_uuid=TEST_UUID,
             created_at=now - 7_200)
-        mariadb.create_cluster_operation_target(
+        self.mock_mariadb.seed_cluster_operation_target(
             operation_uuid=OP_UUID_NEW,
             operation_type='instance_preflight',
             target_object_type='instance',
@@ -418,6 +401,8 @@ class DirectHasPendingClusterOperationTargetTestCase(
             sa.Column('operation_uuid', sa.String(36), primary_key=True),
             sa.Column('target_object_type', sa.String(32)),
             sa.Column('target_uuid', sa.String(36)),
+            sa.Column('observational', sa.Boolean(), nullable=False,
+                      server_default=sa.false()),
         )
         states_table = sa.Table(
             'object_states',
@@ -562,9 +547,6 @@ class HotPlugTripleTargetRegressionTestCase(base.ShakenFistTestCase):
             'shakenfist.mariadb.create_and_enqueue_cluster_operation',
             return_value=(True, ''),
         ).start()
-        self.mock_create_target = mock.patch(
-            'shakenfist.mariadb.create_cluster_operation_target',
-        ).start()
         self.mock_add_event_multi = mock.patch(
             'shakenfist.schema.operations.util.eventlog.add_event_multi',
         ).start()
@@ -604,18 +586,15 @@ class HotPlugTripleTargetRegressionTestCase(base.ShakenFistTestCase):
              HOTPLUG_INTERFACE_UUID},
             {target_uuid for _, target_uuid in targets},
         )
-        # The retired non-atomic per-row writer must not be used.
-        self.mock_create_target.assert_not_called()
 
 
 class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
     """Integration regression: hot-plug must persist three target rows.
 
-    Drives _direct_create_cluster_operation_target() against a real
-    in-memory SQLite engine so the actual UNIQUE constraint is
-    exercised. The pre-fix schema (v1) declared operation_uuid UNIQUE,
-    which silently dropped every target row after the first --
-    masked by the IntegrityError-as-True handler in the writer. The
+    Seeds target rows into a real in-memory SQLite engine so the
+    actual UNIQUE constraint is exercised. The pre-fix schema (v1)
+    declared operation_uuid UNIQUE, which silently dropped every
+    target row after the first. The
     fixed schema (v2) replaces that with a composite UNIQUE on
     (operation_uuid, target_object_type, target_uuid).
 
@@ -659,6 +638,8 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
                       nullable=False),
             sa.Column('target_uuid', sa.String(36), nullable=False),
             sa.Column('created_at', sa.Double(), nullable=False),
+            sa.Column('observational', sa.Boolean(), nullable=False,
+                      server_default=sa.false()),
             sa.UniqueConstraint(
                 'operation_uuid', 'target_object_type', 'target_uuid',
                 name='uq_cot_op_target'),
@@ -686,9 +667,8 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
         self._metadata.create_all(self._engine)
 
         # Route the mariadb helpers at the real in-memory engine and
-        # tables. The helpers under test (_direct_create_cluster_
-        # operation_target, _direct_has_pending_cluster_operation_
-        # target) read these accessors and the table objects each
+        # tables. The helper under test (_direct_has_pending_cluster_
+        # operation_target) reads these accessors and the table objects each
         # invocation.
         self._patches = [
             mock.patch(
@@ -719,6 +699,23 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
                 message=None,
             ))
 
+    def _write_target(self, operation_uuid, operation_type,
+                      target_object_type, target_uuid, created_at):
+        """Insert a target row straight into the fake table.
+
+        Production writes these rows inside the atomic enqueue
+        transaction; this fixture builds only the targets and states
+        tables, so it seeds the rows directly.
+        """
+        with self._engine.begin() as conn:
+            conn.execute(self._targets_table.insert().values(
+                operation_uuid=operation_uuid,
+                operation_type=operation_type,
+                target_object_type=target_object_type,
+                target_uuid=target_uuid,
+                created_at=created_at))
+        return True
+
     def _count_target_rows(self):
         with self._engine.connect() as conn:
             return conn.execute(
@@ -740,7 +737,7 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
                 ('instance', HOTPLUG_INSTANCE_UUID, 'instance'),
                 ('network', HOTPLUG_NETWORK_UUID, 'network'),
                 ('interface', HOTPLUG_INTERFACE_UUID, 'interface')):
-            ok = self._mariadb._direct_create_cluster_operation_target(
+            ok = self._write_target(
                 operation_uuid=op_uuid,
                 operation_type=op_type,
                 target_object_type=target_type,
@@ -760,29 +757,6 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
         self.assertEqual({'instance', 'network', 'interface'},
                          target_types)
 
-    def test_duplicate_op_target_pair_is_idempotent(self):
-        """Same (op_uuid, target_type, target_uuid) triple written
-        twice must not raise -- callers rely on idempotency."""
-        op_uuid = 'cccc1111-1111-4111-8111-111111111111'
-
-        ok = self._mariadb._direct_create_cluster_operation_target(
-            operation_uuid=op_uuid,
-            operation_type='node_inst_net_iface_op',
-            target_object_type='network',
-            target_uuid=HOTPLUG_NETWORK_UUID,
-            created_at=1000.0)
-        self.assertTrue(ok)
-
-        ok = self._mariadb._direct_create_cluster_operation_target(
-            operation_uuid=op_uuid,
-            operation_type='node_inst_net_iface_op',
-            target_object_type='network',
-            target_uuid=HOTPLUG_NETWORK_UUID,
-            created_at=2000.0)
-        self.assertTrue(ok)
-
-        self.assertEqual(1, self._count_target_rows())
-
     def test_pending_network_target_visible_while_op_queued(self):
         """has_pending_cluster_operation_target(NETWORK, uuid) must
         return True while the op is in 'queued' state. This is the
@@ -793,7 +767,7 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
         op_uuid = 'cccc1111-1111-4111-8111-111111111111'
 
         self._insert_op_state(op_uuid, 'queued')
-        ok = self._mariadb._direct_create_cluster_operation_target(
+        ok = self._write_target(
             operation_uuid=op_uuid,
             operation_type='node_inst_net_iface_op',
             target_object_type='network',
@@ -811,7 +785,7 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
         op_uuid = 'cccc1111-1111-4111-8111-111111111111'
 
         self._insert_op_state(op_uuid, 'complete')
-        self._mariadb._direct_create_cluster_operation_target(
+        self._write_target(
             operation_uuid=op_uuid,
             operation_type='node_inst_net_iface_op',
             target_object_type='network',
@@ -823,30 +797,11 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
                 'network', HOTPLUG_NETWORK_UUID))
         self.assertFalse(result)
 
-    def test_non_uniqueness_integrity_error_returns_false(self):
-        """A NOT NULL violation (or any non-uniqueness IntegrityError)
-        must surface as False, not be swallowed as idempotency.
-
-        Before the keyword-match was tightened, the writer's
-        IntegrityError handler returned True for any IntegrityError --
-        which hid bugs like passing None for a required column. The
-        narrowed match only forgives the composite UNIQUE we
-        actually want to be idempotent on.
-        """
-        ok = self._mariadb._direct_create_cluster_operation_target(
-            operation_uuid=None,
-            operation_type='node_inst_net_iface_op',
-            target_object_type='network',
-            target_uuid=HOTPLUG_NETWORK_UUID,
-            created_at=1000.0)
-        self.assertFalse(ok)
-        self.assertEqual(0, self._count_target_rows())
-
     def test_full_enqueue_persists_three_rows(self):
         """End-to-end: calling node_inst_net_iface_op.create_and_enqueue
         must result in three persisted cluster_operation_targets rows
         (instance, network, interface) in the real database, not just
-        three call-sites to create_cluster_operation_target.
+        three call-sites.
 
         This is the test the v1 schema bug would have failed: the
         UNIQUE(operation_uuid) constraint silently dropped the
@@ -864,14 +819,14 @@ class HotPlugTargetWriteIntegrationTestCase(base.ShakenFistTestCase):
         # The real atomic function writes the target rows in the same
         # transaction as the op/state/work-queue rows (whose tables
         # this fixture does not build). We stub that function and have
-        # the stub persist just the ``targets`` it is handed, through
-        # the real direct target writer against this fixture's SQLite
-        # engine, so the composite UNIQUE constraint is exercised on
-        # the exact three targets the enqueue call-site forwards.
+        # the stub persist just the ``targets`` it is handed into this
+        # fixture's SQLite engine, so the composite UNIQUE constraint is
+        # exercised on the exact three targets the enqueue call-site
+        # forwards.
         def _persist_targets(*args, **kwargs):
             for target_object_type, target_uuid in (
                     kwargs.get('targets') or []):
-                self._mariadb._direct_create_cluster_operation_target(
+                self._write_target(
                     operation_uuid=kwargs['op_uuid'],
                     operation_type=kwargs['operation_type'],
                     target_object_type=target_object_type,
@@ -944,6 +899,8 @@ class GetRecentTerminalOpStatesForTargetTestCase(base.ShakenFistTestCase):
                       nullable=False),
             sa.Column('target_uuid', sa.String(36), nullable=False),
             sa.Column('created_at', sa.Double(), nullable=False),
+            sa.Column('observational', sa.Boolean(), nullable=False,
+                      server_default=sa.false()),
         )
         self._states_table = sa.Table(
             'object_states',
@@ -1191,6 +1148,8 @@ class DirectListClusterOperationsForTargetTestCase(
                       nullable=False),
             sa.Column('target_uuid', sa.String(36), nullable=False),
             sa.Column('created_at', sa.Double(), nullable=False),
+            sa.Column('observational', sa.Boolean(), nullable=False,
+                      server_default=sa.false()),
         )
         # cluster_operations.uuid is a uuid_column_type() column exactly as in
         # production. An earlier version of this fixture used String(36)
@@ -1257,15 +1216,20 @@ class DirectListClusterOperationsForTargetTestCase(
             ))
 
     def _insert_target(self, op_uuid, op_type, target_type,
-                       target_uuid, created_at):
+                       target_uuid, created_at, observational=None):
+        values = {
+            'operation_uuid': op_uuid,
+            'operation_type': op_type,
+            'target_object_type': target_type,
+            'target_uuid': target_uuid,
+            'created_at': created_at,
+        }
+        # None leaves the column to its server default, as an older
+        # daemon's INSERT does.
+        if observational is not None:
+            values['observational'] = observational
         with self._engine.begin() as conn:
-            conn.execute(self._targets_table.insert().values(
-                operation_uuid=op_uuid,
-                operation_type=op_type,
-                target_object_type=target_type,
-                target_uuid=target_uuid,
-                created_at=created_at,
-            ))
+            conn.execute(self._targets_table.insert().values(**values))
 
     def test_empty_when_no_matches(self):
         """Empty list when no target rows exist for the given uuid."""
@@ -1333,6 +1297,33 @@ class DirectListClusterOperationsForTargetTestCase(
         self.assertEqual(str(LIST_OP_UUID_3), results[1]['uuid'])
         self.assertEqual(str(LIST_OP_UUID_1), results[2]['uuid'])
 
+    def test_includes_observational_ops_and_reports_the_flag(self):
+        """Unlike has_pending and get_latest, the listing is unfiltered,
+        and each op carries the flag stored on its target row."""
+        self._insert_op(LIST_OP_UUID_1, 'node_blob_op', 1000.0,
+                        metadata={'tasks': ['verify_size_and_checksum']})
+        self._insert_op(LIST_OP_UUID_2, 'node_blob_op', 2000.0)
+        self._insert_op(LIST_OP_UUID_3, 'node_blob_op', 3000.0)
+        self._insert_target(
+            LIST_OP_UUID_1, 'node_blob_op', 'blob',
+            LIST_TARGET_UUID, 1000.0, observational=True)
+        self._insert_target(
+            LIST_OP_UUID_2, 'node_blob_op', 'blob',
+            LIST_TARGET_UUID, 2000.0, observational=False)
+        self._insert_target(
+            LIST_OP_UUID_3, 'node_blob_op', 'blob',
+            LIST_TARGET_UUID, 3000.0)
+
+        results = (
+            self._mariadb._direct_list_cluster_operations_for_target(
+                'blob', LIST_TARGET_UUID))
+        self.assertEqual(
+            [(LIST_OP_UUID_3, False), (LIST_OP_UUID_2, False),
+             (LIST_OP_UUID_1, True)],
+            [(r['uuid'], r['observational']) for r in results])
+        # The op's own metadata is still flattened in alongside it.
+        self.assertEqual(['verify_size_and_checksum'], results[2]['tasks'])
+
     @mock.patch('shakenfist.mariadb._get_cluster_operations_table')
     @mock.patch('shakenfist.mariadb._get_cluster_operation_targets_table')
     @mock.patch('shakenfist.mariadb._get_engine')
@@ -1358,6 +1349,8 @@ class DirectListClusterOperationsForTargetTestCase(
             sa.Column('operation_uuid', sa.String(36), primary_key=True),
             sa.Column('target_object_type', sa.String(64)),
             sa.Column('target_uuid', sa.String(36)),
+            sa.Column('observational', sa.Boolean(), nullable=False,
+                      server_default=sa.false()),
         )
         ops_table = sa.Table(
             'cluster_operations_err',

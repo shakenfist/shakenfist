@@ -47,6 +47,11 @@ class ClusterOperationTargetData(BaseModel):
         sequence_number: Auto-assigned sequence for ordering within a
             target. None on insert (assigned by database).
         created_at: Unix timestamp when the operation was enqueued.
+        observational: True if every task of the operation only
+            observes the target rather than changing it. Such rows are
+            skipped by the "current state" readers (get_latest and
+            has_pending); see docs/plans/PLAN-cluster-op-visibility.md.
+            Defaults to False, the conservative (mutating) value.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -57,6 +62,7 @@ class ClusterOperationTargetData(BaseModel):
     target_uuid: str = Field(max_length=36)
     sequence_number: Optional[int] = Field(default=None)
     created_at: float
+    observational: bool = Field(default=False)
 
     def external_view(self) -> dict[str, Any]:
         """Serialize for JSON API responses."""
@@ -67,4 +73,5 @@ class ClusterOperationTargetData(BaseModel):
             'target_uuid': self.target_uuid,
             'sequence_number': self.sequence_number,
             'created_at': self.created_at,
+            'observational': self.observational,
         }

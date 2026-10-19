@@ -480,7 +480,12 @@ OBJECT_METADATA_VERSION = 3
 # idempotency (same target written twice) without truncating multi-
 # target ops. A non-unique idx_cot_operation index keeps lookups by
 # operation_uuid fast.
-CLUSTER_OPERATION_TARGETS_VERSION = 2
+# v3: adds observational BOOLEAN NOT NULL DEFAULT 0, and widens
+# idx_cot_target to (target_object_type, target_uuid, observational) so
+# the "current state" readers can skip observational ops (background
+# sweeps that do not change the object) without a row lookup. See
+# docs/plans/PLAN-cluster-op-visibility.md.
+CLUSTER_OPERATION_TARGETS_VERSION = 3
 # v1: schema creation. v2: etcd data-import marker (historical).
 # v3: adds 15 typed nullable capacity columns projected from
 # metrics_json at upsert time, for the capacity reconciler to read.
@@ -1787,6 +1792,19 @@ def _get_cluster_operation_targets_table() -> sa.Table:
             # alone (the v1 schema) silently truncated multi-target ops.
             # idx_cot_operation keeps single-column operation_uuid
             # lookups fast.
+            #
+            # observational is true when every task of the operation
+            # only observes the target (a checksum sweep, a health
+            # probe) rather than changing it. The "current state"
+            # readers (get_latest and has_pending) skip those rows so a
+            # background sweep cannot shadow a mutating op; every other
+            # reader sees them. The server default is false, so a row
+            # written without the column (an older daemon during a
+            # rolling upgrade) counts as mutating. observational is the
+            # last column of idx_cot_target so the filtered readers are
+            # served by the index, while its two-column prefix still
+            # serves the unfiltered ones. See
+            # docs/plans/PLAN-cluster-op-visibility.md.
             _cluster_operation_targets_table = sa.Table(
                 'cluster_operation_targets',
                 metadata,
@@ -1798,11 +1816,14 @@ def _get_cluster_operation_targets_table() -> sa.Table:
                           nullable=False),
                 sa.Column('target_uuid', sa.String(36), nullable=False),
                 sa.Column('created_at', sa.Double(), nullable=False),
+                sa.Column('observational', sa.Boolean(), nullable=False,
+                          server_default=sa.false()),
                 sa.UniqueConstraint(
                     'operation_uuid', 'target_object_type', 'target_uuid',
                     name='uq_cot_op_target'),
                 # Indexes for common query patterns
-                sa.Index('idx_cot_target', 'target_object_type', 'target_uuid'),
+                sa.Index('idx_cot_target', 'target_object_type', 'target_uuid',
+                         'observational'),
                 sa.Index('idx_cot_operation', 'operation_uuid'),
                 sa.Index('idx_cot_created', 'created_at'),
             )
@@ -1877,6 +1898,59 @@ def _ensure_cluster_operation_targets_schema(
                 f'ON {table_name} (operation_uuid)'))
             conn.commit()
         current_ver = 2
+        _set_table_version(engine, table_name, current_ver)
+
+    if current_ver < 3:
+        # Add the observational flag (see
+        # docs/plans/PLAN-cluster-op-visibility.md): true when every
+        # task of the operation only observes its targets, so the
+        # "current state" readers can skip it. The default is the
+        # conservative value. Existing rows, and any row an older
+        # daemon writes during a rolling upgrade (it does not know the
+        # column), read as mutating, which is exactly how they were
+        # treated before this column existed.
+        #
+        # idx_cot_target is replaced by a wider index rather than
+        # joined by a second one. The filtered readers ask for
+        # WHERE type = ? AND uuid = ? AND observational = 0, and
+        # get_latest adds ORDER BY sequence_number DESC LIMIT 1;
+        # InnoDB secondary indexes carry the primary key, so the
+        # three-column index serves both the filter and the ordering,
+        # with no sort and no rows read beyond the one returned. Its
+        # two-column prefix still serves every unfiltered reader, so a
+        # second index would be redundant, and every index costs a
+        # write on the busiest insert in the cluster.
+        #
+        # The ADD INDEX deliberately has no IF NOT EXISTS. MariaDB
+        # evaluates IF NOT EXISTS against the table as it was before
+        # the ALTER, so "DROP INDEX IF EXISTS x, ADD INDEX IF NOT
+        # EXISTS x" drops the old index and then skips the add (note
+        # 1061), leaving no index at all -- verified against 10.11 and
+        # 11.8. DROP IF EXISTS followed by an unconditional ADD of the
+        # same name is valid in one statement and is still restartable:
+        # if a crash lands after the ALTER but before
+        # _set_table_version, the re-run drops and rebuilds the
+        # three-column index. A fresh install creates the table from
+        # the current definition and also passes through here, which
+        # rebuilds the index on an empty table.
+        #
+        # The column add is instant on MariaDB 10.3 and later, and the
+        # index rebuild is in place over a table bounded by in-flight
+        # work, since operations hard-delete their target rows shortly
+        # after going terminal.
+        LOG.info(
+            f'Upgrading {table_name} from v{current_ver} to v3: adding '
+            'observational and widening idx_cot_target.')
+        with engine.connect() as conn:
+            conn.execute(sa.text(
+                f'ALTER TABLE {table_name} '
+                f'ADD COLUMN IF NOT EXISTS observational '
+                f'BOOLEAN NOT NULL DEFAULT 0, '
+                f'DROP INDEX IF EXISTS idx_cot_target, '
+                f'ADD INDEX idx_cot_target '
+                f'(target_object_type, target_uuid, observational)'))
+            conn.commit()
+        current_ver = 3
         _set_table_version(engine, table_name, current_ver)
 
     return {
@@ -4952,58 +5026,6 @@ def delete_object_metadata(
 # Track which cluster operations target which objects, with sequence ordering.
 # =============================================================================
 
-def _direct_create_cluster_operation_target(
-    operation_uuid: str,
-    operation_type: str,
-    target_object_type: ObjectType,
-    target_uuid: str,
-    created_at: float
-) -> bool:
-    """Insert a cluster operation target row directly into MariaDB.
-
-    The sequence_number is assigned automatically by AUTO_INCREMENT.
-    """
-    engine = _get_engine()
-    table = _get_cluster_operation_targets_table()
-
-    try:
-        with engine.connect() as conn:
-            stmt = sa.insert(table).values(
-                operation_uuid=operation_uuid,
-                operation_type=operation_type,
-                target_object_type=target_object_type,
-                target_uuid=target_uuid,
-                created_at=created_at
-            )
-            conn.execute(stmt)
-            conn.commit()
-            return True
-    except IntegrityError as e:
-        # The only IntegrityError we want to treat as success is the
-        # composite UNIQUE on (operation_uuid, target_object_type,
-        # target_uuid) tripping -- the same op-target pair already
-        # exists, which is the idempotency case. Any other integrity
-        # violation (NOT NULL, type-check, foreign-key) is a real
-        # bug and must surface.
-        #
-        # MariaDB names the constraint in the error text. SQLite does
-        # not, so we also accept its fixed "UNIQUE constraint failed"
-        # phrase; the table only carries this one composite UNIQUE so
-        # the fallback cannot misclassify a different uniqueness rule.
-        msg = str(e).lower()
-        if 'uq_cot_op_target' in msg or 'unique constraint failed' in msg:
-            return True
-        LOG.warning(
-            f'Non-uniqueness IntegrityError writing '
-            f'cluster_operation_targets row for op {operation_uuid}: {e}')
-        return False
-    except OperationalError as e:
-        LOG.warning(
-            f'MariaDB write failed for cluster_operation_targets '
-            f'{operation_uuid}: {e}')
-        return False
-
-
 def _direct_get_cluster_operation_target(
     operation_uuid: str
 ) -> Optional[ClusterOperationTargetData]:
@@ -5026,7 +5048,8 @@ def _direct_get_cluster_operation_target(
                 target_object_type=result.target_object_type.value,
                 target_uuid=result.target_uuid,
                 sequence_number=result.sequence_number,
-                created_at=result.created_at
+                created_at=result.created_at,
+                observational=result.observational
             )
     except OperationalError as e:
         LOG.warning(
@@ -5039,12 +5062,18 @@ def _direct_get_cluster_operation_targets_for_object(
     target_object_type: ObjectType,
     target_uuid: str
 ) -> list[ClusterOperationTargetData]:
-    """Get all cluster operation targets for an object, ordered by sequence."""
+    """Get all cluster operation targets for an object, ordered by sequence.
+
+    Observational operations are included, and each row carries its flag.
+    """
     engine = _get_engine()
     table = _get_cluster_operation_targets_table()
 
     try:
         with engine.connect() as conn:
+            # Deliberately not filtered on observational: the per-blob
+            # sweep's duplicate-op guard (daemons/cluster/scheduled_tasks.py)
+            # must see the observational checksum ops it has already queued.
             stmt = sa.select(table).where(
                 sa.and_(
                     table.c.target_object_type == target_object_type,
@@ -5059,7 +5088,8 @@ def _direct_get_cluster_operation_targets_for_object(
                     target_object_type=r.target_object_type.value,
                     target_uuid=r.target_uuid,
                     sequence_number=r.sequence_number,
-                    created_at=r.created_at
+                    created_at=r.created_at,
+                    observational=r.observational
                 )
                 for r in results
             ]
@@ -5074,7 +5104,11 @@ def _direct_get_latest_cluster_operation_target(
     target_object_type: ObjectType,
     target_uuid: str
 ) -> Optional[ClusterOperationTargetData]:
-    """Get the most recent cluster operation target for an object."""
+    """Get the most recent mutating cluster operation target for an object.
+
+    Observational operations are excluded, so a background sweep cannot
+    shadow the mutating operation a caller is waiting on.
+    """
     engine = _get_engine()
     table = _get_cluster_operation_targets_table()
 
@@ -5083,7 +5117,11 @@ def _direct_get_latest_cluster_operation_target(
             stmt = sa.select(table).where(
                 sa.and_(
                     table.c.target_object_type == target_object_type,
-                    table.c.target_uuid == target_uuid
+                    table.c.target_uuid == target_uuid,
+                    # An observational op (a checksum sweep, a health
+                    # probe) must not become last_cluster_operation. See
+                    # docs/plans/PLAN-cluster-op-visibility.md.
+                    table.c.observational == sa.false()
                 )
             ).order_by(table.c.sequence_number.desc()).limit(1)
             result = conn.execute(stmt).fetchone()
@@ -5096,7 +5134,8 @@ def _direct_get_latest_cluster_operation_target(
                 target_object_type=result.target_object_type.value,
                 target_uuid=result.target_uuid,
                 sequence_number=result.sequence_number,
-                created_at=result.created_at
+                created_at=result.created_at,
+                observational=result.observational
             )
     except OperationalError as e:
         LOG.warning(
@@ -5116,7 +5155,11 @@ def _direct_has_pending_cluster_operation_target(
     target_object_type: ObjectType,
     target_uuid: str
 ) -> bool:
-    """True if any in-flight cluster operation targets this object."""
+    """True if any in-flight mutating cluster operation targets this object.
+
+    Observational operations are excluded: an in-flight checksum sweep or
+    health probe does not make an object busy.
+    """
     engine = _get_engine()
     table = _get_cluster_operation_targets_table()
     states_table = _get_object_states_table()
@@ -5132,6 +5175,10 @@ def _direct_has_pending_cluster_operation_target(
                 sa.and_(
                     table.c.target_object_type == target_object_type,
                     table.c.target_uuid == target_uuid,
+                    # An observational op must not count as pending, or a
+                    # background sweep would defer the work gated on this.
+                    # See docs/plans/PLAN-cluster-op-visibility.md.
+                    table.c.observational == sa.false(),
                     states_table.c.state_value.in_(_ACTIVE_OPERATION_STATES)
                 )
             )
@@ -5174,6 +5221,9 @@ def _direct_get_recent_terminal_op_states_for_target(
     table = _get_cluster_operation_targets_table()
     states_table = _get_object_states_table()
 
+    # Deliberately not filtered on observational: the only callers ask
+    # about net_op on networks, which is never observational, and a circuit
+    # breaker wants every failure anyway.
     conditions = [
         table.c.target_object_type == target_object_type,
         table.c.target_uuid == target_uuid,
@@ -5309,34 +5359,6 @@ def _direct_delete_stale_cluster_operation_targets(
 
 # gRPC client functions for cluster operation targets
 
-def _grpc_create_cluster_operation_target(
-    operation_uuid: str,
-    operation_type: str,
-    target_object_type: ObjectType,
-    target_uuid: str,
-    created_at: float
-) -> bool:
-    """Insert a cluster operation target via the database microservice."""
-    try:
-        stub = _get_database_stub()
-        request = database_pb2.CreateClusterOperationTargetRequest(
-            operation_uuid=operation_uuid,
-            operation_type=operation_type,
-            target_object_type=cast(
-                shakenfist_enums_pb2.ObjectType.ValueType,
-                target_object_type.proto_id),
-            target_uuid=target_uuid,
-            created_at=created_at
-        )
-        reply = _grpc_call(stub.CreateClusterOperationTarget, request)
-        return bool(reply.success)
-    except grpc.RpcError as e:
-        LOG.error(
-            f'gRPC CreateClusterOperationTarget failed for '
-            f'{operation_uuid}: {e}')
-        return False
-
-
 def _target_from_proto(
     t: 'database_pb2.ClusterOperationTargetProto'
 ) -> ClusterOperationTargetData:
@@ -5348,7 +5370,8 @@ def _target_from_proto(
         target_object_type=ot.value if ot else 'unknown',
         target_uuid=t.target_uuid,
         sequence_number=t.sequence_number if t.sequence_number else None,
-        created_at=t.created_at
+        created_at=t.created_at,
+        observational=t.observational
     )
 
 
@@ -5530,34 +5553,6 @@ def _grpc_delete_stale_cluster_operation_targets(max_age: float) -> int:
 
 # Public API functions for cluster operation targets
 
-def create_cluster_operation_target(
-    operation_uuid: str,
-    operation_type: str,
-    target_object_type: ObjectType,
-    target_uuid: str,
-    created_at: float
-) -> bool:
-    """Record that a cluster operation targets an object.
-
-    Args:
-        operation_uuid: UUID of the cluster operation.
-        operation_type: The operation type string.
-        target_object_type: The ObjectType of the target object.
-        target_uuid: UUID of the target object.
-        created_at: Unix timestamp when the operation was enqueued.
-
-    Returns:
-        True if the row was created, False on duplicate or error.
-    """
-    if _use_database_service():
-        return _grpc_create_cluster_operation_target(
-            operation_uuid, operation_type, target_object_type,
-            target_uuid, created_at)
-    return _direct_create_cluster_operation_target(
-        operation_uuid, operation_type, target_object_type,
-        target_uuid, created_at)
-
-
 def get_cluster_operation_target(
     operation_uuid: str
 ) -> Optional[ClusterOperationTargetData]:
@@ -5577,6 +5572,9 @@ def get_cluster_operation_targets_for_object(
 ) -> list[ClusterOperationTargetData]:
     """Get all cluster operation targets for an object, ordered by sequence.
 
+    Observational operations are included; each row carries its
+    ``observational`` flag.
+
     Returns:
         List of target data ordered by sequence_number ascending.
     """
@@ -5591,10 +5589,14 @@ def get_latest_cluster_operation_target(
     target_object_type: ObjectType,
     target_uuid: str
 ) -> Optional[ClusterOperationTargetData]:
-    """Get the most recent cluster operation target for an object.
+    """Get the most recent mutating cluster operation target for an object.
+
+    Observational operations (every task only observes the target) are
+    excluded, so a background sweep cannot shadow last_cluster_operation.
+    See docs/plans/PLAN-cluster-op-visibility.md.
 
     Returns:
-        The most recent target data, or None if no operations exist.
+        The most recent mutating target data, or None if there is none.
     """
     if _use_database_service():
         return _grpc_get_latest_cluster_operation_target(
@@ -5607,13 +5609,17 @@ def has_pending_cluster_operation_target(
     target_object_type: ObjectType,
     target_uuid: str
 ) -> bool:
-    """True if any in-flight cluster operation targets this object.
+    """True if any in-flight mutating cluster operation targets this object.
 
     "In flight" means the operation's row in object_states is in
     {queued, preflight, executing}. Any later operation against the same
     object that has reached a terminal state does NOT mask an earlier
     in-flight operation, fixing the latest-only race in the legacy
     single-pointer last_cluster_operation gating.
+
+    Observational operations (every task only observes the target) are
+    excluded, so an in-flight background sweep does not make the object
+    busy. See docs/plans/PLAN-cluster-op-visibility.md.
     """
     if _use_database_service():
         return _grpc_has_pending_cluster_operation_target(
@@ -21462,6 +21468,10 @@ def _direct_list_cluster_operations_for_target(
     Namespace scoping is the caller's responsibility (handled in the REST
     layer by validating access to the target object before issuing the
     query).
+
+    Each dict also carries an ``observational`` key: the flag stored on
+    the operation's target row, which is what decides whether
+    has_pending and get_latest see the operation.
     """
     engine = _get_engine()
     targets_table = _get_cluster_operation_targets_table()
@@ -21469,6 +21479,10 @@ def _direct_list_cluster_operations_for_target(
 
     try:
         with engine.connect() as conn:
+            # Deliberately not filtered on observational: this is the
+            # "what touched this object" view, so it reports every
+            # operation and says which ones were observational.
+            #
             # Two steps rather than a single JOIN.
             # cluster_operation_targets.operation_uuid is a String(36)
             # holding the dashed UUID form, but cluster_operations.uuid
@@ -21480,7 +21494,10 @@ def _direct_list_cluster_operations_for_target(
             # processor, which converts it to the column's storage form so
             # the comparison matches.
             target_rows = conn.execute(
-                sa.select(targets_table.c.operation_uuid).where(
+                sa.select(
+                    targets_table.c.operation_uuid,
+                    targets_table.c.observational
+                ).where(
                     sa.and_(
                         targets_table.c.target_object_type
                         == target_object_type,
@@ -21491,12 +21508,30 @@ def _direct_list_cluster_operations_for_target(
             if not target_rows:
                 return []
 
-            op_uuids = [UUID(r.operation_uuid) for r in target_rows]
+            # uq_cot_op_target allows only one row per (operation, target),
+            # so each operation_uuid appears here once and its flag is
+            # unambiguous. (An operation stamps every one of its target
+            # rows with the same flag anyway.)
+            #
+            # Both sides of the lookup are normalised through
+            # UUID(str(...)): what a Uuid column hands back has changed
+            # under us before (SQLAlchemy 2.1 returned plain strings, see
+            # uuid_column_type()), and a key that drifted would raise
+            # KeyError here rather than OperationalError.
+            observational = {
+                UUID(str(r.operation_uuid)): bool(r.observational)
+                for r in target_rows
+            }
             stmt = sa.select(ops_table).where(
-                ops_table.c.uuid.in_(op_uuids)
+                ops_table.c.uuid.in_(list(observational))
             ).order_by(ops_table.c.created_at.desc())
             result = conn.execute(stmt).fetchall()
-            return [_cluster_operation_row_to_dict(row) for row in result]
+            ops = []
+            for row in result:
+                op = _cluster_operation_row_to_dict(row)
+                op['observational'] = observational[UUID(str(row.uuid))]
+                ops.append(op)
+            return ops
     except OperationalError as e:
         LOG.warning(
             f'MariaDB query failed for list_cluster_operations_for_target '
@@ -21528,7 +21563,9 @@ def _direct_create_and_enqueue_cluster_operation(
         created_at: float,
         queue_name: str,
         delay: float = 0.0,
-        targets: Optional[list[tuple[ObjectType, str]]] = None) -> tuple[bool, str]:
+        targets: Optional[list[tuple[ObjectType, str]]] = None,
+        *,
+        observational: bool = False) -> tuple[bool, str]:
     """Atomically create a cluster operation and enqueue its work item.
 
     Writes the following rows in a single MariaDB transaction:
@@ -21553,7 +21590,11 @@ def _direct_create_and_enqueue_cluster_operation(
        enqueued -- previously the target rows were written by a
        separate, non-transactional loop in the schema layer, so a
        reader in the gap saw an enqueued op with no target rows and
-       concluded, wrongly, that nothing targeted the object.
+       concluded, wrongly, that nothing targeted the object. Every
+       row is stamped with the same ``observational`` flag: an
+       operation has one classification, copied onto each of its
+       target rows so the by-target filters need no JOIN back to
+       cluster_operations (see docs/plans/PLAN-cluster-op-visibility.md).
 
     This is the only function in mariadb.py that writes to more
     than one table in a single transaction. The existing
@@ -21647,6 +21688,7 @@ def _direct_create_and_enqueue_cluster_operation(
                     target_object_type=target_object_type,
                     target_uuid=target_uuid,
                     created_at=created_at,
+                    observational=observational,
                 )
                 conn.execute(target_stmt)
 
@@ -21970,11 +22012,16 @@ def _grpc_list_cluster_operations_for_target(
         )
         reply = _grpc_call(
             stub.ListClusterOperationsForTarget, request)
-        return [
-            json.loads(item.metadata_json)
-            if item.metadata_json else {}
-            for item in reply.items
-        ]
+        ops = []
+        for item in reply.items:
+            op = json.loads(item.metadata_json) if item.metadata_json else {}
+            # Only this RPC sets observational, and an older database
+            # service does not set it at all. Leave the key out rather
+            # than report a flag nobody read from the row.
+            if item.HasField('observational'):
+                op['observational'] = item.observational
+            ops.append(op)
+        return ops
     except grpc.RpcError as e:
         LOG.warning(
             f'gRPC ListClusterOperationsForTarget failed for '
@@ -22003,8 +22050,13 @@ def _grpc_create_and_enqueue_cluster_operation(
         created_at: float,
         queue_name: str,
         delay: float = 0.0,
-        targets: Optional[list[tuple[ObjectType, str]]] = None) -> tuple[bool, str]:
+        targets: Optional[list[tuple[ObjectType, str]]] = None,
+        *,
+        observational: bool = False) -> tuple[bool, str]:
     """Atomic create+enqueue via the database microservice.
+
+    ``observational`` is sent once per operation, not per target;
+    the database service copies it onto every target row.
 
     Returns (success, error) where ``error`` is the failure detail
     reported by the database service (or the gRPC exception), so
@@ -22031,6 +22083,7 @@ def _grpc_create_and_enqueue_cluster_operation(
                 delay=delay,
                 metadata_json=_json_dumps(metadata),
                 targets=target_msgs,
+                observational=observational,
             )
         )
         reply = _grpc_call(
@@ -22565,6 +22618,11 @@ def list_cluster_operations_for_target(
     target object before issuing the query, so this function does no
     namespace filtering itself.
 
+    Unlike has_pending and get_latest, this includes observational
+    operations. Each dict carries an ``observational`` key holding the
+    flag stored on the operation's target row, except when an older
+    database service did not report it, in which case the key is absent.
+
     Args:
         target_object_type: The ObjectType of the target object.
         target_uuid: UUID of the target object.
@@ -22601,7 +22659,9 @@ def create_and_enqueue_cluster_operation(
         created_at: float,
         queue_name: str,
         delay: float = 0.0,
-        targets: Optional[list[tuple[ObjectType, str]]] = None) -> tuple[bool, str]:
+        targets: Optional[list[tuple[ObjectType, str]]] = None,
+        *,
+        observational: bool = False) -> tuple[bool, str]:
     """Atomically create a cluster operation and enqueue its job.
 
     Writes the cluster_operations header, an object_states row
@@ -22618,8 +22678,10 @@ def create_and_enqueue_cluster_operation(
     enqueue_cluster_operation() should normally be preferred -- it
     derives the ``targets`` list from each schema's ``target_fields``
     ClassVar and passes it here so the target rows are written
-    atomically with the operation. Callers using this function
-    directly own the ``targets`` argument themselves.
+    atomically with the operation, and derives ``observational`` from
+    the operation's tasks via is_observational(). Callers using this
+    function directly own the ``targets`` and ``observational``
+    arguments themselves.
 
     Args:
         op_uuid: The operation's UUID (str or UUID).
@@ -22632,6 +22694,10 @@ def create_and_enqueue_cluster_operation(
         targets: Optional list of ``(ObjectType, target_uuid)`` pairs
             recording every object this operation targets. Written to
             cluster_operation_targets in the same transaction.
+        observational: Whether the operation only observes its
+            targets. Stamped on every target row; the default, False,
+            is the conservative value (mutating), which is also what
+            an older client that does not send the flag gets.
 
     Returns:
         A (success, error) tuple. (True, '') on success, including
@@ -22645,10 +22711,10 @@ def create_and_enqueue_cluster_operation(
     if _use_database_service():
         return _grpc_create_and_enqueue_cluster_operation(
             u, operation_type, metadata, created_at,
-            queue_name, delay, targets)
+            queue_name, delay, targets, observational=observational)
     return _direct_create_and_enqueue_cluster_operation(
         u, operation_type, metadata, created_at,
-        queue_name, delay, targets)
+        queue_name, delay, targets, observational=observational)
 
 
 def set_cluster_operation_error(

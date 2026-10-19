@@ -5451,39 +5451,9 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 proto_id),
             target_uuid=data.target_uuid,
             sequence_number=data.sequence_number or 0,
-            created_at=data.created_at
+            created_at=data.created_at,
+            observational=data.observational
         )
-
-    def CreateClusterOperationTarget(
-        self,
-        request: database_pb2.CreateClusterOperationTargetRequest,
-        context: grpc.ServicerContext
-    ) -> database_pb2.StatusReply:
-        """Record a cluster operation targeting an object."""
-        try:
-            self.monitor.counters[
-                'create_cluster_operation_target'].inc()
-            target_object_type = ObjectType.from_proto_id(
-                request.target_object_type)
-            if target_object_type is None:
-                return database_pb2.StatusReply(
-                    success=False,
-                    error='Invalid target_object_type')
-            success = (
-                mariadb._direct_create_cluster_operation_target(
-                    request.operation_uuid,
-                    request.operation_type,
-                    target_object_type,
-                    request.target_uuid,
-                    request.created_at))
-            return database_pb2.StatusReply(
-                success=success, error='')
-        except Exception as e:
-            util_exceptions.ignore_exception(
-                'database CreateClusterOperationTarget failed',
-                e)
-            return database_pb2.StatusReply(
-                success=False, error=str(e))
 
     def RecordEventBatch(
         self,
@@ -6034,11 +6004,19 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 ._direct_list_cluster_operations_for_target(
                     target_object_type,
                     request.target_uuid))
+            # The observational flag travels in its own proto field, not
+            # in metadata_json, so metadata_json stays the same shape
+            # every other cluster operation RPC returns.
+            protos = []
+            for d in items:
+                op = dict(d)
+                observational = op.pop('observational', None)
+                proto = self._cluster_operation_to_proto(op)
+                if observational is not None:
+                    proto.observational = observational
+                protos.append(proto)
             return database_pb2.ListClusterOperationsForTargetReply(
-                items=[
-                    self._cluster_operation_to_proto(d)
-                    for d in items
-                ])
+                items=protos)
         except Exception as e:
             util_exceptions.ignore_exception(
                 'database ListClusterOperationsForTarget failed', e)
@@ -6072,10 +6050,12 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
     ) -> database_pb2.StatusReply:
         """Atomically create a cluster operation and enqueue its work item.
 
-        Writes cluster_operations, object_states and work_queue in a
-        single MariaDB transaction. Audit events are not written by
-        this RPC -- callers emit them via the eventlog service after
-        the RPC returns successfully.
+        Writes cluster_operations, object_states, work_queue and
+        cluster_operation_targets in a single MariaDB transaction,
+        stamping every target row with the request's observational
+        flag. Audit events are not written by this RPC -- callers emit
+        them via the eventlog service after the RPC returns
+        successfully.
         """
         try:
             self.monitor.counters[
@@ -6104,6 +6084,7 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                     request.queue_name,
                     request.delay,
                     targets,
+                    observational=request.observational,
                 )
             )
             return database_pb2.StatusReply(
@@ -6563,7 +6544,6 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_object_metadata', 'set_metadata',
             'delete_object_metadata',
             # MariaDB cluster operation target operations
-            'create_cluster_operation_target',
             'get_cluster_operation_target',
             'get_cluster_operation_targets_for_object',
             'get_latest_cluster_operation_target',

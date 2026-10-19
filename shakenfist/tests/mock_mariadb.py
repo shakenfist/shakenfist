@@ -974,13 +974,6 @@ class MockMariaDB():
             self.mariadb_delete_object_events.stop)
 
         # Mock MariaDB functions for cluster operation targets
-        self.mariadb_create_cluster_operation_target = mock.patch(
-            'shakenfist.mariadb.create_cluster_operation_target',
-            side_effect=self._mariadb_create_cluster_operation_target)
-        self.mariadb_create_cluster_operation_target.start()
-        self.test_obj.addCleanup(
-            self.mariadb_create_cluster_operation_target.stop)
-
         self.mariadb_get_cluster_operation_target = mock.patch(
             'shakenfist.mariadb.get_cluster_operation_target',
             side_effect=self._mariadb_get_cluster_operation_target)
@@ -3425,20 +3418,24 @@ class MockMariaDB():
             f'{object_type}/{object_uuid}): ignored')
         return 0
 
-    def _mariadb_create_cluster_operation_target(
+    def seed_cluster_operation_target(
             self, operation_uuid, operation_type,
-            target_object_type, target_uuid, created_at):
-        """Mock implementation of mariadb.create_cluster_operation_target()"""
+            target_object_type, target_uuid, created_at,
+            observational=False):
+        """Record a cluster_operation_targets row in the mock store.
+
+        The real rows are written inside the atomic enqueue transaction;
+        this is called by the create_and_enqueue mock and by tests that
+        need to seed rows directly. ``observational`` defaults to False,
+        the column's server default.
+        """
         from shakenfist.schema.cluster_operation_target import (
             ClusterOperationTargetData)
 
         if operation_uuid in self.cluster_operation_targets:
-            # Real code (_direct_create_cluster_operation_target in
-            # mariadb.py) swallows IntegrityError on the UNIQUE
-            # constraint and returns True. The mock matches that
-            # behaviour to preserve idempotency semantics.
+            # Keep the first row, as the real UNIQUE constraint does.
             self._trace(
-                f'MockMariaDB.create_cluster_operation_target'
+                f'MockMariaDB.seed_cluster_operation_target'
                 f'({operation_uuid}): duplicate')
             return True
 
@@ -3450,10 +3447,11 @@ class MockMariaDB():
                 target_object_type=str(target_object_type),
                 target_uuid=target_uuid,
                 sequence_number=seq,
-                created_at=created_at
+                created_at=created_at,
+                observational=observational
             ))
         self._trace(
-            f'MockMariaDB.create_cluster_operation_target'
+            f'MockMariaDB.seed_cluster_operation_target'
             f'({operation_uuid}): created seq={seq}')
         return True
 
@@ -3484,9 +3482,15 @@ class MockMariaDB():
 
     def _mariadb_get_latest_cluster_operation_target(
             self, target_object_type, target_uuid):
-        """Mock implementation of mariadb.get_latest_cluster_operation_target()"""
-        results = self._mariadb_get_cluster_operation_targets_for_object(
-            target_object_type, target_uuid)
+        """Mock implementation of mariadb.get_latest_cluster_operation_target()
+
+        Skips observational rows, as the real query does.
+        """
+        results = [
+            d for d in self._mariadb_get_cluster_operation_targets_for_object(
+                target_object_type, target_uuid)
+            if not d.observational
+        ]
         if not results:
             return None
         return results[-1]
@@ -3655,7 +3659,8 @@ class MockMariaDB():
 
     def _mariadb_create_and_enqueue_cluster_operation(
             self, op_uuid, operation_type, metadata,
-            created_at, queue_name, delay=0.0, targets=None):
+            created_at, queue_name, delay=0.0, targets=None, *,
+            observational=False):
         """Mock implementation of the atomic create+enqueue path.
 
         Mirrors the real function's contract: insert-only on
@@ -3665,6 +3670,9 @@ class MockMariaDB():
         cluster_operation_targets row per target in the same call,
         matching the real function which now writes them in the
         same transaction as the operation.
+
+        ``observational`` is stamped on every target row, as the real
+        function does.
         """
         key = str(op_uuid)
         if key in self.cluster_operations_store:
@@ -3710,12 +3718,13 @@ class MockMariaDB():
         # existing target-writer preserves the mock's storage and
         # idempotency semantics.
         for target_object_type, target_uuid in (targets or []):
-            self._mariadb_create_cluster_operation_target(
+            self.seed_cluster_operation_target(
                 operation_uuid=key,
                 operation_type=operation_type,
                 target_object_type=target_object_type,
                 target_uuid=target_uuid,
                 created_at=created_at,
+                observational=observational,
             )
 
         self._trace(

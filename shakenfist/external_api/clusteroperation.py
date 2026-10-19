@@ -54,7 +54,8 @@ clusteroperations_for_target_example = """[
         "operation_type": "net_op",
         "uuid": "22b757ae-41d1-456b-84a4-edca694ceb6d",
         "state": "complete",
-        "tasks": ["network_deploy"]
+        "tasks": ["network_deploy"],
+        "observational": false
     }
 ]"""
 
@@ -377,5 +378,12 @@ class ClusterOperationsEndpoint(api_base.Resource):
             op = _hydrate_op(record.get('uuid'))
             if op is None:
                 continue
-            retval.append(op.external_view())
+            view = op.external_view()
+            # The flag stored on this op's target row, which decides
+            # whether has_pending and last_cluster_operation see it. It is
+            # absent only when an older database service did not report
+            # it; omit it then rather than guess.
+            if 'observational' in record:
+                view['observational'] = record['observational']
+            retval.append(view)
         return retval
