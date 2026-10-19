@@ -13514,6 +13514,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-rdp-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDP frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15913,7 +15941,7 @@ ryll's through its own Makefile, never with a host toolchain.</p>
 <td>high</td>
 <td>opus</td>
 <td>none</td>
-<td>ryll: server-role display serialisers, a configurable display channel, and a slim renderer feature set. See brief notes.</td>
+<td>ryll: server-role display serialisers and a configurable display channel. The slim renderer feature set moved to ryll's <code>PLAN-rdp-frontend.md</code> phase 1. See brief notes.</td>
 </tr>
 <tr>
 <td>3b</td>
@@ -15947,7 +15975,9 @@ ryll's through its own Makefile, never with a host toolchain.</p>
 </table>
 <p>Steps 1a and 1b come first. Step 2 depends only on the relay
 and can run beside 1a. Step 3a can start once 1a has merged,
-and 3b needs 1b and 3a. Steps 4 and 5 need 3b. The management
+and 3b needs 1b, 3a and phase 1 of ryll's
+<code>PLAN-rdp-frontend.md</code> (the slim feature set and the
+renderer's damage accumulator). Steps 4 and 5 need 3b. The management
 session reviews and commits each step, and records each merge
 in this plan.</p>
 <p>Brief notes for 1a:</p>
@@ -16056,11 +16086,15 @@ in this plan.</p>
   none) and whether PREFERRED_VIDEO_CODEC_TYPE is sent, instead
   of the unconditional AUTO_GLZ and [H264, MJPEG]. Defaults stay
   as today for Ryll.</li>
-<li><strong>Slim features.</strong> Make it possible to depend on
-  <code>shakenfist-spice-renderer</code> for display decode without
-  usbredir, webdav, audio or openh264. Report the resulting
-  dependency tree. If openh264 cannot be separated cleanly from
-  stream decode, say so; MJPEG decode must remain.</li>
+<li><strong>Slim features</strong> moved on 2026-10-19 to phase 1 of ryll's
+  <code>PLAN-rdp-frontend.md</code>, which needs the same thing for
+  <code>ryll --rdp</code> and carries this brief over unchanged: depend
+  on <code>shakenfist-spice-renderer</code> for display decode without
+  usbredir, webdav, audio output or openh264, report the
+  dependency tree, and say so if openh264 cannot be separated
+  from stream decode (MJPEG decode must remain). If this step
+  reaches the renderer's <code>Cargo.toml</code> first, coordinate rather
+  than duplicate.</li>
 </ul>
 <p>Brief notes for 3b:</p>
 <ul>
@@ -16077,7 +16111,9 @@ in this plan.</p>
   <code>DisplayChannel</code>, configured to send PREFERRED_COMPRESSION LZ4
   and no codec preference. Apply its events to a
   <code>SurfaceMirror</code>, and accumulate damage rectangles from the
-  events. Ignore STREAM_CLIP and STREAM_DESTROY for unknown
+  events, using the damage accumulator that phase 1 of ryll's
+  <code>PLAN-rdp-frontend.md</code> adds to the renderer rather than
+  writing one in Kerbside. Ignore STREAM_CLIP and STREAM_DESTROY for unknown
   stream ids.</li>
 <li><strong>Client half.</strong> Answer as a display server with the sequence
   in Situation: read DISPLAY_INIT, SURFACE_CREATE for the

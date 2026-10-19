@@ -1493,6 +1493,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rust-projects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rust Projects
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#projects-using-this-infrastructure" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13573,6 +13584,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ryll/plans/PLAN-rdp-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDP frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15618,6 +15657,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rust-projects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rust Projects
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#projects-using-this-infrastructure" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15887,6 +15937,14 @@ rewrite a released tag. <code>RELEASE-SETUP.md</code> step 3 explains why the
 fleet accepts that gap rather than close it with <strong>Restrict updates</strong>.</p>
 <h3 id="step-5-remove-old-release-scripts">Step 5: Remove Old Release Scripts<a class="headerlink" href="#step-5-remove-old-release-scripts" title="Permanent link">&para;</a></h3>
 <p>Delete any existing <code>release.sh</code> and commit the removal.</p>
+<h2 id="rust-projects">Rust Projects<a class="headerlink" href="#rust-projects" title="Permanent link">&para;</a></h2>
+<p>ryll, instar and andris release from
+<a href="https://github.com/shakenfist/development/tree/main/templates/release-automation-rust"><code>templates/release-automation-rust/</code></a>
+instead. It keeps the same CI gate, signing and guards, and adds two
+scripts: one proposes the version bump as a pull request through the
+merge queue, and the other tags the commit that merged it. Its README
+lists the invariants every Rust release keeps, and how each of the
+three repositories fills the workflow's build section.</p>
 <h2 id="projects-using-this-infrastructure">Projects Using This Infrastructure<a class="headerlink" href="#projects-using-this-infrastructure" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

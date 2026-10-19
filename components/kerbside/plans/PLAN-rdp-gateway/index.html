@@ -13580,6 +13580,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ryll/plans/PLAN-rdp-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDP frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15731,6 +15759,16 @@ quickly, so re-check each claim before building on it. Ground
 every claim in the code rather than in this document, and
 flag uncertainty rather than guessing.</p>
 <h2 id="situation">Situation<a class="headerlink" href="#situation" title="Permanent link">&para;</a></h2>
+<p><strong>Superseded on 2026-10-19 by ryll's
+<a href="https://github.com/shakenfist/ryll/blob/develop/docs/plans/PLAN-rdp-frontend.md"><code>PLAN-rdp-frontend.md</code></a>.</strong>
+We decided to build RDP out in ryll first, as a <code>ryll --rdp</code>
+mode over a reusable <code>shakenfist-spice-rdp</code> library crate, and
+to move it into Kerbside once it has proven itself. That plan
+re-checked the IronRDP claims below on 2026-10-19 (several
+were stale: CredSSP, EGFX and H.264 are implemented, the
+routing token is discarded by the acceptor) and carries this
+plan's Kerbside integration work in its <em>Moving to Kerbside</em>
+section. The rest of this file is kept as it was written.</p>
 <p>This plan was written on 2026-09-27 as a statement of
 direction, not a schedule. Its status is <code>Proposed</code>: nothing
 here is committed to, and it may never be built. It is
@@ -16086,43 +16124,43 @@ SPICE session, and nothing on the hypervisor changes.</p>
 <tr>
 <td>1. Go/no-go from the spike, and an RDP prototype outside Kerbside</td>
 <td></td>
-<td>Proposed</td>
+<td>Superseded</td>
 <td></td>
 </tr>
 <tr>
 <td>2. The gateway: display, keyboard, mouse and cursor</td>
 <td></td>
-<td>Proposed</td>
+<td>Superseded</td>
 <td></td>
 </tr>
 <tr>
 <td>3. Control plane: listener, credentials, <code>.rdp</code> files, audit, termination</td>
 <td></td>
-<td>Proposed</td>
+<td>Superseded</td>
 <td></td>
 </tr>
 <tr>
 <td>4. Virtual channels: text clipboard, audio playback, resize</td>
 <td></td>
-<td>Proposed</td>
+<td>Superseded</td>
 <td></td>
 </tr>
 <tr>
 <td>5. CI: an RDP client against the direct-qemu harness</td>
 <td></td>
-<td>Proposed</td>
+<td>Superseded</td>
 <td></td>
 </tr>
 <tr>
 <td>6. Documentation: operator guide, ports, and the fallback framing</td>
 <td></td>
-<td>Proposed</td>
+<td>Superseded</td>
 <td></td>
 </tr>
 <tr>
 <td>7. Push audit</td>
 <td></td>
-<td>Proposed</td>
+<td>Superseded</td>
 <td></td>
 </tr>
 </tbody>

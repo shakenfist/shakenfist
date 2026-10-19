@@ -13442,6 +13442,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-rdp-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RDP frontend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15710,6 +15738,13 @@ obvious, that reason belongs in the plan itself rather than in this table.</p>
 <td>Break the 6,400-line <code>ryll/src/app.rs</code> into an <code>app/</code> module directory along its existing seams, share the draw-op dispatch it duplicates with web mode's <code>SurfaceMirror</code>, group panel state into sub-structs, and enable <code>clippy::too_many_lines</code> so the next god function is visible</td>
 <td>In progress</td>
 <td><a href="/components/ryll/plans/PLAN-app-split-phase-01-reuse/">1. Reuse</a>, <a href="/components/ryll/plans/PLAN-app-split-phase-02-pure-state/">2. Pure state</a>, 3. Events, 4. Panels, 5. Sub-structs, 6. Lint, 7. Push audit</td>
+</tr>
+<tr>
+<td>2026-10-19</td>
+<td><a href="/components/ryll/plans/PLAN-rdp-frontend/">RDP frontend</a></td>
+<td>A <code>--rdp</code> mode of ryll that transcodes SPICE to a stock RDP client (mstsc, FreeRDP) with IronRDP, so users on locked-down desktops or RDP-only networks can reach a console. A reachability fallback, not a better path. Replaces Kerbside's <code>PLAN-rdp-gateway.md</code>; its renderer prep also delivers the slim build and damage tracking Kerbside's transcoding spike needs</td>
+<td>Not started</td>
+<td>1. Renderer prep, 2. RDP skeleton, 3. Cursor and resize, 4. Clipboard and audio, 5. Lifecycle and CI, 6. Docs, 7. Push audit (phase plans pending)</td>
 </tr>
 </tbody>
 </table>
