@@ -17,9 +17,11 @@ completed (see `RELEASE-SETUP.md` in the repository root for details):
 ## Testing
 
 We only release things which have passed CI testing, and preferably have had a
-period running as the underlying cloud for the CI cluster as well. Sometimes in
-an emergency we will bend the rules for a hotfix, but we should try and avoid
-doing that.
+period running as the underlying cloud for the CI cluster as well. The first
+half of that is enforced: the release workflow's `ci-gate` job refuses a tag
+unless `functional-tests.yml` succeeded on the tagged commit (see
+[The CI gate](#the-ci-gate) below). A hotfix goes through the merge queue like
+any other change.
 
 ## Triggering a release
 
@@ -32,6 +34,9 @@ git tag | grep "^v" | sort -V | tail -5
 ```
 
 ### Step 2: Create and push the version tag
+
+Tag a commit that is on `develop` and went through the merge queue, and wait
+for its `functional-tests.yml` run in the queue to finish first.
 
 ```bash
 git checkout develop  # or the appropriate branch
@@ -54,21 +59,51 @@ This triggers the release workflow but does **not** publish anything yet.
 
 The workflow will:
 
-1. Build the Python package and archives (deploy.tgz, docs.tgz)
-2. Sign the release tag using Sigstore/gitsign
-3. Generate attestations for the built artifacts
-4. Publish to PyPI
-5. Create a GitHub Release with all artifacts attached
+1. Check that CI passed on the tagged commit (`ci-gate`)
+2. Build the Python package, run `twine check` and the wheel contents check
+   on it, and build the Ansible collection
+3. Sign the release tag using Sigstore/gitsign
+4. Generate attestations for the built artifacts
+5. Publish the package to PyPI and the collection to Ansible Galaxy
+6. Create a GitHub Release with the package files attached
 
 You can monitor progress in the Actions tab. If any step fails, the workflow
 stops and you can investigate the logs.
 
+## The CI gate
+
+`ci-gate` is the first job in `release.yml`, and both build jobs need it. It
+uses
+[`require-ci-success`](https://github.com/shakenfist/actions/blob/main/docs/actions.md#require-ci-success)
+to check that `functional-tests.yml` succeeded on the tagged commit. The run
+that counts is the commit's merge queue run: a run started by hand, as
+`pr-retest.yml` does with `workflow_dispatch`, does not. So a change merged
+around the queue, by an administrator bypassing it, cannot be released until
+a later commit has gone through the queue. How the gate decides is documented
+with the action, and it has no override.
+
+A gate failure means nothing was built, signed or published, so every failure
+is recoverable. The release automation template's
+[recovery table](https://github.com/shakenfist/development/blob/main/templates/release-automation/README.md#recovering-from-a-gate-failure)
+says what to do for each cause. Usually that is moving the tag to a commit
+that went through the queue, or, for a flaky queue run, using "Re-run jobs"
+on that merge queue run itself and then re-running the `ci-gate` job.
+
+The wheel contents check in `build` is
+[`check-dist`](https://github.com/shakenfist/actions/blob/main/docs/actions.md#check-dist).
+It fails if the wheel holds a test directory or nothing at all. The wheel
+ships the `shakenfist` packages and `shakenfist/data/*.yaml`, and nothing
+under `shakenfist/tests/` or `shakenfist/deploy/`: the unit tests, the Ansible
+collection and the functional CI suites are all used from a checkout.
+
+Running `release.yml` by hand with `workflow_dispatch` skips the gate and the
+publishing jobs, and only builds and checks the packages.
+
 ## What gets released
 
 - **PyPI**: The `shakenfist` Python package
-- **GitHub Releases**: The package files plus:
-    - `deploy.tgz` - Deployment tooling archive
-    - `docs.tgz` - Documentation archive
+- **Ansible Galaxy**: The `shakenfist.shakenfist` collection
+- **GitHub Releases**: The package files
 
 ## Verifying a release
 
@@ -98,6 +133,11 @@ cosign verify-attestation \
 ```
 
 ## Troubleshooting
+
+### `ci-gate` fails
+
+- Nothing was published. Follow the recovery table linked from
+  [The CI gate](#the-ci-gate) above.
 
 ### Workflow doesn't trigger
 

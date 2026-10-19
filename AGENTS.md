@@ -182,6 +182,10 @@ metrics. The headlines:
   [docs/plans/index.md](docs/plans/index.md) first; the reasoning is in
   [docs/developer_guide/ci.md](docs/developer_guide/ci.md).
 
+- **Only a commit whose merge queue run passed can be released.** Merge
+  through the queue, never around it; see
+  [docs/developer_guide/release_process.md](docs/developer_guide/release_process.md#the-ci-gate).
+
 ## Documentation
 
 `docs/` is the home for anything a human would also want to read. This

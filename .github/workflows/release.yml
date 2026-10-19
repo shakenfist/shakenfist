@@ -29,8 +29,49 @@ env:
   PIP_EXTRA_INDEX_URL: https://pypi.org/simple/
 
 jobs:
+  # Fails the release unless the named CI workflows succeeded on the
+  # tagged commit, so that nothing is signed or published from code CI
+  # did not pass. It carries the same push and tag guard as the
+  # publishing jobs, so a workflow_dispatch dry run skips it and still
+  # exercises both builds. See the release automation template's
+  # README.md (in shakenfist/development,
+  # templates/release-automation/) for what counts as CI, and
+  # https://github.com/shakenfist/actions/blob/main/docs/actions.md
+  # (the require-ci-success section) for how the gate works.
+  ci-gate:
+    name: Require CI success on the tagged commit
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: [self-hosted, static]
+
+    permissions:
+      actions: read
+      contents: read
+
+    steps:
+      - name: Require CI success
+        uses: shakenfist/actions/require-ci-success@main
+        # A few API calls per commit, at most 21 commits, and up to
+        # five pages of the default branch's history.
+        timeout-minutes: 5
+        with:
+          workflows: |
+            functional-tests.yml
+
   build:
     name: Build distribution packages
+    needs: ci-gate
+    # A skipped ci-gate would otherwise skip this job too, so the
+    # guard lets a skipped gate through, but only on a run that
+    # publishes nothing. A tag push always runs the gate, and this job
+    # then needs its success. A workflow_dispatch skips the gate by
+    # design, and never reaches a publishing job. The ${{ }} wrapper
+    # is required: YAML reads a bare value starting with "!" as a tag.
+    # build-collection carries the same guard, because it is the other
+    # root of the graph: publish-collection reaches the release
+    # environment through it.
+    if: >-
+      ${{ !cancelled() && (needs.ci-gate.result == 'success' ||
+      (github.event_name != 'push' && needs.ci-gate.result == 'skipped')) }}
     runs-on: [self-hosted, static]
 
     steps:
@@ -54,6 +95,10 @@ jobs:
         run: |
           release-venv/bin/twine check dist/*
 
+      - name: Check the wheel contents
+        timeout-minutes: 2
+        uses: shakenfist/actions/check-dist@main
+
       - name: Upload distribution artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -62,6 +107,11 @@ jobs:
 
   build-collection:
     name: Build ansible collection
+    needs: ci-gate
+    # Guarded as build is, for the reasons given there.
+    if: >-
+      ${{ !cancelled() && (needs.ci-gate.result == 'success' ||
+      (github.event_name != 'push' && needs.ci-gate.result == 'skipped')) }}
     runs-on: [self-hosted, static]
 
     steps:
@@ -87,17 +137,17 @@ jobs:
           name: collection
           path: dist-collection/
 
-  # The four publishing jobs are guarded so that a workflow_dispatch
-  # run only ever exercises the build and the twine check. The event
-  # is tested as well as the ref because a dispatch can be aimed at a
-  # tag: the ref test alone passes there, and the run re-signs and
-  # force-pushes a tag that already exists, rewriting a signed object
-  # someone may already have verified. Aimed at a branch instead, an
-  # unguarded sign-tag computes a tag name of the literal string
-  # "refs/heads/<branch>" and force-pushes a garbage
-  # refs/tags/refs/heads/<branch> ref. Nothing is lost by requiring
-  # push: re-running a failed release goes through "Re-run jobs",
-  # which keeps the original push event.
+  # The four publishing jobs, and ci-gate above, are guarded so that
+  # a workflow_dispatch run only ever exercises the builds and the
+  # package checks. The event is tested as well as the ref because a
+  # dispatch can be aimed at a tag: the ref test alone passes there,
+  # and the run re-signs and force-pushes a tag that already exists,
+  # rewriting a signed object someone may already have verified. Aimed
+  # at a branch instead, an unguarded sign-tag computes a tag name of
+  # the literal string "refs/heads/<branch>" and force-pushes a
+  # garbage refs/tags/refs/heads/<branch> ref. Nothing is lost by
+  # requiring push: re-running a failed release goes through "Re-run
+  # jobs", which keeps the original push event.
   sign-tag:
     name: Sign release tag with Sigstore
     needs: build

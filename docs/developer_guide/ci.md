@@ -375,6 +375,11 @@ A failed `Can merge` ejects the pull request from the queue, and
 [merge failure triage](#merge-failure-triage) then classifies the failure
 automatically.
 
+The queue run is also the one a release counts: `release.yml`'s `ci-gate`
+job accepts a tag only on a commit whose merge queue run of
+`functional-tests.yml` succeeded. So merge through the queue, never around
+it; see [the release process](release_process.md#the-ci-gate).
+
 ### The issue link check
 
 `Can enqueue` also needs the `Issue links` job, which calls the reusable
@@ -426,6 +431,8 @@ Every job that can run in the queue and holds a scarce runner carries a
 `functional_matrix_merge_collection` entries and `ansible_modules_collection`
 through the shared `smoke-cluster.yml`, and `node_lifecycle_collection`,
 `schema_enum_widening` and `automated_delinter` in this repository.
+`sanity_checks` holds only a static runner, but is keyed the same way so that
+a superseded queue run does not finish its lint and unit tests either.
 
 `github.ref` is the obvious key and is right on every other event. On
 `merge_group` it is the per-attempt queue branch
@@ -473,6 +480,16 @@ on, which is no worse than before the check existed. A run judged superseded
 whose self-cancellation does not land exits non-zero instead, skipping every
 queue job and failing `Can merge` on a commit the queue has already
 abandoned.
+
+Only a run's first attempt uses the base-branch key; the keys in this
+repository test `github.run_attempt == '1'` as well as the event. A re-run is
+not a queue build: it keeps its original `merge_group` event, so with the
+base-branch key a "Re-run jobs" on an old queue run, which is how a release
+recovers from a flaky queue run, would cancel the live queue entry or be
+cancelled by it. A re-run therefore keeps its own queue branch's group.
+`smoke-cluster.yml` in `shakenfist/actions` does not carry that guard yet, so
+re-running an old queue run's collection jobs still shares a group with the
+live entry's.
 
 Raising `max_entries_to_build` breaks both halves: the key would cancel live
 queue entries building in parallel, and a parallel entry is not built on the

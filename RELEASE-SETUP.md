@@ -53,6 +53,12 @@ This ensures releases only happen after explicit approval.
    - Add a rule: `v*` (to only allow release tags)
 8. Click **Save protection rules**
 
+The consistency audit's `release-environment-protection` criterion
+checks this: the environment must exist, have a required reviewer, and
+deploy only from tags. It is described in
+`docs/audits/release-environment-protection.md` in
+shakenfist/development.
+
 ### 3. Configure Protected Tags (Recommended)
 
 This prevents unauthorized users from creating release tags.
@@ -81,8 +87,15 @@ Verification can be done by anyone using `cosign` or `gitsign verify`.
 
 1. A maintainer pushes a tag matching `v*` (e.g., `v0.8.0`)
 2. The `release.yml` workflow triggers
-3. The workflow builds the package and waits for environment approval
-4. A required reviewer approves the release in GitHub's UI
+3. The `ci-gate` job checks that `functional-tests.yml` succeeded on
+   the tagged commit, in its merge queue run. The workflow builds the
+   package and the Ansible collection only if the gate passed, and
+   then waits for environment approval
+4. A required reviewer approves the release in GitHub's UI. The
+   reviewer is approving a release whose CI the gate has already
+   checked, so the approval is a decision about the release, not a
+   substitute for looking at CI. The deployment review page does not
+   show CI status, which is why the gate has no override
 5. The workflow:
    - Creates a signed git tag using gitsign (Sigstore)
    - Generates Sigstore attestations for the built artifacts
