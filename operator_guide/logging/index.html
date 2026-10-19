@@ -15676,7 +15676,13 @@ instead:</p>
 <p>The full set of JSON field names (the base fields plus the
 <code>with_fields</code> conventions) is documented as a stable contract in
 the <code>shakenfist_utilities</code> library, in
-<a href="https://github.com/shakenfist/library-utilities/blob/develop/docs/log-record-fields.md"><code>docs/log-record-fields.md</code></a>.</p>
+<a href="https://github.com/shakenfist/library-utilities/blob/develop/docs/log-record-fields.md"><code>docs/log-record-fields.md</code></a>.
+That document also covers how a field value that JSON cannot encode
+natively (raw bytes, an enum member, a model object such as a
+<code>State</code>) is rendered. Before shakenfist-utilities 0.8.9 such a value
+lost the whole record to a <code>--- Logging error ---</code> traceback on
+stderr, which accounted for about 650 missing records a day (issue
+4509).</p>
 <h2 id="buffering-backpressure-and-durability">Buffering, backpressure and durability<a class="headerlink" href="#buffering-backpressure-and-durability" title="Permanent link">&para;</a></h2>
 <p>The shipper is modelled on Shaken Fist's eventlog spool/drainer
 (see <a href="../events/">Events</a>). Each daemon process holds its own
