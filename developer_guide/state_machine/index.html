@@ -15548,6 +15548,13 @@ done because the <code>error</code> transition is a queue job and happens someti
 Instances in the <code>error</code> state are not removed like those in the <code>deleted</code> state,
 as we assume a caller must acknowledge an error occurred. To remove them, delete
 the instance in <code>error</code> state.</p>
+<p>An instance whose start can never run is errored the same way. If the
+operation carrying its preflight, start and create tasks is ended by a
+<code>depends_on</code> dependency that is missing, failed, or never reaches a terminal
+state, the instance moves to <code>initial-error</code> (and then <code>error</code>) with the reason
+<code>instance start abandoned: ...</code>, rather than staying in <code>initial</code> indefinitely.
+See <a href="../network_dispatcher/#dependency-waiting-and-deferred-re-queue">dependency waiting</a>
+for when that happens.</p>
 <p>The state model also permits a <code>creating</code> or <code>created</code> instance to move directly
 to <code>error</code>, and any of the <code>*-error</code> transition states to move on to <code>delete-wait</code>
 or <code>deleted</code> as well as to <code>error</code>. An instance in <code>error</code> (or one of the

@@ -16240,13 +16240,35 @@ seconds. The defer cycle is:</p>
 <ol>
 <li>The op is dequeued.</li>
 <li>The dispatcher checks each entry in <code>op.depends_on</code>.</li>
-<li>If any dependency is still in <code>initial</code>, <code>queued</code>, or <code>preflight</code>, the op is
-   deferred with a delay drawn from the back-off map and the loop moves on.</li>
-<li>If a dependency is in <code>error</code>, <code>deleted</code>, or <code>abort</code>, the op itself is
-   transitioned to <code>abort</code> or <code>error</code> and removed from the map.</li>
+<li>If any dependency is still in <code>initial</code>, <code>queued</code>, <code>preflight</code>, or
+   <code>executing</code>, the op is deferred with a delay drawn from the back-off map and
+   the loop moves on. Once the op has been deferred
+   <code>DEPENDENCY_DEFER_BUDGET</code> (30) times, about six minutes, the wait is
+   abandoned instead (<code>abandon_dependency_wait()</code>) and the op is aborted.</li>
+<li>If a dependency no longer exists the op goes to <code>error</code>
+   (<code>cancel_for_missing_dependency()</code>); if it is in <code>error</code>, <code>deleted</code>, or
+   <code>abort</code> the op goes to <code>abort</code> (<code>abort_for_unsuitable_dependency()</code>).
+   In both cases, as for an abandoned wait, the op's map entry is dropped.</li>
 <li>When all dependencies are satisfied the op executes normally and its map
    entry is dropped.</li>
 </ol>
+<p>Each of the three ways a dependency ends an op in steps 3 and 4 also calls the
+op's <code>_dependency_failed()</code> hook, provided the op is still <code>queued</code> and so has
+never run. Ending the op alone tells a client watching its target nothing, so
+an op class whose targets would be left half-built overrides the hook.
+<code>NodeInstNetdescOp</code> (instance preflight, start and create) errors its instance,
+which would otherwise sit in <code>initial</code> indefinitely (issue 4542). The base class
+does nothing. These methods live on <code>BaseClusterOperation</code> so that <code>sf-queues</code>
+and <code>sf-network</code> share one implementation.</p>
+<p>The hook runs before the op's state is written, not after. Both dispatchers
+skip an op that is already terminal before looking at its dependencies (a work
+item the stuck-row reaper re-queues can name an op that has already finished),
+so a hook that raised after the op had gone terminal would never be retried.
+Raising <code>DatabaseUnavailable</code> or <code>StateWriteFailed</code> while the op is still
+<code>queued</code> leaves the work item to the reaper, and the retry calls the hook again.
+Overrides must therefore be idempotent. Any other exception from the hook is
+recorded as an audit event and the op is ended anyway: the dispatchers resolve
+the work item for those, so an op left <code>queued</code> would have nothing to retry it.</p>
 <h2 id="exponential-back-off-map">Exponential back-off map<a class="headerlink" href="#exponential-back-off-map" title="Permanent link">&para;</a></h2>
 <p>The back-off map (<code>self._defer_delays</code>, a plain <code>dict[str, float]</code>) records the
 next defer delay for each op UUID. Constants:</p>
