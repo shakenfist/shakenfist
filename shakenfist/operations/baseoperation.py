@@ -12,6 +12,7 @@ from shakenfist import exceptions
 from shakenfist import mariadb
 from shakenfist.operations.error_report import ErrorReport
 from shakenfist.schema.operations.baseclusteroperation import PRIORITY
+from shakenfist.util import exceptions as util_exceptions
 
 
 class BaseOperationException(Exception):
@@ -778,10 +779,117 @@ class BaseClusterOperation(BaseOperation):
                     'defer_count': self.current_defer_count
                 })
 
+        self._end_for_dependency(
+            BaseClusterOperation.STATE_ABORT, 'failed to abort operation',
+            f'gave up waiting for dependency {dep_op.object_type} '
+            f'{dep_op.uuid}, which was still {dep_op.state.value}')
+
+    def abort_for_unsuitable_dependency(
+            self, dep_op: 'BaseClusterOperation') -> None:
+        """Abort this operation because a dependency failed.
+
+        Called by the dispatchers when a ``depends_on`` operation is in
+        error, aborted or deleted. It lives here rather than in either
+        dispatcher for the reason ``abandon_dependency_wait`` gives.
+        """
+        self.add_event(
+            EVENT_TYPE_AUDIT,
+            'aborting operation, as dependency is unsuitable',
+            extra={
+                'dep_object_type': dep_op.object_type,
+                'dep_object_uuid': dep_op.uuid,
+                'dep_object_state': dep_op.state.value
+            })
+
+        self._end_for_dependency(
+            BaseClusterOperation.STATE_ABORT, 'failed to abort operation',
+            f'dependency {dep_op.object_type} {dep_op.uuid} is '
+            f'{dep_op.state.value}')
+
+    def cancel_for_missing_dependency(self, dep: dict[str, Any]) -> None:
+        """Error this operation because a dependency no longer exists.
+
+        Called by the dispatchers when a ``depends_on`` operation cannot
+        be loaded. It lives here rather than in either dispatcher for
+        the reason ``abandon_dependency_wait`` gives.
+        """
+        self.add_event(
+            EVENT_TYPE_AUDIT,
+            'cancelling operation, as dependency does not exist',
+            extra={
+                'dep_object_type': dep['op_type'],
+                'dep_object_uuid': dep['op_uuid']
+            })
+        self._end_for_dependency(
+            BaseClusterOperation.STATE_ERROR,
+            'failed to mark operation as errored',
+            f'dependency {dep["op_type"]} {dep["op_uuid"]} does not exist')
+
+    def _end_for_dependency(self, new_state: str, failure_message: str,
+                            reason: str) -> None:
+        """End this operation because of a ``depends_on`` dependency.
+
+        Shared by the three helpers above. Only an operation still
+        queued has never run, so only then are its targets told. An
+        operation the dispatcher sees again after it started (a worker
+        crash, or a resolve the stuck-row reaper retries) did not fail
+        to run, and an instance it already finished starting must not
+        be errored because a dependency has since been cleaned up.
+
+        The targets are told before the state write rather than after.
+        Both dispatchers skip operations already in a terminal state, so
+        a hook which raised DatabaseUnavailable after the operation had
+        gone terminal would never be retried. Raising with the operation
+        still queued leaves the work item to the stuck-row reaper, and
+        the retry calls the hook again.
+
+        That only holds for the two exceptions the dispatchers hand to
+        the reaper. Any other exception from the hook would resolve the
+        work item with the operation still queued and nothing behind it
+        -- stuck forever, which is the outcome the hook exists to
+        prevent -- so it is recorded and the state write goes ahead.
+
+        A transition which is no longer legal is recorded, not raised:
+        the operation has already ended some other way.
+        """
+        if self.state.value == BaseClusterOperation.STATE_QUEUED:
+            try:
+                self._dependency_failed(reason)
+            except (exceptions.DatabaseUnavailable,
+                    exceptions.StateWriteFailed):
+                raise
+            except Exception as e:
+                util_exceptions.ignore_exception('dependency_failed', e)
+                self.add_event(
+                    EVENT_TYPE_AUDIT,
+                    'failed to tell targets the operation will never run',
+                    extra={'error': str(e)})
+
         try:
-            self.state = BaseClusterOperation.STATE_ABORT  # type: ignore[misc]
+            self.state = new_state  # type: ignore[misc]
         except exceptions.InvalidStateException:
-            self.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
+            self.add_event(EVENT_TYPE_AUDIT, failure_message)
+
+    def _dependency_failed(self, reason: str) -> None:
+        """Tell this operation's targets that it will never run.
+
+        Each of the three ways a ``depends_on`` dependency can end an
+        operation (missing, unsuitable, or a wait abandoned once the
+        defer budget is spent) calls this, but only for an operation
+        which has never started -- see ``_end_for_dependency``. A
+        ``runs_after`` wait never calls it, because the operation still
+        runs. Ending the operation alone says nothing to a client
+        watching the object the operation was meant to change: an
+        instance whose start was abandoned stays in ``initial``,
+        indistinguishable from one still being built (issue 4542).
+
+        The default does nothing, which suits operations whose targets
+        are left usable by the operation never running. Operations
+        whose targets are not, override it. An override may be called
+        more than once for the same operation (the stuck-row reaper
+        retries one which raised), so it must be idempotent.
+        """
+        pass
 
     def is_outstanding(self) -> bool:
         if self.state.value in [BaseClusterOperation.STATE_ERROR,

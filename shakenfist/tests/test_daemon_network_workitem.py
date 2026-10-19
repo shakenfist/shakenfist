@@ -396,7 +396,8 @@ class DependencyDeferBudgetTest(base.ShakenFistTestCase):
     defer_count the work item persists, so it survives daemon restarts
     and the back-off map's FIFO eviction."""
 
-    def _run(self, defer_count, dep_kind):
+    def _run(self, defer_count, dep_kind,
+             dep_state=BaseClusterOperation.STATE_QUEUED, dep_missing=False):
         mock_op = mock.MagicMock()
         mock_op.uuid = OP_UUID
         mock_op.state.value = BaseClusterOperation.STATE_QUEUED
@@ -407,10 +408,10 @@ class DependencyDeferBudgetTest(base.ShakenFistTestCase):
         setattr(mock_op, dep_kind, [dep])
 
         mock_dep_op = mock.MagicMock()
-        mock_dep_op.state.value = BaseClusterOperation.STATE_QUEUED
+        mock_dep_op.state.value = dep_state
 
         dep_class = mock.MagicMock()
-        dep_class.from_db.return_value = mock_dep_op
+        dep_class.from_db.return_value = None if dep_missing else mock_dep_op
 
         from shakenfist.daemons.network.workitem import Job
         job = Job.__new__(Job)
@@ -433,6 +434,32 @@ class DependencyDeferBudgetTest(base.ShakenFistTestCase):
         mock_op.defer.assert_not_called()
         mock_op.execute.assert_not_called()
         # The worker's back-off entry is dropped with the wait.
+        self.assertNotIn(str(OP_UUID), defer_delays)
+
+    def test_failed_dependency_aborts_through_the_operation(self):
+        """Issue 4542: the abort lives on the operation, which is what
+        tells the operation's targets it will never run."""
+        for state in [BaseClusterOperation.STATE_ERROR,
+                      BaseClusterOperation.STATE_ABORT,
+                      BaseClusterOperation.STATE_DELETED]:
+            with self.subTest(state=state):
+                mock_op, mock_dep_op, defer_delays = self._run(
+                    0, 'depends_on', dep_state=state)
+
+                mock_op.abort_for_unsuitable_dependency.assert_called_once_with(
+                    mock_dep_op)
+                mock_op.defer.assert_not_called()
+                mock_op.execute.assert_not_called()
+                self.assertNotIn(str(OP_UUID), defer_delays)
+
+    def test_missing_dependency_cancels_through_the_operation(self):
+        mock_op, _, defer_delays = self._run(
+            0, 'depends_on', dep_missing=True)
+
+        mock_op.cancel_for_missing_dependency.assert_called_once_with(
+            {'op_type': 'net_op', 'op_uuid': 'dep-uuid'})
+        mock_op.defer.assert_not_called()
+        mock_op.execute.assert_not_called()
         self.assertNotIn(str(OP_UUID), defer_delays)
 
     def test_depends_on_below_budget_still_defers(self):
