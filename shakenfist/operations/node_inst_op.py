@@ -59,7 +59,7 @@ class NodeInstOp(BaseClusterOperation):
             'operation_uuid': self.uuid,
             'node_uuid': self.node_uuid,
             'instance_uuid': self.instance_uuid,
-            'tasks': self.tasks
+            'tasks': [t.name for t in self.tasks]
         })
 
     # Static values
