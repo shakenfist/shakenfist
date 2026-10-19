@@ -16377,9 +16377,10 @@ while planning it.</p>
 <li><strong>#4415</strong> (open): SPICE certificate renewal never fires, and
   certificates expire after 365 days (found while planning; see
   Situation). Phase 1 fixes it and closes the issue.</li>
-<li><strong>#4416</strong> (open): the SPICE private key is installed
-  world-readable. Phase 1 adds the parameters a fix needs, but
-  leaves the default unchanged; see its Future work.</li>
+<li><strong>#4416</strong> (fixed outside this plan): the SPICE private key was
+  installed world-readable. Phase 1 added the parameters a fix
+  needed, and a later change made the default <code>root:kvm 0440</code>.
+  Key rotation (phase 1's D5) is no longer blocked on it.</li>
 <li><strong>#4004</strong> (closed by #4024) delivered the first increment
   only. This plan is the remainder; phase 2 comments on #4004
   with a link here.</li>
