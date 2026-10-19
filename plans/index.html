@@ -15613,6 +15613,13 @@ numbers here it cannot recompute.</p>
 <td>Proposed</td>
 <td>—</td>
 </tr>
+<tr>
+<td>2026-10-18</td>
+<td><a href="PLAN-deleted-object-sweep/">Keep the deleted-object sweep ahead of its arrivals</a></td>
+<td>The hard-delete sweep on sfcbr is 1.6M objects behind and losing ground by 24-43k a day: it refills only on restart, drains one FIFO across every type so whole types starve, and manages 30-120 objects an hour. Measure where a hard delete spends its time, then drain fairly and with bounded reads, make hard deletes cheaper, and drain sfcbr behind a published per-type backlog gauge; closes <a href="https://github.com/shakenfist/shakenfist/issues/4473">#4473</a></td>
+<td>In progress</td>
+<td>0 of 5</td>
+</tr>
 </tbody>
 </table>
 

@@ -16843,6 +16843,18 @@ daemon process:</p>
   maintainer, and dropped entirely when that node loses the election.
   Zero in steady state; see <a href="/operator_guide/database/">the operator guide on the
   database</a> for a sample alert.</li>
+<li><code>cluster_deleted_object_queue_depth{object_type}</code> — gauge,
+  sf-cluster: entries waiting in the deleted-object sweep's queue. The
+  value after a queue fill is the per-type backlog. Published only by
+  the elected cluster maintainer.</li>
+<li><code>cluster_deleted_object_seconds{object_type,outcome}</code> — histogram,
+  sf-cluster: wall time spent on each entry of the deleted-object
+  queue, by how the entry ended (<code>gone</code>, <code>not_final</code>, <code>too_young</code>,
+  <code>hard_deleted</code> or <code>failed</code>).</li>
+<li><code>database_client_rpc_seconds{sweep,object_type,operation}</code> —
+  histogram, database client: wall time of database RPCs (including
+  retries) made inside a timing scope, which today is only the
+  deleted-object sweep. Other daemons export no samples for it.</li>
 </ul>
 <p>See <a href="/operator_guide/events/">the operator guide on events</a> for alert
 recommendations and the full metrics reference.</p>
