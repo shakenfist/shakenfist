@@ -8,6 +8,10 @@ Shaken Fist is composed of a series of components. There is Shaken Fist itself, 
 from systems. This is useful for CI test environments, but also for customer
 support.
 
+* [Hunky Dory](/components/hunkydory/) is a VS Code extension that keeps the
+`@@` hunk headers in a patch file correct while you edit it, for those of us
+who maintain patches as source.
+
 * [Kerbside](/components/kerbside/) is a SPICE protocol native VDI proxy
 responsible for providing rich VDI experiences to users of Shaken Fist
 and OpenStack.

@@ -63,6 +63,13 @@ jobs:
           path: development
           fetch-depth: 0
 
+      - name: Checkout the hunkydory repository
+        uses: actions/checkout@v7
+        with:
+          repository: shakenfist/hunkydory
+          path: hunkydory
+          fetch-depth: 0
+
       - name: Checkout the instar repository
         uses: actions/checkout@v7
         with:
