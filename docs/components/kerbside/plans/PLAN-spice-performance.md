@@ -882,14 +882,16 @@ Other deferred items:
 - Report spice-server 0.15.2's crash when a client connects
   while streams already exist, once it has been reproduced
   against spice-server's current master.
-- **RDP out.** `PLAN-rdp-gateway.md` (proposed 2026-09-27)
-  depends on phase 3. It reuses the terminating renderer, the
-  damage stream and the per-session worker to serve RDP to
-  clients whose networks block SPICE. Its case is
-  reachability, not latency, so phase 3's write-up should say
-  separately whether renderer accuracy and CPU per session
-  would support it, even if the verdict for SPICE out is
-  no-go.
+- **RDP out.** `PLAN-rdp-gateway.md` (proposed 2026-09-27) is
+  superseded by ryll's `PLAN-rdp-frontend.md` (2026-10-19),
+  which builds RDP out as `ryll --rdp` first and moves it here
+  once proven. Its case is reachability, not latency, so it
+  does not wait for phase 3. Its phase 1 takes over step 3a's
+  slim renderer feature set and adds a damage accumulator to
+  ryll's renderer, both of which step 3b then builds on.
+  Phase 3's write-up should still say whether
+  renderer accuracy and CPU per session would support RDP out
+  in Kerbside, since that decides the eventual move.
 
 ## Bugs fixed during this work
 

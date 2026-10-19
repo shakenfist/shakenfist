@@ -168,6 +168,16 @@ fleet accepts that gap rather than close it with **Restrict updates**.
 
 Delete any existing `release.sh` and commit the removal.
 
+## Rust Projects
+
+ryll, instar and andris release from
+[`templates/release-automation-rust/`](https://github.com/shakenfist/development/tree/main/templates/release-automation-rust)
+instead. It keeps the same CI gate, signing and guards, and adds two
+scripts: one proposes the version bump as a pull request through the
+merge queue, and the other tags the commit that merged it. Its README
+lists the invariants every Rust release keeps, and how each of the
+three repositories fills the workflow's build section.
+
 ## Projects Using This Infrastructure
 
 | Project | PyPI Package | Status |

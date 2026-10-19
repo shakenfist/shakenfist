@@ -23,6 +23,17 @@ flag uncertainty rather than guessing.
 
 ## Situation
 
+**Superseded on 2026-10-19 by ryll's
+[`PLAN-rdp-frontend.md`](https://github.com/shakenfist/ryll/blob/develop/docs/plans/PLAN-rdp-frontend.md).**
+We decided to build RDP out in ryll first, as a `ryll --rdp`
+mode over a reusable `shakenfist-spice-rdp` library crate, and
+to move it into Kerbside once it has proven itself. That plan
+re-checked the IronRDP claims below on 2026-10-19 (several
+were stale: CredSSP, EGFX and H.264 are implemented, the
+routing token is discarded by the acceptor) and carries this
+plan's Kerbside integration work in its *Moving to Kerbside*
+section. The rest of this file is kept as it was written.
+
 This plan was written on 2026-09-27 as a statement of
 direction, not a schedule. Its status is `Proposed`: nothing
 here is committed to, and it may never be built. It is
@@ -315,13 +326,13 @@ Specifically:
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 1. Go/no-go from the spike, and an RDP prototype outside Kerbside | | Proposed | |
-| 2. The gateway: display, keyboard, mouse and cursor | | Proposed | |
-| 3. Control plane: listener, credentials, `.rdp` files, audit, termination | | Proposed | |
-| 4. Virtual channels: text clipboard, audio playback, resize | | Proposed | |
-| 5. CI: an RDP client against the direct-qemu harness | | Proposed | |
-| 6. Documentation: operator guide, ports, and the fallback framing | | Proposed | |
-| 7. Push audit | | Proposed | |
+| 1. Go/no-go from the spike, and an RDP prototype outside Kerbside | | Superseded | |
+| 2. The gateway: display, keyboard, mouse and cursor | | Superseded | |
+| 3. Control plane: listener, credentials, `.rdp` files, audit, termination | | Superseded | |
+| 4. Virtual channels: text clipboard, audio playback, resize | | Superseded | |
+| 5. CI: an RDP client against the direct-qemu harness | | Superseded | |
+| 6. Documentation: operator guide, ports, and the fallback framing | | Superseded | |
+| 7. Push audit | | Superseded | |
 
 Nothing starts until `PLAN-spice-performance.md` phase 3 has
 reported. Phases 2 and 3 can run in parallel once phase 1
