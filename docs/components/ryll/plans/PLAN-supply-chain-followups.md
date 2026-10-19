@@ -123,6 +123,25 @@ below. When an ignore is resolved, delete both the
 - **Remove ignore when:** `ttf-parser` no longer appears in
   `cargo tree`, or maintenance resumes upstream.
 
+### 5. `zvariant` / `zbus_names` / `zvariant_derive` unmaintained (RUSTSEC-2026-0370, -0371, -0372)
+
+- **Ignore rationale:** upstream folded all three crates
+  into `zbus` 6.0.0 (as its `zvariant` and `names` modules)
+  and stopped maintaining them standalone. They reach us via
+  eframe's Linux accessibility stack (`egui-winit` ->
+  `accesskit_winit` -> `accesskit_unix` -> `atspi` /
+  `zbus` 5.x), so there is nothing to change on our side
+  until accesskit moves to `zbus` 6.
+- **Attack surface:** D-Bus message (de)serialisation for
+  the AT-SPI accessibility bus on Linux. Unmaintained-status
+  advisories, not vulnerabilities.
+- **Action plan:**
+  1. Track accesskit / atspi for a migration to `zbus` 6.
+  2. Re-check on each eframe upgrade (we already take these
+     via renovate).
+- **Remove ignore when:** `zbus` 5.x (and with it these
+  three crates) no longer appears in `cargo tree`.
+
 ## Also tracked: duplicate-version warnings
 
 `cargo deny check` currently reports ~45 duplicate-version

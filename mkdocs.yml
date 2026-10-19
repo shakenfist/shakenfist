@@ -149,6 +149,7 @@ nav:
                 - "Audit: README absolute links": components/development/audits/readme-absolute-links.md
                 - "Audit: README structure": components/development/audits/readme-structure.md
                 - "Audit: Release artifacts exclude docs/plans": components/development/audits/release-artifacts-exclude-plans.md
+                - "Audit: Release environment protection": components/development/audits/release-environment-protection.md
                 - "Audit: Release process": components/development/audits/release-process.md
                 - "Audit: Renovate for dependency bumps": components/development/audits/renovate.md
                 - "Audit: Renovate groups for lockstep dependency families": components/development/audits/renovate-lockstep-groups.md
@@ -175,12 +176,18 @@ nav:
                 - "Plan: stestr / testtools version pin": components/development/plans/PLAN-stestr-testtools.md
                 - "Plan: the image supply chain, from end-of-life migration to production that reports its own failures": components/development/plans/PLAN-image-supply-chain.md
                 - "Plan: the size of a review unit": components/development/plans/PLAN-review-unit-size.md
+                - "Release gating": components/development/plans/PLAN-release-gating.md
                 - "Renovate cadence": components/development/plans/PLAN-renovate-cadence.md
                 - "Review coverage steady state": components/development/plans/PLAN-review-coverage.md
                 - "Review import": components/development/plans/PLAN-review-import.md
                 - "Shaken Fist Project Consistency Plan": components/development/plans/PLAN-consistency.md
                 - "Systematic whole-codebase review tracking": components/development/plans/PLAN-code-review-tracking.md
                 - "Workflow ref trust": components/development/plans/PLAN-workflow-ref-trust.md
+        - Hunky Dory:
+            - "Introduction": components/hunkydory/index.md
+            - "Testing": components/hunkydory/testing.md
+            - "The ambiguous cases": components/hunkydory/ambiguity.md
+            - "The hunk header format": components/hunkydory/hunk-format.md
         - Instar:
             - "Introduction": components/instar/index.md
             - "`instar amend` — change qcow2 image options in place": components/instar/amend.md

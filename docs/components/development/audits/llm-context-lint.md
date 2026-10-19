@@ -58,6 +58,9 @@ N/A would close every open one at once. The consistency-audit
 workflow installs a pinned skillsaw and checks its version before the
 audit runs, so the state should not arise. See "What each status
 means" in [docs/consistency-audits.md](/components/development/consistency-audits/).
+Markdown that will never load as a skill is the exception: it is
+found without skillsaw, so a repository holding some still fails,
+with the details saying that skillsaw was not run.
 
 ### How skillsaw is run
 

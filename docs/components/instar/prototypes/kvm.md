@@ -65,6 +65,14 @@ regions can be configured in different slots.
 To run 64-bit code, the vCPU must be configured in long mode before the guest
 starts. This requires setting up:
 
+> On Linux 6.12.112 and newer, `KVM_SET_SREGS` refuses a long-mode EFER
+> unless `KVM_SET_CPUID2` has already run on that vCPU, because a new
+> vCPU's guest CPUID advertises no long mode. The prototypes and the
+> pseudocode below predate that and omit the call, so they fail with
+> `EINVAL`; see the `setup_cpuid` helper in `src/vmm/src/main.rs` and
+> [docs/guest-architecture.md](/components/instar/guest-architecture/) for what the
+> shipped VMM does.
+
 ### Control Registers
 
 | Register | Bits to Set | Purpose |

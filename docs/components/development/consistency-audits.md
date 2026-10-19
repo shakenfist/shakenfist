@@ -124,6 +124,11 @@ permissions, each read-only:
   `security_and_analysis`, which GitHub leaves out of the repository
   for a caller without admin access.
 
+These are enough for `release-environment-protection` too: the token
+was confirmed on 2026-10-19 to read both
+`environments/<name>` and its `deployment-branch-policies` without a
+separate Environments permission.
+
 Each leg checks first that the read token is set -- an unset secret
 is an empty string, and `gh` with an empty `GH_TOKEN` falls back to
 whatever login the runner's user holds -- and that it can see those
@@ -242,7 +247,10 @@ scheduled run of `main`.
 repository the work has to happen in, labelled `consistency` (the label
 is created if missing). The body names the failing check, quotes the
 detail the check produced, and links the spec file and template so
-whoever picks it up has the implementation to hand.
+whoever picks it up has the implementation to hand. The detail and
+every listed item are quoted as code spans: they are text out of the
+audited repository, and as prose an `@org/team` in them would notify,
+and their markdown would render, under the bot's identity.
 
 A check whose fix is per item can carry the items as well. Returning a
 `missing` list renders them as bullets under **Missing items**, and a
@@ -251,7 +259,11 @@ check that reports things present which should not be rather than
 things absent. `details` still has to stand alone, because that is what
 the compliance page prints into a table cell, so it carries the count
 and the guidance while the list carries the locations. The worked
-examples are `review-scope-completeness` and `eol-distro`.
+examples are `review-scope-completeness` and `eol-distro`. Those two
+keys are the only ones the body renders, so a list under any other
+name reaches the result JSON and nobody else;
+`test_every_extra_result_key_is_one_the_issue_renders` in
+`scripts/tests/test_metadata.py` refuses one.
 
 Aggregate across the fleet with:
 

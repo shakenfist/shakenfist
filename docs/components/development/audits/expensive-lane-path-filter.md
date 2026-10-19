@@ -24,6 +24,10 @@ Two mechanisms count:
   `paths:` / `paths-ignore:`. An inclusion-style `paths:` list (naming
   what the lane exercises, as the rust workflows do) excludes
   everything else by construction and passes without pattern checks.
+  Only the `pull_request` trigger's filters count: a `push` trigger's
+  `paths:` does nothing for a pull request, and `merge_group` takes
+  no path filters. The exclusions are read from that trigger's
+  `paths-ignore:` list, block or inline.
 - A workflow backing a required status check must use a filter job
   instead — `dorny/paths-filter` feeding job-level `if:` conditions, as
   kerbside's `check_paths` jobs do. Trigger-level filtering cannot
@@ -37,9 +41,15 @@ kerbside is the worked example: `functional-tests.yml`,
 `check_paths` filter job, `functional-tests.yml` also runs its filter
 on `merge_group`, and
 [kerbside's docs/testing.md](https://github.com/shakenfist/kerbside/blob/develop/docs/testing.md)
-documents the design. When adopting it, note dorny/paths-filter's
+documents the design. A filter job's exclusions are looked for
+anywhere in the workflow, since its patterns sit in the job's own
+`filters:` input. When adopting it, note dorny/paths-filter's
 `predicate-quantifier: 'every'` trap: the default ANY-match semantics
 make a `'**'` pattern defeat every exclusion.
+
+Comments do not count anywhere in this: a `# TODO: also ignore
+docs/**` excludes nothing, and a filter job mentioned only in a comment
+is not a filter job.
 
 Dedicated content-scanner workflows are exempt. Their whole point is to
 read the human-written text a filter would skip: a secret lands in docs

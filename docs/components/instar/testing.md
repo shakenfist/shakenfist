@@ -1146,12 +1146,16 @@ refuse for want of it — breaking other people's pull requests, not this
 repository's own gates. The one-argument form is a cross-repository contract
 and exists on every branch. The job also loses nothing by it: on the static
 `claude-code` fleet it never meets the disk, so it always wants the whole
-tree resparsified anyway. The exception is
-`coverage-fuzz.yml`, which prepares the tree only to seed fuzz corpora and
-never asks `qemu-img info` for an allocated size, so the fully allocated
-tree costs it disk and nothing else. git and git-lfs write each file
-out fully allocated, so a clone or an `lfs pull` fills the images' sparse
-holes with real zeros: the tree becomes about 7.5 GiB of mostly zeros, and
+tree resparsified anyway.
+
+`coverage-fuzz` is the one job that prepares testdata and does not
+resparsify: it uses the tree only to seed fuzz corpora and never asks
+`qemu-img info` for an allocated size, so the fully allocated tree costs it
+disk and nothing else.
+
+Resparsifying is needed at all because git and git-lfs write each file out
+fully allocated, so a clone or an `lfs pull` fills the images' sparse holes
+with real zeros: the tree becomes about 7.5 GiB of mostly zeros, and
 `qemu-img info` reports an allocated size that belongs to git rather than to
 the fixture, which the disk_size comparisons check. The script restores the
 holes with `cp --sparse=always`, over `downloaded/` only and over the five
@@ -1203,8 +1207,8 @@ That refusal is deliberate and its blast radius is worth knowing before you
 meet it. The `--files-from` list on the cache path comes from git, not from an
 operator, so a single instar-testdata commit adding a symlink under
 `downloaded/` with an image extension and a target outside the checkout would
-fail the resparsify step on **all eight labelled jobs at once**, and keep
-failing until that commit is fixed. Fleet-wide CI failure with
+fail the resparsify step on **all seven jobs that call the wrapper at once**,
+and keep failing until that commit is fixed. Fleet-wide CI failure with
 `resparsify-testdata: refusing …: resolves outside …` in it is a testdata
 commit to look at, not an instar regression; the refusal message names the
 list file the entry came from for that reason. Refusing is still the right
@@ -1214,12 +1218,15 @@ failure here that is nobody's pull request.
 Everything else in a list is filtered rather than refused, and the filtering
 is done without resolving each entry: a candidate that is relative, free of
 `..`, and either outside `downloaded/` or not an image extension is dropped on
-the string alone. That matters because the list is not bounded by the number
-of images — its stat-dirty component names every tracked path, so a cache
-whose index did not survive the handoff names all ~770,000 — and a process per
-entry would turn the step into a job timeout, hiding the warning that
-diagnoses it. `tools/ci/test-resparsify-testdata.sh` counts the resolutions
-rather than timing the run.
+the string alone, and refused if it was named as an argument rather than read
+from a list. That applies to a symlink too, whatever it points at: the link's
+own name has to pass before its target is looked at. That matters because the
+list is not bounded by the number of images — its stat-dirty component names
+every tracked path, so a cache whose index did not survive the handoff names
+all ~770,000 — and a process per entry would turn the step into a job
+timeout, hiding the warning that diagnoses it.
+`tools/ci/test-resparsify-testdata.sh` counts the resolutions rather than
+timing the run.
 
 ## Expected Output Overrides
 

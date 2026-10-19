@@ -11,7 +11,9 @@
 * A release job which attaches assets downloads them to a named
   destination (`name:` or `merge-multiple: true`) and sets
   `fail_on_unmatched_files: true`, so that a glob matching nothing
-  fails the job instead of publishing an empty release.
+  fails the job instead of publishing an empty release. A quoted
+  `"true"` is the same value: an action receives every input as a
+  string.
 * Where `release.yml` offers `workflow_dispatch`, its publishing jobs
   are confined to a pushed tag with
   `if: github.event_name == 'push' && startsWith(github.ref,
@@ -30,7 +32,9 @@
 * The steps reading the distribution (`subject-path` on the attestation,
   `files` on the release) name the directory the download actually
   filled. Moving one and not the other leaves a step globbing an empty
-  directory.
+  directory. A glob is compared by the directory it reads, so
+  `dist/*.tar.gz` agrees with a download to `dist/`. A block scalar
+  (`files: |`, one path per line) is not read, and so is not judged.
 * A job running a known container action (`pypa/gh-action-pypi-publish`)
   takes its paths relative to the workspace, and therefore checks out.
   The runner does mount its directories into the container, but not

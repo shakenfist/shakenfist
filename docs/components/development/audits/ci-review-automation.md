@@ -30,8 +30,12 @@ workflow files alone, so a reviewer confirms it instead.
   requires that export to be `'true'` in its `if:`.
 * `pr-re-review.yml` confirms that the tree it checked out is the commit
   its resolve step validated, on the head fallback path as well as the
-  merge path: the step comparing `HEAD^2` has no `if:` and also
-  compares `HEAD`.
+  merge path. The confirm step has no `if:`, and it is either a call to
+  `shakenfist/actions/pr-review-ref@main` with `mode: confirm`, as the
+  template makes, or inline shell that compares `HEAD^2` and also
+  compares `HEAD`, as copies made before that action existed carry. A
+  call's `head-sha` and `merged` inputs read the outputs of those names
+  from the same action's `mode: resolve` step in that job.
 * The retired comment addresser is gone from the tree, as below.
 
 ### Required, but confirmed by a reviewer
@@ -43,7 +47,10 @@ workflow files alone, so a reviewer confirms it instead.
   project's `check-bot-commit` job too. A compliant hand-written job
   that uses the shared action still passes, because only the
   measurement above is made.
-* The calling job sets `pull-requests: write` and `issues: write`.
+* The calling job sets `contents: read` and `pull-requests: write`.
+  `issues: write` is not needed, since the reviewer files no issues; a
+  caller that still grants it is not at fault, because the reusable
+  workflow narrows what it is given.
 * The automatic review does not pass `force`, and runs on
   same-repository pull requests only.
 * Optional, for suites prone to drift: `pr-fix-tests.yml` +
@@ -94,11 +101,27 @@ fallback review be of a commit nobody validated. Measured rather than
 left to the template because every adopter copied the earlier one
 (shakenfist/development#172).
 
+The comparison itself lives in `pr-review-ref`, where its tests run
+every path against a stub `gh` and real git repositories, so a call to
+it is all that is measured, with what it is fed: a copy re-synced by
+hand from the inline shape keeps that shape's `head_sha` output name,
+which the action does not set, so the confirm step has no sha to
+confirm against and fails every run. The reverse half re-sync, an
+inline confirm step reading the action's resolve outputs by the old
+name, is worse: it compares the checkout against an empty sha and
+tells the requester the pull request moved, every run. So in a job
+that resolves through the action, any step reading an output the
+action does not set in resolve mode is a finding. The inline shape
+still passes because it works, and a repository should not be filed
+against for a copy that is correct; it is a re-sync to make when
+convenient, not a defect.
+
 **Same-repository pull requests only.** The diff is untrusted input,
 and the reviewer reads it on a shared, long-lived runner pool in a job
 that holds a write-capable token. Claude Code runs there with
-read-only tools and without the token in its environment, but a
-fork's diff would reach it with nobody having read it first. So the
+read-only tools, confined to the checkout and without the token in its
+environment (shakenfist/actions#168), but a fork's diff would reach it
+with nobody having read it first. So the
 bot never reviews a fork pull request, whoever asks. To have a fork's
 change reviewed, a maintainer pushes the branch to the repository and
 opens the pull request from there.

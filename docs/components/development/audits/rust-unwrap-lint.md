@@ -22,6 +22,11 @@ Concretely, we require:
    unwrap_used = "warn"
    ```
 
+   The table form, `unwrap_used = { level = "warn", priority = -1 }`,
+   is accepted too. The level is read from the value, not from a
+   comment after it, so `unwrap_used = "allow"  # was "deny"` is not
+   enabled.
+
 2. A `clippy.toml` at the repository root exempts test code:
 
    ```toml
