@@ -90,17 +90,26 @@ argument_specs:
             A map of node name to mesh IP for every host in the cluster, used to
             render /etc/hosts. Same value on every host. The example playbook
             builds it from inventory.
-      deploy_name:
+      deploy_name: &deploy_name_option
         type: str
         default: "sf"
         description:
-          - The deployment/zone name. Becomes SHAKENFIST_ZONE.
-      api_url:
+          - >-
+            The deployment/zone name. Becomes SHAKENFIST_ZONE, and the name of
+            the console source kerbside_source builds for Kerbside.
+      api_url: &api_url_option
         type: str
         default: "http://localhost:13000"
         description:
-          - The cluster's API URL, written into sfrc and the global auth file so
-            sf-client on this node can reach the API.
+          - >-
+            The cluster's API URL, written into sfrc and the global auth file
+            so sf-client on this node can reach the API.
+          - >-
+            On a Kerbside host, kerbside_source makes it the url of the
+            console source it builds, from which Kerbside fetches the console
+            token signing key. The default only works on a Kerbside host which
+            is also a Shaken Fist node, so kerbside_source refuses a loopback
+            URL on one which is not (kerbside_colocated false).
       floating_network_ipblock:
         type: str
         default: "10.10.0.0/24"
@@ -243,6 +252,53 @@ argument_specs:
             16 characters. Empty, the default, mints nothing; removing it
             later does not delete the key, which is revoked with
             sf-client namespace delete-key system kerbside.
+          - >-
+            On a Kerbside host, kerbside_source refuses it empty, and makes it
+            the password of the console source it builds.
+      kerbside_sf_ca_cert: &kerbside_sf_ca_cert_option
+        type: str
+        default: ""
+        description:
+          - >-
+            The PEM content of the CA which Shaken Fist's /admin/cacert serves,
+            which kerbside_source makes the ca_cert of the console source it
+            builds, and refuses unless it holds a PEM certificate. Kerbside
+            refuses to fetch the console token signing key unless the two
+            match. The example playbook reads it from the first database-tier
+            host's /etc/pki/libvirt-spice/ca-cert.pem, the file /admin/cacert
+            serves.
+          - >-
+            null means the CA is not known yet, as before Shaken Fist is
+            deployed: the source then carries a placeholder, and the check is
+            skipped. The example playbook passes null when it validates the
+            Kerbside configuration, and the CA when it deploys Kerbside.
+      kerbside_url_on_sf_nodes: &kerbside_url_on_sf_nodes_option
+        type: str
+        default: null
+        description:
+          - >-
+            kerbside_url as Shaken Fist's nodes see it. When it is supplied,
+            kerbside_source requires kerbside_url to equal it byte for byte,
+            since the one variable is both Shaken Fist's KERBSIDE_URL and
+            Kerbside's console token audience, and a difference makes every
+            console token fail Kerbside's audience check.
+          - >-
+            Not supplied (null), the default, skips the check. An empty string
+            means Shaken Fist's nodes have no kerbside_url, which fails it. The
+            example playbook supplies it from the first allsf host's
+            variables, so kerbside_url kept only where the kerbside hosts read
+            it (group_vars/kerbside) is refused before any host is changed.
+      kerbside_colocated: &kerbside_colocated_option
+        type: bool
+        default: false
+        description:
+          - >-
+            Whether this Kerbside host is also a Shaken Fist node. When it is,
+            kerbside_source reserves the ports Shaken Fist's daemons listen on
+            (13000, 13001 and 13005-13007 by default) as well as the instance
+            console range; when it is not, kerbside_source refuses a loopback
+            api_url, since nothing answers there. The example playbook sets it
+            per host, from the allsf group.
       federation_jwks_ca_bundle:
         type: str
         default: ""
@@ -392,3 +448,37 @@ argument_specs:
             hostvars[cluster_db_host]['node_mesh_ip'].
       sf_ctl_path: *sf_ctl_path_option
       cluster_db_host: *cluster_db_host_option
+  kerbside_source:
+    short_description: Describe this Shaken Fist cluster to a Kerbside on this host.
+    description:
+      - >-
+        Run on each Kerbside host, with that host's own variables, before the
+        shakenfist.kerbside collection's kerbside role: once before any host is
+        changed, with kerbside_sf_ca_cert null, and again when Kerbside is
+        deployed, with the CA. Changes nothing on the host, and reads no
+        inventory groups.
+      - >-
+        Fails when kerbside_system_key is empty; when kerbside_sf_ca_cert is
+        not null and holds no PEM certificate; when api_url is a loopback URL
+        and kerbside_colocated is false; or when kerbside_url_on_sf_nodes is
+        supplied and differs from kerbside_url. No message includes the key.
+      - >-
+        Then sets the fact kerbside_sf_source, the console source through
+        which Kerbside scrapes this cluster: source deploy_name, type
+        shakenfist, url api_url, username system, password kerbside_system_key
+        and ca_cert kerbside_sf_ca_cert, or a placeholder while that is null.
+        It is a secret, set under no_log, and the consuming playbook puts it
+        first in the kerbside role's kerbside_sources.
+      - >-
+        And sets the fact kerbside_reserved_ports, which the kerbside role
+        reads: the instance console range, every port from 30000, on every
+        Kerbside host, and the ports Shaken Fist's daemons listen on when
+        kerbside_colocated is true.
+    options:
+      kerbside_system_key: *kerbside_system_key_option
+      kerbside_sf_ca_cert: *kerbside_sf_ca_cert_option
+      api_url: *api_url_option
+      deploy_name: *deploy_name_option
+      kerbside_url: *kerbside_url_option
+      kerbside_url_on_sf_nodes: *kerbside_url_on_sf_nodes_option
+      kerbside_colocated: *kerbside_colocated_option

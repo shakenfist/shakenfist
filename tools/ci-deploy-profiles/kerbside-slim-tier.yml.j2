@@ -23,10 +23,12 @@
     * The cluster is deployed twice, and no sf-* or kerbside-* unit may
       restart on the second deploy.
     * The functional tests are told a VDI console proxy is expected.
+    * shakenfist.kerbside, the collection with the kerbside role, is installed
+      from Galaxy before the first deploy, in the range
+      examples/_shared/requirements.yml pins, so the row deploys the release
+      an operator gets.
 
-  kerbside_package is deliberately not set: the role's default, kerbside>=0.7.0
-  from PyPI, keeps Kerbside's installed files, and so its restart hash, the
-  same across the two deploys. kerbside_token_duration is left at its default.
+  kerbside_token_duration is left at its default.
 
   Every secret is lower-case letters, digits and hyphens only, so none needs
   escaping in a URL (the password sits in kerbside_sql_url), in kerbside.ini
@@ -73,6 +75,12 @@ mariadb_sql: |
 
 redeploy_check:
   units: ['sf-*.service', 'kerbside-*.service']
+
+# The same range as examples/_shared/requirements.yml, which site.yml refuses
+# an installed shakenfist.kerbside outside of.
+collections:
+  - name: shakenfist.kerbside
+    version: '>=0.8.0,<0.9.0'
 
 test_env:
   SF_CI_EXPECT_VDI_CONSOLE_PROXY: '1'

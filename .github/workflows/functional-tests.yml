@@ -266,18 +266,17 @@ jobs:
           . /tmp/venv-test/bin/activate
           tools/ci-test-kerbside-cluster-config.sh
 
-      # Rootless test of the kerbside role's validate, bootstrap (against a
-      # stub virtualenv) and config entry points (register needs systemd,
-      # MariaDB and Shaken Fist, so it waits for the cluster lane), and of
-      # examples/_shared/site.yml's Kerbside plays.
-      # Needs the ansible-core which ansible-lint brought in above, which
-      # also brings the cryptography and PyYAML config's helper scripts use,
-      # and openssl.
-      - name: Test the kerbside role
+      # Rootless test of how examples/_shared/site.yml and the node role's
+      # kerbside_source entry point wire in the kerbside role, which lives in
+      # Kerbside's shakenfist.kerbside collection and is tested there. Needs
+      # the ansible-core which ansible-lint brought in above, openssl and
+      # certtool, and Ansible Galaxy, from which it installs the release
+      # examples/_shared/requirements.yml pins.
+      - name: Test the Kerbside wiring
         timeout-minutes: 5
         run: |
           . /tmp/venv-test/bin/activate
-          tools/ci-test-kerbside-role.sh
+          tools/ci-test-kerbside-wiring.sh
 
       - name: Attempt to install requirements
         timeout-minutes: 5

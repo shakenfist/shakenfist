@@ -4,18 +4,19 @@
 A SPICE client given a host-subject compares it with the subject of the
 certificate the server presents. Shaken Fist renders a hypervisor's subject
 for that comparison in shakenfist.node._spice_host_subject_from_cert(), and
-the kerbside role renders the proxy's with a copy of the same rules
-(roles/kerbside/files/kerbside-host-subject.py). The functional tests need a
-third renderer, to check that the host-subject Kerbside hands out matches the
-certificate its proxy actually presents: the attributes in certificate (DER)
-order, each as SHORT=value with OpenSSL's short name, backslash and then comma
-escaped in values, joined by a comma with no space.
+the shakenfist.kerbside collection's kerbside role renders the proxy's with a
+copy of the same rules (its roles/kerbside/files/kerbside-host-subject.py).
+The functional tests need a third renderer, to check that the host-subject
+Kerbside hands out matches the certificate its proxy actually presents: the
+attributes in certificate (DER) order, each as SHORT=value with OpenSSL's
+short name, backslash and then comma escaped in values, joined by a comma with
+no space.
 
 This is a copy of those rules rather than an import of node.py, because the
 functional suite does not depend on the server package. It imports nothing
-from the rest of the suite either, so that
-shakenfist/tests/test_kerbside_host_subject.py can load it by path and hold
-it to node.py over the same certificates the role's script is held to.
+from the rest of the suite either, so that shakenfist/tests/test_spice_subject.py
+can load it by path and hold it to node.py over generated certificates. The
+role's script is held to the same renderings in Kerbside.
 """
 
 from cryptography import x509

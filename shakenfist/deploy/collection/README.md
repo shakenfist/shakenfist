@@ -19,7 +19,6 @@ another host's facts, so the roles compose cleanly with any inventory layout.
 | `shakenfist.shakenfist.hypervisor` | Hypervisor host preparation: nested KVM detection/enable, KSM, `vhost_vsock`, SPICE TLS, and the libvirt AppArmor/config tweaks. Apply only to hosts where `node_is_hypervisor` is true. |
 | `shakenfist.shakenfist.network` | Network node preparation: removes the distro `dnsmasq` unit, installs the DHCP/DNS templates, enables IPv4 forwarding, and validates the mesh interface MTU. Apply only to hosts where `node_is_network_node` is true. |
 | `shakenfist.shakenfist.internal_ca` | Internal certificate authority: generates a CA on the control node, then issues a certificate for any host, SPICE TLS by default, and distributes the certificates to it (see [Certificates](#certificates)). |
-| `shakenfist.shakenfist.kerbside` | Deploys a [Kerbside](https://github.com/shakenfist/kerbside) VDI console proxy: validates the configuration, installs Kerbside into its own virtualenv, renders its configuration, certificate and systemd units, runs its database migrations and waits for it to fetch Shaken Fist's console token signing key. Has `validate`, `bootstrap`, `config` and `register` entry points. Apply only to hosts in the optional `kerbside` group (see [Kerbside](#kerbside)). |
 
 ## Idempotence and restart-on-change
 

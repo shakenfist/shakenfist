@@ -1,0 +1,14 @@
+---
+# The collections site.yml uses besides shakenfist.shakenfist. It needs
+# shakenfist.kerbside only to deploy Kerbside, that is with hosts in a kerbside
+# inventory group. Install them with:
+#
+#     ansible-galaxy collection install -r examples/_shared/requirements.yml
+#
+# site.yml reads the version range below from this file, and refuses an
+# installed shakenfist.kerbside outside it before any host is changed. The
+# slim-tier CI deploy profile (tools/ci-deploy-profiles/) repeats the range,
+# so a change here belongs there too.
+collections:
+  - name: shakenfist.kerbside
+    version: '>=0.8.0,<0.9.0'

@@ -86,6 +86,16 @@ kerbside_system_key: ""
 # uses the literal path.
 sf_ctl_path: /srv/shakenfist/venv/bin/sf-ctl
 
+# Inputs of the kerbside_source entry point which describe one Kerbside host,
+# and which the consuming playbook passes per host. The CA Shaken Fist's
+# /admin/cacert serves, null while it is not known yet; an empty value is
+# refused. kerbside_url as Shaken Fist's nodes see it, which must equal
+# kerbside_url; null skips that check. Whether this Kerbside host is also a
+# Shaken Fist node.
+kerbside_sf_ca_cert: ""
+kerbside_url_on_sf_nodes: null
+kerbside_colocated: false
+
 # Extra certificate authorities to trust when fetching a federated identity
 # provider's JWKS. Empty means the system trust store alone. Set this to a
 # path on the nodes when the provider is behind a private CA, which a self

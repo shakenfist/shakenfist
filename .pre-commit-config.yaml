@@ -67,13 +67,14 @@ repos:
         files: ^(shakenfist/deploy/collection/roles/node/(tasks/kerbside_(preflight|credentials)\.yml|meta/argument_specs\.yml|defaults/main\.yml|templates/config)|examples/_shared/site\.yml|tools/ci-test-kerbside-cluster-config\.sh)$
         pass_filenames: false
 
-      # Requires: ansible-core, openssl
-      - id: test-kerbside-role
-        name: Test the kerbside role
-        description: Drive the kerbside role's validate, bootstrap and config entry points and site.yml's Kerbside plays, rootless
-        entry: tools/ci-test-kerbside-role.sh
+      # Requires: ansible-core, openssl, gnutls-bin (certtool), and network
+      # access to Ansible Galaxy, from which it installs shakenfist.kerbside
+      - id: test-kerbside-wiring
+        name: Test the Kerbside wiring
+        description: Check and drive site.yml's Kerbside plays and the node role's kerbside_source against the shakenfist.kerbside release requirements.yml pins, rootless
+        entry: tools/ci-test-kerbside-wiring.sh
         language: system
-        files: ^(shakenfist/deploy/collection/roles/kerbside/|shakenfist/deploy/collection/roles/internal_ca/(defaults|tasks|vars)/|examples/_shared/site\.yml$|tools/ci-test-kerbside-role\.sh$)
+        files: ^(examples/_shared/(site|requirements)\.yml|shakenfist/deploy/collection/roles/node/(tasks/kerbside_source\.yml|meta/argument_specs\.yml|defaults/main\.yml)|shakenfist/deploy/collection/roles/internal_ca/(defaults|tasks|vars)/.*|tools/ci-test-kerbside-wiring\.sh)$
         pass_filenames: false
 
   # Flake8 style checking via tox

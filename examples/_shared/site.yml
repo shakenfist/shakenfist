@@ -30,18 +30,42 @@
 # key), and the optional sf_build_local_wheels / repo_path / client_repo_path
 # for a git-checkout deploy.
 #
-# With a kerbside group, the Kerbside hosts also need kerbside_public_fqdn,
-# kerbside_sql_url and kerbside_auth_secret_seed (both secrets), and may
-# override the kerbside role's other defaults: its packages, ports and the
-# three proxy certificate paths (kerbside_proxy_cert_path,
-# kerbside_proxy_key_path and kerbside_cacert_path). kerbside_url and
-# kerbside_system_key must be visible to both the allsf and the kerbside hosts
-# (group_vars/all, not group_vars/kerbside): Shaken Fist's nodes render
-# kerbside_url as KERBSIDE_URL and mint the credential, Kerbside renders the
-# same values as its token audience and its source password, and the Kerbside
-# validation play refuses a kerbside_url the two sides see differently.
-# On a Kerbside host which is not in allsf, api_url must be an address of the
-# Shaken Fist API that host can reach, not a loopback address.
+# With a kerbside group, Kerbside is deployed by the kerbside role of the
+# shakenfist.kerbside collection, which Kerbside publishes and which is not
+# part of shakenfist.shakenfist. Install it, at the versions this playbook
+# accepts, with:
+#
+#     ansible-galaxy collection install -r examples/_shared/requirements.yml
+#
+# The Kerbside hosts also need kerbside_public_fqdn, kerbside_sql_url and
+# kerbside_auth_secret_seed (both secrets), and may override the kerbside
+# role's other defaults: its packages, ports and the three proxy certificate
+# paths (kerbside_proxy_cert_path, kerbside_proxy_key_path and
+# kerbside_cacert_path). kerbside_url and kerbside_system_key must be visible
+# to both the allsf and the kerbside hosts (group_vars/all, not
+# group_vars/kerbside): Shaken Fist's nodes render kerbside_url as KERBSIDE_URL
+# and mint the credential, Kerbside renders the same values as its token
+# audience and its source password, and the Kerbside validation play refuses a
+# kerbside_url the two sides see differently. On a Kerbside host which is not
+# in allsf, api_url must be an address of the Shaken Fist API that host can
+# reach, not a loopback address.
+#
+# The role's kerbside_sources and kerbside_reserved_ports are built here, not
+# read from the inventory. The node role's kerbside_source entry point builds
+# this cluster's console source from deploy_name, api_url, kerbside_system_key
+# and the CA /admin/cacert serves, and reserves the ports Shaken Fist uses. The
+# optional kerbside_extra_sources (a secret: a list of further console sources,
+# such as oVirt, OpenStack or static ones, each in the form kerbside_sources
+# takes) is appended after this cluster's source.
+#
+# shakenfist.kerbside is a soft dependency. This playbook reaches its role only
+# through ansible.builtin.include_role, never import_role or a play's roles:
+# list, which ansible resolves while it parses the playbook, whether or not the
+# play would run. So without the collection installed the playbook still
+# parses, and deploys a cluster with no kerbside group. With one, the Kerbside
+# validation play names the install command when the collection is missing,
+# and refuses a version outside the range requirements.yml pins, before any
+# host is changed. Keep it that way: every use of the role is an include_role.
 
 
 # ---------------------------------------------------------------------------
@@ -140,20 +164,33 @@
 
 # ---------------------------------------------------------------------------
 # Refuse a Kerbside configuration which cannot work, before any host is
-# changed. The kerbside role's validate entry point runs on every reachable
-# Kerbside host, with that host's own variables: operators commonly keep the
-# Kerbside settings in group_vars/kerbside, which localhost cannot see, so
-# validating on localhost would refuse a correct inventory, and a host_vars
-# override on one Kerbside host is seen by no other, so validating one host
-# would miss it. With no kerbside group this play matches no host and nothing
-# runs, which is the feature-off path.
+# changed. The node role's kerbside_source entry point, and then the kerbside
+# role's validate entry point, run on every reachable Kerbside host, with that
+# host's own variables: operators commonly keep the Kerbside settings in
+# group_vars/kerbside, which localhost cannot see, so validating on localhost
+# would refuse a correct inventory, and a host_vars override on one Kerbside
+# host is seen by no other, so validating one host would miss it. With no
+# kerbside group this play matches no host and nothing runs, which is the
+# feature-off path, and needs no shakenfist.kerbside installed.
 #
+# kerbside_source builds this cluster's console source and the ports Kerbside
+# must leave alone, and refuses what only Shaken Fist can judge.
 # kerbside_colocated says whether this Kerbside host is also a Shaken Fist
-# node, where validate refuses a Kerbside port a Shaken Fist daemon uses, and
-# where a loopback api_url reaches that node's own sf-api.
-# kerbside_url_on_sf_nodes is kerbside_url as the Shaken Fist nodes see it.
-# validate requires it to equal the Kerbside hosts' kerbside_url, since the one
-# variable is both Shaken Fist's KERBSIDE_URL and Kerbside's token audience.
+# node, whose daemons' ports are then reserved, and where a loopback api_url
+# reaches that node's own sf-api. kerbside_url_on_sf_nodes is kerbside_url as
+# the Shaken Fist nodes see it, which kerbside_source requires to equal the
+# Kerbside hosts' kerbside_url, since the one variable is both Shaken Fist's
+# KERBSIDE_URL and Kerbside's token audience. Shaken Fist is not deployed yet,
+# so the CA its /admin/cacert serves is not known: kerbside_sf_ca_cert is null,
+# the source carries a placeholder, and the Deploy Kerbside play builds it
+# again with the CA.
+#
+# validate runs in a block whose rescue stops the deploy either way: naming the
+# install command when the role could not be loaded at all, and otherwise
+# pointing at validate's refusal. public exposes the role's
+# kerbside_collection_version, which is then checked against the range
+# requirements.yml pins. A checkout of Kerbside reports unreleased, which is
+# accepted with a warning, so a Kerbside pull request can deploy its own role.
 # any_errors_fatal makes a refusal on any one host end the whole run, not just
 # this play's hosts, so no later play touches allsf.
 # ---------------------------------------------------------------------------
@@ -162,15 +199,119 @@
   gather_facts: false
   become: false
   any_errors_fatal: true
+  vars:
+    # The version range requirements.yml pins shakenfist.kerbside to, read
+    # from the file itself so the pin has one source. playbook_dir is this
+    # file's directory, also when another playbook imports it.
+    kerbside_collection_range: >-
+      {{ ((lookup('ansible.builtin.file', playbook_dir ~ '/requirements.yml') | from_yaml).collections
+          | selectattr('name', 'equalto', 'shakenfist.kerbside') | first).version | string }}
+    # What the installed collection says it is, empty when it says nothing.
+    kerbside_collection_reported: "{{ kerbside_collection_version | default('') | string }}"
+    # The clauses of the range a released version fails, compared as
+    # ansible-galaxy compares them, joined as text; empty when it meets every
+    # one, and when there is no release version to compare.
+    kerbside_collection_unmet: >-
+      {%- set ns = namespace(unmet=[]) -%}
+      {%- if kerbside_collection_reported not in ['', 'unreleased'] -%}
+      {%- for clause in kerbside_collection_range.split(',') | map('trim') | reject('in', ['', '*']) -%}
+      {%- set operator = clause | regex_replace('^([<>=!]*).*$', '\\1') -%}
+      {%- set test = {'': 'eq', '==': 'eq', '!=': 'ne', '>=': 'ge', '>': 'gt', '<=': 'le',
+                      '<': 'lt'}[operator] -%}
+      {%- if kerbside_collection_reported is not version(clause[operator | length:] | trim, test,
+                                                         version_type='semver') -%}
+      {%- set ns.unmet = ns.unmet + [clause] -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {%- endif -%}
+      {{ ns.unmet | join(', ') }}
+    # Why the installed collection is not one this playbook accepts, or
+    # nothing when it is (ansible renders an empty template as None, hence the
+    # default('', true) wherever it is read).
+    kerbside_collection_problem: >-
+      {%- if kerbside_collection_reported == '' -%}
+      shakenfist.kerbside does not report its version, so it predates the
+      releases this playbook accepts ({{ kerbside_collection_range }})
+      {%- elif kerbside_collection_unmet | default('', true) | length > 0 -%}
+      shakenfist.kerbside {{ kerbside_collection_reported }} is installed, but
+      requirements.yml pins {{ kerbside_collection_range }}
+      {%- endif -%}
   tasks:
-    - name: Run the kerbside role's validate entry point
+    - name: Build this cluster's Kerbside source and reserved ports
       ansible.builtin.include_role:
-        name: shakenfist.shakenfist.kerbside
-        tasks_from: validate
+        name: shakenfist.shakenfist.node
+        tasks_from: kerbside_source
       vars:
-        kerbside_hosts: "{{ groups.get('kerbside', []) }}"
         kerbside_colocated: "{{ inventory_hostname in groups['allsf'] }}"
         kerbside_url_on_sf_nodes: "{{ hostvars[groups['allsf'][0]]['kerbside_url'] | default('') }}"
+        kerbside_sf_ca_cert: null
+
+    - name: Validate the Kerbside configuration with the kerbside role
+      block:
+        - name: Run the kerbside role's validate entry point
+          ansible.builtin.include_role:
+            name: shakenfist.kerbside.kerbside
+            tasks_from: validate
+            public: true
+          vars:
+            kerbside_hosts: "{{ groups.get('kerbside', []) }}"
+            kerbside_sources: "{{ [kerbside_sf_source] + kerbside_extra_sources | default([]) }}"
+      rescue:
+        # Three ways here. The role could not be loaded, which leaves
+        # kerbside_collection_version, the role's own variable, undefined:
+        # that is how a role which is not installed fails. One of validate's
+        # tasks refused this host, which defines ansible_failed_task. Or this
+        # host passed and another failed, which any_errors_fatal brings every
+        # host here for. A rescue which did not fail would let the deploy
+        # carry on past a refusal, so this always fails.
+        - name: Stop the deploy, saying what to fix
+          ansible.builtin.fail:
+            msg: >-
+              {% if kerbside_collection_version is not defined -%}
+              shakenfist.kerbside is not installed; run ansible-galaxy
+              collection install -r examples/_shared/requirements.yml (the
+              kerbside role could not be loaded; if shakenfist.kerbside is
+              installed, the error above says why).
+              {%- else -%}
+              {%- if ansible_failed_task is defined -%}
+              The kerbside role refused the Kerbside configuration on
+              {{ inventory_hostname }} in its task "{{ ansible_failed_task.name }}",
+              for the reason above.
+              {%- else -%}
+              The kerbside role refused the Kerbside configuration on another
+              Kerbside host, for the reason above, so {{ inventory_hostname }}
+              stops too.
+              {%- endif -%}
+              {%- if kerbside_collection_problem | default('', true) | length > 0 %}
+              {{ kerbside_collection_problem }}, which may be why: install a
+              release in that range with ansible-galaxy collection install
+              --force -r examples/_shared/requirements.yml.
+              {%- endif -%}
+              {%- endif %}
+
+    - name: Refuse a shakenfist.kerbside outside the range requirements.yml pins
+      ansible.builtin.assert:
+        that: kerbside_collection_problem | default('', true) | length == 0
+        fail_msg: >-
+          {{ kerbside_collection_problem }}. Install a release in that range with
+          ansible-galaxy collection install --force -r
+          examples/_shared/requirements.yml.
+        quiet: true
+      run_once: true
+
+    - name: Warn that shakenfist.kerbside is not a release
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: shakenfist.kerbside reports its version as unreleased, so
+          it was installed from a checkout of Kerbside rather than a release,
+          and the range requirements.yml pins ({{ kerbside_collection_range }})
+          does not apply to it. It is installed at
+          {{ ([playbook_dir ~ '/collections'] + lookup('ansible.builtin.config', 'COLLECTIONS_PATHS'))
+             | product(['ansible_collections/shakenfist/kerbside']) | map('path_join')
+             | select('directory') | first
+             | default('a path outside the collection paths, such as Python site-packages') }}.
+      when: kerbside_collection_reported == 'unreleased'
+      run_once: true
 
 
 # ---------------------------------------------------------------------------
@@ -784,14 +925,18 @@
 # kerbside_hosts is the reachable members only, since register runs its
 # migration and readiness check on kerbside_hosts[0]. Only derived names are
 # play vars: play vars outrank inventory group_vars (#4441), so an operator
-# setting would be silently ignored here.
+# setting would be silently ignored here. kerbside_sources is derived: this
+# cluster's source, which kerbside_source builds again below now that the CA is
+# known, then kerbside_extra_sources. The kerbside role reads
+# kerbside_reserved_ports from the fact kerbside_source sets.
 #
 # The proxy certificate comes from internal_ca unless the operator supplied
 # all three override paths (validate refused anything in between). Its
-# cert_dest_dir is the kerbside role's kerbside_pki_dir, which the role reads
-# itself and is not passed here: the same expression as the role's default
-# (kerbside_config_dir/pki), and an inventory kerbside_pki_dir or
-# kerbside_config_dir reaches both.
+# cert_dest_dir and file names are the kerbside role's kerbside_pki_dir,
+# kerbside_proxy_cert_name, kerbside_proxy_key_name and
+# kerbside_proxy_cacert_name, which the role reads itself and are not passed
+# here: the same expressions as the role's defaults, so an inventory value for
+# any of them, or for kerbside_config_dir, reaches both.
 # ---------------------------------------------------------------------------
 - name: Deploy Kerbside
   hosts: kerbside:&reachable
@@ -799,7 +944,7 @@
   gather_facts: false
   vars:
     kerbside_hosts: "{{ groups.get('kerbside', []) | intersect(groups['reachable'] | default([])) }}"
-    kerbside_colocated: "{{ inventory_hostname in groups['allsf'] }}"
+    kerbside_sources: "{{ [kerbside_sf_source] + kerbside_extra_sources | default([]) }}"
   tasks:
     # The CA /admin/cacert serves, from the file it serves it from, so that
     # Kerbside's comparison of sources.yaml's ca_cert with it passes by
@@ -816,14 +961,21 @@
           {{ ((groups.get('database_node', []) + groups.get('etcd_master', []))
               | unique | intersect(groups['reachable'] | default([]))) | first }}
 
-    - name: Remember the CA which Shaken Fist's /admin/cacert serves
-      ansible.builtin.set_fact:
+    # As in the validation play, but with the CA, which replaces the
+    # placeholder the validation play's source carried.
+    - name: Build this cluster's Kerbside source and reserved ports
+      ansible.builtin.include_role:
+        name: shakenfist.shakenfist.node
+        tasks_from: kerbside_source
+      vars:
+        kerbside_colocated: "{{ inventory_hostname in groups['allsf'] }}"
+        kerbside_url_on_sf_nodes: "{{ hostvars[groups['allsf'][0]]['kerbside_url'] | default('') }}"
         kerbside_sf_ca_cert: "{{ kerbside_sf_ca_slurp.content | b64decode }}"
 
     # Creates the kerbside group the certificate's key is readable by.
     - name: Bootstrap Kerbside
       ansible.builtin.include_role:
-        name: shakenfist.shakenfist.kerbside
+        name: shakenfist.kerbside.kerbside
         tasks_from: bootstrap
 
     - name: Issue this host's Kerbside proxy certificate (generated on the control node)
@@ -845,6 +997,9 @@
         cert_san_dns: "{{ [] if kerbside_cert_fqdn_is_address else [kerbside_public_fqdn] }}"
         cert_san_ip: "{{ [kerbside_public_fqdn] if kerbside_cert_fqdn_is_address else [] }}"
         cert_dest_dir: "{{ kerbside_pki_dir | default((kerbside_config_dir | default('/etc/kerbside')) ~ '/pki') }}"
+        cert_dest_cert_name: "{{ kerbside_proxy_cert_name | default('server-cert.pem') }}"
+        cert_dest_key_name: "{{ kerbside_proxy_key_name | default('server-key.pem') }}"
+        cert_dest_ca_name: "{{ kerbside_proxy_cacert_name | default('ca-cert.pem') }}"
         cert_owner: "{{ kerbside_file_owner | default('root') }}"
         cert_group: "{{ kerbside_group | default('kerbside') }}"
         cert_key_mode: "0640"
@@ -859,10 +1014,10 @@
 
     - name: Configure Kerbside
       ansible.builtin.include_role:
-        name: shakenfist.shakenfist.kerbside
+        name: shakenfist.kerbside.kerbside
         tasks_from: config
 
     - name: Start Kerbside and wait for its first scrape
       ansible.builtin.include_role:
-        name: shakenfist.shakenfist.kerbside
+        name: shakenfist.kerbside.kerbside
         tasks_from: register
