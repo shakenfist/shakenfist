@@ -155,7 +155,10 @@ on `pull_request` or on `push` to the default branch is good practice
 and is not what this forbids — catching a fuzz target that stopped
 compiling is worth ten seconds of a PR. What it forbids is putting the
 fuzz lane in the merge queue's path, where its cost is charged against
-the queue's timeout.
+the queue's timeout. A `workflow_call` workflow that runs the targets
+inherits its caller's event, so it gates the queue when a workflow
+with a `merge_group` trigger `uses:` it, as the schedule rule above
+follows a callee to its caller.
 
 Building the targets rather than running them does not exempt a lane
 from that. What the queue pays for is runners held while its clock
@@ -242,10 +245,14 @@ testable; `tools/ci/test-report-fuzz-crash.sh` now covers that case.
 
 A repository whose fuzz lane must run in the merge queue takes an
 `audit-ok: fuzz-in-merge-queue` comment in the workflow, ideally with
-a reason. Anywhere in the file works; its own comment line above the
+a reason; where the queue reaches the lane through a caller, the
+caller may carry it instead. Anywhere in the file works; its own comment line above the
 trigger is where it belongs, and is where a reader will look for it.
 
-Repositories with no fuzz targets are not applicable.
+Repositories with no fuzz targets are not applicable. A repository
+with fuzz targets and no `.github/workflows/` directory is not: it
+fails, as one with an empty directory does, since nothing runs the
+targets in either.
 
 ## Template
 

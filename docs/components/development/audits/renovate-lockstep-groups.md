@@ -76,6 +76,11 @@ are accepted, along with the deprecated `matchPackagePatterns`:
 }
 ```
 
+A `/regex/` entry is evaluated under a time limit, because the
+repository wrote it and a pathological pattern would otherwise run
+past the job's: one that does not finish within a few seconds selects
+nothing, as one that does not compile does.
+
 A `!`-prefixed entry excludes, and is honoured wherever it sits in the
 list, because Renovate drops a package matched by any negated entry
 regardless of order: a rule matching `/oslo/` while excluding

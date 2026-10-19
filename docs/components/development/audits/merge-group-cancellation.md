@@ -9,7 +9,9 @@ on -- and that nothing running *beside* them joins, so the
 cancellation takes only what is superseded.
 
 For every workflow with a `merge_group:` trigger, and every reusable
-`workflow_call:` workflow, each job holding a scarce self-hosted
+`workflow_call:` workflow -- either trigger in block or flow form
+(`on: [workflow_call]`), read from the `on:` header rather than from
+the jobs below it -- each job holding a scarce self-hosted
 runner needs an effective `concurrency:` block -- job-level, or
 workflow-level if the job declares none -- that:
 

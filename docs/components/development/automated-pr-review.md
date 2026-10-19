@@ -8,8 +8,9 @@ findings as a structured comment.
 
 The automated reviewer reviews a pull request once CI passes and posts
 structured feedback as a comment. It runs Claude Code on a self-hosted GitHub
-Actions runner with the `--dangerously-skip-permissions` flag for autonomous
-operation.
+Actions runner with read-only tools, confined to the checkout and without the
+job's GitHub token in its environment (shakenfist/actions#168); everything that
+talks to GitHub happens in the shared action around it.
 
 A second component, the comment addresser, used to act on that feedback when a
 maintainer asked it to. It was retired in August 2026 -- see [The comment
@@ -205,6 +206,9 @@ This composite action handles the common pattern of:
 - Adding a reaction to the comment
 - Posting unauthorized/starting messages
 - Outputting PR details for downstream use
+- Vouching for those outputs: `confirmed` is `true` only when the request was
+  triggered, authorized, from this repository and has a `pr-ref`, and when the
+  action cannot tell, it fails and says so on the pull request
 
 **Usage in workflows:**
 
@@ -218,11 +222,14 @@ This composite action handles the common pattern of:
       Starting tests on branch `{pr_ref}`...
       [View workflow run]({run_url})
 
-- name: Do something if authorized
-  if: steps.trigger.outputs.authorized == 'true'
+- name: Do something once the request is confirmed
+  if: steps.trigger.outputs.confirmed == 'true'
   run: |
     echo "PR branch: ${{ steps.trigger.outputs.pr-ref }}"
 ```
+
+Gate on `confirmed` rather than re-reading the other outputs to check them:
+that check lives in the action so callers do not each carry a copy of it.
 
 This reduces duplication across projects and ensures consistent security checks
 and user experience.
@@ -321,8 +328,9 @@ Potential enhancements to consider:
 - **Custom review focus** - Allow PR authors to request focus areas
 - **Metrics dashboard** - Track review quality and fix rates over time
 
-Automatic issue creation for deferred items was on this list and is
-done: `create-review-issues.py` in the shared action files every `fix`
-and `document` item. Having the reviewer also apply its own fixes was
-tried, as the comment addresser, and retired -- see
+Two things that were on this list have been tried and dropped. Filing
+an issue for every `fix` and `document` item was built into the shared
+action and removed, because it never filed one: the items stay in the
+review, for whoever reads it to act on. Having the reviewer also apply
+its own fixes was tried, as the comment addresser, and retired -- see
 [`ci-review-automation.md`](/components/development/ci-review-automation/).

@@ -60,7 +60,10 @@ path, `HEAD` itself on the fallback path -- because a push between
 resolving the ref and checking it out moves what the ref reaches. If
 the head moved in that window the run fails rather than reviewing
 code nobody validated, and the requester comments again to review the
-new head.
+new head. Both halves are the `pr-review-ref` action in
+shakenfist/actions, which the workflow calls before and after the
+checkout, so the logic is tested once there rather than copied into
+every repository.
 
 ## Security Model
 
@@ -82,6 +85,12 @@ elevated permissions. Security is enforced through multiple layers:
    reporting the outputs it reads, rather than letting the work job
    skip silently. The `ci-review-automation` criterion measures both
    halves of the gate on every adopter.
+
+   `pr-re-review.yml` also ignores comments posted by a bot, or by
+   the `shakenfist-bot` account, which is a user rather than a bot as
+   far as GitHub is concerned and holds admin rights. Text the
+   automation posts, such as a review that quotes a trigger phrase,
+   therefore cannot request another review.
 2. **Trusted tools** -- scripts are checked out from the base branch,
    not the PR, preventing execution of malicious PR code
 3. **No credential persistence** -- `persist-credentials: false`

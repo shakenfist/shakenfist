@@ -859,3 +859,31 @@ Virtqueue memory and everything above it (DMA pool, scratch, the
 See [docs/chain-config.md](/components/instar/chain-config/) for the chain config
 structure layout and VMM-to-guest data flow.
 
+## vCPU setup and what the guest can see
+
+The guest runs in 64-bit long mode from its first instruction. The VMM
+builds the GDT and page tables in guest memory, then sets `CR0.PE|PG`,
+`CR3`, `CR4.PAE` and `EFER.LME|LMA` with `KVM_SET_SREGS`. KVM accepts
+those control registers only if the vCPU's guest CPUID advertises long
+mode, and a freshly created vCPU has an *empty* CPUID, so every vCPU is
+given one with `KVM_SET_CPUID2` before anything else (`setup_cpuid` in
+`src/vmm/src/main.rs`). Linux accepted a long-mode EFER without that
+until 6.12.112 backported validation of EFER against the guest's
+advertised capabilities; since then, omitting it fails every operation
+with `Error: Error(22)` and nothing more informative.
+`tools/ci/check-vcpu-cpuid.py` asserts in CI that each `create_vcpu` is
+followed by that call, because no pull-request job starts a guest.
+
+What the vCPU is given is KVM's *supported* CPUID -- everything the host
+advertises -- rather than a hand-built subset. That is a deliberate
+choice about where the sandbox boundary sits, so it is worth stating
+plainly: code running in the guest can read the host's CPU family, model
+and stepping, its feature flags, its cache topology and its MAXPHYADDR.
+No guest code in `src/` executes CPUID, so this changes no decision the
+guest makes. It matters only to code already running there against
+instar's intent -- which is to say, after a successful parser exploit --
+where it offers a way to fingerprint the host and choose
+micro-architecture-specific gadgets. Narrowing it is possible: the
+identifying leaves (`0x1` EAX, and the brand string in `0x80000002` to
+`0x80000004`) could be cleared while keeping `0x80000001` EDX.LM, which
+is the only bit KVM needs here.

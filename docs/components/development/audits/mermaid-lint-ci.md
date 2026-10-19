@@ -5,6 +5,12 @@
 A repository whose markdown contains any `mermaid` fence carries
 `tools/mermaid-lint.sh` and runs it from a CI workflow.
 
+"Its markdown" is every `*.md` file in the index, which is the set the
+script lints: a diagram in a plan or under `vendor/` counts, and one in
+an ignored or untracked tree, such as a Rust registry cache, does not.
+A repository whose index git cannot list reports `error` rather than
+being called diagram-free.
+
 Mermaid fails at *render* time, not at commit time. A diagram with a
 syntax error commits cleanly, passes actionlint, shellcheck, flake8
 and skillsaw alike, and then shows an error box on GitHub and nothing

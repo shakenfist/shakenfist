@@ -10,6 +10,12 @@ with any run of `-`, `_` and `.` collapsed to a single `-`. So
 `prometheus-client`/`prometheus_client` and `pydantic-core`/
 `pydantic_core`.
 
+The arrays are read as TOML, so a one-line array is read as fully as
+one entry per line: `[build-system] requires`, `[project]
+dependencies`, each `[project.optional-dependencies]` group and each
+PEP 735 `[dependency-groups]` group. A `pyproject.toml` that does not
+parse fails, since nothing in it can be checked.
+
 Within a single dependency array we flag a canonical name that carries:
 
 * two or more exact (`==`) pins with no extras -- differing only by

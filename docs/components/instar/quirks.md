@@ -2188,7 +2188,8 @@ landed during the PLAN-snapshot work).
   32 clusters) and each refblock covers little file range. Found
   by the differential fuzzer; its chain generator pairs
   512-byte clusters only with 4M images (the matrix
-  pairing). Refcount-structure growth is future work (open question 7).
+  pairing). instar does not yet grow refcount structures during a
+  snapshot create.
 
 - **Dirty / corrupt images refused.** `qemu-img` auto-repairs a
   dirty lazy-refcount image when it opens it read-write; instar v1

@@ -10,13 +10,18 @@ to add it to a new project.
 When a maintainer pushes a git tag matching `v*` (e.g. `v0.6.0`),
 the `release.yml` workflow:
 
-1. **Builds** the package using `python3 -m build` in a clean venv
-2. **Validates** the package with `twine check`
-3. **Waits for approval** from a required reviewer (via a GitHub
+1. **Checks CI** with `ci-gate`, which fails unless the repository's
+   named CI workflows succeeded on the tagged commit (see
+   [`require-ci-success`](https://github.com/shakenfist/actions/blob/main/docs/actions.md#require-ci-success))
+2. **Builds** the package using `python3 -m build` in a clean venv
+3. **Validates** the package with `twine check`, and checks the wheel
+   holds no test directory with
+   [`check-dist`](https://github.com/shakenfist/actions/blob/main/docs/actions.md#check-dist)
+4. **Waits for approval** from a required reviewer (via a GitHub
    environment)
-4. **Signs the tag** using Sigstore/gitsign (keyless, OIDC-based)
-5. **Publishes to PyPI** using trusted publishers (no API tokens)
-6. **Creates a GitHub Release** with the built artifacts and
+5. **Signs the tag** using Sigstore/gitsign (keyless, OIDC-based)
+6. **Publishes to PyPI** using trusted publishers (no API tokens)
+7. **Creates a GitHub Release** with the built artifacts and
    auto-generated release notes
 
 The release job downloads the distribution to a named path and sets
@@ -25,11 +30,11 @@ fails rather than reporting success. Both are load bearing: with a
 bare download and the action's default of warning on an unmatched
 glob, an empty release is indistinguishable from a good one.
 
-The workflow can also be started by hand, which runs the build and the
-`twine check` as a smoke test and stops there. Everything from the tag
-signing down is confined to a pushed tag with
-`if: github.event_name == 'push' && startsWith(github.ref,
-'refs/tags/v')`. Both clauses are needed: aimed at a branch, an
+The workflow can also be started by hand, which skips `ci-gate`, runs
+the build, the `twine check` and the wheel check as a smoke test, and
+stops there. Everything from the tag signing down is confined to a
+pushed tag with `if: github.event_name == 'push' &&
+startsWith(github.ref, 'refs/tags/v')`. Both clauses are needed: aimed at a branch, an
 unguarded `sign-tag` would take `refs/heads/<branch>` for a tag name and
 force-push `refs/tags/refs/heads/<branch>`; aimed at an existing tag, a
 ref-only guard would let the run re-sign and force-push that tag,
@@ -51,14 +56,16 @@ checkout and downloads into the per-job `${{ runner.temp }}` instead.
 ```mermaid
 flowchart TB
     tag["Maintainer pushes v0.6.0 tag"]
-    build["Build package"]
+    gate["Check CI passed on the tagged commit"]
+    build["Build and check package"]
     artifacts["Upload artifacts"]
     approve["Wait for reviewer approval<br/>(GitHub environment)"]
     sign["Sign tag with Sigstore"]
     pypi["Publish to PyPI"]
     release["Create GitHub Release"]
 
-    tag --> build
+    tag --> gate
+    gate --> build
     build --> artifacts
     build --> approve
     approve --> sign
@@ -76,6 +83,9 @@ The release process is designed to eliminate long-lived secrets:
 - **No GPG keys** -- tag signing uses Sigstore's keyless signing
   with OIDC identity certificates, recorded in the Rekor
   transparency log
+- **Tested commits only** -- `ci-gate` refuses a tag on a commit
+  whose CI did not pass, before anything is built, so a reviewer
+  approves a release whose CI has already been checked
 - **Multi-party approval** -- the `release` environment requires
   a reviewer to approve before publishing proceeds
 - **Protected tags** -- tag rulesets prevent unauthorized users
@@ -92,6 +102,9 @@ The project must:
 - Use `pyproject.toml` with `setuptools_scm` (or similar) for
   version detection from git tags
 - Not have an old `release.sh` script (remove it first)
+- Run CI in a way the release gate can count: see "Prerequisites for
+  gated CI" in the
+  [template README](https://github.com/shakenfist/development/blob/main/templates/release-automation/README.md)
 
 ### Step 1: Copy the Templates
 
@@ -110,6 +123,7 @@ Replace the placeholders in the copied files:
 | `{{PROJECT_DISPLAY_NAME}}` | Human-readable name | `Occy Strap` |
 | `{{PYPI_PACKAGE_NAME}}` | PyPI package name | `occystrap` |
 | `{{GITHUB_REPO_NAME}}` | GitHub repo name | `occystrap` |
+| `{{CI_WORKFLOWS}}` | CI workflow files the release gate requires, one per line | `ci.yml` |
 
 ### Step 2: Configure PyPI Trusted Publisher
 

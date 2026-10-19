@@ -200,6 +200,7 @@ attached rather than quietly disappearing from the table.
 | [github-security.md](/components/development/audits/github-security/) | Dependabot, secret scanning, CodeQL |
 | [delete-branch-on-merge.md](/components/development/audits/delete-branch-on-merge/) | Branches are deleted automatically when a PR merges |
 | [merge-queue-config.md](/components/development/audits/merge-queue-config/) | Merge queues process entries serially, without speculative stacking or merge batching |
+| [release-environment-protection.md](/components/development/audits/release-environment-protection/) | Every environment a release job names exists, has a required reviewer, and deploys only from tags |
 | [merge-group-cancellation.md](/components/development/audits/merge-group-cancellation/) | Superseded merge group runs are cancelled, not left building clouds |
 | [security-sanitization.md](/components/development/audits/security-sanitization/) | HTTP header and file path sanitization |
 | [workflow-standards.md](/components/development/audits/workflow-standards/) | Permissions, naming, self-hosted runners, static runner tags, vm runner size, devpi cache fallback, devpi cache address, linting, PIPESTATUS, flake8wrap |
