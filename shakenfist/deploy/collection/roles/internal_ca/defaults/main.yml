@@ -39,9 +39,14 @@ cert_dest_cert_name: "server-cert.pem"
 cert_dest_key_name: "server-key.pem"
 # Owner of the installed files.
 cert_owner: "root"
-# Group of the installed files.
-cert_group: "root"
+# Group of the installed files. QEMU, not libvirtd, opens the SPICE TLS key,
+# and runs as libvirt-qemu, whose primary group is kvm on every supported
+# distribution. kvm is created by udev, so unlike the libvirt-qemu group it
+# already exists when site.yml distributes certificates, before libvirt is
+# installed.
+cert_group: "kvm"
 # Mode of the installed CA and host certificates.
 cert_mode: "0444"
-# Mode of the installed host private key.
-cert_key_mode: "0444"
+# Mode of the installed host private key. Readable by cert_group, so QEMU can
+# start SPICE TLS, and by nobody else (#4416).
+cert_key_mode: "0440"

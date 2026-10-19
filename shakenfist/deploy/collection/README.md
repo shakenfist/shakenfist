@@ -180,16 +180,17 @@ openssl x509 -in /etc/pki/libvirt-spice/server-cert.pem -noout -enddate
 | `cert_dest_cert_name` | `server-cert.pem` | File name of the host certificate. |
 | `cert_dest_key_name` | `server-key.pem` | File name of the host private key. |
 | `cert_owner` | `root` | Owner of the installed files. |
-| `cert_group` | `root` | Group of the installed files. |
+| `cert_group` | `kvm` | Group of the installed files. QEMU runs as `libvirt-qemu`, whose primary group is `kvm`, and must be able to read the SPICE key. The group must already exist on the host. |
 | `cert_mode` | `'0444'` | Mode of the installed CA and host certificates. |
-| `cert_key_mode` | `'0444'` | Mode of the installed host private key. |
+| `cert_key_mode` | `'0440'` | Mode of the installed host private key. Never make it world readable. |
 
 The modes must be quoted four digit octal strings, as the defaults are: YAML
 reads an unquoted `0400` as the integer 256, which can end up installed as mode
 `0256`, so the role refuses it. The role also refuses a `deploy_name`,
 `cert_cn` or subject alternative name containing a newline, since each is
 written into a certtool template as a line of its own, and a `cert_name` or
-`cert_dest_*_name` that is not a plain file name.
+`cert_dest_*_name` that is not a plain file name, and, before installing
+anything on a host, a `cert_group` that host does not have.
 
 ## Kerbside
 
