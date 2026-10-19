@@ -400,12 +400,11 @@ jobs:
     # why check_paths cancels a superseded run before its jobs get here
     # (issue #3998). A re-run is not a queue build, though. It keeps its
     # original event, so with the base-branch key a "Re-run jobs" on an
-    # old queue run, the release recovery in
-    # docs/developer_guide/release_process.md, would cancel the live
-    # queue entry or be cancelled by it. Re-runs therefore keep their own
-    # queue branch's group. The merge_group- prefix keeps a queue run
-    # from sharing a group with a workflow_dispatch run on develop, whose
-    # github.ref is the same string.
+    # old queue run would cancel the live queue entry or be cancelled by
+    # it. Re-runs therefore keep their own queue branch's group. The
+    # merge_group- prefix keeps a queue run from sharing a group with a
+    # workflow_dispatch run on develop, whose github.ref is the same
+    # string.
     concurrency:
       group: >-
         ${{ github.workflow }}-delinter-${{
