@@ -511,6 +511,7 @@ nav:
                 - "Main-channel event drops": components/ryll/plans/PLAN-main-event-drops.md
                 - "Image decoder hardening": components/ryll/plans/PLAN-decoder-hardening.md
                 - "Splitting app.rs": components/ryll/plans/PLAN-app-split.md
+                - "RDP frontend": components/ryll/plans/PLAN-rdp-frontend.md
     - Features: features.md
     - Glossary: glossary.md
     - Release notes:
