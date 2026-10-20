@@ -339,3 +339,85 @@ class GetReferencesFromFailedReadTestCase(base.ShakenFistTestCase):
         context.set_code.assert_called_once_with(
             grpc.StatusCode.INVALID_ARGUMENT)
         self.assertEqual([], list(reply.references))
+
+
+class CountObjectsByStateTestCase(base.ShakenFistTestCase):
+    """A failed count must never be answered with a count of zero.
+
+    The count feeds a backlog gauge, where 0 reads as an empty backlog.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.servicer = daemons_database_main.DatabaseService(
+            mock.MagicMock())
+        self.request = database_pb2.CountObjectsByStateRequest(
+            object_type=ObjectType.BLOB.proto_id,
+            state_values=['deleted', 'error'])
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state',
+                return_value=42)
+    def test_count_is_returned(self, mock_count):
+        context = mock.MagicMock()
+
+        reply = self.servicer.CountObjectsByState(self.request, context)
+
+        context.set_code.assert_not_called()
+        self.assertEqual(42, reply.count)
+        mock_count.assert_called_once_with(
+            ObjectType.BLOB, ['deleted', 'error'])
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state',
+                return_value=0)
+    def test_zero_is_a_successful_answer(self, mock_count):
+        context = mock.MagicMock()
+
+        reply = self.servicer.CountObjectsByState(self.request, context)
+
+        context.set_code.assert_not_called()
+        self.assertEqual(0, reply.count)
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state',
+                return_value=None)
+    def test_failed_count_is_unavailable(self, mock_count):
+        context = mock.MagicMock()
+
+        self.servicer.CountObjectsByState(self.request, context)
+
+        context.set_code.assert_called_once_with(
+            grpc.StatusCode.UNAVAILABLE)
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state',
+                side_effect=ValueError('boom'))
+    def test_unexpected_exception_is_internal(self, mock_count):
+        context = mock.MagicMock()
+
+        self.servicer.CountObjectsByState(self.request, context)
+
+        context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state')
+    def test_unknown_object_type_is_a_bad_request(self, mock_count):
+        context = mock.MagicMock()
+
+        self.servicer.CountObjectsByState(
+            database_pb2.CountObjectsByStateRequest(
+                object_type=0, state_values=['deleted']),
+            context)
+
+        context.set_code.assert_called_once_with(
+            grpc.StatusCode.INVALID_ARGUMENT)
+        mock_count.assert_not_called()
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state')
+    def test_empty_states_is_a_bad_request(self, mock_count):
+        context = mock.MagicMock()
+
+        self.servicer.CountObjectsByState(
+            database_pb2.CountObjectsByStateRequest(
+                object_type=ObjectType.BLOB.proto_id),
+            context)
+
+        context.set_code.assert_called_once_with(
+            grpc.StatusCode.INVALID_ARGUMENT)
+        mock_count.assert_not_called()

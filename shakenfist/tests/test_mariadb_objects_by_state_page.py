@@ -152,3 +152,75 @@ class PublicPagedReadTestCase(base.ShakenFistTestCase):
         mock_direct.assert_called_once_with(
             ObjectType.BLOB, ['deleted'], 5, after_uuid='',
             updated_before=None)
+
+
+class CountWrapperTestCase(base.ShakenFistTestCase):
+    def test_request_fields_and_reply(self):
+        with mock.patch('shakenfist.mariadb._get_database_stub'), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=database_pb2.CountObjectsByStateReply(
+                               count=7)) as mock_call:
+            result = mariadb._grpc_count_objects_by_state(
+                ObjectType.BLOB, ['deleted', 'error'])
+
+        request = mock_call.call_args[0][1]
+        self.assertEqual(ObjectType.BLOB.proto_id, request.object_type)
+        self.assertEqual(['deleted', 'error'], list(request.state_values))
+        self.assertEqual(7, result)
+
+    def test_zero_is_not_a_failure(self):
+        with mock.patch('shakenfist.mariadb._get_database_stub'), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=database_pb2.CountObjectsByStateReply(
+                               count=0)):
+            result = mariadb._grpc_count_objects_by_state(
+                ObjectType.BLOB, ['deleted'])
+
+        self.assertEqual(0, result)
+
+    @mock.patch('shakenfist.mariadb.LOG')
+    def test_unimplemented_is_a_failed_read(self, mock_log):
+        # An sf-database older than the RPC answers UNIMPLEMENTED.
+        with mock.patch('shakenfist.mariadb._get_database_stub'), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           side_effect=FakeRpcError(
+                               grpc.StatusCode.UNIMPLEMENTED)):
+            result = mariadb._grpc_count_objects_by_state(
+                ObjectType.BLOB, ['deleted'])
+
+        self.assertIsNone(result)
+        mock_log.error.assert_called_once()
+
+    def test_empty_states_is_rejected_before_routing(self):
+        with mock.patch('shakenfist.mariadb._use_database_service') as svc:
+            self.assertRaises(
+                ValueError, mariadb.count_objects_by_state,
+                ObjectType.BLOB, [])
+        svc.assert_not_called()
+
+    def test_direct_rejects_empty_states(self):
+        self.assertRaises(
+            ValueError, mariadb._direct_count_objects_by_state,
+            ObjectType.BLOB, [])
+
+    def test_routes_to_grpc(self):
+        with mock.patch('shakenfist.mariadb._use_database_service',
+                        return_value=True), \
+                mock.patch('shakenfist.mariadb._grpc_count_objects_by_state',
+                           return_value=3) as mock_grpc:
+            result = mariadb.count_objects_by_state(
+                ObjectType.BLOB, ['deleted'])
+
+        self.assertEqual(3, result)
+        mock_grpc.assert_called_once_with(ObjectType.BLOB, ['deleted'])
+
+    def test_routes_to_direct(self):
+        with mock.patch('shakenfist.mariadb._use_database_service',
+                        return_value=False), \
+                mock.patch('shakenfist.mariadb._direct_count_objects_by_state',
+                           return_value=4) as mock_direct:
+            result = mariadb.count_objects_by_state(
+                ObjectType.BLOB, ['deleted'])
+
+        self.assertEqual(4, result)
+        mock_direct.assert_called_once_with(ObjectType.BLOB, ['deleted'])

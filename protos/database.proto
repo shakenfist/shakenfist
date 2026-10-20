@@ -53,6 +53,7 @@ service DatabaseService {
   rpc SetObjectState (SetObjectStateRequest) returns (StatusReply) {}
   rpc DeleteObjectState (DeleteObjectStateRequest) returns (StatusReply) {}
   rpc GetObjectsByState (GetObjectsByStateRequest) returns (GetObjectsByStateReply) {}
+  rpc CountObjectsByState (CountObjectsByStateRequest) returns (CountObjectsByStateReply) {}
   rpc DeleteOrphanedObjectStates (DeleteOrphanedObjectStatesRequest) returns (DeleteOrphanedObjectStatesReply) {}
   rpc GetStatelessObjectUuids (GetStatelessObjectUuidsRequest) returns (GetStatelessObjectUuidsReply) {}
   rpc DeleteOrphanedArtifactAttributes (DeleteOrphanedArtifactAttributesRequest) returns (DeleteOrphanedArtifactAttributesReply) {}
@@ -808,6 +809,17 @@ message GetObjectsByStateReply {
   repeated string object_uuids = 1;
   bool more_available = 2;           // Set only on a paged reply that stopped
                                      // early
+}
+
+// Counts the rows a GetObjectsByState with the same type and states would
+// return, without an age filter and without reading the uuids.
+message CountObjectsByStateRequest {
+  ObjectType object_type = 1;
+  repeated string state_values = 2;  // States to count; must not be empty
+}
+
+message CountObjectsByStateReply {
+  uint64 count = 1;
 }
 
 // Orphan reconciliation (issue 3534). Phantoms are object_states rows

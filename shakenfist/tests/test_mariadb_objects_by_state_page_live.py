@@ -209,3 +209,27 @@ class ObjectsByStatePageLiveTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             mariadb.ObjectsByStatePage(uuids=[], more_available=False),
             page)
+
+    def test_count_equals_the_unpaged_read_without_an_age_filter(self):
+        # The count has no age filter, so it includes the young rows
+        # which the aged read leaves out.
+        unfiltered = mariadb.get_objects_by_state(ObjectType.BLOB, FINAL_STATES)
+        self.assertEqual(len(self.expected) + len(self.young_blobs),
+                         len(unfiltered))
+        self.assertEqual(
+            len(unfiltered),
+            mariadb.count_objects_by_state(ObjectType.BLOB, FINAL_STATES))
+
+    def test_count_filters_by_state_and_type(self):
+        self.assertEqual(
+            len(self.live_blobs),
+            mariadb.count_objects_by_state(ObjectType.BLOB, ['created']))
+        self.assertEqual(
+            len(self.instances),
+            mariadb.count_objects_by_state(ObjectType.INSTANCE, ['deleted']))
+        self.assertEqual(
+            0, mariadb.count_objects_by_state(ObjectType.INSTANCE, ['error']))
+
+    def test_count_of_an_empty_type_is_zero_not_a_failure(self):
+        self.assertEqual(
+            0, mariadb.count_objects_by_state(ObjectType.NETWORK, FINAL_STATES))
