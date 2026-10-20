@@ -62,12 +62,14 @@ against a local registry at `localhost:5000` that the workflow populates
 with test images.
 
 Both CI lanes -- `Sanity checks` and `Functional tests` -- run on
-ephemeral VM runners and skip changes that touch only `docs/**` or
-markdown at the top of the tree, because nothing they run reads those
-files. To test a documentation-only branch anyway, run the functional
-workflow by hand (`workflow_dispatch`, which path filters do not apply
-to) or comment `@shakenfist-bot please retest` on the pull request. The
-`Supply chain` lane is deliberately not filtered.
+ephemeral VM runners. A pull request that touches only `docs/**` or
+markdown skips them, because nothing they run reads those files: a
+`Check paths` job in each workflow decides, and the lane's jobs skip on
+its output. A merge queue entry always runs both in full. To test a
+documentation-only branch anyway, run the functional workflow by hand
+(`workflow_dispatch`, which the filter does not apply to) or comment
+`@shakenfist-bot please retest` on the pull request. The `Supply chain`
+lane is deliberately not filtered.
 
 Every lane that runs on a pull request checks out the pull request's own
 tree and runs scripts from it, so a pull request can change what CI
@@ -149,18 +151,73 @@ tools/mermaid-lint.sh docs/foo.md  # just this one
 It is not in the `Supply chain` workflow because it needs a docker
 daemon and therefore a different runner image.
 
+## Merging
+
+Pull requests merge through a merge queue on `develop`, not with the
+merge button directly. A pull request can be queued once "Can enqueue"
+and "Can enqueue: unit" pass. The queue then runs `Sanity checks` and
+`Functional tests` again on the commit it is about to merge, and merges
+only when "Can merge" and "Can merge: unit" pass. Each workflow has a
+pair of its own, because a job's `needs:` cannot reach across workflows
+and the queue has to require both. That second run is the one a release
+counts (see below), so a change merged around the queue, by an
+administrator bypassing it, cannot be released until a later commit has
+gone through the queue.
+
+The queue builds one entry at a time (`max_entries_to_build: 1` in the
+`develop` ruleset). The `concurrency` groups in `python-unit-tests.yml`
+and `functional-tests.yml` depend on that: a queue run shares a group
+with whatever the queue builds next, so that a superseded run is
+cancelled. Raising the setting would make each entry cancel the one
+ahead of it, so revisit those groups first.
+
+A new job in either workflow goes in the `needs:` of that workflow's
+two aggregator jobs.
+
+The wheel check in the functional lane is
+[`check-dist`](https://github.com/shakenfist/actions/blob/main/docs/actions.md#check-dist).
+It fails if the wheel holds a test directory, so a packaging change
+that would ship the tests fails on its pull request rather than at
+release time.
+
 ## Releasing
 
-Releases are automated via GitHub Actions. Push a version tag to trigger the
-pipeline:
+Pushing a `v*` tag triggers `release.yml`. Its jobs, in order:
+
+1. `ci-gate` checks that `python-unit-tests.yml` and
+   `functional-tests.yml` both succeeded on the tagged commit, in their
+   merge queue runs. A run started by hand, as `pr-retest.yml` does
+   with `workflow_dispatch`, does not count. A queue run that fails,
+   flaky or not, ejects its entry, so the commit it built never reaches
+   `develop` and re-running that run cannot make any tag pass: re-queue
+   the pull request and tag the commit that merges. Re-running a queue
+   run helps only when the tagged commit's run was re-run after it
+   merged and that later attempt failed, because the gate judges each
+   run at its latest attempt; then use "Re-run jobs" on it.
+   How the gate decides is documented with the action, as
+   [`require-ci-success`](https://github.com/shakenfist/actions/blob/main/docs/actions.md#require-ci-success).
+   It has no override.
+2. `build` builds the sdist and wheel, then runs `twine check` and the
+   same wheel check as CI. It runs only if the gate passed.
+3. The publishing jobs wait for approval in the `release`
+   environment, re-sign the tag with gitsign, and publish to PyPI with
+   attestations.
+
+So tag a commit that is on `develop` and went through the merge
+queue, and wait for both workflows' runs on it to finish first. A gate
+failure means nothing was signed or published, so every failure is
+recoverable: the template's
+[recovery table](https://github.com/shakenfist/development/blob/main/templates/release-automation/README.md#recovering-from-a-gate-failure)
+says what to do for each cause, which is usually moving the tag or
+re-running CI and then the `ci-gate` job.
 
 ```
 git tag -s v0.5.0 -m "Release v0.5.0"
 git push origin v0.5.0
 ```
 
-The workflow builds the package, signs the tag with Sigstore, publishes to
-PyPI, and creates a GitHub Release. See
+Running `release.yml` by hand with `workflow_dispatch` skips the gate
+and the publishing jobs, and only builds and checks the packages. See
 [RELEASE-SETUP.md](https://github.com/shakenfist/occystrap/blob/develop/RELEASE-SETUP.md)
 for one-time configuration steps.
 

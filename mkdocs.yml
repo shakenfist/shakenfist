@@ -93,6 +93,7 @@ nav:
             - "Introduction": components/clingwrap/index.md
             - "Command Types": components/clingwrap/command-types.md
             - "Configuration": components/clingwrap/configuration.md
+            - "Development": components/clingwrap/development.md
             - "Examples": components/clingwrap/examples.md
             - "Installation": components/clingwrap/installation.md
         - Development:
@@ -185,6 +186,7 @@ nav:
                 - "Workflow ref trust": components/development/plans/PLAN-workflow-ref-trust.md
         - Hunky Dory:
             - "Introduction": components/hunkydory/index.md
+            - "Merging and releasing": components/hunkydory/development.md
             - "Testing": components/hunkydory/testing.md
             - "The ambiguous cases": components/hunkydory/ambiguity.md
             - "The hunk header format": components/hunkydory/hunk-format.md
