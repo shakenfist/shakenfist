@@ -361,7 +361,7 @@ table entirely (decision D8).
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete | `597312d2a` (#3957), `b54f126e5` (#3971), `c37012c89` (#3972), `96c78fd63` (#4006) |
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
 | 7a. An operator-readable capacity surface | PLAN-scheduler-reservations-phase-07a-capacity-surface.md | Not started | — |
-| 7b. Capacity and claim views in sf-client | client-python: PLAN-scheduler-reservations-phase-07b-client-views.md | Not started | — |
+| 7b. Capacity and claim views in sf-client | `PLAN-scheduler-reservations-phase-07b-client-views.md` (in shakenfist/client-python, branch `scheduler-reservations-phase-07b-client-views`; a relative link cannot cross repositories, so it is named rather than linked) | Not started | — |
 | 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started | — |
 | 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started | — |
 
@@ -605,8 +605,8 @@ is here.
   phases 2 to 7 built without `curl`. The operator guide phase 8
   owes cannot document commands that do not exist, and phase 9's
   audit is meant to review the final client surface, so both
-  phases sit ahead of them. They depend on neither phase 5 nor
-  each other for most of their work; see their scope stubs.
+  phases sit ahead of them. Neither depends on phase 5, and 7b
+  needs nothing from 7a, so the two can run in parallel.
 
 ### Phase scope stubs
 
@@ -1008,12 +1008,25 @@ server half: publish what the table above says nobody can read.
   nothing of it.
 * Functional coverage asserting each new key's presence and
   type, on every cluster topology.
+* The `sf-client` reader of each of the above, as a client-python
+  step in this phase's own plan: the claims ledger on `node
+  capacity`, a cross-namespace `claim list`, and the exclusion
+  reasons in place of the "not reported" line 7b prints. 7a
+  designs these response shapes, and the reader of a surface is
+  its best test. A server surface that nobody can read is the
+  gap these two phases exist to close (7b's D7).
 
 **Phase 7b — capacity and claim views in sf-client.** This is the
-client half. It lands in `client-python`, so the phase plan goes
-there too, as 4b's did. Most of it needs nothing from 7a and can
-merge first. The rest is gated on 7a's capability tokens and
-degrades without them.
+client half. It lands entirely in `client-python`, so the phase
+plan goes there too, following agent operation deadlines phase 6.
+4b's plan lives here because half of 4b's work was this
+repository's functional tests. Nothing in 7b needs 7a.
+
+*Corrected by the phase 7b survey (2026-10-20):* this stub first
+put 7a's client reader in 7b, gated on 7a's tokens. The phase
+plan's D7 moves that work into 7a, whose plan designs the shapes
+it reads. The second bullet below is kept as a record and is not
+7b's scope.
 
 * *Needs nothing from 7a:* a command that renders
   `/admin/resources` per node. The command name and its home
@@ -1029,10 +1042,10 @@ degrades without them.
   phase 7's tokens. Add `peak_used_*` to `namespace claim show`.
   Add daemon states, which `Node.external_view()` already
   returns, to `node show`.
-* *Gated on 7a:* the cluster claims ledger on the capacity view,
-  showing total, claimed, unclaimed used and what remains
-  claimable; a cross-namespace `claim list`; and the excluded
-  hypervisors with their reasons.
+* *Gated on 7a, and moved to 7a:* the cluster claims ledger on
+  the capacity view, showing total, claimed, unclaimed used and
+  what remains claimable; a cross-namespace `claim list`; and the
+  excluded hypervisors with their reasons.
 * Unit tests per command, and a `docs/` page in `client-python`
   that phase 8's operator guide links rather than duplicates.
 
@@ -1084,10 +1097,12 @@ So the diff under audit is the plan's cumulative diff, not
 paths this plan touches, so the range does not drag in
 unrelated work merged over the same months. The phase plan
 pins the path list.
-The client halves (4b and 7b) merged in `client-python`, which
-has no `PUSH-AUDIT.md`. Their ranges are audited from here, the
-way `PLAN-transient-capacity-refusals` phase 7 audited its client
-retry.
+Client-python has no `PUSH-AUDIT.md`. 4b's client range
+predates the `plan-push-audit-phase` rule and is audited from
+here, the way `PLAN-transient-capacity-refusals` phase 7 audited
+its client retry. 7b applies the shared block's floor checklist
+in its own pull request, and this phase cites that result
+instead of re-running it.
 
 Two adaptations follow from the range being months of merged
 history rather than a pending branch:
