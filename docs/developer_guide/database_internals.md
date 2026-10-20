@@ -282,9 +282,59 @@ at enqueue time by `is_observational()` in `schema/operations/util.py`. A
 model may declare `observational_tasks: ClassVar[frozenset[...]]` beside
 `target_fields`; an operation is observational only if it has tasks and every
 one of them is in that set, so a single mutating task makes the whole
-operation mutating. No model declares any yet. See
+operation mutating. Three tasks on two models are declared today:
+`collect_billing_statistics` and `health_check_kvm_process` on
+`node_inst_op`, and `verify_size_and_checksum` on `node_blob_op`. The
+instance sweep enqueues the first two together, and every caller enqueues
+the third on its own. Every other task mutates. See
 [the master plan](../plans/PLAN-cluster-op-visibility.md) for the
 rationale.
+
+### When is a task observational?
+
+A task is observational if its purpose is to measure or verify its target,
+and its only writes are of one of two kinds:
+
+- **Recording what it observed.** Events, usage records and computed hashes
+  are the examples. Nothing waits for these, and nothing that a user asked
+  for depends on them.
+- **Correcting a cached observation that reality has already falsified.**
+  `health_check_kvm_process` clears an instance's `kvm_pid` only when that
+  process no longer exists, and `verify_size_and_checksum` drops a replica
+  location only when the file is proven missing or corrupt. In both cases
+  the task reveals a change, it does not make one.
+
+Anything that changes desired state, guest-visible state, or something a
+user action or another operation depends on is mutating. That includes
+creating, starting, deleting and snapshotting, routing, DHCP and NAT
+changes, and replicating a blob onto a node.
+
+When in doubt, a task is mutating. The two mistakes are not equally costly.
+Marking a mutating task observational hides it from `last_cluster_operation`
+and `has_pending_cluster_operation()`, which are the gates that exist to wait
+for it, and that is the very bug the flag was introduced to fix. Marking an
+observational task mutating costs only a stale pointer, because a sweep
+briefly becomes the object's latest operation.
+
+Two practical traps:
+
+- The declaration must be annotated `ClassVar`. Without it pydantic turns
+  the attribute into a model field, and `is_observational()` silently sees an
+  empty set, so every operation of the model is stored as mutating with no
+  error anywhere.
+- Marking a task observational changes what the flag says, not what a failing
+  task does. A billing or health check task which raises still moves its
+  instance to an error state (see
+  [issue 4585](https://github.com/shakenfist/shakenfist/issues/4585)).
+
+The classification of every task is pinned by
+`shakenfist/tests/schema/operations/test_observational_tasks.py`. It holds a
+table of every task of every operation model, so adding a task or a model
+fails the test until someone classifies it. Update the table in the same
+change that adds the task, and add the task to `observational_tasks` only if
+it is observational. The reasoning for each existing task is in the
+[audit table](../plans/PLAN-cluster-op-visibility-phase-03-mark-observational.md#audit-table)
+of the plan which classified them.
 
 `DatabaseBackedObjectWithOperations` exposes two read shapes over the
 history:
