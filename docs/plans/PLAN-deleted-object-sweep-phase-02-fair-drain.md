@@ -651,6 +651,9 @@ max by (object_type) (rate(database_client_rpc_seconds_sum{sweep="deleted_object
 # What it costs the database tier
 sum(rate(database_requests_total[24h]))
 rate(mysql_global_status_commands_total{command="commit"}[24h])
+
+# The sweep's pairs against the shipped load budget (see Execution notes)
+sort_desc(sum by (operation) (rate(database_requests_total{caller_daemon="cluster"}[24h])))
 ```
 
 Compare the last two with the 24 hours before the deploy (`offset
@@ -732,6 +735,41 @@ plan, under "What phase 2 measured".
 10. After deploy: brief 2g's queries have been run. Every type whose
     backlog was non-zero at the start of the window shows hard deletes
     in it. The results are recorded by phase 3's planning commit.
+
+## Execution notes
+
+- **2026-10-21 (UTC), back brief.** Michael agreed with D8 and D10 as
+  written, which ungates step 2e. He asked for the live MariaDB tests
+  to be run locally, and allowed this session to push and open the
+  pull request once the definition of done passes.
+- **Live tests run locally against a throwaway `mariadb:11.8`
+  container**, with a scratch virtualenv using PyMySQL
+  (`mariadb+pymysql://`), because MySQLdb is not installed on the
+  development host. CI uses the mysqldb dialect through
+  `tools/ci-enum-widening-test.sh`. The baseline before this phase was
+  140 live tests. After steps 2a and 2b it is 149, all passing.
+- **A risk the plan missed: the database load budget.**
+  `shakenfist/data/database_load_budget.yaml` budgets sf-cluster's
+  `GetObjectState` (1.986/s base) and `GetObjectsByState` (0.222/s
+  base), but none of the sweep's `Delete*` RPCs. Those are below the
+  unbudgeted ceiling today because the sweep runs 16 minutes a day. At
+  D10's budget on sfcbr, each will run at roughly 0.8/s, above the
+  ceiling of `max(0.25, 0.05 × nodes)`, and `GetObjectState` will
+  approach its tolerance.
+  - `ShakenFistUnbudgetedDatabasePolling` is not deployed on the 33fl
+    Prometheus (no such rule on 2026-10-21), so nothing pages. The 33fl
+    nightly ratchet will report the new pairs.
+  - In CI, `test_no_unbudgeted_fixed_rate_database_polling` flags a
+    pair whose rate is constant across four one-minute windows and
+    independent of suite activity. A sweep that stays budget-bound for
+    four minutes would look like that. CI's local MariaDB should make
+    deletes cheap enough that the sweep drains and goes idle, so its
+    rate follows arrivals, but the pull request's CI is the real test.
+  - Not fixed here, because a budget entry should be derived from
+    measured rates, not guessed. Brief 2g adds a check of the sweep's
+    pairs against the budget. Phase 3's planning commit decides between
+    budget entries for the sweep and treating its rate as activity
+    coupled.
 
 ## Back brief
 
