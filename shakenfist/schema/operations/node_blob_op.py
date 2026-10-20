@@ -43,8 +43,10 @@ class model(BaseModel):
     observational_tasks: ClassVar[frozenset[model_tasks]] = frozenset({
         # Measures a replica and records hashes. On a mismatch it drops
         # this node's replica, which corrects a location record that was
-        # already false. If a blob gate is ever built on
-        # has_pending_cluster_operation, revisit this classification.
+        # already false. The blob checksum endpoint also enqueues it for a
+        # user waiting on a hash, but that caller polls the endpoint for
+        # the hash rather than the operation. If a blob gate is ever built
+        # on has_pending_cluster_operation, revisit this classification.
         model_tasks.verify_size_and_checksum,
     })
 

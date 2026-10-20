@@ -445,9 +445,11 @@ equivalent check.
   `get_cluster_operations()`, and decide explicitly whether
   delete cancels in-flight observational ops. Once phase 3
   lands they are no longer the pointer, so the current walk
-  skips them. That is probably right, since a health check
-  against a deleting instance does no harm, but it is a
-  behaviour change, so state it.
+  skips them. Phase 3 made that safe rather than leaving it
+  harmless by assumption: both sweep tasks now return early
+  for an instance that is not `created`, and the billing
+  task no longer raises when a delete removes a file it is
+  measuring. It is still a behaviour change, so state it.
 * client-python (sibling repo): add
   `get_instance()`-adjacent accessors as needed, a
   `has_pending_operations`-aware helper, and capability

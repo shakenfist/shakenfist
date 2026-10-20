@@ -296,8 +296,11 @@ A task is observational if its purpose is to measure or verify its target,
 and its only writes are of one of two kinds:
 
 - **Recording what it observed.** Events, usage records and computed hashes
-  are the examples. Nothing waits for these, and nothing that a user asked
-  for depends on them.
+  are the examples. No other operation is sequenced behind these writes. A
+  user can wait for one: `GET /blobs/<uuid>/checksum/<algorithm>` enqueues
+  `verify_size_and_checksum` when the hash is not yet known, and returns it
+  once recorded. That caller polls for the value, though, not for the
+  operation, so it does not need the operation to count as pending.
 - **Correcting a cached observation that reality has already falsified.**
   `health_check_kvm_process` clears an instance's `kvm_pid` only when that
   process no longer exists, and `verify_size_and_checksum` drops a replica

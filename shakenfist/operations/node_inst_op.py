@@ -110,6 +110,13 @@ class NodeInstOp(BaseClusterOperation):
                     inst.state = Instance.STATE_ERROR
 
     def _collect_billing_statistics(self, inst):
+        # The sweep enqueues this only for created instances, but a queued
+        # sweep is not cancelled by a later delete, so the instance may have
+        # moved on. A failed task errors its instance, so measuring a guest
+        # that is being deleted could error the delete.
+        if inst.state.value != Instance.STATE_CREATED:
+            return
+
         with util_libvirt.LibvirtConnection() as lc:
             try:
                 # The basic structure
@@ -136,23 +143,31 @@ class NodeInstOp(BaseClusterOperation):
                     for disk in bd.get('devices', [{}]):
                         disk_path = disk.get('path')
                         disk_device = disk.get('device')
-                        if disk_path and disk_device and os.path.exists(disk_path):
-                            # Because nvme disks don't exist as full libvirt
-                            # disks, they are missing from the statistics
-                            # results.
-                            if disk_device not in statistics['disk usage']:
-                                statistics['disk usage'][disk_device] = {
-                                }
+                        if not disk_path or not disk_device:
+                            continue
 
-                            statistics['disk usage'][disk_device][
-                                'actual bytes on disk'] = os.stat(disk_path).st_size
+                        # A delete can remove the file at any moment, so
+                        # stat it rather than checking it exists first.
+                        try:
+                            disk_size = os.stat(disk_path).st_size
+                        except FileNotFoundError:
+                            continue
+
+                        # Because nvme disks don't exist as full libvirt
+                        # disks, they are missing from the statistics
+                        # results.
+                        if disk_device not in statistics['disk usage']:
+                            statistics['disk usage'][disk_device] = {
+                            }
+
+                        statistics['disk usage'][disk_device][
+                            'actual bytes on disk'] = disk_size
 
                 # Console log size
                 console_path = os.path.join(inst.instance_path, 'console.log')
-                if os.path.exists(console_path):
-                    st = os.stat(console_path)
-                    statistics['console_log_size'] = st.st_size
-                else:
+                try:
+                    statistics['console_log_size'] = os.stat(console_path).st_size
+                except FileNotFoundError:
                     statistics['console_log_size'] = 0
 
                 # Add in OOM details
@@ -188,6 +203,12 @@ class NodeInstOp(BaseClusterOperation):
         # process is just a guest that powered itself off, which the
         # cleaner already records as such -- error-deleting it here would
         # be wrong.
+        #
+        # Like the billing task, skip an instance that is no longer created:
+        # a delete may have started since the sweep queued this.
+        if inst.state.value != Instance.STATE_CREATED:
+            return
+
         pid = inst.kvm_pid
         if pid:
             try:

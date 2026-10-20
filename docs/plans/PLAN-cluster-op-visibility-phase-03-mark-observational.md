@@ -220,6 +220,15 @@ Rubric: decision 1. One row per task, every model.
      the flag says, so a reviewer who prefers mutating loses nothing
      by accepting this either.
 
+   One caller does have a user waiting on it, which the survey
+   missed and review found: `BlobChecksumEndpoint`
+   (`external_api/blob.py:343-345`) enqueues the verify at
+   `user_waiting` priority when a requested hash is not yet known.
+   That caller polls the endpoint for the hash, not the operation,
+   so it is consistent with the rubric as corrected in
+   `database_internals.md`. Phase 4 must not offer
+   `has_pending_operations` as the way to wait for that hash.
+
    If a blob gate is ever built on `has_pending_cluster_operation`,
    revisit this. The declaration's comment will say so.
 
@@ -310,7 +319,14 @@ Rubric: decision 1. One row per task, every model.
   `None` handling. The instance delete walk (`instance.py:2773`)
   now skips sweep ops when choosing what to cancel. Phase 4 already
   owns that walk, and the master plan records the behaviour change
-  there. A health check against a deleting instance does no harm.
+  there. This bullet originally said that a sweep surviving a delete
+  does no harm, which was true of the health check but not of the
+  billing task: it checked each file existed and then stat()ed it,
+  so a delete removing the file in between raised, and
+  `dispatch_task` errored the deleting instance (#4585's path).
+  Review caught it. Both tasks now return early for an instance
+  that is not `created`, and the billing task treats a file
+  removed mid-measurement as absent.
 * **The merge-queue smoke suites change timing,** because instance
   `runs_after` chains stop waiting behind sweep ops. That is the
   intended fix, but a flake that coincides with this PR will look
@@ -360,3 +376,27 @@ this phase and the order of the steps, as the master plan
 requires. No step needs a separate gate. Decision 3 is the only
 classification a reviewer is likely to dispute, and reversing it
 is a one-line change to a declaration and a table row.
+
+## Execution notes
+
+* 2026-10-20 (UTC): steps 3a-3c ran in sequence as planned and
+  were opened as #4588. The PR's own CI passed.
+* The automated review (0 fix, 0 document, 5 consider) found that
+  a queued billing sweep now survives an instance delete and could
+  error it (see Risks). At Michael's direction this phase took the
+  fix rather than leaving it to #4585: a `created` guard on both
+  sweep tasks and a stat race fix in the billing task, with tests
+  in `test_node_inst_op_collect_billing_statistics.py` and
+  `test_node_inst_op_health_check_kvm_process.py`, each
+  mutation-checked. Review items 2 (the user-requested hash, see
+  decision 3) and 5 (a release note sentence for clients) were
+  taken as documentation. Items 3 and 4, test hygiene in
+  correct tests, were declined.
+* The first merge queue run,
+  https://github.com/shakenfist/shakenfist/actions/runs/39473878717,
+  failed on two known flakes unrelated to the diff:
+  `test_lifecycle_power_cycle` lost ping after a power cycle with
+  `ssh.service` failing in the guest (#4407's signature), and the
+  node lifecycle job got a 500 from the under-cloud powering off
+  sf2. The review fix was pushed while the PR was out of the
+  queue.
