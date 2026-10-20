@@ -1075,6 +1075,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../clingwrap/development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../clingwrap/examples/" class="md-nav__link">
         
   
@@ -3739,6 +3767,34 @@
     
   
     Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../hunkydory/development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Merging and releasing
   
 
     
@@ -10553,6 +10609,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#merging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#releasing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15585,6 +15652,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#merging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#releasing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15690,12 +15768,14 @@ inherits that scope. To lint the whole tree:</p>
 against a local registry at <code>localhost:5000</code> that the workflow populates
 with test images.</p>
 <p>Both CI lanes -- <code>Sanity checks</code> and <code>Functional tests</code> -- run on
-ephemeral VM runners and skip changes that touch only <code>docs/**</code> or
-markdown at the top of the tree, because nothing they run reads those
-files. To test a documentation-only branch anyway, run the functional
-workflow by hand (<code>workflow_dispatch</code>, which path filters do not apply
-to) or comment <code>@shakenfist-bot please retest</code> on the pull request. The
-<code>Supply chain</code> lane is deliberately not filtered.</p>
+ephemeral VM runners. A pull request that touches only <code>docs/**</code> or
+markdown skips them, because nothing they run reads those files: a
+<code>Check paths</code> job in each workflow decides, and the lane's jobs skip on
+its output. A merge queue entry always runs both in full. To test a
+documentation-only branch anyway, run the functional workflow by hand
+(<code>workflow_dispatch</code>, which the filter does not apply to) or comment
+<code>@shakenfist-bot please retest</code> on the pull request. The <code>Supply chain</code>
+lane is deliberately not filtered.</p>
 <p>Every lane that runs on a pull request checks out the pull request's own
 tree and runs scripts from it, so a pull request can change what CI
 executes -- <code>tools/gitleaks-scan.sh</code> and <code>tools/mermaid-lint.sh</code> as much
@@ -15758,14 +15838,64 @@ it locally, with a docker daemon available:</p>
 </code></pre></div>
 <p>It is not in the <code>Supply chain</code> workflow because it needs a docker
 daemon and therefore a different runner image.</p>
+<h2 id="merging">Merging<a class="headerlink" href="#merging" title="Permanent link">&para;</a></h2>
+<p>Pull requests merge through a merge queue on <code>develop</code>, not with the
+merge button directly. A pull request can be queued once "Can enqueue"
+and "Can enqueue: unit" pass. The queue then runs <code>Sanity checks</code> and
+<code>Functional tests</code> again on the commit it is about to merge, and merges
+only when "Can merge" and "Can merge: unit" pass. Each workflow has a
+pair of its own, because a job's <code>needs:</code> cannot reach across workflows
+and the queue has to require both. That second run is the one a release
+counts (see below), so a change merged around the queue, by an
+administrator bypassing it, cannot be released until a later commit has
+gone through the queue.</p>
+<p>The queue builds one entry at a time (<code>max_entries_to_build: 1</code> in the
+<code>develop</code> ruleset). The <code>concurrency</code> groups in <code>python-unit-tests.yml</code>
+and <code>functional-tests.yml</code> depend on that: a queue run shares a group
+with whatever the queue builds next, so that a superseded run is
+cancelled. Raising the setting would make each entry cancel the one
+ahead of it, so revisit those groups first.</p>
+<p>A new job in either workflow goes in the <code>needs:</code> of that workflow's
+two aggregator jobs.</p>
+<p>The wheel check in the functional lane is
+<a href="https://github.com/shakenfist/actions/blob/main/docs/actions.md#check-dist"><code>check-dist</code></a>.
+It fails if the wheel holds a test directory, so a packaging change
+that would ship the tests fails on its pull request rather than at
+release time.</p>
 <h2 id="releasing">Releasing<a class="headerlink" href="#releasing" title="Permanent link">&para;</a></h2>
-<p>Releases are automated via GitHub Actions. Push a version tag to trigger the
-pipeline:</p>
+<p>Pushing a <code>v*</code> tag triggers <code>release.yml</code>. Its jobs, in order:</p>
+<ol>
+<li><code>ci-gate</code> checks that <code>python-unit-tests.yml</code> and
+   <code>functional-tests.yml</code> both succeeded on the tagged commit, in their
+   merge queue runs. A run started by hand, as <code>pr-retest.yml</code> does
+   with <code>workflow_dispatch</code>, does not count. A queue run that fails,
+   flaky or not, ejects its entry, so the commit it built never reaches
+   <code>develop</code> and re-running that run cannot make any tag pass: re-queue
+   the pull request and tag the commit that merges. Re-running a queue
+   run helps only when the tagged commit's run was re-run after it
+   merged and that later attempt failed, because the gate judges each
+   run at its latest attempt; then use "Re-run jobs" on it.
+   How the gate decides is documented with the action, as
+   <a href="https://github.com/shakenfist/actions/blob/main/docs/actions.md#require-ci-success"><code>require-ci-success</code></a>.
+   It has no override.</li>
+<li><code>build</code> builds the sdist and wheel, then runs <code>twine check</code> and the
+   same wheel check as CI. It runs only if the gate passed.</li>
+<li>The publishing jobs wait for approval in the <code>release</code>
+   environment, re-sign the tag with gitsign, and publish to PyPI with
+   attestations.</li>
+</ol>
+<p>So tag a commit that is on <code>develop</code> and went through the merge
+queue, and wait for both workflows' runs on it to finish first. A gate
+failure means nothing was signed or published, so every failure is
+recoverable: the template's
+<a href="https://github.com/shakenfist/development/blob/main/templates/release-automation/README.md#recovering-from-a-gate-failure">recovery table</a>
+says what to do for each cause, which is usually moving the tag or
+re-running CI and then the <code>ci-gate</code> job.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>git tag -s v0.5.0 -m "Release v0.5.0"
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>git push origin v0.5.0
 </code></pre></div>
-<p>The workflow builds the package, signs the tag with Sigstore, publishes to
-PyPI, and creates a GitHub Release. See
+<p>Running <code>release.yml</code> by hand with <code>workflow_dispatch</code> skips the gate
+and the publishing jobs, and only builds and checks the packages. See
 <a href="https://github.com/shakenfist/occystrap/blob/develop/RELEASE-SETUP.md">RELEASE-SETUP.md</a>
 for one-time configuration steps.</p>
 <h2 id="developer-automation">Developer automation<a class="headerlink" href="#developer-automation" title="Permanent link">&para;</a></h2>
