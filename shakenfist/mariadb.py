@@ -181,6 +181,21 @@ def rpc_timing_scope(sweep: str, object_type: str) -> Iterator[None]:
         _RPC_TIMING_SCOPE.reset(token)
 
 
+def _observe_scoped_rpc(
+        timing_scope: Optional[tuple[str, str]], operation: str,
+        started: float) -> None:
+    """Observe an RPC's wall time if it was made inside a timing scope.
+
+    timing_scope is the value of _RPC_TIMING_SCOPE read when the call
+    began; started is the time.monotonic() reading taken then. Does
+    nothing when timing_scope is None.
+    """
+    if timing_scope is not None:
+        DATABASE_CLIENT_RPC_SECONDS.labels(
+            sweep=timing_scope[0], object_type=timing_scope[1],
+            operation=operation).observe(time.monotonic() - started)
+
+
 # Sentinel node name used during migration when the original node is unknown.
 # This uses a name that cannot conflict with real hostnames.
 MIGRATION_UNKNOWN_NODE = '__migrated_unknown_node__'
@@ -962,11 +977,7 @@ def _grpc_call(
         raise exceptions.DatabaseUnavailable(
             f'database service unreachable: {summary}') from last_error
     finally:
-        if timing_scope is not None:
-            DATABASE_CLIENT_RPC_SECONDS.labels(
-                sweep=timing_scope[0], object_type=timing_scope[1],
-                operation=method_name or 'unknown').observe(
-                    time.monotonic() - started)
+        _observe_scoped_rpc(timing_scope, method_name or 'unknown', started)
 
 
 # =============================================================================
@@ -6741,7 +6752,13 @@ def _grpc_delete_object_events(
     but do not re-raise: hard_delete must not fail because an events
     cleanup failed. The events row will be reaped by the daily prune
     if it becomes an orphan.
+
+    This does not go through _grpc_call(), because that would retry and
+    change the failure handling above, so it observes its own wall time
+    on database_client_rpc_seconds when called inside an rpc_timing_scope().
     """
+    timing_scope = _RPC_TIMING_SCOPE.get()
+    started = time.monotonic() if timing_scope is not None else 0.0
     try:
         stub = _get_database_stub()
         request = database_pb2.DeleteObjectEventsRequest(
@@ -6759,6 +6776,8 @@ def _grpc_delete_object_events(
         LOG.warning(
             f'gRPC DeleteObjectEvents failed for '
             f'{object_type}/{object_uuid}: {e}')
+    finally:
+        _observe_scoped_rpc(timing_scope, 'DeleteObjectEvents', started)
 
 
 def get_object_events(

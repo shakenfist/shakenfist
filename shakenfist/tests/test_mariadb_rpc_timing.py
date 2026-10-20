@@ -133,3 +133,48 @@ class RpcTimingScopeTestCase(base.ShakenFistTestCase):
             self.assertEqual(
                 (self.sweep, 'blob'), mariadb._RPC_TIMING_SCOPE.get())
         self.assertIsNone(mariadb._RPC_TIMING_SCOPE.get())
+
+
+@mock.patch('shakenfist.mariadb._get_database_stub')
+class DeleteObjectEventsTimingTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        patcher = mock.patch('shakenfist.mariadb.time')
+        self.mock_time = patcher.start()
+        self.addCleanup(patcher.stop)
+        self.mock_time.monotonic.return_value = 0.0
+        self.sweep = 'sweep-' + self.id().rsplit('.', 1)[-1]
+        self.before = _count(self.sweep, 'blob', 'DeleteObjectEvents')
+
+    def test_success_in_scope_observes_one_sample(self, mock_stub):
+        self.mock_time.monotonic.side_effect = [10.0, 10.5]
+        mock_stub.return_value.DeleteObjectEvents.return_value = (
+            mock.MagicMock(success=True))
+
+        with mariadb.rpc_timing_scope(self.sweep, 'blob'):
+            mariadb._grpc_delete_object_events('blob', 'uuid')
+
+        self.assertEqual(
+            self.before + 1, _count(self.sweep, 'blob', 'DeleteObjectEvents'))
+        self.assertEqual(
+            30.0, mock_stub.return_value.DeleteObjectEvents.call_args.kwargs['timeout'])
+
+    def test_rpc_error_in_scope_observes_one_sample(self, mock_stub):
+        mock_stub.return_value.DeleteObjectEvents.side_effect = FakeRpcError(
+            grpc.StatusCode.UNAVAILABLE)
+
+        with mariadb.rpc_timing_scope(self.sweep, 'blob'):
+            mariadb._grpc_delete_object_events('blob', 'uuid')
+
+        self.assertEqual(
+            self.before + 1, _count(self.sweep, 'blob', 'DeleteObjectEvents'))
+
+    def test_outside_scope_observes_nothing(self, mock_stub):
+        mock_stub.return_value.DeleteObjectEvents.return_value = (
+            mock.MagicMock(success=True))
+
+        mariadb._grpc_delete_object_events('blob', 'uuid')
+
+        self.assertEqual(
+            self.before, _count(self.sweep, 'blob', 'DeleteObjectEvents'))
+        self.mock_time.monotonic.assert_not_called()
