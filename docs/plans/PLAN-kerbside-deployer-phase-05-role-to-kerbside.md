@@ -1421,6 +1421,19 @@ Kerbside's admin UI is unavailable without Keystone. The Kerbside
 collection documents nothing about Keystone, so linking to it would
 have lost the note.
 
+**C's trial needed no TRIAL commit.** B had merged and 0.8.0 was on
+Galaxy, so the operator approved pushing the branch and dispatching
+`functional-tests.yml` on it as it stood.
+[Run 39346524038](https://github.com/shakenfist/shakenfist/actions/runs/39346524038)
+passed every job:
+* the sanity step's wiring test passed 14 of 14 cases;
+* the slim-tier row installed `shakenfist.kerbside:0.8.0` from Galaxy
+  before the first deploy;
+* its redeploy check reported 43 units unchanged and 0 restarted,
+  `kerbside-*` included;
+* 147 tests passed and 0 failed, the Kerbside exchange and console
+  tests among them. None of the 4 skipped tests is a Kerbside test.
+
 **Steps 8 and 9 have not started.** Step 8 needs C merged, and step 9
 needs D merged and one nightly pass (back-brief gate 3).
 
