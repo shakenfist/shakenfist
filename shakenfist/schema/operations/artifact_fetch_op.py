@@ -24,6 +24,7 @@ initial_version = 1
 current_version = 1
 
 
+# All tasks mutate: it downloads images and creates blobs and artifact versions.
 class model_tasks(Enum):
     image_fetch = 1
 

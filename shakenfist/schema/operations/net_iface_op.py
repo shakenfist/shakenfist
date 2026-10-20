@@ -24,6 +24,7 @@ initial_version = 1
 current_version = 1
 
 
+# All tasks mutate: it allocates and routes a floating address.
 class model_tasks(Enum):
     interface_float = 1
 

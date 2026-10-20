@@ -59,8 +59,9 @@ class _Tasks(Enum):
 class _ObservingModel(BaseModel):
     """A test-local op model declaring one observational task.
 
-    No production model declares observational_tasks yet (phase 3 does),
-    so the mechanism is exercised through this one.
+    The mechanism is exercised through this model rather than a production
+    one, so these tests do not change when a production task is
+    reclassified.
     """
     target_fields: ClassVar[dict[str, ObjectType]] = {
         'instance_uuid': ObjectType.INSTANCE,

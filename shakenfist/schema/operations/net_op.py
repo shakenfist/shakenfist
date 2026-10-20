@@ -29,6 +29,10 @@ initial_version = 1
 current_version = 3
 
 
+# All tasks mutate: each creates, changes or removes network host state
+# (bridges, dnsmasq, NAT, mesh, floating IPs). network_ensure_mesh
+# reconciles rather than creates, but reconciling changes the host, and
+# network gating must wait for it.
 class model_tasks(Enum):
     network_deploy = 1
     network_destroy = 2

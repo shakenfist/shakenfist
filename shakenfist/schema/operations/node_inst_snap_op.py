@@ -24,6 +24,7 @@ initial_version = 1
 current_version = 1
 
 
+# All tasks mutate: it creates blobs and artifacts from the guest's disks.
 class model_tasks(Enum):
     instance_snapshot = 1
 

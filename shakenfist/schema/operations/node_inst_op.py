@@ -33,16 +33,20 @@ class model_tasks(Enum):
 
 
 class model(BaseModel):
-    # A model may also declare, beside target_fields, the tasks that only
-    # observe their targets, as observational_tasks:
-    # ClassVar[frozenset[model_tasks]]. An op whose tasks are all in that
-    # set is stamped observational on its target rows; see
-    # is_observational() in util.py. Absent means none. No model
-    # declares it yet: phase 3 of docs/plans/PLAN-cluster-op-visibility.md
-    # classifies the tasks.
     target_fields: ClassVar[dict[str, ObjectType]] = {
         'instance_uuid': ObjectType.INSTANCE,
     }
+
+    # Tasks that only observe their instance. The ClassVar annotation is
+    # required: without it pydantic makes this a field and
+    # is_observational() sees nothing. See "When is a task observational?"
+    # in docs/developer_guide/database_internals.md.
+    observational_tasks: ClassVar[frozenset[model_tasks]] = frozenset({
+        # Reads libvirt and records the result as a usage event.
+        model_tasks.collect_billing_statistics,
+        # Clears a kvm_pid cache entry whose process is already gone.
+        model_tasks.health_check_kvm_process,
+    })
 
     uuid: UUID4
     node_uuid: UUID4

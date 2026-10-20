@@ -27,6 +27,7 @@ initial_version = 1
 current_version = 1
 
 
+# All tasks mutate: they add and remove host routing for an address.
 class model_tasks(Enum):
     route_address = 1
     unroute_address = 2

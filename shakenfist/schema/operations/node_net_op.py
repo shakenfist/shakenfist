@@ -26,6 +26,7 @@ initial_version = 1
 current_version = 1
 
 
+# All tasks mutate: they create or remove a network on a hypervisor.
 class model_tasks(Enum):
     network_destroy = 1
     network_apply_create_hypervisor = 2
