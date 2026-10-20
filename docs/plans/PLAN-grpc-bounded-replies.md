@@ -295,6 +295,14 @@ Sequencing constraints:
 
 ## Dependencies on other plans
 
+- **[Keep the deleted-object sweep ahead](PLAN-deleted-object-sweep.md)
+  phase 2 pages `GetObjectsByState` first.** It adds `page_size` and
+  `after_uuid` to `GetObjectsByStateRequest` and `more_available` to
+  its reply, in the shape this plan's worked brief describes, and
+  converts the deleted-object sweep to read one primary-key page per
+  type. `page_size` 0 keeps today's unbounded reply, so every other
+  caller is unchanged. This plan's phase 2 should treat that caller as
+  done and reuse the fields for the rest.
 - **`PLAN-eventlog-direct-mariadb` is complete and is where this came
   from.** Its Future work section listed cursor pagination for
   `GetObjectEvents` as deferred; issue 3638 is that deferral coming due.

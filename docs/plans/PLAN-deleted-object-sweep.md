@@ -135,6 +135,99 @@ hour, which is 0.3 to 1.4 seconds per object. At that cost no budget
 the 15 minute job could afford would drain the queue. Even 15 minutes
 of work every 15 minutes, the whole job, would manage about 60k a day.
 
+### What phase 1 measured
+
+Phase 1's metrics went live on sfcbr at 2026-10-19T20:15Z, when sf-5
+refilled the queue. sf-4 took over at 2026-10-20T19:40Z and refilled
+it again. The numbers below are 24 hour windows ending
+2026-10-20T21:23Z, queried from the 33fl Prometheus with phase 1's
+brief 1d. `rate()` and `increase()` handle the change of leader per
+series.
+
+**Throughput.** The sweep hard deleted 2,048 objects in 24 hours and
+spent 974 seconds doing it. That is the whole budget: 10 seconds every
+15 minutes is 960 seconds a day. Every entry it reached was
+`hard_deleted`. No entry was `gone`, `not_final`, `too_young` or
+`failed`, so none of the budget was spent on entries that were no
+longer actionable.
+
+**Starvation.** All 2,048 came from the four types at the head of the
+fill order:
+
+| Type | Hard deleted | Mean seconds | In timed RPCs | Outside them |
+|---|---|---|---|---|
+| `artifact_fetch_op` | 1,351 | 0.458 | 0.343 | 0.115 |
+| `dhcp` | 516 | 0.147 | 0.095 | 0.052 |
+| `instance` | 130 | 0.558 | 0.305 | 0.253 |
+| `blob` | 51 | 4.056 | 0.698 | 3.358 |
+
+The other 16 types with a backlog, 1.72M objects between them, got
+nothing.
+
+**Where the time goes.** Reads are cheap and the deletes that remove a
+row are not. Mean wall time per RPC, as the client sees it:
+
+| RPC | Mean ms | Kind |
+|---|---|---|
+| `GetObjectState`, `GetClusterOperation`, `GetInstance`, `GetBlob`, `GetDnsMasq` | 2.0-2.4 | read |
+| `ReleaseInstancePlacement` | 1.9 | placement already gone |
+| `DeleteClusterOperationError`, `DeleteObjectMetadata` | 3.4-5.1 | delete, usually of nothing |
+| `DeleteBlobTransfersForBlob` | 12 | delete |
+| `DeleteDnsMasq` | 49 | delete of a row |
+| `DeleteInstanceAttributes`, `DeleteInstance` | 63-70 | delete of a row |
+| `DeleteClusterOperationTargetsForObject`, `DeleteObjectState` | 84-88 | delete of a row |
+| `DeleteClusterOperationTarget`, `DeleteClusterOperation` | 105-116 | delete of a row |
+| `DeleteBlob`, `DeleteBlobAttributes` | 138-139 | delete of a row |
+| `DeleteBlobHashes` | 250 | delete of several rows |
+
+A delete that removes a row costs 25 to 125 times a read. The "usually
+of nothing" label is inferred: most objects have no metadata and no
+operation errors, and those two RPCs cost what a read costs. MariaDB on
+labqnap runs with `innodb_flush_log_at_trx_commit=1` and no binary log.
+It reported no row lock waits over the window. That pattern fits a
+per-commit log flush of something like 50 to 100 ms on labqnap's
+storage. It is the most likely explanation, but phase 1 cannot prove
+it.
+
+**The time outside the timed RPCs is mostly `DeleteObjectEvents`.**
+`_grpc_delete_object_events()` (`shakenfist/mariadb.py:6508`) calls
+its stub directly with its own 30 second timeout, not through
+`_grpc_call()`, so phase 1's scope never saw it. It is the base
+`hard_delete()`'s event-reference delete. The objects with the most
+events cost the most outside: 3.4 seconds for a blob, 0.25 for an
+instance, 0.12 for an operation.
+
+**Arrivals.** Between the fills at 2026-10-19T20:15Z (1,688,146) and
+2026-10-20T19:55Z (1,726,236), the backlog grew by 38,090 while the
+sweep removed about 2,000. That is about 40k arrivals a day, which
+matches the Loki series above. By type, over those 23.7 hours:
+`namespace` 8,819, `node_inst_op` 7,750, `net_op` 5,612,
+`namespace_key` 3,943, `node_net_op` 3,809, `node_inst_netdesc_op`
+1,603, `interface` 1,143, and under 1,000 each for the rest.
+
+**Backlog by type** at 2026-10-20T21:23Z, 1,725,810 in all:
+`node_inst_op` 639,004, `net_op` 367,052, `node_net_op` 199,403,
+`node_inst_netdesc_op` 109,500, `namespace_key` 103,252, `interface`
+81,284, `net_macaddr_ip_op` 48,251, `namespace` 45,755,
+`node_blob_op` 39,108, `network` 32,712, `net_iface_op` 27,775,
+`net_iface_ip_op` 18,657, `node_inst_net_iface_op` 4,726, `ipam`
+3,114, `instance` 2,622, `artifact_fetch_op` 1,186,
+`node_inst_snap_op` 1,016, `net_ip_op` 732, `dhcp` 630, `blob` 34.
+
+**What it means.** At about 0.4 seconds an object, keeping up with
+40k arrivals a day takes about four and a half hours of serial work
+a day. The sweep gets 16 minutes. Fairness alone (phase 2) cannot close
+that gap within today's budget, and a larger budget alone would spend
+it on commits. The cost per object has to fall (phase 3).
+
+**#4399 is not the sweep.** sf-cleaner's `GetObjectState` rate is
+2.86/s, against 2.90/s three days earlier. Every `GetObjectState` the
+sweep makes comes from `caller_daemon="cluster"`, at about 0.05/s.
+Phase 1 scopes only sf-cluster's sweep, so it cannot attribute
+sf-cleaner's reads, and #4399 stays open. Phase 4's drain is a natural
+experiment: if sf-cleaner's rate falls as the backlog drains, the
+backlog was the cause.
+
 ### Why it matters
 
 - **Database load.** Anything that lists including deleted objects
@@ -175,7 +268,8 @@ of work every 15 minutes, the whole job, would manage about 60k a day.
   events prune is also slow, and both sweeps share the events tables.
 - [#4399](https://github.com/shakenfist/shakenfist/issues/4399):
   sf-cleaner's `GetObjectState` rate has doubled since July. Phase 1
-  should check whether that is the backlog too.
+  checked whether that is the sweep. It is not, and phase 1 could not
+  tell whether it is the backlog (see "What phase 1 measured").
 
 ## Mission and problem statement
 
@@ -184,8 +278,10 @@ drain the backlog sfcbr already has. When this plan is done:
 
 1. An object in a final state is hard deleted within a bounded time
    after its delay has passed, for every object type, on a cluster
-   with sfcbr's churn. Phase 1 sets the bound from measured numbers.
-   It is not chosen now.
+   with sfcbr's churn. The bound is **24 hours**, set from phase 1's
+   numbers while planning phase 2. At about 40k arrivals a day, any
+   tighter bound needs the same continuous throughput as 24 hours
+   does. A day is also what a daily report can check.
 2. No object type can starve another. A large backlog in one type
    slows that type, not the rest.
 3. The sweep's reads are bounded by construction, not by gRPC's
@@ -215,26 +311,38 @@ recommends today.
    step is slow (the instance placement release, the namespace
    cascade, the event write), or every gRPC round trip from the
    maintainer is slow. We should not design the throughput fix until
-   this is measured per object type and per step. No recommendation
-   yet. That is the point of the phase.
+   this is measured per object type and per step. **Answered by phase
+   1** (see "What phase 1 measured"): no single step dominates. The
+   cost is the deletes that actually remove a row, each 50 to 250 ms,
+   plus the event-reference delete that phase 1's scope could not see.
+   Reads cost about 2 ms. The instance placement release, a suspect
+   when this was written, costs 2 ms. The namespace cascade was never
+   reached, because namespaces starved, so it is still unmeasured.
 
 2. **Which order should the drain use within a type?** (Phase 2.)
-   Oldest first keeps the semantics simple and is what the
-   `updated_before` filter already implies. Newest first would bring
-   back the one-hour retention for fresh deletions straight away, but
-   the load costs in Situation scale with the *size* of the deleted
-   set, not its age. So newest first buys little, and it leaves the
-   oldest rows to rot. **Recommendation:** oldest first within a type,
-   round robin across types.
+   **Answered while planning phase 2: primary key order, round robin
+   across types.** This replaces the earlier recommendation of oldest
+   first. `object_states` has no index that can return a type's
+   final-state rows in `update_time` order. Oldest first would need a
+   new index on the cluster's largest table, or a sort of up to 639k
+   rows for every page. Walking the existing primary key `(object_type,
+   object_uuid)` with a keyset cursor is bounded and index-served. It
+   is also the shape [Bound gRPC reply sizes](PLAN-grpc-bounded-replies.md)
+   already specifies for this RPC. The order within a type does not
+   change what the mission needs: every object is reached within one
+   pass of its type's cursor. See phase 2's D8.
 
 3. **Where should the sweep run?** (Phase 2.) Today it shares the
    elected maintainer's `schedule.run_pending()` loop, and the
    watchdog is only petted between jobs (WatchdogSec=300s). A larger
    budget inside that loop competes with every other scheduled job and
    with the watchdog. The options are a bigger budget, a higher
-   cadence, or a dedicated thread with its own pet. **Recommendation:**
-   decide after phase 1. If phase 3 can make an object cheap enough,
-   the cadence change alone may do.
+   cadence, or a dedicated thread with its own pet. **Answered while
+   planning phase 2: stay in the maintenance loop, run every minute,
+   and make the budget a configuration option.** Phase 1 shows that
+   the time goes on database commits, so a thread would only add
+   concurrency against the tier that is the bottleneck, and it would
+   bring a second sweeper after a lost election. See phase 2's D10.
 
 4. **Batch the deletes, or keep per-object `hard_delete()`?**
    (Phase 3.) Several types' `hard_delete()` is nothing but table
@@ -245,7 +353,10 @@ recommends today.
    cascades with side effects (placement release, claim release,
    blob transfers) that must stay per object. **Recommendation:**
    batch where the hard delete is pure deletes, keep the rest per
-   object, and let phase 1's numbers say which types are worth it.
+   object. Phase 1's numbers strengthen the case. If the cost is a
+   per-commit flush, which is the likeliest reading, then deleting a
+   batch in one transaction pays that cost once per batch, not three or
+   four times per object.
 
 5. **How should sfcbr's backlog be drained?** (Phase 4.) At the
    target throughput, 1.6M objects is still days of work, and a drain
@@ -313,7 +424,7 @@ shape of phases 2 and 3, so only their scope is fixed here.
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. Measure the sweep | [PLAN-deleted-object-sweep-phase-01-measure.md](PLAN-deleted-object-sweep-phase-01-measure.md) | Complete | 6537966c00 |
-| 2. A fair, bounded drain | PLAN-deleted-object-sweep-phase-02-fair-drain.md | Not started | — |
+| 2. A fair, bounded drain | [PLAN-deleted-object-sweep-phase-02-fair-drain.md](PLAN-deleted-object-sweep-phase-02-fair-drain.md) | In progress | — |
 | 3. Cheaper hard deletes | PLAN-deleted-object-sweep-phase-03-throughput.md | Not started | — |
 | 4. Drain sfcbr and keep it drained | PLAN-deleted-object-sweep-phase-04-drain.md | Not started | — |
 | 5. Push audit | - | Not started | — |
@@ -356,30 +467,50 @@ watchdog and job-sharing behaviour.
 
 - Replace the single FIFO with per-type work, drained round robin, so
   one type's backlog cannot starve another (mission 2).
-- Refill a type when its work runs low or its last fill is older than
-  a bound, not only when everything is empty, so a restart is no
-  longer what keeps the sweep alive.
-- Bound each fill. Ask for a page per type, oldest first, rather than
-  every uuid. Coordinate with [Bound gRPC reply
-  sizes](PLAN-grpc-bounded-replies.md) phase 2: whichever lands first
-  adds the paged `get_objects_by_state`, and the other uses it.
+- Refill a type when its own work runs out, not only when everything
+  is empty, so a restart is no longer what keeps the sweep alive.
+- Bound each fill. Ask for a page per type in primary key order
+  (open question 2), rather than every uuid. [Bound gRPC reply
+  sizes](PLAN-grpc-bounded-replies.md) has not started, so this phase
+  adds the paged `GetObjectsByState` in the shape that plan already
+  specifies, and that plan's phase 2 reuses it.
 - Answer open question 3 and set the budget and cadence to match.
+- Keep the backlog visible. Paging means the sweep no longer holds
+  the whole backlog in memory, so phase 1's depth gauge stops being
+  the backlog. Replace it with a per-type count from the database
+  (added while planning phase 2).
+- Make `DeleteObjectEvents` visible to phase 1's timing scope, so
+  that phase 3 is planned against complete numbers, including the
+  namespace cascade that phase 2 reaches for the first time (added
+  while planning phase 2).
 
 Definition of done: a unit test showing that a type with a huge
 backlog does not stop another type's objects from being hard deleted
 in the same pass, and evidence that the same test fails against the
 current single FIFO, so that it is known to test what it claims to.
+After deploy, sfcbr's 24 hour numbers show hard deletes in every type
+with a backlog. They are recorded by phase 3's planning commit.
 
 ### Phase 3: cheaper hard deletes
 
 Planning effort: high. It may add `DatabaseService` RPCs, and it
 changes the cascade code for objects that hold capacity.
 
-Scope follows from phase 1. The candidates are batch deletes for the
-types whose hard delete is only table deletes (open question 4),
-dropping the `from_db()` hydration where the fill's SQL has already
-established state and age, and fixing whichever single step phase 1
-finds dominant. The cascades that release capacity (instance
+Scope follows from phase 1, and from phase 2's numbers for the types
+phase 1 never reached. Phase 1 found that the cost is in the deletes
+that remove rows, at 50 to 250 ms each, and in `DeleteObjectEvents`.
+So the candidates are now:
+
+- Delete a batch of objects of one type in one database transaction,
+  paying the per-commit cost once per batch (open question 4). The
+  pure-delete types come first, as before.
+- Include the event-reference delete in that batch.
+- Confirm or refute the per-commit flush reading. The batch's own
+  latency against its size answers it.
+
+Dropping the `from_db()` hydration is **no longer a candidate**. Reads
+cost about 2 ms, so two of them per object are under 1% of an
+operation's cost. The cascades that release capacity (instance
 placement, namespace claims) keep their per-object semantics, and
 their existing unit tests must still pass unchanged.
 
@@ -396,8 +527,8 @@ Planning effort: medium.
   skill while it runs.
 - Add a regression guard so that, once drained, a sweep falling
   behind is reported rather than discovered: an entry in the 33fl
-  infra report reading phase 1's gauge, or an alert, whichever matches
-  how comparable signals are already reported.
+  infra report reading phase 2's backlog gauge, or an alert,
+  whichever matches how comparable signals are already reported.
 - Document the sweep's tuning, and the regression guard, in
   `docs/operator_guide/database.md`, beside the metrics phase 1
   documents in "Watching for sweeps that silently do nothing".
