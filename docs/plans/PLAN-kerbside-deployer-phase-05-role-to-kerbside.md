@@ -1362,8 +1362,67 @@ profile. Instead:
   * the rows without a profile passed unchanged.
 * The trial branches and worktree are deleted.
 
-**Steps 5-9 have not started.** Step 5 needs A merged and
-`shakenfist.kerbside` 0.8.0 on Galaxy (back-brief gate 2).
+**The release (2026-10-20, Australia/Sydney).** A merged as Kerbside
+`2093f2ed`. The operator added `ANSIBLE_GALAXY_TOKEN` as a repository
+secret and tagged `v0.8.0`.
+[Release run 39309817927](https://github.com/shakenfist/kerbside/actions/runs/39309817927)
+passed all nine jobs. Kerbside 0.8.0 is on PyPI, and
+`shakenfist.kerbside` 0.8.0 is on Galaxy. Installed from Galaxy, its
+`kerbside_collection_version` is `0.8.0` and `kerbside_package` defaults
+to `kerbside==0.8.0`. Gate 2 is met.
+
+**Steps 5 and 6: one commit, `83d15cc23a`.** The old
+`tools/ci-test-kerbside-role.sh` also tested `site.yml`'s include lists,
+so a step 5 commit would have failed its own pre-commit hooks:
+`test-kerbside-role`, and `py3`, since `test_kerbside_host_subject.py`
+loaded a file from the deleted role. Step 5 departs from brief 5 in
+these ways:
+* **The CA.** The validation play passes `kerbside_sf_ca_cert: null`,
+  because the CA does not exist before Shaken Fist's first deploy. The
+  source carries a placeholder `ca_cert` and the PEM check is skipped.
+  "Deploy Kerbside" runs `kerbside_source` again with the CA it reads.
+* **The rescue always fails.** It names the install command only when
+  `kerbside_collection_version` is undefined, that is when the role
+  could not be loaded. `any_errors_fatal` also brings hosts which
+  passed into the rescue, so keying on the failed task would have told
+  them, wrongly, that the collection was missing.
+* **The version check.** It handles every operator a range can use,
+  compared as semver as ansible-galaxy does, not just a `ge` floor and
+  an `lt` ceiling.
+* **`kerbside_reserved_ports`** reaches the role as the fact
+  `kerbside_source` sets, not as an `include_role` variable. Passing it
+  under its own name would be a recursive template.
+* **Additions beyond brief 5:**
+  * `kerbside_source` refuses an empty `kerbside_system_key`, as the
+    old role did.
+  * "Deploy Kerbside" passes the role's three certificate file names
+    to internal_ca.
+  * `TOP_LEVEL_KEYS` in `test_ci_deploy_profiles.py` gains `collections`.
+
+Step 6 renamed the test to `test_spice_subject.py` and replaced brief
+6's internal_ca file-name match with a stronger check: for five
+override sets, the paths, owner and group that `site.yml` gives
+internal_ca equal what the installed role reads. The wiring script has
+14 cases and kills all 51 mutations. It installs the pinned release
+from Galaxy, so the hook and the CI sanity step now need network access
+to Galaxy, which the old script did not.
+
+**Step 7.** Brief 7's first check, the `grep` for
+`roles/kerbside`, still finds two kinds of match, both correct:
+* `docs/components/kerbside/`, which is synced from Kerbside and must
+  not be edited;
+* the installed collection's path
+  `ansible_collections/shakenfist/kerbside/roles/kerbside` in
+  `tools/ci-test-kerbside-wiring.sh`.
+
+The check was written too broadly. Its other two checks pass. The
+management session restored the installation guide's note that
+Kerbside's admin UI is unavailable without Keystone. The Kerbside
+collection documents nothing about Keystone, so linking to it would
+have lost the note.
+
+**Steps 8 and 9 have not started.** Step 8 needs C merged, and step 9
+needs D merged and one nightly pass (back-brief gate 3).
 
 ## Future work
 
