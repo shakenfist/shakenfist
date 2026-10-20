@@ -194,11 +194,12 @@ anything on a host, a `cert_group` that host does not have.
 ## Kerbside
 
 The `node` role handles the Shaken Fist side of a
-[Kerbside](https://github.com/shakenfist/kerbside) VDI console proxy, and the
-`kerbside` role deploys Kerbside itself onto the hosts in the optional
-`kerbside` inventory group. Nothing below does anything unless
-`kerbside_url` is set, and Kerbside is only deployed when the `kerbside` group
-has members.
+[Kerbside](https://github.com/shakenfist/kerbside) VDI console proxy. The
+deploy can also install Kerbside itself onto the hosts in the optional
+`kerbside` inventory group, using the `kerbside` role of Kerbside's own
+`shakenfist.kerbside` collection, which is not part of this collection. Nothing
+below does anything unless `kerbside_url` is set, and Kerbside is only deployed
+when the `kerbside` group has members.
 
 ### The Shaken Fist side
 
@@ -219,66 +220,90 @@ The deploy stops, before writing anything, if a `KERBSIDE_URL` or
 
 ### Deploying Kerbside
 
-The `kerbside` group is optional. Its members may be Shaken Fist nodes
-(co-located) or hosts which are not (dedicated). Deploying needs these
-variables, all of which the deploy refuses to proceed without:
+Install the `shakenfist.kerbside` collection on the control node, at the
+versions the playbook accepts, with:
+
+```bash
+ansible-galaxy collection install -r examples/_shared/requirements.yml
+```
+
+It is published on
+[Galaxy](https://galaxy.ansible.com/ui/repo/published/shakenfist/kerbside/),
+and `requirements.yml` pins the range this playbook is tested against.
+`examples/_shared/site.yml` reaches the role only when the `kerbside` group has
+members, so a cluster without one deploys without the collection installed. With
+one, the deploy stops before any host is changed if the collection is missing,
+naming the install command, or if the installed version is outside the range in
+`requirements.yml`. A git checkout of Kerbside, which reports its version as
+`unreleased`, is accepted with a warning.
+
+The `kerbside` group's members may be Shaken Fist nodes (co-located) or hosts
+which are not (dedicated). Deploying needs these variables, all of which the
+deploy refuses to proceed without:
 
 | Variable | Purpose |
 |----------|---------|
 | `kerbside_url` | As above. Also Kerbside's console token audience. |
 | `kerbside_system_key` | As above. Also Kerbside's credential for Shaken Fist. A secret. |
 | `kerbside_public_fqdn` | The name SPICE clients use to reach the proxy. |
-| `kerbside_sql_url` | The SQLAlchemy URL of Kerbside's MySQL or MariaDB database, for example `mysql://kerbside:PASSWORD@db.example.com/kerbside`. A secret. |
-| `kerbside_auth_secret_seed` | Seeds Kerbside's token signing. A secret of at least 32 characters, and never Kerbside's placeholder `~~unconfigured~~`. |
+| `kerbside_sql_url` | The SQLAlchemy URL of Kerbside's MySQL or MariaDB database. A secret. |
+| `kerbside_auth_secret_seed` | Seeds Kerbside's token signing. A secret. |
+
+The role's own variables, its checks on them (including the ports it listens
+on, its database, its certificate and its package) and what a redeploy does
+are documented in the
+[collection's README](https://github.com/shakenfist/kerbside/tree/develop/ansible)
+in the Kerbside repository, not here.
 
 `kerbside_url` and `kerbside_system_key` must be visible to both the `allsf`
 and the `kerbside` hosts, for example in `group_vars/all`: the deploy refuses a
 `kerbside_url` which the two sides see differently, since every console token
 would then fail Kerbside's audience check. The other three may live in
-`group_vars/kerbside`. Every Kerbside port (`kerbside_api_port`,
-`kerbside_vdi_secure_port`, `kerbside_vdi_insecure_port` and
-`kerbside_metrics_port`) must be below 30000 and distinct from the others, and
-on a Kerbside host which is also a Shaken Fist node none may be 13000, 13001,
-13005, 13006 or 13007, the ports Shaken Fist's daemons listen on. Every Kerbside
-host is validated with its own variables, before any host is changed.
+`group_vars/kerbside`. Every Kerbside host is validated with its own
+variables, before any host is changed.
+
+**This cluster's source.** The playbook does not take Kerbside's
+`kerbside_sources` from your inventory. The `node` role's `kerbside_source`
+entry point builds this cluster's console source from `deploy_name`,
+`api_url`, `kerbside_system_key` and the CA which `/admin/cacert` serves, and
+the playbook passes it to the role first. It refuses an empty
+`kerbside_system_key`, a CA which is not a PEM certificate, and a
+`kerbside_url` which differs between the Shaken Fist and the Kerbside hosts.
 Kerbside fetches the signing key from `api_url`, so `api_url` must not be a
 loopback address on a dedicated Kerbside host (a co-located one reaches its
-own `sf-api` there).
+own `sf-api` there). The entry point also tells the role which ports to leave
+alone: every port from 30000 up, where instance consoles live, and on a
+co-located host the ports Shaken Fist's daemons listen on (13000, 13001, 13005,
+13006 and 13007).
 
-**Database.** Bring your own MySQL or MariaDB: create a `kerbside` database and
-a user with all privileges on it, and give its URL as `kerbside_sql_url`.
-Kerbside does not support sqlite. The deploy runs Kerbside's migrations.
+**Further sources.** To have the same Kerbside proxy consoles from other
+clusters or platforms, set `kerbside_extra_sources`, in the form
+`kerbside_sources` takes in the collection's README. It is appended after this
+cluster's source, whose `source` name is `deploy_name`, so no extra source may
+use that name. It holds credentials, so treat it as a secret. For example, a
+static source:
 
-**Certificate.** Unless you override it, the proxy certificate is issued from
-the deployment's internal CA into `/etc/kerbside/pki`, with `kerbside_public_fqdn`
-as its CN, and as an IP SAN if it is an address or a DNS SAN if it is a name.
-To use your own, set all three of `kerbside_proxy_cert_path`,
-`kerbside_proxy_key_path` and `kerbside_cacert_path` to paths on the Kerbside
-host; all or none.
-
-**Package.** `kerbside_package` defaults to `kerbside>=0.7.0`, because Kerbside
-0.6.0's API returns source passwords, which here is the cluster's `kerbside`
-key. Until 0.7.0 is released, set `kerbside_package` to a version or a wheel. A
-local wheel must be built from a git checkout of Kerbside, not an unpacked
-sdist ([kerbside#326](https://github.com/shakenfist/kerbside/issues/326)).
-
-**Redeploys.** Each deploy waits, for up to about three minutes
-(`kerbside_ready_retries`), for Kerbside to fetch the signing key with the
-credential that deploy minted. A redeploy restarts Kerbside only when its
-code (including the version of any package in its virtualenv other than pip
-and uv), configuration, systemd units or certificate changed.
+```yaml
+kerbside_extra_sources:
+  - source: lab
+    type: static
+    consoles:
+      - uuid: 5d1d0d46-6b1f-4e4a-9a45-7b3e0d3c2f10
+        name: lab-vm-1
+        hypervisor: lab-hv-1
+        hypervisor_ip: 192.0.2.10
+        insecure_port: 5901
+        ticket: "{{ vault_lab_vm_1_ticket }}"
+```
 
 Without a `kerbside` group, ansible prints `Could not match supplied host
 pattern, ignoring: kerbside`. This is harmless; defining an empty `kerbside:`
 group in your inventory silences it.
 
-Kerbside's admin login is Keystone-only, and the role configures no
-Keystone, so its admin UI is unavailable
-([kerbside#300](https://github.com/shakenfist/kerbside/issues/300)); consoles
-work. The `debian-13-slim-tier` merge row deploys Kerbside on a hypervisor
-against a real cluster, and proves the deploy, the migrations, restart-on-change
-across a no-op redeploy, readiness, the token exchange and the proxy's TLS
-endpoint.
+The `debian-13-slim-tier` merge row deploys Kerbside on a hypervisor against a
+real cluster, installing the collection from Galaxy as an operator would, and
+proves the deploy, the migrations, restart-on-change across a no-op redeploy,
+readiness, the token exchange and the proxy's TLS endpoint.
 
 ## Consuming the collection
 
