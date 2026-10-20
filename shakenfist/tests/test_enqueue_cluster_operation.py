@@ -12,7 +12,9 @@ from unittest import mock
 from pydantic import BaseModel
 
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.daemons.cluster import scheduled_tasks
 from shakenfist import exceptions
+from shakenfist.instance import Instance
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.schema.operations import util
 from shakenfist.tests import base
@@ -608,3 +610,45 @@ class EnqueueClusterOperationObservationalTestCase(
         mock_helper.assert_called_once_with(
             _NoDeclarationModel, ['mutate'])
         self.assertIs(True, kwargs['observational'])
+
+
+class PerInstanceSweepObservationalTestCase(base.ShakenFistTestCase):
+    """The production per-instance sweep enqueues an observational op."""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_create_and_enqueue = mock.patch(
+            'shakenfist.mariadb.create_and_enqueue_cluster_operation'
+        ).start()
+        self.mock_create_and_enqueue.return_value = (True, '')
+        mock.patch(
+            'shakenfist.schema.operations.util.eventlog.add_event_multi'
+        ).start()
+        self.addCleanup(mock.patch.stopall)
+
+        # Drain anything another test left on the module-level queue.
+        while not scheduled_tasks.INSTANCE_CHECKS_QUEUE.empty():
+            scheduled_tasks.INSTANCE_CHECKS_QUEUE.get(block=False)
+
+    def test_sweep_op_is_enqueued_observational(self):
+        inst = mock.MagicMock()
+        inst.uuid = INSTANCE_UUID
+        inst.state.value = Instance.STATE_CREATED
+        inst.placement = {'node': NODE_UUID}
+        scheduled_tasks.INSTANCE_CHECKS_QUEUE.put(inst)
+
+        node = mock.MagicMock()
+        node.uuid = NODE_UUID
+        with mock.patch('shakenfist.daemons.cluster.scheduled_tasks.Node'
+                        '.from_db', return_value=node):
+            processed = scheduled_tasks._process_per_instance_queue()
+
+        self.assertEqual(1, processed)
+        self.mock_create_and_enqueue.assert_called_once()
+        kwargs = self.mock_create_and_enqueue.call_args.kwargs
+        self.assertIs(True, kwargs['observational'])
+        self.assertEqual(
+            [(ObjectType.INSTANCE, INSTANCE_UUID)], kwargs['targets'])
+        self.assertEqual(
+            ['collect_billing_statistics', 'health_check_kvm_process'],
+            kwargs['metadata']['tasks'])
