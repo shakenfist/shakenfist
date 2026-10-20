@@ -360,6 +360,8 @@ table entirely (decision D8).
 | 5. Caller migration and hard ceiling | PLAN-scheduler-reservations-phase-05-callers.md | Not started | — |
 | 6. Affinity model rework | [PLAN-scheduler-reservations-phase-06-affinity.md](PLAN-scheduler-reservations-phase-06-affinity.md) | Complete | `597312d2a` (#3957), `b54f126e5` (#3971), `c37012c89` (#3972), `96c78fd63` (#4006) |
 | 7. Capacity diagnostics | [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md) | Complete | `30a02a918` (#4052) |
+| 7a. An operator-readable capacity surface | PLAN-scheduler-reservations-phase-07a-capacity-surface.md | Not started | — |
+| 7b. Capacity and claim views in sf-client | `PLAN-scheduler-reservations-phase-07b-client-views.md` (in shakenfist/client-python, branch `scheduler-reservations-phase-07b-client-views`; a relative link cannot cross repositories, so it is named rather than linked) | Not started | — |
 | 8. Documentation and operator guide | PLAN-scheduler-reservations-phase-08-docs.md | Not started | — |
 | 9. Push audit | PLAN-scheduler-reservations-phase-09-push-audit.md | Not started | — |
 
@@ -596,6 +598,15 @@ is here.
   was closed in the interval with no comment on it. The phase plan
   records both, because a phase whose bookkeeping trails its code
   by a day is a phase whose status columns lie for a day.
+
+- **Phases 7a and 7b** were inserted on 2026-10-20, between phases
+  7 and 8, after a reading of `sf-client` against this plan's API
+  surface found that an operator can see almost none of what
+  phases 2 to 7 built without `curl`. The operator guide phase 8
+  owes cannot document commands that do not exist, and phase 9's
+  audit is meant to review the final client surface, so both
+  phases sit ahead of them. Neither depends on phase 5, and 7b
+  needs nothing from 7a, so the two can run in parallel.
 
 ### Phase scope stubs
 
@@ -936,9 +947,115 @@ tree and the phase plan's G1 decides there should not be one.
 Detail in
 [PLAN-scheduler-reservations-phase-07-diagnostics.md](PLAN-scheduler-reservations-phase-07-diagnostics.md).
 
+*Phases 7a and 7b were added on 2026-10-20* from the operator's
+question "have we completely missed implementing any form of
+visibility for claims and node business in general in the
+shakenfist command line UI?" A reading of `client-python` at
+`d789e0b` against this repository at `ebc0f9772b` says yes,
+with one exception. `sf-client namespace claim` covers the claim
+CRUD surface in full, `used / limit` included. Nothing else this
+plan publishes reaches the command line:
+
+| What this plan publishes | Where an operator can read it today |
+|---|---|
+| Per-node ledger and measurements (`/admin/resources`: `cpu_committed`, `cpu_measured`, `cpu_hard_max`, `cpu_limit`, the `ram_*` and `disk_*` equivalents, the clamp flags, `cpu_committed_row_present`, `capacity_degraded`) | `curl` only. `apiclient.get_cluster_resources()` exists and has no CLI caller |
+| The cluster claims ledger (`cluster_capacity`: `total_*`, `claimed_*`, `unclaimed_used_*`), which is what a claim create is refused against (`mariadb.py:28175`) | Nowhere. No endpoint reads the singleton |
+| Every claim on the cluster | Nowhere. `mariadb.get_namespace_claims('')` lists them all and says this is "what a cluster-wide operator view wants" (`mariadb.py:29023`), but the only endpoint is per namespace, so an operator has to walk the namespaces |
+| Namespace and claim events (phase 7, `namespace-events`, `namespace-claim-events`) | `curl` only. The client has neither verb |
+| A claim's `peak_used_*`, the figure a caller sizing its next claim wants | `--output json` only |
+| A hypervisor dropped from `/admin/resources` for an unreasonable queue length (`scheduler.py:1089`) | Nowhere. It is left out of `per_node` without a trace, so the busiest node in the cluster is the one a capacity view cannot show |
+
+The only node-level command that tries, `sf-client node
+resources`, reads the latest raw `resources` event rather than
+the ledger, and is broken twice over: it indexes `[0]` before
+checking for an empty result (`node.py:166`), and it reads
+`event['extra']['resource']` with the literal key rather than the
+loop variable (`node.py:174`, `:180`). That reading is from the
+code alone; nobody ran it against a cluster.
+
+Phase 4c's finding that "the claims mechanism works and the numbers
+feeding it do not" is a sizing problem, and nobody can size what
+they cannot see. Phase 5 makes claims binding. That makes the
+blind spot worse, but it is not a dependency in either direction.
+
+**Phase 7a — an operator-readable capacity surface.** The
+server half: publish what the table above says nobody can read.
+
+* The `cluster_capacity` singleton, published from the same read
+  the claim guard makes. It goes in `/admin/resources` beside
+  `per_node`, or on an endpoint of its own; the phase plan
+  decides which, and why. Whichever it picks, the singleton's
+  own counters are what gets published. They are not re-derived
+  by summing claim rows. `summarize_resources()`'s comment at
+  `scheduler.py:1053` already records why: a second ledger
+  derived independently beside the real one is how the two
+  come to disagree. A degraded read is flagged the way
+  `capacity_degraded` is, so a zero can be told apart from a
+  failure.
+* An admin-only cross-namespace claim listing over the existing
+  `get_namespace_claims('')`, filtered by `coverage_state` in SQL
+  rather than in Python (the filter-pushdown rule).
+* Hypervisors excluded from `per_node` are listed with the reason
+  they were excluded, so they do not silently disappear.
+* Capability tokens for each of the above. `cluster-resources`
+  already covers the endpoint, but a client cannot tell "older
+  server" from "nothing claimed" when a key is missing, and
+  issue 4003 is the precedent for what happens when a client has
+  to guess.
+* A real `admin_resources_get_example` in place of the `{ ... }`
+  at `external_api/admin.py:103`. 7b is the first client written
+  against that body, and today the API reference documents
+  nothing of it.
+* Functional coverage asserting each new key's presence and
+  type, on every cluster topology.
+* The `sf-client` reader of each of the above, as a client-python
+  step in this phase's own plan: the claims ledger on `node
+  capacity`, a cross-namespace `claim list`, and the exclusion
+  reasons in place of the "not reported" line 7b prints. 7a
+  designs these response shapes, and the reader of a surface is
+  its best test. A server surface that nobody can read is the
+  gap these two phases exist to close (7b's D7).
+
+**Phase 7b — capacity and claim views in sf-client.** This is the
+client half. It lands entirely in `client-python`, so the phase
+plan goes there too, following agent operation deadlines phase 6.
+4b's plan lives here because half of 4b's work was this
+repository's functional tests. Nothing in 7b needs 7a.
+
+*Corrected by the phase 7b survey (2026-10-20):* this stub first
+put 7a's client reader in 7b, gated on 7a's tokens. The phase
+plan's D7 moves that work into 7a, whose plan designs the shapes
+it reads. The second bullet below is kept as a record and is not
+7b's scope.
+
+* *Needs nothing from 7a:* a command that renders
+  `/admin/resources` per node. The command name and its home
+  (`admin` or `node`) are the phase plan's decision. Committed,
+  measured, hard max and limit go side by side, because seeing
+  which one binds is why the server publishes all four. The
+  rule here is the same one `namespace claim` follows for
+  `state` and `coverage_state`: they are never merged into one
+  "used" column. The command must also show which nodes have no
+  capacity row, which are clamped, and when the read was degraded.
+  `node resources` is fixed or retired in favour of it. Add
+  `namespace events` and `namespace claim events` verbs, gated on
+  phase 7's tokens. Add `peak_used_*` to `namespace claim show`.
+  Add daemon states, which `Node.external_view()` already
+  returns, to `node show`.
+* *Gated on 7a, and moved to 7a:* the cluster claims ledger on
+  the capacity view, showing total, claimed, unclaimed used and
+  what remains claimable; a cross-namespace `claim list`; and the
+  excluded hypervisors with their reasons.
+* Unit tests per command, and a `docs/` page in `client-python`
+  that phase 8's operator guide links rather than duplicates.
+
+CI and the conductor track `client-python`'s `develop` (4b's D7),
+so no release is cut here. Phase 8's single release covers 4b to
+7b.
+
 **Phase 8 — documentation.** Operator guide for claims and
 capacity (including the two service classes and the
-reconciler), developer-guide write-up of the guarded-UPDATE
+reconciler, read through phase 7b's commands rather than `curl`), developer-guide write-up of the guarded-UPDATE
 idiom (D10), user-facing affinity migration notes.
 
 This phase also owns **the client release**, added here on
@@ -948,7 +1065,7 @@ so a release buys them nothing and would put a tag and a human
 approval on each phase's critical path. An operator is a
 different matter -- this phase's guide documents `sf-client
 namespace claim`, which no released client has. So phase 8
-cuts one release covering everything phases 4b to 7 accumulate,
+cuts one release covering everything phases 4b to 7b accumulate,
 and the guide must not merge claiming a command an operator
 cannot install. That ordering is this phase's obligation and
 nobody else's.
@@ -980,6 +1097,12 @@ So the diff under audit is the plan's cumulative diff, not
 paths this plan touches, so the range does not drag in
 unrelated work merged over the same months. The phase plan
 pins the path list.
+Client-python has no `PUSH-AUDIT.md`. 4b's client range
+predates the `plan-push-audit-phase` rule and is audited from
+here, the way `PLAN-transient-capacity-refusals` phase 7 audited
+its client retry. 7b applies the shared block's floor checklist
+in its own pull request, and this phase cites that result
+instead of re-running it.
 
 Two adaptations follow from the range being months of merged
 history rather than a pending branch:
@@ -1135,6 +1258,9 @@ because the following statements will be true:
   sizes on the smallest node size the CI fleet runs
   (behavioural); issue #3813 closes once that phase's soak has
   been observed.
+* An operator can answer "how full is each node, which ledger is
+  binding, and who has claimed what" from `sf-client` alone,
+  without `curl` or `--output json` (phases 7a and 7b).
 * `pre-commit run --all-files` passes.
 
 ### Future work
