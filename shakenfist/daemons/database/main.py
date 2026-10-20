@@ -769,6 +769,25 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 context.set_details(
                     f'unknown object type id {request.object_type}')
                 return database_pb2.GetObjectsByStateReply(object_uuids=[])
+            if request.page_size > 0:
+                # A paged read. page_size 0 is the unbounded read below,
+                # which is what every complement-set caller sends.
+                page = mariadb.get_objects_by_state_page(
+                    object_type, list(request.state_values),
+                    request.page_size, after_uuid=request.after_uuid,
+                    updated_before=(request.updated_before or None))
+                if page is None:
+                    LOG.warning(
+                        f'GetObjectsByState transient MariaDB error for '
+                        f'{object_type} in {list(request.state_values)} '
+                        f'after {request.after_uuid!r}')
+                    context.set_code(grpc.StatusCode.UNAVAILABLE)
+                    context.set_details('object state read failed')
+                    return database_pb2.GetObjectsByStateReply(
+                        object_uuids=[])
+                return database_pb2.GetObjectsByStateReply(
+                    object_uuids=page.uuids,
+                    more_available=page.more_available)
             uuids = mariadb.get_objects_by_state(
                 object_type, list(request.state_values),
                 updated_before=(request.updated_before or None))

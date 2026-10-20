@@ -1376,9 +1376,19 @@ class GetObjectsByStateRequest(_message.Message):
     OBJECT_TYPE_FIELD_NUMBER: _builtins.int
     STATE_VALUES_FIELD_NUMBER: _builtins.int
     UPDATED_BEFORE_FIELD_NUMBER: _builtins.int
+    PAGE_SIZE_FIELD_NUMBER: _builtins.int
+    AFTER_UUID_FIELD_NUMBER: _builtins.int
     object_type: _shakenfist_enums_pb2.ObjectType.ValueType
     updated_before: _builtins.float
     """Only rows with update_time older than"""
+    page_size: _builtins.int
+    """this unix timestamp; 0 means no filter
+    Paging. A page is never a complete answer, so a caller which treats
+    the reply as a complement set must leave page_size at 0.
+    0 means unbounded (every match)
+    """
+    after_uuid: _builtins.str
+    """Keyset cursor; '' means from the start"""
     @_builtins.property
     def state_values(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
         """List of states to match"""
@@ -1389,10 +1399,12 @@ class GetObjectsByStateRequest(_message.Message):
         object_type: _shakenfist_enums_pb2.ObjectType.ValueType = ...,
         state_values: _abc.Iterable[_builtins.str] | None = ...,
         updated_before: _builtins.float = ...,
+        page_size: _builtins.int = ...,
+        after_uuid: _builtins.str = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["object_type", b"object_type", "state_values", b"state_values", "updated_before", b"updated_before"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["after_uuid", b"after_uuid", "object_type", b"object_type", "page_size", b"page_size", "state_values", b"state_values", "updated_before", b"updated_before"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -1403,16 +1415,20 @@ class GetObjectsByStateReply(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     OBJECT_UUIDS_FIELD_NUMBER: _builtins.int
+    MORE_AVAILABLE_FIELD_NUMBER: _builtins.int
+    more_available: _builtins.bool
+    """Set only on a paged reply that stopped"""
     @_builtins.property
     def object_uuids(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]: ...
     def __init__(
         self,
         *,
         object_uuids: _abc.Iterable[_builtins.str] | None = ...,
+        more_available: _builtins.bool = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["object_uuids", b"object_uuids"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["more_available", b"more_available", "object_uuids", b"object_uuids"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

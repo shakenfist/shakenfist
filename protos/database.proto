@@ -798,10 +798,16 @@ message GetObjectsByStateRequest {
   repeated string state_values = 2;  // List of states to match
   double updated_before = 3;         // Only rows with update_time older than
                                      // this unix timestamp; 0 means no filter
+  // Paging. A page is never a complete answer, so a caller which treats
+  // the reply as a complement set must leave page_size at 0.
+  uint32 page_size = 4;              // 0 means unbounded (every match)
+  string after_uuid = 5;             // Keyset cursor; '' means from the start
 }
 
 message GetObjectsByStateReply {
   repeated string object_uuids = 1;
+  bool more_available = 2;           // Set only on a paged reply that stopped
+                                     // early
 }
 
 // Orphan reconciliation (issue 3534). Phantoms are object_states rows
