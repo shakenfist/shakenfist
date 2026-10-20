@@ -1286,6 +1286,98 @@ class DeletedObjectSweepMixedQueueTestCase(base.ShakenFistTestCase):
         self.assertEqual(1, self._depth('network'))
 
 
+class DeletedObjectBacklogTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        _reset_sweep_failure_state()
+        st.CLUSTER_DELETED_OBJECT_BACKLOG.clear()
+        self.addCleanup(st.CLUSTER_DELETED_OBJECT_BACKLOG.clear)
+
+    def _backlog(self, objtype):
+        return REGISTRY.get_sample_value(
+            'cluster_deleted_object_backlog', {'object_type': objtype})
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state')
+    def test_every_type_published_zero_included(self, mock_count):
+        counts = {ObjectType.NETWORK: 7}
+        mock_count.side_effect = lambda objtype, states: counts.get(objtype, 0)
+
+        st.publish_deleted_object_backlog()
+
+        for objtype in OBJECT_NAMES_TO_CLASSES:
+            self.assertEqual(7 if objtype == 'network' else 0,
+                             self._backlog(objtype), objtype)
+        self.assertEqual(len(OBJECT_NAMES_TO_CLASSES), mock_count.call_count)
+        for call in mock_count.call_args_list:
+            self.assertIsInstance(call.args[0], ObjectType)
+            self.assertEqual(st.FINAL_OBJECT_STATES, call.args[1])
+        self.assertNotIn('deleted_object_backlog', st._SWEEP_RESUME_AFTER)
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state')
+    def test_failed_count_removes_label_set(self, mock_count):
+        mock_count.return_value = 4
+        st.publish_deleted_object_backlog()
+        self.assertEqual(4, self._backlog('network'))
+
+        mock_count.side_effect = (
+            lambda objtype, states: None if objtype == ObjectType.NETWORK else 5)
+        st.publish_deleted_object_backlog()
+
+        self.assertIsNone(self._backlog('network'))
+        self.assertEqual(5, self._backlog('blob'))
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state')
+    def test_failed_count_never_published_is_safe(self, mock_count):
+        mock_count.return_value = None
+        st.publish_deleted_object_backlog()
+        self.assertIsNone(self._backlog('network'))
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state')
+    def test_database_unavailable_stops_and_records_resume(self, mock_count):
+        types = list(OBJECT_NAMES_TO_CLASSES)
+
+        def count(objtype, states):
+            if objtype == ObjectType(types[3]):
+                raise DatabaseUnavailable('gone')
+            return 1
+        mock_count.side_effect = count
+
+        st.publish_deleted_object_backlog()
+
+        self.assertEqual(4, mock_count.call_count)
+        self.assertEqual(1, self._backlog(types[2]))
+        self.assertIsNone(self._backlog(types[3]))
+        self.assertIsNone(self._backlog(types[4]))
+        self.assertEqual(
+            types[4], st._SWEEP_RESUME_AFTER['deleted_object_backlog'])
+
+        # The next pass resumes after the type that stopped this one.
+        mock_count.reset_mock()
+        mock_count.side_effect = None
+        mock_count.return_value = 2
+        st.publish_deleted_object_backlog()
+        self.assertEqual(ObjectType(types[4]), mock_count.call_args_list[0].args[0])
+        self.assertEqual(len(types), mock_count.call_count)
+        self.assertNotIn('deleted_object_backlog', st._SWEEP_RESUME_AFTER)
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state', return_value=0)
+    def test_each_count_is_timed_in_a_scope(self, mock_count):
+        with mock.patch('shakenfist.mariadb.rpc_timing_scope') as mock_scope:
+            st.publish_deleted_object_backlog()
+        self.assertEqual(
+            [mock.call('deleted_object_backlog', t) for t in
+             OBJECT_NAMES_TO_CLASSES], mock_scope.call_args_list)
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state', return_value=3)
+    def test_demotion_clears_gauge(self, mock_count):
+        st.publish_deleted_object_backlog()
+        self.assertEqual(3, self._backlog('network'))
+
+        st.clear_deleted_object_metrics()
+
+        self.assertIsNone(self._backlog('network'))
+
+
 class ReconcileOrphanedObjectsTestCase(base.ShakenFistTestCase):
     """Orphan reconciliation: phantoms removed server-side, zombies
     repaired after two consecutive observations (issue 3534) -- to

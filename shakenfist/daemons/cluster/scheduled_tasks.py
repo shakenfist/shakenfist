@@ -69,6 +69,11 @@ CLUSTER_DELETED_OBJECT_QUEUE_DEPTH = Gauge(
     'cluster_deleted_object_queue_depth',
     'Entries waiting in the per-deleted-object queue, by object type.',
     ['object_type'])
+CLUSTER_DELETED_OBJECT_BACKLOG = Gauge(
+    'cluster_deleted_object_backlog',
+    'Objects in a final state, by object type. This is a count with no age '
+    'filter, so it includes objects still inside their grace period.',
+    ['object_type'])
 
 REAPER_REQUEUED = Counter(
     'cluster_op_reaper_requeued_total',
@@ -268,7 +273,7 @@ def clear_sweep_failure_metrics() -> None:
 
 
 def clear_deleted_object_metrics() -> None:
-    """Drop the deleted-object queue depth gauge when this node is demoted.
+    """Drop the deleted-object gauges when this node is demoted.
 
     Only the elected cluster maintainer fills and drains the queue, so a
     node that held the lock and then lost it would otherwise keep
@@ -280,8 +285,11 @@ def clear_deleted_object_metrics() -> None:
     Only the gauge goes. The counter behind it describes the queue, which
     a demotion does not empty, so it must keep matching it. The next pass
     on this node, if it is re-elected, republishes the gauge from it.
+
+    The backlog gauge is a plain published value, so it just goes.
     """
     CLUSTER_DELETED_OBJECT_QUEUE_DEPTH.clear()
+    CLUSTER_DELETED_OBJECT_BACKLOG.clear()
 
 
 # Scheduler capacity reconciler metrics. Per-node gauges are labelled by node
@@ -879,6 +887,45 @@ def per_deleted_object_checks():
         fields[outcome] = outcomes[outcome]
     LOG.with_fields(fields).info(
         f'Processed {processed} items from per-deleted-object queue')
+
+
+@util_general.recorded_method
+def publish_deleted_object_backlog():
+    """Set the backlog gauge from a count of final-state objects per type.
+
+    Every type is published, zeros included, so an alert can rely on the
+    series existing. A failed count removes the type's label set rather than
+    leaving a value the failed read can no longer vouch for. A tier-wide
+    failure stops the pass for the reason given in
+    ``_fill_per_deleted_object_queue()``.
+    """
+    object_types = list(OBJECT_NAMES_TO_CLASSES)
+    for objtype in _sweep_object_types('deleted_object_backlog', object_types):
+        try:
+            with mariadb.rpc_timing_scope('deleted_object_backlog', objtype):
+                count = mariadb.count_objects_by_state(
+                    ObjectType(objtype), FINAL_OBJECT_STATES)
+        except DatabaseUnavailable as e:
+            LOG.with_fields({'object_type': objtype}).warning(
+                f'Stopping deleted object backlog pass, database '
+                f'unavailable: {e}')
+            _record_sweep_stopped(
+                'deleted_object_backlog', object_types, objtype)
+            break
+
+        if count is None:
+            LOG.with_fields({'object_type': objtype}).warning(
+                'Could not count deleted objects, dropping backlog gauge')
+            try:
+                CLUSTER_DELETED_OBJECT_BACKLOG.remove(objtype)
+            except KeyError:
+                # Never published, or cleared by a demotion.
+                pass
+            continue
+
+        CLUSTER_DELETED_OBJECT_BACKLOG.labels(objtype).set(count)
+    else:
+        _record_sweep_completed('deleted_object_backlog')
 
 
 def _publish_deleted_object_depth() -> None:

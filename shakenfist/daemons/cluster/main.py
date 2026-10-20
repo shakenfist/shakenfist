@@ -1066,6 +1066,8 @@ class Monitor(daemon.Daemon):
             scheduled_tasks.per_instance_checks_and_usage)
         schedule.every(15).minutes.do(
             scheduled_tasks.per_deleted_object_checks)
+        schedule.every(60).minutes.do(
+            scheduled_tasks.publish_deleted_object_backlog)
         schedule.every(15).minutes.do(
             scheduled_tasks.reap_expired_namespace_keys)
         schedule.every(15).minutes.do(
