@@ -482,14 +482,12 @@ queue job and failing `Can merge` on a commit the queue has already
 abandoned.
 
 Only a run's first attempt uses the base-branch key; the keys in this
-repository test `github.run_attempt == '1'` as well as the event. A re-run is
-not a queue build: it keeps its original `merge_group` event, so with the
-base-branch key a "Re-run jobs" on an old queue run would cancel the live
-queue entry or be cancelled by it. A re-run therefore keeps its own queue
+repository, and the one `smoke-cluster.yml` in `shakenfist/actions` gives the
+collection jobs, test `github.run_attempt == '1'` as well as the event. A
+re-run is not a queue build: it keeps its original `merge_group` event, so
+with the base-branch key a "Re-run jobs" on an old queue run would cancel the
+live queue entry or be cancelled by it. A re-run therefore keeps its own queue
 branch's group.
-`smoke-cluster.yml` in `shakenfist/actions` does not carry that guard yet, so
-re-running an old queue run's collection jobs still shares a group with the
-live entry's.
 
 Raising `max_entries_to_build` breaks both halves: the key would cancel live
 queue entries building in parallel, and a parallel entry is not built on the
