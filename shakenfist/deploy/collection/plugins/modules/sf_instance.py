@@ -88,9 +88,35 @@ options:
     required: false
     type: str
   video:
-    description: The video model to use.
+    description:
+      - The instance's video card and console, as a videospec. A key left
+        out takes the server's default, so giving only a model of C(vga)
+        asks for a vga card with 16384 KiB of memory and a SPICE console.
+      - Like the other specifications it may also be written as a
+        key=value string, for example C(model=qxl,memory=65536).
+      - Unset, the server applies its default videospec, and an existing
+        instance's video is not compared.
     required: false
-    type: str
+    type: dict
+    suboptions:
+      model:
+        description:
+          - The video card model, for example C(cirrus), C(vga) or C(qxl).
+            The set which works is the hypervisor's.
+        type: str
+        default: cirrus
+      memory:
+        description: The video card's memory, in KiB.
+        type: int
+        default: 16384
+      vdi:
+        description:
+          - The console protocol to offer. C(spiceconcurrent) allows
+            limited multi-user sessions, and C(spicedebug) behaves like
+            C(spice) with verbose SPICE server logging.
+        type: str
+        choices: [vnc, spice, spiceconcurrent, spicedebug]
+        default: spice
   nvram_template:
     description: The NVRAM template to use (for UEFI / secure boot).
     required: false
@@ -741,6 +767,22 @@ class _CapacityWait:
         }
 
 
+def _stored_video(video):
+    """An existing instance's videospec, in the shape the module sends.
+
+    An instance created with sf-client's --videospec memory=65536 stores
+    its memory as the string the command line parser produced, which is
+    the same videospec as the integer the module sends.
+    """
+    if not isinstance(video, dict):
+        return video
+    video = dict(video)
+    memory = video.get('memory')
+    if isinstance(memory, str) and memory.isdigit():
+        video['memory'] = int(memory)
+    return video
+
+
 def _check_instance(client, existing, params, log):
     # Faithful port of client-python's commandline/ansible.py _check_instance.
     # Builds the create_instance() args and kwargs and determines whether the
@@ -919,8 +961,27 @@ def _check_instance(client, existing, params, log):
                 dirty = True
         instance_args.append(value)
 
+    # The videospec. The API declares video a dict, but this parameter
+    # was once a string: the API refused it with a 400 at its default
+    # validation mode, and a string could never equal the dict the API
+    # reports, so a play which set it was perpetually dirty as well
+    # (issue 4227). Ansible fills in each suboption's default, and those
+    # are the server's own, so a requested videospec is complete and
+    # compares key for key with a stored one.
+    if params.get('video') is not None:
+        requested_video = dict(params['video'])
+        existing_video = _stored_video(existing.get('video'))
+        if existing_video != requested_video:
+            log.append('Instance dirty: video has changed')
+            log.append('    Requested: %s'
+                       % json.dumps(requested_video, sort_keys=True))
+            log.append('    Existing: %s'
+                       % json.dumps(existing_video, sort_keys=True))
+            dirty = True
+        instance_kwargs['video'] = requested_video
+
     # Optional single string keyword values.
-    for key in ['placement', 'video', 'nvram_template', 'configdrive', 'namespace']:
+    for key in ['placement', 'nvram_template', 'configdrive', 'namespace']:
         if params.get(key) is not None:
             if existing.get(key) != params[key]:
                 log.append('Instance dirty: %s has changed' % key)
@@ -1028,7 +1089,20 @@ def run_module():
         'ssh_key': {'required': False, 'type': 'str'},
         'user_data': {'required': False, 'type': 'str'},
         'placement': {'required': False, 'type': 'str'},
-        'video': {'required': False, 'type': 'str'},
+        'video': {
+            'required': False,
+            'type': 'dict',
+            'options': {
+                'model': {'type': 'str', 'default': 'cirrus'},
+                'memory': {'type': 'int', 'default': 16384},
+                'vdi': {
+                    'type': 'str',
+                    'default': 'spice',
+                    'choices': [
+                        'vnc', 'spice', 'spiceconcurrent', 'spicedebug'],
+                },
+            },
+        },
         'nvram_template': {'required': False, 'type': 'str'},
         'configdrive': {'required': False, 'type': 'str'},
         'side_channels': {'required': False, 'type': 'list', 'elements': 'str'},

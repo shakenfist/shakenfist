@@ -110,6 +110,13 @@
     # way whether the caller wrote "" or omitted the parameter, and reports
     # it back as null, so the module's comparison of "" against that null was
     # perpetually dirty and the instance was silently replaced on every run.
+    #
+    # NOTE(mikal): video sets only the model, so the module fills in the
+    # rest of the videospec from its defaults. This create is the regression
+    # coverage for issue 4227, where video was a string the API refused with
+    # a 400, and the idempotency assertion below is the coverage for its
+    # second half: the string could never equal the dict the API reports, so
+    # it was perpetually dirty too.
     - name: Create a test instance that uses those networks
       sf_instance:
         name: "ansibleci-004"
@@ -128,6 +135,8 @@
         user_data: ""
         uefi: false
         secure_boot: false
+        video:
+          model: vga
         state: present
         await: true
         await_timeout: 1200
@@ -158,6 +167,14 @@
           - ci_instance['log'] | select('search', 'already spent') | list | length > 0
         fail_msg: "await budget not reported in {{ ci_instance['log'] }}"
 
+    - name: Assert the instance has the whole videospec asked for
+      assert:
+        that:
+          - ci_instance['meta']['video']['model'] == 'vga'
+          - ci_instance['meta']['video']['memory'] | int == 16384
+          - ci_instance['meta']['video']['vdi'] == 'spice'
+        fail_msg: "unexpected videospec in {{ ci_instance['meta'] }}"
+
     - name: Create the same test instance and check it hasn't changed
       sf_instance:
         name: "ansibleci-004"
@@ -176,6 +193,8 @@
         user_data: ""
         uefi: false
         secure_boot: false
+        video:
+          model: vga
         state: present
       register: ci_instance
 

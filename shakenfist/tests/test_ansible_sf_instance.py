@@ -171,11 +171,11 @@ class SfInstanceParameterDirtinessTestCase(base.ShakenFistTestCase):
 
     # Every documented parameter which participates in the dirtiness
     # comparison, as (parameter name, API field name, value as passed,
-    # value as the API reports it, a different value). video and
-    # placement are deliberately absent: their API representations
-    # differ in shape from the parameter (a dict and a node attribute
-    # respectively), which is the same class of defect but not this
-    # fix -- see issue 4061's discussion.
+    # value as the API reports it, a different value). placement is
+    # deliberately absent: the API reports it as a node attribute, which
+    # is the same class of defect but not this fix -- see issue 4061's
+    # discussion. video is a dict, and is covered by
+    # SfInstanceVideoTestCase.
     ROUND_TRIP = [
         ('ssh_key', 'ssh_key', 'ssh-rsa AAAA', 'ssh-rsa AAAA', 'ssh-rsa BBBB'),
         ('user_data', 'user_data', 'dXNlcg==', 'dXNlcg==', 'b3RoZXI='),
@@ -275,6 +275,150 @@ class SfInstanceParameterDirtinessTestCase(base.ShakenFistTestCase):
         self.assertEqual(True, instance_kwargs.get('secure_boot'))
         self.assertEqual(True, instance_kwargs.get('uefi'))
         self.assertNotIn('secureboot', instance_kwargs)
+
+
+class SfInstanceVideoTestCase(base.ShakenFistTestCase):
+    """video is a videospec dict, sent and compared as one.
+
+    Issue 4227: the parameter was a string, passed straight through to
+    create_instance(), where the API declares a dict, so any play which
+    set it was refused with "video: Not a valid mapping type". The same
+    string was compared against the dict the API reports, so it was
+    perpetually dirty too.
+    """
+
+    # What Ansible hands the module for video: {model: vga}, with the
+    # other suboptions' defaults filled in.
+    VGA = {'model': 'vga', 'memory': 16384, 'vdi': 'spice'}
+
+    def _existing(self, **kwargs):
+        existing = {
+            'name': 'test',
+            'cpus': 1,
+            'memory': 1024,
+            'interfaces': [],
+            'disk_spec': []
+        }
+        existing.update(kwargs)
+        return existing
+
+    def _params(self, **kwargs):
+        params = {
+            'name': 'test',
+            'cpu': 1,
+            'ram': 1024
+        }
+        params.update(kwargs)
+        return params
+
+    def _check(self, existing, params):
+        log = []
+        dirty, _, instance_kwargs = sf_instance._check_instance(
+            mock.MagicMock(), existing, params, log)
+        return dirty, instance_kwargs, log
+
+    def test_a_videospec_is_passed_as_a_dict(self):
+        dirty, instance_kwargs, _ = self._check(
+            self._existing(), self._params(video=dict(self.VGA)))
+        self.assertTrue(dirty)
+        self.assertEqual(self.VGA, instance_kwargs['video'])
+
+    def test_a_matching_stored_videospec_is_clean(self):
+        dirty, _, log = self._check(
+            self._existing(video=dict(self.VGA)),
+            self._params(video=dict(self.VGA)))
+        self.assertFalse(dirty, log)
+
+    def test_a_stored_string_memory_matches_the_integer(self):
+        # sf-client's --videospec memory=16384 stores the string its
+        # parser produced, and it is the same videospec.
+        stored = dict(self.VGA, memory='16384')
+        dirty, _, log = self._check(
+            self._existing(video=stored), self._params(video=dict(self.VGA)))
+        self.assertFalse(dirty, log)
+        self.assertEqual('16384', stored['memory'])
+
+    def test_each_differing_key_is_dirty(self):
+        for key, different in [('model', 'qxl'), ('memory', 65536),
+                               ('vdi', 'spiceconcurrent')]:
+            dirty, _, log = self._check(
+                self._existing(video=dict(self.VGA)),
+                self._params(video=dict(self.VGA, **{key: different})))
+            self.assertTrue(dirty, '%s should be dirty' % key)
+            self.assertIn('Instance dirty: video has changed', log)
+
+    def test_a_stored_videospec_without_vdi_is_dirty(self):
+        # Not normalised to spice: the console code reads a missing vdi
+        # as no SPICE console at all.
+        stored = {'model': 'vga', 'memory': 16384}
+        dirty, _, _ = self._check(
+            self._existing(video=stored), self._params(video=dict(self.VGA)))
+        self.assertTrue(dirty)
+
+    def test_unset_video_is_not_compared_or_passed(self):
+        dirty, _, log = self._check(
+            self._existing(video=dict(self.VGA)), self._params())
+        self.assertFalse(dirty, log)
+
+        dirty, instance_kwargs, _ = self._check(
+            self._existing(video=dict(self.VGA)), self._params(cpu=2))
+        self.assertTrue(dirty)
+        self.assertNotIn('video', instance_kwargs)
+
+
+class _SpecCaptured(Exception):
+    pass
+
+
+class SfInstanceVideoSpecTestCase(base.ShakenFistTestCase):
+    """The video parameter's declaration matches the API's videospec.
+
+    AnsibleModule is not importable here, so the spec run_module() hands
+    it is captured and asserted rather than exercised.
+    """
+
+    def _video_spec(self):
+        with mock.patch.object(sf_instance, 'AnsibleModule',
+                               side_effect=_SpecCaptured) as ansible_module:
+            with self.assertRaises(_SpecCaptured):
+                sf_instance.run_module()
+        return ansible_module.call_args.kwargs['argument_spec']['video']
+
+    def test_video_is_a_dict_of_the_videospec_keys(self):
+        from shakenfist.external_api import base as api_base
+
+        spec = self._video_spec()
+        schema = api_base.VIDEOSPEC_SCHEMA['properties']
+        self.assertEqual('dict', spec['type'])
+        self.assertEqual(set(schema), set(spec['options']))
+        self.assertEqual('str', spec['options']['model']['type'])
+        self.assertEqual('int', spec['options']['memory']['type'])
+        self.assertEqual('integer', schema['memory']['type'])
+        self.assertEqual(schema['vdi']['enum'],
+                         spec['options']['vdi']['choices'])
+
+    def test_the_defaults_are_the_servers(self):
+        # The handler's whole default videospec, which an instance created
+        # without one is given and reports.
+        spec = self._video_spec()
+        self.assertEqual(
+            {'model': 'cirrus', 'memory': 16384, 'vdi': 'spice'},
+            {key: option['default']
+             for key, option in spec['options'].items()})
+
+    def test_the_documentation_matches_the_spec(self):
+        import yaml
+
+        spec = self._video_spec()
+        documented = yaml.safe_load(sf_instance.DOCUMENTATION)
+        documented = documented['options']['video']
+        self.assertEqual('dict', documented['type'])
+        for key, option in spec['options'].items():
+            for field in ('type', 'default', 'choices'):
+                self.assertEqual(
+                    option.get(field),
+                    documented['suboptions'][key].get(field),
+                    '%s.%s' % (key, field))
 
 
 class SfInstanceEmptyStringDirtinessTestCase(base.ShakenFistTestCase):
