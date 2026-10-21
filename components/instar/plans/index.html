@@ -15701,9 +15701,9 @@ at the repo root).</p>
 <tr>
 <td>2026-10-19</td>
 <td><a href="/components/instar/plans/PLAN-654-subcluster-classification/">One subcluster classification for qcow2</a></td>
-<td>Replace the ad hoc readings of "host offset zero" across the qcow2 chain reader, map, measure and check with one classifier that mirrors qemu's seven subcluster types, including the external-data-file rule, and refuse what qemu calls an invalid entry. Fixes extended-L2 reads that skip the backing file (#654), a crafted entry that serves the image header as data (#653), and data-file images whose cluster 0 reads as zeros; then stops treating the data device as a chain layer (#792)</td>
+<td>Replace the ad hoc readings of "host offset zero" across the qcow2 chain reader, map, measure and check with one classifier that mirrors qemu's seven subcluster types, including the external-data-file rule, and refuse what qemu calls an invalid entry. Fixes extended-L2 reads that skip the backing file (#654), a crafted entry that serves the image header as data (#653), and data-file images whose cluster 0 reads as zeros; then stops treating the data device as a chain layer (#792) and refuses the data-file entries qemu refuses (#803)</td>
 <td>In progress</td>
-<td><a href="/components/instar/plans/PLAN-654-subcluster-classification-phase-01-classifier/">1: classifier</a>, 2: data device, 3: push audit</td>
+<td><a href="/components/instar/plans/PLAN-654-subcluster-classification-phase-01-classifier/">1: classifier</a> ✓, <a href="/components/instar/plans/PLAN-654-subcluster-classification-phase-02-data-device/">2: data device</a> (also takes #803, qemu's data-file host-offset refusals; the survey found the chain config documents the data device as a layer behind its owner, and that the crate harness never used the layout the VMM writes, which is why #792 had no crate test), 3: push audit</td>
 </tr>
 </tbody>
 </table>

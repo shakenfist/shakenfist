@@ -16026,7 +16026,7 @@ for a stable memory layout.</p>
 <td>4</td>
 <td>u32</td>
 <td><code>version</code></td>
-<td>Structure version (currently 3)</td>
+<td>Structure version (currently 4)</td>
 </tr>
 <tr>
 <td>12</td>
@@ -16109,7 +16109,14 @@ composing a differencing child against whatever image happened to
 follow it.</p>
 <p>An external data file device, which the host inserts immediately after
 the image that owns it, belongs to the chain it was inserted into and
-is covered by that chain's segment.</p>
+is covered by that chain's segment. It is marked with
+<code>FLAG_DATA_DEVICE</code> and is never a layer: it holds its owner's cluster
+data, it is not a backing file, and the chain reader steps over it
+(#792). A qcow2 owns one such device, its external data file; a VMDK
+flat descriptor owns the run of marked devices that holds its extents.
+The owner's <code>data_device_idx</code> must name the slot immediately after the
+owner, and every marked device must belong to an owner;
+<code>ChainConfig::data_devices_are_owned</code> refuses any other layout.</p>
 <h3 id="chaindeviceinfo-32-bytes-per-device">ChainDeviceInfo (32 bytes per device)<a class="headerlink" href="#chaindeviceinfo-32-bytes-per-device" title="Permanent link">&para;</a></h3>
 <p>Each device entry starts at offset <code>16 + (device_index * 32)</code> within the
 chain config.</p>
@@ -16171,9 +16178,12 @@ chain config.</p>
 <h3 id="device-indexing">Device Indexing<a class="headerlink" href="#device-indexing" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Device 0 is always the <strong>top</strong> (primary) image</li>
-<li>Devices 1 through N-1 are backing files in chain order (higher index =
-  closer to the base image)</li>
-<li>The <strong>base</strong> image (no backing file) is at index <code>device_count - 1</code></li>
+<li>The remaining devices are backing files in chain order (higher index =
+  closer to the base image), except external data file devices</li>
+<li>An external data file device sits immediately after the image that
+  owns it, so the owner's <code>data_device_idx</code> is its own index plus one.
+  It is not a backing file, and the next backing file follows it</li>
+<li>The <strong>base</strong> image (no backing file) is the last non-data device</li>
 </ul>
 <h2 id="imageformat-values">ImageFormat Values<a class="headerlink" href="#imageformat-values" title="Permanent link">&para;</a></h2>
 <table>
@@ -16327,6 +16337,11 @@ chain config.</p>
 <td>8</td>
 <td><code>FLAG_HAS_GPT</code></td>
 <td>Raw image has GPT partition table</td>
+</tr>
+<tr>
+<td>31</td>
+<td><code>FLAG_DATA_DEVICE</code></td>
+<td>Device is an external data file, not a layer. Set only by the host in the chain config; the host masks it out of the flags an info operation reports, so an image cannot mark itself</td>
 </tr>
 </tbody>
 </table>

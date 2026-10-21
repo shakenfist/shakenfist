@@ -15756,13 +15756,13 @@ the failure #654 measured.</p>
 <tr>
 <td>1. One subcluster classifier (#653, #654, rows C and D)</td>
 <td><a href="/components/instar/plans/PLAN-654-subcluster-classification-phase-01-classifier/">PLAN-654-subcluster-classification-phase-01-classifier.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td><code>d08841e</code> (#801)</td>
 </tr>
 <tr>
-<td>2. The data device is not a chain layer (#792)</td>
-<td>PLAN-654-subcluster-classification-phase-02-data-device.md</td>
-<td>Not started</td>
+<td>2. The data device is not a chain layer (#792, #803)</td>
+<td><a href="/components/instar/plans/PLAN-654-subcluster-classification-phase-02-data-device/">PLAN-654-subcluster-classification-phase-02-data-device.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -16250,8 +16250,9 @@ chosen to defer to here, so that we do not forget them.</p>
   so it is not fixed here.</li>
 <li><strong>qemu's data-file offset check.</strong> qemu refuses a data-file entry
   whose host offset differs from its guest offset
-  (<code>block/qcow2-cluster.c:696-704</code>). instar does not check this. Phase
-  2 should decide whether it belongs with #792.</li>
+  (<code>block/qcow2-cluster.c:696-704</code>), and a compressed entry in a
+  data-file image. Phase 1 filed both as #803, and phase 2 takes it
+  (that phase's D5).</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>This section should list any bugs we encounter during development
@@ -16261,7 +16262,7 @@ either resolve as part of this master plan or at least be aware of
 while planning it.</p>
 <p>Phase 1 is planned to close #653 and #654, and to fix rows C and D of
 Situation for read, map, measure and check. Phase 2 is planned to close</p>
-<h1 id="792-650-fixed-in-652-is-related-d2-reverses-its-zero-fill-policy">792. #650, fixed in #652, is related: D2 reverses its zero-fill policy.<a class="headerlink" href="#792-650-fixed-in-652-is-related-d2-reverses-its-zero-fill-policy" title="Permanent link">&para;</a></h1>
+<h1 id="792-and-803-650-fixed-in-652-is-related-d2-reverses-its-zero-fill-policy">792 and #803. #650, fixed in #652, is related: D2 reverses its zero-fill policy.<a class="headerlink" href="#792-and-803-650-fixed-in-652-is-related-d2-reverses-its-zero-fill-policy" title="Permanent link">&para;</a></h1>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
 <p>Before executing any step of this plan, please back brief the
 operator as to your understanding of the plan and how the work you

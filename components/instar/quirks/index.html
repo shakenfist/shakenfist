@@ -27761,13 +27761,17 @@ well-formed and reads from the backing file, read zeros instead
 cluster with an empty subcluster bitmap is not reported, and a
 compressed entry with any non-zero bitmap is reported.</p>
 <p>Two shapes in a data-file image are refused by qemu's read path after
-classification, and instar does not yet refuse them by name
-(<a href="https://github.com/shakenfist/instar/issues/803">issue #803</a>). A
-compressed entry fails with instar's generic read-failure text, where
-qemu says that compressed clusters are not allowed with a data file. A
-host offset that differs from the guest offset is read from the data
-file at that offset and the operation succeeds, where qemu fails the
-read with <code>EIO</code>, because qemu maps data-file clusters one to one.</p>
+classification, and instar refuses both by name
+(<a href="https://github.com/shakenfist/instar/issues/803">issue #803</a>). The
+refusal reads <code>&lt;op&gt;: &lt;qemu wording&gt; at virtual offset N (0x...)</code>. A
+compressed entry is refused with qemu's <code>Compressed cluster entry found
+in image with external data file</code>. A host offset that differs from the
+guest offset is refused with <code>External data file host cluster offset
+does not match guest cluster offset</code>, because qemu maps data-file
+clusters one to one. The offset rule applies to zero and unallocated
+entries with an allocated offset as well as to normal ones. instar's
+message omits the host offset that qemu prints, because the refusal
+carries only the virtual offset.</p>
 <h2 id="future-additions">Future Additions<a class="headerlink" href="#future-additions" title="Permanent link">&para;</a></h2>
 <p>Additional quirks will be documented here as they are discovered during
 compatibility testing.</p>

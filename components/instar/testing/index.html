@@ -18176,7 +18176,7 @@ deliberately broken emitter is not guarding what its name says it
 guards. See the VHD and VHDX notes in
 <a href="/components/instar/chain-config/#format-specific-notes">chain-config.md</a> for the
 composing path being guarded.</p>
-<p>There are <strong>106 cases</strong>, in eight groups.</p>
+<p>There are <strong>126 cases</strong>, in ten groups.</p>
 <p>Twenty-seven cover the writer. Fifteen mutate a library crate
 (<code>create</code>, <code>vhd</code>, <code>vhdx</code>) and are caught by a Rust unit or round-trip
 test; twelve are caught by a Python integration test through the real
@@ -18337,8 +18337,8 @@ disable the guard with <code>if false</code> and are caught, through the real
 binary, by <code>TestAdversarialChainDeviceCount</code> in <code>tests/test_adversarial.py</code>
 -- the same test module that builds the fixture, since no static
 <code>instar-testdata</code> image has this shape.</p>
-<p>The last group is <strong>3 subcluster cases</strong>, and is the only group not
-about a differencing format at all. It is here because the defect it
+<p>Then <strong>3 subcluster cases</strong>, the first of the two groups not about a
+differencing format at all. It is here because the defect it
 guards is the same class as the rest -- a span the reader never wrote,
 returned to the caller under a successful read -- and because the
 differencing work's own fuzz target is what found it. An extended-L2
@@ -18361,6 +18361,50 @@ one backing cluster's worth from the wrong place and leaves the rest of
 the buffer unwritten. Its test reads over backing files whose clusters
 are stored in reverse order on the host, so a read that runs on into
 the next host cluster cannot land on the right bytes by accident.</p>
+<p>Then <strong>12 data-device cases</strong>, guarding the fix for issue</p>
+<h1 id="792-the-host-puts-a-qcow2s-external-data-file-and-a-vmdk-flat">792. The host puts a qcow2's external data file, and a VMDK flat<a class="headerlink" href="#792-the-host-puts-a-qcow2s-external-data-file-and-a-vmdk-flat" title="Permanent link">&para;</a></h1>
+<p>descriptor's extents, in the device slots immediately after the image
+that owns them, inside its chain segment. Before the chain config
+marked them, the reader took the slot after a data-file image for the
+layer under it, and a cluster the image left unallocated read the data
+file at the virtual offset instead of the backing file or zeros, under
+success. Now the host sets <code>FLAG_DATA_DEVICE</code> on each data device, the
+reader steps over a marked device at the top of its device loop,
+<code>init_chain_states</code> refuses a config whose marks are not where the host
+puts them (<code>ChainConfig::data_devices_are_owned</code>), and the descriptor's
+extent walk stops at the end of its run of marked devices.</p>
+<p>Three cases remove the reader's skip, each caught by a different test
+in the crate's subcluster fixture, which now lays its devices out as the
+host does: a wholly unallocated cluster with a backing file behind the
+data device, the same with none, and a run of unallocated subclusters,
+which reaches the next device by descending rather than by <code>continue</code>.
+One removes the extent walk's bound, caught by a read past a
+descriptor's last extent whose next device is the other input's image,
+which is <code>compare</code>'s layout. Six remove one clause each of the layout
+rule, caught through <code>init_chain_states</code> by a config that breaks only
+that clause; one of the six loosens "the slot after the owner" to "any
+later slot". The last two are the host's half, in <code>write_chain_device_entries</code>:
+writing a data device unmarked, and passing an info operation's flags
+through with the mark intact. Both are caught by a <code>vmm</code> unit test that
+reads the host's config back as the guest's own type and checks it
+against the same rule.</p>
+<p>The last group is <strong>8 data-file entry cases</strong>, guarding the fix for
+issue #803. qemu applies two rules to the L2 entries of an image with
+an external data file, after an entry has classified as valid: a
+compressed entry is refused, and so is a host cluster offset that is
+not the guest cluster offset, because qemu maps a data file one to one.
+Without the second rule instar read the data file at the entry's offset
+and returned the wrong bytes under success. Two cases remove one rule
+each, and each is caught through the chain reader by a test that reads
+every entry shape the rule covers through both the narrow and the wide
+arm. One removes the rules' deference to the invalid-entry refusal,
+which qemu reaches first, caught by an entry that is both invalid and
+moved. One removes the reader's refusal arm, so a refused entry reads
+as success over a buffer nothing wrote. Two remove the rule from the
+classic <code>measure</code> walk and the extended <code>map</code> walk, caught by a unit
+test of the metadata walkers. The last two are the host's half: the
+<code>vmm</code> decoder no longer captures the refusal, or the run loops no longer
+see it, and the reason falls back to the generic failure text.</p>
 <p>Most of the reader cases name a test in the <code>qcow2</code> crate and run it
 with the full input-format feature list, because the
 arms are behind <code>vhd-input</code> and <code>vhdx-input</code> and a run without those
