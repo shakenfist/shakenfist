@@ -797,18 +797,21 @@ message DeleteObjectStateRequest {
 message GetObjectsByStateRequest {
   ObjectType object_type = 1;
   repeated string state_values = 2;  // List of states to match
-  double updated_before = 3;         // Only rows with update_time older than
-                                     // this unix timestamp; 0 means no filter
-  // Paging. A page is never a complete answer, so a caller which treats
-  // the reply as a complement set must leave page_size at 0.
-  uint32 page_size = 4;              // 0 means unbounded (every match)
-  string after_uuid = 5;             // Keyset cursor; '' means from the start
+  // Only rows with update_time older than this unix timestamp; 0 means no
+  // filter.
+  double updated_before = 3;
+  // The most uuids to return; 0 means unbounded (every match). A page is
+  // never a complete answer, so a caller which treats the reply as a
+  // complement set must leave this at 0.
+  uint32 page_size = 4;
+  // Keyset cursor: return uuids after this one. '' means from the start.
+  string after_uuid = 5;
 }
 
 message GetObjectsByStateReply {
   repeated string object_uuids = 1;
-  bool more_available = 2;           // Set only on a paged reply that stopped
-                                     // early
+  // Set only on a paged reply that stopped early.
+  bool more_available = 2;
 }
 
 // Counts the rows a GetObjectsByState with the same type and states would

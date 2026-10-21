@@ -55,8 +55,11 @@ INSTANCE_CHECKS_QUEUE = queue.Queue()
 # keyset cursor is where the next page of that type's walk starts, and ''
 # starts a new walk, which is how objects that arrived behind the cursor are
 # reached. A type is read again only when its own work has run out, and a
-# type whose read came back empty is left alone until its recheck time, so
-# an idle cluster costs a handful of small reads every few minutes.
+# type whose walk has completed -- including one whose read came back empty
+# -- is not walked again until its recheck time. That keeps an idle cluster
+# to a handful of small reads every few minutes, and means an object whose
+# hard delete fails every time is retried once per recheck rather than
+# once per pass.
 #
 # _DELETED_OBJECT_NEXT_TYPE is the drain's position in the rotation, an
 # index into list(OBJECT_NAMES_TO_CLASSES). It persists across passes: if
@@ -70,10 +73,10 @@ INSTANCE_CHECKS_QUEUE = queue.Queue()
 # were re-elected, and each one is re-read and re-checked before it is acted
 # on, so a stale entry costs a read rather than a wrong delete.
 DELETED_OBJECT_PAGE_SIZE = 500
-DELETED_OBJECT_EMPTY_RECHECK = 300
+DELETED_OBJECT_WALK_RECHECK = 300
 _DELETED_OBJECT_WORK: dict[str, collections.deque[str]] = {}
 _DELETED_OBJECT_CURSOR: dict[str, str] = {}
-_DELETED_OBJECT_EMPTY_UNTIL: dict[str, float] = {}
+_DELETED_OBJECT_RECHECK_AT: dict[str, float] = {}
 _DELETED_OBJECT_NEXT_TYPE: int = 0
 DELETED_OBJECT_OUTCOMES = (
     'gone', 'not_final', 'too_young', 'hard_deleted', 'failed')
@@ -924,7 +927,7 @@ def per_deleted_object_checks():
     budget = config.DELETED_OBJECT_SWEEP_SECONDS
 
     held_before = _deleted_object_work_held()
-    if not _fill_deleted_object_work(start_time):
+    if not _fill_deleted_object_work(start_time, start_time + budget):
         # The first read of every entry would spend a whole _grpc_call
         # retry budget against a tier which has just failed one, and fail
         # anyway, so a pass whose fill could not reach the tier does not
@@ -992,11 +995,12 @@ def publish_deleted_object_backlog():
         _record_sweep_completed('deleted_object_backlog')
 
 
-def _fill_deleted_object_work(now: float) -> bool:
+def _fill_deleted_object_work(now: float, deadline: float) -> bool:
     """Read a page of work for each type whose own work has run out.
 
-    Returns False when the database tier was unavailable, in which case the
-    caller must not drain.
+    No read is started after ``deadline``, a time.time() value; the types
+    not reached are read first by the next pass. Returns False when the
+    database tier was unavailable, in which case the caller must not drain.
     """
     # The work holds uuids, not hydrated objects. Hydrating here serialised
     # a gRPC round trip per object inside a single scheduled call, which
@@ -1009,8 +1013,18 @@ def _fill_deleted_object_work(now: float) -> bool:
         work = _DELETED_OBJECT_WORK.setdefault(objtype, collections.deque())
         if work:
             continue
-        if _DELETED_OBJECT_EMPTY_UNTIL.get(objtype, 0.0) > now:
+        if _DELETED_OBJECT_RECHECK_AT.get(objtype, 0.0) > now:
             continue
+
+        # Each read is cheap while MariaDB walks the primary key, but 28 of
+        # them back to back are not if it ever chooses to sort instead, and
+        # the pass is meant to fit its budget whichever it does. Resuming
+        # at this type rather than starting from the top again means a run
+        # of slow reads moves along the list rather than starving its tail.
+        if time.time() >= deadline:
+            previous = object_types[object_types.index(objtype) - 1]
+            _record_sweep_stopped('per_deleted_object', object_types, previous)
+            return True
 
         # A per-reply failure for one object type must not stop the sweep
         # for the rest: the other types are still collectable. This is the
@@ -1062,11 +1076,12 @@ def _fill_deleted_object_work(now: float) -> bool:
             _DELETED_OBJECT_CURSOR[objtype] = page.uuids[-1]
         else:
             # The walk is complete, so the next one starts from the top and
-            # reaches whatever arrived behind the cursor.
+            # reaches whatever arrived behind the cursor -- but not until
+            # the recheck, or every entry which failed in this walk would
+            # be read and fail again in the very next pass.
             _DELETED_OBJECT_CURSOR[objtype] = ''
-            if not page.uuids:
-                _DELETED_OBJECT_EMPTY_UNTIL[objtype] = (
-                    now + DELETED_OBJECT_EMPTY_RECHECK)
+            _DELETED_OBJECT_RECHECK_AT[objtype] = (
+                now + DELETED_OBJECT_WALK_RECHECK)
 
     _record_sweep_completed('per_deleted_object')
     return True

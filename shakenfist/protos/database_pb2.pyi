@@ -1380,15 +1380,16 @@ class GetObjectsByStateRequest(_message.Message):
     AFTER_UUID_FIELD_NUMBER: _builtins.int
     object_type: _shakenfist_enums_pb2.ObjectType.ValueType
     updated_before: _builtins.float
-    """Only rows with update_time older than"""
+    """Only rows with update_time older than this unix timestamp; 0 means no
+    filter.
+    """
     page_size: _builtins.int
-    """this unix timestamp; 0 means no filter
-    Paging. A page is never a complete answer, so a caller which treats
-    the reply as a complement set must leave page_size at 0.
-    0 means unbounded (every match)
+    """The most uuids to return; 0 means unbounded (every match). A page is
+    never a complete answer, so a caller which treats the reply as a
+    complement set must leave this at 0.
     """
     after_uuid: _builtins.str
-    """Keyset cursor; '' means from the start"""
+    """Keyset cursor: return uuids after this one. '' means from the start."""
     @_builtins.property
     def state_values(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
         """List of states to match"""
@@ -1417,7 +1418,7 @@ class GetObjectsByStateReply(_message.Message):
     OBJECT_UUIDS_FIELD_NUMBER: _builtins.int
     MORE_AVAILABLE_FIELD_NUMBER: _builtins.int
     more_available: _builtins.bool
-    """Set only on a paged reply that stopped"""
+    """Set only on a paged reply that stopped early."""
     @_builtins.property
     def object_uuids(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]: ...
     def __init__(

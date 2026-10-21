@@ -205,6 +205,13 @@ whose page came back empty is not read again for
 costs at most 28 small reads every five minutes. A restart is no
 longer what refills the sweep.
 
+*Revised in review:* any completed walk backs off, not only an empty
+page, so an object whose hard delete always fails is retried every
+five minutes rather than every pass. The names became
+`DELETED_OBJECT_WALK_RECHECK` and `_DELETED_OBJECT_RECHECK_AT`. The
+fill also stops starting reads at the pass's deadline. See the
+execution notes.
+
 The page size is `DELETED_OBJECT_PAGE_SIZE` = 500. At phase 1's costs
 that is several minutes of one type's share of the budget, so a type
 with a backlog is read about once an hour. Each reply is at most 500
@@ -770,6 +777,30 @@ plan, under "What phase 2 measured".
     pairs against the budget. Phase 3's planning commit decides between
     budget entries for the sweep and treating its rate as activity
     coupled.
+- **2026-10-22 (UTC), first automated review** (1 document, 6
+  consider, 1 none). Taken:
+  - The fill now stops starting reads at the pass's deadline, and the
+    next pass resumes with the types it did not reach. D10 said reading
+    counts against the budget, but before this change the fill only
+    reduced the drain's share; nothing stopped it.
+  - D9's backoff now applies to every completed walk. With only empty
+    pages backed off, an object whose hard delete always fails was
+    re-read and logged at ERROR every minute. Before this phase that
+    happened every 15 minutes, when the old queue emptied.
+  - Upgrade order (`sf-database` first) is documented, and so is an
+    `absent()` alert on the backlog gauge in place of failure streak
+    coverage for the hourly count.
+  - The proto comments are leading comments, so the generated stubs
+    describe the right fields.
+  - Tests cover an old server's long reply going through the fill.
+  - Declined: feeding the backlog count into the failure streak gauge.
+    That gauge's contract is a work-list read whose failure stops a
+    sweep collecting, and the count collects nothing.
+  - The PR's smoke run included
+    `test_no_unbudgeted_fixed_rate_database_polling`, which *skipped*:
+    the tier's rate was too level (activity spread 1.30 against 1.80
+    required) to tell polling from activity. Its summary listed no
+    unbudgeted or over-budget pairs. The merge queue's runs repeat it.
 
 ## Back brief
 

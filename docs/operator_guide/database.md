@@ -608,6 +608,13 @@ staged rollout that upgrades API nodes and leaves the database tier on
 the old release stays broken until the tier is upgraded -- do the
 database tier first.
 
+The deleted-object sweep is a milder case of the same rule. A new
+`sf-cluster` asks for its work a page at a time, and an old `sf-database`
+ignores the paging and returns every matching object of a type at once.
+The sweep copes, but until the tier is upgraded it holds and re-reads
+whole lists as it did before paging, which on a cluster with a large
+backlog is the expensive read paging exists to avoid.
+
 ### initialise-node
 
 Creates a node record in the database. By default, it uses the local node's
@@ -964,19 +971,23 @@ hard deletes objects that have been in a final state (`deleted`,
 for most objects, 30 seconds for completed operations):
 
 - **`DELETED_OBJECT_SWEEP_SECONDS`** — the time budget of each pass
-  (default `20`). Reading the sweep's work counts against it. It caps the
-  work rather than spending it, so a pass with nothing to delete finishes
-  at once. Lower it to reduce the load the sweep puts on the database
-  tier, at the cost of a slower drain.
+  (default `20`). Reading the sweep's work counts against it: no read
+  starts once the budget is spent, and the next pass begins with the types
+  this one did not reach. It caps the work rather than spending it, so a
+  pass with nothing to delete finishes at once. Lower it to reduce the
+  load the sweep puts on the database tier, at the cost of a slower drain.
 
 The sweep's work is a list of uuids per object type. Each list is a page
 of up to 500 uuids, read in primary key order with the age filter applied
-database-side, and a type is read again only when its own list runs out.
-A type with nothing to delete is not read again for five minutes. Objects
-are hydrated one at a time at processing time, and the sweep takes one
-object from each type in turn, remembering its place between passes, so
-neither a large backlog in one type nor a single failing object can stop
-the others.
+database-side, and a type is read again only when its own list runs out. A
+type whose list has been read to the end, including one with nothing to
+delete, is not read again for five minutes, so an object whose hard delete
+fails every time is retried every five minutes rather than every pass.
+Each failure is logged at ERROR and counted with the `failed` outcome
+below. Objects are hydrated one at a time at processing time, and the
+sweep takes one object from each type in turn, remembering its place
+between passes, so neither a large backlog in one type nor a single
+failing object can stop the others.
 
 ### Watching for sweeps that silently do nothing
 
@@ -1028,7 +1039,11 @@ object costs. All are published by the elected cluster maintainer only.
   it includes objects still inside their grace period and is a little
   higher than what the sweep could delete right now. Every type is
   published, zeros included, so an alert can rely on the series existing.
-  Like the failure streak gauge it is dropped when the node loses the
+  A count that fails drops that type's series until the next hour's count
+  succeeds, and these counts are not covered by the failure streak gauge
+  above, so alert on
+  `absent(cluster_deleted_object_backlog{object_type="..."})` for a type
+  you need watched. Like the failure streak gauge it is dropped when the node loses the
   election, and a new maintainer publishes it within an hour of being
   elected, so do not read a gap in that window as a broken metric. A
   backlog which grows hour over hour means the sweep is not keeping up
