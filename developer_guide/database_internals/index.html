@@ -15428,6 +15428,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Cluster Operation Tracking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-is-a-task-observational" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When is a task observational?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15777,9 +15794,58 @@ at enqueue time by <code>is_observational()</code> in <code>schema/operations/ut
 model may declare <code>observational_tasks: ClassVar[frozenset[...]]</code> beside
 <code>target_fields</code>; an operation is observational only if it has tasks and every
 one of them is in that set, so a single mutating task makes the whole
-operation mutating. No model declares any yet. See
+operation mutating. Three tasks on two models are declared today:
+<code>collect_billing_statistics</code> and <code>health_check_kvm_process</code> on
+<code>node_inst_op</code>, and <code>verify_size_and_checksum</code> on <code>node_blob_op</code>. The
+instance sweep enqueues the first two together, and every caller enqueues
+the third on its own. Every other task mutates. See
 <a href="../../plans/PLAN-cluster-op-visibility/">the master plan</a> for the
 rationale.</p>
+<h3 id="when-is-a-task-observational">When is a task observational?<a class="headerlink" href="#when-is-a-task-observational" title="Permanent link">&para;</a></h3>
+<p>A task is observational if its purpose is to measure or verify its target,
+and its only writes are of one of two kinds:</p>
+<ul>
+<li><strong>Recording what it observed.</strong> Events, usage records and computed hashes
+  are the examples. No other operation is sequenced behind these writes. A
+  user can wait for one: <code>GET /blobs/&lt;uuid&gt;/checksum/&lt;algorithm&gt;</code> enqueues
+  <code>verify_size_and_checksum</code> when the hash is not yet known, and returns it
+  once recorded. That caller polls for the value, though, not for the
+  operation, so it does not need the operation to count as pending.</li>
+<li><strong>Correcting a cached observation that reality has already falsified.</strong>
+  <code>health_check_kvm_process</code> clears an instance's <code>kvm_pid</code> only when that
+  process no longer exists, and <code>verify_size_and_checksum</code> drops a replica
+  location only when the file is proven missing or corrupt. In both cases
+  the task reveals a change, it does not make one.</li>
+</ul>
+<p>Anything that changes desired state, guest-visible state, or something a
+user action or another operation depends on is mutating. That includes
+creating, starting, deleting and snapshotting, routing, DHCP and NAT
+changes, and replicating a blob onto a node.</p>
+<p>When in doubt, a task is mutating. The two mistakes are not equally costly.
+Marking a mutating task observational hides it from <code>last_cluster_operation</code>
+and <code>has_pending_cluster_operation()</code>, which are the gates that exist to wait
+for it, and that is the very bug the flag was introduced to fix. Marking an
+observational task mutating costs only a stale pointer, because a sweep
+briefly becomes the object's latest operation.</p>
+<p>Two practical traps:</p>
+<ul>
+<li>The declaration must be annotated <code>ClassVar</code>. Without it pydantic turns
+  the attribute into a model field, and <code>is_observational()</code> silently sees an
+  empty set, so every operation of the model is stored as mutating with no
+  error anywhere.</li>
+<li>Marking a task observational changes what the flag says, not what a failing
+  task does. A billing or health check task which raises still moves its
+  instance to an error state (see
+  <a href="https://github.com/shakenfist/shakenfist/issues/4585">issue 4585</a>).</li>
+</ul>
+<p>The classification of every task is pinned by
+<code>shakenfist/tests/schema/operations/test_observational_tasks.py</code>. It holds a
+table of every task of every operation model, so adding a task or a model
+fails the test until someone classifies it. Update the table in the same
+change that adds the task, and add the task to <code>observational_tasks</code> only if
+it is observational. The reasoning for each existing task is in the
+<a href="../../plans/PLAN-cluster-op-visibility-phase-03-mark-observational/#audit-table">audit table</a>
+of the plan which classified them.</p>
 <p><code>DatabaseBackedObjectWithOperations</code> exposes two read shapes over the
 history:</p>
 <ul>

@@ -13931,6 +13931,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#background-sweeps-no-longer-count-as-an-objects-latest-operation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background sweeps no longer count as an object's latest operation
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -16026,6 +16037,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#background-sweeps-no-longer-count-as-an-objects-latest-operation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background sweeps no longer count as an object's latest operation
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -17408,6 +17430,39 @@ worker the refusal is a 400 naming the parameter.</p>
   against an old cluster raises <code>AgentOperationFailed</code> where it used
   to raise <code>AgentCommandError</code>. Catch both, as above.</li>
 </ul>
+<h2 id="background-sweeps-no-longer-count-as-an-objects-latest-operation">Background sweeps no longer count as an object's latest operation<a class="headerlink" href="#background-sweeps-no-longer-count-as-an-objects-latest-operation" title="Permanent link">&para;</a></h2>
+<p>The per-instance billing and health sweep and the per-blob checksum sweep
+are now marked observational. Each cluster operation target row carries an
+<code>observational</code> flag, set when the operation is enqueued, and an operation is
+observational only if all of its tasks are. The tasks classified this way are
+<code>collect_billing_statistics</code>, <code>health_check_kvm_process</code> and
+<code>verify_size_and_checksum</code>. Every other task is mutating.</p>
+<p>What you will see:</p>
+<ul>
+<li>An instance's <code>last_cluster_operation</code> no longer names the billing and
+  health sweep. It names the newest mutating operation, and because terminal
+  operations are removed about thirty seconds after they finish, it is
+  usually <code>null</code> for an instance at rest. Clients should already treat it as
+  optional.</li>
+<li><code>runs_after</code> chains built from an instance's <code>last_cluster_operation</code> now
+  serialise behind the last user-requested change rather than behind the
+  last sweep.</li>
+<li><code>GET /clusteroperations?target_object_type=...&amp;target_uuid=...</code> still
+  reports every operation for the object, with <code>observational: true</code> on the
+  sweeps. A client that polls this listing to wait for an object to settle
+  should ignore those entries.</li>
+<li>A delete no longer cancels a queued billing and health sweep for the
+  instance, because the sweep is no longer the operation it walks from. The
+  sweep's two tasks now do nothing for an instance that is not <code>created</code>,
+  and the billing task treats a disk or console log removed mid-measurement
+  as absent, so a sweep that outlives a delete cannot error it.</li>
+</ul>
+<p>No migration is needed. The flag is stored per row at enqueue time, so rows
+written before the upgrade stay mutating until their operation is removed.
+During a rolling upgrade, an older daemon or database gateway writes the
+flag as false, which is the safe direction.</p>
+<p>A billing or health check task that fails for any other reason still moves
+its instance to an error state, as it did before (<a href="https://github.com/shakenfist/shakenfist/issues/4585">issue 4585</a>).</p>
 
 
 

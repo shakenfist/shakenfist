@@ -15608,39 +15608,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#bugs-fixed-during-this-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bugs fixed during this work
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#documentation-index-maintenance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation index maintenance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#back-brief" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Back brief
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -15948,13 +15915,13 @@ every consumer, so that:</p>
 <tr>
 <td>2. Observational flag: schema and query layer</td>
 <td><a href="../PLAN-cluster-op-visibility-phase-02-observational-schema/">PLAN-cluster-op-visibility-phase-02-observational-schema.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>9b098c6ac</code> (#4574)</td>
 </tr>
 <tr>
 <td>3. Classify and mark observational tasks</td>
-<td>PLAN-cluster-op-visibility-phase-03-mark-observational.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-cluster-op-visibility-phase-03-mark-observational/">PLAN-cluster-op-visibility-phase-03-mark-observational.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -16137,9 +16104,11 @@ equivalent check.</p>
   <code>get_cluster_operations()</code>, and decide explicitly whether
   delete cancels in-flight observational ops. Once phase 3
   lands they are no longer the pointer, so the current walk
-  skips them. That is probably right, since a health check
-  against a deleting instance does no harm, but it is a
-  behaviour change, so state it.</li>
+  skips them. Phase 3 made that safe rather than leaving it
+  harmless by assumption: both sweep tasks now return early
+  for an instance that is not <code>created</code>, and the billing
+  task no longer raises when a delete removes a file it is
+  measuring. It is still a behaviour change, so state it.</li>
 <li>client-python (sibling repo): add
   <code>get_instance()</code>-adjacent accessors as needed, a
   <code>has_pending_operations</code>-aware helper, and capability
@@ -16152,6 +16121,13 @@ equivalent check.</p>
   <code>has_pending_operations</code> (cheaper, single GET) once the
   deployed server advertises the capability; keep the
   by-target fallback for older servers.</li>
+<li><em>(Added by the phase 3 survey.)</em> <code>_await_object_operations_complete()</code>
+  (<code>deploy/shakenfist_ci/base.py</code>) fails a test when any op it
+  watched go in flight ends in <code>error</code>, and its by-target listing
+  includes observational ops. A billing op that errored (#4585)
+  therefore fails an unrelated test. Ignore ops reporting
+  <code>observational: true</code>, both when deciding whether anything is
+  outstanding and when failing on <code>error</code>.</li>
 <li>Functional test: hot-plug an interface and assert the
   await helper genuinely blocks until the attach lands even
   when a billing sweep fires (can be provoked by simply
@@ -16311,6 +16287,12 @@ because the following statements will be true:</p>
   <code>user_waiting</code> hot-plug chain in CI (dependency deferral
   polling cadence) is worth a separate look — it is latency,
   not correctness, but user-visible.</li>
+<li>
+<h1 id="4585-a-failing-billing-or-kvm-health-check-task-moves-a">4585: a failing billing or KVM health check task moves a<a class="headerlink" href="#4585-a-failing-billing-or-kvm-health-check-task-moves-a" title="Permanent link">&para;</a></h1>
+  healthy instance to <code>created-error</code>, because
+  <code>NodeInstOp.dispatch_task()</code> errors the instance on any task
+  exception. Found by the phase 3 survey. Its natural fix keys off
+  the <code>observational_tasks</code> declarations phase 3 adds.</li>
 <li>Issue #3278 (CI and test coverage backlog) may want a note
   about the deflaked helper pattern.</li>
 </ul>
