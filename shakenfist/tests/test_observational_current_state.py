@@ -107,9 +107,12 @@ class _SqliteUpsert:
             set_=kwargs)
 
 
-class ObservationalCurrentStateTestCase(
-        dbfixture.MariaDBTableFixture, base.ShakenFistTestCase):
-    """Decision 8's behaviour test, against real SQL."""
+class ClusterOperationTablesFixture(dbfixture.MariaDBTableFixture):
+    """The real enqueue path and readers over sqlite cluster operation tables.
+
+    Mix in ahead of base.ShakenFistTestCase. Also used by
+    test_object_cluster_operations.
+    """
 
     def setUp(self):
         super().setUp()
@@ -136,6 +139,27 @@ class ObservationalCurrentStateTestCase(
             p.start()
         self.addCleanup(mock.patch.stopall)
 
+    def _set_op_state(self, op_uuid, state_value):
+        states = mariadb._get_object_states_table()
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                sa.update(states)
+                .where(states.c.object_uuid == op_uuid)
+                .values(state_value=state_value))
+        self.assertEqual(1, result.rowcount)
+
+    def _op_state(self, op_uuid):
+        states = mariadb._get_object_states_table()
+        with self.engine.connect() as conn:
+            return conn.execute(
+                sa.select(states.c.state_value)
+                .where(states.c.object_uuid == op_uuid)).scalar()
+
+
+class ObservationalCurrentStateTestCase(
+        ClusterOperationTablesFixture, base.ShakenFistTestCase):
+    """Decision 8's behaviour test, against real SQL."""
+
     def _enqueue(self, op_uuid, tasks, model_class=_ObservingModel,
                  op_type='NODE_INST_OP', target_field='instance_uuid',
                  target_uuid=INSTANCE_UUID):
@@ -161,22 +185,6 @@ class ObservationalCurrentStateTestCase(
                       model_class=node_blob_op.model,
                       op_type='NODE_BLOB_OP', target_field='blob_uuid',
                       target_uuid=BLOB_UUID)
-
-    def _set_op_state(self, op_uuid, state_value):
-        states = mariadb._get_object_states_table()
-        with self.engine.begin() as conn:
-            result = conn.execute(
-                sa.update(states)
-                .where(states.c.object_uuid == op_uuid)
-                .values(state_value=state_value))
-        self.assertEqual(1, result.rowcount)
-
-    def _op_state(self, op_uuid):
-        states = mariadb._get_object_states_table()
-        with self.engine.connect() as conn:
-            return conn.execute(
-                sa.select(states.c.state_value)
-                .where(states.c.object_uuid == op_uuid)).scalar()
 
     def _latest(self):
         latest = mariadb.get_latest_cluster_operation_target(

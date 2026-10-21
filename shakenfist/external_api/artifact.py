@@ -1031,19 +1031,18 @@ class ArtifactMetadataEndpoint(api_base.Resource):
 
 
 artifact_outstanding_operations_example = """[
-    [
-        {
-            "instance_uuid": "d657c162-65c2-4abd-b81f-5908632e6c3f",
-            "namespace": "system",
-            "operation_type": "artifact_fetch_op",
-            "state": "complete",
-            "tasks": [
-                "image_fetch"
-            ],
-            "url": "debian:12",
-            "uuid": "2f9cd517-0aab-443c-aaed-7fad23a0115d"
-        }
-    ]
+    {
+        "instance_uuid": "d657c162-65c2-4abd-b81f-5908632e6c3f",
+        "namespace": "system",
+        "observational": false,
+        "operation_type": "artifact_fetch_op",
+        "state": "complete",
+        "tasks": [
+            "image_fetch"
+        ],
+        "url": "debian:12",
+        "uuid": "2f9cd517-0aab-443c-aaed-7fad23a0115d"
+    }
 ]"""
 
 
@@ -1062,20 +1061,17 @@ class ArtifactOutstandingOperationsEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.VISIBLE_ARTIFACT_REF_NAMESPACE_DESCRIPTION, False),
          ('all', 'query', 'boolean',
-          'Include operations which have already completed, rather than '
-          'only those still in flight.', False)],
+          'Also include finished operations which have not yet been removed. '
+          'Finished operations are normally removed within about fifteen '
+          'minutes, and errored ones are kept for up to seven days, so this '
+          'is not a history.', False)],
         [(
             200,
-            'A list of the cluster operations not yet executed for this artifact.',
+            'The cluster operations targeting this artifact, newest first.',
             artifact_outstanding_operations_example),
          (404, 'Artifact not found.', None)]))
     @use_kwargs(get_args, location='json_or_query')
     @arg_is_visible_artifact_ref
     @requires_artifact_access
     def get(self, artifact_ref=None, all=False, artifact_from_db=None):
-        retval = []
-        for op in artifact_from_db.get_cluster_operations(
-            outstanding_only=(not all)
-        ):
-            retval.append(op.external_view())
-        return retval
+        return artifact_from_db.cluster_operation_views(outstanding_only=(not all))
