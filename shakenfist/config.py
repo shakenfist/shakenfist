@@ -774,6 +774,20 @@ class SFConfig(BaseSettings):
             'How long to wait before removing old data from the database.'
         )
     )
+    DELETED_OBJECT_SWEEP_SECONDS: int = Field(
+        20,
+        ge=1,
+        description=(
+            'The time budget, in seconds, of each pass of the cluster '
+            'daemon\'s deleted-object sweep, which runs every minute and '
+            'hard deletes objects which have been in a final state for '
+            'longer than CLEANER_DELAY. Reading the sweep\'s work from the '
+            'database counts against the budget. It caps the work rather '
+            'than spending it: a pass with nothing to delete finishes at '
+            'once. Lower it to reduce the load the sweep puts on the '
+            'database tier, at the cost of a slower drain.'
+        )
+    )
     CLUSTER_OPERATION_TARGET_RETENTION: int = Field(
         7 * 24 * 3600,
         description=(

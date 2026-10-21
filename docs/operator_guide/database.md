@@ -608,6 +608,13 @@ staged rollout that upgrades API nodes and leaves the database tier on
 the old release stays broken until the tier is upgraded -- do the
 database tier first.
 
+The deleted-object sweep is a milder case of the same rule. A new
+`sf-cluster` asks for its work a page at a time, and an old `sf-database`
+ignores the paging and returns every matching object of a type at once.
+The sweep copes, but until the tier is upgraded it holds and re-reads
+whole lists as it did before paging, which on a cluster with a large
+backlog is the expensive read paging exists to avoid.
+
 ### initialise-node
 
 Creates a node record in the database. By default, it uses the local node's
@@ -958,15 +965,29 @@ schedule. It re-queues or rejects rows whose claim has gone stale:
   `cluster_op_reaper_requeued_total` and
   `cluster_op_reaper_rejected_total` record reaper activity.
 
-The cluster daemon also runs a deleted-object sweep (every 15 minutes)
-which hard deletes objects that have been in a final state (`deleted`,
+The cluster daemon also runs a deleted-object sweep, every minute, which
+hard deletes objects that have been in a final state (`deleted`,
 `complete`, `abort`) for longer than their grace period (`CLEANER_DELAY`
-for most objects, 30 seconds for completed operations). The sweep's
-work queue holds `(object_type, uuid)` tuples — the candidate list is a
-single SQL query per object type with the age filter applied
-database-side, and objects are hydrated one at a time at processing
-time, so a large backlog or a single failing object cannot stall the
-pass.
+for most objects, 30 seconds for completed operations):
+
+- **`DELETED_OBJECT_SWEEP_SECONDS`** — the time budget of each pass
+  (default `20`). Reading the sweep's work counts against it: no read
+  starts once the budget is spent, and the next pass begins with the types
+  this one did not reach. It caps the work rather than spending it, so a
+  pass with nothing to delete finishes at once. Lower it to reduce the
+  load the sweep puts on the database tier, at the cost of a slower drain.
+
+The sweep's work is a list of uuids per object type. Each list is a page
+of up to 500 uuids, read in primary key order with the age filter applied
+database-side, and a type is read again only when its own list runs out. A
+type whose list has been read to the end, including one with nothing to
+delete, is not read again for five minutes, so an object whose hard delete
+fails every time is retried every five minutes rather than every pass.
+Each failure is logged at ERROR and counted with the `failed` outcome
+below. Objects are hydrated one at a time at processing time, and the
+sweep takes one object from each type in turn, remembering its place
+between passes, so neither a large backlog in one type nor a single
+failing object can stop the others.
 
 ### Watching for sweeps that silently do nothing
 
@@ -1012,14 +1033,21 @@ A deleted-object sweep which reads its work list fine can still fall
 behind, so three further metrics say how far behind it is and what each
 object costs. All are published by the elected cluster maintainer only.
 
-- **`cluster_deleted_object_queue_depth`** — a gauge on
+- **`cluster_deleted_object_backlog`** — a gauge on
   `CLUSTER_METRICS_PORT`, labelled by `object_type`: the number of
-  entries waiting in the sweep's queue. It is set every pass from a count
-  kept beside the queue, and like the failure streak gauge it is dropped
-  when the node loses the election. The value right after a fill (which
-  today means right after an sf-cluster restart) is the per-type
-  backlog. A depth that grows pass over pass means the sweep is not
-  keeping up with arrivals. A type with an empty queue has no label set.
+  objects in a final state. It is counted hourly, with no age filter, so
+  it includes objects still inside their grace period and is a little
+  higher than what the sweep could delete right now. Every type is
+  published, zeros included, so an alert can rely on the series existing.
+  A count that fails drops that type's series until the next hour's count
+  succeeds, and these counts are not covered by the failure streak gauge
+  above, so alert on
+  `absent(cluster_deleted_object_backlog{object_type="..."})` for a type
+  you need watched. Like the failure streak gauge it is dropped when the node loses the
+  election, and a new maintainer publishes it within an hour of being
+  elected, so do not read a gap in that window as a broken metric. A
+  backlog which grows hour over hour means the sweep is not keeping up
+  with arrivals.
 - **`cluster_deleted_object_seconds`** — a histogram on the same port,
   labelled by `object_type` and `outcome`, observed once per dequeued
   entry. The outcomes are:
@@ -1034,21 +1062,33 @@ object costs. All are published by the elected cluster maintainer only.
   database client, labelled by `sweep`, `object_type` and `operation`
   (the RPC name). It is observed only while a timing scope is active,
   which today is only the deleted-object sweep (`sweep` is
-  `per_deleted_object`), so most daemons export no samples for it. Each
+  `per_deleted_object` for processing an entry, `per_deleted_object_fill`
+  for reading a page of work, or `deleted_object_backlog` for the
+  hourly count), so most daemons export no samples for it. Each
   observation is the wall time of one call including its retries, and
-  failed calls are observed too. Subtracting its `_sum` from
-  `cluster_deleted_object_seconds`'s `_sum` gives the time spent outside
-  the database.
+  failed calls are observed too. `DeleteObjectEvents` is not retried,
+  so each of its observations is a single attempt. Subtracting its
+  `_sum` from `cluster_deleted_object_seconds`'s `_sum` gives the time
+  spent outside the database.
 
 The per-pass log line `Processed N items from per-deleted-object queue`
-also carries structured fields: a count for each outcome, the remaining
-depth (`remaining`) and the seconds spent processing (`elapsed_seconds`).
+also carries structured fields: a count for each outcome, the number of
+entries still held for later passes across all types (`remaining`), the
+number added by this pass's reads (`filled`), the number processed
+(`total`) and the seconds spent processing (`elapsed_seconds`).
 
 Mean seconds per hard delete, by object type:
 
 ```
 sum by (object_type) (rate(cluster_deleted_object_seconds_sum{outcome="hard_deleted"}[24h]))
   / sum by (object_type) (rate(cluster_deleted_object_seconds_count{outcome="hard_deleted"}[24h]))
+```
+
+The backlog trend across all types, in objects per day. A positive
+value means the sweep is falling further behind:
+
+```
+deriv(sum(cluster_deleted_object_backlog)[1d:1h]) * 86400
 ```
 
 The RPCs which take the most total time, by object type:

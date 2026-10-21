@@ -1376,9 +1376,20 @@ class GetObjectsByStateRequest(_message.Message):
     OBJECT_TYPE_FIELD_NUMBER: _builtins.int
     STATE_VALUES_FIELD_NUMBER: _builtins.int
     UPDATED_BEFORE_FIELD_NUMBER: _builtins.int
+    PAGE_SIZE_FIELD_NUMBER: _builtins.int
+    AFTER_UUID_FIELD_NUMBER: _builtins.int
     object_type: _shakenfist_enums_pb2.ObjectType.ValueType
     updated_before: _builtins.float
-    """Only rows with update_time older than"""
+    """Only rows with update_time older than this unix timestamp; 0 means no
+    filter.
+    """
+    page_size: _builtins.int
+    """The most uuids to return; 0 means unbounded (every match). A page is
+    never a complete answer, so a caller which treats the reply as a
+    complement set must leave this at 0.
+    """
+    after_uuid: _builtins.str
+    """Keyset cursor: return uuids after this one. '' means from the start."""
     @_builtins.property
     def state_values(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
         """List of states to match"""
@@ -1389,10 +1400,12 @@ class GetObjectsByStateRequest(_message.Message):
         object_type: _shakenfist_enums_pb2.ObjectType.ValueType = ...,
         state_values: _abc.Iterable[_builtins.str] | None = ...,
         updated_before: _builtins.float = ...,
+        page_size: _builtins.int = ...,
+        after_uuid: _builtins.str = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["object_type", b"object_type", "state_values", b"state_values", "updated_before", b"updated_before"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["after_uuid", b"after_uuid", "object_type", b"object_type", "page_size", b"page_size", "state_values", b"state_values", "updated_before", b"updated_before"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
@@ -1403,20 +1416,72 @@ class GetObjectsByStateReply(_message.Message):
     DESCRIPTOR: _descriptor.Descriptor
 
     OBJECT_UUIDS_FIELD_NUMBER: _builtins.int
+    MORE_AVAILABLE_FIELD_NUMBER: _builtins.int
+    more_available: _builtins.bool
+    """Set only on a paged reply that stopped early."""
     @_builtins.property
     def object_uuids(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]: ...
     def __init__(
         self,
         *,
         object_uuids: _abc.Iterable[_builtins.str] | None = ...,
+        more_available: _builtins.bool = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["object_uuids", b"object_uuids"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["more_available", b"more_available", "object_uuids", b"object_uuids"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 
 Global___GetObjectsByStateReply: _TypeAlias = GetObjectsByStateReply  # noqa: Y015
+
+@_typing.final
+class CountObjectsByStateRequest(_message.Message):
+    """Counts the rows a GetObjectsByState with the same type and states would
+    return, without an age filter and without reading the uuids.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    OBJECT_TYPE_FIELD_NUMBER: _builtins.int
+    STATE_VALUES_FIELD_NUMBER: _builtins.int
+    object_type: _shakenfist_enums_pb2.ObjectType.ValueType
+    @_builtins.property
+    def state_values(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
+        """States to count; must not be empty"""
+
+    def __init__(
+        self,
+        *,
+        object_type: _shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        state_values: _abc.Iterable[_builtins.str] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["object_type", b"object_type", "state_values", b"state_values"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CountObjectsByStateRequest: _TypeAlias = CountObjectsByStateRequest  # noqa: Y015
+
+@_typing.final
+class CountObjectsByStateReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    COUNT_FIELD_NUMBER: _builtins.int
+    count: _builtins.int
+    def __init__(
+        self,
+        *,
+        count: _builtins.int = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["count", b"count"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___CountObjectsByStateReply: _TypeAlias = CountObjectsByStateReply  # noqa: Y015
 
 @_typing.final
 class DeleteOrphanedObjectStatesRequest(_message.Message):

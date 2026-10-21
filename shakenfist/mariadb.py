@@ -181,6 +181,21 @@ def rpc_timing_scope(sweep: str, object_type: str) -> Iterator[None]:
         _RPC_TIMING_SCOPE.reset(token)
 
 
+def _observe_scoped_rpc(
+        timing_scope: Optional[tuple[str, str]], operation: str,
+        started: float) -> None:
+    """Observe an RPC's wall time if it was made inside a timing scope.
+
+    timing_scope is the value of _RPC_TIMING_SCOPE read when the call
+    began; started is the time.monotonic() reading taken then. Does
+    nothing when timing_scope is None.
+    """
+    if timing_scope is not None:
+        DATABASE_CLIENT_RPC_SECONDS.labels(
+            sweep=timing_scope[0], object_type=timing_scope[1],
+            operation=operation).observe(time.monotonic() - started)
+
+
 # Sentinel node name used during migration when the original node is unknown.
 # This uses a name that cannot conflict with real hostnames.
 MIGRATION_UNKNOWN_NODE = '__migrated_unknown_node__'
@@ -962,11 +977,7 @@ def _grpc_call(
         raise exceptions.DatabaseUnavailable(
             f'database service unreachable: {summary}') from last_error
     finally:
-        if timing_scope is not None:
-            DATABASE_CLIENT_RPC_SECONDS.labels(
-                sweep=timing_scope[0], object_type=timing_scope[1],
-                operation=method_name or 'unknown').observe(
-                    time.monotonic() - started)
+        _observe_scoped_rpc(timing_scope, method_name or 'unknown', started)
 
 
 # =============================================================================
@@ -4360,6 +4371,100 @@ def _direct_get_objects_by_state(object_type: ObjectType,
         return None
 
 
+class ObjectsByStatePage(NamedTuple):
+    """One page of a keyset walk over a type's object_states rows.
+
+    ``more_available`` is True only when the walk stopped early, so the
+    caller should read again with ``after_uuid`` set to the last uuid.
+    """
+    uuids: list[str]
+    more_available: bool
+
+
+def _direct_get_objects_by_state_page(object_type: ObjectType,
+                                      state_values: list[str],
+                                      page_size: int,
+                                      after_uuid: str = '',
+                                      updated_before: Optional[float] = None
+                                      ) -> Optional[ObjectsByStatePage]:
+    """Get one page of object UUIDs of a given type in specified states.
+
+    The filters are those of ``_direct_get_objects_by_state()``. The page
+    is the first ``page_size`` matching uuids greater than ``after_uuid``
+    in ascending ``object_uuid`` order. Within one ``object_type`` that
+    is the primary key's order, so the walk is index-served rather than
+    a sort of the type's whole matching range. One extra row is asked
+    for, so that whether there are more is known without counting.
+
+    This is the direct access version used by the database daemon.
+    Returns None on error (distinct from an empty page for no matches).
+    """
+    engine = _get_engine()
+    table = _get_object_states_table()
+
+    try:
+        with engine.connect() as conn:
+            where = [table.c.object_type == object_type]
+            if state_values:
+                where.append(table.c.state_value.in_(state_values))
+            if updated_before:
+                where.append(table.c.update_time < updated_before)
+            if after_uuid:
+                where.append(table.c.object_uuid > after_uuid)
+            stmt = (sa.select(table.c.object_uuid)
+                    .where(sa.and_(*where))
+                    .order_by(table.c.object_uuid)
+                    .limit(page_size + 1))
+            uuids = [row.object_uuid for row in conn.execute(stmt).fetchall()]
+            return ObjectsByStatePage(
+                uuids=uuids[:page_size],
+                more_available=len(uuids) > page_size)
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB paged query failed for {object_type} in '
+            f'{state_values} after {after_uuid!r}: {e}')
+        return None
+
+
+def _direct_count_objects_by_state(object_type: ObjectType,
+                                   state_values: list[str]
+                                   ) -> Optional[int]:
+    """Count the objects of a given type in specified states.
+
+    There is deliberately no age filter. ``update_time`` is not in
+    ``idx_object_states_type_state``, so filtering on it would turn an
+    index-only range count into a row lookup for every match. The count
+    therefore includes objects still inside any grace period a reader of
+    the matching uuids would apply.
+
+    ``state_values`` must not be empty: unlike
+    ``_direct_get_objects_by_state()``, where an empty list means no
+    state filter, an unfiltered count of a whole type is not what this
+    is for.
+
+    This is the direct access version used by the database daemon.
+    Returns None on error (distinct from 0 for no matches).
+    """
+    if not state_values:
+        raise ValueError('state_values must not be empty')
+
+    engine = _get_engine()
+    table = _get_object_states_table()
+
+    try:
+        with engine.connect() as conn:
+            stmt = (sa.select(sa.func.count())
+                    .select_from(table)
+                    .where(sa.and_(table.c.object_type == object_type,
+                                   table.c.state_value.in_(state_values))))
+            return int(conn.execute(stmt).scalar_one())
+    except OperationalError as e:
+        LOG.warning(
+            f'MariaDB count query failed for {object_type} in '
+            f'{state_values}: {e}')
+        return None
+
+
 # =============================================================================
 # gRPC Client Functions
 # These call the database microservice for state operations.
@@ -4473,6 +4578,69 @@ def _grpc_get_objects_by_state(object_type: ObjectType,
         return list(reply.object_uuids)
     except grpc.RpcError as e:
         _log_failed_read('GetObjectsByState', e, target=str(object_type))
+        return None
+
+
+def _grpc_get_objects_by_state_page(object_type: ObjectType,
+                                    state_values: list[str],
+                                    page_size: int,
+                                    after_uuid: str = '',
+                                    updated_before: Optional[float] = None
+                                    ) -> Optional[ObjectsByStatePage]:
+    """Get one page of object UUIDs of a given type in specified states via gRPC.
+
+    An sf-database older than the paging fields ignores them, because
+    protobuf drops fields a reader does not know, and answers with every
+    match in no particular order. A reply longer than ``page_size`` can
+    only have come from such a server, so it is returned whole with
+    ``more_available`` False rather than trimmed: trimming an unordered
+    list would hand the caller a cursor that skips arbitrary rows. The
+    caller then behaves as it did before paging existed, and its cursor
+    resets because the walk reports that it is complete.
+
+    Returns None on error (distinct from an empty page for no matches).
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetObjectsByStateRequest(
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
+            state_values=state_values,
+            updated_before=(updated_before or 0),
+            page_size=page_size,
+            after_uuid=after_uuid
+        )
+        reply = _grpc_call(stub.GetObjectsByState, request)
+        uuids = list(reply.object_uuids)
+        if len(uuids) > page_size:
+            return ObjectsByStatePage(uuids=uuids, more_available=False)
+        return ObjectsByStatePage(
+            uuids=uuids, more_available=bool(reply.more_available))
+    except grpc.RpcError as e:
+        _log_failed_read('GetObjectsByState', e, target=str(object_type))
+        return None
+
+
+def _grpc_count_objects_by_state(object_type: ObjectType,
+                                 state_values: list[str]
+                                 ) -> Optional[int]:
+    """Count the objects of a given type in specified states via gRPC.
+
+    Returns None on error (distinct from 0 for no matches). An
+    sf-database older than this RPC answers UNIMPLEMENTED, which is
+    reported as a failed read like any other.
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.CountObjectsByStateRequest(
+            object_type=cast(
+                shakenfist_enums_pb2.ObjectType.ValueType, object_type.proto_id),
+            state_values=state_values
+        )
+        reply = _grpc_call(stub.CountObjectsByState, request)
+        return int(reply.count)
+    except grpc.RpcError as e:
+        _log_failed_read('CountObjectsByState', e, target=str(object_type))
         return None
 
 
@@ -4747,6 +4915,76 @@ def get_objects_by_state(object_type: ObjectType,
             object_type, state_values, updated_before=updated_before)
     return _direct_get_objects_by_state(
         object_type, state_values, updated_before=updated_before)
+
+
+def get_objects_by_state_page(object_type: ObjectType,
+                              state_values: list[str],
+                              page_size: int,
+                              after_uuid: str = '',
+                              updated_before: Optional[float] = None
+                              ) -> Optional[ObjectsByStatePage]:
+    """Get one page of object UUIDs of a given type in specified states.
+
+    A page is never a complete answer. A caller which treats the result
+    as a complement set -- everything *not* named is deletable, as
+    ``get_active_blob_uuids()`` does -- must use
+    ``get_objects_by_state()`` instead, or it will delete whatever the
+    page did not reach.
+
+    Pages are in ascending ``object_uuid`` order. To walk a type, start
+    with ``after_uuid`` '' and pass the last uuid of each page while
+    ``more_available`` is True. Rows which arrive behind the cursor are
+    seen on the next walk.
+
+    Args:
+        object_type: The type of object.
+        state_values: List of state values to match.
+        page_size: The most uuids to return. Must be at least 1: 0 is
+            the wire value for an unbounded read, which belongs to
+            ``get_objects_by_state()``.
+        after_uuid: Only return uuids greater than this; '' starts from
+            the beginning.
+        updated_before: If set, only return objects whose state
+            update_time is older than this unix timestamp.
+
+    Returns:
+        An ObjectsByStatePage, or None if the query failed (distinct
+        from an empty page, which means no matches).
+    """
+    if page_size < 1:
+        raise ValueError(
+            f'page_size must be at least 1, not {page_size}; use '
+            f'get_objects_by_state() for an unbounded read')
+    if _use_database_service():
+        return _grpc_get_objects_by_state_page(
+            object_type, state_values, page_size, after_uuid=after_uuid,
+            updated_before=updated_before)
+    return _direct_get_objects_by_state_page(
+        object_type, state_values, page_size, after_uuid=after_uuid,
+        updated_before=updated_before)
+
+
+def count_objects_by_state(object_type: ObjectType,
+                           state_values: list[str]) -> Optional[int]:
+    """Count the objects of a given type in specified states.
+
+    There is no age filter, so the count includes objects younger than
+    any grace period a reader of the uuids would apply. Use this for a
+    backlog gauge, not to decide what to delete.
+
+    Args:
+        object_type: The type of object.
+        state_values: List of state values to count. Must not be empty.
+
+    Returns:
+        The number of matching objects, or None if the query failed
+        (distinct from 0, which means no matches).
+    """
+    if not state_values:
+        raise ValueError('state_values must not be empty')
+    if _use_database_service():
+        return _grpc_count_objects_by_state(object_type, state_values)
+    return _direct_count_objects_by_state(object_type, state_values)
 
 
 def get_all_states_for_type(object_type: ObjectType) -> list[tuple[str, State]]:
@@ -6514,7 +6752,13 @@ def _grpc_delete_object_events(
     but do not re-raise: hard_delete must not fail because an events
     cleanup failed. The events row will be reaped by the daily prune
     if it becomes an orphan.
+
+    This does not go through _grpc_call(), because that would retry and
+    change the failure handling above, so it observes its own wall time
+    on database_client_rpc_seconds when called inside an rpc_timing_scope().
     """
+    timing_scope = _RPC_TIMING_SCOPE.get()
+    started = time.monotonic() if timing_scope is not None else 0.0
     try:
         stub = _get_database_stub()
         request = database_pb2.DeleteObjectEventsRequest(
@@ -6532,6 +6776,8 @@ def _grpc_delete_object_events(
         LOG.warning(
             f'gRPC DeleteObjectEvents failed for '
             f'{object_type}/{object_uuid}: {e}')
+    finally:
+        _observe_scoped_rpc(timing_scope, 'DeleteObjectEvents', started)
 
 
 def get_object_events(

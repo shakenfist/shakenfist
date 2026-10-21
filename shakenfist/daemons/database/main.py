@@ -769,6 +769,25 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 context.set_details(
                     f'unknown object type id {request.object_type}')
                 return database_pb2.GetObjectsByStateReply(object_uuids=[])
+            if request.page_size > 0:
+                # A paged read. page_size 0 is the unbounded read below,
+                # which is what every complement-set caller sends.
+                page = mariadb.get_objects_by_state_page(
+                    object_type, list(request.state_values),
+                    request.page_size, after_uuid=request.after_uuid,
+                    updated_before=(request.updated_before or None))
+                if page is None:
+                    LOG.warning(
+                        f'GetObjectsByState transient MariaDB error for '
+                        f'{object_type} in {list(request.state_values)} '
+                        f'after {request.after_uuid!r}')
+                    context.set_code(grpc.StatusCode.UNAVAILABLE)
+                    context.set_details('object state read failed')
+                    return database_pb2.GetObjectsByStateReply(
+                        object_uuids=[])
+                return database_pb2.GetObjectsByStateReply(
+                    object_uuids=page.uuids,
+                    more_available=page.more_available)
             uuids = mariadb.get_objects_by_state(
                 object_type, list(request.state_values),
                 updated_before=(request.updated_before or None))
@@ -791,6 +810,48 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(str(e))
             return database_pb2.GetObjectsByStateReply(object_uuids=[])
+
+    def CountObjectsByState(
+        self,
+        request: database_pb2.CountObjectsByStateRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.CountObjectsByStateReply:
+        """Count the objects of a type in the given states.
+
+        The statuses follow GetObjectsByState: INVALID_ARGUMENT for a
+        request which can never succeed, UNAVAILABLE for a transient
+        MariaDB failure, and INTERNAL for an unexpected exception. None
+        of them is answered with a count of zero, which a caller would
+        read as an empty backlog.
+        """
+        try:
+            self.monitor.counters['count_objects_by_state'].inc()
+            object_type = ObjectType.from_proto_id(request.object_type)
+            if object_type is None:
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                context.set_details(
+                    f'unknown object type id {request.object_type}')
+                return database_pb2.CountObjectsByStateReply(count=0)
+            if not request.state_values:
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                context.set_details('state_values must not be empty')
+                return database_pb2.CountObjectsByStateReply(count=0)
+            count = mariadb.count_objects_by_state(
+                object_type, list(request.state_values))
+            if count is None:
+                LOG.warning(
+                    f'CountObjectsByState transient MariaDB error for '
+                    f'{object_type} in {list(request.state_values)}')
+                context.set_code(grpc.StatusCode.UNAVAILABLE)
+                context.set_details('object state count failed')
+                return database_pb2.CountObjectsByStateReply(count=0)
+            return database_pb2.CountObjectsByStateReply(count=count)
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database CountObjectsByState failed', e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return database_pb2.CountObjectsByStateReply(count=0)
 
     def DeleteOrphanedObjectStates(
         self,
@@ -6413,7 +6474,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             'get_object_events', 'delete_object_events',
             # MariaDB state operations
             'get_object_state', 'set_object_state', 'delete_object_state',
-            'get_objects_by_state',
+            'get_objects_by_state', 'count_objects_by_state',
             # Orphan reconciliation
             'delete_orphaned_object_states', 'get_stateless_object_uuids',
             'delete_orphaned_artifact_attributes',

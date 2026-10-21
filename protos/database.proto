@@ -53,6 +53,7 @@ service DatabaseService {
   rpc SetObjectState (SetObjectStateRequest) returns (StatusReply) {}
   rpc DeleteObjectState (DeleteObjectStateRequest) returns (StatusReply) {}
   rpc GetObjectsByState (GetObjectsByStateRequest) returns (GetObjectsByStateReply) {}
+  rpc CountObjectsByState (CountObjectsByStateRequest) returns (CountObjectsByStateReply) {}
   rpc DeleteOrphanedObjectStates (DeleteOrphanedObjectStatesRequest) returns (DeleteOrphanedObjectStatesReply) {}
   rpc GetStatelessObjectUuids (GetStatelessObjectUuidsRequest) returns (GetStatelessObjectUuidsReply) {}
   rpc DeleteOrphanedArtifactAttributes (DeleteOrphanedArtifactAttributesRequest) returns (DeleteOrphanedArtifactAttributesReply) {}
@@ -796,12 +797,32 @@ message DeleteObjectStateRequest {
 message GetObjectsByStateRequest {
   ObjectType object_type = 1;
   repeated string state_values = 2;  // List of states to match
-  double updated_before = 3;         // Only rows with update_time older than
-                                     // this unix timestamp; 0 means no filter
+  // Only rows with update_time older than this unix timestamp; 0 means no
+  // filter.
+  double updated_before = 3;
+  // The most uuids to return; 0 means unbounded (every match). A page is
+  // never a complete answer, so a caller which treats the reply as a
+  // complement set must leave this at 0.
+  uint32 page_size = 4;
+  // Keyset cursor: return uuids after this one. '' means from the start.
+  string after_uuid = 5;
 }
 
 message GetObjectsByStateReply {
   repeated string object_uuids = 1;
+  // Set only on a paged reply that stopped early.
+  bool more_available = 2;
+}
+
+// Counts the rows a GetObjectsByState with the same type and states would
+// return, without an age filter and without reading the uuids.
+message CountObjectsByStateRequest {
+  ObjectType object_type = 1;
+  repeated string state_values = 2;  // States to count; must not be empty
+}
+
+message CountObjectsByStateReply {
+  uint64 count = 1;
 }
 
 // Orphan reconciliation (issue 3534). Phantoms are object_states rows

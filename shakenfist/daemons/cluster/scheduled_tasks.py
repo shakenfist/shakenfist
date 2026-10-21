@@ -41,17 +41,43 @@ from shakenfist.util import general as util_general
 LOG, _ = logs.setup(__name__)
 BLOB_CHECKS_QUEUE = queue.Queue()
 INSTANCE_CHECKS_QUEUE = queue.Queue()
-DELETED_OBJECTS_QUEUE = queue.Queue()
 
-# How many entries of each object type are in DELETED_OBJECTS_QUEUE.
-# queue.Queue cannot be counted by type without draining it, so this
-# moves in step with the queue: incremented beside every put() and
-# decremented after every successful get(). It is deliberately not
-# cleared when this node is demoted, because the queue is not -- a
-# demoted node keeps its stale entries and would drain them if it were
-# re-elected, so the counts must keep describing them. Only the gauge
-# derived from it is cleared (clear_deleted_object_metrics()).
-_DELETED_OBJECTS_DEPTH: collections.Counter[str] = collections.Counter()
+# The deleted-object sweep's work, held per object type. A single queue
+# filled type by type let one large backlog take every pass's whole budget,
+# so the types behind it were never reached at all. Instead the drain takes
+# one entry from each type that has work in turn, in the order of
+# OBJECT_NAMES_TO_CLASSES, so a type with thirty objects gets the same share
+# of the budget as one with hundreds of thousands.
+#
+# Each type holds at most one page of uuids, read in primary key order: an
+# ORDER BY on anything else would sort the type's whole final-state range
+# for every page, which is the unbounded read paging exists to avoid. The
+# keyset cursor is where the next page of that type's walk starts, and ''
+# starts a new walk, which is how objects that arrived behind the cursor are
+# reached. A type is read again only when its own work has run out, and a
+# type whose walk has completed -- including one whose read came back empty
+# -- is not walked again until its recheck time. That keeps an idle cluster
+# to a handful of small reads every few minutes, and means an object whose
+# hard delete fails every time is retried once per recheck rather than
+# once per pass.
+#
+# _DELETED_OBJECT_NEXT_TYPE is the drain's position in the rotation, an
+# index into list(OBJECT_NAMES_TO_CLASSES). It persists across passes: if
+# every pass started from the top, a budget that ran out part way through a
+# round would favour the types at the head of the order every time, which
+# is the same starvation in a milder form.
+#
+# None of this is cleared on demotion, for the same reason as
+# _SWEEP_RESUME_AFTER below: it is work and a position, not a published
+# value. A demoted node keeps its entries and would carry on with them if it
+# were re-elected, and each one is re-read and re-checked before it is acted
+# on, so a stale entry costs a read rather than a wrong delete.
+DELETED_OBJECT_PAGE_SIZE = 500
+DELETED_OBJECT_WALK_RECHECK = 300
+_DELETED_OBJECT_WORK: dict[str, collections.deque[str]] = {}
+_DELETED_OBJECT_CURSOR: dict[str, str] = {}
+_DELETED_OBJECT_RECHECK_AT: dict[str, float] = {}
+_DELETED_OBJECT_NEXT_TYPE: int = 0
 DELETED_OBJECT_OUTCOMES = (
     'gone', 'not_final', 'too_young', 'hard_deleted', 'failed')
 
@@ -65,9 +91,10 @@ CLUSTER_DELETED_OBJECT_SECONDS = Histogram(
     'Wall time spent on one entry of the per-deleted-object queue, by '
     'object type and how the entry ended.', ['object_type', 'outcome'],
     buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10))
-CLUSTER_DELETED_OBJECT_QUEUE_DEPTH = Gauge(
-    'cluster_deleted_object_queue_depth',
-    'Entries waiting in the per-deleted-object queue, by object type.',
+CLUSTER_DELETED_OBJECT_BACKLOG = Gauge(
+    'cluster_deleted_object_backlog',
+    'Objects in a final state, by object type. This is a count with no age '
+    'filter, so it includes objects still inside their grace period.',
     ['object_type'])
 
 REAPER_REQUEUED = Counter(
@@ -95,7 +122,7 @@ _SWEEP_FAILURE_STREAK: dict[tuple[str, str], int] = {}
 # Where each per-object-type sweep should begin its next pass. The
 # sweeps that read one work list per object type stop the pass on a
 # tier-wide failure, which bounds the pass to a single _grpc_call retry
-# budget (see _fill_per_deleted_object_queue). Stopping at the same
+# budget (see _fill_deleted_object_work). Stopping at the same
 # place every pass would starve every type after it, though:
 # DatabaseUnavailable is raised for an exhausted DEADLINE_EXCEEDED
 # budget too, which one large, slow or lock-contended query can produce
@@ -148,7 +175,7 @@ class WorkList(NamedTuple):
     readable), so that caller should move on to the next type. A
     ``DatabaseUnavailable`` is tier-wide, and asking the same dead tier
     27 more times buys nothing while costing a full ``_grpc_call``
-    retry budget each time -- see ``_fill_per_deleted_object_queue``.
+    retry budget each time -- see ``_fill_deleted_object_work``.
     """
     uuids: Optional[list[str]]
     tier_unavailable: bool
@@ -224,6 +251,50 @@ def _sweep_work_list(sweep: str, object_type: ObjectType,
     return WorkList(uuids=obj_uuids, tier_unavailable=tier_unavailable)
 
 
+class WorkPage(NamedTuple):
+    """The outcome of reading one page of a sweep's work list.
+
+    ``uuids`` and ``tier_unavailable`` mean exactly what they do in
+    ``WorkList``. ``more_available`` is True only when the walk stopped
+    early, so the next read should start after the last uuid; it is False
+    for a failed read.
+    """
+    uuids: Optional[list[str]]
+    more_available: bool
+    tier_unavailable: bool
+
+
+def _sweep_work_page(sweep: str, object_type: ObjectType,
+                     state_values: list[str], page_size: int,
+                     after_uuid: str,
+                     updated_before: Optional[float] = None
+                     ) -> WorkPage:
+    """Read one page of a sweep's work list, treating a failed read as visible.
+
+    This is ``_sweep_work_list()`` for a keyset walk, and handles the two
+    shapes of failed read in the same way for the same reasons: a None
+    from the gRPC wrapper is per-reply, a raised ``DatabaseUnavailable``
+    is tier-wide, and both are accounted against the failure streak.
+    """
+    try:
+        page = mariadb.get_objects_by_state_page(
+            object_type, state_values, page_size, after_uuid=after_uuid,
+            updated_before=updated_before)
+        error = None
+        tier_unavailable = False
+    except DatabaseUnavailable as e:
+        page = None
+        error = str(e)
+        tier_unavailable = True
+
+    obj_uuids = page.uuids if page is not None else None
+    _record_sweep_read(sweep, object_type, obj_uuids, error)
+    return WorkPage(
+        uuids=obj_uuids,
+        more_available=page.more_available if page is not None else False,
+        tier_unavailable=tier_unavailable)
+
+
 def _stateless_work_list(sweep: str, object_type: ObjectType) -> WorkList:
     """Read the zombie-repair work list, with the same visibility.
 
@@ -268,20 +339,18 @@ def clear_sweep_failure_metrics() -> None:
 
 
 def clear_deleted_object_metrics() -> None:
-    """Drop the deleted-object queue depth gauge when this node is demoted.
+    """Drop the deleted-object backlog gauge when this node is demoted.
 
-    Only the elected cluster maintainer fills and drains the queue, so a
-    node that held the lock and then lost it would otherwise keep
-    exporting the depth it last saw forever -- nothing on that node will
-    ever run the publishing code again. The newly elected node
-    repopulates on its first pass. This is the same reasoning as
-    ``clear_sweep_failure_metrics()``.
+    Only the elected cluster maintainer publishes the backlog, so a node
+    that held the lock and then lost it would otherwise keep exporting the
+    counts it last saw forever -- nothing on that node will ever run the
+    publishing code again. The newly elected node repopulates on its first
+    pass. This is the same reasoning as ``clear_sweep_failure_metrics()``.
 
-    Only the gauge goes. The counter behind it describes the queue, which
-    a demotion does not empty, so it must keep matching it. The next pass
-    on this node, if it is re-elected, republishes the gauge from it.
+    The sweep's work is not touched: it is not a published value, and a
+    re-elected node carries on with it.
     """
-    CLUSTER_DELETED_OBJECT_QUEUE_DEPTH.clear()
+    CLUSTER_DELETED_OBJECT_BACKLOG.clear()
 
 
 # Scheduler capacity reconciler metrics. Per-node gauges are labelled by node
@@ -847,32 +916,38 @@ def _deleted_object_delay(objtype):
     return config.CLEANER_DELAY
 
 
+def _deleted_object_work_held() -> int:
+    """How many entries the deleted-object sweep holds, across every type."""
+    return sum(len(work) for work in _DELETED_OBJECT_WORK.values())
+
+
 @util_general.recorded_method
 def per_deleted_object_checks():
     start_time = time.time()
-    if DELETED_OBJECTS_QUEUE.empty():
-        _fill_per_deleted_object_queue()
-        LOG.info(
-            'Refreshed per-deleted-object queue with '
-            f'{DELETED_OBJECTS_QUEUE.qsize()} items')
+    budget = config.DELETED_OBJECT_SWEEP_SECONDS
 
-    queue_fill_cost = time.time() - start_time
-    if queue_fill_cost > 10:
-        # A pass that only filled is exactly the one that reports the
-        # backlog, so the gauge is published on this path too.
-        _publish_deleted_object_depth()
+    held_before = _deleted_object_work_held()
+    if not _fill_deleted_object_work(start_time, start_time + budget):
+        # The first read of every entry would spend a whole _grpc_call
+        # retry budget against a tier which has just failed one, and fail
+        # anyway, so a pass whose fill could not reach the tier does not
+        # drain. Whatever it did read waits for the next pass.
+        LOG.warning(
+            'Skipping per-deleted-object drain, database unavailable '
+            'during the fill')
         return
+    filled = _deleted_object_work_held() - held_before
 
+    fill_cost = time.time() - start_time
     outcomes: collections.Counter[str] = collections.Counter()
     process_start = time.time()
-    processed = _process_per_deleted_object_queue(
-        execution_limit=(10 - queue_fill_cost), outcomes=outcomes)
+    processed = _drain_deleted_object_work(budget - fill_cost, outcomes)
     process_seconds = time.time() - process_start
-    _publish_deleted_object_depth()
 
     fields: dict[str, object] = {
         'total': processed,
-        'remaining': sum(_DELETED_OBJECTS_DEPTH.values()),
+        'remaining': _deleted_object_work_held(),
+        'filled': filled,
         'elapsed_seconds': round(process_seconds, 3)
     }
     for outcome in DELETED_OBJECT_OUTCOMES:
@@ -881,36 +956,76 @@ def per_deleted_object_checks():
         f'Processed {processed} items from per-deleted-object queue')
 
 
-def _publish_deleted_object_depth() -> None:
-    """Set the depth gauge from _DELETED_OBJECTS_DEPTH.
+@util_general.recorded_method
+def publish_deleted_object_backlog():
+    """Set the backlog gauge from a count of final-state objects per type.
 
-    A type whose count has reached zero loses its label set rather than
-    exporting zero forever, and is dropped from the counter.
+    Every type is published, zeros included, so an alert can rely on the
+    series existing. A failed count removes the type's label set rather than
+    leaving a value the failed read can no longer vouch for. A tier-wide
+    failure stops the pass for the reason given in
+    ``_fill_deleted_object_work()``.
     """
-    for objtype in list(_DELETED_OBJECTS_DEPTH):
-        depth = _DELETED_OBJECTS_DEPTH[objtype]
-        if depth > 0:
-            CLUSTER_DELETED_OBJECT_QUEUE_DEPTH.labels(objtype).set(depth)
+    object_types = list(OBJECT_NAMES_TO_CLASSES)
+    for objtype in _sweep_object_types('deleted_object_backlog', object_types):
+        try:
+            with mariadb.rpc_timing_scope('deleted_object_backlog', objtype):
+                count = mariadb.count_objects_by_state(
+                    ObjectType(objtype), FINAL_OBJECT_STATES)
+        except DatabaseUnavailable as e:
+            LOG.with_fields({'object_type': objtype}).warning(
+                f'Stopping deleted object backlog pass, database '
+                f'unavailable: {e}')
+            _record_sweep_stopped(
+                'deleted_object_backlog', object_types, objtype)
+            break
+
+        if count is None:
+            LOG.with_fields({'object_type': objtype}).warning(
+                'Could not count deleted objects, dropping backlog gauge')
+            try:
+                CLUSTER_DELETED_OBJECT_BACKLOG.remove(objtype)
+            except KeyError:
+                # Never published, or cleared by a demotion.
+                pass
             continue
 
-        try:
-            CLUSTER_DELETED_OBJECT_QUEUE_DEPTH.remove(objtype)
-        except KeyError:
-            # Never published, or cleared by a demotion.
-            pass
-        del _DELETED_OBJECTS_DEPTH[objtype]
+        CLUSTER_DELETED_OBJECT_BACKLOG.labels(objtype).set(count)
+    else:
+        _record_sweep_completed('deleted_object_backlog')
 
 
-def _fill_per_deleted_object_queue():
-    # The queue holds (object_type, uuid) tuples, not hydrated objects.
-    # Hydrating here serialised a gRPC round trip per object inside a
-    # single scheduled call, which with a large backlog blew both the
-    # fill budget and the watchdog window before any processing happened
-    # (issue 3533). The age filter is pushed down to SQL so objects too
-    # young to hard delete are never fetched at all.
-    now = time.time()
+def _fill_deleted_object_work(now: float, deadline: float) -> bool:
+    """Read a page of work for each type whose own work has run out.
+
+    No read is started after ``deadline``, a time.time() value; the types
+    not reached are read first by the next pass. Returns False when the
+    database tier was unavailable, in which case the caller must not drain.
+    """
+    # The work holds uuids, not hydrated objects. Hydrating here serialised
+    # a gRPC round trip per object inside a single scheduled call, which
+    # with a large backlog blew both the fill budget and the watchdog window
+    # before any processing happened (issue 3533). The age filter is pushed
+    # down to SQL so objects too young to hard delete are never fetched at
+    # all.
     object_types = list(OBJECT_NAMES_TO_CLASSES)
     for objtype in _sweep_object_types('per_deleted_object', object_types):
+        work = _DELETED_OBJECT_WORK.setdefault(objtype, collections.deque())
+        if work:
+            continue
+        if _DELETED_OBJECT_RECHECK_AT.get(objtype, 0.0) > now:
+            continue
+
+        # Each read is cheap while MariaDB walks the primary key, but 28 of
+        # them back to back are not if it ever chooses to sort instead, and
+        # the pass is meant to fit its budget whichever it does. Resuming
+        # at this type rather than starting from the top again means a run
+        # of slow reads moves along the list rather than starving its tail.
+        if time.time() >= deadline:
+            previous = object_types[object_types.index(objtype) - 1]
+            _record_sweep_stopped('per_deleted_object', object_types, previous)
+            return True
+
         # A per-reply failure for one object type must not stop the sweep
         # for the rest: the other types are still collectable. This is the
         # site where collapsing None into [] silently turned garbage
@@ -931,7 +1046,7 @@ def _fill_per_deleted_object_queue():
         #
         #   DEADLINE_EXCEEDED -- a tier that is up but not answering --
         #   spends GRPC_RETRIES (3) deadlines of GRPC_TIMEOUT (30s) each
-        #   plus sleeps, so about 93s. This is the shape the break is
+        #   plus sleeps, so about 93s. This is the shape the early return is
         #   sized for.
         #
         # There are 28 object types here and _run_due_scheduled_jobs()
@@ -944,31 +1059,94 @@ def _fill_per_deleted_object_queue():
         # skipped a pass. Nothing is gained by asking a tier that is not
         # there 27 more times. This function has blown the watchdog
         # window once already (issue 3533).
-        work = _sweep_work_list(
-            'per_deleted_object', ObjectType(objtype), FINAL_OBJECT_STATES,
-            updated_before=(now - _deleted_object_delay(objtype)))
-        if work.uuids is None:
-            if work.tier_unavailable:
+        with mariadb.rpc_timing_scope('per_deleted_object_fill', objtype):
+            page = _sweep_work_page(
+                'per_deleted_object', ObjectType(objtype), FINAL_OBJECT_STATES,
+                DELETED_OBJECT_PAGE_SIZE, _DELETED_OBJECT_CURSOR.get(objtype, ''),
+                updated_before=(now - _deleted_object_delay(objtype)))
+        if page.uuids is None:
+            if page.tier_unavailable:
                 _record_sweep_stopped(
                     'per_deleted_object', object_types, objtype)
-                break
+                return False
             continue
 
-        for obj_uuid in work.uuids:
-            DELETED_OBJECTS_QUEUE.put((objtype, obj_uuid))
-            _DELETED_OBJECTS_DEPTH[objtype] += 1
-    else:
-        _record_sweep_completed('per_deleted_object')
+        work.extend(page.uuids)
+        if page.more_available and page.uuids:
+            _DELETED_OBJECT_CURSOR[objtype] = page.uuids[-1]
+        else:
+            # The walk is complete, so the next one starts from the top and
+            # reaches whatever arrived behind the cursor -- but not until
+            # the recheck, or every entry which failed in this walk would
+            # be read and fail again in the very next pass.
+            _DELETED_OBJECT_CURSOR[objtype] = ''
+            _DELETED_OBJECT_RECHECK_AT[objtype] = (
+                now + DELETED_OBJECT_WALK_RECHECK)
+
+    _record_sweep_completed('per_deleted_object')
+    return True
 
 
-def _process_per_deleted_object_queue(
-        execution_limit=10,
-        outcomes: Optional[collections.Counter[str]] = None) -> int:
-    """Work through the queue, returning how many entries were taken.
+def _hard_delete_deleted_object(
+        objtype: str, obj_uuid: str,
+        outcomes: Optional[collections.Counter[str]] = None) -> None:
+    """Hard delete one object, if it is still in a final state and old enough.
 
-    If ``outcomes`` is given it is filled with how many entries ended in
-    each of DELETED_OBJECT_OUTCOMES.
+    If ``outcomes`` is given, the outcome of this entry -- one of
+    DELETED_OBJECT_OUTCOMES -- is counted in it.
     """
+    # Which way this entry ended, for the histogram and the pass
+    # summary. 'too_young' is the implicit else of the age check.
+    outcome = 'too_young'
+    entry_start = time.monotonic()
+
+    # A failure to hard delete one object must only cost that one
+    # object, not the rest of the pass (and the other scheduled
+    # tasks sharing the run_pending() invocation).
+    try:
+        with mariadb.rpc_timing_scope('per_deleted_object', objtype):
+            # The object row may have been hard-deleted by a
+            # concurrent cleaner between the state query and this
+            # lookup; suppress the failure audit so that race does
+            # not show up as an ERROR event in the logs.
+            obj = get_object_class(objtype).from_db(
+                obj_uuid, suppress_failure_audit=True)
+            if not obj:
+                outcome = 'gone'
+                return
+
+            # Work entries can be old by the time we get to them, so
+            # re-check the state before acting on it.
+            if obj.state.value not in FINAL_OBJECT_STATES:
+                outcome = 'not_final'
+                return
+
+            if (time.time() - obj.state.update_time >
+                    _deleted_object_delay(objtype)):
+                obj.hard_delete()
+                outcome = 'hard_deleted'
+    except Exception as e:
+        outcome = 'failed'
+        util_exceptions.ignore_exception(
+            f'hard delete of {objtype} {obj_uuid}', e)
+    finally:
+        CLUSTER_DELETED_OBJECT_SECONDS.labels(objtype, outcome).observe(
+            time.monotonic() - entry_start)
+        if outcomes is not None:
+            outcomes[outcome] += 1
+
+
+def _drain_deleted_object_work(
+        execution_limit: float,
+        outcomes: Optional[collections.Counter[str]] = None) -> int:
+    """Take one entry from each type with work in turn, within a time limit.
+
+    Returns how many entries were taken. If ``outcomes`` is given it is
+    filled with how many entries ended in each of DELETED_OBJECT_OUTCOMES.
+    """
+    global _DELETED_OBJECT_NEXT_TYPE
+
+    object_types = list(OBJECT_NAMES_TO_CLASSES)
     processed = 0
     start_time = time.time()
     while True:
@@ -976,56 +1154,21 @@ def _process_per_deleted_object_queue(
         if time.time() - start_time > execution_limit:
             return processed
 
-        try:
-            objtype, obj_uuid = DELETED_OBJECTS_QUEUE.get(block=False)
-        except queue.Empty:
+        # The first type at or after the rotation's position which has
+        # work, wrapping around the end of the list.
+        objtype = None
+        for offset in range(len(object_types)):
+            index = (_DELETED_OBJECT_NEXT_TYPE + offset) % len(object_types)
+            if _DELETED_OBJECT_WORK.get(object_types[index]):
+                objtype = object_types[index]
+                _DELETED_OBJECT_NEXT_TYPE = (index + 1) % len(object_types)
+                break
+        if objtype is None:
             return processed
 
-        # Must follow the get() immediately, before anything can skip
-        # past it, to keep the depth in step with the queue.
-        _DELETED_OBJECTS_DEPTH[objtype] -= 1
-
+        obj_uuid = _DELETED_OBJECT_WORK[objtype].popleft()
         processed += 1
-
-        # Which way this entry ended, for the histogram and the pass
-        # summary. 'too_young' is the implicit else of the age check.
-        outcome = 'too_young'
-        entry_start = time.monotonic()
-
-        # A failure to hard delete one object must only cost that one
-        # object, not the rest of the pass (and the other scheduled
-        # tasks sharing the run_pending() invocation).
-        try:
-            with mariadb.rpc_timing_scope('per_deleted_object', objtype):
-                # The object row may have been hard-deleted by a
-                # concurrent cleaner between the state query and this
-                # lookup; suppress the failure audit so that race does
-                # not show up as an ERROR event in the logs.
-                obj = get_object_class(objtype).from_db(
-                    obj_uuid, suppress_failure_audit=True)
-                if not obj:
-                    outcome = 'gone'
-                    continue
-
-                # Queue entries can be old by the time we get to them, so
-                # re-check the state before acting on it.
-                if obj.state.value not in FINAL_OBJECT_STATES:
-                    outcome = 'not_final'
-                    continue
-
-                if (time.time() - obj.state.update_time >
-                        _deleted_object_delay(objtype)):
-                    obj.hard_delete()
-                    outcome = 'hard_deleted'
-        except Exception as e:
-            outcome = 'failed'
-            util_exceptions.ignore_exception(
-                f'hard delete of {objtype} {obj_uuid}', e)
-        finally:
-            CLUSTER_DELETED_OBJECT_SECONDS.labels(objtype, outcome).observe(
-                time.monotonic() - entry_start)
-            if outcomes is not None:
-                outcomes[outcome] += 1
+        _hard_delete_deleted_object(objtype, obj_uuid, outcomes)
 
 
 # Orphan reconciliation (issue 3534). Zombie repair is excluded for nodes

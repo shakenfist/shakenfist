@@ -17,6 +17,7 @@ from shakenfist.exceptions import InvalidStateException
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
 from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
 from shakenfist.namespace_key import NamespaceKey
+from shakenfist.protos import database_pb2
 from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
@@ -47,6 +48,40 @@ def _reset_sweep_failure_state():
     st._SWEEP_FAILURE_STREAK.clear()
     st.SWEEP_WORK_LIST_FAILURE_STREAK.clear()
     st._SWEEP_RESUME_AFTER.clear()
+
+
+def _reset_deleted_object_sweep_state():
+    """Empty the deleted-object sweep's process-global work.
+
+    The work, the cursors, the empty-type backoff and the rotation's
+    position all outlive a pass by design, so a test which leaves any of
+    them behind changes what a later test's pass reads and drains.
+    """
+    st._DELETED_OBJECT_WORK.clear()
+    st._DELETED_OBJECT_CURSOR.clear()
+    st._DELETED_OBJECT_RECHECK_AT.clear()
+    st._DELETED_OBJECT_NEXT_TYPE = 0
+
+
+def _hold_deleted_object_work(objtype, *uuids):
+    """Give the deleted-object sweep work for a type, as a fill would."""
+    st._DELETED_OBJECT_WORK.setdefault(
+        objtype, collections.deque()).extend(uuids)
+
+
+def _held_deleted_object_work():
+    """The deleted-object sweep's work, leaving out types with none."""
+    return {objtype: list(work)
+            for objtype, work in st._DELETED_OBJECT_WORK.items() if work}
+
+
+# The fill's deadline, for tests about something other than the budget.
+NO_DEADLINE = float('inf')
+
+
+def _page(uuids, more_available=False):
+    return mariadb.ObjectsByStatePage(
+        uuids=list(uuids), more_available=more_available)
 
 
 class FakeBlob:
@@ -533,6 +568,39 @@ class FakeFinalStateObject:
         self.hard_deleted = True
 
 
+class FakeDeletedObjectStore:
+    """Final-state uuids per object type, served the way sf-database does.
+
+    Both the unpaged read and the keyset page are answered from the same
+    store, in ascending uuid order, and a hard delete removes the uuid so
+    a later read does not return it again.
+    """
+
+    def __init__(self, counts):
+        self.uuids = {
+            objtype: [f'{objtype}-{i:08d}' for i in range(count)]
+            for objtype, count in counts.items()}
+        self.initial = {objtype: list(uuids)
+                        for objtype, uuids in self.uuids.items()}
+
+    def by_state(self, objtype, states, updated_before=None):
+        return list(self.uuids.get(str(objtype), []))
+
+    def page(self, objtype, states, page_size, after_uuid='',
+             updated_before=None):
+        after = [u for u in self.uuids.get(str(objtype), []) if u > after_uuid]
+        return mariadb.ObjectsByStatePage(
+            uuids=after[:page_size], more_available=len(after) > page_size)
+
+
+class FakeClock:
+    def __init__(self, now=1000000000.0):
+        self.now = now
+
+    def __call__(self):
+        return self.now
+
+
 def _attrs(expiry):
     return NamespaceKeyAttributesData(
         uuid=KEY_UUID_1, key='aGFzaA==', nonce='noncenonce', expiry=expiry)
@@ -729,8 +797,9 @@ class HardDeleteExpiredNamespaceKeyTestCase(base.ShakenFistTestCase):
 
     def setUp(self):
         super().setUp()
-        while not st.DELETED_OBJECTS_QUEUE.empty():
-            st.DELETED_OBJECTS_QUEUE.get(block=False)
+        _reset_sweep_failure_state()
+        _reset_deleted_object_sweep_state()
+        self.addCleanup(_reset_deleted_object_sweep_state)
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
     def test_hard_deletes_a_soft_deleted_key_after_cleaner_delay(
@@ -740,9 +809,9 @@ class HardDeleteExpiredNamespaceKeyTestCase(base.ShakenFistTestCase):
         key = FakeNamespaceKey('stale', state=dbo.STATE_DELETED,
                                update_time=0.0)
         mock_get_class.return_value.from_db.return_value = key
-        st.DELETED_OBJECTS_QUEUE.put(('namespace_key', KEY_UUID_1))
+        _hold_deleted_object_work('namespace_key', KEY_UUID_1)
 
-        st._process_per_deleted_object_queue(execution_limit=5)
+        st._drain_deleted_object_work(execution_limit=5)
 
         self.assertTrue(key.hard_deleted)
 
@@ -751,9 +820,9 @@ class HardDeleteExpiredNamespaceKeyTestCase(base.ShakenFistTestCase):
         key = FakeNamespaceKey('fresh', state=dbo.STATE_DELETED,
                                update_time=time.time())
         mock_get_class.return_value.from_db.return_value = key
-        st.DELETED_OBJECTS_QUEUE.put(('namespace_key', KEY_UUID_1))
+        _hold_deleted_object_work('namespace_key', KEY_UUID_1)
 
-        st._process_per_deleted_object_queue(execution_limit=5)
+        st._drain_deleted_object_work(execution_limit=5)
 
         self.assertFalse(key.hard_deleted)
 
@@ -765,83 +834,85 @@ class HardDeleteExpiredNamespaceKeyTestCase(base.ShakenFistTestCase):
 
         with mock.patch(
                 'shakenfist.daemons.cluster.scheduled_tasks.'
-                'mariadb.get_objects_by_state',
-                side_effect=lambda objtype, states, updated_before=None: (
+                'mariadb.get_objects_by_state_page',
+                side_effect=lambda objtype, states, page_size, after_uuid='',
+                updated_before=None: _page(
                     [KEY_UUID_1]
                     if objtype == ObjectType.NAMESPACE_KEY else [])):
-            st._fill_per_deleted_object_queue()
+            st._fill_deleted_object_work(time.time(), NO_DEADLINE)
 
-        self.assertEqual([('namespace_key', KEY_UUID_1)],
-                         list(st.DELETED_OBJECTS_QUEUE.queue))
+        self.assertEqual({'namespace_key': [KEY_UUID_1]},
+                         _held_deleted_object_work())
 
 
 class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
-    """The deleted-object sweep fills with (type, uuid) tuples and only
+    """The deleted-object sweep fills with uuids per type and only
     hydrates at processing time, one object per try/except (issue 3533)."""
 
     def setUp(self):
         super().setUp()
-        while not st.DELETED_OBJECTS_QUEUE.empty():
-            st.DELETED_OBJECTS_QUEUE.get(block=False)
         _reset_sweep_failure_state()
+        _reset_deleted_object_sweep_state()
+        self.addCleanup(_reset_deleted_object_sweep_state)
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
-    @mock.patch('shakenfist.mariadb.get_objects_by_state')
-    def test_fill_enqueues_tuples_without_hydration(
-            self, mock_get_by_state, mock_get_class):
-        def by_state(objtype, states, updated_before=None):
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
+    def test_fill_holds_uuids_without_hydration(
+            self, mock_page, mock_get_class):
+        def by_page(objtype, states, page_size, after_uuid='',
+                    updated_before=None):
             self.assertIsNotNone(updated_before)
             self.assertTrue(updated_before < time.time())
+            self.assertEqual(st.DELETED_OBJECT_PAGE_SIZE, page_size)
+            self.assertEqual('', after_uuid)
             if objtype == ObjectType.NETWORK:
-                return [BLOB_UUID_1, BLOB_UUID_2]
-            return []
-        mock_get_by_state.side_effect = by_state
+                return _page([BLOB_UUID_1, BLOB_UUID_2])
+            return _page([])
+        mock_page.side_effect = by_page
 
-        st._fill_per_deleted_object_queue()
+        self.assertTrue(st._fill_deleted_object_work(time.time(), NO_DEADLINE))
 
         # Hydration must not happen at fill time -- with a large backlog
         # it blew the fill budget and the watchdog window.
         mock_get_class.assert_not_called()
 
-        items = []
-        while not st.DELETED_OBJECTS_QUEUE.empty():
-            items.append(st.DELETED_OBJECTS_QUEUE.get(block=False))
-        self.assertEqual(
-            [('network', BLOB_UUID_1), ('network', BLOB_UUID_2)], items)
+        self.assertEqual({'network': [BLOB_UUID_1, BLOB_UUID_2]},
+                         _held_deleted_object_work())
 
-    @mock.patch('shakenfist.mariadb.get_objects_by_state')
-    def test_fill_failure_is_visible_not_empty(self, mock_get_by_state):
-        # get_objects_by_state returns None when the read failed
-        # (e.g. a RESOURCE_EXHAUSTED oversized gRPC reply), distinct
-        # from [] for no matches. Collapsing the two silently turned
-        # the GC off for an object type forever (#3638): the failed
-        # type must be skipped visibly while other types still enqueue.
-        def by_state(objtype, states, updated_before=None):
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
+    def test_fill_failure_is_visible_not_empty(self, mock_page):
+        # get_objects_by_state_page returns None when the read failed
+        # (e.g. a RESOURCE_EXHAUSTED gRPC reply), distinct from an empty
+        # page for no matches. Collapsing the two silently turned the GC
+        # off for an object type forever (#3638): the failed type must be
+        # skipped visibly while other types still fill.
+        def by_page(objtype, states, page_size, after_uuid='',
+                    updated_before=None):
             if objtype == ObjectType.NETWORK:
                 return None
             if objtype == ObjectType.BLOB:
-                return [BLOB_UUID_1]
-            return []
-        mock_get_by_state.side_effect = by_state
+                return _page([BLOB_UUID_1])
+            return _page([])
+        mock_page.side_effect = by_page
 
-        st._fill_per_deleted_object_queue()
+        self.assertTrue(st._fill_deleted_object_work(time.time(), NO_DEADLINE))
 
-        self.assertEqual([('blob', BLOB_UUID_1)],
-                         list(st.DELETED_OBJECTS_QUEUE.queue))
+        self.assertEqual({'blob': [BLOB_UUID_1]}, _held_deleted_object_work())
         # Every object type was still read: a per-reply failure costs
         # one type, not the pass.
-        self.assertEqual(
-            len(OBJECT_NAMES_TO_CLASSES), mock_get_by_state.call_count)
+        self.assertEqual(len(OBJECT_NAMES_TO_CLASSES), mock_page.call_count)
         self.assertEqual(
             {('per_deleted_object', 'network'): 1}, st._SWEEP_FAILURE_STREAK)
         self.assertEqual(
             1, REGISTRY.get_sample_value(
                 'cluster_sweep_work_list_failure_streak',
                 {'sweep': 'per_deleted_object', 'object_type': 'network'}))
+        # A failed read is not an empty one, so it is not backed off.
+        self.assertNotIn('network', st._DELETED_OBJECT_RECHECK_AT)
 
-    @mock.patch('shakenfist.mariadb.get_objects_by_state')
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
     def test_unavailable_database_stops_the_sweep_after_one_budget(
-            self, mock_get_by_state):
+            self, mock_page):
         """A tier outage must cost one retry budget, not 28 of them.
 
         DatabaseUnavailable is only raised once _grpc_call has spent its
@@ -862,12 +933,12 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
         A dead tier does not become reachable on the 28th ask, so the
         bound is the property worth pinning: one read attempt, then stop.
         """
-        mock_get_by_state.side_effect = DatabaseUnavailable('tier is down')
+        mock_page.side_effect = DatabaseUnavailable('tier is down')
 
-        st._fill_per_deleted_object_queue()
+        self.assertFalse(st._fill_deleted_object_work(time.time(), NO_DEADLINE))
 
-        self.assertEqual(1, mock_get_by_state.call_count)
-        self.assertEqual(0, st.DELETED_OBJECTS_QUEUE.qsize())
+        self.assertEqual(1, mock_page.call_count)
+        self.assertEqual({}, _held_deleted_object_work())
         # The one type we did attempt is still counted, so the gauge is
         # not silent during exactly the outage it exists to expose.
         first_type = next(iter(OBJECT_NAMES_TO_CLASSES))
@@ -879,28 +950,27 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
                 'cluster_sweep_work_list_failure_streak',
                 {'sweep': 'per_deleted_object', 'object_type': first_type}))
 
-    @mock.patch('shakenfist.mariadb.get_objects_by_state')
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
     def test_unavailable_database_keeps_work_read_before_it(
-            self, mock_get_by_state):
+            self, mock_page):
         # Stopping the loop must not discard the types already read.
         # 'blob' comes before 'network' in OBJECT_NAMES_TO_CLASSES, so
-        # its work is still enqueued for this pass even though the tier
-        # goes away part way through.
-        def by_state(objtype, states, updated_before=None):
+        # its work is still held even though the tier goes away part way
+        # through.
+        def by_page(objtype, states, page_size, after_uuid='',
+                    updated_before=None):
             if objtype == ObjectType.NETWORK:
                 raise DatabaseUnavailable('tier is down')
             if objtype == ObjectType.BLOB:
-                return [BLOB_UUID_1]
-            return []
-        mock_get_by_state.side_effect = by_state
+                return _page([BLOB_UUID_1])
+            return _page([])
+        mock_page.side_effect = by_page
 
-        st._fill_per_deleted_object_queue()
+        self.assertFalse(st._fill_deleted_object_work(time.time(), NO_DEADLINE))
 
-        self.assertEqual([('blob', BLOB_UUID_1)],
-                         list(st.DELETED_OBJECTS_QUEUE.queue))
+        self.assertEqual({'blob': [BLOB_UUID_1]}, _held_deleted_object_work())
         types = list(OBJECT_NAMES_TO_CLASSES)
-        self.assertEqual(
-            types.index('network') + 1, mock_get_by_state.call_count)
+        self.assertEqual(types.index('network') + 1, mock_page.call_count)
         self.assertEqual(
             {('per_deleted_object', 'network'): 1}, st._SWEEP_FAILURE_STREAK)
         self.assertEqual(
@@ -908,16 +978,16 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
                 'cluster_sweep_work_list_failure_streak',
                 {'sweep': 'per_deleted_object', 'object_type': 'network'}))
 
-    @mock.patch('shakenfist.mariadb.get_objects_by_state')
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
     def test_a_slow_type_cannot_starve_the_types_behind_it(
-            self, mock_get_by_state):
+            self, mock_page):
         """Stopping the pass must not stop it in the same place forever.
 
         DatabaseUnavailable is not only raised for a dead tier: an
         exhausted DEADLINE_EXCEEDED budget raises it too, which one
         large, slow or lock-contended query can produce for a single
         object type while the tier is otherwise healthy. With a fixed
-        starting point, `break` would mean every type after that one is
+        starting point, stopping would mean every type after that one is
         never swept again -- and the backlog that then accumulates makes
         the slow type slower still. That is the #3638 ratchet rebuilt
         one level up, so each pass resumes after wherever the last one
@@ -926,53 +996,59 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
         types = list(OBJECT_NAMES_TO_CLASSES)
         slow = types[0]
 
-        def by_state(objtype, states, updated_before=None):
+        def by_page(objtype, states, page_size, after_uuid='',
+                    updated_before=None):
             if str(objtype) == slow:
                 raise DatabaseUnavailable('this one query is too slow')
-            return []
-        mock_get_by_state.side_effect = by_state
+            return _page([])
+        mock_page.side_effect = by_page
 
         # Pass one stops on the very first type, having read only it.
-        st._fill_per_deleted_object_queue()
-        self.assertEqual(1, mock_get_by_state.call_count)
+        now = time.time()
+        st._fill_deleted_object_work(now, NO_DEADLINE)
+        self.assertEqual(1, mock_page.call_count)
 
         # Pass two starts after it and reaches every other type, rather
         # than dying on the same query again.
-        mock_get_by_state.reset_mock()
-        st._fill_per_deleted_object_queue()
+        mock_page.reset_mock()
+        st._fill_deleted_object_work(now, NO_DEADLINE)
 
         # Every other type is reached, and the slow one is retried
         # last: one wasted budget per pass, and nothing behind it
         # starves. The resume point then holds steady, so this is the
         # steady state rather than a one-off recovery.
-        read = [str(c.args[0]) for c in mock_get_by_state.call_args_list]
+        read = [str(c.args[0]) for c in mock_page.call_args_list]
         self.assertEqual(types[1:] + [slow], read)
 
-    @mock.patch('shakenfist.mariadb.get_objects_by_state', return_value=[])
-    def test_a_completed_pass_starts_from_the_top_again(
-            self, mock_get_by_state):
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page',
+                return_value=mariadb.ObjectsByStatePage(
+                    uuids=[], more_available=False))
+    def test_a_completed_pass_starts_from_the_top_again(self, mock_page):
         # Only a pass which stopped early leaves a resume offset behind.
         types = list(OBJECT_NAMES_TO_CLASSES)
         st._SWEEP_RESUME_AFTER['per_deleted_object'] = types[5]
 
-        st._fill_per_deleted_object_queue()
+        now = time.time()
+        st._fill_deleted_object_work(now, NO_DEADLINE)
         self.assertNotIn('per_deleted_object', st._SWEEP_RESUME_AFTER)
 
-        mock_get_by_state.reset_mock()
-        st._fill_per_deleted_object_queue()
+        # Every type came back empty, so wait out their backoff.
+        mock_page.reset_mock()
+        st._fill_deleted_object_work(now + st.DELETED_OBJECT_WALK_RECHECK + 1, NO_DEADLINE)
         self.assertEqual(
-            types, [str(c.args[0]) for c in mock_get_by_state.call_args_list])
+            types, [str(c.args[0]) for c in mock_page.call_args_list])
 
-    @mock.patch('shakenfist.mariadb.get_objects_by_state')
-    def test_demotion_stops_publishing_the_streak(self, mock_get_by_state):
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
+    def test_demotion_stops_publishing_the_streak(self, mock_page):
         # Only the elected node runs these sweeps, so a demoted node
         # holding a non-zero streak keeps a "streak > 0" alert firing
         # against work it is no longer doing. Nothing on that node will
         # run the reset branch again, so the clear has to be explicit.
-        mock_get_by_state.side_effect = (
-            lambda objtype, states, updated_before=None:
-            None if objtype == ObjectType.NETWORK else [])
-        st._fill_per_deleted_object_queue()
+        mock_page.side_effect = (
+            lambda objtype, states, page_size, after_uuid='',
+            updated_before=None:
+            None if objtype == ObjectType.NETWORK else _page([]))
+        st._fill_deleted_object_work(time.time(), NO_DEADLINE)
         self.assertEqual(
             1, REGISTRY.get_sample_value(
                 'cluster_sweep_work_list_failure_streak',
@@ -988,16 +1064,18 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
                 'cluster_sweep_work_list_failure_streak',
                 {'sweep': 'per_deleted_object', 'object_type': 'network'}))
 
-    @mock.patch('shakenfist.mariadb.get_objects_by_state')
-    def test_fill_failure_streak_counts_and_resets(self, mock_get_by_state):
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
+    def test_fill_failure_streak_counts_and_resets(self, mock_page):
         # The streak counts consecutive failed passes per object type,
         # and a successful read clears it -- the alertable signal is
         # "still failing", not "failed once ever" (#3638).
-        def failing(objtype, states, updated_before=None):
-            return None if objtype == ObjectType.NETWORK else []
-        mock_get_by_state.side_effect = failing
-        st._fill_per_deleted_object_queue()
-        st._fill_per_deleted_object_queue()
+        def failing(objtype, states, page_size, after_uuid='',
+                    updated_before=None):
+            return None if objtype == ObjectType.NETWORK else _page([])
+        mock_page.side_effect = failing
+        now = time.time()
+        st._fill_deleted_object_work(now, NO_DEADLINE)
+        st._fill_deleted_object_work(now, NO_DEADLINE)
         self.assertEqual(
             {('per_deleted_object', 'network'): 2}, st._SWEEP_FAILURE_STREAK)
         self.assertEqual(
@@ -1005,9 +1083,10 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
                 'cluster_sweep_work_list_failure_streak',
                 {'sweep': 'per_deleted_object', 'object_type': 'network'}))
 
-        mock_get_by_state.side_effect = (
-            lambda objtype, states, updated_before=None: [])
-        st._fill_per_deleted_object_queue()
+        mock_page.side_effect = (
+            lambda objtype, states, page_size, after_uuid='',
+            updated_before=None: _page([]))
+        st._fill_deleted_object_work(now, NO_DEADLINE)
         self.assertEqual({}, st._SWEEP_FAILURE_STREAK)
         self.assertEqual(
             0, REGISTRY.get_sample_value(
@@ -1018,9 +1097,9 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
     def test_process_hard_deletes_old_final_objects(self, mock_get_class):
         obj = FakeFinalStateObject()
         mock_get_class.return_value.from_db.return_value = obj
-        st.DELETED_OBJECTS_QUEUE.put(('network', BLOB_UUID_1))
+        _hold_deleted_object_work('network', BLOB_UUID_1)
 
-        processed = st._process_per_deleted_object_queue()
+        processed = st._drain_deleted_object_work(execution_limit=10)
 
         self.assertEqual(1, processed)
         self.assertTrue(obj.hard_deleted)
@@ -1038,10 +1117,9 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
             return good
         mock_get_class.return_value.from_db.side_effect = from_db
 
-        st.DELETED_OBJECTS_QUEUE.put(('network', BLOB_UUID_1))
-        st.DELETED_OBJECTS_QUEUE.put(('network', BLOB_UUID_2))
+        _hold_deleted_object_work('network', BLOB_UUID_1, BLOB_UUID_2)
 
-        processed = st._process_per_deleted_object_queue()
+        processed = st._drain_deleted_object_work(execution_limit=10)
 
         self.assertEqual(2, processed)
         self.assertTrue(good.hard_deleted)
@@ -1059,10 +1137,9 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
             return resurrected
         mock_get_class.return_value.from_db.side_effect = from_db
 
-        st.DELETED_OBJECTS_QUEUE.put(('network', BLOB_UUID_1))
-        st.DELETED_OBJECTS_QUEUE.put(('network', BLOB_UUID_2))
+        _hold_deleted_object_work('network', BLOB_UUID_1, BLOB_UUID_2)
 
-        processed = st._process_per_deleted_object_queue()
+        processed = st._drain_deleted_object_work(execution_limit=10)
 
         self.assertEqual(2, processed)
         self.assertFalse(resurrected.hard_deleted)
@@ -1070,13 +1147,13 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
     def test_process_respects_delay(self, mock_get_class):
         # An object still inside its post-deletion grace period is left
-        # alone (fill filters age in SQL, but queue entries can be old
+        # alone (fill filters age in SQL, but held entries can be old
         # and objects can be re-deleted in the interim).
         young = FakeFinalStateObject(age=1.0)
         mock_get_class.return_value.from_db.return_value = young
-        st.DELETED_OBJECTS_QUEUE.put(('network', BLOB_UUID_1))
+        _hold_deleted_object_work('network', BLOB_UUID_1)
 
-        processed = st._process_per_deleted_object_queue()
+        processed = st._drain_deleted_object_work(execution_limit=10)
 
         self.assertEqual(1, processed)
         self.assertFalse(young.hard_deleted)
@@ -1090,15 +1167,13 @@ UUID_FAILED = 'a0000000-0000-4000-8000-000000000005'
 
 
 class DeletedObjectSweepMixedQueueTestCase(base.ShakenFistTestCase):
-    """One queue entry for each way a deleted-object entry can end."""
+    """One work entry for each way a deleted-object entry can end."""
 
     def setUp(self):
         super().setUp()
-        while not st.DELETED_OBJECTS_QUEUE.empty():
-            st.DELETED_OBJECTS_QUEUE.get(block=False)
-        st._DELETED_OBJECTS_DEPTH.clear()
-        st.CLUSTER_DELETED_OBJECT_QUEUE_DEPTH.clear()
         _reset_sweep_failure_state()
+        _reset_deleted_object_sweep_state()
+        self.addCleanup(_reset_deleted_object_sweep_state)
 
     def _fixtures(self, calls):
         """Return a from_db side effect which records its calls in order."""
@@ -1128,10 +1203,9 @@ class DeletedObjectSweepMixedQueueTestCase(base.ShakenFistTestCase):
         return from_db, objs
 
     def _queue_mixed(self):
-        for obj_uuid in (UUID_GONE, UUID_NOT_FINAL, UUID_TOO_YOUNG,
-                         UUID_HARD_DELETED, UUID_FAILED):
-            st.DELETED_OBJECTS_QUEUE.put(('network', obj_uuid))
-            st._DELETED_OBJECTS_DEPTH['network'] += 1
+        _hold_deleted_object_work(
+            'network', UUID_GONE, UUID_NOT_FINAL, UUID_TOO_YOUNG,
+            UUID_HARD_DELETED, UUID_FAILED)
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
     def test_call_order_is_unchanged(self, mock_get_class):
@@ -1142,7 +1216,7 @@ class DeletedObjectSweepMixedQueueTestCase(base.ShakenFistTestCase):
         mock_get_class.return_value.from_db.side_effect = from_db
         self._queue_mixed()
 
-        processed = st._process_per_deleted_object_queue(execution_limit=5)
+        processed = st._drain_deleted_object_work(execution_limit=5)
 
         self.assertEqual(5, processed)
         self.assertEqual(
@@ -1164,10 +1238,6 @@ class DeletedObjectSweepMixedQueueTestCase(base.ShakenFistTestCase):
                 {'object_type': 'network', 'outcome': outcome}) or 0
             for outcome in st.DELETED_OBJECT_OUTCOMES}
 
-    def _depth(self, objtype):
-        return REGISTRY.get_sample_value(
-            'cluster_deleted_object_queue_depth', {'object_type': objtype})
-
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
     def test_one_histogram_sample_per_outcome(self, mock_get_class):
         calls = []
@@ -1177,7 +1247,7 @@ class DeletedObjectSweepMixedQueueTestCase(base.ShakenFistTestCase):
         before = self._sample_counts()
 
         outcomes = collections.Counter()
-        processed = st._process_per_deleted_object_queue(
+        processed = st._drain_deleted_object_work(
             execution_limit=5, outcomes=outcomes)
 
         after = self._sample_counts()
@@ -1186,7 +1256,7 @@ class DeletedObjectSweepMixedQueueTestCase(base.ShakenFistTestCase):
                          {o: after[o] - before[o] for o in after})
         self.assertEqual({outcome: 1 for outcome in st.DELETED_OBJECT_OUTCOMES},
                          dict(outcomes))
-        self.assertEqual(0, st._DELETED_OBJECTS_DEPTH['network'])
+        self.assertEqual({}, _held_deleted_object_work())
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
     def test_outcomes_parameter_is_optional(self, mock_get_class):
@@ -1196,94 +1266,600 @@ class DeletedObjectSweepMixedQueueTestCase(base.ShakenFistTestCase):
         self._queue_mixed()
 
         self.assertEqual(
-            5, st._process_per_deleted_object_queue(execution_limit=5))
+            5, st._drain_deleted_object_work(execution_limit=5))
+
+    def _pass_fields(self, mock_log):
+        """The structured fields of the pass's summary line."""
+        lines = [c.args[0] for c in mock_log.with_fields.call_args_list
+                 if 'total' in c.args[0]]
+        self.assertEqual(1, len(lines))
+        return lines[0]
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.LOG')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
+    def test_pass_summary_tracks_fill_and_drain(
+            self, mock_page, mock_get_class, mock_log):
+        store = FakeDeletedObjectStore({'network': 2, 'blob': 1})
+        mock_page.side_effect = store.page
+        clock = FakeClock()
+        spend = [10.0]
+
+        def from_db(obj_uuid, suppress_failure_audit=False):
+            # A concurrent cleaner got there first.
+            for uuids in store.uuids.values():
+                if obj_uuid in uuids:
+                    uuids.remove(obj_uuid)
+            clock.now += spend[0]
+            return None
+        mock_get_class.return_value.from_db.side_effect = from_db
+
+        # The first entry spends more than the whole budget, so the pass
+        # takes exactly one.
+        with mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
+                        'time') as fake_time, \
+                mock.patch.object(config, 'DELETED_OBJECT_SWEEP_SECONDS', 5):
+            fake_time.time.side_effect = clock
+            fake_time.monotonic.side_effect = clock
+            st.per_deleted_object_checks()
+
+            fields = self._pass_fields(mock_log)
+            self.assertEqual(1, fields['total'])
+            self.assertEqual(1, fields['gone'])
+            self.assertEqual(3, fields['filled'])
+            self.assertEqual(2, fields['remaining'])
+
+            # The next pass reads nothing for the type which still has
+            # work, and drains the rest.
+            mock_log.reset_mock()
+            spend[0] = 0.0
+            st.per_deleted_object_checks()
+
+        fields = self._pass_fields(mock_log)
+        self.assertEqual(2, fields['total'])
+        self.assertEqual(0, fields['filled'])
+        self.assertEqual(0, fields['remaining'])
+        self.assertEqual({}, _held_deleted_object_work())
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.LOG')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
+    def test_fill_which_spends_the_budget_leaves_the_work(
+            self, mock_page, mock_get_class, mock_log):
+        clock = FakeClock()
+
+        def by_page(objtype, states, page_size, after_uuid='',
+                    updated_before=None):
+            # Reading the work takes a minute.
+            if objtype == ObjectType.NETWORK:
+                clock.now += 60.0
+                return _page([BLOB_UUID_1, BLOB_UUID_2])
+            return _page([])
+        mock_page.side_effect = by_page
+
+        with mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
+                        'time') as fake_time:
+            fake_time.time.side_effect = clock
+            fake_time.monotonic.side_effect = clock
+            st.per_deleted_object_checks()
+
+        mock_get_class.assert_not_called()
+        self.assertEqual({'network': [BLOB_UUID_1, BLOB_UUID_2]},
+                         _held_deleted_object_work())
+        fields = self._pass_fields(mock_log)
+        self.assertEqual(0, fields['total'])
+        self.assertEqual(2, fields['filled'])
+        self.assertEqual(2, fields['remaining'])
+        # The fill stopped reading once it had spent the pass's budget, and
+        # the next pass starts with the types it did not reach.
+        types = list(OBJECT_NAMES_TO_CLASSES)
+        self.assertEqual(
+            types[(types.index('network') + 1) % len(types)],
+            st._SWEEP_RESUME_AFTER['per_deleted_object'])
+
+    def test_demotion_keeps_the_work(self):
+        _hold_deleted_object_work('network', BLOB_UUID_1)
+        st._DELETED_OBJECT_CURSOR['network'] = BLOB_UUID_1
+        st._DELETED_OBJECT_NEXT_TYPE = 5
+
+        st.clear_deleted_object_metrics()
+
+        self.assertEqual({'network': [BLOB_UUID_1]},
+                         _held_deleted_object_work())
+        self.assertEqual(BLOB_UUID_1, st._DELETED_OBJECT_CURSOR['network'])
+        self.assertEqual(5, st._DELETED_OBJECT_NEXT_TYPE)
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
-    @mock.patch('shakenfist.mariadb.get_objects_by_state')
-    def test_depth_gauge_tracks_fill_and_processing(
-            self, mock_get_by_state, mock_get_class):
-        def by_state(objtype, states, updated_before=None):
-            if objtype == ObjectType.NETWORK:
-                return [BLOB_UUID_1, BLOB_UUID_2]
-            if objtype == ObjectType.BLOB:
-                return [BLOB_UUID_1]
-            return []
-        mock_get_by_state.side_effect = by_state
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page',
+                return_value=mariadb.ObjectsByStatePage(
+                    uuids=[], more_available=False))
+    def test_next_pass_after_demotion_carries_on(
+            self, mock_page, mock_get_class):
+        _hold_deleted_object_work('network', BLOB_UUID_1)
+        st.clear_deleted_object_metrics()
         mock_get_class.return_value.from_db.return_value = None
-
-        st._fill_per_deleted_object_queue()
-        st._publish_deleted_object_depth()
-
-        self.assertEqual(2, self._depth('network'))
-        self.assertEqual(1, self._depth('blob'))
-
-        # Take one entry only, by way of a limit which expires at once.
-        # The module's clock is replaced, not the global one: start and
-        # first limit check at t=0, every later check well past the limit.
-        clock = iter([0.0, 0.0])
-        with mock.patch('shakenfist.daemons.cluster.scheduled_tasks.time') as fake_time:
-            fake_time.time.side_effect = lambda: next(clock, 100.0)
-            fake_time.monotonic.return_value = 0.0
-            st._process_per_deleted_object_queue(execution_limit=10)
-        st._publish_deleted_object_depth()
-        # Which type comes off first is the fill order's business.
-        self.assertEqual(
-            3 - 1, (self._depth('network') or 0) + (self._depth('blob') or 0))
-        self.assertEqual(2, st.DELETED_OBJECTS_QUEUE.qsize())
-
-        st._process_per_deleted_object_queue()
-        st._publish_deleted_object_depth()
-        # Emptied types lose their label set rather than exporting zero.
-        self.assertIsNone(self._depth('network'))
-        self.assertIsNone(self._depth('blob'))
-        self.assertEqual({}, dict(st._DELETED_OBJECTS_DEPTH))
-
-    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks._process_per_deleted_object_queue')
-    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.time')
-    @mock.patch('shakenfist.mariadb.get_objects_by_state')
-    def test_gauge_set_when_fill_exceeds_budget(
-            self, mock_get_by_state, mock_time, mock_process):
-        def by_state(objtype, states, updated_before=None):
-            return [BLOB_UUID_1, BLOB_UUID_2] if objtype == ObjectType.NETWORK else []
-        mock_get_by_state.side_effect = by_state
-        # per_deleted_object_checks() reads the clock first; every later
-        # read is a minute on, so the fill looks like it took a minute.
-        clock = iter([0.0])
-        mock_time.time.side_effect = lambda: next(clock, 60.0)
 
         st.per_deleted_object_checks()
 
-        mock_process.assert_not_called()
-        self.assertEqual(2, self._depth('network'))
+        mock_get_class.return_value.from_db.assert_called_once_with(
+            BLOB_UUID_1, suppress_failure_audit=True)
+        self.assertEqual({}, _held_deleted_object_work())
 
-    def test_clear_drops_gauge_but_not_counter(self):
-        st.DELETED_OBJECTS_QUEUE.put(('network', BLOB_UUID_1))
-        st._DELETED_OBJECTS_DEPTH['network'] += 1
-        st._publish_deleted_object_depth()
-        self.assertEqual(1, self._depth('network'))
+
+class DeletedObjectSweepFairnessTestCase(base.ShakenFistTestCase):
+    """A large backlog in one type must not starve the others.
+
+    This drives the scheduled entry point rather than any one helper, so
+    it describes the sweep's behaviour whatever its internal structure.
+    """
+
+    def setUp(self):
+        super().setUp()
+        _reset_sweep_failure_state()
+        # Only reset the per-type work where it exists, so that this test
+        # still runs against the single-queue implementation it replaced,
+        # which is how it was shown to fail there.
+        if hasattr(st, '_DELETED_OBJECT_WORK'):
+            _reset_deleted_object_sweep_state()
+            self.addCleanup(_reset_deleted_object_sweep_state)
+
+    def test_a_small_type_is_served_behind_a_large_one(self):
+        types = list(OBJECT_NAMES_TO_CLASSES)
+        first, last = types[0], types[-1]
+        store = FakeDeletedObjectStore({first: 5000, last: 3})
+        clock = FakeClock()
+        deleted = []
+
+        def object_class(objtype):
+            class FakeClass:
+                @staticmethod
+                def from_db(obj_uuid, suppress_failure_audit=False):
+                    obj = mock.MagicMock()
+                    obj.state.value = dbo.STATE_DELETED
+                    obj.state.update_time = 0.0
+
+                    def hard_delete():
+                        deleted.append((objtype, obj_uuid))
+                        store.uuids[objtype].remove(obj_uuid)
+                        clock.now += 0.1
+                    obj.hard_delete = hard_delete
+                    return obj
+            return FakeClass
+
+        # A copy of the configuration, rather than a patched attribute, so
+        # this test also runs against an implementation which predates the
+        # budget option.
+        budgeted = config.model_copy(
+            update={'DELETED_OBJECT_SWEEP_SECONDS': 5})
+
+        with mock.patch('shakenfist.mariadb.get_objects_by_state',
+                        side_effect=store.by_state), \
+                mock.patch('shakenfist.mariadb.get_objects_by_state_page',
+                           side_effect=store.page, create=True), \
+                mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
+                           'get_object_class', side_effect=object_class), \
+                mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
+                           'time') as fake_time, \
+                mock.patch.object(st, 'config', budgeted):
+            fake_time.time.side_effect = clock
+            fake_time.monotonic.side_effect = clock
+
+            st.per_deleted_object_checks()
+
+        # One pass reaches every object of the small type, even though the
+        # large one could have used the whole budget by itself.
+        self.assertEqual(
+            store.initial[last],
+            sorted(u for t, u in deleted if t == last))
+        # And the pass was cut short by its budget, so the large type was
+        # not simply drained first.
+        self.assertAlmostEqual(50, len(deleted), delta=1)
+        self.assertNotEqual([], store.uuids[first])
+
+
+class DeletedObjectSweepPagedWorkTestCase(base.ShakenFistTestCase):
+    """How the sweep chooses its next entry and when it reads more."""
+
+    def setUp(self):
+        super().setUp()
+        _reset_sweep_failure_state()
+        _reset_deleted_object_sweep_state()
+        self.addCleanup(_reset_deleted_object_sweep_state)
+
+    def test_rotation_survives_a_budget_cut(self):
+        # Each entry takes a second against a budget of one and a half, so
+        # every drain takes two entries. If each pass started from the top
+        # of the order, the first two types would get every entry until
+        # they ran out.
+        types = list(OBJECT_NAMES_TO_CLASSES)
+        served = [types[0], types[5], types[10], types[15]]
+        for objtype in served:
+            _hold_deleted_object_work(objtype, f'{objtype}-1', f'{objtype}-2')
+        clock = FakeClock()
+        taken = []
+
+        def object_class(objtype):
+            cls = mock.MagicMock()
+
+            def from_db(obj_uuid, suppress_failure_audit=False):
+                taken.append(obj_uuid)
+                clock.now += 1.0
+                return None
+            cls.from_db.side_effect = from_db
+            return cls
+
+        with mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
+                        'get_object_class', side_effect=object_class), \
+                mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
+                           'time') as fake_time:
+            fake_time.time.side_effect = clock
+            fake_time.monotonic.side_effect = clock
+
+            passes = []
+            for _ in range(4):
+                taken.clear()
+                st._drain_deleted_object_work(1.5)
+                passes.append(list(taken))
+
+        self.assertEqual(
+            [[f'{served[0]}-1', f'{served[1]}-1'],
+             [f'{served[2]}-1', f'{served[3]}-1'],
+             [f'{served[0]}-2', f'{served[1]}-2'],
+             [f'{served[2]}-2', f'{served[3]}-2']],
+            passes)
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
+    def test_one_type_refills_while_others_have_work(self, mock_page):
+        _hold_deleted_object_work('network', BLOB_UUID_1)
+        mock_page.side_effect = (
+            lambda objtype, states, page_size, after_uuid='',
+            updated_before=None: _page(
+                [BLOB_UUID_2] if objtype == ObjectType.BLOB else []))
+
+        self.assertTrue(st._fill_deleted_object_work(time.time(), NO_DEADLINE))
+
+        read = [str(c.args[0]) for c in mock_page.call_args_list]
+        self.assertNotIn('network', read)
+        self.assertIn('blob', read)
+        self.assertEqual(len(OBJECT_NAMES_TO_CLASSES) - 1, len(read))
+        self.assertEqual(
+            {'network': [BLOB_UUID_1], 'blob': [BLOB_UUID_2]},
+            _held_deleted_object_work())
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
+    def test_cursor_advances_then_resets(self, mock_page):
+        pages = {
+            '': _page(['uuid-1', 'uuid-2'], more_available=True),
+            'uuid-2': _page(['uuid-3']),
+        }
+
+        def by_page(objtype, states, page_size, after_uuid='',
+                    updated_before=None):
+            if objtype == ObjectType.NETWORK:
+                return pages[after_uuid]
+            return _page([])
+        mock_page.side_effect = by_page
+        now = time.time()
+
+        # A page which stopped early moves the cursor to its last uuid.
+        st._fill_deleted_object_work(now, NO_DEADLINE)
+        self.assertEqual('uuid-2', st._DELETED_OBJECT_CURSOR['network'])
+        self.assertEqual({'network': ['uuid-1', 'uuid-2']},
+                         _held_deleted_object_work())
+
+        # The next page continues the walk, and finishing it resets the
+        # cursor so the next walk reaches anything which arrived behind it.
+        st._DELETED_OBJECT_WORK['network'].clear()
+        st._fill_deleted_object_work(now, NO_DEADLINE)
+        self.assertEqual('', st._DELETED_OBJECT_CURSOR['network'])
+        self.assertEqual({'network': ['uuid-3']}, _held_deleted_object_work())
+
+        st._DELETED_OBJECT_WORK['network'].clear()
+        st._fill_deleted_object_work(
+            now + st.DELETED_OBJECT_WALK_RECHECK + 1, NO_DEADLINE)
+        self.assertEqual(
+            ['', 'uuid-2', ''],
+            [c.kwargs['after_uuid'] for c in mock_page.call_args_list
+             if c.args[0] == ObjectType.NETWORK])
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
+    def test_completed_walk_backs_off(self, mock_page):
+        mock_page.side_effect = (
+            lambda objtype, states, page_size, after_uuid='',
+            updated_before=None: _page(
+                [BLOB_UUID_1] if objtype == ObjectType.BLOB else []))
+        types = list(OBJECT_NAMES_TO_CLASSES)
+        now = 1000000.0
+
+        st._fill_deleted_object_work(now, NO_DEADLINE)
+        self.assertEqual(len(types), mock_page.call_count)
+        # An empty page and a page which finished its walk are both a
+        # completed walk.
+        self.assertEqual(now + st.DELETED_OBJECT_WALK_RECHECK,
+                         st._DELETED_OBJECT_RECHECK_AT['network'])
+        self.assertEqual(now + st.DELETED_OBJECT_WALK_RECHECK,
+                         st._DELETED_OBJECT_RECHECK_AT['blob'])
+
+        # Until the recheck is due nothing is read again, even once the
+        # type which found work has run out.
+        st._DELETED_OBJECT_WORK['blob'].clear()
+        mock_page.reset_mock()
+        st._fill_deleted_object_work(
+            now + st.DELETED_OBJECT_WALK_RECHECK - 1, NO_DEADLINE)
+        mock_page.assert_not_called()
+
+        st._DELETED_OBJECT_WORK['blob'].clear()
+        mock_page.reset_mock()
+        st._fill_deleted_object_work(now + st.DELETED_OBJECT_WALK_RECHECK + 1, NO_DEADLINE)
+        self.assertEqual(len(types), mock_page.call_count)
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
+    def test_page_which_stopped_early_is_not_backed_off(self, mock_page):
+        mock_page.side_effect = (
+            lambda objtype, states, page_size, after_uuid='',
+            updated_before=None: _page(
+                ['uuid-1'], more_available=objtype == ObjectType.NETWORK))
+        now = 1000000.0
+
+        st._fill_deleted_object_work(now, NO_DEADLINE)
+        self.assertNotIn('network', st._DELETED_OBJECT_RECHECK_AT)
+
+        st._DELETED_OBJECT_WORK['network'].clear()
+        mock_page.reset_mock()
+        st._fill_deleted_object_work(now, NO_DEADLINE)
+        self.assertEqual(
+            ['network'], [str(c.args[0]) for c in mock_page.call_args_list])
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
+    def test_failing_object_waits_for_the_recheck(
+            self, mock_page, mock_get_class):
+        mock_page.side_effect = (
+            lambda objtype, states, page_size, after_uuid='',
+            updated_before=None: _page(
+                [BLOB_UUID_1] if objtype == ObjectType.NETWORK else []))
+        mock_get_class.return_value.from_db.side_effect = Exception('broken')
+        clock = FakeClock()
+
+        with mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
+                        'time') as fake_time, \
+                mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
+                           'util_exceptions.ignore_exception'):
+            fake_time.time.side_effect = clock
+            fake_time.monotonic.side_effect = clock
+            for _ in range(st.DELETED_OBJECT_WALK_RECHECK // 60):
+                st.per_deleted_object_checks()
+                clock.now += 60.0
+            attempts_in_recheck = (
+                mock_get_class.return_value.from_db.call_count)
+
+            st.per_deleted_object_checks()
+
+        # One attempt per recheck, rather than one per pass, and the next
+        # once the recheck is due.
+        self.assertEqual(1, attempts_in_recheck)
+        self.assertEqual(
+            2, mock_get_class.return_value.from_db.call_count)
+
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
+    def test_fill_stops_reading_at_its_deadline(self, mock_page):
+        types = list(OBJECT_NAMES_TO_CLASSES)
+        clock = FakeClock()
+
+        def by_page(objtype, states, page_size, after_uuid='',
+                    updated_before=None):
+            clock.now += 2.0
+            return _page([f'{str(objtype)}-1'], more_available=True)
+        mock_page.side_effect = by_page
+
+        with mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
+                        'time') as fake_time:
+            fake_time.time.side_effect = clock
+            self.assertTrue(
+                st._fill_deleted_object_work(clock.now, clock.now + 5.0))
+
+        # Reads start at 0, 2 and 4 seconds; the fourth would start at 6.
+        self.assertEqual(
+            types[:3], [str(c.args[0]) for c in mock_page.call_args_list])
+        self.assertEqual(
+            types[3], st._SWEEP_RESUME_AFTER['per_deleted_object'])
+
+        # The next pass starts where this one stopped.
+        st._DELETED_OBJECT_WORK.clear()
+        mock_page.reset_mock()
+        st._fill_deleted_object_work(time.time(), NO_DEADLINE)
+        self.assertEqual(
+            types[3:] + types[:3],
+            [str(c.args[0]) for c in mock_page.call_args_list])
+        self.assertNotIn('per_deleted_object', st._SWEEP_RESUME_AFTER)
+
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=True)
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    @mock.patch('shakenfist.mariadb._grpc_call')
+    def test_old_server_reply_is_held_whole(
+            self, mock_call, mock_stub, mock_use):
+        # An sf-database from before paging ignores page_size and returns
+        # every match, unordered. The fill holds all of it and treats it as
+        # a completed walk.
+        uuids = [f'uuid-{i:04d}'
+                 for i in reversed(range(st.DELETED_OBJECT_PAGE_SIZE + 3))]
+
+        def reply(method_name, request):
+            if request.object_type == ObjectType.NETWORK.proto_id:
+                return database_pb2.GetObjectsByStateReply(object_uuids=uuids)
+            return database_pb2.GetObjectsByStateReply()
+        mock_call.side_effect = reply
+        now = time.time()
+        st._DELETED_OBJECT_CURSOR['network'] = 'uuid-0100'
+
+        self.assertTrue(st._fill_deleted_object_work(now, NO_DEADLINE))
+
+        self.assertEqual({'network': uuids}, _held_deleted_object_work())
+        self.assertEqual('', st._DELETED_OBJECT_CURSOR['network'])
+        self.assertEqual(now + st.DELETED_OBJECT_WALK_RECHECK,
+                         st._DELETED_OBJECT_RECHECK_AT['network'])
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
+    def test_unavailable_fill_does_not_drain(self, mock_page, mock_get_class):
+        # Each entry's first read would spend a whole _grpc_call retry
+        # budget against the tier which has just failed one, and fail.
+        types = list(OBJECT_NAMES_TO_CLASSES)
+
+        def by_page(objtype, states, page_size, after_uuid='',
+                    updated_before=None):
+            if objtype == ObjectType(types[3]):
+                raise DatabaseUnavailable('tier is down')
+            return _page([f'{str(objtype)}-1'])
+        mock_page.side_effect = by_page
+
+        st.per_deleted_object_checks()
+
+        mock_get_class.assert_not_called()
+        self.assertEqual({t: [f'{t}-1'] for t in types[:3]},
+                         _held_deleted_object_work())
+        self.assertEqual(
+            types[4], st._SWEEP_RESUME_AFTER['per_deleted_object'])
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
+    def test_failed_page_does_not_stop_the_other_types(
+            self, mock_page, mock_get_class):
+        def by_page(objtype, states, page_size, after_uuid='',
+                    updated_before=None):
+            if objtype == ObjectType.NETWORK:
+                return None
+            if objtype in (ObjectType.BLOB, ObjectType.UPLOAD):
+                return _page([f'{str(objtype)}-1'])
+            return _page([])
+        mock_page.side_effect = by_page
+        mock_get_class.return_value.from_db.return_value = None
+
+        st.per_deleted_object_checks()
+
+        # Types on both sides of the failed one are filled and drained.
+        self.assertEqual(
+            ['blob-1', 'upload-1'],
+            [c.args[0] for c in
+             mock_get_class.return_value.from_db.call_args_list])
+        self.assertEqual(
+            {('per_deleted_object', 'network'): 1}, st._SWEEP_FAILURE_STREAK)
+        self.assertNotIn('per_deleted_object', st._SWEEP_RESUME_AFTER)
+
+    @mock.patch('shakenfist.mariadb._use_database_service', return_value=True)
+    @mock.patch('shakenfist.mariadb._get_database_stub')
+    def test_page_reads_are_timed_per_type(self, mock_stub, mock_use):
+        method = mock.MagicMock(
+            return_value=database_pb2.GetObjectsByStateReply())
+        method._method = '/shakenfist.protos.DatabaseService/GetObjectsByState'
+        mock_stub.return_value.GetObjectsByState = method
+        types = list(OBJECT_NAMES_TO_CLASSES)
+
+        def count(objtype):
+            return REGISTRY.get_sample_value(
+                'database_client_rpc_seconds_count',
+                {'sweep': 'per_deleted_object_fill', 'object_type': objtype,
+                 'operation': 'GetObjectsByState'}) or 0
+        before = {objtype: count(objtype) for objtype in types}
+
+        self.assertTrue(st._fill_deleted_object_work(time.time(), NO_DEADLINE))
+
+        self.assertEqual(len(types), method.call_count)
+        self.assertEqual(
+            {objtype: before[objtype] + 1 for objtype in types},
+            {objtype: count(objtype) for objtype in types})
+
+
+class DeletedObjectBacklogTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        _reset_sweep_failure_state()
+        st.CLUSTER_DELETED_OBJECT_BACKLOG.clear()
+        self.addCleanup(st.CLUSTER_DELETED_OBJECT_BACKLOG.clear)
+
+    def _backlog(self, objtype):
+        return REGISTRY.get_sample_value(
+            'cluster_deleted_object_backlog', {'object_type': objtype})
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state')
+    def test_every_type_published_zero_included(self, mock_count):
+        counts = {ObjectType.NETWORK: 7}
+        mock_count.side_effect = lambda objtype, states: counts.get(objtype, 0)
+
+        st.publish_deleted_object_backlog()
+
+        for objtype in OBJECT_NAMES_TO_CLASSES:
+            self.assertEqual(7 if objtype == 'network' else 0,
+                             self._backlog(objtype), objtype)
+        self.assertEqual(len(OBJECT_NAMES_TO_CLASSES), mock_count.call_count)
+        for call in mock_count.call_args_list:
+            self.assertIsInstance(call.args[0], ObjectType)
+            self.assertEqual(st.FINAL_OBJECT_STATES, call.args[1])
+        self.assertNotIn('deleted_object_backlog', st._SWEEP_RESUME_AFTER)
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state')
+    def test_failed_count_removes_label_set(self, mock_count):
+        mock_count.return_value = 4
+        st.publish_deleted_object_backlog()
+        self.assertEqual(4, self._backlog('network'))
+
+        mock_count.side_effect = (
+            lambda objtype, states: None if objtype == ObjectType.NETWORK else 5)
+        st.publish_deleted_object_backlog()
+
+        self.assertIsNone(self._backlog('network'))
+        self.assertEqual(5, self._backlog('blob'))
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state')
+    def test_failed_count_never_published_is_safe(self, mock_count):
+        mock_count.return_value = None
+        st.publish_deleted_object_backlog()
+        self.assertIsNone(self._backlog('network'))
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state')
+    def test_database_unavailable_stops_and_records_resume(self, mock_count):
+        types = list(OBJECT_NAMES_TO_CLASSES)
+
+        def count(objtype, states):
+            if objtype == ObjectType(types[3]):
+                raise DatabaseUnavailable('gone')
+            return 1
+        mock_count.side_effect = count
+
+        st.publish_deleted_object_backlog()
+
+        self.assertEqual(4, mock_count.call_count)
+        self.assertEqual(1, self._backlog(types[2]))
+        self.assertIsNone(self._backlog(types[3]))
+        self.assertIsNone(self._backlog(types[4]))
+        self.assertEqual(
+            types[4], st._SWEEP_RESUME_AFTER['deleted_object_backlog'])
+
+        # The next pass resumes after the type that stopped this one.
+        mock_count.reset_mock()
+        mock_count.side_effect = None
+        mock_count.return_value = 2
+        st.publish_deleted_object_backlog()
+        self.assertEqual(ObjectType(types[4]), mock_count.call_args_list[0].args[0])
+        self.assertEqual(len(types), mock_count.call_count)
+        self.assertNotIn('deleted_object_backlog', st._SWEEP_RESUME_AFTER)
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state', return_value=0)
+    def test_each_count_is_timed_in_a_scope(self, mock_count):
+        with mock.patch('shakenfist.mariadb.rpc_timing_scope') as mock_scope:
+            st.publish_deleted_object_backlog()
+        self.assertEqual(
+            [mock.call('deleted_object_backlog', t) for t in
+             OBJECT_NAMES_TO_CLASSES], mock_scope.call_args_list)
+
+    @mock.patch('shakenfist.mariadb.count_objects_by_state', return_value=3)
+    def test_demotion_clears_gauge(self, mock_count):
+        st.publish_deleted_object_backlog()
+        self.assertEqual(3, self._backlog('network'))
 
         st.clear_deleted_object_metrics()
 
-        self.assertIsNone(self._depth('network'))
-        self.assertEqual({'network': 1}, dict(st._DELETED_OBJECTS_DEPTH))
-        self.assertEqual(1, st.DELETED_OBJECTS_QUEUE.qsize())
-
-        # Emptying a type after a clear must not trip over the label set
-        # having gone already.
-        st._DELETED_OBJECTS_DEPTH['network'] = 0
-        st._publish_deleted_object_depth()
-        self.assertEqual({}, dict(st._DELETED_OBJECTS_DEPTH))
-
-    def test_next_pass_republishes_after_clear(self):
-        st.DELETED_OBJECTS_QUEUE.put(('network', BLOB_UUID_1))
-        st._DELETED_OBJECTS_DEPTH['network'] += 1
-        st._publish_deleted_object_depth()
-        st.clear_deleted_object_metrics()
-        self.assertIsNone(self._depth('network'))
-
-        st._publish_deleted_object_depth()
-
-        self.assertEqual(1, self._depth('network'))
+        self.assertIsNone(self._backlog('network'))
 
 
 class ReconcileOrphanedObjectsTestCase(base.ShakenFistTestCase):

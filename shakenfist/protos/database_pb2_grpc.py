@@ -184,6 +184,11 @@ class DatabaseServiceStub:
                 request_serializer=database__pb2.GetObjectsByStateRequest.SerializeToString,
                 response_deserializer=database__pb2.GetObjectsByStateReply.FromString,
                 _registered_method=True)
+        self.CountObjectsByState = channel.unary_unary(
+                '/shakenfist.protos.DatabaseService/CountObjectsByState',
+                request_serializer=database__pb2.CountObjectsByStateRequest.SerializeToString,
+                response_deserializer=database__pb2.CountObjectsByStateReply.FromString,
+                _registered_method=True)
         self.DeleteOrphanedObjectStates = channel.unary_unary(
                 '/shakenfist.protos.DatabaseService/DeleteOrphanedObjectStates',
                 request_serializer=database__pb2.DeleteOrphanedObjectStatesRequest.SerializeToString,
@@ -1398,6 +1403,12 @@ class DatabaseServiceServicer:
         raise NotImplementedError('Method not implemented!')
 
     def GetObjectsByState(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CountObjectsByState(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2904,6 +2915,11 @@ def add_DatabaseServiceServicer_to_server(servicer, server):
                     servicer.GetObjectsByState,
                     request_deserializer=database__pb2.GetObjectsByStateRequest.FromString,
                     response_serializer=database__pb2.GetObjectsByStateReply.SerializeToString,
+            ),
+            'CountObjectsByState': grpc.unary_unary_rpc_method_handler(
+                    servicer.CountObjectsByState,
+                    request_deserializer=database__pb2.CountObjectsByStateRequest.FromString,
+                    response_serializer=database__pb2.CountObjectsByStateReply.SerializeToString,
             ),
             'DeleteOrphanedObjectStates': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteOrphanedObjectStates,
@@ -4736,6 +4752,33 @@ class DatabaseService:
             '/shakenfist.protos.DatabaseService/GetObjectsByState',
             database__pb2.GetObjectsByStateRequest.SerializeToString,
             database__pb2.GetObjectsByStateReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CountObjectsByState(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/shakenfist.protos.DatabaseService/CountObjectsByState',
+            database__pb2.CountObjectsByStateRequest.SerializeToString,
+            database__pb2.CountObjectsByStateReply.FromString,
             options,
             channel_credentials,
             insecure,

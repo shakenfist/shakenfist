@@ -415,11 +415,13 @@ dedup independently refuses to return a rowless op, so a caller's
 
 The cluster daemon also runs two other reaping sweeps from
 `daemons/cluster/scheduled_tasks.py`. `per_deleted_object_checks()`
-(every 15 minutes) hard deletes objects that have been in a final
-state (`deleted`, `complete`, `abort`) for longer than their grace
-period; its work queue holds `(object_type, uuid)` tuples fetched
-with the age filter pushed down to SQL, and objects are hydrated one
-at a time at processing time inside a per-item exception guard.
+(every minute, within `DELETED_OBJECT_SWEEP_SECONDS`) hard deletes
+objects that have been in a final state (`deleted`, `complete`,
+`abort`) for longer than their grace period; it holds a list of
+uuids per object type, filled a page at a time with the age filter
+pushed down to SQL, and takes one object from each type in turn.
+Objects are hydrated one at a time at processing time inside a
+per-item exception guard.
 `reconcile_orphaned_objects()` (hourly) removes "phantom"
 `object_states` rows whose static-values row is gone (with an age
 guard so mid-creation objects are never raced) and repairs "zombie"
