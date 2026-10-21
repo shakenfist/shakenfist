@@ -16134,24 +16134,26 @@
   <code>kerbside</code> inventory group (Shaken Fist nodes or dedicated hosts) and set
   <code>kerbside_url</code>, <code>kerbside_system_key</code>, <code>kerbside_public_fqdn</code>,
   <code>kerbside_sql_url</code> and <code>kerbside_auth_secret_seed</code> (32 or more characters).
+  The role which does it ships as the <code>shakenfist.kerbside</code> collection, from
+  the Kerbside repository, rather than in this collection. Install it with
+  <code>ansible-galaxy collection install -r examples/_shared/requirements.yml</code>; the
+  playbook refuses to deploy Kerbside without it, or with a version outside
+  the range in that file. Its own variables are documented in
+  <a href="https://github.com/shakenfist/kerbside/tree/develop/ansible">Kerbside's collection README</a>.
   <code>kerbside_url</code> and <code>kerbside_system_key</code> must be visible to both the Shaken
   Fist and the Kerbside hosts, for example in <code>group_vars/all</code>. Kerbside needs
   a MySQL or MariaDB database you create beforehand (a <code>kerbside</code> database and
-  a user with all privileges on it); the deploy runs its migrations. The proxy
-  certificate is issued from the deployment's internal CA unless you set all
-  three of <code>kerbside_proxy_cert_path</code>, <code>kerbside_proxy_key_path</code> and
-  <code>kerbside_cacert_path</code>. <code>kerbside_package</code> defaults to <code>kerbside&gt;=0.7.0</code>
-  because Kerbside 0.6.0's API returns source passwords; until 0.7.0 is
-  released, set it to a version or to a wheel built from a git checkout. With
-  no <code>kerbside</code> group nothing changes, though ansible prints a harmless
-  <code>Could not match supplied host pattern, ignoring: kerbside</code> warning, which an
-  empty <code>kerbside:</code> group in your inventory silences. If <code>kerbside_public_fqdn</code>
-  is an IP address, the proxy certificate now carries it as an IP SAN rather
-  than a DNS SAN. The <code>debian-13-slim-tier</code> merge row deploys Kerbside on a
-  hypervisor against a real cluster, and proves the deploy, migrations,
-  restart-on-change across a no-op redeploy, readiness, the token exchange and
-  the proxy's TLS endpoint. See the
-  <a href="/developer_guide/ci/#deploy-profiles">CI developer guide</a> and the
+  a user with all privileges on it); the deploy runs its migrations. The
+  optional <code>kerbside_extra_sources</code> adds console sources for other clusters or
+  platforms. With no <code>kerbside</code> group nothing changes, and the collection need
+  not be installed, though ansible prints a harmless <code>Could not match supplied
+  host pattern, ignoring: kerbside</code> warning, which an empty <code>kerbside:</code> group
+  in your inventory silences. If <code>kerbside_public_fqdn</code> is an IP address, the
+  proxy certificate now carries it as an IP SAN rather than a DNS SAN. The
+  <code>debian-13-slim-tier</code> merge row deploys Kerbside on a hypervisor against a
+  real cluster, and proves the deploy, migrations, restart-on-change across a
+  no-op redeploy, readiness, the token exchange and the proxy's TLS endpoint.
+  See the <a href="/developer_guide/ci/#deploy-profiles">CI developer guide</a> and the
   <a href="https://github.com/shakenfist/shakenfist/blob/develop/shakenfist/deploy/collection/README.md#kerbside">collection README</a>.</li>
 <li>There are now API calls for managing trusted issuers
   (<code>GET</code>/<code>POST /auth/issuers</code>, <code>GET</code>/<code>PUT</code>/<code>DELETE /auth/issuers/...issuerref...</code>).

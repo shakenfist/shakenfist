@@ -15987,13 +15987,13 @@ every phase has been completed, abandoned or superseded.</p>
 <tr>
 <td>4. A merge-queue lane with the feature on</td>
 <td><a href="../PLAN-kerbside-deployer-phase-04-ci/">PLAN-kerbside-deployer-phase-04-ci.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>0016c5dad</code> (#4479)</td>
 </tr>
 <tr>
 <td>5. The <code>kerbside</code> role moves into Kerbside, and Kerbside's sf-e2e lane deploys through it</td>
-<td>PLAN-kerbside-deployer-phase-05-role-to-kerbside.md</td>
-<td>Proposed</td>
+<td><a href="../PLAN-kerbside-deployer-phase-05-role-to-kerbside/">PLAN-kerbside-deployer-phase-05-role-to-kerbside.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -16022,11 +16022,13 @@ phase has not landed.</p>
   credential it writes into <code>sources.yaml</code>.</li>
 <li>Phase 4 needs phase 3, and an operator push to
   <code>shakenfist/actions</code>.</li>
-<li>Phase 5 needs phase 4, and a Kerbside release that includes
-  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/533" title="GitHub Issue: shakenfist/kerbside #533">kerbside#533</a>. It moves the role to Kerbside only once SF's merge
-  queue proves the role works, so the move changes the role's home
-  and not its behaviour. Phase 4's lane then keeps proving the
-  integration from SF's side.</li>
+<li>Phase 5 needs phase 4. That condition is met: #4479 merged, and
+  Kerbside 0.7.0, which carries <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/533" title="GitHub Issue: shakenfist/kerbside #533">kerbside#533</a>'s fix, is on PyPI.
+  Moving the role only after SF's merge queue proved it means the
+  move changes the role's home, not its behaviour. Within the phase,
+  SF's switch waits on a Kerbside release that publishes the new
+  collection to Galaxy (the phase plan's D7). Phase 4's lane keeps
+  proving the integration from SF's side.</li>
 <li>Phase 6 is the last implementation phase, and phase 7 audits
   them all.</li>
 </ul>
@@ -16253,12 +16255,16 @@ host's facts, which is the seam the move needs.</p>
 <ul>
 <li><strong>Sources become a list.</strong> <code>templates/sources.yaml</code> stops
   hard-coding one Shaken Fist source and renders a
-  <code>kerbside_sources</code> list variable. SF's <code>site.yml</code> computes its
-  own entry (name, <code>api_url</code>, the <code>system</code> credential, the CA) and
-  passes it. An operator can append others (oVirt, OpenStack,
-  static). The role validates every entry, not just SF's. The
-  data-not-strings rendering and its quoting guarantees carry over
-  unchanged.</li>
+  <code>kerbside_sources</code> list variable. SF builds its own entry (name,
+  <code>api_url</code>, the <code>system</code> credential, the CA) in a node role entry
+  point, which also takes over the role's SF-specific checks.
+  <code>site.yml</code> passes that entry plus any the operator appends (oVirt,
+  OpenStack, static). The role validates every entry by Kerbside's
+  own per-type rules, not just SF's. The data-not-strings rendering
+  and its quoting guarantees carry over unchanged. The phase plan's
+  survey found the role SF-shaped in more places than this template:
+  the sources checker, readiness, the code hash, the CA assertion
+  and three validate checks (its S1).</li>
 <li><strong>The cross-repository dependency.</strong> SF's collection, or SF's
   <code>site.yml</code> users, depend on Kerbside's collection. The phase
   plan designs and verifies all of the following:</li>
@@ -16274,15 +16280,21 @@ host's facts, which is the seam the move needs.</p>
 <p>It is expected to prefer a soft dependency, so that a cluster
   without Kerbside does not install it. Whatever it chooses, it
   must check each claim about <code>ansible-galaxy</code> against the
-  installed version rather than the documentation.
+  installed version rather than the documentation. Planning did:
+  Galaxy refuses a git-URL dependency, and only <code>include_role</code>
+  survives a missing collection. The phase plan therefore chooses a
+  soft dependency, with a requirements file that <code>site.yml</code> also
+  reads (its S2-S4 and D2).
 - <strong>SF-side tests that reach into the role</strong> follow it or are
   replaced:
   - <code>test_kerbside_host_subject.py</code> pins
     <code>files/kerbside-host-subject.py</code> to <code>node.py</code>'s subject
     rendering, and a cross-repository pin needs a new shape;
-  - <code>test_ci_deploy_profiles.py</code> checks profiles against the
-    role's argument specs;
-  - <code>tools/ci-test-kerbside-role.sh</code> runs the role itself.
+  - <code>test_ci_deploy_profiles.py</code> keeps hard-coded copies of the
+    role's constraints rather than reading its argument specs, so
+    its comments must name the new home;
+  - <code>tools/ci-test-kerbside-role.sh</code> runs the role itself, and
+    also tests SF's <code>site.yml</code> wiring, which stays.
 - <strong>Kerbside's sf-e2e lane exercises the role directly.</strong>
   <code>sf-e2e-functional.yml</code> stops running
   <code>deploy-kerbside-on-shakenfist</code>. It deploys the smoke cluster
@@ -16292,9 +16304,11 @@ host's facts, which is the seam the move needs.</p>
   <code>tools/sf-e2e/{provision-sf.sh,deploy-kerbside.sh,gen-sources.py}</code>
   are then retired, or reduced to whatever the drivers still need.
   The lane stops testing a deploy shape no real operator would
-  use, and becomes the early warning for role changes. Phase 4's
-  slim-tier row keeps proving the integration from SF's side
-  against a released version of the role.</p>
+  use, and becomes the early warning for role changes. The lane
+  stays on <code>build-smoke-cluster</code> rather than <code>smoke-cluster.yml</code>,
+  which cannot run Kerbside's drivers. Phase 4's slim-tier row
+  keeps proving the integration from SF's side, installing the
+  released collection from Galaxy through a new deploy-profile key.</p>
 <p>Out of scope: any non-SF source in CI. A second source type only
 needs the list variable to accept it. Testing one is Kerbside's
 deployment options plan's business.</p>
@@ -16303,9 +16317,10 @@ cell records both sides.</p>
 <p>Planned at high effort. The phase crosses two repositories and a
 release boundary, and the dependency mechanism is cheap to propose
 and expensive to redo, so its shape is a back-brief gate. The lane
-was failing nightly (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/482" title="GitHub Issue: shakenfist/kerbside #482">kerbside#482</a>); phase 4's survey found it
-green, and the phase confirms that before moving the lane, so the
-move is not blamed for an old failure.</p>
+was failing nightly. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/482" title="GitHub Issue: shakenfist/kerbside #482">kerbside#482</a> closed on 2026-10-17, but
+<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/579" title="GitHub Issue: shakenfist/kerbside #579">kerbside#579</a> opened the next day for a proxy-wheel build failure.
+The phase confirms the lane's state before moving it, so the move
+is not blamed for an old failure.</p>
 <h3 id="phase-6-documentation-and-close-out">Phase 6 -- Documentation and close-out<a class="headerlink" href="#phase-6-documentation-and-close-out" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>docs/operator_guide/vdi_console_tokens.md</code> loses its "manual
@@ -16667,6 +16682,13 @@ chosen to defer to here, so that we do not forget them.</p>
   which moves the whole role, units included, to Kerbside.</li>
 <li><strong>Automated signing-key rotation</strong>, carried over from the
   tokens plan.</li>
+<li><strong>Every develop commit restarts every daemon</strong> (#4483, open).
+  The node role's restart-on-change hash covers <code>_version.py</code>, which
+  setuptools_scm rewrites on every commit, so a docs-only commit
+  restarts every <code>sf-*</code> unit, contrary to the role's own comment.
+  Phase 4's trial found it beside the <code>build-collection.py</code> dirty-tree
+  bug, which phase 4 fixed. Whether to keep the behaviour and fix the
+  comment, or exclude the file from the hash, is the operator's call.</li>
 <li><strong>More than one Kerbside host, tested</strong>, behind a TCP
   passthrough load balancer.</li>
 <li><strong>Homelab adoption.</strong> sfcbr, the report that prompted this
@@ -16708,12 +16730,15 @@ while planning it.</p>
   side and stay with that issue.</li>
 <li><strong>#4367</strong> (open): Kerbside's deploy lane, and node lifecycle's, call
   <code>build-smoke-cluster</code> directly and so get no headroom probe. Phase 4
-  adds no such job: it uses the existing slim-tier row. Phase 5 moves
-  Kerbside's lane onto <code>smoke-cluster.yml</code>, which is instrumented.</li>
-<li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/482" title="GitHub Issue: shakenfist/kerbside #482">kerbside#482</a></strong> (open): the nightly sf-e2e lane was failing. Phase
-  4's survey found the last ten nightly runs (2026-09-27 to
-  2026-10-06) green, so the issue is stale. Phase 5 confirms that
-  before it moves the lane.</li>
+  adds no such job: it uses the existing slim-tier row. Phase 5
+  planning found that Kerbside's lane cannot move onto
+  <code>smoke-cluster.yml</code>. That workflow ends in an stestr suite and
+  cannot hand its cluster to the caller's driver steps. So the lane
+  stays on <code>build-smoke-cluster</code>, and #4367 stays open.</li>
+<li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/482" title="GitHub Issue: shakenfist/kerbside #482">kerbside#482</a></strong> (closed 2026-10-17): the nightly sf-e2e lane was
+  failing. Phase 4's survey found it stale. <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/579" title="GitHub Issue: shakenfist/kerbside #579">kerbside#579</a> (open)
+  reports a new nightly failure, building the proxy wheel, on
+  2026-10-18. Phase 5 confirms the lane's state before it moves it.</li>
 <li><strong><a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/131" title="GitHub Issue: shakenfist/kerbside #131">kerbside#131</a>, #313, #465</strong> (open): a forgeable default seed,
   a malformed INI that exits 0, and a malformed <code>sources.yaml</code>
   that crash-loops the daemon. Phase 3 guards each at deploy

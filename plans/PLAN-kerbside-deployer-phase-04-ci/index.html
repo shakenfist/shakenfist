@@ -15810,7 +15810,7 @@ straight after the first deploy:</p>
 </ol>
 <p>Any changed or vanished <code>InvocationID</code> fails the step, and the failure
 names the host and the unit. The comparison is a new actions script,
-<code>tools/ci-redeploy-check.sh</code>, with <code>snapshot</code> and <code>compare</code> modes.</p>
+<code>tools/ci-redeploy-check.py</code>, with <code>snapshot</code> and <code>compare</code> modes.</p>
 <ul>
 <li><strong>Why <code>InvocationID</code>:</strong> it changes on every start, including a start
   that systemd's own <code>Restart=</code> made, where <code>ActiveEnterTimestamp</code> can
@@ -15999,7 +15999,7 @@ another lane later.</p>
 <td>high</td>
 <td>opus</td>
 <td>same actions worktree</td>
-<td>The redeploy check (<code>ci-redeploy-check.sh</code>, wired after the first deploy) and <code>test_env</code> export into the test run. See brief 2. Commit (actions): "Deploy twice and require no restarts."</td>
+<td>The redeploy check (<code>ci-redeploy-check.py</code>, wired after the first deploy) and <code>test_env</code> export into the test run. See brief 2. Commit (actions): "Deploy twice and require no restarts."</td>
 </tr>
 <tr>
 <td>3</td>
@@ -16120,7 +16120,7 @@ and D2 of this plan first. Files:</p>
 <h3 id="brief-2-the-redeploy-check-and-test-env">Brief 2 -- the redeploy check and test env<a class="headerlink" href="#brief-2-the-redeploy-check-and-test-env" title="Permanent link">&para;</a></h3>
 <p>Same worktree. Read D3.</p>
 <ul>
-<li><strong><code>tools/ci-redeploy-check.sh snapshot|compare &lt;inventory&gt; &lt;state-file&gt; &lt;unit-glob&gt;...</code>.</strong>
+<li><strong><code>tools/ci-redeploy-check.py snapshot|compare &lt;inventory&gt; &lt;state-file&gt; &lt;unit-glob&gt;...</code>.</strong>
   <code>snapshot</code> sshes to every inventory host and records <code>&lt;host&gt; &lt;unit&gt;
   &lt;InvocationID&gt;</code> for each loaded unit matching the globs. Use
   <code>systemctl list-units --all --plain --no-legend</code> plus <code>systemctl show
@@ -16339,7 +16339,7 @@ behaviour (with Kerbside citations). New
   <code>deploy-collection.sh</code>'s rendered command is unchanged.
   <code>tools/ci-apply-deploy-profile.py</code>'s tests fail when an unknown key
   or host is accepted (mutated once each).</li>
-<li><code>tools/ci-redeploy-check.sh compare</code> exits non-zero on a changed or
+<li><code>tools/ci-redeploy-check.py compare</code> exits non-zero on a changed or
   vanished <code>InvocationID</code> fixture and zero on an identical one.</li>
 <li>The trial run's slim-tier log shows each of these:</li>
 <li>two <code>site.yml</code> runs;</li>
