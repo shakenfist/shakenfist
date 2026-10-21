@@ -1,34 +1,42 @@
 # Releasing
 
 Cutting a release is a two-phase operation so the version bump
-goes through the normal PR review gate rather than landing
+goes through review and the merge queue rather than landing
 directly on `develop`:
 
 1. **Stage 1 — propose:**
    [tools/propose-release.sh](https://github.com/shakenfist/ryll/blob/develop/tools/propose-release.sh)
    (wrapped by `make propose-release X.Y.Z`) creates a
    `release-X.Y.Z` branch from `develop`, bumps the workspace
-   version, runs tests, and pushes the branch. You open a PR
-   from it into `develop` and get it reviewed and merged like
-   any other change.
+   version, runs pre-commit and the tests, pushes the branch and
+   opens a pull request. You get it reviewed and merge it through
+   the merge queue like any other change.
 2. **Stage 2 — tag:** after the PR has merged,
    [tools/tag-release.sh](https://github.com/shakenfist/ryll/blob/develop/tools/tag-release.sh) (wrapped by
-   `make tag-release X.Y.Z`) fetches `develop`, verifies its
-   tip has the expected workspace version, creates an annotated
-   `vX.Y.Z` tag at that commit, and pushes the tag.
+   `make tag-release X.Y.Z`) finds the commit that merged the
+   release, verifies it carries the expected workspace version,
+   creates an annotated `vX.Y.Z` tag at that commit, and pushes
+   the tag.
 
 The tag push triggers
 [.github/workflows/release.yml](https://github.com/shakenfist/ryll/blob/develop/.github/workflows/release.yml),
 which:
 
-- Verifies the tag matches the workspace version.
+- Checks that `ci.yml` passed on the tagged commit, and stops
+  before building anything if it did not (see
+  [The release gate](#the-release-gate)).
+- Verifies the tag matches the workspace version, and that
+  `Cargo.lock` agrees with it.
 - Builds release binaries on Linux (`x86_64` and `aarch64`),
   macOS (Apple Silicon), and Windows (`x86_64` and `aarch64`),
   running the test suite on each.
 - Produces `.deb` and `.rpm` (both Linux arches), macOS
   `.tar.gz`, and Windows `.zip` (both Windows arches) artifacts.
 - Builds the per-arch `ryll` PyPI wheel natively for `x86_64` and
-  `aarch64` (no QEMU).
+  `aarch64` (no QEMU), and checks each with
+  [`check-dist`](https://github.com/shakenfist/actions/blob/main/docs/actions.md#check-dist),
+  which fails a wheel carrying a test directory or nothing outside
+  its metadata.
 - Packages every workspace crate and builds each from its tarball
   (`make package-check`, in the Linux x86_64 build job), so a crate
   that `cargo publish` would reject fails the run before anything
@@ -133,13 +141,14 @@ else runs on the host and requires:
   match the workspace's MSRV. If your host toolchain is older
   than 1.91 (for example Debian's packaged cargo 1.85), pin
   the last version that supports it:
-  `cargo install --locked cargo-release@0.25.18`.
+  `cargo install --locked cargo-release@0.25.18`. Stage 1 also
+  runs `cargo metadata` to list the workspace crates.
 - `docker` — used by `make test` (and by `pre-commit` via
   `scripts/check-rust.sh`) to run the Rust toolchain in the
   devcontainer.
 - `gh` — the GitHub CLI, signed in (`gh auth login`). Used in
-  stage 2 to watch the release workflow and open the release
-  page on completion.
+  stage 1 to open the pull request, and in stage 2 to watch the
+  release workflow and open the release page on completion.
 - `jq`, `curl`, `git`, `pre-commit`, `make` — standard dev
   tooling.
 
@@ -171,30 +180,37 @@ The script will:
 2. Confirm the working tree is clean, the branch is `develop`
    and in sync with `origin/develop`, and neither `v0.2.0` nor
    `release-0.2.0` exist locally or on origin.
-3. Query crates.io for `0.2.0` on every workspace crate (read from
+3. Check the new version is newer than the current one.
+4. Query crates.io for `0.2.0` on every workspace crate (read from
    `cargo metadata`), and check that `tools/publish-crates.sh` publishes
    each of them; bail if any version already exists or any crate is missing.
-4. Create and switch to `release-0.2.0`.
-5. Run `pre-commit run --all-files`.
+5. Create and switch to `release-0.2.0`.
 6. Bump `[workspace.package].version` and the matching
    `version =` qualifiers on ryll's path dependencies via
    `cargo release version 0.2.0 --workspace --execute
-   --no-confirm`.
-7. Run `make test` (which runs `cargo test --workspace`
+   --no-confirm`, then refresh `Cargo.lock` with `make lock`.
+   It refuses to go on if the bump left an untracked file.
+7. Run `pre-commit run --all-files` over the bumped tree, and
+   the release workflow's own version check
+   (`tools/release-version.sh check refs/tags/v0.2.0`).
+8. Run `make test` (which runs `cargo test --workspace`
    inside the devcontainer).
-8. Show `git diff --stat` and prompt
-   `Commit and push release-0.2.0? [y/N]`.
-9. On confirmation: commit `Release 0.2.0.` and push
-   `release-0.2.0` to origin.
+9. Show `git diff --stat` and prompt
+   `Commit, push release-0.2.0 and open a pull request? [y/N]`.
+10. On confirmation: commit `Release 0.2.0.`, push
+    `release-0.2.0` to origin, and open a pull request into
+    `develop`.
 
 Nothing goes to origin before the `y/N` prompt. If you answer
-`N`, the script switches back to `develop` and deletes the
-release branch; nothing is committed.
+`N`, or anything fails before the push, the script switches back
+to `develop` and deletes the release branch; nothing is
+committed.
 
-Once the script finishes, open a PR from `release-0.2.0` into
-`develop`, get it reviewed, and merge it using the repository's
-usual merge strategy. No release artefacts are produced yet —
-this PR is the audit trail for the version bump itself.
+Get the pull request reviewed and merge it through the merge
+queue like any other change. No release artefacts are produced
+yet — this PR is the audit trail for the version bump itself. The
+queue's CI run on the merged commit is the result the release
+gate later requires, so do not merge it around the queue.
 
 ### Stage 2: tag the merged commit
 
@@ -212,25 +228,34 @@ The script will:
    tagged the previous release still holds the unsigned original,
    and a plain `git fetch --tags` would refuse to update it.
 2. Verify no `v0.2.0` tag exists locally or on origin.
-3. Verify the `[workspace.package].version` on
-   `origin/develop` is `0.2.0` (i.e. the release PR has
-   landed). If it still reports the previous version, the PR
-   has not merged yet — the script bails.
-4. Show the target SHA and subject line, spell out that
-   pushing the tag will publish every workspace crate to crates.io
-   irreversibly, and prompt `Create and push tag v0.2.0? [y/N]`.
-5. On confirmation: create the annotated tag at
-   `origin/develop` and push it.
-6. Watch the triggered release workflow via `gh run watch` and
+3. Find the commit that merged `Release 0.2.0.` into `develop`
+   (the queue's merge commit, not `develop`'s tip, which may
+   have moved on). If there is none, the PR has not merged yet
+   and the script bails.
+4. Verify that commit is on `develop`'s first-parent history,
+   and that its `[workspace.package].version` and `Cargo.lock`
+   both say `0.2.0`.
+5. Show the target SHA and subject line, list anything merged
+   after it (which is not in the release), spell out that
+   publishing cannot be undone, and prompt
+   `Create and push tag v0.2.0? [y/N]`.
+6. On confirmation: create the annotated tag at that commit and
+   push it. If the push fails, the local tag is removed so the
+   script can be run again.
+7. Watch the triggered release workflow via `gh run watch` and
    open the GitHub Release page when it completes.
 
-The pushed tag runs `check-version`, then builds the `.deb`/
+`make tag-release` takes only the version. To tag a later commit
+instead, for recovery, run `tools/tag-release.sh 0.2.0 <commit>`.
+
+The pushed tag runs `ci-gate` and `check-version`, then builds the `.deb`/
 `.rpm`/tarball/zip artifacts and the per-arch `ryll` PyPI wheels
 (`build-ryll-wheels`, natively on `x86_64` and `aarch64`, no
 QEMU) in parallel. No pull request CI builds the wheels, so if
 the wheel build has changed since the last release, run
 `manual-build.yml` on `develop` with the `wheel-x86_64` and
-`wheel-aarch64` platforms before tagging. Once all builds
+`wheel-aarch64` platforms, or a [dry run](#a-dry-run) of the
+release workflow, before tagging. Once all builds
 succeed, the workflow pauses
 at `sign-tag` for approval on the `release` environment — this is
 where `gh run watch` will sit until a required reviewer approves
@@ -241,6 +266,61 @@ the tag, then `publish-crates` and `github-release` run. Once
 `release` environment. It passes `skip-existing`, so a re-run
 after a partial failure does not hard-error on a file already
 published.
+
+## The release gate
+
+The first job, `ci-gate`, uses
+[`require-ci-success`](https://github.com/shakenfist/actions/blob/main/docs/actions.md#require-ci-success)
+to check that `ci.yml` concluded `success` on the tagged commit.
+If it did not, nothing is built, signed or published. That run is
+the merge queue's run on the commit the queue merged, which is
+why a release must go through the queue: a commit merged around
+it, by an administrator bypassing the queue, has no such run and
+cannot be released. A commit that only adds review marks, from
+`prune-reviews`, is checked through the commit below it, but a
+merge commit is never crossed. The gate has no override.
+
+### A dry run
+
+Running the workflow by hand (**Actions → Release → Run
+workflow**) on any branch is a dry run. It runs `check-version`,
+which on a branch checks only that `Cargo.toml` and `Cargo.lock`
+agree, and every build job, including the wheels and their
+`check-dist`. `ci-gate`, `sign-tag`, `github-release` and every
+publishing job show as skipped. The build jobs run at all only
+because each tests `check-version`'s result itself: a job with no
+`if:` of its own is skipped when any job upstream of it was, and
+`ci-gate` was. This is the way to exercise a
+change to the release build before tagging; `manual-build.yml`
+remains for building a single platform's artefacts from a branch.
+
+### Recovering from a gate failure
+
+A gate failure means nothing was built or published. The
+recovery depends on why it failed:
+
+| Why | What to do |
+|-----|------------|
+| The tagged commit was merged around the queue, or sits above such a merge, so it has no queue run | Move the tag to a later commit that went through the queue |
+| The tag is not on `develop`'s first-parent history | Move the tag to the commit the queue landed for that change, or a later one |
+| The queue's CI run on that commit failed for a reason unrelated to the change, such as a flaky job | Re-run it from **Actions → CI** until it succeeds, then use "Re-run jobs" on the release's `ci-gate` job |
+| The CI run is still going | Wait for it, then re-run the `ci-gate` job |
+
+`ci.yml` has no `paths-ignore`: a documentation-only change still
+gets a queue run, in which `check_paths` skips the builds and the
+run succeeds, so such a commit can be tagged.
+
+To move the tag:
+
+```bash
+git push origin :refs/tags/v0.2.0   # needs the tag ruleset's bypass
+git tag -d v0.2.0
+tools/tag-release.sh 0.2.0 <commit that went through the queue>
+```
+
+The
+[template README](https://github.com/shakenfist/development/blob/main/templates/release-automation/README.md#recovering-from-a-gate-failure)
+has the full table.
 
 ## Artifacts produced
 
@@ -297,18 +377,19 @@ the base image rather than a copy that could drift from it.
 
 ### Version mismatch
 
-The `check-version` job reads `[workspace.package].version`
-from the root `Cargo.toml` and compares it to the tag. A
-mismatch fails the workflow and files a GitHub issue. This
-should not happen when you release via the `propose-release`
-→ `tag-release` flow, since `tag-release` refuses to run
-unless `origin/develop` already carries the matching
-workspace version. If it does (for example after a manual tag
-push):
+The `check-version` job runs `tools/release-version.sh check`,
+which reads `[workspace.package].version` from the root
+`Cargo.toml`, checks that `ryll`'s entry in `Cargo.lock` agrees,
+and compares it to the tag. A mismatch fails the workflow before
+anything is built. This should not happen when you release via
+the `propose-release` → `tag-release` flow, since `tag-release`
+runs the same checks against the commit before tagging it. If it
+does (for example after a manual tag push), nothing has been
+signed or published:
 
 ```bash
+git push origin :refs/tags/v0.2.0   # needs the tag ruleset's bypass
 git tag -d v0.2.0
-git push origin :refs/tags/v0.2.0
 # fix the workspace version on develop via a new release PR,
 # then re-run make tag-release X.Y.Z.
 ```

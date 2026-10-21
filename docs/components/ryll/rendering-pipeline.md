@@ -81,6 +81,33 @@ drop-oldest backpressure path that carries events to a client — are
 both documented in
 [control-socket-protocol.md](/components/ryll/control-socket-protocol/).
 
+## Damage tracking
+
+Each `DisplaySurface` records where draws landed, alongside its dirty
+flag, for consumers that re-encode only what changed.
+`DamageRegion` (`shakenfist-spice-renderer/src/display/damage.rs`)
+holds the rectangles written since the consumer last called
+`take_damage()`; `damage()` peeks without clearing.
+
+- Every draw op that writes pixels records the rectangle it wrote,
+  after clamping to the surface and the clip list. `copy_bits`
+  records only its destination: the source is read, not changed.
+  A new or resized surface starts fully damaged.
+- A rectangle inside one already held is dropped, and two merge when
+  their bounding box covers no more pixels than the two do
+  separately. Past `MAX_DAMAGE_RECTS` (32) the region collapses to its
+  bounding box. The region only ever grows, so it over-reports but
+  never misses a changed pixel.
+- Damage and the dirty flag are independent: `consume_dirty()` leaves
+  the damage alone and `take_damage()` leaves the dirty flag alone,
+  so a whole-frame consumer (the encoder) and a damage consumer can
+  share a surface.
+- If the `EventBus` mirror lags and misses events, it marks every
+  surface fully damaged so damage consumers resend whole surfaces.
+  That keeps a consumer from trusting a partial damage region, but it
+  does not restore the missed pixels or a missed surface create or
+  destroy: the picture recovers only as the guest redraws.
+
 ## Multi-Monitor Support
 
 Ryll supports multiple monitors via the `--monitors N` CLI option.
@@ -210,6 +237,12 @@ flowchart TB
     msg --> opus --> ring
     ring --> thread --> drain --> resample --> cpal
 ```
+
+This is the local-output path (`PlaybackOutput::Local`, which needs
+the renderer's `audio` feature). With `PlaybackOutput::Sink`, as in
+`--web` mode, no ring buffer or audio thread exists: the channel still
+decodes Opus, to keep its counters meaningful, and hands the audio to
+a `PlaybackSink`.
 
 The tokio network task is the **producer**: it decodes incoming audio
 and pushes i16 samples into the ring buffer via `rtrb::Producer<i16>`.

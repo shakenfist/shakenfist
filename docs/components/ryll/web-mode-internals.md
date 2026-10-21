@@ -453,14 +453,36 @@ before applying the rule to it.
 Four connections carry real data between the SPICE session and the
 bridge: display frames, audio, keyboard/mouse input, and cursor overlay.
 
+### `EventBus`
+
+`shakenfist-spice-renderer/src/event_bus.rs` — the one place the
+renderer's `ChannelEvent` mpsc is fanned out. `run_web` and
+`run_headless` both build an `EventBus`, which owns a forwarder task
+that republishes every event onto a `tokio::sync::broadcast` channel,
+and a second task that applies each bus event to a shared
+`SurfaceMirror`. Consumers (the cursor relay, the headless stats
+drain, control-socket clients, the digest poller) call `subscribe()`
+or `sender()` rather than spawning their own forwarder, so a slow one
+cannot back-pressure the SPICE channel producers. A receiver only sees
+events sent after it subscribed, so anything that needs the
+session-init events must subscribe before the session is spawned.
+
+If the mirror task lags the bus it has missed events and its pixels
+can no longer be trusted, so it logs a warning and marks every surface
+fully damaged (`SurfaceMirror::mark_all_damaged`); a damage consumer
+then resends whole surfaces. That keeps a consumer from trusting a
+partial damage region, but it does not restore the missed pixels or a
+missed surface create or destroy: the picture recovers only as the
+guest redraws. The bus closes once the forwarder and
+every cloned sender have been dropped.
+
 ### `SurfaceMirror`
 
-`shakenfist-spice-renderer/src/surface_mirror.rs` — subscribes
-to the renderer's broadcast `ChannelEvent` stream and maintains
+`shakenfist-spice-renderer/src/surface_mirror.rs` — maintains
 a `HashMap<(u8, u32), DisplaySurface>` keyed by
-`(channel_id, surface_id)`. The mirror is the authoritative
-surface state for the web encoder path; it is separate from
-the `RyllApp` surface map so the `--web` mode can run without
+`(channel_id, surface_id)`, fed by the `EventBus`. The mirror is the
+authoritative surface state for the web encoder path; it is separate
+from the `RyllApp` surface map so the `--web` mode can run without
 any egui dependency.
 
 ### `RealFrameSource`
@@ -472,17 +494,21 @@ skips the tick rather than blocking) and also returns `None` when
 the primary surface is not dirty, achieving genuine
 encode-on-dirty behaviour within the 30 fps cap.
 
-### `OpusPacketSink` trait
+### `PlaybackSink` trait
 
-`shakenfist-spice-renderer/src/audio_sink.rs` — a pre-decode
-tap on the SPICE playback channel. When a type implementing this
-trait is injected into the playback channel constructor, raw Opus
-packets from the SPICE server are delivered to `push_opus_packet`
-before being decoded to PCM for the cpal path. The `--web` mode
-uses this to route Opus packets to the WebRTC audio track without
-re-encoding. When the SPICE server negotiates raw PCM (not Opus),
-the sink receives no packets; the web audio track is silent (a
-warning is logged).
+`shakenfist-spice-renderer/src/playback_sink.rs` — where the
+playback channel sends audio when a session is not playing it
+locally. `run_connection` takes a `PlaybackOutput`: `Local` plays
+through the host's default device on a cpal thread (needs the
+renderer's `audio` feature), `Sink(Arc<dyn PlaybackSink>)` hands the
+audio to the sink and opens no device, in every build. `--web` uses
+`Sink`, so a server with no sound hardware, or a binary built without
+`audio`, still delivers guest audio to the browser. The sink receives
+`on_start` (with a `PlaybackFormat`) and `on_stop`, each raw Opus
+packet before decode (`on_opus_packet`), the PCM decoded from it
+(`on_decoded_pcm`), and raw PCM for servers that negotiated PCM
+(`on_pcm_samples`). The channel still decodes Opus in sink mode, so
+the control socket's playback counters mean the same in every mode.
 
 ### Control-message module
 
@@ -543,6 +569,14 @@ change takes effect on the next move:
   each `MouseMotion` occupies a slot in an ack window that only
   drains on `MOUSE_MOTION_ACK`.
 
+That choice lives in `PointerTranslator`
+(`shakenfist-spice-renderer/src/pointer.rs`), which the egui
+frontend shares. It keeps only the last position sent and takes the
+mouse mode as an argument on every call, so a frontend can read the
+mode from a field or a `watch` and a mode change takes effect on the
+next call. The relay owns one.
+The browser shell sends no wheel events yet.
+
 `BrowserMsg::Hello` is the browser's first message after
 `dc.onopen`, and the relay answers it with the current mouse mode.
 This is the only correct moment to deliver it: the SPICE server
@@ -585,13 +619,16 @@ rather than the video encoder path.
 
 ### Audio adapter
 
-`ryll/src/web/audio.rs` — `WebOpusSink` implements
-`OpusPacketSink`. When the peer connection reaches
-`Connected`, the bridge activates the audio pump; `WebOpusSink`
-routes each incoming Opus packet to the bridge's audio track
-via the WebRTC audio pump. PCM-only SPICE servers do not
-trigger any `push_opus_packet` calls, so the audio track emits
-silence (and a one-time warning is logged).
+`ryll/src/web/audio.rs` — `WebPlaybackSink` implements
+`PlaybackSink` and is passed to the session as
+`PlaybackOutput::Sink`, so no host audio device is opened. When the
+peer connection reaches `Connected`, the bridge activates the audio
+pump; `WebPlaybackSink::on_opus_packet` routes each incoming Opus
+packet to the bridge's audio track via the WebRTC audio pump, and
+drops it when no viewer is attached. It ignores the decoded PCM.
+PCM-only SPICE servers deliver `on_pcm_samples` instead, which the
+sink discards after a one-time warning, so the audio track emits
+silence.
 
 ### End-to-end data flow
 
@@ -605,7 +642,7 @@ flowchart TB
     ev["broadcast ChannelEvent"]
     mirror["SurfaceMirror"]
     crelay["CursorRelay (cursor.rs)"]
-    sink["WebOpusSink / OpusPacketSink (audio.rs)"]
+    sink["WebPlaybackSink / PlaybackSink (audio.rs)"]
     frames["RealFrameSource"]
     enc["EncoderTask"]
     irelay["web inputs relay (inputs.rs)"]

@@ -238,33 +238,31 @@ typedef enum QCow2SubclusterType {
 
 ### Subcluster Bitmap Validation (check operation)
 
-The `instar check` operation validates extended-L2 subcluster bitmaps
-against the QCOW2 spec's invalid-combination rules. The following
-invariants are enforced:
+`instar check` reports an extended-L2 entry when `qemu-img check` would,
+and with the same class of message. Validity is not a separate rule set:
+an entry is reported when `qcow2::subcluster_type()` (the transcription
+of qemu's `qcow2_get_subcluster_type`, which the readers, `map` and
+`measure` also use) classifies it as `INVALID`, plus one check-only rule
+for compressed entries.
 
-**Standard (non-compressed) entries:**
+| Shape | qemu-img check message | Read |
+|-------|------------------------|------|
+| Allocated cluster (a host offset, or `COPIED` at offset 0 with an external data file) with a subcluster both allocated and zero | `Allocated cluster has corrupted subcluster allocation bitmap` | refused (`INVALID`) |
+| Unallocated cluster (host offset 0 otherwise) with any alloc bit | `Unallocated cluster has non-zero subcluster allocation map` | refused (`INVALID`) |
+| Compressed entry with any non-zero bitmap, including `alloc_bits == 0xFFFF_FFFF` | `compressed cluster ... with non-zero subcluster allocation bitmap` | read (qemu ignores the bitmap) |
 
-| # | Condition | Meaning |
-|---|-----------|---------|
-| I1 | `alloc_bits & zero_bits != 0` | Subcluster simultaneously allocated and all-zero |
-| I2 | `host_offset == 0 && alloc_bits != 0` | Bitmap claims subclusters allocated but no host cluster |
-| I3 | `host_offset != 0 && alloc_bits == 0 && zero_bits == 0` | Host cluster allocated but no subcluster references it |
+Two shapes are deliberately not reported, because qemu-img check 10.0.13
+accepts them: a host cluster whose bitmap is empty (32
+`UNALLOCATED_ALLOC` subclusters), and a data-file image's `COPIED | 0`
+entry with alloc bits, which is that image's virtual cluster 0.
 
-**Compressed entries:**
+Each reported entry increments `corruptions`, `total_errors`, and
+`subcluster_errors` in the check result. The qemu message is emitted
+via `debug_print` (visible with `--verbose`).
 
-| # | Condition | Meaning |
-|---|-----------|---------|
-| C1 | `sc_bitmap != 0` (excluding legacy `alloc_bits=0xFFFF_FFFF`) | Spec reserves all 64 bitmap bits as zero |
-
-Note: C1 accepts `alloc_bits == 0xFFFF_FFFF` with `zero_bits == 0`
-for compatibility with images produced by older QEMU versions.
-
-Each violation increments `corruptions`, `total_errors`, and
-`subcluster_errors` in the check result. Detailed messages are
-emitted via `debug_print` (visible with `--verbose`).
-
-Implemented by `qcow2::validate_subcluster_bitmap()` in the qcow2
-crate, called from the L2 walk in the check operation.
+Implemented by `qcow2::validate_subcluster_bitmap()` and
+`qcow2::compressed_entry_has_bitmap()` in the qcow2 crate, called from
+the L2 walk in the check operation.
 
 ## The COPIED Flag
 

@@ -535,7 +535,9 @@ harness exercises the proxy-side cancellation path live.
 `kerbside/`, with or without an `__init__.py`, and
 `[tool.setuptools.package-data]` lists the non-Python file types that
 ship (templates, static assets, `alembic.ini` and so on). A file with a
-new extension needs adding to that list.
+new extension needs adding to that list. `kerbside.tests` is excluded,
+and `include-package-data` is off, so the tests stay out of the wheel:
+they run from the checkout, never from an install.
 
 Do not rely on a file being tracked in git to make it ship.
 setuptools_scm's git file finder adds every tracked file beneath a
@@ -550,6 +552,54 @@ python3 -m venv /tmp/wheelcheck
 /tmp/wheelcheck/bin/pip install build
 /tmp/wheelcheck/bin/python tools/check-wheel.py
 ```
+
+CI and the release also run
+[`check-dist`](https://github.com/shakenfist/actions/blob/main/docs/actions.md#check-dist)
+on a wheel built through the sdist, the way the release builds it. It
+fails if the wheel holds a test directory, so a packaging change that
+would ship the tests fails on its pull request rather than at release
+time. The release runs it on the proxy wheels too.
+
+## Releasing
+
+Pushing a `v*` tag triggers `release.yml`. Its jobs, in order:
+
+1. `ci-gate` checks that `functional-tests.yml` succeeded on the tagged
+   commit, in its merge queue run. How the gate decides is documented
+   with the action, as
+   [`require-ci-success`](https://github.com/shakenfist/actions/blob/main/docs/actions.md#require-ci-success).
+   It has no override.
+2. `build`, `build-collection` and `build-proxy-wheels` build the
+   packages, the Ansible collection and the proxy wheels, and the wheel
+   builds run `check-dist`. They run only if the gate passed.
+3. The publishing jobs wait for approval in the `release` environment,
+   re-sign the tag with gitsign, and publish the proxy wheels, then
+   kerbside, to PyPI, the collection to Ansible Galaxy, and a GitHub
+   release.
+
+So tag a commit that is on `develop` and went through the merge queue,
+and wait for its `functional-tests.yml` run to finish first. A merge
+that bypassed the queue has no merge queue run, so it cannot be
+released until a later commit has gone through the queue. A gate
+failure means nothing was signed or published, so every failure is
+recoverable: the release template's
+[recovery table](https://github.com/shakenfist/development/blob/main/templates/release-automation/README.md#recovering-from-a-gate-failure)
+says what to do for each cause, which is usually moving the tag. A run
+started some other way, such as a `workflow_dispatch`, does not count.
+
+A flaky queue run is not recovered by re-running it. The queue merges
+an entry only once `Can merge` passes, so a failed queue run gets its
+entry ejected and the commit it built never reaches `develop`: no tag
+can name it. Re-queue the pull request instead, and tag the commit
+that merges. Re-running a queue run helps only when the tagged
+commit's own run was re-run after it merged and that later attempt
+failed, because the gate judges each run at its latest attempt. Then
+use "Re-run failed jobs" on that run, and re-run the `ci-gate` job.
+
+Running `release.yml` by hand with `workflow_dispatch` skips the gate
+and the publishing jobs, and only builds and checks the packages. The
+one-time setup, and how to verify a release, are in
+[`RELEASE-SETUP.md`](https://github.com/shakenfist/kerbside/blob/develop/RELEASE-SETUP.md).
 
 ## Dependency pinning
 

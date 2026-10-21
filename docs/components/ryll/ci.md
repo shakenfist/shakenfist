@@ -311,8 +311,7 @@ Six details in the arrangement are load-bearing:
   different first moves, and because they carry separate titles
   none of them can dedup on top of another and bury it.
 - Reporting runs on the static runner, where the rest of this
-  repository's `gh` calls run — `release.yml`'s version-mismatch
-  issue is the precedent. The `debian-12-docker` image is not
+  repository's `gh` calls run. The `debian-12-docker` image is not
   known to carry the CLI. A failure to report is counted rather
   than thrown, and fails the job at the end: one target nobody
   could file about must not stop the rest being filed.

@@ -138,8 +138,9 @@ Kerbside spike* below).
 1. **No damage rectangles.** `DisplaySurface` keeps one dirty
    bool (`consume_dirty`). `RealFrameSource` copies the whole
    primary surface whenever it is set. The rectangles exist
-   in the events (`ImageReady`, `FillRect`, `CopyBits`,
-   `Invert` all carry one) but `SurfaceMirror::apply_event`
+   in the events (`ImageReady`, `ImageReadyChroma`,
+   `ImageReadyAlpha`, `FillRect`, `CopyBits` and `Invert` all
+   carry one) but `SurfaceMirror::apply_event`
    reports only `DrawOutcome::Drawn { key }`. RDP wants dirty
    rects; sending the whole frame every time would be
    wasteful even though IronRDP re-diffs internally (below).
@@ -148,17 +149,24 @@ Kerbside spike* below).
    `last_pos`, synthesise relative motion in server mode,
    suppress zero deltas because each motion costs an
    ack-window slot) exists twice: `ryll/src/web/inputs.rs`
-   and `ryll/src/app/mod.rs`. RDP would be a third copy.
+   and `ryll/src/app/mod.rs`, and the two copies disagree in
+   details (phase 1's survey lists them). RDP would be a
+   third copy.
 3. **The heavy build cannot be trimmed.** The renderer always
    builds the encoder (openh264 from C++) and compression's
    default `mozjpeg`, and always pulls in `nusb`,
-   `dav-server` and `hyper`. Kerbside's spike step 3a planned a
+   `dav-server` and `hyper`. openh264 is also a non-optional
+   dependency of the compression crate's H.264 stream
+   *decoder*, so dropping it needs a decode feature as well
+   as an encoder one. Kerbside's spike step 3a planned a
    slim feature set for exactly this reason; phase 1 of this
    plan now does it for both.
 4. **Audio is a tap, not a sink.** With the `audio` feature
    the playback channel decodes Opus and opens a local cpal
    output regardless of the tap, and decoded PCM is never
-   offered to the sink. A server process wants Opus packets
+   offered to the sink. Without the feature the playback
+   channel is not linked at all, so there is no tap either:
+   a slim ryll serves `--web` with no audio. A server process wants Opus packets
    when the client accepts Opus, decoded PCM when it does not,
    and no local audio device in either case.
 5. **Single primary surface.** The mirror keys surfaces by
@@ -318,8 +326,10 @@ competing with it:
   saying so if openh264 cannot be separated cleanly from
   stream decode (MJPEG decode must remain). Step 3a keeps its
   Kerbside-only parts: server-role display serialisers, the
-  LZ4 and JPEG encoders, and a configurable display channel.
-  Kerbside's phase 3 plan has been updated to match.
+  LZ4 and JPEG encoders (both since landed in ryll), and a
+  configurable display channel. Kerbside's phase 3 plan is
+  updated to match in kerbside PR #581, which was still open
+  on 2026-10-20.
 - **Damage accumulation goes in the renderer**, not in either
   consumer, so the spike's step 3b uses phase 1's accumulator
   instead of writing its own in Kerbside.
@@ -465,7 +475,7 @@ cursor, resize, text clipboard and audio playback. Specifically:
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 1. Renderer prep: damage, pointer translation, slim build, device-free audio | - | Not started | |
+| 1. Renderer prep: damage, pointer translation, slim build, device-free audio | [PLAN-rdp-frontend-phase-01-renderer-prep.md](/components/ryll/plans/PLAN-rdp-frontend-phase-01-renderer-prep/) | In progress | |
 | 2. RDP skeleton: `shakenfist-spice-rdp`, `--rdp`, display, keyboard, mouse, security | - | Not started | |
 | 3. Cursor and resize | - | Not started | |
 | 4. Clipboard and audio | - | Not started | |
@@ -510,7 +520,8 @@ slim feature set taken over from Kerbside spike step 3a:
   a cpal device. `--web` should use it too, since a
   server-side web session has no use for local audio either.
 - A small helper that spawns the forwarder and mirror-apply
-  tasks `run_web` writes by hand, so RDP does not copy them.
+  tasks that `run_web` and `run_headless` each write by hand,
+  so RDP does not make a third copy.
 
 **Acceptance:** existing tests pass on all platforms; a
 renderer build with default features off and only display

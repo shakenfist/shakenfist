@@ -1016,6 +1016,14 @@ entry as `ZeroAllocated` for both `host_offset == 0` and
 `ZeroAllocated` reporting was always correct — instar walks
 the bitmap and classifies subclusters directly.
 
+`map --output json` now also carries qemu's `"offset"` on
+zero-allocated runs and on unallocated-allocated runs, as `qemu-img
+map` does; before, a zero-flag cluster with a non-zero host offset
+omitted it. Data-file cluster 0 maps as data at offset 0. `measure`
+no longer counts zero-flag clusters as allocated, matching `qemu-img
+measure` (a 1M image with zeroed clusters reported 589824 bytes
+required, qemu reports 458752).
+
 ### qcow2 compressed clusters report `compressed: false`
 
 `qemu-img map` emits `compressed: true` for extents that
@@ -4845,76 +4853,62 @@ rather than fixed, because none of them was that change's job to close:
    refuses a differencing VHD
    ([issue #565](https://github.com/shakenfist/instar/issues/565)).
 
-## Malformed qcow2 subcluster: instar zero-fills where qemu-img errors
+## Invalid qcow2 subcluster entries are refused, as in qemu-img
 
-**Classification: neither a safe nor an unsafe quirk in the sense above
-— a divergence from qemu-img that no flag controls, recorded because
-the direction it diverges in is the permissive one.**
+**Classification: no divergence from qemu-img for the entries qemu
+classifies as invalid; two related data-file shapes still diverge (see
+the end of this entry). Recorded because instar used to zero-fill these
+entries, and the reason it stopped is worth keeping.**
 
 ### Observed Behavior
 
-An extended-L2 qcow2 image can carry an L2 entry whose host offset
-field is zero while its subcluster allocation bitmap marks a subcluster
-allocated. The two statements contradict each other: there is no host
-cluster to read the subcluster from. qemu treats such an entry as an
-invalid subcluster and fails the read with `EIO`. instar zero-fills the
-subcluster and reports the read as successful, so an operation reading
-through it — `convert`, `dd`, `compare`, `bench` — exits 0 with zeros
-where the image claimed data.
-
-Only genuinely corrupt or hostile images contain this shape; no
-qcow2 writer produces it. The sector-bitmap readers for VHD and VHDX
-refuse their analogous contradictions (see "VHD/VHDX differencing"
-above), which is why this one is worth recording rather than leaving
-implicit.
+An extended-L2 qcow2 image can carry an L2 entry whose subcluster
+bitmap contradicts itself or the host offset: a subcluster marked
+allocated with no host cluster behind it, or one marked both allocated
+and zero. qemu classifies such an entry as invalid
+(`QCOW2_SUBCLUSTER_INVALID`) and fails the read with `EIO`.
 
 ### instar Behavior
 
-Both arms of the extended-L2 read path zero-fill it. The narrow arm
-(device sector size at or below the subcluster size) has done so since
-it was written; the wide arm did not, and left the caller's buffer
-untouched under a `true` return —
-[issue #650](https://github.com/shakenfist/instar/issues/650), found by
-the `fuzz_chain_compose` fuzz target and fixed by making the wide arm
-match the narrow one. Zeroing the subcluster was the conservative half
-of that fix: it makes the two arms agree and removes the uninitialised
-read, without changing what a caller sees for an image that was already
-being accepted.
+instar refuses the same entries. `convert`, `dd`, `compare`, `bench`
+and `rebase` fail with a message in the same class as qemu's:
 
-### Open Question
+```
+convert: Invalid cluster entry found at virtual offset 65536 (0x10000): corrupt qcow2 L2 entry
+```
 
-Whether *refusing* is the better answer for both arms, matching qemu,
-is deliberately left open on #650. It is a user-visible behaviour
-change — an image that converts today would stop converting — and the
-project's own philosophy of failing closed on contradictory metadata
-points towards it, so it is a decision to take on its own merits rather
-than inside a consistency fix. Until it is taken, this page is the
-record that the permissive answer is deliberate and not an oversight.
+(the operation name and offset vary; the message is one line). `map`
+and `measure` refuse with the same text. The decision is made in one
+place, `subcluster_type()` and `subcluster_range()` in the qcow2 crate,
+a transcription of qemu's `qcow2_get_subcluster_type` (see
+[qcow2-format.md](/components/instar/qcow2/qcow2-format/#subcluster-types)).
 
-The decision has a second call site to cover. Sweeping this class
-turned up
-[issue #653](https://github.com/shakenfist/instar/issues/653): an
-extended-L2 entry with every allocation bit set and no zero bits takes
-a shortcut to the plain `Standard` arm, which has no host-offset guard
-at all, so a host offset of zero there is read as a payload offset and
-the image's own header bytes are served as guest data. That is a
-defect rather than a policy — the classic non-extended branch three
-lines away already resolves a zero host offset to `Unallocated` — but
-the fix picks the same answer this question is about, so the two
-belong together.
+Earlier versions zero-filled these entries and reported the read as
+successful, on the premise that no qcow2 writer produces them. That
+premise was wrong. With an external data file, an entry of `COPIED` and
+host offset zero is a normal cluster at offset 0, and qemu writes
+exactly that for virtual cluster 0 of a data-file image, so a partly
+written cluster 0 read back as zeros. The same ad hoc reading of a zero
+host offset caused two neighbouring defects: a fully-allocated entry
+with host offset zero and no data file served the image's own header as
+guest data
+([issue #653](https://github.com/shakenfist/instar/issues/653)), and a
+subcluster with neither the allocation nor the zero bit set, which is
+well-formed and reads from the backing file, read zeros instead
+([issue #654](https://github.com/shakenfist/instar/issues/654)).
 
-And a third,
-[issue #654](https://github.com/shakenfist/instar/issues/654): a
-subcluster with neither its allocation bit nor its zero bit set is
-defined to read from the backing file, and both arms zero-fill it
-instead when the host offset is zero. Unlike the two above, that one
-is reachable on **well-formed** images — it is the entry shape qemu
-writes when zeroing part of an unallocated cluster in an image with a
-backing file — so it is a silent wrong answer in ordinary use rather
-than only on corrupt input. All three turn on what a host offset of
-zero means for a subcluster, which is the argument on #654 for
-classifying each subcluster once into the types qcow2 defines instead
-of interpreting that offset separately in each branch.
+`check` follows what qemu-img 10.0.13 was measured to report: a host
+cluster with an empty subcluster bitmap is not reported, and a
+compressed entry with any non-zero bitmap is reported.
+
+Two shapes in a data-file image are refused by qemu's read path after
+classification, and instar does not yet refuse them by name
+([issue #803](https://github.com/shakenfist/instar/issues/803)). A
+compressed entry fails with instar's generic read-failure text, where
+qemu says that compressed clusters are not allowed with a data file. A
+host offset that differs from the guest offset is read from the data
+file at that offset and the operation succeeds, where qemu fails the
+read with `EIO`, because qemu maps data-file clusters one to one.
 
 ## Future Additions
 

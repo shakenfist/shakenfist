@@ -254,6 +254,13 @@ branch. **Raising `max_entries_to_build` above 1 would make this wrong**
 — speculative groups for different entries would then cancel each other
 — so that setting and this concurrency key have to move together.
 
+Only a run's first attempt takes the base-branch key. A re-run keeps
+its original `merge_group` event, so with that key a "Re-run jobs" on
+an old queue run (see [Releasing](/components/kerbside/development/#releasing) for when a
+release needs one) would cancel the live queue entry or be cancelled
+by it. A re-run therefore keeps its own
+queue branch's group.
+
 The sibling smoke workflows (`direct-qemu-functional.yml`,
 `sf-e2e-functional.yml`) still key on `github.ref` alone. They trigger
 on `merge_group` but skip their heavy jobs there, so a piled-up run
