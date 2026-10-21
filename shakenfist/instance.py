@@ -744,7 +744,8 @@ class Instance(dbowo):
             'agent_start_time': self.agent_start_time,
             'agent_system_boot_time': self.agent_system_boot_time,
             'error_message': self.error,
-            'last_cluster_operation': self.last_cluster_operation
+            'last_cluster_operation': self.last_cluster_operation,
+            'has_pending_operations': self.has_pending_cluster_operation()
         })
 
         if self.requested_placement:

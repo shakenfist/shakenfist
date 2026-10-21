@@ -346,7 +346,8 @@ class Network(dbowo):
             'floating_gateway': self.floating_gateway,
             'vxlan_id': self.__vxid,
             'error_message': self.error,
-            'last_cluster_operation': self.last_cluster_operation
+            'last_cluster_operation': self.last_cluster_operation,
+            'has_pending_operations': self.has_pending_cluster_operation()
         })
 
         return n

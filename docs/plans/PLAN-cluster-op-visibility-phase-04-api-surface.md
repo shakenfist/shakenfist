@@ -583,3 +583,13 @@ undo:
 Step 4b's proto field is not gated: it is optional, additive, and
 ignored by older services, so getting it wrong costs a follow-up
 commit, not a migration.
+
+## Execution notes
+
+* 2026-10-22 (AEDT): back brief given. Michael confirmed the token
+  name `object-pending-operations` (decision 2), decisions 6 and 7
+  as written, and the client method names and helper signature of
+  decision 9. He asked for the server pull request to be pushed and
+  opened once steps 4a to 4e are committed and the Definition of
+  done passes. Steps run one at a time in this worktree, as the step
+  plan says.

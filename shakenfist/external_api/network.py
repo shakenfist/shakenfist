@@ -101,6 +101,7 @@ def _delete_network(network_from_db, wait_interfaces=None):
 
 network_get_example = """{
     "floating_gateway": "192.168.10.16",
+    "has_pending_operations": false,
     "last_cluster_operation": {
         "op_type": "net_iface_op",
         "op_uuid": "48a40459-a813-491f-81d6-a68536122e07"

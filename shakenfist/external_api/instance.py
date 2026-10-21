@@ -118,6 +118,7 @@ instance_get_example = """{
     ],
     "disks": [],
     "error_message": null,
+    "has_pending_operations": false,
     "interfaces": [],
     "last_cluster_operation": {
         "op_type": "node_inst_snap_op",

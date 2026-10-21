@@ -995,6 +995,13 @@ class MockMariaDB():
         self.test_obj.addCleanup(
             self.mariadb_get_latest_cluster_operation_target.stop)
 
+        self.mariadb_has_pending_cluster_operation_target = mock.patch(
+            'shakenfist.mariadb.has_pending_cluster_operation_target',
+            side_effect=self._mariadb_has_pending_cluster_operation_target)
+        self.mariadb_has_pending_cluster_operation_target.start()
+        self.test_obj.addCleanup(
+            self.mariadb_has_pending_cluster_operation_target.stop)
+
         self.mariadb_delete_cluster_operation_target = mock.patch(
             'shakenfist.mariadb.delete_cluster_operation_target',
             side_effect=self._mariadb_delete_cluster_operation_target)
@@ -3494,6 +3501,24 @@ class MockMariaDB():
         if not results:
             return None
         return results[-1]
+
+    def _mariadb_has_pending_cluster_operation_target(
+            self, target_object_type, target_uuid):
+        """Mock implementation of mariadb.has_pending_cluster_operation_target()
+
+        True if a non-observational op targeting the object is queued,
+        in preflight or executing, as the real query's state join does.
+        """
+        for d in self._mariadb_get_cluster_operation_targets_for_object(
+                target_object_type, target_uuid):
+            if d.observational:
+                continue
+            state = self.mariadb_states.get(
+                f'{d.operation_type}/{d.operation_uuid}')
+            if state and state['state_value'] in (
+                    'queued', 'preflight', 'executing'):
+                return True
+        return False
 
     def _mariadb_delete_cluster_operation_target(
             self, operation_uuid):

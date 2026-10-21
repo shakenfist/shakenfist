@@ -36,10 +36,6 @@ interface_get_example = """{
     "floating": null,
     "instance_uuid": "d512e9f5-98d6-4c36-8520-33b6fc6de15f",
     "ipv4": "10.0.0.6",
-    "last_cluster_operation": {
-        "op_type": "net_iface_op",
-        "op_uuid": "48a40459-a813-491f-81d6-a68536122e07"
-    },
     "macaddr": "02:00:00:73:18:66",
     "metadata": {},
     "model": "virtio",

@@ -252,6 +252,7 @@ artifact_get_example = """{
             "uuid": "25adc99e-369b-4959-a387-2ae046ee6ad4"
         }
     },
+    "has_pending_operations": false,
     "index": 101,
     "last_cluster_operation": {
         "op_type": "artifact_fetch_op",
