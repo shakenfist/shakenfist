@@ -16,6 +16,7 @@ from uuid import uuid4
 
 import psutil
 
+from shakenfist.instance import Instance
 from shakenfist.operations.node_inst_op import NodeInstOp
 from shakenfist.schema.operations.node_inst_op import create_and_enqueue
 from shakenfist.schema.operations.node_inst_op import model_tasks
@@ -27,8 +28,9 @@ from shakenfist.tests.mock_mariadb import MockMariaDB
 class FakeInstance:
     """An instance double for driving _health_check_kvm_process directly."""
 
-    def __init__(self, pid):
+    def __init__(self, pid, state=Instance.STATE_CREATED):
         self.uuid = str(uuid4())
+        self.state = mock.Mock(value=state)
         self.kvm_pid = pid
         self.power_state = {'power_state': 'on'}
         self.enqueue_delete_due_error = mock.Mock()
@@ -101,3 +103,20 @@ class HealthCheckKvmProcessTestCase(base.ShakenFistTestCase):
         mock_process.assert_not_called()
         self.assertIsNone(inst.kvm_pid)
         inst.enqueue_delete_due_error.assert_not_called()
+
+    def test_instance_no_longer_created_is_skipped(self):
+        # A queued sweep survives a later delete, so the task can run
+        # against an instance that is being deleted.
+        for state in [Instance.STATE_DELETE_WAIT, Instance.STATE_DELETED,
+                      Instance.STATE_ERROR]:
+            with self.subTest(state=state):
+                inst = FakeInstance(pid=1234, state=state)
+                op = self._make_op()
+
+                with mock.patch(
+                        'shakenfist.operations.node_inst_op.psutil.Process',
+                        side_effect=psutil.NoSuchProcess(1234)) as mock_process:
+                    op._health_check_kvm_process(inst)
+
+                mock_process.assert_not_called()
+                self.assertEqual(1234, inst.kvm_pid)

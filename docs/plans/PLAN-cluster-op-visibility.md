@@ -269,8 +269,8 @@ every consumer, so that:
 |-------|------|--------|--------|
 | 1. CI await helper deflake | [PLAN-cluster-op-visibility-phase-01-ci-deflake.md](PLAN-cluster-op-visibility-phase-01-ci-deflake.md) | Complete | `bc7c119bf` (#3465) |
 | 1b. Atomic target writes + by-target JOIN fix | (folded into phase 1 PR; see below) | Complete | `bc7c119bf` (#3465) |
-| 2. Observational flag: schema and query layer | [PLAN-cluster-op-visibility-phase-02-observational-schema.md](PLAN-cluster-op-visibility-phase-02-observational-schema.md) | In progress | — |
-| 3. Classify and mark observational tasks | PLAN-cluster-op-visibility-phase-03-mark-observational.md | Not started | — |
+| 2. Observational flag: schema and query layer | [PLAN-cluster-op-visibility-phase-02-observational-schema.md](PLAN-cluster-op-visibility-phase-02-observational-schema.md) | Complete | `9b098c6ac` (#4574) |
+| 3. Classify and mark observational tasks | [PLAN-cluster-op-visibility-phase-03-mark-observational.md](PLAN-cluster-op-visibility-phase-03-mark-observational.md) | In progress | — |
 | 4. API surface: has_pending_operations and truthful outstanding ops | PLAN-cluster-op-visibility-phase-04-api-surface.md | Not started | — |
 | 5. CI helper simplification, functional coverage, documentation | PLAN-cluster-op-visibility-phase-05-coverage-docs.md | Not started | — |
 | 6. Push audit | PLAN-cluster-op-visibility-phase-06-push-audit.md | Not started | — |
@@ -445,9 +445,11 @@ equivalent check.
   `get_cluster_operations()`, and decide explicitly whether
   delete cancels in-flight observational ops. Once phase 3
   lands they are no longer the pointer, so the current walk
-  skips them. That is probably right, since a health check
-  against a deleting instance does no harm, but it is a
-  behaviour change, so state it.
+  skips them. Phase 3 made that safe rather than leaving it
+  harmless by assumption: both sweep tasks now return early
+  for an instance that is not `created`, and the billing
+  task no longer raises when a delete removes a file it is
+  measuring. It is still a behaviour change, so state it.
 * client-python (sibling repo): add
   `get_instance()`-adjacent accessors as needed, a
   `has_pending_operations`-aware helper, and capability
@@ -460,6 +462,13 @@ equivalent check.
   `has_pending_operations` (cheaper, single GET) once the
   deployed server advertises the capability; keep the
   by-target fallback for older servers.
+* *(Added by the phase 3 survey.)* `_await_object_operations_complete()`
+  (`deploy/shakenfist_ci/base.py`) fails a test when any op it
+  watched go in flight ends in `error`, and its by-target listing
+  includes observational ops. A billing op that errored (#4585)
+  therefore fails an unrelated test. Ignore ops reporting
+  `observational: true`, both when deciding whether anything is
+  outstanding and when failing on `error`.
 * Functional test: hot-plug an interface and assert the
   await helper genuinely blocks until the attach lands even
   when a billing sweep fires (can be provoked by simply
@@ -639,6 +648,11 @@ because the following statements will be true:
   `user_waiting` hot-plug chain in CI (dependency deferral
   polling cadence) is worth a separate look — it is latency,
   not correctness, but user-visible.
+* #4585: a failing billing or KVM health check task moves a
+  healthy instance to `created-error`, because
+  `NodeInstOp.dispatch_task()` errors the instance on any task
+  exception. Found by the phase 3 survey. Its natural fix keys off
+  the `observational_tasks` declarations phase 3 adds.
 * Issue #3278 (CI and test coverage backlog) may want a note
   about the deflaked helper pattern.
 

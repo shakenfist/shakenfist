@@ -26,6 +26,7 @@ initial_version = 1
 current_version = 1
 
 
+# All tasks mutate: it writes a transcoded image to the cache.
 class model_tasks(Enum):
     archive_transcode = 1
 

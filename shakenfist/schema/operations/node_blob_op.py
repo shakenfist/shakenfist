@@ -36,6 +36,20 @@ class model(BaseModel):
         'blob_uuid': ObjectType.BLOB,
     }
 
+    # Tasks that only observe their blob. The ClassVar annotation is
+    # required: without it pydantic makes this a field and
+    # is_observational() sees nothing. See "When is a task observational?"
+    # in docs/developer_guide/database_internals.md.
+    observational_tasks: ClassVar[frozenset[model_tasks]] = frozenset({
+        # Measures a replica and records hashes. On a mismatch it drops
+        # this node's replica, which corrects a location record that was
+        # already false. The blob checksum endpoint also enqueues it for a
+        # user waiting on a hash, but that caller polls the endpoint for
+        # the hash rather than the operation. If a blob gate is ever built
+        # on has_pending_cluster_operation, revisit this classification.
+        model_tasks.verify_size_and_checksum,
+    })
+
     uuid: UUID4
     node_uuid: UUID4
     blob_uuid: UUID4

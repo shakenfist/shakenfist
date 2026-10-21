@@ -26,6 +26,7 @@ initial_version = 1
 current_version = 1
 
 
+# All tasks mutate: it promotes, expires or fails an agent operation.
 class model_tasks(Enum):
     preflight = 1
 

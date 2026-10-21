@@ -24,6 +24,7 @@ initial_version = 1
 current_version = 1
 
 
+# All tasks mutate: they change the guest's devices.
 class model_tasks(Enum):
     hot_plug_instance_interface = 1
     # hot_plug_instance_interface reconciles the network onto this node and

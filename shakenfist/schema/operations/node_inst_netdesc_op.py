@@ -26,6 +26,7 @@ initial_version = 1
 current_version = 1
 
 
+# All tasks mutate: they are the create chain and advance instance state.
 class model_tasks(Enum):
     instance_preflight = 1
     instance_start = 2

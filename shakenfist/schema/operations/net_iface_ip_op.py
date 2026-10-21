@@ -27,6 +27,7 @@ initial_version = 1
 current_version = 1
 
 
+# All tasks mutate: it removes a floating address.
 class model_tasks(Enum):
     interface_defloat = 1
 

@@ -39,6 +39,8 @@ from shakenfist import mariadb
 from shakenfist.protos import database_pb2
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
 from shakenfist.schema.object_types import ObjectType
+from shakenfist.schema.operations import node_blob_op
+from shakenfist.schema.operations import node_inst_op
 from shakenfist.schema.operations import util
 from shakenfist.tests import base
 from shakenfist.tests import dbfixture
@@ -49,6 +51,9 @@ INSTANCE_UUID = 'bbbb2222-2222-4222-8222-222222222222'
 MUTATING_OP = '11112222-2222-4222-8222-000000000001'
 OBSERVING_OP = '11112222-2222-4222-8222-000000000002'
 MIXED_OP = '11112222-2222-4222-8222-000000000003'
+BLOB_UUID = 'cccc2222-2222-4222-8222-222222222222'
+DELETE_OP = '11112222-2222-4222-8222-000000000004'
+SWEEP_OP = '11112222-2222-4222-8222-000000000005'
 
 
 class _Tasks(Enum):
@@ -59,8 +64,9 @@ class _Tasks(Enum):
 class _ObservingModel(BaseModel):
     """A test-local op model declaring one observational task.
 
-    No production model declares observational_tasks yet (phase 3 does),
-    so the mechanism is exercised through this one.
+    The mechanism is exercised through this model rather than a production
+    one, so these tests do not change when a production task is
+    reclassified.
     """
     target_fields: ClassVar[dict[str, ObjectType]] = {
         'instance_uuid': ObjectType.INSTANCE,
@@ -130,17 +136,31 @@ class ObservationalCurrentStateTestCase(
             p.start()
         self.addCleanup(mock.patch.stopall)
 
-    def _enqueue(self, op_uuid, tasks):
+    def _enqueue(self, op_uuid, tasks, model_class=_ObservingModel,
+                 op_type='NODE_INST_OP', target_field='instance_uuid',
+                 target_uuid=INSTANCE_UUID):
         util.enqueue_cluster_operation(
-            _FakeObjectType('NODE_INST_OP'),
+            _FakeObjectType(op_type),
             {
                 'uuid': op_uuid,
                 'node_uuid': NODE_UUID,
-                'instance_uuid': INSTANCE_UUID,
+                target_field: target_uuid,
                 'priority': 'background',
                 'tasks': tasks,
             },
-            model_class=_ObservingModel)
+            model_class=model_class)
+
+    def _enqueue_inst(self, op_uuid, task_names):
+        """Enqueue against the production node_inst_op model."""
+        self._enqueue(op_uuid, [t.name for t in task_names],
+                      model_class=node_inst_op.model)
+
+    def _enqueue_blob(self, op_uuid, task_names):
+        """Enqueue against the production node_blob_op model."""
+        self._enqueue(op_uuid, [t.name for t in task_names],
+                      model_class=node_blob_op.model,
+                      op_type='NODE_BLOB_OP', target_field='blob_uuid',
+                      target_uuid=BLOB_UUID)
 
     def _set_op_state(self, op_uuid, state_value):
         states = mariadb._get_object_states_table()
@@ -222,6 +242,62 @@ class ObservationalCurrentStateTestCase(
         self.assertEqual(
             {MUTATING_OP: False, OBSERVING_OP: True, MIXED_OP: False},
             {op['uuid']: op['observational'] for op in ops})
+
+    # The tests below use the production models, so they fail if a
+    # declaration is dropped or reclassified without this being noticed.
+
+    def test_sweep_does_not_shadow_a_queued_instance_delete(self):
+        sweep_tasks = [
+            node_inst_op.model_tasks.collect_billing_statistics,
+            node_inst_op.model_tasks.health_check_kvm_process]
+
+        self._enqueue_inst(DELETE_OP, [node_inst_op.model_tasks.instance_delete])
+        self._enqueue_inst(SWEEP_OP, sweep_tasks)
+
+        # The pointer stays on the delete, which is pending.
+        self.assertEqual(DELETE_OP, self._latest())
+        self.assertTrue(self._pending())
+
+        # Once the delete completes nothing is pending, although the sweep
+        # is still queued.
+        self._set_op_state(DELETE_OP, 'complete')
+        self.assertEqual('queued', self._op_state(SWEEP_OP))
+        self.assertFalse(self._pending())
+        self.assertEqual(DELETE_OP, self._latest())
+
+    def test_sweep_alone_leaves_no_pointer_and_nothing_pending(self):
+        self._enqueue_inst(
+            SWEEP_OP,
+            [node_inst_op.model_tasks.collect_billing_statistics,
+             node_inst_op.model_tasks.health_check_kvm_process])
+
+        self.assertEqual('queued', self._op_state(SWEEP_OP))
+        self.assertIsNone(self._latest())
+        self.assertFalse(self._pending())
+
+    def test_blob_checksum_op_is_observational_but_still_listed(self):
+        self._enqueue_blob(
+            OBSERVING_OP, [node_blob_op.model_tasks.verify_size_and_checksum])
+
+        row = mariadb.get_cluster_operation_target(OBSERVING_OP)
+        self.assertIsNotNone(row)
+        self.assertEqual(ObjectType.BLOB.value, row.target_object_type)
+        self.assertTrue(row.observational)
+
+        # The blob sweep's duplicate guard reads this unfiltered listing.
+        rows = mariadb.get_cluster_operation_targets_for_object(
+            ObjectType.BLOB, BLOB_UUID)
+        self.assertEqual(
+            [(OBSERVING_OP, True)],
+            [(r.operation_uuid, r.observational) for r in rows])
+
+    def test_blob_ensure_local_op_is_mutating(self):
+        self._enqueue_blob(
+            MUTATING_OP, [node_blob_op.model_tasks.ensure_local])
+
+        row = mariadb.get_cluster_operation_target(MUTATING_OP)
+        self.assertIsNotNone(row)
+        self.assertFalse(row.observational)
 
 
 class ObservationalOnTheWireTestCase(base.ShakenFistTestCase):

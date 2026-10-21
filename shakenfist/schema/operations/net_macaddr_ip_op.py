@@ -28,6 +28,7 @@ initial_version = 1
 current_version = 1
 
 
+# All tasks mutate: it changes dnsmasq lease state.
 class model_tasks(Enum):
     remove_dhcp_lease = 1
 

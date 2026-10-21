@@ -173,10 +173,13 @@ class Monitor(daemon.Daemon):
         if deleted > 0:
             LOG.info(f'Deleted {deleted} stale blob transfers')
 
-        # Prune the cluster_operation_targets history table. The table is
-        # append-only -- bounded only by CLUSTER_OPERATION_TARGET_RETENTION.
-        # Operations still in flight (queued/preflight/executing) are never
-        # pruned regardless of age. Set the config to 0 to disable.
+        # Prune the cluster_operation_targets table. Rows normally go when
+        # their operation is hard-deleted, about thirty seconds after it
+        # goes terminal; this is a backstop for rows which outlive their
+        # operation, removing those older than
+        # CLUSTER_OPERATION_TARGET_RETENTION. Operations still in flight
+        # (queued/preflight/executing) are never pruned regardless of age.
+        # Set the config to 0 to disable.
         if config.CLUSTER_OPERATION_TARGET_RETENTION > 0:
             deleted = mariadb.delete_stale_cluster_operation_targets(
                 max_age=config.CLUSTER_OPERATION_TARGET_RETENTION)
