@@ -4902,13 +4902,17 @@ cluster with an empty subcluster bitmap is not reported, and a
 compressed entry with any non-zero bitmap is reported.
 
 Two shapes in a data-file image are refused by qemu's read path after
-classification, and instar does not yet refuse them by name
-([issue #803](https://github.com/shakenfist/instar/issues/803)). A
-compressed entry fails with instar's generic read-failure text, where
-qemu says that compressed clusters are not allowed with a data file. A
-host offset that differs from the guest offset is read from the data
-file at that offset and the operation succeeds, where qemu fails the
-read with `EIO`, because qemu maps data-file clusters one to one.
+classification, and instar refuses both by name
+([issue #803](https://github.com/shakenfist/instar/issues/803)). The
+refusal reads `<op>: <qemu wording> at virtual offset N (0x...)`. A
+compressed entry is refused with qemu's `Compressed cluster entry found
+in image with external data file`. A host offset that differs from the
+guest offset is refused with `External data file host cluster offset
+does not match guest cluster offset`, because qemu maps data-file
+clusters one to one. The offset rule applies to zero and unallocated
+entries with an allocated offset as well as to normal ones. instar's
+message omits the host offset that qemu prints, because the refusal
+carries only the virtual offset.
 
 ## Future Additions
 
