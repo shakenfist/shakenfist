@@ -204,13 +204,28 @@ sf-transfers = "shakenfist.daemons.transfers.main:main"
 sf-privexec = "shakenfist.daemons.privexec.main:main"
 sf-nodelock = "shakenfist.daemons.nodelock.main:main"
 
+# Every directory under shakenfist/ is a package, including those with no
+# __init__.py, so they are found by discovery (namespaces defaults to true
+# here) rather than listed. Until this was set only "shakenfist" was named,
+# and every subpackage reached the wheel as *data*, through
+# include-package-data and setuptools_scm's git file finder -- which also
+# shipped the unit tests. include-package-data is therefore off, and the one
+# data file the package reads at runtime is declared below.
+#
+# Excluded: the unit tests, which run from a checkout; and deploy/, the
+# ansible collection and the functional CI suites, which CI, the deployer
+# (actions' install-collection.sh) and the operator guide all use from a
+# checkout and never from an installed wheel.
 [tool.setuptools]
-packages = ["shakenfist"]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["shakenfist*"]
+exclude = ["shakenfist.tests*", "shakenfist.deploy*"]
 
 [tool.setuptools.package-data]
 shakenfist = [
     "data/*.yaml",
-    "deploy/**"
 ]
 
 [tool.setuptools_scm]

@@ -86,6 +86,18 @@ jobs:
         id: filter
         if: github.event_name != 'workflow_dispatch'
         with:
+          # On merge_group, compare against the base_sha fixed in the
+          # event payload, the develop commit the queue built this
+          # entry on. With no base the action falls back to the default
+          # branch, which moves: once the queue has merged this entry,
+          # develop contains it, so a "Re-run all jobs" of the run would
+          # find no changes, skip every lane, and let "Can merge" go
+          # green having tested nothing -- a run the release gate would
+          # count. A re-run keeps its original payload, so it sees the
+          # same diff as the first attempt. On pull_request events the
+          # action ignores base and compares against the pull request's
+          # base branch.
+          base: ${{ github.event.merge_group.base_sha || 'develop' }}
           # By default a file matches the filter if it matches ANY listed
           # pattern, which makes '**' match everything and silently
           # defeats the '!docs/**' exclusions. 'every' requires a file to
@@ -206,8 +218,13 @@ jobs:
       || needs.check_paths.outputs.plans_changed == 'true'
     outputs:
       flake8_failed: ${{ steps.flake8.outcome == 'failure' }}
+    # Keyed as automated_delinter's is, for the reasons given there.
     concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-lint
+      group: >-
+        ${{ github.workflow }}-lint-${{
+        github.event_name == 'merge_group' && github.run_attempt == '1'
+        && format('merge_group-{0}', github.event.merge_group.base_ref)
+        || github.ref }}
       cancel-in-progress: true
 
     steps:
@@ -387,18 +404,22 @@ jobs:
     # superseded merge groups starving a neighbour's, and
     # shakenfist/development audits/merge-group-cancellation.md.
     #
-    # This queue is serial (max_entries_to_build: 1), so of two
-    # merge_group runs in one of these groups, one is superseded. But
-    # cancel-in-progress cancels whichever entered the group first, which
-    # is not necessarily the superseded one: that is why check_paths
-    # cancels a superseded run before its jobs get here (issue #3998).
-    # The merge_group- prefix keeps a queue run from sharing a group with
-    # a workflow_dispatch run on develop, whose github.ref is the same
+    # This queue is serial (max_entries_to_build: 1), so of two first
+    # attempts of merge_group runs in one of these groups, one is
+    # superseded. But cancel-in-progress cancels whichever entered the
+    # group first, which is not necessarily the superseded one: that is
+    # why check_paths cancels a superseded run before its jobs get here
+    # (issue #3998). A re-run is not a queue build, though. It keeps its
+    # original event, so with the base-branch key a "Re-run jobs" on an
+    # old queue run would cancel the live queue entry or be cancelled by
+    # it. Re-runs therefore keep their own queue branch's group. The
+    # merge_group- prefix keeps a queue run from sharing a group with a
+    # workflow_dispatch run on develop, whose github.ref is the same
     # string.
     concurrency:
       group: >-
         ${{ github.workflow }}-delinter-${{
-        github.event_name == 'merge_group'
+        github.event_name == 'merge_group' && github.run_attempt == '1'
         && format('merge_group-{0}', github.event.merge_group.base_ref)
         || github.ref }}
       cancel-in-progress: true
@@ -647,10 +668,11 @@ jobs:
     # this is the backstop for the setup and teardown around them, and
     # is still far short of GitHub's six hour default.
     timeout-minutes: 180
+    # Keyed as automated_delinter's is, for the reasons given there.
     concurrency:
       group: >-
         ${{ github.workflow }}-nodelifecycle-collection-${{
-        github.event_name == 'merge_group'
+        github.event_name == 'merge_group' && github.run_attempt == '1'
         && format('merge_group-{0}', github.event.merge_group.base_ref)
         || github.ref }}
       cancel-in-progress: true
@@ -840,10 +862,11 @@ jobs:
     # moving this job to a distro with an older MariaDB drops that.
     runs-on: [self-hosted, vm, debian-13, s]
     timeout-minutes: 30
+    # Keyed as automated_delinter's is, for the reasons given there.
     concurrency:
       group: >-
         ${{ github.workflow }}-schema-enum-widening-${{
-        github.event_name == 'merge_group'
+        github.event_name == 'merge_group' && github.run_attempt == '1'
         && format('merge_group-{0}', github.event.merge_group.base_ref)
         || github.ref }}
       cancel-in-progress: true
