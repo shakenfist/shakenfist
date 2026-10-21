@@ -5298,26 +5298,39 @@ def _direct_get_cluster_operation_target(
 
 def _direct_get_cluster_operation_targets_for_object(
     target_object_type: ObjectType,
-    target_uuid: str
+    target_uuid: str,
+    pending_only: bool = False
 ) -> list[ClusterOperationTargetData]:
-    """Get all cluster operation targets for an object, ordered by sequence.
+    """Get cluster operation targets for an object, ordered by sequence.
 
     Observational operations are included, and each row carries its flag.
+    With pending_only, only targets whose operation is in flight are
+    returned, judged by the same object_states join as
+    _direct_has_pending_cluster_operation_target.
     """
     engine = _get_engine()
     table = _get_cluster_operation_targets_table()
+    states_table = _get_object_states_table()
 
     try:
         with engine.connect() as conn:
             # Deliberately not filtered on observational: the per-blob
             # sweep's duplicate-op guard (daemons/cluster/scheduled_tasks.py)
             # must see the observational checksum ops it has already queued.
-            stmt = sa.select(table).where(
-                sa.and_(
-                    table.c.target_object_type == target_object_type,
-                    table.c.target_uuid == target_uuid
-                )
-            ).order_by(table.c.sequence_number)
+            # That caller does not pass pending_only.
+            conditions = [
+                table.c.target_object_type == target_object_type,
+                table.c.target_uuid == target_uuid
+            ]
+            stmt = sa.select(table)
+            if pending_only:
+                stmt = stmt.join(
+                    states_table,
+                    table.c.operation_uuid == states_table.c.object_uuid)
+                conditions.append(
+                    states_table.c.state_value.in_(_ACTIVE_OPERATION_STATES))
+            stmt = stmt.where(sa.and_(*conditions)).order_by(
+                table.c.sequence_number)
             results = conn.execute(stmt).fetchall()
             return [
                 ClusterOperationTargetData(
@@ -5635,16 +5648,18 @@ def _grpc_get_cluster_operation_target(
 
 def _grpc_get_cluster_operation_targets_for_object(
     target_object_type: ObjectType,
-    target_uuid: str
+    target_uuid: str,
+    pending_only: bool = False
 ) -> list[ClusterOperationTargetData]:
-    """Get all cluster operation targets for an object via gRPC."""
+    """Get cluster operation targets for an object via gRPC."""
     try:
         stub = _get_database_stub()
         request = database_pb2.GetClusterOperationTargetsForObjectRequest(
             target_object_type=cast(
                 shakenfist_enums_pb2.ObjectType.ValueType,
                 target_object_type.proto_id),
-            target_uuid=target_uuid
+            target_uuid=target_uuid,
+            pending_only=pending_only
         )
         reply = _grpc_call(stub.GetClusterOperationTargetsForObject, request)
         return [_target_from_proto(t) for t in reply.targets]
@@ -5806,21 +5821,25 @@ def get_cluster_operation_target(
 
 def get_cluster_operation_targets_for_object(
     target_object_type: ObjectType,
-    target_uuid: str
+    target_uuid: str,
+    pending_only: bool = False
 ) -> list[ClusterOperationTargetData]:
-    """Get all cluster operation targets for an object, ordered by sequence.
+    """Get cluster operation targets for an object, ordered by sequence.
 
     Observational operations are included; each row carries its
-    ``observational`` flag.
+    ``observational`` flag. With pending_only, only targets whose
+    operation is queued, in preflight or executing are returned. An
+    sf-database older than the field ignores it and returns every row, so
+    callers must still check each operation's state.
 
     Returns:
         List of target data ordered by sequence_number ascending.
     """
     if _use_database_service():
         return _grpc_get_cluster_operation_targets_for_object(
-            target_object_type, target_uuid)
+            target_object_type, target_uuid, pending_only)
     return _direct_get_cluster_operation_targets_for_object(
-        target_object_type, target_uuid)
+        target_object_type, target_uuid, pending_only)
 
 
 def get_latest_cluster_operation_target(

@@ -243,6 +243,41 @@ class ObservationalCurrentStateTestCase(
             {MUTATING_OP: False, OBSERVING_OP: True, MIXED_OP: False},
             {op['uuid']: op['observational'] for op in ops})
 
+    def test_pending_only_listing_filters_on_state_in_sql(self):
+        ops = {
+            'queued': '11112222-2222-4222-8222-000000000011',
+            'executing': '11112222-2222-4222-8222-000000000012',
+            'complete': '11112222-2222-4222-8222-000000000013',
+            'error': '11112222-2222-4222-8222-000000000014',
+        }
+        for state, op_uuid in ops.items():
+            self._enqueue(op_uuid, ['mutate'])
+            if state != 'queued':
+                self._set_op_state(op_uuid, state)
+
+        everything = mariadb.get_cluster_operation_targets_for_object(
+            ObjectType.INSTANCE, INSTANCE_UUID)
+        self.assertEqual(list(ops.values()),
+                         [r.operation_uuid for r in everything])
+
+        pending = mariadb.get_cluster_operation_targets_for_object(
+            ObjectType.INSTANCE, INSTANCE_UUID, pending_only=True)
+        self.assertEqual([ops['queued'], ops['executing']],
+                         [r.operation_uuid for r in pending])
+        self.assertEqual(
+            sorted(r.sequence_number for r in pending),
+            [r.sequence_number for r in pending])
+
+    def test_pending_only_listing_keeps_observational_ops(self):
+        self._enqueue(OBSERVING_OP, ['check'])
+        self.assertEqual('queued', self._op_state(OBSERVING_OP))
+
+        rows = mariadb.get_cluster_operation_targets_for_object(
+            ObjectType.INSTANCE, INSTANCE_UUID, pending_only=True)
+        self.assertEqual(
+            [(OBSERVING_OP, True)],
+            [(r.operation_uuid, r.observational) for r in rows])
+
     # The tests below use the production models, so they fail if a
     # declaration is dropped or reclassified without this being noticed.
 
@@ -412,3 +447,37 @@ class ObservationalOnTheWireTestCase(base.ShakenFistTestCase):
         self.assertEqual(1, len(ops))
         self.assertIs(True, ops[0]['observational'])
         self.assertEqual(MUTATING_OP, str(UUID(ops[0]['uuid'])))
+
+    def test_targets_wrapper_sends_pending_only(self):
+        reply = database_pb2.GetClusterOperationTargetsForObjectReply()
+        for pending_only in (True, False):
+            with mock.patch('shakenfist.mariadb._get_database_stub'), \
+                    mock.patch('shakenfist.mariadb._grpc_call',
+                               return_value=reply) as call:
+                mariadb._grpc_get_cluster_operation_targets_for_object(
+                    ObjectType.INSTANCE, INSTANCE_UUID, pending_only)
+            request = call.call_args.args[1]
+            self.assertIs(pending_only, request.pending_only)
+            self.assertEqual(INSTANCE_UUID, request.target_uuid)
+
+    def test_targets_handler_forwards_pending_only(self):
+        for pending_only in (True, False):
+            with mock.patch(
+                    'shakenfist.mariadb'
+                    '._direct_get_cluster_operation_targets_for_object',
+                    return_value=[self._target(False)]) as direct:
+                reply = self._servicer().GetClusterOperationTargetsForObject(
+                    database_pb2.GetClusterOperationTargetsForObjectRequest(
+                        target_object_type=ObjectType.INSTANCE.proto_id,
+                        target_uuid=INSTANCE_UUID,
+                        pending_only=pending_only),
+                    mock.MagicMock())
+            direct.assert_called_once_with(
+                ObjectType.INSTANCE, INSTANCE_UUID, pending_only)
+            self.assertEqual(1, len(reply.targets))
+
+    def test_targets_request_from_older_client_is_unfiltered(self):
+        request = database_pb2.GetClusterOperationTargetsForObjectRequest(
+            target_object_type=ObjectType.INSTANCE.proto_id,
+            target_uuid=INSTANCE_UUID)
+        self.assertFalse(request.pending_only)

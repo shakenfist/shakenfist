@@ -479,3 +479,38 @@ class ClusterOperationTargetsIndexLiveTestCase(base.ShakenFistTestCase):
 
         row = self._plan_for_targets_table(self._explain(statement, parameters))
         self.assertEqual('idx_cot_target', row['key'], row)
+
+    def test_pending_only_listing_uses_idx_cot_target(self):
+        # One in-flight and one finished op, so the state join decides
+        # what comes back.
+        target_uuid = str(uuid4())
+        now = time.time()
+        wanted = None
+        with self.engine.connect() as conn:
+            for state in ('queued', 'complete'):
+                op_uuid = str(uuid4())
+                if state == 'queued':
+                    wanted = op_uuid
+                conn.execute(self.table.insert().values(
+                    operation_uuid=op_uuid,
+                    operation_type='node_inst_op',
+                    target_object_type=ObjectType.INSTANCE,
+                    target_uuid=target_uuid,
+                    created_at=now,
+                    observational=False))
+                conn.execute(self.states_table.insert().values(
+                    object_uuid=op_uuid,
+                    object_type=ObjectType.NODE_INST_OP,
+                    state_value=state,
+                    update_time=now,
+                    message=None))
+            conn.commit()
+
+        rows, statement, parameters = self._production_statement(
+            mariadb._direct_get_cluster_operation_targets_for_object,
+            ObjectType.INSTANCE, target_uuid, True)
+        self.assertIn('object_states', statement)
+        self.assertEqual([wanted], [r.operation_uuid for r in rows])
+
+        row = self._plan_for_targets_table(self._explain(statement, parameters))
+        self.assertEqual('idx_cot_target', row['key'], row)
