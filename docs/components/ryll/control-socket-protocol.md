@@ -833,9 +833,12 @@ whether that happened.
 published its counters, which it does after each batch of messages
 and every 100 ms while the server is silent. It is absent, not zeroed,
 when the server offered no playback channel, before the channel links,
-after it closes, and always in a ryll built without the `audio` Cargo feature (the slim
-`--no-default-features` build), so a client can tell "no audio here"
-from "audio, but nothing played". The counters count from the channel
+after it closes, and always in a `--headless` session of a ryll built
+without the `audio` Cargo feature (the slim `--no-default-features`
+build), which does not link the playback channel, so a client can
+tell "no audio here" from "audio, but nothing played". A `--web`
+session links it in every build, since it sends the audio to the
+browser rather than a local device. The counters count from the channel
 linking and survive `STOP` and the next `START`. It holds:
 
 | Field | Type | Description |
@@ -851,9 +854,11 @@ linking and survive `STOP` and the next `START`. It holds:
 | `channels` | u8 or null | The current stream's channel count from `START`, saturating at 255; `null` as for `codec`. |
 
 The codec is the data mode the server last sent in `PLAYBACK_MODE`.
-Decoding does not need a sound device: a ryll with `audio` and no
-device decodes into its ring and retries the device in the background,
-so these counters move on a headless test host too.
+Decoding does not need a sound device, and runs whether or not the
+audio is played locally: a `--headless` ryll with `audio` and no device
+decodes into its ring and retries the device in the background, and a
+`--web` session decodes without opening a device at all, so these
+counters move on a test host with no sound hardware too.
 
 Verb-specific error codes: none beyond the common set.
 

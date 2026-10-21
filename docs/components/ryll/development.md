@@ -107,11 +107,15 @@ out at build time:
   libxcb1, libxkbcommon0, libwayland-client0.  Running such a
   binary without `--headless` or `--web` exits with a clear
   "this binary was built without the `gui` feature" message.
-- **`audio`** (default-on) — cpal, opus-decoder, rtrb, and the
-  SPICE playback channel in `shakenfist-spice-renderer`.
-  Disabling it drops libasound2 from the runtime image and
-  skips the SPICE playback channel at connect time (the rest
-  of the session is unaffected).
+- **`audio`** (default-on) — local audio output: cpal and rtrb
+  in `shakenfist-spice-renderer`.  Disabling it drops libasound2
+  from the runtime image.  The GUI and `--headless`, which play
+  through the host's device, then have no local output and skip
+  the SPICE playback channel at connect time (the rest of the
+  session is unaffected).  `--web` hands the audio to a sink
+  instead of a device, so it still links the playback channel
+  (and its Opus decoder, which is always compiled) and the
+  browser still gets audio.
 - **`capture`** (default-on) — pcap-file + etherparse + mp4 for
   `--capture` recording.
 - **`digest-decode`** (default-off) — adds the
@@ -125,6 +129,32 @@ The slim test-harness binary is built with
 `cargo build --release --no-default-features -p ryll`.  See
 [control-socket-protocol.md](/components/ryll/control-socket-protocol/)
 for the `surface_drawn` and `digest_updated` event shapes.
+
+### Renderer features
+
+`shakenfist-spice-renderer` has its own feature set so that a
+consumer which only needs display decode, such as a server-role
+frontend that relays the guest's screen, can leave out the C codecs
+and device stacks.  All but `digest-decode` are default-on, so a plain
+dependency still builds the full client:
+
+| Feature | What it gates |
+|---------|---------------|
+| `audio` | Local audio output (cpal, rtrb).  The playback channel and Opus decode are always built; only `PlaybackOutput::Local` needs this |
+| `usbredir` | The usbredir channel and the USB device backends (nusb) |
+| `webdav` | The WebDAV folder-sharing channel and server |
+| `encoder` | The live H.264 encoder (openh264, vendored C++) |
+| `h264-decode` | H.264 stream decode; without it the display channel does not advertise H.264 |
+| `mozjpeg` | SIMD JPEG decode (vendored libjpeg-turbo); without it JPEG falls back to the platform or pure-Rust decoder |
+| `digest-decode` | Visual-digest QR detection (default-off) |
+
+The slim renderer is built with
+`cargo build -p shakenfist-spice-renderer --no-default-features`,
+optionally naming the features needed.  `tools/check-slim-renderer.sh`
+guards it, and `make lint` runs it: clippy with no default features,
+clippy with each feature on its own (both with warnings denied), and a
+check that the slim dependency tree contains none of the crates the
+features gate.
 
 ## Workspace dependency convention
 

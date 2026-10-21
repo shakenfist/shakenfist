@@ -46,11 +46,12 @@ tox -ecover
 
 ## Continuous Integration
 
-Pull requests to `develop` run `.github/workflows/functional-tests.yml`.
-Its `sanity_checks` job (flake8, a dependency install check, unit tests
-and coverage) runs on an ephemeral VM runner, so a `check_paths` job
-skips it when a pull request changes nothing outside `docs/`. The
-automated reviewer still runs on those pull requests. Commenting
+Pull requests to `develop`, and merge queue entries, run
+`.github/workflows/functional-tests.yml`. Its `sanity_checks` job
+(flake8, a dependency install check, unit tests and coverage) runs on
+an ephemeral VM runner, so a `check_paths` job skips it when a change
+touches nothing outside `docs/`. The automated reviewer still runs on
+those pull requests. Commenting
 `@shakenfist-bot please retest` re-runs the workflow by dispatch, which
 always runs the full set.
 
@@ -81,16 +82,84 @@ the rules that did fire; update the expected list in the script to
 match, after checking that the new rule still catches the planted
 credential.
 
-None of these checks is configured as a required status check on
-`develop` today, so a failing gitleaks or agent context job is visible
-on the pull request but does not by itself block a merge; `can_merge`
-in `functional-tests.yml` only aggregates that workflow's own jobs.
+The only required status checks on `develop` are "Can enqueue" and
+"Can merge", which collect `functional-tests.yml`'s own jobs (see
+Merging below). So a failing gitleaks or agent context job is visible
+on the pull request but does not by itself block a merge.
 
 The same workflow runs [skillsaw](https://skillsaw.org/) over the agent
 context (`AGENTS.md` and anything else an agent is handed) by running
 its pre-commit hook. `.pre-commit-config.yaml` carries that hook
 alongside actionlint and shellcheck, so run `pre-commit install` once
 per clone and `pre-commit run --all-files` before proposing a change.
+
+### Merging
+
+Pull requests merge through a merge queue on `develop`, not with the
+merge button directly. A pull request can be queued once its "Can
+enqueue" check passes. The queue then runs `functional-tests.yml`
+again on the commit it is about to merge, and merges only when "Can
+merge" passes. That second run is the one a release counts (see
+below), so a change merged around the queue, by an administrator
+bypassing it, cannot be released until a later queue entry that
+changes something outside `docs/` has gone through the queue. The gate
+reads only the tagged commit's own runs, and a docs-only entry skips
+`sanity_checks`, so its successful run would vouch for the bypassed
+change without testing it. Both checks fail if any job failed, or was skipped for any
+reason other than `check_paths` finding a docs-only change. A new job
+in `functional-tests.yml` goes in the `needs:` of both.
+
+The queue builds one entry at a time (`max_entries_to_build: 1` in the
+`develop` ruleset). `functional-tests.yml`'s concurrency groups depend
+on that: a queue run shares a group with whatever the queue builds
+next, so that a superseded run is cancelled. Raising the setting would
+make each entry cancel the one ahead of it, so revisit those groups
+first.
+
+Enqueueing a fork's pull request runs its version of the workflow on
+the merge queue without the approval GitHub asks for on a fork's pull
+request, so review the whole diff, and changes under `.github/` most
+closely, before enqueueing it.
+
+## Releasing
+
+Pushing a `v*` tag triggers `release.yml`. Its jobs, in order:
+
+1. `ci-gate` checks that `functional-tests.yml` succeeded on the tagged
+   commit, in its merge queue run. A run started by hand, as
+   `pr-retest.yml` does with `workflow_dispatch`, does not count. A
+   queue run that fails, flaky or not, ejects its entry, so the commit
+   it built never reaches `develop` and re-running that run cannot make
+   any tag pass: re-queue the pull request and tag the commit that
+   merges. Re-running a queue run helps only when the tagged commit's
+   run was re-run after it merged and that later attempt failed,
+   because the gate judges each run at its latest attempt; then use
+   "Re-run jobs" on it. How the gate decides is documented with the
+   action, as
+   [`require-ci-success`](https://github.com/shakenfist/actions/blob/main/docs/actions.md#require-ci-success).
+   It has no override.
+2. `build` builds the sdist and wheel, then runs `twine check` and
+   [`check-dist`](https://github.com/shakenfist/actions/blob/main/docs/actions.md#check-dist),
+   which fails if the wheel holds a test directory. It runs only if the
+   gate passed.
+3. The publishing jobs wait for approval in the `release` environment,
+   re-sign the tag with gitsign, and publish to PyPI with attestations.
+
+So tag a commit that is on `develop` and went through the merge queue,
+and wait for its `functional-tests.yml` run to finish first. A gate
+failure means nothing was signed or published, so every failure is
+recoverable: the template's
+[recovery table](https://github.com/shakenfist/development/blob/main/templates/release-automation/README.md#recovering-from-a-gate-failure)
+says what to do for each cause, which is usually moving the tag or
+re-running CI and then the `ci-gate` job.
+
+Running `release.yml` by hand with `workflow_dispatch` skips the gate
+and the publishing jobs, and only builds and checks the packages.
+
+The wheel ships the `shakenfist_agent` package and nothing else: the
+tests, the `.proto` sources and `_copy_stubs.sh` stay in the checkout.
+The version comes from the tag through setuptools_scm. The one-time
+setup, and how to verify a release, are in `RELEASE-SETUP.md`.
 
 ## Adding a New Command
 

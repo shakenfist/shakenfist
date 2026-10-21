@@ -86,9 +86,10 @@ provides a modular architecture with:
 - **crates/qcow2/** - Shared QCOW2 format crate: header parsing, L1/L2
  cluster lookup (including extended L2 with 16-byte entries
  and full subcluster bitmap parsing), subcluster bitmap validation
- (`validate_subcluster_bitmap()` enforcing QCOW2 spec
- invalid-combination rules), compressed cluster decompression (zlib
- via `decompress` feature, ZSTD via `decompress-zstd` feature using
+ (`validate_subcluster_bitmap()`, which reports what qemu-img check
+ reports, on top of the `subcluster_type()` classifier), compressed
+ cluster decompression (zlib via `decompress` feature, ZSTD via
+ `decompress-zstd` feature using
  ruzstd), cluster compression (behind `compress` feature flag using
  raw deflate via miniz_oxide), refcount table reading (all widths:
  1/2/4/8/16/32/64-bit), compressed L2 entry parsing, backing file

@@ -132,6 +132,23 @@ Header extensions follow immediately after the header, padded to 8-byte boundari
 #define QCOW_OFLAG_ZERO         (1ULL << 0)   // Reads as zeros (v3+)
 ```
 
+## Subcluster Types
+
+Every L2 entry, classic or extended, is decided by one classifier in
+the qcow2 crate: `subcluster_type()` for a
+single subcluster and `subcluster_range()` for a run of them. They
+transcribe qemu's `qcow2_get_cluster_type`,
+`qcow2_get_subcluster_type` and `qcow2_get_subcluster_range_type`
+(`block/qcow2.h` and `block/qcow2-cluster.c`, as of qemu v10.0.0).
+The reader, `map`, `measure` and `check` all take their answer from
+it rather than decoding L2 entries themselves.
+
+A subcluster is normal, zero (plain or allocated), unallocated (plain
+or allocated), compressed, or invalid. Invalid entries are refused with
+"Invalid cluster entry found". With an external data file, an entry of
+`QCOW_OFLAG_COPIED` and host offset 0 is a normal cluster at offset 0.
+See `docs/quirks.md` for the observable behaviour.
+
 ## References
 
 - qemu source: `block/qcow2.h`, `block/qcow2.c`
