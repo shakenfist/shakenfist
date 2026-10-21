@@ -1064,7 +1064,17 @@ class Monitor(daemon.Daemon):
             scheduled_tasks.per_blob_checks)
         schedule.every(5).minutes.do(
             scheduled_tasks.per_instance_checks_and_usage)
-        schedule.every(15).minutes.do(
+        # The deleted-object sweep runs every minute, within its own
+        # DELETED_OBJECT_SWEEP_SECONDS budget, rather than in a thread of its
+        # own. Its cost is database commits, so a thread would only add
+        # concurrency against the tier that is already the bottleneck, and
+        # would need its own answer to what stops a node which has just lost
+        # the election from sweeping alongside the new leader -- which this
+        # loop already answers. The watchdog is petted between jobs (see
+        # _run_due_scheduled_jobs), so a budget of tens of seconds is well
+        # inside its window; the other one-minute jobs just run that much
+        # later.
+        schedule.every(1).minutes.do(
             scheduled_tasks.per_deleted_object_checks)
         schedule.every(60).minutes.do(
             scheduled_tasks.publish_deleted_object_backlog)
