@@ -371,7 +371,7 @@ straight after the first deploy:
 
 Any changed or vanished `InvocationID` fails the step, and the failure
 names the host and the unit. The comparison is a new actions script,
-`tools/ci-redeploy-check.sh`, with `snapshot` and `compare` modes.
+`tools/ci-redeploy-check.py`, with `snapshot` and `compare` modes.
 
 * **Why `InvocationID`:** it changes on every start, including a start
   that systemd's own `Restart=` made, where `ActiveEnterTimestamp` can
@@ -560,7 +560,7 @@ another lane later.
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
 | 1 | high | opus | worktree in actions | Deploy profiles: input plumbing, `ci-apply-deploy-profile.py` and its tests, `deploy-collection.sh`'s extra-vars file, the facts/inventory path for profile groups. See brief 1. Commit (actions): "Let a caller supply a deploy profile." |
-| 2 | high | opus | same actions worktree | The redeploy check (`ci-redeploy-check.sh`, wired after the first deploy) and `test_env` export into the test run. See brief 2. Commit (actions): "Deploy twice and require no restarts." |
+| 2 | high | opus | same actions worktree | The redeploy check (`ci-redeploy-check.py`, wired after the first deploy) and `test_env` export into the test run. See brief 2. Commit (actions): "Deploy twice and require no restarts." |
 | 3 | medium | sonnet | same actions worktree | `kerbside-*` in node checks and the failure log bundle; fix the stale "slim-tier is two nodes" comment. See brief 3. Commit (actions): "Check and collect Kerbside units in CI." |
 | 4 | medium | sonnet | none | The IP SAN in `site.yml`, plus two role-test cases. See brief 4. Commit: "Give an addressed Kerbside an IP SAN." |
 | 5 | high | opus | none | The profile, its unit test, the slim-tier row and the seam-test comment. See brief 5. Commit: "Deploy Kerbside in the slim-tier merge row." |
@@ -650,7 +650,7 @@ Constraints:
 
 Same worktree. Read D3.
 
-* **`tools/ci-redeploy-check.sh snapshot|compare <inventory> <state-file> <unit-glob>...`.**
+* **`tools/ci-redeploy-check.py snapshot|compare <inventory> <state-file> <unit-glob>...`.**
   `snapshot` sshes to every inventory host and records `<host> <unit>
   <InvocationID>` for each loaded unit matching the globs. Use
   `systemctl list-units --all --plain --no-legend` plus `systemctl show
@@ -850,7 +850,7 @@ This worktree, sonnet, medium.
   `deploy-collection.sh`'s rendered command is unchanged.
   `tools/ci-apply-deploy-profile.py`'s tests fail when an unknown key
   or host is accepted (mutated once each).
-* `tools/ci-redeploy-check.sh compare` exits non-zero on a changed or
+* `tools/ci-redeploy-check.py compare` exits non-zero on a changed or
   vanished `InvocationID` fixture and zero on an identical one.
 * The trial run's slim-tier log shows each of these:
   * two `site.yml` runs;

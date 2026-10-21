@@ -55,7 +55,8 @@ adds the proxied path.
 !!! note
 
     The collection can deploy Kerbside itself onto hosts in an optional
-    `kerbside` inventory group (see [Installation](installation.md)); if you
+    `kerbside` inventory group, using the `shakenfist.kerbside` collection
+    from Kerbside (see [Installation](installation.md)); if you
     deploy it some other way, see the
     [Kerbside component documentation](/components/kerbside/). Either way the
     collection handles the Shaken Fist side: the URL, the token duration, the

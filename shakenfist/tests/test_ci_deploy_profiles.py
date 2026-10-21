@@ -14,15 +14,18 @@ StrictUndefined, against a context built from a facts file shaped like the
 one actions' topology playbook writes (ansible/ci-include-common-localhost.yml
 there) -- and checked against what can be checked offline:
 
-* the schema actions accepts: only its five top-level keys, groups that are
+* the schema actions accepts: only its six top-level keys, groups that are
   new and name only hosts the topology has, string test_env values, plain
   unit globs;
-* for a profile which deploys Kerbside, the constraints the kerbside and node
-  roles' argument_specs and the kerbside role's validate entry point would
-  otherwise enforce mid-deploy, plus the two that only a CI profile can get
-  wrong: a kerbside_system_key equal to actions' CI system_key, and a database
-  password which differs between kerbside_sql_url and the SQL that creates the
-  user.
+* for a profile which deploys Kerbside, the constraints the node role's
+  kerbside_source entry point and the shakenfist.kerbside collection's kerbside
+  role would otherwise enforce mid-deploy, plus the two that only a CI profile
+  can get wrong: a kerbside_system_key equal to actions' CI system_key, and a
+  database password which differs between kerbside_sql_url and the SQL that
+  creates the user;
+* for a profile which deploys Kerbside, that it installs shakenfist.kerbside
+  in the range examples/_shared/requirements.yml pins, so the lane deploys the
+  release an operator gets, and site.yml does not refuse it.
 
 docs/plans/PLAN-kerbside-deployer-phase-04-ci.md (D1, D2 and D6) is the
 design.
@@ -45,6 +48,7 @@ def _repo_root():
 
 
 PROFILE_DIR = os.path.join(_repo_root(), 'tools', 'ci-deploy-profiles')
+REQUIREMENTS = os.path.join(_repo_root(), 'examples', '_shared', 'requirements.yml')
 
 # Facts files shaped like the one actions' topology playbooks write, by
 # topology. The mesh addresses are the real ones (actions'
@@ -71,7 +75,7 @@ EXISTING_GROUPS = ('all', 'ungrouped', 'allsf', 'hypervisors', 'network_node', '
                    'etcd_master')
 
 # The schema, from tools/ci-apply-deploy-profile.py in shakenfist/actions.
-TOP_LEVEL_KEYS = ('groups', 'extra_vars', 'mariadb_sql', 'redeploy_check', 'test_env')
+TOP_LEVEL_KEYS = ('groups', 'extra_vars', 'mariadb_sql', 'redeploy_check', 'test_env', 'collections')
 IDENTIFIER = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 UNIT_GLOB = re.compile(r'^[A-Za-z0-9_.@:*?\[\]-]+$')
 
@@ -82,16 +86,24 @@ UNIT_GLOB = re.compile(r'^[A-Za-z0-9_.@:*?\[\]-]+$')
 # system namespace.
 CI_SYSTEM_KEY = 'ci-system-key-do-not-use-in-production-ci-system-key'
 
-# Kerbside's shipped default seed, which the kerbside role refuses.
+# Kerbside's shipped default seed, which the shakenfist.kerbside collection's
+# kerbside role refuses (its roles/kerbside/tasks/validate.yml).
 KERBSIDE_SEED_SENTINEL = '~~unconfigured~~'
 
-# The kerbside role's default api_url (roles/kerbside/defaults/main.yml).
+# The node role's default api_url (roles/node/defaults/main.yml), which its
+# kerbside_source entry point makes the url of this cluster's Kerbside source.
 ROLE_DEFAULT_API_URL = 'http://localhost:13000'
 
-# Variables the kerbside role's validate entry point requires once the
-# kerbside group is not empty.
+# Variables which must be set once the kerbside group is not empty:
+# kerbside_system_key by the node role's kerbside_source entry point, and the
+# rest by the shakenfist.kerbside collection's kerbside role (kerbside_url
+# because this cluster's source is of type shakenfist).
 KERBSIDE_REQUIRED = ('kerbside_url', 'kerbside_system_key', 'kerbside_public_fqdn', 'kerbside_sql_url',
                      'kerbside_auth_secret_seed')
+
+# The collection with the kerbside role, which a profile deploying Kerbside
+# installs through its collections key.
+KERBSIDE_COLLECTION = 'shakenfist.kerbside'
 
 # Variables the Shaken Fist nodes read as well as the Kerbside hosts
 # (examples/_shared/site.yml), so a profile must set them for every host --
@@ -134,9 +146,9 @@ def topology_of(path):
 
 
 def is_loopback_host(host):
-    """Whether a URL's host is loopback, by the kerbside role's own rule.
+    """Whether a URL's host is loopback, by the node role's own rule.
 
-    validate.yml's loopback api_url check: localhost and any name under it,
+    kerbside_source.yml's loopback api_url check: localhost and any name under it,
     127.0.0.0/8 including short forms such as 127.1, ::1 in any spelling, its
     IPv4-mapped form, and the unspecified addresses, which Linux connects to
     the local host.
@@ -215,12 +227,32 @@ class CiDeployProfilesTestCase(base.ShakenFistTestCase):
             for unit in (profile.get('redeploy_check') or {}).get('units') or []:
                 self.assertRegex(unit, UNIT_GLOB, '%s: redeploy unit %r is not a plain glob.' % (name, unit))
 
+    def test_kerbside_collection_is_the_pinned_range(self):
+        # site.yml refuses a shakenfist.kerbside outside the range the
+        # requirements file pins, so a profile installing another would fail
+        # its deploy; and one installing none would deploy no Kerbside.
+        with open(REQUIREMENTS) as f:
+            pinned = [c for c in yaml.safe_load(f)['collections'] if c.get('name') == KERBSIDE_COLLECTION]
+        self.assertEqual(
+            1, len(pinned), '%s does not pin %s exactly once.' % (REQUIREMENTS, KERBSIDE_COLLECTION))
+        for name, _, profile, _ in self._kerbside_profiles():
+            entries = [c for c in profile.get('collections') or []
+                       if isinstance(c, dict) and c.get('name') == KERBSIDE_COLLECTION]
+            self.assertEqual(
+                1, len(entries),
+                '%s deploys Kerbside but does not install %s exactly once in its collections.'
+                % (name, KERBSIDE_COLLECTION))
+            self.assertEqual(
+                str(pinned[0].get('version')), str(entries[0].get('version')),
+                '%s installs %s %s, but examples/_shared/requirements.yml pins %s.'
+                % (name, KERBSIDE_COLLECTION, entries[0].get('version'), pinned[0].get('version')))
+
     def test_kerbside_required_variables_are_set(self):
         for name, _, profile, group in self._kerbside_profiles():
             for var in KERBSIDE_REQUIRED:
                 self.assertTrue(
                     self._effective(profile, group, var),
-                    '%s deploys Kerbside without %s, which the kerbside role requires.' % (name, var))
+                    '%s deploys Kerbside without %s, which deploying it requires.' % (name, var))
             for var in KERBSIDE_CLUSTER_WIDE:
                 self.assertIn(
                     var, profile.get('extra_vars') or {},

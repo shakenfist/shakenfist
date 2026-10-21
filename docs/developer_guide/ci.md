@@ -256,9 +256,18 @@ Profiles live in `tools/ci-deploy-profiles/` and are named
 outside the database tier, scraping the primary's `sf-api` across hosts. It
 creates Kerbside's database on the primary's MariaDB, sets throwaway CI
 credentials, and exports `SF_CI_EXPECT_VDI_CONSOLE_PROXY` into the test run.
-It leaves `kerbside_package` at the role's default, so this row needs a
-Kerbside release satisfying `kerbside>=0.7.0`. Kerbside is addressed by IP
-because CI nodes have no DNS, so its certificate carries an IP SAN.
+Kerbside is addressed by IP because CI nodes have no DNS, so its certificate
+carries an IP SAN.
+
+The role which deploys Kerbside is not in this repository: it is the `kerbside`
+role of Kerbside's `shakenfist.kerbside` collection, published on Galaxy. The
+profile's `collections` key lists collections for the deploy to install before
+the first deploy (`ci-apply-deploy-profile.py` in shakenfist/actions does the
+install), and this profile installs `shakenfist.kerbside` from Galaxy in the
+same version range as `examples/_shared/requirements.yml`, so the row deploys
+the release an operator gets. `test_ci_deploy_profiles.py` checks the two
+ranges are equal, so change them together. The profile leaves the role's own
+variables, including its package, at their defaults.
 
 The redeploy check runs straight after the first deploy, before anything
 restarts `sf-api` on purpose and before the tests. It asserts that a second

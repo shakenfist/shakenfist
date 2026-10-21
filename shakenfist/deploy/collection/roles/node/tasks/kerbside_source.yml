@@ -1,0 +1,152 @@
+---
+# Describe this Shaken Fist cluster to a Kerbside, in the terms the
+# shakenfist.kerbside collection's kerbside role takes, and refuse a Shaken
+# Fist side of the configuration which cannot work.
+#
+# Runs on each Kerbside host, with that host's own variables, since operators
+# commonly keep the Kerbside settings in the Kerbside hosts' group variables
+# and may override them per host. The consuming playbook runs it twice: in the
+# Kerbside validation play, before any host is changed, and again in the
+# Kerbside deploy play, once the CA is known. It sets two facts:
+#
+#   * kerbside_sf_source: the console source through which Kerbside scrapes
+#     this cluster, which the consuming playbook puts first in
+#     kerbside_sources. It carries kerbside_system_key, so it is a secret.
+#   * kerbside_reserved_ports: the ports a Kerbside listener on this host must
+#     leave alone. Every Kerbside host gets the instance console range; one
+#     which is also a Shaken Fist node (kerbside_colocated) gets the ports
+#     Shaken Fist's daemons listen on too.
+#
+# Every task here is an assert or a set_fact, so nothing is changed on any
+# host. kerbside_system_key is a secret, and no_log on an assert would hide its
+# message too, leaving an operator with nothing to act on, so these asserts
+# instead only ever print their own fixed messages and the text of their
+# conditions, neither of which contains the key. kerbside_sf_source is set
+# under no_log.
+
+- name: Refuse an empty Kerbside system key on a Kerbside host
+  ansible.builtin.assert:
+    that: kerbside_system_key | default('', true) | string | length > 0
+    fail_msg: >-
+      kerbside_system_key is empty on {{ inventory_hostname }}, but the kerbside
+      group is not. Kerbside authenticates to Shaken Fist with it. Set it, or
+      remove every host from the kerbside group.
+    quiet: true
+
+# null means the CA is not known yet: the validation play runs before Shaken
+# Fist is deployed, and so before the file /admin/cacert serves need exist.
+# The deploy play passes the CA it read, which must then be a PEM. The CA
+# certificate is not a secret, but its absence is only otherwise caught by
+# Kerbside's sources check, which cannot say where the value should come from.
+- name: Require the Shaken Fist CA certificate
+  ansible.builtin.assert:
+    that: "'-----BEGIN CERTIFICATE-----' in kerbside_sf_ca_cert"
+    fail_msg: >-
+      kerbside_sf_ca_cert does not hold a PEM certificate. It must be the CA
+      which Shaken Fist's /admin/cacert serves (the API node's
+      /etc/pki/libvirt-spice/ca-cert.pem), or Kerbside will refuse to fetch
+      the console token signing key.
+    quiet: true
+  when: kerbside_sf_ca_cert is not none
+
+# Kerbside fetches the console token signing key from api_url, as this host
+# sees it. Its default, http://localhost:13000, works on a Kerbside host which
+# is also a Shaken Fist node, since sf-api listens on every node, and reaches
+# nothing from one which is not. So it is judged per host: a co-located host
+# may use loopback even when another Kerbside host is dedicated and uses a
+# routable address. Loopback here is localhost and any name under it,
+# 127.0.0.0/8 (including the short forms such as 127.1 which the resolver
+# accepts), ::1 in any spelling, its IPv4-mapped form, and the unspecified
+# addresses 0.0.0.0 and ::, which Linux connects to the local host. Host names
+# are not secrets; the message names the host part of api_url rather than the
+# whole URL, in case the URL carries a credential.
+- name: Refuse a loopback api_url on a Kerbside host which is not a Shaken Fist node
+  ansible.builtin.assert:
+    that: >-
+      kerbside_colocated | bool or not (
+        kerbside_api_host in ['0.0.0.0', '::']
+        or kerbside_api_host is match('^(.*[.])?localhost[.]?$')
+        or kerbside_api_host is match('^127([.][0-9]+){0,3}$')
+        or kerbside_api_host is match('^[0:]*:0{0,3}1$')
+        or kerbside_api_host is match('^(0{0,4}:)*:?ffff:127[.]'))
+    fail_msg: >-
+      api_url's host on {{ inventory_hostname }} is {{ kerbside_api_host }},
+      a loopback address, but {{ inventory_hostname }} is not a Shaken Fist
+      node, so nothing answers there. Kerbside reaches Shaken Fist at
+      api_url, so on this host it must be an address of the Shaken Fist
+      API which this host can reach, such as the cluster's load balancer
+      or an API node's address.
+    quiet: true
+  vars:
+    kerbside_api_host: "{{ api_url | urlsplit('hostname') | default('', true) | lower }}"
+
+# kerbside_url is the single source of truth for the console token audience:
+# this role's config entry point renders it as Shaken Fist's KERBSIDE_URL, and
+# the kerbside role renders it as Kerbside's SF_CONSOLE_TOKEN_AUDIENCE. Set
+# where only one side reads it, such as group_vars/kerbside, the two differ,
+# and Kerbside rejects every console token (or Shaken Fist never issues one).
+# null, the default, means the caller did not supply the Shaken Fist nodes'
+# value, and skips the check. URLs are not secrets, so the message names both
+# values.
+- name: Refuse a kerbside_url which Shaken Fist's nodes see differently
+  ansible.builtin.assert:
+    that: kerbside_url_on_sf_nodes is none or kerbside_url == kerbside_url_on_sf_nodes
+    fail_msg: >-
+      {{ inventory_hostname }} sees kerbside_url as {{ kerbside_url }}, but
+      Shaken Fist's nodes render {{ ('a different kerbside_url, ' ~
+      kerbside_url_on_sf_nodes) if kerbside_url_on_sf_nodes | default('', true)
+      | length > 0 else 'no kerbside_url at all' }}. It is both Shaken Fist's
+      KERBSIDE_URL and Kerbside's token audience, so it must be set once,
+      where both the allsf and the kerbside hosts read it, for example in
+      group_vars/all.
+    quiet: true
+
+# Built as data, never assembled from strings, so the kerbside role writes it
+# to sources.yaml with its own quoting. The username is always system:
+# Kerbside scrapes the whole cluster, and the kerbside_credentials entry point
+# mints kerbside_system_key as the system namespace's "kerbside" key.
+# Until the CA is known, its ca_cert is a placeholder, text as the CA is, so
+# that the kerbside role's validate entry point can check every other field.
+- name: Build Shaken Fist's console source for Kerbside
+  ansible.builtin.set_fact:
+    kerbside_sf_source:
+      source: "{{ deploy_name }}"
+      type: shakenfist
+      url: "{{ api_url }}"
+      username: system
+      password: "{{ kerbside_system_key }}"
+      ca_cert: >-
+        {{ kerbside_sf_ca_cert if kerbside_sf_ca_cert is not none
+           else 'The CA which Shaken Fist serves at /admin/cacert, read when Kerbside is deployed.' }}
+  no_log: true
+
+# Shaken Fist hands out instance console ports from 30000
+# (Instance._allocate_console_port() in shakenfist/instance.py picks from 30000
+# to 50000), so a Kerbside port there on a hypervisor would collide with an
+# instance's console. Every port from 30000 up is reserved on every Kerbside
+# host, so Kerbside's ports are valid wherever it runs. The daemons' ports
+# matter only on a Kerbside host which is also a Shaken Fist node, where a
+# Kerbside listener on one fails to bind, or takes the port from the Shaken
+# Fist daemon, whichever starts second; a dedicated Kerbside host runs no
+# Shaken Fist daemon.
+#
+# The ports Shaken Fist's daemons listen on, by default, on every node they run
+# on, and the daemon behind each. sf-api binds 13000 in
+# roles/node/templates/sf-api.service:33; the others are the defaults of
+# RESOURCES_METRICS_PORT and CLUSTER_METRICS_PORT (shakenfist/config.py:537-544)
+# and of MARIADB_GATEWAY_PORT and MARIADB_GATEWAY_METRICS_PORT
+# (shakenfist/config.py:896-903). sf-database runs only on the database tier,
+# but which nodes those are is the inventory's, so its ports are reserved on
+# every co-located host. A change to any of those defaults belongs here too.
+- name: Reserve the ports Shaken Fist uses on this host
+  ansible.builtin.set_fact:
+    kerbside_reserved_ports: >-
+      {{ (kerbside_sf_listener_ports.keys() | list if kerbside_colocated | bool else [])
+         + [[30000, 65535]] }}
+  vars:
+    kerbside_sf_listener_ports:
+      13000: sf-api
+      13001: sf-resources' metrics (RESOURCES_METRICS_PORT)
+      13005: sf-database's gRPC gateway (MARIADB_GATEWAY_PORT)
+      13006: sf-database's metrics (MARIADB_GATEWAY_METRICS_PORT)
+      13007: sf-cluster's metrics (CLUSTER_METRICS_PORT)

@@ -294,13 +294,16 @@ Current hooks:
   defaults or config template, `examples/_shared/site.yml` (whose wiring of
   those entry points it checks structurally), or the script change. The sanity-checks
   workflow runs the same script
-- `test-kerbside-role` - Drives the `kerbside` role's `validate` and `config`
-  entry points, and lists and runs `examples/_shared/site.yml`'s Kerbside
-  plays against a test inventory, without root, by running
-  `tools/ci-test-kerbside-role.sh`. It needs `ansible-core`, `openssl` and a
-  `python3` which can import `cryptography` and PyYAML (both `ansible-core`
-  dependencies), and only runs when the role, `examples/_shared/site.yml` or
-  the script change. The sanity-checks workflow runs the same script
+- `test-kerbside-wiring` - Checks how `examples/_shared/site.yml` and the node
+  role's `kerbside_source` entry point wire in the `kerbside` role of the
+  `shakenfist.kerbside` collection (which is tested in the Kerbside repository),
+  without root, by running `tools/ci-test-kerbside-wiring.sh`. It installs the
+  release `examples/_shared/requirements.yml` pins from Ansible Galaxy, so it
+  needs network access to Galaxy, as well as `ansible-core`, `openssl` and
+  `certtool` (the `gnutls-bin` package). It only runs when `site.yml`,
+  `requirements.yml`, the `kerbside_source` entry point, the node role's
+  `argument_specs` or defaults, the `internal_ca` role or the script change. The
+  sanity-checks workflow runs the same script
 - `flake8` - Style check via tox, on changed files
 - `py3` - Unit tests via tox
 - `check-from-db-by-ref-namespace` - Every `*_from_db_by_ref` call passes a
