@@ -483,7 +483,9 @@ entries:
       Queue depth gauge published by the resources daemon. Twelve of
       these per publish, or seventeen on the network node, which makes
       them the bulk of a publish's database cost. A publish follows
-      the running-domain set rather than a fixed 60s tick, so this
+      the running-domain set rather than a fixed 60s tick (two per
+      change: one on the poll which sees it and a follow-up on the
+      next, once the change has settled), so this
       pair's rate is coupled to instance churn instead of a steady
       per-node cadence. Activity coupled for that reason
       (#4197), which also tracks re-deriving it against a window that

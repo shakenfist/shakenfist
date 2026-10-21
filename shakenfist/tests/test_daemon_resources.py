@@ -582,6 +582,19 @@ class ShouldPublishMetricsTestCase(base.ShakenFistTestCase):
         self.assertTrue(resources_main._should_publish_metrics(
             1000.0, {17, 18}, set(), 1005.0))
 
+    def test_settle_pending_publishes_on_the_next_poll(self):
+        # The last publish followed a change, and may have caught a domain
+        # part way through starting. The next poll republishes even though
+        # the set has not moved again.
+        self.assertTrue(resources_main._should_publish_metrics(
+            1000.0, {17}, {17}, 1005.0, settle_pending=True))
+
+    def test_settle_pending_waits_for_a_poll(self):
+        # A tick with no poll has not looked at libvirt again, so it cannot
+        # settle anything.
+        self.assertFalse(resources_main._should_publish_metrics(
+            1000.0, {17}, None, 1003.0, settle_pending=True))
+
 
 class _FakeClock:
     """A clock the test advances by hand, so the loop's cadence is exact."""
@@ -652,32 +665,44 @@ class RunInnerCadenceTestCase(base.ShakenFistTestCase):
     def test_vanished_domain_publishes_before_the_interval(self):
         # Two domains at startup, one of them gone five seconds later. The
         # measurement must follow the delete rather than waiting out the
-        # sixty second interval.
+        # sixty second interval, and the poll after it publishes once more
+        # to measure the change once it has settled.
         mock_upsert, _ = self._drive([{17, 18}, {17}, {17}])
 
-        self.assertEqual(2, mock_upsert.call_count)
+        self.assertEqual(3, mock_upsert.call_count)
         # upsert_node_metrics(node_uuid, node_name, timestamp, stats)
-        first = mock_upsert.call_args_list[0][0][2]
-        second = mock_upsert.call_args_list[1][0][2]
-        self.assertEqual(1000.0, first)
-        self.assertEqual(1005.0, second)
-        self.assertLess(second - first,
+        published_at = [c[0][2] for c in mock_upsert.call_args_list]
+        self.assertEqual([1000.0, 1005.0, 1010.0], published_at)
+        self.assertLess(published_at[1] - published_at[0],
                         resources_main.METRICS_PUBLISH_INTERVAL_SECONDS)
 
+    def test_a_change_is_followed_by_exactly_one_settled_publish(self):
+        # A stable set, then one domain starting. The start publishes on the
+        # poll which sees it and once more on the poll after, then the node
+        # goes quiet again. The startup publish is a change from no history,
+        # so it is followed by a settled publish too.
+        mock_upsert, _ = self._drive(
+            [{17}, {17}, {17}, {17, 18}, {17, 18}, {17, 18}], iterations=6)
+
+        published_at = [c[0][2] for c in mock_upsert.call_args_list]
+        self.assertEqual([1000.0, 1005.0, 1015.0, 1020.0], published_at)
+
     def test_unchanged_domains_do_not_publish(self):
-        # The same three iterations with a stable domain set publish once, at
-        # startup, and then say nothing.
-        mock_upsert, _ = self._drive([{17, 18}, {17, 18}, {17, 18}])
-        self.assertEqual(1, mock_upsert.call_count)
+        # A stable domain set publishes at startup and once more as the
+        # startup publish settles, and then says nothing.
+        mock_upsert, _ = self._drive([{17, 18}] * 4, iterations=4)
+        self.assertEqual(2, mock_upsert.call_count)
 
     def test_failed_poll_keeps_the_previous_domain_set(self):
-        # The middle poll raises. It must not publish, and it must not be
-        # recorded as an observation -- if it were treated as an empty set the
-        # third poll would look like two domains appearing and would publish.
+        # The third poll raises, after the startup publish has settled. It
+        # must not publish, and it must not be recorded as an observation --
+        # if it were treated as an empty set the fourth poll would look like
+        # two domains appearing and would publish.
         mock_upsert, mock_ignore = self._drive(
-            [{17, 18}, ConnectionError('libvirtd is unwell'), {17, 18}])
+            [{17, 18}, {17, 18}, ConnectionError('libvirtd is unwell'),
+             {17, 18}], iterations=4)
 
-        self.assertEqual(1, mock_upsert.call_count)
+        self.assertEqual(2, mock_upsert.call_count)
         self.assertEqual(1, mock_ignore.call_count)
         self.assertEqual('resource statistics', mock_ignore.call_args[0][0])
 
