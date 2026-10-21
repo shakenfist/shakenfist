@@ -475,7 +475,11 @@ class TestNodes(base.BaseNamespacedTestCase):
     # this leaves margin for a loaded CI node rather than being the
     # tightest bound that could pass -- four 5 s domain polls plus a
     # publish plus the scheduler's cache. Before this phase either wait
-    # could take 60 s.
+    # could take 60 s. The publish a wait sees is often not the one on
+    # the poll which noticed the change but the follow-up on the poll
+    # after: libvirt lists a domain as active before create() returns,
+    # so the first publish can enumerate before libvirt_returned_at and
+    # not count as following it (issue 4394).
     CPU_MEASURED_DEADLINE_SECONDS = 20
     CPU_MEASURED_POLL_SECONDS = 5
 

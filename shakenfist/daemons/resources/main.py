@@ -162,10 +162,12 @@ def _should_poll_domains(last_poll: float, now: float) -> bool:
 
 
 def _should_publish_metrics(last_publish: float, last_domains: set[int] | None,
-                            polled_domains: set[int] | None, now: float) -> bool:
+                            polled_domains: set[int] | None, now: float,
+                            settle_pending: bool = False) -> bool:
     """Is it time to publish a metrics row?
 
     Either because the set of running domains moved since we last looked, or
+    because the poll after such a move is due its follow-up publish, or
     because the publish interval has elapsed and the row is due regardless.
 
     The trigger is set membership, not a count and not a vCPU total. A count
@@ -184,9 +186,26 @@ def _should_publish_metrics(last_publish: float, last_domains: set[int] | None,
     all -- it sits inside the same try as this call, so the iteration is
     abandoned and the next tick starts over; it is a poll which did not run,
     because the interval had not elapsed, that arrives here as None.
+
+    settle_pending is true when the last publish was triggered by a change, and
+    asks for one more publish on the next poll which ran, even if the set has
+    not moved again. libvirt lists a domain as active as soon as its start
+    begins, before create() returns, so a poll can catch a domain part way
+    through starting: the change publish then enumerates before the start has
+    finished, and a domain.info() which fails mid-start is skipped and goes
+    uncounted. Without the follow-up nothing republishes until the interval
+    elapses, so a measurement taken mid-start would stand for a minute rather
+    than five seconds (issue 4394). There is one follow-up, not one per poll
+    until the start is seen to finish: a start which outlasts the poll after
+    it is still measured mid-start until the interval elapses. A poll which
+    did not run cannot settle anything, so None falls through to the interval
+    as before.
     """
-    if polled_domains is not None and polled_domains != last_domains:
-        return True
+    if polled_domains is not None:
+        if polled_domains != last_domains:
+            return True
+        if settle_pending:
+            return True
     return now - last_publish >= METRICS_PUBLISH_INTERVAL_SECONDS
 
 
@@ -753,6 +772,7 @@ class Monitor(daemon.Daemon):
         last_billing = 0
         last_domain_poll = 0.0
         last_domains = None
+        settle_pending = False
 
         def update_metrics():
             stats = self._get_stats()
@@ -835,13 +855,20 @@ class Monitor(daemon.Daemon):
                         polled_domains = lc.get_active_domain_ids()
 
                 if _should_publish_metrics(last_metrics, last_domains,
-                                           polled_domains, now):
+                                           polled_domains, now,
+                                           settle_pending):
                     update_metrics()
                     # Every publish resets the interval, whichever gate caused
                     # it, so that a change-triggered publish moments before the
                     # tick suppresses the tick instead of being followed by a
                     # near-duplicate.
                     last_metrics = now
+                    # A publish caused by a change asks for one more on the
+                    # next poll, to measure the change once it has settled
+                    # (see _should_publish_metrics). Any other publish, the
+                    # follow-up itself included, asks for nothing more.
+                    settle_pending = (polled_domains is not None
+                                      and polled_domains != last_domains)
 
                 # Only a poll which returned a set updates what we believe is
                 # running. A poll which raised does not reach this line at all
