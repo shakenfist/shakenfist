@@ -22,7 +22,7 @@ Written at `CHAIN_CONFIG_ADDR` (`0x000F2000`) in guest physical memory.
 |--------|------|------|-------|-------------|
 | 0 | 4 | u32 | `magic` | `0x4348414E` ("CHAN") |
 | 4 | 4 | u32 | `device_count` | Number of valid device entries (1 = no backing files) |
-| 8 | 4 | u32 | `version` | Structure version (currently 3) |
+| 8 | 4 | u32 | `version` | Structure version (currently 4) |
 | 12 | 4 | u32 | `segment_count` | Number of valid segment entries; never 0 |
 | 16 | 512 | | `devices` | Array of up to 16 `ChainDeviceInfo` entries |
 | 528 | 128 | | `segments` | Array of up to 16 `ChainSegment` entries |
@@ -62,7 +62,14 @@ follow it.
 
 An external data file device, which the host inserts immediately after
 the image that owns it, belongs to the chain it was inserted into and
-is covered by that chain's segment.
+is covered by that chain's segment. It is marked with
+`FLAG_DATA_DEVICE` and is never a layer: it holds its owner's cluster
+data, it is not a backing file, and the chain reader steps over it
+(#792). A qcow2 owns one such device, its external data file; a VMDK
+flat descriptor owns the run of marked devices that holds its extents.
+The owner's `data_device_idx` must name the slot immediately after the
+owner, and every marked device must belong to an owner;
+`ChainConfig::data_devices_are_owned` refuses any other layout.
 
 ### ChainDeviceInfo (32 bytes per device)
 
@@ -81,9 +88,12 @@ chain config.
 ### Device Indexing
 
 - Device 0 is always the **top** (primary) image
-- Devices 1 through N-1 are backing files in chain order (higher index =
-  closer to the base image)
-- The **base** image (no backing file) is at index `device_count - 1`
+- The remaining devices are backing files in chain order (higher index =
+  closer to the base image), except external data file devices
+- An external data file device sits immediately after the image that
+  owns it, so the owner's `data_device_idx` is its own index plus one.
+  It is not a backing file, and the next backing file follows it
+- The **base** image (no backing file) is the last non-data device
 
 ## ImageFormat Values
 
@@ -122,6 +132,7 @@ The `flags` field uses the same bit definitions as `InfoResult`:
 | 6 | `FLAG_CORRUPT` | Corrupt bit set |
 | 7 | `FLAG_HAS_MBR` | Raw image has MBR partition table |
 | 8 | `FLAG_HAS_GPT` | Raw image has GPT partition table |
+| 31 | `FLAG_DATA_DEVICE` | Device is an external data file, not a layer. Set only by the host in the chain config; the host masks it out of the flags an info operation reports, so an image cannot mark itself |
 
 ## VMM to Guest Data Flow
 

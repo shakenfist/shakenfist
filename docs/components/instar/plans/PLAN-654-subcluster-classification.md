@@ -231,8 +231,8 @@ the failure #654 measured.
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 1. One subcluster classifier (#653, #654, rows C and D) | [PLAN-654-subcluster-classification-phase-01-classifier.md](/components/instar/plans/PLAN-654-subcluster-classification-phase-01-classifier/) | In progress | |
-| 2. The data device is not a chain layer (#792) | PLAN-654-subcluster-classification-phase-02-data-device.md | Not started | |
+| 1. One subcluster classifier (#653, #654, rows C and D) | [PLAN-654-subcluster-classification-phase-01-classifier.md](/components/instar/plans/PLAN-654-subcluster-classification-phase-01-classifier/) | Complete | `d08841e` (#801) |
+| 2. The data device is not a chain layer (#792, #803) | [PLAN-654-subcluster-classification-phase-02-data-device.md](/components/instar/plans/PLAN-654-subcluster-classification-phase-02-data-device/) | In progress | |
 | 3. Push audit | - | Not started | |
 
 Phase 2's plan is written by `/next-phase` once phase 1 has merged,
@@ -716,8 +716,9 @@ chosen to defer to here, so that we do not forget them.
   so it is not fixed here.
 * **qemu's data-file offset check.** qemu refuses a data-file entry
   whose host offset differs from its guest offset
-  (`block/qcow2-cluster.c:696-704`). instar does not check this. Phase
-  2 should decide whether it belongs with #792.
+  (`block/qcow2-cluster.c:696-704`), and a compressed entry in a
+  data-file image. Phase 1 filed both as #803, and phase 2 takes it
+  (that phase's D5).
 
 ### Bugs fixed during this work
 
@@ -729,7 +730,7 @@ while planning it.
 
 Phase 1 is planned to close #653 and #654, and to fix rows C and D of
 Situation for read, map, measure and check. Phase 2 is planned to close
-#792. #650, fixed in #652, is related: D2 reverses its zero-fill policy.
+#792 and #803. #650, fixed in #652, is related: D2 reverses its zero-fill policy.
 
 ### Back brief
 
