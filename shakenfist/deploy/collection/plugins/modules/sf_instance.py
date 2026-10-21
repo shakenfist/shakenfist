@@ -90,8 +90,9 @@ options:
   video:
     description:
       - The instance's video card and console, as a videospec. A key left
-        out takes the server's default, so giving only a model of C(vga)
-        asks for a vga card with 16384 KiB of memory and a SPICE console.
+        out is filled in by the module with the server's default for it,
+        so giving only a model of C(vga) asks for a vga card with 16384 KiB
+        of memory and a SPICE console.
       - Like the other specifications it may also be written as a
         key=value string, for example C(model=qxl,memory=65536).
       - Unset, the server applies its default videospec, and an existing
@@ -778,7 +779,7 @@ def _stored_video(video):
         return video
     video = dict(video)
     memory = video.get('memory')
-    if isinstance(memory, str) and memory.isdigit():
+    if isinstance(memory, str) and memory.isdecimal():
         video['memory'] = int(memory)
     return video
 

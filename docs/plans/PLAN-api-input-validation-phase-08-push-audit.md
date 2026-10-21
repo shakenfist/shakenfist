@@ -3443,7 +3443,9 @@ checked against the tree rather than recalled.
    surviving instance of #4223's defect is a new entry for #4339, and
    the eight-issues bullet records the seven fixes with the two
    caveats that matter -- #4250 is create-time only and #4253 covers
-   `warn` but not `off`.
+   `warn` but not `off`. #4236 has since been fixed too, by the change
+   that also closed its duplicate #4227, so all three original entries
+   now read as fixed.
 9. **Met** by step 8d, verified here: `grep -n "float" docs/user_guide/usage.md`
    and `docs/developer_guide/api_reference/instances.md` show both now
    say a JSON boolean is the expected form and that the string

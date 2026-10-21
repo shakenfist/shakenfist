@@ -338,6 +338,14 @@ class SfInstanceVideoTestCase(base.ShakenFistTestCase):
         self.assertFalse(dirty, log)
         self.assertEqual('16384', stored['memory'])
 
+    def test_a_stored_memory_int_cannot_parse_is_dirty(self):
+        # A superscript two is a digit to str.isdigit() but not to int().
+        stored = dict(self.VGA, memory='\u00b2')
+        dirty, _, log = self._check(
+            self._existing(video=stored), self._params(video=dict(self.VGA)))
+        self.assertTrue(dirty)
+        self.assertIn('Instance dirty: video has changed', log)
+
     def test_each_differing_key_is_dirty(self):
         for key, different in [('model', 'qxl'), ('memory', 65536),
                                ('vdi', 'spiceconcurrent')]:
