@@ -6803,6 +6803,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#subcluster-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subcluster Types
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#references" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15610,6 +15621,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#subcluster-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Subcluster Types
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#references" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15986,6 +16008,20 @@ compiled from qemu source code analysis and official documentation.</p>
 <a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="cp">#define QCOW_OFLAG_COMPRESSED   (1ULL &lt;&lt; 62)  </span><span class="c1">// Cluster is compressed</span>
 <a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="cp">#define QCOW_OFLAG_ZERO         (1ULL &lt;&lt; 0)   </span><span class="c1">// Reads as zeros (v3+)</span>
 </code></pre></div>
+<h2 id="subcluster-types">Subcluster Types<a class="headerlink" href="#subcluster-types" title="Permanent link">&para;</a></h2>
+<p>Every L2 entry, classic or extended, is decided by one classifier in
+the qcow2 crate: <code>subcluster_type()</code> for a
+single subcluster and <code>subcluster_range()</code> for a run of them. They
+transcribe qemu's <code>qcow2_get_cluster_type</code>,
+<code>qcow2_get_subcluster_type</code> and <code>qcow2_get_subcluster_range_type</code>
+(<code>block/qcow2.h</code> and <code>block/qcow2-cluster.c</code>, as of qemu v10.0.0).
+The reader, <code>map</code>, <code>measure</code> and <code>check</code> all take their answer from
+it rather than decoding L2 entries themselves.</p>
+<p>A subcluster is normal, zero (plain or allocated), unallocated (plain
+or allocated), compressed, or invalid. Invalid entries are refused with
+"Invalid cluster entry found". With an external data file, an entry of
+<code>QCOW_OFLAG_COPIED</code> and host offset 0 is a normal cluster at offset 0.
+See <code>docs/quirks.md</code> for the observable behaviour.</p>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
 <li>qemu source: <code>block/qcow2.h</code>, <code>block/qcow2.c</code></li>

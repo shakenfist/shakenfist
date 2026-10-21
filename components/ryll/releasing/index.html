@@ -12035,6 +12035,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-release-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The release gate
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The release gate">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-dry-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A dry run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recovering-from-a-gate-failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovering from a gate failure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#artifacts-produced" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15747,6 +15786,45 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-release-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The release gate
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The release gate">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-dry-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A dry run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recovering-from-a-gate-failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovering from a gate failure
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#artifacts-produced" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15863,34 +15941,42 @@
 
 <h1 id="releasing">Releasing<a class="headerlink" href="#releasing" title="Permanent link">&para;</a></h1>
 <p>Cutting a release is a two-phase operation so the version bump
-goes through the normal PR review gate rather than landing
+goes through review and the merge queue rather than landing
 directly on <code>develop</code>:</p>
 <ol>
 <li><strong>Stage 1 — propose:</strong>
    <a href="https://github.com/shakenfist/ryll/blob/develop/tools/propose-release.sh">tools/propose-release.sh</a>
    (wrapped by <code>make propose-release X.Y.Z</code>) creates a
    <code>release-X.Y.Z</code> branch from <code>develop</code>, bumps the workspace
-   version, runs tests, and pushes the branch. You open a PR
-   from it into <code>develop</code> and get it reviewed and merged like
-   any other change.</li>
+   version, runs pre-commit and the tests, pushes the branch and
+   opens a pull request. You get it reviewed and merge it through
+   the merge queue like any other change.</li>
 <li><strong>Stage 2 — tag:</strong> after the PR has merged,
    <a href="https://github.com/shakenfist/ryll/blob/develop/tools/tag-release.sh">tools/tag-release.sh</a> (wrapped by
-   <code>make tag-release X.Y.Z</code>) fetches <code>develop</code>, verifies its
-   tip has the expected workspace version, creates an annotated
-   <code>vX.Y.Z</code> tag at that commit, and pushes the tag.</li>
+   <code>make tag-release X.Y.Z</code>) finds the commit that merged the
+   release, verifies it carries the expected workspace version,
+   creates an annotated <code>vX.Y.Z</code> tag at that commit, and pushes
+   the tag.</li>
 </ol>
 <p>The tag push triggers
 <a href="https://github.com/shakenfist/ryll/blob/develop/.github/workflows/release.yml">.github/workflows/release.yml</a>,
 which:</p>
 <ul>
-<li>Verifies the tag matches the workspace version.</li>
+<li>Checks that <code>ci.yml</code> passed on the tagged commit, and stops
+  before building anything if it did not (see
+  <a href="#the-release-gate">The release gate</a>).</li>
+<li>Verifies the tag matches the workspace version, and that
+  <code>Cargo.lock</code> agrees with it.</li>
 <li>Builds release binaries on Linux (<code>x86_64</code> and <code>aarch64</code>),
   macOS (Apple Silicon), and Windows (<code>x86_64</code> and <code>aarch64</code>),
   running the test suite on each.</li>
 <li>Produces <code>.deb</code> and <code>.rpm</code> (both Linux arches), macOS
   <code>.tar.gz</code>, and Windows <code>.zip</code> (both Windows arches) artifacts.</li>
 <li>Builds the per-arch <code>ryll</code> PyPI wheel natively for <code>x86_64</code> and
-  <code>aarch64</code> (no QEMU).</li>
+  <code>aarch64</code> (no QEMU), and checks each with
+  <a href="https://github.com/shakenfist/actions/blob/main/docs/actions.md#check-dist"><code>check-dist</code></a>,
+  which fails a wheel carrying a test directory or nothing outside
+  its metadata.</li>
 <li>Packages every workspace crate and builds each from its tarball
   (<code>make package-check</code>, in the Linux x86_64 build job), so a crate
   that <code>cargo publish</code> would reject fails the run before anything
@@ -15986,13 +16072,14 @@ else runs on the host and requires:</p>
   match the workspace's MSRV. If your host toolchain is older
   than 1.91 (for example Debian's packaged cargo 1.85), pin
   the last version that supports it:
-  <code>cargo install --locked cargo-release@0.25.18</code>.</li>
+  <code>cargo install --locked cargo-release@0.25.18</code>. Stage 1 also
+  runs <code>cargo metadata</code> to list the workspace crates.</li>
 <li><code>docker</code> — used by <code>make test</code> (and by <code>pre-commit</code> via
   <code>scripts/check-rust.sh</code>) to run the Rust toolchain in the
   devcontainer.</li>
 <li><code>gh</code> — the GitHub CLI, signed in (<code>gh auth login</code>). Used in
-  stage 2 to watch the release workflow and open the release
-  page on completion.</li>
+  stage 1 to open the pull request, and in stage 2 to watch the
+  release workflow and open the release page on completion.</li>
 <li><code>jq</code>, <code>curl</code>, <code>git</code>, <code>pre-commit</code>, <code>make</code> — standard dev
   tooling.</li>
 </ul>
@@ -16017,29 +16104,36 @@ those lists into the release notes by hand.</p>
 <li>Confirm the working tree is clean, the branch is <code>develop</code>
    and in sync with <code>origin/develop</code>, and neither <code>v0.2.0</code> nor
    <code>release-0.2.0</code> exist locally or on origin.</li>
+<li>Check the new version is newer than the current one.</li>
 <li>Query crates.io for <code>0.2.0</code> on every workspace crate (read from
    <code>cargo metadata</code>), and check that <code>tools/publish-crates.sh</code> publishes
    each of them; bail if any version already exists or any crate is missing.</li>
 <li>Create and switch to <code>release-0.2.0</code>.</li>
-<li>Run <code>pre-commit run --all-files</code>.</li>
 <li>Bump <code>[workspace.package].version</code> and the matching
    <code>version =</code> qualifiers on ryll's path dependencies via
    <code>cargo release version 0.2.0 --workspace --execute
-   --no-confirm</code>.</li>
+   --no-confirm</code>, then refresh <code>Cargo.lock</code> with <code>make lock</code>.
+   It refuses to go on if the bump left an untracked file.</li>
+<li>Run <code>pre-commit run --all-files</code> over the bumped tree, and
+   the release workflow's own version check
+   (<code>tools/release-version.sh check refs/tags/v0.2.0</code>).</li>
 <li>Run <code>make test</code> (which runs <code>cargo test --workspace</code>
    inside the devcontainer).</li>
 <li>Show <code>git diff --stat</code> and prompt
-   <code>Commit and push release-0.2.0? [y/N]</code>.</li>
-<li>On confirmation: commit <code>Release 0.2.0.</code> and push
-   <code>release-0.2.0</code> to origin.</li>
+   <code>Commit, push release-0.2.0 and open a pull request? [y/N]</code>.</li>
+<li>On confirmation: commit <code>Release 0.2.0.</code>, push
+    <code>release-0.2.0</code> to origin, and open a pull request into
+    <code>develop</code>.</li>
 </ol>
 <p>Nothing goes to origin before the <code>y/N</code> prompt. If you answer
-<code>N</code>, the script switches back to <code>develop</code> and deletes the
-release branch; nothing is committed.</p>
-<p>Once the script finishes, open a PR from <code>release-0.2.0</code> into
-<code>develop</code>, get it reviewed, and merge it using the repository's
-usual merge strategy. No release artefacts are produced yet —
-this PR is the audit trail for the version bump itself.</p>
+<code>N</code>, or anything fails before the push, the script switches back
+to <code>develop</code> and deletes the release branch; nothing is
+committed.</p>
+<p>Get the pull request reviewed and merge it through the merge
+queue like any other change. No release artefacts are produced
+yet — this PR is the audit trail for the version bump itself. The
+queue's CI run on the merged commit is the result the release
+gate later requires, so do not merge it around the queue.</p>
 <h3 id="stage-2-tag-the-merged-commit">Stage 2: tag the merged commit<a class="headerlink" href="#stage-2-tag-the-merged-commit" title="Permanent link">&para;</a></h3>
 <p>After the PR has merged:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>make<span class="w"> </span>tag-release<span class="w"> </span><span class="m">0</span>.2.0
@@ -16052,25 +16146,33 @@ this PR is the audit trail for the version bump itself.</p>
    tagged the previous release still holds the unsigned original,
    and a plain <code>git fetch --tags</code> would refuse to update it.</li>
 <li>Verify no <code>v0.2.0</code> tag exists locally or on origin.</li>
-<li>Verify the <code>[workspace.package].version</code> on
-   <code>origin/develop</code> is <code>0.2.0</code> (i.e. the release PR has
-   landed). If it still reports the previous version, the PR
-   has not merged yet — the script bails.</li>
-<li>Show the target SHA and subject line, spell out that
-   pushing the tag will publish every workspace crate to crates.io
-   irreversibly, and prompt <code>Create and push tag v0.2.0? [y/N]</code>.</li>
-<li>On confirmation: create the annotated tag at
-   <code>origin/develop</code> and push it.</li>
+<li>Find the commit that merged <code>Release 0.2.0.</code> into <code>develop</code>
+   (the queue's merge commit, not <code>develop</code>'s tip, which may
+   have moved on). If there is none, the PR has not merged yet
+   and the script bails.</li>
+<li>Verify that commit is on <code>develop</code>'s first-parent history,
+   and that its <code>[workspace.package].version</code> and <code>Cargo.lock</code>
+   both say <code>0.2.0</code>.</li>
+<li>Show the target SHA and subject line, list anything merged
+   after it (which is not in the release), spell out that
+   publishing cannot be undone, and prompt
+   <code>Create and push tag v0.2.0? [y/N]</code>.</li>
+<li>On confirmation: create the annotated tag at that commit and
+   push it. If the push fails, the local tag is removed so the
+   script can be run again.</li>
 <li>Watch the triggered release workflow via <code>gh run watch</code> and
    open the GitHub Release page when it completes.</li>
 </ol>
-<p>The pushed tag runs <code>check-version</code>, then builds the <code>.deb</code>/
+<p><code>make tag-release</code> takes only the version. To tag a later commit
+instead, for recovery, run <code>tools/tag-release.sh 0.2.0 &lt;commit&gt;</code>.</p>
+<p>The pushed tag runs <code>ci-gate</code> and <code>check-version</code>, then builds the <code>.deb</code>/
 <code>.rpm</code>/tarball/zip artifacts and the per-arch <code>ryll</code> PyPI wheels
 (<code>build-ryll-wheels</code>, natively on <code>x86_64</code> and <code>aarch64</code>, no
 QEMU) in parallel. No pull request CI builds the wheels, so if
 the wheel build has changed since the last release, run
 <code>manual-build.yml</code> on <code>develop</code> with the <code>wheel-x86_64</code> and
-<code>wheel-aarch64</code> platforms before tagging. Once all builds
+<code>wheel-aarch64</code> platforms, or a <a href="#a-dry-run">dry run</a> of the
+release workflow, before tagging. Once all builds
 succeed, the workflow pauses
 at <code>sign-tag</code> for approval on the <code>release</code> environment — this is
 where <code>gh run watch</code> will sit until a required reviewer approves
@@ -16081,6 +16183,69 @@ the tag, then <code>publish-crates</code> and <code>github-release</code> run. O
 <code>release</code> environment. It passes <code>skip-existing</code>, so a re-run
 after a partial failure does not hard-error on a file already
 published.</p>
+<h2 id="the-release-gate">The release gate<a class="headerlink" href="#the-release-gate" title="Permanent link">&para;</a></h2>
+<p>The first job, <code>ci-gate</code>, uses
+<a href="https://github.com/shakenfist/actions/blob/main/docs/actions.md#require-ci-success"><code>require-ci-success</code></a>
+to check that <code>ci.yml</code> concluded <code>success</code> on the tagged commit.
+If it did not, nothing is built, signed or published. That run is
+the merge queue's run on the commit the queue merged, which is
+why a release must go through the queue: a commit merged around
+it, by an administrator bypassing the queue, has no such run and
+cannot be released. A commit that only adds review marks, from
+<code>prune-reviews</code>, is checked through the commit below it, but a
+merge commit is never crossed. The gate has no override.</p>
+<h3 id="a-dry-run">A dry run<a class="headerlink" href="#a-dry-run" title="Permanent link">&para;</a></h3>
+<p>Running the workflow by hand (<strong>Actions → Release → Run
+workflow</strong>) on any branch is a dry run. It runs <code>check-version</code>,
+which on a branch checks only that <code>Cargo.toml</code> and <code>Cargo.lock</code>
+agree, and every build job, including the wheels and their
+<code>check-dist</code>. <code>ci-gate</code>, <code>sign-tag</code>, <code>github-release</code> and every
+publishing job show as skipped. The build jobs run at all only
+because each tests <code>check-version</code>'s result itself: a job with no
+<code>if:</code> of its own is skipped when any job upstream of it was, and
+<code>ci-gate</code> was. This is the way to exercise a
+change to the release build before tagging; <code>manual-build.yml</code>
+remains for building a single platform's artefacts from a branch.</p>
+<h3 id="recovering-from-a-gate-failure">Recovering from a gate failure<a class="headerlink" href="#recovering-from-a-gate-failure" title="Permanent link">&para;</a></h3>
+<p>A gate failure means nothing was built or published. The
+recovery depends on why it failed:</p>
+<table>
+<thead>
+<tr>
+<th>Why</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The tagged commit was merged around the queue, or sits above such a merge, so it has no queue run</td>
+<td>Move the tag to a later commit that went through the queue</td>
+</tr>
+<tr>
+<td>The tag is not on <code>develop</code>'s first-parent history</td>
+<td>Move the tag to the commit the queue landed for that change, or a later one</td>
+</tr>
+<tr>
+<td>The queue's CI run on that commit failed for a reason unrelated to the change, such as a flaky job</td>
+<td>Re-run it from <strong>Actions → CI</strong> until it succeeds, then use "Re-run jobs" on the release's <code>ci-gate</code> job</td>
+</tr>
+<tr>
+<td>The CI run is still going</td>
+<td>Wait for it, then re-run the <code>ci-gate</code> job</td>
+</tr>
+</tbody>
+</table>
+<p><code>ci.yml</code> has no <code>paths-ignore</code>: a documentation-only change still
+gets a queue run, in which <code>check_paths</code> skips the builds and the
+run succeeds, so such a commit can be tagged.</p>
+<p>To move the tag:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>:refs/tags/v0.2.0<span class="w">   </span><span class="c1"># needs the tag ruleset's bypass</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>git<span class="w"> </span>tag<span class="w"> </span>-d<span class="w"> </span>v0.2.0
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>tools/tag-release.sh<span class="w"> </span><span class="m">0</span>.2.0<span class="w"> </span>&lt;commit<span class="w"> </span>that<span class="w"> </span>went<span class="w"> </span>through<span class="w"> </span>the<span class="w"> </span>queue&gt;
+</code></pre></div>
+<p>The
+<a href="https://github.com/shakenfist/development/blob/main/templates/release-automation/README.md#recovering-from-a-gate-failure">template README</a>
+has the full table.</p>
 <h2 id="artifacts-produced">Artifacts produced<a class="headerlink" href="#artifacts-produced" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -16161,18 +16326,19 @@ the policy of the auditwheel the build image ships, so it follows
 the base image rather than a copy that could drift from it.</p>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <h3 id="version-mismatch">Version mismatch<a class="headerlink" href="#version-mismatch" title="Permanent link">&para;</a></h3>
-<p>The <code>check-version</code> job reads <code>[workspace.package].version</code>
-from the root <code>Cargo.toml</code> and compares it to the tag. A
-mismatch fails the workflow and files a GitHub issue. This
-should not happen when you release via the <code>propose-release</code>
-→ <code>tag-release</code> flow, since <code>tag-release</code> refuses to run
-unless <code>origin/develop</code> already carries the matching
-workspace version. If it does (for example after a manual tag
-push):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>tag<span class="w"> </span>-d<span class="w"> </span>v0.2.0
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>:refs/tags/v0.2.0
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># fix the workspace version on develop via a new release PR,</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># then re-run make tag-release X.Y.Z.</span>
+<p>The <code>check-version</code> job runs <code>tools/release-version.sh check</code>,
+which reads <code>[workspace.package].version</code> from the root
+<code>Cargo.toml</code>, checks that <code>ryll</code>'s entry in <code>Cargo.lock</code> agrees,
+and compares it to the tag. A mismatch fails the workflow before
+anything is built. This should not happen when you release via
+the <code>propose-release</code> → <code>tag-release</code> flow, since <code>tag-release</code>
+runs the same checks against the commit before tagging it. If it
+does (for example after a manual tag push), nothing has been
+signed or published:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>:refs/tags/v0.2.0<span class="w">   </span><span class="c1"># needs the tag ruleset's bypass</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>git<span class="w"> </span>tag<span class="w"> </span>-d<span class="w"> </span>v0.2.0
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># fix the workspace version on develop via a new release PR,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># then re-run make tag-release X.Y.Z.</span>
 </code></pre></div>
 <h3 id="cratesio-publish-fails">crates.io publish fails<a class="headerlink" href="#cratesio-publish-fails" title="Permanent link">&para;</a></h3>
 <p>A <code>publish-crates</code> job failure does not roll back the earlier
@@ -16233,10 +16399,10 @@ credentials:</p>
 <p>If <code>HOMEBREW_TAP_TOKEN</code> is missing or expired the tap update
 job fails but the release and the crates.io publishes still
 succeed. Update the formula manually:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">cd</span><span class="w"> </span>homebrew-tap
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># update version and sha256 in Formula/ryll.rb</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>git<span class="w"> </span>commit<span class="w"> </span>-am<span class="w"> </span><span class="s2">"Update ryll to 0.2.0"</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>git<span class="w"> </span>push
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">cd</span><span class="w"> </span>homebrew-tap
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1"># update version and sha256 in Formula/ryll.rb</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>git<span class="w"> </span>commit<span class="w"> </span>-am<span class="w"> </span><span class="s2">"Update ryll to 0.2.0"</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>git<span class="w"> </span>push
 </code></pre></div>
 
 

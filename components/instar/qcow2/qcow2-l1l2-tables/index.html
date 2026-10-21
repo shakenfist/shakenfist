@@ -16074,60 +16074,48 @@ efficient copy-on-write operations.</p>
 - Extended L2 requires cluster_bits &gt;= 14 (minimum 16 KB clusters)
 - Minimum subcluster size is 512 bytes</p>
 <h3 id="subcluster-bitmap-validation-check-operation">Subcluster Bitmap Validation (check operation)<a class="headerlink" href="#subcluster-bitmap-validation-check-operation" title="Permanent link">&para;</a></h3>
-<p>The <code>instar check</code> operation validates extended-L2 subcluster bitmaps
-against the QCOW2 spec's invalid-combination rules. The following
-invariants are enforced:</p>
-<p><strong>Standard (non-compressed) entries:</strong></p>
+<p><code>instar check</code> reports an extended-L2 entry when <code>qemu-img check</code> would,
+and with the same class of message. Validity is not a separate rule set:
+an entry is reported when <code>qcow2::subcluster_type()</code> (the transcription
+of qemu's <code>qcow2_get_subcluster_type</code>, which the readers, <code>map</code> and
+<code>measure</code> also use) classifies it as <code>INVALID</code>, plus one check-only rule
+for compressed entries.</p>
 <table>
 <thead>
 <tr>
-<th>#</th>
-<th>Condition</th>
-<th>Meaning</th>
+<th>Shape</th>
+<th>qemu-img check message</th>
+<th>Read</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>I1</td>
-<td><code>alloc_bits &amp; zero_bits != 0</code></td>
-<td>Subcluster simultaneously allocated and all-zero</td>
+<td>Allocated cluster (a host offset, or <code>COPIED</code> at offset 0 with an external data file) with a subcluster both allocated and zero</td>
+<td><code>Allocated cluster has corrupted subcluster allocation bitmap</code></td>
+<td>refused (<code>INVALID</code>)</td>
 </tr>
 <tr>
-<td>I2</td>
-<td><code>host_offset == 0 &amp;&amp; alloc_bits != 0</code></td>
-<td>Bitmap claims subclusters allocated but no host cluster</td>
+<td>Unallocated cluster (host offset 0 otherwise) with any alloc bit</td>
+<td><code>Unallocated cluster has non-zero subcluster allocation map</code></td>
+<td>refused (<code>INVALID</code>)</td>
 </tr>
 <tr>
-<td>I3</td>
-<td><code>host_offset != 0 &amp;&amp; alloc_bits == 0 &amp;&amp; zero_bits == 0</code></td>
-<td>Host cluster allocated but no subcluster references it</td>
+<td>Compressed entry with any non-zero bitmap, including <code>alloc_bits == 0xFFFF_FFFF</code></td>
+<td><code>compressed cluster ... with non-zero subcluster allocation bitmap</code></td>
+<td>read (qemu ignores the bitmap)</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Compressed entries:</strong></p>
-<table>
-<thead>
-<tr>
-<th>#</th>
-<th>Condition</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>C1</td>
-<td><code>sc_bitmap != 0</code> (excluding legacy <code>alloc_bits=0xFFFF_FFFF</code>)</td>
-<td>Spec reserves all 64 bitmap bits as zero</td>
-</tr>
-</tbody>
-</table>
-<p>Note: C1 accepts <code>alloc_bits == 0xFFFF_FFFF</code> with <code>zero_bits == 0</code>
-for compatibility with images produced by older QEMU versions.</p>
-<p>Each violation increments <code>corruptions</code>, <code>total_errors</code>, and
-<code>subcluster_errors</code> in the check result. Detailed messages are
-emitted via <code>debug_print</code> (visible with <code>--verbose</code>).</p>
-<p>Implemented by <code>qcow2::validate_subcluster_bitmap()</code> in the qcow2
-crate, called from the L2 walk in the check operation.</p>
+<p>Two shapes are deliberately not reported, because qemu-img check 10.0.13
+accepts them: a host cluster whose bitmap is empty (32
+<code>UNALLOCATED_ALLOC</code> subclusters), and a data-file image's <code>COPIED | 0</code>
+entry with alloc bits, which is that image's virtual cluster 0.</p>
+<p>Each reported entry increments <code>corruptions</code>, <code>total_errors</code>, and
+<code>subcluster_errors</code> in the check result. The qemu message is emitted
+via <code>debug_print</code> (visible with <code>--verbose</code>).</p>
+<p>Implemented by <code>qcow2::validate_subcluster_bitmap()</code> and
+<code>qcow2::compressed_entry_has_bitmap()</code> in the qcow2 crate, called from
+the L2 walk in the check operation.</p>
 <h2 id="the-copied-flag">The COPIED Flag<a class="headerlink" href="#the-copied-flag" title="Permanent link">&para;</a></h2>
 <p>The COPIED flag (bit 63) is an optimization hint:</p>
 <ul>

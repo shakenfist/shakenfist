@@ -11702,6 +11702,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Cargo features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#renderer-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renderer features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15677,6 +15694,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Cargo features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#renderer-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renderer features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15975,11 +16009,15 @@ out at build time:</p>
   libxcb1, libxkbcommon0, libwayland-client0.  Running such a
   binary without <code>--headless</code> or <code>--web</code> exits with a clear
   "this binary was built without the <code>gui</code> feature" message.</li>
-<li><strong><code>audio</code></strong> (default-on) — cpal, opus-decoder, rtrb, and the
-  SPICE playback channel in <code>shakenfist-spice-renderer</code>.
-  Disabling it drops libasound2 from the runtime image and
-  skips the SPICE playback channel at connect time (the rest
-  of the session is unaffected).</li>
+<li><strong><code>audio</code></strong> (default-on) — local audio output: cpal and rtrb
+  in <code>shakenfist-spice-renderer</code>.  Disabling it drops libasound2
+  from the runtime image.  The GUI and <code>--headless</code>, which play
+  through the host's device, then have no local output and skip
+  the SPICE playback channel at connect time (the rest of the
+  session is unaffected).  <code>--web</code> hands the audio to a sink
+  instead of a device, so it still links the playback channel
+  (and its Opus decoder, which is always compiled) and the
+  browser still gets audio.</li>
 <li><strong><code>capture</code></strong> (default-on) — pcap-file + etherparse + mp4 for
   <code>--capture</code> recording.</li>
 <li><strong><code>digest-decode</code></strong> (default-off) — adds the
@@ -15993,6 +16031,57 @@ out at build time:</p>
 <code>cargo build --release --no-default-features -p ryll</code>.  See
 <a href="/components/ryll/control-socket-protocol/">control-socket-protocol.md</a>
 for the <code>surface_drawn</code> and <code>digest_updated</code> event shapes.</p>
+<h3 id="renderer-features">Renderer features<a class="headerlink" href="#renderer-features" title="Permanent link">&para;</a></h3>
+<p><code>shakenfist-spice-renderer</code> has its own feature set so that a
+consumer which only needs display decode, such as a server-role
+frontend that relays the guest's screen, can leave out the C codecs
+and device stacks.  All but <code>digest-decode</code> are default-on, so a plain
+dependency still builds the full client:</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>What it gates</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>audio</code></td>
+<td>Local audio output (cpal, rtrb).  The playback channel and Opus decode are always built; only <code>PlaybackOutput::Local</code> needs this</td>
+</tr>
+<tr>
+<td><code>usbredir</code></td>
+<td>The usbredir channel and the USB device backends (nusb)</td>
+</tr>
+<tr>
+<td><code>webdav</code></td>
+<td>The WebDAV folder-sharing channel and server</td>
+</tr>
+<tr>
+<td><code>encoder</code></td>
+<td>The live H.264 encoder (openh264, vendored C++)</td>
+</tr>
+<tr>
+<td><code>h264-decode</code></td>
+<td>H.264 stream decode; without it the display channel does not advertise H.264</td>
+</tr>
+<tr>
+<td><code>mozjpeg</code></td>
+<td>SIMD JPEG decode (vendored libjpeg-turbo); without it JPEG falls back to the platform or pure-Rust decoder</td>
+</tr>
+<tr>
+<td><code>digest-decode</code></td>
+<td>Visual-digest QR detection (default-off)</td>
+</tr>
+</tbody>
+</table>
+<p>The slim renderer is built with
+<code>cargo build -p shakenfist-spice-renderer --no-default-features</code>,
+optionally naming the features needed.  <code>tools/check-slim-renderer.sh</code>
+guards it, and <code>make lint</code> runs it: clippy with no default features,
+clippy with each feature on its own (both with warnings denied), and a
+check that the slim dependency tree contains none of the crates the
+features gate.</p>
 <h2 id="workspace-dependency-convention">Workspace dependency convention<a class="headerlink" href="#workspace-dependency-convention" title="Permanent link">&para;</a></h2>
 <p>Every workspace crate carries <code>version.workspace = true</code>, so
 the single version in the root <code>Cargo.toml</code> is the only place

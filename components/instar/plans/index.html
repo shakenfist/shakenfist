@@ -15698,6 +15698,13 @@ at the repo root).</p>
 <td>Complete</td>
 <td>(no phase files; single change)</td>
 </tr>
+<tr>
+<td>2026-10-19</td>
+<td><a href="/components/instar/plans/PLAN-654-subcluster-classification/">One subcluster classification for qcow2</a></td>
+<td>Replace the ad hoc readings of "host offset zero" across the qcow2 chain reader, map, measure and check with one classifier that mirrors qemu's seven subcluster types, including the external-data-file rule, and refuse what qemu calls an invalid entry. Fixes extended-L2 reads that skip the backing file (#654), a crafted entry that serves the image header as data (#653), and data-file images whose cluster 0 reads as zeros; then stops treating the data device as a chain layer (#792)</td>
+<td>In progress</td>
+<td><a href="/components/instar/plans/PLAN-654-subcluster-classification-phase-01-classifier/">1: classifier</a>, 2: data device, 3: push audit</td>
+</tr>
 </tbody>
 </table>
 

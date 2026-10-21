@@ -16101,13 +16101,14 @@ instead of <code>AGENT_CONNECTED</code> when the guest agent (re)connects, carry
 a fresh agent token window. spice-server resets its token accounting
 whenever the agent detaches, so ryll adopts that window rather than
 keeping its old count, which could leave both ends waiting on each
-other. Channels without their own default (inputs, cursor, playback and
-the rest) still advertise the word they always have, without
+other. Channels without their own default (inputs, cursor and the rest)
+still advertise the word they always have, without
 <code>AGENT_CONNECTED_TOKENS</code>, because capability bits mean different things
-on each channel type. On playback that word's bits 0 and 3 are
-<code>PLAYBACK_CELT_0_5_1</code> and <code>PLAYBACK_OPUS</code>; ryll plays only Opus and raw
-PCM, and does not advertise <code>PLAYBACK_VOLUME</code>, so a server sends it no
-<code>VOLUME</code> or <code>MUTE</code>.</p>
+on each channel type. Playback has its own word, <code>DEFAULT_PLAYBACK</code>,
+which is <code>PLAYBACK_OPUS</code> alone. Ryll plays only Opus and raw PCM, so it
+does not offer <code>PLAYBACK_CELT_0_5_1</code>; a server with no Opus falls back to
+raw PCM, which needs no cap. It does not advertise <code>PLAYBACK_VOLUME</code>
+either, so a server sends it no <code>VOLUME</code> or <code>MUTE</code>.</p>
 <p>A proxy that must forward a real client's capabilities to the
 server instead uses <code>perform_link_with_caps</code>, or
 <code>SpiceClient::connect_channel_with_caps</code>, which take the common

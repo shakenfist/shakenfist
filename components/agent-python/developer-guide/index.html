@@ -994,6 +994,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Continuous Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#merging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merging
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#releasing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Releasing
+      
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15560,6 +15588,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Continuous Integration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#merging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merging
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#releasing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Releasing
+      
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
@@ -15641,11 +15697,12 @@ version management. Versions are derived from git tags:</p>
 <a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>tox<span class="w"> </span>-ecover
 </code></pre></div>
 <h2 id="continuous-integration">Continuous Integration<a class="headerlink" href="#continuous-integration" title="Permanent link">&para;</a></h2>
-<p>Pull requests to <code>develop</code> run <code>.github/workflows/functional-tests.yml</code>.
-Its <code>sanity_checks</code> job (flake8, a dependency install check, unit tests
-and coverage) runs on an ephemeral VM runner, so a <code>check_paths</code> job
-skips it when a pull request changes nothing outside <code>docs/</code>. The
-automated reviewer still runs on those pull requests. Commenting
+<p>Pull requests to <code>develop</code>, and merge queue entries, run
+<code>.github/workflows/functional-tests.yml</code>. Its <code>sanity_checks</code> job
+(flake8, a dependency install check, unit tests and coverage) runs on
+an ephemeral VM runner, so a <code>check_paths</code> job skips it when a change
+touches nothing outside <code>docs/</code>. The automated reviewer still runs on
+those pull requests. Commenting
 <code>@shakenfist-bot please retest</code> re-runs the workflow by dispatch, which
 always runs the full set.</p>
 <p>Two bot commands are honoured on pull requests, from collaborators
@@ -15672,15 +15729,75 @@ it expects, <code>github-pat</code> and <code>private-key</code>. The failure me
 the rules that did fire; update the expected list in the script to
 match, after checking that the new rule still catches the planted
 credential.</p>
-<p>None of these checks is configured as a required status check on
-<code>develop</code> today, so a failing gitleaks or agent context job is visible
-on the pull request but does not by itself block a merge; <code>can_merge</code>
-in <code>functional-tests.yml</code> only aggregates that workflow's own jobs.</p>
+<p>The only required status checks on <code>develop</code> are "Can enqueue" and
+"Can merge", which collect <code>functional-tests.yml</code>'s own jobs (see
+Merging below). So a failing gitleaks or agent context job is visible
+on the pull request but does not by itself block a merge.</p>
 <p>The same workflow runs <a href="https://skillsaw.org/">skillsaw</a> over the agent
 context (<code>AGENTS.md</code> and anything else an agent is handed) by running
 its pre-commit hook. <code>.pre-commit-config.yaml</code> carries that hook
 alongside actionlint and shellcheck, so run <code>pre-commit install</code> once
 per clone and <code>pre-commit run --all-files</code> before proposing a change.</p>
+<h3 id="merging">Merging<a class="headerlink" href="#merging" title="Permanent link">&para;</a></h3>
+<p>Pull requests merge through a merge queue on <code>develop</code>, not with the
+merge button directly. A pull request can be queued once its "Can
+enqueue" check passes. The queue then runs <code>functional-tests.yml</code>
+again on the commit it is about to merge, and merges only when "Can
+merge" passes. That second run is the one a release counts (see
+below), so a change merged around the queue, by an administrator
+bypassing it, cannot be released until a later queue entry that
+changes something outside <code>docs/</code> has gone through the queue. The gate
+reads only the tagged commit's own runs, and a docs-only entry skips
+<code>sanity_checks</code>, so its successful run would vouch for the bypassed
+change without testing it. Both checks fail if any job failed, or was skipped for any
+reason other than <code>check_paths</code> finding a docs-only change. A new job
+in <code>functional-tests.yml</code> goes in the <code>needs:</code> of both.</p>
+<p>The queue builds one entry at a time (<code>max_entries_to_build: 1</code> in the
+<code>develop</code> ruleset). <code>functional-tests.yml</code>'s concurrency groups depend
+on that: a queue run shares a group with whatever the queue builds
+next, so that a superseded run is cancelled. Raising the setting would
+make each entry cancel the one ahead of it, so revisit those groups
+first.</p>
+<p>Enqueueing a fork's pull request runs its version of the workflow on
+the merge queue without the approval GitHub asks for on a fork's pull
+request, so review the whole diff, and changes under <code>.github/</code> most
+closely, before enqueueing it.</p>
+<h2 id="releasing">Releasing<a class="headerlink" href="#releasing" title="Permanent link">&para;</a></h2>
+<p>Pushing a <code>v*</code> tag triggers <code>release.yml</code>. Its jobs, in order:</p>
+<ol>
+<li><code>ci-gate</code> checks that <code>functional-tests.yml</code> succeeded on the tagged
+   commit, in its merge queue run. A run started by hand, as
+   <code>pr-retest.yml</code> does with <code>workflow_dispatch</code>, does not count. A
+   queue run that fails, flaky or not, ejects its entry, so the commit
+   it built never reaches <code>develop</code> and re-running that run cannot make
+   any tag pass: re-queue the pull request and tag the commit that
+   merges. Re-running a queue run helps only when the tagged commit's
+   run was re-run after it merged and that later attempt failed,
+   because the gate judges each run at its latest attempt; then use
+   "Re-run jobs" on it. How the gate decides is documented with the
+   action, as
+   <a href="https://github.com/shakenfist/actions/blob/main/docs/actions.md#require-ci-success"><code>require-ci-success</code></a>.
+   It has no override.</li>
+<li><code>build</code> builds the sdist and wheel, then runs <code>twine check</code> and
+   <a href="https://github.com/shakenfist/actions/blob/main/docs/actions.md#check-dist"><code>check-dist</code></a>,
+   which fails if the wheel holds a test directory. It runs only if the
+   gate passed.</li>
+<li>The publishing jobs wait for approval in the <code>release</code> environment,
+   re-sign the tag with gitsign, and publish to PyPI with attestations.</li>
+</ol>
+<p>So tag a commit that is on <code>develop</code> and went through the merge queue,
+and wait for its <code>functional-tests.yml</code> run to finish first. A gate
+failure means nothing was signed or published, so every failure is
+recoverable: the template's
+<a href="https://github.com/shakenfist/development/blob/main/templates/release-automation/README.md#recovering-from-a-gate-failure">recovery table</a>
+says what to do for each cause, which is usually moving the tag or
+re-running CI and then the <code>ci-gate</code> job.</p>
+<p>Running <code>release.yml</code> by hand with <code>workflow_dispatch</code> skips the gate
+and the publishing jobs, and only builds and checks the packages.</p>
+<p>The wheel ships the <code>shakenfist_agent</code> package and nothing else: the
+tests, the <code>.proto</code> sources and <code>_copy_stubs.sh</code> stay in the checkout.
+The version comes from the tag through setuptools_scm. The one-time
+setup, and how to verify a release, are in <code>RELEASE-SETUP.md</code>.</p>
 <h2 id="adding-a-new-command">Adding a New Command<a class="headerlink" href="#adding-a-new-command" title="Permanent link">&para;</a></h2>
 <ol>
 <li>

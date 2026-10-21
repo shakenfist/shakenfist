@@ -12282,6 +12282,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#eventbus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EventBus
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#surfacemirror" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12304,10 +12315,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#opuspacketsink-trait" class="md-nav__link">
+  <a href="#playbacksink-trait" class="md-nav__link">
     <span class="md-ellipsis">
       
-        OpusPacketSink trait
+        PlaybackSink trait
       
     </span>
   </a>
@@ -16059,6 +16070,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#eventbus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EventBus
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#surfacemirror" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16081,10 +16103,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#opuspacketsink-trait" class="md-nav__link">
+  <a href="#playbacksink-trait" class="md-nav__link">
     <span class="md-ellipsis">
       
-        OpusPacketSink trait
+        PlaybackSink trait
       
     </span>
   </a>
@@ -16729,13 +16751,32 @@ before applying the rule to it.</p>
 <h2 id="spice-wire-up">SPICE wire-up<a class="headerlink" href="#spice-wire-up" title="Permanent link">&para;</a></h2>
 <p>Four connections carry real data between the SPICE session and the
 bridge: display frames, audio, keyboard/mouse input, and cursor overlay.</p>
+<h3 id="eventbus"><code>EventBus</code><a class="headerlink" href="#eventbus" title="Permanent link">&para;</a></h3>
+<p><code>shakenfist-spice-renderer/src/event_bus.rs</code> — the one place the
+renderer's <code>ChannelEvent</code> mpsc is fanned out. <code>run_web</code> and
+<code>run_headless</code> both build an <code>EventBus</code>, which owns a forwarder task
+that republishes every event onto a <code>tokio::sync::broadcast</code> channel,
+and a second task that applies each bus event to a shared
+<code>SurfaceMirror</code>. Consumers (the cursor relay, the headless stats
+drain, control-socket clients, the digest poller) call <code>subscribe()</code>
+or <code>sender()</code> rather than spawning their own forwarder, so a slow one
+cannot back-pressure the SPICE channel producers. A receiver only sees
+events sent after it subscribed, so anything that needs the
+session-init events must subscribe before the session is spawned.</p>
+<p>If the mirror task lags the bus it has missed events and its pixels
+can no longer be trusted, so it logs a warning and marks every surface
+fully damaged (<code>SurfaceMirror::mark_all_damaged</code>); a damage consumer
+then resends whole surfaces. That keeps a consumer from trusting a
+partial damage region, but it does not restore the missed pixels or a
+missed surface create or destroy: the picture recovers only as the
+guest redraws. The bus closes once the forwarder and
+every cloned sender have been dropped.</p>
 <h3 id="surfacemirror"><code>SurfaceMirror</code><a class="headerlink" href="#surfacemirror" title="Permanent link">&para;</a></h3>
-<p><code>shakenfist-spice-renderer/src/surface_mirror.rs</code> — subscribes
-to the renderer's broadcast <code>ChannelEvent</code> stream and maintains
+<p><code>shakenfist-spice-renderer/src/surface_mirror.rs</code> — maintains
 a <code>HashMap&lt;(u8, u32), DisplaySurface&gt;</code> keyed by
-<code>(channel_id, surface_id)</code>. The mirror is the authoritative
-surface state for the web encoder path; it is separate from
-the <code>RyllApp</code> surface map so the <code>--web</code> mode can run without
+<code>(channel_id, surface_id)</code>, fed by the <code>EventBus</code>. The mirror is the
+authoritative surface state for the web encoder path; it is separate
+from the <code>RyllApp</code> surface map so the <code>--web</code> mode can run without
 any egui dependency.</p>
 <h3 id="realframesource"><code>RealFrameSource</code><a class="headerlink" href="#realframesource" title="Permanent link">&para;</a></h3>
 <p><code>shakenfist-spice-renderer/src/encoder/frame_source.rs</code> — a
@@ -16744,16 +16785,20 @@ under <code>try_lock</code>. Returns <code>None</code> on lock contention (the e
 skips the tick rather than blocking) and also returns <code>None</code> when
 the primary surface is not dirty, achieving genuine
 encode-on-dirty behaviour within the 30 fps cap.</p>
-<h3 id="opuspacketsink-trait"><code>OpusPacketSink</code> trait<a class="headerlink" href="#opuspacketsink-trait" title="Permanent link">&para;</a></h3>
-<p><code>shakenfist-spice-renderer/src/audio_sink.rs</code> — a pre-decode
-tap on the SPICE playback channel. When a type implementing this
-trait is injected into the playback channel constructor, raw Opus
-packets from the SPICE server are delivered to <code>push_opus_packet</code>
-before being decoded to PCM for the cpal path. The <code>--web</code> mode
-uses this to route Opus packets to the WebRTC audio track without
-re-encoding. When the SPICE server negotiates raw PCM (not Opus),
-the sink receives no packets; the web audio track is silent (a
-warning is logged).</p>
+<h3 id="playbacksink-trait"><code>PlaybackSink</code> trait<a class="headerlink" href="#playbacksink-trait" title="Permanent link">&para;</a></h3>
+<p><code>shakenfist-spice-renderer/src/playback_sink.rs</code> — where the
+playback channel sends audio when a session is not playing it
+locally. <code>run_connection</code> takes a <code>PlaybackOutput</code>: <code>Local</code> plays
+through the host's default device on a cpal thread (needs the
+renderer's <code>audio</code> feature), <code>Sink(Arc&lt;dyn PlaybackSink&gt;)</code> hands the
+audio to the sink and opens no device, in every build. <code>--web</code> uses
+<code>Sink</code>, so a server with no sound hardware, or a binary built without
+<code>audio</code>, still delivers guest audio to the browser. The sink receives
+<code>on_start</code> (with a <code>PlaybackFormat</code>) and <code>on_stop</code>, each raw Opus
+packet before decode (<code>on_opus_packet</code>), the PCM decoded from it
+(<code>on_decoded_pcm</code>), and raw PCM for servers that negotiated PCM
+(<code>on_pcm_samples</code>). The channel still decodes Opus in sink mode, so
+the control socket's playback counters mean the same in every mode.</p>
 <h3 id="control-message-module">Control-message module<a class="headerlink" href="#control-message-module" title="Permanent link">&para;</a></h3>
 <p><code>ryll/src/web/control.rs</code> — everything the server pushes to
 <code>app.js</code> travels as JSON over the one control datachannel the
@@ -16807,6 +16852,13 @@ change takes effect on the next move:</p>
   each <code>MouseMotion</code> occupies a slot in an ack window that only
   drains on <code>MOUSE_MOTION_ACK</code>.</li>
 </ul>
+<p>That choice lives in <code>PointerTranslator</code>
+(<code>shakenfist-spice-renderer/src/pointer.rs</code>), which the egui
+frontend shares. It keeps only the last position sent and takes the
+mouse mode as an argument on every call, so a frontend can read the
+mode from a field or a <code>watch</code> and a mode change takes effect on the
+next call. The relay owns one.
+The browser shell sends no wheel events yet.</p>
 <p><code>BrowserMsg::Hello</code> is the browser's first message after
 <code>dc.onopen</code>, and the relay answers it with the current mouse mode.
 This is the only correct moment to deliver it: the SPICE server
@@ -16842,13 +16894,16 @@ an <code>&lt;img&gt;</code> overlay element, and repositions it to follow cursor
 motion events — keeping cursor latency on the datachannel path
 rather than the video encoder path.</p>
 <h3 id="audio-adapter">Audio adapter<a class="headerlink" href="#audio-adapter" title="Permanent link">&para;</a></h3>
-<p><code>ryll/src/web/audio.rs</code> — <code>WebOpusSink</code> implements
-<code>OpusPacketSink</code>. When the peer connection reaches
-<code>Connected</code>, the bridge activates the audio pump; <code>WebOpusSink</code>
-routes each incoming Opus packet to the bridge's audio track
-via the WebRTC audio pump. PCM-only SPICE servers do not
-trigger any <code>push_opus_packet</code> calls, so the audio track emits
-silence (and a one-time warning is logged).</p>
+<p><code>ryll/src/web/audio.rs</code> — <code>WebPlaybackSink</code> implements
+<code>PlaybackSink</code> and is passed to the session as
+<code>PlaybackOutput::Sink</code>, so no host audio device is opened. When the
+peer connection reaches <code>Connected</code>, the bridge activates the audio
+pump; <code>WebPlaybackSink::on_opus_packet</code> routes each incoming Opus
+packet to the bridge's audio track via the WebRTC audio pump, and
+drops it when no viewer is attached. It ignores the decoded PCM.
+PCM-only SPICE servers deliver <code>on_pcm_samples</code> instead, which the
+sink discards after a one-time warning, so the audio track emits
+silence.</p>
 <h3 id="end-to-end-data-flow">End-to-end data flow<a class="headerlink" href="#end-to-end-data-flow" title="Permanent link">&para;</a></h3>
 <pre class="mermaid"><code>flowchart TB
     spice["SPICE server"]
@@ -16859,7 +16914,7 @@ silence (and a one-time warning is logged).</p>
     ev["broadcast ChannelEvent"]
     mirror["SurfaceMirror"]
     crelay["CursorRelay (cursor.rs)"]
-    sink["WebOpusSink / OpusPacketSink (audio.rs)"]
+    sink["WebPlaybackSink / PlaybackSink (audio.rs)"]
     frames["RealFrameSource"]
     enc["EncoderTask"]
     irelay["web inputs relay (inputs.rs)"]

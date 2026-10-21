@@ -15834,8 +15834,8 @@ around it.</p>
 <tr>
 <td>Audio playback (PCM and Opus decoding)</td>
 <td>available</td>
-<td>partial (<code>shakenfist-spice-renderer/src/channels/playback.rs</code> — <code>PlaybackChannel</code> connects and decodes, but always spawns a cpal thread; with no audio device present it raises one notification and retries with a backoff of up to 30 s; no headless-safe "discard" path exists)</td>
-<td>available (MVP; Opus passthrough preferred, PCM→Opus fallback; the host-side cpal thread still runs, so on a host with no audio device the snapshot's <code>output_*</code> fields record retries every 30 s, with notifications suppressed)</td>
+<td>partial (<code>shakenfist-spice-renderer/src/channels/playback.rs</code> — <code>PlaybackChannel</code> connects and decodes, but always spawns a cpal thread (the headless runner plays locally); with no audio device present it raises one notification and retries with a backoff of up to 30 s; headless does not use a playback sink, so there is no discard path there)</td>
+<td>available (MVP; Opus passthrough; raw-PCM servers give silent audio. The session uses a playback sink, so no host cpal thread or audio device is opened and the <code>output_*</code> snapshot fields stay empty)</td>
 </tr>
 <tr>
 <td>Volume control (slider + mute)</td>
@@ -15868,8 +15868,14 @@ around it.</p>
 <td>available (MVP)</td>
 </tr>
 <tr>
+<td>Mouse wheel</td>
+<td>available (egui scroll events become SPICE wheel clicks)</td>
+<td>missing (no pointer path in headless; the control socket has no wheel verb)</td>
+<td>missing (<code>BrowserMsg</code> has no wheel message, so the browser shell does not forward scrolling)</td>
+</tr>
+<tr>
 <td>Mouse mode negotiation (CLIENT/SERVER)</td>
-<td>available</td>
+<td>available (both modes drive the guest pointer. In server mode the relative deltas come from host hover positions with no pointer grab, so they drift under guest pointer acceleration until targets near the window edge cannot be reached)</td>
 <td>available (negotiation runs in <code>MainChannel</code> regardless of mode)</td>
 <td>available (both modes drive the guest pointer: absolute <code>MouseMove</code> in client mode, relative <code>MouseMotion</code> derived from consecutive browser positions in server mode. Pointer Lock is still absent, so the derived deltas drift under guest pointer acceleration and dead-zone at the window edge — see docs/web-frontend.md)</td>
 </tr>
@@ -16423,7 +16429,7 @@ around it.</p>
 <td>Real SPICE audio over WebRTC (Opus passthrough)</td>
 <td>available (cpal sink)</td>
 <td>n/a — intrinsic (no audio sink)</td>
-<td>available (Opus path; PCM-only servers fall back to silent audio with a warn)</td>
+<td>available (Opus path; PCM-only servers give silent audio with a one-time warn, as <code>WebPlaybackSink</code> discards raw PCM and does not encode it)</td>
 </tr>
 <tr>
 <td>Browser-side keyboard/mouse input over datachannel</td>

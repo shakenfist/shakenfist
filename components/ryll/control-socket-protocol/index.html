@@ -17641,9 +17641,12 @@ whether that happened.</p>
 published its counters, which it does after each batch of messages
 and every 100 ms while the server is silent. It is absent, not zeroed,
 when the server offered no playback channel, before the channel links,
-after it closes, and always in a ryll built without the <code>audio</code> Cargo feature (the slim
-<code>--no-default-features</code> build), so a client can tell "no audio here"
-from "audio, but nothing played". The counters count from the channel
+after it closes, and always in a <code>--headless</code> session of a ryll built
+without the <code>audio</code> Cargo feature (the slim <code>--no-default-features</code>
+build), which does not link the playback channel, so a client can
+tell "no audio here" from "audio, but nothing played". A <code>--web</code>
+session links it in every build, since it sends the audio to the
+browser rather than a local device. The counters count from the channel
 linking and survive <code>STOP</code> and the next <code>START</code>. It holds:</p>
 <table>
 <thead>
@@ -17702,9 +17705,11 @@ linking and survive <code>STOP</code> and the next <code>START</code>. It holds:
 </tbody>
 </table>
 <p>The codec is the data mode the server last sent in <code>PLAYBACK_MODE</code>.
-Decoding does not need a sound device: a ryll with <code>audio</code> and no
-device decodes into its ring and retries the device in the background,
-so these counters move on a headless test host too.</p>
+Decoding does not need a sound device, and runs whether or not the
+audio is played locally: a <code>--headless</code> ryll with <code>audio</code> and no device
+decodes into its ring and retries the device in the background, and a
+<code>--web</code> session decodes without opening a device at all, so these
+counters move on a test host with no sound hardware too.</p>
 <p>Verb-specific error codes: none beyond the common set.</p>
 <p>Worked example, polled while an H.264 stream plays:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>→ {"id": 13, "method": "stats", "params": {}}

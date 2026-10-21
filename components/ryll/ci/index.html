@@ -16297,8 +16297,7 @@ the reporter's own test cannot see.</p>
   different first moves, and because they carry separate titles
   none of them can dedup on top of another and bury it.</li>
 <li>Reporting runs on the static runner, where the rest of this
-  repository's <code>gh</code> calls run — <code>release.yml</code>'s version-mismatch
-  issue is the precedent. The <code>debian-12-docker</code> image is not
+  repository's <code>gh</code> calls run. The <code>debian-12-docker</code> image is not
   known to carry the CLI. A failure to report is counted rather
   than thrown, and fails the job at the end: one target nobody
   could file about must not stop the rest being filed.</li>

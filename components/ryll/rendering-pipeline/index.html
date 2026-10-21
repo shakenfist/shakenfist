@@ -12002,6 +12002,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#damage-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Damage tracking
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#multi-monitor-support" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15575,6 +15586,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#damage-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Damage tracking
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#multi-monitor-support" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15705,6 +15727,32 @@ the single-client accept model, and the broadcast-bus and
 drop-oldest backpressure path that carries events to a client — are
 both documented in
 <a href="/components/ryll/control-socket-protocol/">control-socket-protocol.md</a>.</p>
+<h2 id="damage-tracking">Damage tracking<a class="headerlink" href="#damage-tracking" title="Permanent link">&para;</a></h2>
+<p>Each <code>DisplaySurface</code> records where draws landed, alongside its dirty
+flag, for consumers that re-encode only what changed.
+<code>DamageRegion</code> (<code>shakenfist-spice-renderer/src/display/damage.rs</code>)
+holds the rectangles written since the consumer last called
+<code>take_damage()</code>; <code>damage()</code> peeks without clearing.</p>
+<ul>
+<li>Every draw op that writes pixels records the rectangle it wrote,
+  after clamping to the surface and the clip list. <code>copy_bits</code>
+  records only its destination: the source is read, not changed.
+  A new or resized surface starts fully damaged.</li>
+<li>A rectangle inside one already held is dropped, and two merge when
+  their bounding box covers no more pixels than the two do
+  separately. Past <code>MAX_DAMAGE_RECTS</code> (32) the region collapses to its
+  bounding box. The region only ever grows, so it over-reports but
+  never misses a changed pixel.</li>
+<li>Damage and the dirty flag are independent: <code>consume_dirty()</code> leaves
+  the damage alone and <code>take_damage()</code> leaves the dirty flag alone,
+  so a whole-frame consumer (the encoder) and a damage consumer can
+  share a surface.</li>
+<li>If the <code>EventBus</code> mirror lags and misses events, it marks every
+  surface fully damaged so damage consumers resend whole surfaces.
+  That keeps a consumer from trusting a partial damage region, but it
+  does not restore the missed pixels or a missed surface create or
+  destroy: the picture recovers only as the guest redraws.</li>
+</ul>
 <h2 id="multi-monitor-support">Multi-Monitor Support<a class="headerlink" href="#multi-monitor-support" title="Permanent link">&para;</a></h2>
 <p>Ryll supports multiple monitors via the <code>--monitors N</code> CLI option.
 Each monitor gets its own display channel, and the main channel
@@ -15819,6 +15867,11 @@ followed by encoded audio. The codec is negotiated via <code>PLAYBACK_MODE</code
     msg --&gt; pcm --&gt; ring
     msg --&gt; opus --&gt; ring
     ring --&gt; thread --&gt; drain --&gt; resample --&gt; cpal</code></pre>
+<p>This is the local-output path (<code>PlaybackOutput::Local</code>, which needs
+the renderer's <code>audio</code> feature). With <code>PlaybackOutput::Sink</code>, as in
+<code>--web</code> mode, no ring buffer or audio thread exists: the channel still
+decodes Opus, to keep its counters meaningful, and hands the audio to
+a <code>PlaybackSink</code>.</p>
 <p>The tokio network task is the <strong>producer</strong>: it decodes incoming audio
 and pushes i16 samples into the ring buffer via <code>rtrb::Producer&lt;i16&gt;</code>.
 Back-pressure is applied by dropping samples when the ring buffer is

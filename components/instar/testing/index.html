@@ -18176,7 +18176,7 @@ deliberately broken emitter is not guarding what its name says it
 guards. See the VHD and VHDX notes in
 <a href="/components/instar/chain-config/#format-specific-notes">chain-config.md</a> for the
 composing path being guarded.</p>
-<p>There are <strong>105 cases</strong>, in eight groups.</p>
+<p>There are <strong>106 cases</strong>, in eight groups.</p>
 <p>Twenty-seven cover the writer. Fifteen mutate a library crate
 (<code>create</code>, <code>vhd</code>, <code>vhdx</code>) and are caught by a Rust unit or round-trip
 test; twelve are caught by a Python integration test through the real
@@ -18337,24 +18337,30 @@ disable the guard with <code>if false</code> and are caught, through the real
 binary, by <code>TestAdversarialChainDeviceCount</code> in <code>tests/test_adversarial.py</code>
 -- the same test module that builds the fixture, since no static
 <code>instar-testdata</code> image has this shape.</p>
-<p>The last group is <strong>2 subcluster cases</strong>, and is the only group not
+<p>The last group is <strong>3 subcluster cases</strong>, and is the only group not
 about a differencing format at all. It is here because the defect it
 guards is the same class as the rest -- a span the reader never wrote,
 returned to the caller under a successful read -- and because the
 differencing work's own fuzz target is what found it. An extended-L2
 qcow2 entry can mark a subcluster allocated while naming host offset
 zero, which is a contradiction: there is no host cluster to read it
-from. The narrow arm of the fill loop has always zero-filled such a
-subcluster; the wide arm, taken when the device's sector size exceeds
-<code>cluster / 32</code>, matched no arm at all and left the caller's buffer
-untouched (issue #650). One case removes the arm that now handles it;
-the other reverts the lookup that classifies the entry, which is the
-vacuity guard -- without it a green test would prove only that the
-read never reached the fill loop. Both are <code>rust_case</code> against a
-static in-memory fixture at 8192-byte clusters and 512-byte sectors,
-the geometry that selects the wide arm; the default 64 KiB cluster
-takes the narrow one. <code>docs/quirks.md</code> records why instar zero-fills
-here where qemu fails the read.</p>
+from. The wide arm of the fill loop, taken when the device's sector
+size exceeds <code>cluster / 32</code>, once matched no arm for it and left the
+caller's buffer untouched (issue #650). qemu calls the entry INVALID
+and fails the read, and instar now does the same, by name. One case
+removes that refusal, so the read reports success over a buffer
+nothing wrote; the other removes the classifier's alloc-bit check,
+which is the vacuity guard -- without it a green test would prove only
+that the read never reached the refusal. Both are <code>rust_case</code> against
+the crate's in-memory subcluster fixture, whose test reads through
+both the narrow and the wide arm. <code>docs/quirks.md</code> records the
+refusal. The third removes the split that cuts a chunk at a qcow2
+device's own cluster boundaries: without it, a run of unallocated
+subclusters handed to a qcow2 backing file with smaller clusters reads
+one backing cluster's worth from the wrong place and leaves the rest of
+the buffer unwritten. Its test reads over backing files whose clusters
+are stored in reverse order on the host, so a read that runs on into
+the next host cluster cannot land on the right bytes by accident.</p>
 <p>Most of the reader cases name a test in the <code>qcow2</code> crate and run it
 with the full input-format feature list, because the
 arms are behind <code>vhd-input</code> and <code>vhdx-input</code> and a run without those

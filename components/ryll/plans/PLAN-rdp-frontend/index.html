@@ -16286,8 +16286,9 @@ Kerbside spike</em> below).</p>
 <li><strong>No damage rectangles.</strong> <code>DisplaySurface</code> keeps one dirty
    bool (<code>consume_dirty</code>). <code>RealFrameSource</code> copies the whole
    primary surface whenever it is set. The rectangles exist
-   in the events (<code>ImageReady</code>, <code>FillRect</code>, <code>CopyBits</code>,
-   <code>Invert</code> all carry one) but <code>SurfaceMirror::apply_event</code>
+   in the events (<code>ImageReady</code>, <code>ImageReadyChroma</code>,
+   <code>ImageReadyAlpha</code>, <code>FillRect</code>, <code>CopyBits</code> and <code>Invert</code> all
+   carry one) but <code>SurfaceMirror::apply_event</code>
    reports only <code>DrawOutcome::Drawn { key }</code>. RDP wants dirty
    rects; sending the whole frame every time would be
    wasteful even though IronRDP re-diffs internally (below).</li>
@@ -16296,17 +16297,24 @@ Kerbside spike</em> below).</p>
    <code>last_pos</code>, synthesise relative motion in server mode,
    suppress zero deltas because each motion costs an
    ack-window slot) exists twice: <code>ryll/src/web/inputs.rs</code>
-   and <code>ryll/src/app/mod.rs</code>. RDP would be a third copy.</li>
+   and <code>ryll/src/app/mod.rs</code>, and the two copies disagree in
+   details (phase 1's survey lists them). RDP would be a
+   third copy.</li>
 <li><strong>The heavy build cannot be trimmed.</strong> The renderer always
    builds the encoder (openh264 from C++) and compression's
    default <code>mozjpeg</code>, and always pulls in <code>nusb</code>,
-   <code>dav-server</code> and <code>hyper</code>. Kerbside's spike step 3a planned a
+   <code>dav-server</code> and <code>hyper</code>. openh264 is also a non-optional
+   dependency of the compression crate's H.264 stream
+   <em>decoder</em>, so dropping it needs a decode feature as well
+   as an encoder one. Kerbside's spike step 3a planned a
    slim feature set for exactly this reason; phase 1 of this
    plan now does it for both.</li>
 <li><strong>Audio is a tap, not a sink.</strong> With the <code>audio</code> feature
    the playback channel decodes Opus and opens a local cpal
    output regardless of the tap, and decoded PCM is never
-   offered to the sink. A server process wants Opus packets
+   offered to the sink. Without the feature the playback
+   channel is not linked at all, so there is no tap either:
+   a slim ryll serves <code>--web</code> with no audio. A server process wants Opus packets
    when the client accepts Opus, decoded PCM when it does not,
    and no local audio device in either case.</li>
 <li><strong>Single primary surface.</strong> The mirror keys surfaces by
@@ -16462,8 +16470,10 @@ competing with it:</p>
   saying so if openh264 cannot be separated cleanly from
   stream decode (MJPEG decode must remain). Step 3a keeps its
   Kerbside-only parts: server-role display serialisers, the
-  LZ4 and JPEG encoders, and a configurable display channel.
-  Kerbside's phase 3 plan has been updated to match.</li>
+  LZ4 and JPEG encoders (both since landed in ryll), and a
+  configurable display channel. Kerbside's phase 3 plan is
+  updated to match in kerbside PR #581, which was still open
+  on 2026-10-20.</li>
 <li><strong>Damage accumulation goes in the renderer</strong>, not in either
   consumer, so the spike's step 3b uses phase 1's accumulator
   instead of writing its own in Kerbside.</li>
@@ -16690,8 +16700,8 @@ cursor, resize, text clipboard and audio playback. Specifically:</p>
 <tbody>
 <tr>
 <td>1. Renderer prep: damage, pointer translation, slim build, device-free audio</td>
-<td>-</td>
-<td>Not started</td>
+<td><a href="/components/ryll/plans/PLAN-rdp-frontend-phase-01-renderer-prep/">PLAN-rdp-frontend-phase-01-renderer-prep.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -16767,7 +16777,8 @@ slim feature set taken over from Kerbside spike step 3a:</p>
   a cpal device. <code>--web</code> should use it too, since a
   server-side web session has no use for local audio either.</li>
 <li>A small helper that spawns the forwarder and mirror-apply
-  tasks <code>run_web</code> writes by hand, so RDP does not copy them.</li>
+  tasks that <code>run_web</code> and <code>run_headless</code> each write by hand,
+  so RDP does not make a third copy.</li>
 </ul>
 <p><strong>Acceptance:</strong> existing tests pass on all platforms; a
 renderer build with default features off and only display

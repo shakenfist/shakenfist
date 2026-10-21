@@ -7522,6 +7522,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#releasing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Releasing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#dependency-pinning" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15886,6 +15897,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#releasing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Releasing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#dependency-pinning" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16369,7 +16391,9 @@ harness exercises the proxy-side cancellation path live.</p>
 <code>kerbside/</code>, with or without an <code>__init__.py</code>, and
 <code>[tool.setuptools.package-data]</code> lists the non-Python file types that
 ship (templates, static assets, <code>alembic.ini</code> and so on). A file with a
-new extension needs adding to that list.</p>
+new extension needs adding to that list. <code>kerbside.tests</code> is excluded,
+and <code>include-package-data</code> is off, so the tests stay out of the wheel:
+they run from the checkout, never from an install.</p>
 <p>Do not rely on a file being tracked in git to make it ship.
 setuptools_scm's git file finder adds every tracked file beneath a
 package directory, but only when git metadata is present, so a build
@@ -16381,6 +16405,49 @@ if the two differ. Run it locally after changing the layout:</p>
 <a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>/tmp/wheelcheck/bin/pip<span class="w"> </span>install<span class="w"> </span>build
 <a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>/tmp/wheelcheck/bin/python<span class="w"> </span>tools/check-wheel.py
 </code></pre></div>
+<p>CI and the release also run
+<a href="https://github.com/shakenfist/actions/blob/main/docs/actions.md#check-dist"><code>check-dist</code></a>
+on a wheel built through the sdist, the way the release builds it. It
+fails if the wheel holds a test directory, so a packaging change that
+would ship the tests fails on its pull request rather than at release
+time. The release runs it on the proxy wheels too.</p>
+<h2 id="releasing">Releasing<a class="headerlink" href="#releasing" title="Permanent link">&para;</a></h2>
+<p>Pushing a <code>v*</code> tag triggers <code>release.yml</code>. Its jobs, in order:</p>
+<ol>
+<li><code>ci-gate</code> checks that <code>functional-tests.yml</code> succeeded on the tagged
+   commit, in its merge queue run. How the gate decides is documented
+   with the action, as
+   <a href="https://github.com/shakenfist/actions/blob/main/docs/actions.md#require-ci-success"><code>require-ci-success</code></a>.
+   It has no override.</li>
+<li><code>build</code>, <code>build-collection</code> and <code>build-proxy-wheels</code> build the
+   packages, the Ansible collection and the proxy wheels, and the wheel
+   builds run <code>check-dist</code>. They run only if the gate passed.</li>
+<li>The publishing jobs wait for approval in the <code>release</code> environment,
+   re-sign the tag with gitsign, and publish the proxy wheels, then
+   kerbside, to PyPI, the collection to Ansible Galaxy, and a GitHub
+   release.</li>
+</ol>
+<p>So tag a commit that is on <code>develop</code> and went through the merge queue,
+and wait for its <code>functional-tests.yml</code> run to finish first. A merge
+that bypassed the queue has no merge queue run, so it cannot be
+released until a later commit has gone through the queue. A gate
+failure means nothing was signed or published, so every failure is
+recoverable: the release template's
+<a href="https://github.com/shakenfist/development/blob/main/templates/release-automation/README.md#recovering-from-a-gate-failure">recovery table</a>
+says what to do for each cause, which is usually moving the tag. A run
+started some other way, such as a <code>workflow_dispatch</code>, does not count.</p>
+<p>A flaky queue run is not recovered by re-running it. The queue merges
+an entry only once <code>Can merge</code> passes, so a failed queue run gets its
+entry ejected and the commit it built never reaches <code>develop</code>: no tag
+can name it. Re-queue the pull request instead, and tag the commit
+that merges. Re-running a queue run helps only when the tagged
+commit's own run was re-run after it merged and that later attempt
+failed, because the gate judges each run at its latest attempt. Then
+use "Re-run failed jobs" on that run, and re-run the <code>ci-gate</code> job.</p>
+<p>Running <code>release.yml</code> by hand with <code>workflow_dispatch</code> skips the gate
+and the publishing jobs, and only builds and checks the packages. The
+one-time setup, and how to verify a release, are in
+<a href="https://github.com/shakenfist/kerbside/blob/develop/RELEASE-SETUP.md"><code>RELEASE-SETUP.md</code></a>.</p>
 <h2 id="dependency-pinning">Dependency pinning<a class="headerlink" href="#dependency-pinning" title="Permanent link">&para;</a></h2>
 <p>Indirect (transitive) dependencies are pinned in <code>pyproject.toml</code>
 between the <code># START_OF_INDIRECT_DEPS</code> and <code># END_OF_INDIRECT_DEPS</code>

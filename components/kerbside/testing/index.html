@@ -16332,6 +16332,12 @@ by definition superseded and GitHub has already abandoned its queue
 branch. <strong>Raising <code>max_entries_to_build</code> above 1 would make this wrong</strong>
 — speculative groups for different entries would then cancel each other
 — so that setting and this concurrency key have to move together.</p>
+<p>Only a run's first attempt takes the base-branch key. A re-run keeps
+its original <code>merge_group</code> event, so with that key a "Re-run jobs" on
+an old queue run (see <a href="/components/kerbside/development/#releasing">Releasing</a> for when a
+release needs one) would cancel the live queue entry or be cancelled
+by it. A re-run therefore keeps its own
+queue branch's group.</p>
 <p>The sibling smoke workflows (<code>direct-qemu-functional.yml</code>,
 <code>sf-e2e-functional.yml</code>) still key on <code>github.ref</code> alone. They trigger
 on <code>merge_group</code> but skip their heavy jobs there, so a piled-up run

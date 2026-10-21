@@ -16326,14 +16326,92 @@ edge-case, and AFL-discovered images).</p>
 <h2 id="releases">Releases<a class="headerlink" href="#releases" title="Permanent link">&para;</a></h2>
 <p>See <a href="https://github.com/shakenfist/instar/blob/develop/CHANGELOG.md">CHANGELOG.md</a>
 for release notes.</p>
-<p>Release artifacts (pre-compiled Linux binaries) are published to
+<p>Release artifacts (pre-compiled Linux binaries, plus <code>.deb</code> and <code>.rpm</code>
+packages) are published to
 <a href="https://github.com/shakenfist/instar/releases">GitHub Releases</a>
 via the release workflow (<code>.github/workflows/release.yml</code>). Tags
-are signed with Sigstore. To cut a release:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>make<span class="w"> </span>release<span class="w"> </span><span class="nv">VERSION</span><span class="o">=</span><span class="m">0</span>.2.0
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>HEAD
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v0.2.0
+are signed with Sigstore.</p>
+<p>A release is two steps, because the commit that is tagged must have
+been through the merge queue: the release workflow refuses to build a
+commit whose <code>functional-tests.yml</code> merge queue run did not succeed,
+and a version bump pushed straight to <code>develop</code> has no such run.</p>
+<ol>
+<li><strong>Propose.</strong> From a clean <code>develop</code> that is in step with <code>origin</code>,
+   run <code>make propose-release VERSION=0.2.0</code> (or
+   <code>tools/propose-release.sh 0.2.0</code>). It creates a <code>release-0.2.0</code>
+   branch, sets every crate's version with <code>make set-version</code>, runs
+   pre-commit, the release workflow's own version check and
+   <code>make test-rust</code>, and then asks before it commits <code>Release 0.2.0.</code>,
+   pushes the branch and opens a pull request. On <code>N</code>, or on any
+   failure before the push, it deletes the branch and leaves the
+   checkout as it was. It does not touch <code>CHANGELOG.md</code>: date the
+   release there with a second commit on <code>release-0.2.0</code>, moving the
+   <code>## [Unreleased]</code> entries under <code>## [0.2.0] - YYYY-MM-DD</code>, and push
+   it before the pull request queues. <code>tag-release.sh</code> finds the merge
+   that contains <code>Release 0.2.0.</code>, so the extra commit does not change
+   which commit is tagged.</li>
+<li><strong>Merge.</strong> Get the pull request reviewed and land it through the
+   merge queue like any other change, then wait for the queue's
+   <code>functional-tests.yml</code> run on the merged commit to finish.</li>
+<li><strong>Tag.</strong> Run <code>make tag-release VERSION=0.2.0</code> (or
+   <code>tools/tag-release.sh 0.2.0</code>). It finds the commit that merged
+   <code>Release 0.2.0.</code>, which is the queue's merge commit rather than
+   <code>develop</code>'s tip, checks that it carries the version, lists anything
+   that merged after it and so is not in the release, and asks before
+   it pushes the annotated tag <code>v0.2.0</code>. It then watches the workflow
+   run.</li>
+<li><strong>Approve.</strong> The workflow runs <code>ci-gate</code>, <code>check-version</code> and
+   <code>build</code>, then waits at <code>sign-tag</code> for a reviewer to approve the
+   <code>release</code> environment. After approval it re-signs the tag with
+   gitsign and creates the GitHub release.</li>
+</ol>
+<p><code>ci-gate</code> checks that <code>functional-tests.yml</code> succeeded on the tagged
+commit, in its merge queue run. A run started by hand, as
+<code>pr-retest.yml</code> does with <code>workflow_dispatch</code>, does not count. How the
+gate decides is documented with the action, as
+<a href="https://github.com/shakenfist/actions/blob/main/docs/actions.md#require-ci-success"><code>require-ci-success</code></a>.
+It has no override. A commit merged around the queue, by an
+administrator bypassing it, cannot be released: tag a later commit
+that went through the queue instead.</p>
+<p>The queue merges an entry only once <code>Can merge</code> passes, so a commit
+that merged through the queue already has a successful run. A queue
+run that fails, flaky or not, gets its entry ejected, and the commit
+it built never reaches <code>develop</code>: re-running that run cannot make any
+tag pass. Re-queue the pull request instead, and tag the commit that
+merges. Re-running a queue run matters only when the tagged commit's
+own run was re-run after it merged and that later attempt failed,
+because the gate judges each run at its latest attempt. Then use
+"Re-run jobs" on that merge queue run until it succeeds, and re-run
+the release's <code>ci-gate</code> job.</p>
+<p>A gate or version-check failure means nothing was signed or published,
+so every such failure is recoverable. It shows only as the failed
+workflow run, which <code>tools/tag-release.sh</code> is watching. The workflow
+files no issue for it: <code>propose-release.sh</code> and <code>tag-release.sh</code> both
+check the version before the tag is pushed. The
+<a href="https://github.com/shakenfist/development/blob/main/templates/release-automation/README.md#recovering-from-a-gate-failure">recovery table</a>
+in the shared release template's README says what to do for each
+cause; it is the canonical one, and the
+<a href="https://github.com/shakenfist/development/blob/main/templates/release-automation-rust/README.md#the-ci-gate">Rust template's README</a>
+points to it rather than keeping its own. Where it says to move the
+tag:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>:refs/tags/v0.2.0<span class="w">   </span><span class="c1"># needs the tag ruleset's bypass</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>git<span class="w"> </span>tag<span class="w"> </span>-d<span class="w"> </span>v0.2.0
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>tools/tag-release.sh<span class="w"> </span><span class="m">0</span>.2.0<span class="w"> </span>&lt;commit<span class="w"> </span>that<span class="w"> </span>went<span class="w"> </span>through<span class="w"> </span>the<span class="w"> </span>queue&gt;
 </code></pre></div>
+<p>Running <code>release.yml</code> by hand with <code>workflow_dispatch</code> is a dry run:
+it runs <code>check-version</code> and <code>build</code>, and skips <code>ci-gate</code>, <code>sign-tag</code>
+and <code>github-release</code>.</p>
+<p>The release scripts come from shakenfist/development's
+<a href="https://github.com/shakenfist/development/tree/main/templates/release-automation-rust">Rust release template</a>.
+<code>tools/tag-release.sh</code> and <code>tools/sign-release-tag.sh</code> are copied from
+it unchanged, and <code>tools/propose-release.sh</code> and
+<code>tools/release-version.sh</code> differ only between their
+<code>--- per-repository settings ---</code> markers, so make changes upstream
+first. The version the tag must name is <code>src/vmm/Cargo.toml</code>'s;
+<code>make set-version</code> keeps the other crates in <code>CARGO_TOML_FILES</code> at
+the same version. Bump with it, never with <code>tools/release-version.sh
+set</code>, which changes only <code>src/vmm/Cargo.toml</code> and would leave the
+other crates behind.</p>
 <h2 id="github-automation">GitHub automation<a class="headerlink" href="#github-automation" title="Permanent link">&para;</a></h2>
 <p>This project uses Claude Code-powered GitHub automation for PR management.</p>
 <h3 id="bot-commands">Bot commands<a class="headerlink" href="#bot-commands" title="Permanent link">&para;</a></h3>
@@ -16485,9 +16563,9 @@ full runtime, succeeds at the real work, and then dies on
 <code>gh: command not found</code>. That is exactly what happened to
 <code>rust-nightly-bump</code> on 2026-08-24: it validated <code>nightly-2026-08-24</code>,
 committed it and pushed the branch, then failed the run without opening
-the PR. Worse, in <code>release.yml</code> the <code>gh</code> call sits on a <code>if: failure()</code>
-error-reporting path, where a missing <code>gh</code> would have silently swallowed
-the report of the original failure.</p>
+the PR. Worse, an <code>if: failure()</code> error-reporting step that calls <code>gh</code>
+silently swallows the report of the original failure when <code>gh</code> is
+missing.</p>
 <h3 id="merge-queue-and-the-develop-ruleset">Merge queue and the <code>develop</code> ruleset<a class="headerlink" href="#merge-queue-and-the-develop-ruleset" title="Permanent link">&para;</a></h3>
 <p><code>develop</code> is gated by a repository <strong>ruleset</strong> named "Develop branch"
 (not classic branch protection — the whole Shaken Fist fleet uses
@@ -16829,7 +16907,7 @@ so issues are automatically closed when the PR merges.</p>
 <li><code>.github/workflows/functional-tests.yml</code> - Main CI, and the caller for the
   shared automated review workflow
   (<code>shakenfist/actions/.github/workflows/pr-auto-review.yml</code>)</li>
-<li><code>.github/workflows/release.yml</code> - Release workflow (Sigstore-signed tags, GitHub Releases with pre-compiled binaries)</li>
+<li><code>.github/workflows/release.yml</code> - Release workflow, on a <code>v*</code> tag: the CI gate, the version check, the build, then Sigstore-signed tags and GitHub Releases with pre-compiled binaries (see "Releases" above)</li>
 <li><code>.github/workflows/pr-re-review.yml</code> - Manual re-review trigger</li>
 <li><code>.github/workflows/pr-retest.yml</code> - Manual retest trigger via bot command</li>
 <li><code>.github/workflows/pr-fix-tests.yml</code> - Test failure fixing</li>
@@ -16861,6 +16939,9 @@ step -- see "Self-hosted runners and the GitHub CLI" in
 <li><code>tools/ci/test-apt-get.sh</code> - Tests for that wrapper against a fake <code>apt-get</code>; the <code>ci-tooling</code> CI job runs it</li>
 <li><code>tools/ci/install-docker.sh</code> - Installs the Docker client and daemon on a self-hosted runner, plus any extra packages passed as arguments (see "Self-hosted runners and Docker" above)</li>
 <li><code>tools/ci/install-gh-cli.sh</code> - Installs the GitHub CLI on a self-hosted runner if absent (see "Self-hosted runners and the GitHub CLI" above)</li>
+<li><code>tools/propose-release.sh</code>, <code>tools/tag-release.sh</code> - The two release steps: open the version-bump pull request, then tag the commit that merged it (see "Releases" above)</li>
+<li><code>tools/release-version.sh</code> - Reads and checks the release version in <code>src/vmm/Cargo.toml</code>; <code>check-version</code> in <code>release.yml</code> and <code>make check-version</code> run it</li>
+<li><code>tools/sign-release-tag.sh</code> - Re-signs the release tag with gitsign and force-pushes it; <code>sign-tag</code> in <code>release.yml</code> runs it on a throwaway runner</li>
 <li><code>tools/ci/fuzz-tier.sh</code> - Computes tiered nightly per-target fuzz durations</li>
 <li><code>tools/ci/report-fuzz-crash.sh</code> - Files the <code>security-audit</code> issue for a coverage-fuzz crash (bounds the log excerpt, dedups against open issues; see "Crash reporting" in <code>docs/testing.md</code>)</li>
 <li><code>tools/ci/pick-fuzz-artifact.sh</code> - Chooses which libFuzzer artifact to report as the reproducer</li>
