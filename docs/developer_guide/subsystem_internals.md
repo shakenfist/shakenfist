@@ -218,7 +218,8 @@ metrics period, and publishes once more on the poll after that. The
 follow-up is there because libvirt lists a domain as active as soon
 as its start begins, so the first publish can measure a domain part
 way through starting; without it that measurement would stand for a
-minute. At cluster start-up, where no domains are yet running
+minute. There is one follow-up, so a start which is still running at
+the poll after it still waits for the minute. At cluster start-up, where no domains are yet running
 for the set to change, that publish still waits out the once-a-minute
 floor.
 The check also forces at most once per distinct unguarded set: a node

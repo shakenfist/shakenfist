@@ -195,8 +195,11 @@ def _should_publish_metrics(last_publish: float, last_domains: set[int] | None,
     finished, and a domain.info() which fails mid-start is skipped and goes
     uncounted. Without the follow-up nothing republishes until the interval
     elapses, so a measurement taken mid-start would stand for a minute rather
-    than five seconds (issue 4394). A poll which did not run cannot settle
-    anything, so None falls through to the interval as before.
+    than five seconds (issue 4394). There is one follow-up, not one per poll
+    until the start is seen to finish: a start which outlasts the poll after
+    it is still measured mid-start until the interval elapses. A poll which
+    did not run cannot settle anything, so None falls through to the interval
+    as before.
     """
     if polled_domains is not None:
         if polled_domains != last_domains:

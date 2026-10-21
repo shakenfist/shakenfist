@@ -1057,9 +1057,10 @@ entries:
       Resolving this node's own name to its record. Every daemon does
       it at startup, and several re-resolve during their loops. For
       the resources daemon this call is also the first step of every
-      metrics publish (main.py:221), and a publish follows the
-      running-domain set rather than a fixed 60s tick, so this pair's
-      rate is coupled to instance churn. Activity coupled for that reason
+      metrics publish (Node.from_db() in _get_stats()), and a publish
+      follows the running-domain set rather than a fixed 60s tick (two
+      per change, as GetQueueLength above says), so this pair's rate
+      is coupled to instance churn. Activity coupled for that reason
       (#4197), which also tracks re-deriving it against a window that
       includes the new cadence.
   - operation: GetExistingLocks
@@ -1246,24 +1247,24 @@ entries:
     activity_coupled: true
     note: >-
       The stale metrics row read at the start of every publish
-      (main.py:226), one call per publish. No prior window exists for
+      (get_node_metrics() in _get_stats()), one call per publish. No prior window exists for
       this pair to fit -- it had no budget entry before the publish
       began following the running-domain set -- so the rate is the
       one-per-publish floor rather than a fit: one publish per node
       per 60s, so 1/60 = 0.017/s. Activity coupled for the same
       reason as GetNodeByFqdn and GetQueueLength above (#4197): the
       publish now follows the running-domain set instead of a fixed
-      tick.
+      tick, twice per change.
   - operation: UpsertNodeMetrics
     caller_daemon: resources
     per_node_base_qps: 0.017
     activity_coupled: true
     note: >-
       The metrics row write that completes every publish
-      (main.py:658), one call per publish. This operation had no
+      (update_metrics() in _run_inner()), one call per publish. This operation had no
       budget entry for any daemon before the publish began following
       the running-domain set. As with GetNodeMetrics above, the rate is the
       one-per-publish floor -- one publish per node per 60s, so
       1/60 = 0.017/s -- not a fit from measured data, and it is
       activity coupled (#4197) because the publish now follows the
-      running-domain set rather than a fixed tick.
+      running-domain set rather than a fixed tick, twice per change.
