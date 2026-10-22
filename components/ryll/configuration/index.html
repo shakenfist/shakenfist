@@ -6063,6 +6063,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../instar/plans/PLAN-bat-population/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -11666,6 +11694,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#rdp-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RDP Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#capture-and-debugging" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15852,6 +15891,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#rdp-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RDP Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#capture-and-debugging" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16339,6 +16389,64 @@ window. The operator guide, including reverse-proxy and TLS setup, is
 <td><code>--web-ice-server &lt;URL&gt;</code></td>
 <td>none</td>
 <td>STUN or TURN server URL (<code>stun:host:port</code>, <code>turn:host:port</code>). Repeatable. Empty by default: ryll assumes browser and host share a LAN, so ICE host candidates are usually enough. The scheme must be <code>stun:</code>, <code>stuns:</code>, <code>turn:</code> or <code>turns:</code> and is checked at startup, so a URL with the scheme left off fails the launch rather than producing an ICE server that silently does nothing</td>
+</tr>
+</tbody>
+</table>
+<h3 id="rdp-mode">RDP Mode<a class="headerlink" href="#rdp-mode" title="Permanent link">&para;</a></h3>
+<p><code>--rdp</code> runs ryll as a SPICE-to-RDP server instead of opening a GUI window,
+so a stock RDP client (FreeRDP, mstsc, Remmina) can drive the guest. The
+binary must be built with the <code>rdp</code> feature (see
+<a href="/components/ryll/development/">development.md</a>); one built without it refuses <code>--rdp</code> with
+a clear message. An operator guide is to come; this table is the flag
+reference.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--rdp</code></td>
+<td>false</td>
+<td>Run as a SPICE → RDP server. A reachability fallback for users with no SPICE client: it loses SPICE features such as USB redirection and folder sharing. Serves one client at a time; a second client waits until the first disconnects. Prints the address, username, password and certificate fingerprint at launch. Mutually exclusive with <code>--web</code> and <code>--headless</code>; <code>--control-socket</code> works with it</td>
+</tr>
+<tr>
+<td><code>--rdp-host &lt;ADDR&gt;</code></td>
+<td><code>127.0.0.1</code></td>
+<td>Bind address for the RDP listener. Use <code>0.0.0.0</code> for LAN access</td>
+</tr>
+<tr>
+<td><code>--rdp-port &lt;PORT&gt;</code></td>
+<td>3389, or an ephemeral port if 3389 is taken</td>
+<td>TCP port to listen on. The port actually bound is printed at launch. A port given explicitly is used or the launch fails; <code>0</code> asks for an ephemeral port</td>
+</tr>
+<tr>
+<td><code>--rdp-user &lt;NAME&gt;</code></td>
+<td><code>ryll</code></td>
+<td>Username RDP clients log in with</td>
+</tr>
+<tr>
+<td><code>--rdp-password &lt;PASSWORD&gt;</code></td>
+<td>generated</td>
+<td>Password RDP clients log in with. When absent, a random password is generated and printed at each launch. A password on the command line is visible to other users of the host in the process list, so prefer the generated one on a shared machine</td>
+</tr>
+<tr>
+<td><code>--rdp-security &lt;MODE&gt;</code></td>
+<td><code>tls</code></td>
+<td>How clients authenticate: <code>tls</code> (TLS with the credentials checked by ryll; every client speaks it) or <code>nla</code> (CredSSP, which refuses clients that cannot do it)</td>
+</tr>
+<tr>
+<td><code>--rdp-tls-cert &lt;PATH&gt;</code></td>
+<td>self-signed, generated at launch</td>
+<td>PEM-encoded TLS certificate chain. Requires <code>--rdp-tls-key</code> as well</td>
+</tr>
+<tr>
+<td><code>--rdp-tls-key &lt;PATH&gt;</code></td>
+<td>none</td>
+<td>PEM-encoded TLS private key. Required with <code>--rdp-tls-cert</code></td>
 </tr>
 </tbody>
 </table>

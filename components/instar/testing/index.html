@@ -6317,6 +6317,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-bat-population/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -18740,6 +18768,41 @@ invocation random fields (vmdk <code>cid</code> / <code>parent-cid</code>, vhdx
 header-id) prevent dedup from collapsing duplicate-output
 versions, so each version gets its own profile; the comparison logic excludes those random fields from the
 field-equivalence check.</p>
+<h3 id="qemu-img-create-pins">qemu-img create pins<a class="headerlink" href="#qemu-img-create-pins" title="Permanent link">&para;</a></h3>
+<p><code>tests/golden/qemu-create-pins.json</code> records what every static
+<code>qemu-img</code> build in <code>instar-testdata/qemu-img-binaries/x86_64/</code>
+writes for the commands in <code>tests/helpers/qemu_pins.py</code> (<code>CASES</code>):
+VHDX create and convert (as a structural summary from
+<code>tests/helpers/vhdx_structure.py</code>, including the BAT), what
+preallocation changes for vpc, vmdk and vhdx, and the vmdk
+monolithicFlat descriptor. Results are grouped by outcome, so a
+version boundary shows up as a case with more than one group.</p>
+<p>Each preallocation mode records whether its image has the same bytes
+(<code>same_bytes_as_off</code>) and the same allocation
+(<code>same_allocation_as_off</code>) as a <code>preallocation=off</code> image. The <code>off</code>
+entry compares two <code>off</code> images, and the bytes that differ between
+those images are masked out, so its <code>same_bytes_as_off</code> is true by
+construction. Only its allocation comparison is measured. The <code>falloc</code>
+and <code>full</code> entries are the ones that carry evidence.</p>
+<p><code>tests/test_qemu_create_pins.py</code> keeps it honest. It fails when a
+build is present that the pin does not list, when 6.0.0, 6.2.0,
+8.2.0, 10.2.0 or the host <code>qemu-img</code> no longer produce what the pin
+says, and when a VHDX create case gains a second group.</p>
+<p>When instar-testdata gains a qemu build, re-pin every version and
+case (about six minutes at <code>--jobs 2</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>tools/sweep-qemu-create.py<span class="w"> </span>--write<span class="w"> </span>tests/golden/qemu-create-pins.json<span class="w"> </span>--jobs<span class="w"> </span><span class="m">2</span>
+</code></pre></div>
+<p>To replay a suspected boundary on its own, check a few versions and
+cases against the committed pin; it exits 1 and names each differing
+field:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>tools/sweep-qemu-create.py<span class="w"> </span>--check<span class="w"> </span>tests/golden/qemu-create-pins.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">    </span>--versions<span class="w"> </span><span class="m">8</span>.1.5,8.2.0<span class="w"> </span>--cases<span class="w"> </span>vhdx-fixed-64M
+</code></pre></div>
+<p>Host load has made qemu commands fail spuriously here before, so
+replay any new boundary before believing it. A new boundary is a
+finding, not a re-pin: a VHDX create case with two groups means
+instar has to decide which behaviour it matches, and that needs a
+human decision before the pin is committed.</p>
 <h2 id="integration-testing">Integration Testing<a class="headerlink" href="#integration-testing" title="Permanent link">&para;</a></h2>
 <p>Integration tests compare <code>instar info</code> output against <code>qemu-img info</code> to verify
 drop-in replacement compatibility, validate <code>instar check</code> against deliberately
@@ -18803,28 +18866,28 @@ baseline is suspect, diff <code>profiles/</code> against <code>raw/</code> and c
 recorded <code>*_stdout_bytes</code> in each <code>.meta.json</code>, which is what
 <code>detect-profiles.py</code>'s <code>validate_profiles()</code> now does before it will
 commit anything.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># Set up test environment</span>
-<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>make<span class="w"> </span>test-venv
-<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>
-<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># Run safe integration tests</span>
-<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a>make<span class="w"> </span><span class="nb">test</span>
-<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a>
-<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="c1"># Run tests with verbose output (shows diffs on failure)</span>
-<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>make<span class="w"> </span>test-report
-<a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>
-<a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a><span class="c1"># Run all tests including malicious images (use with caution)</span>
-<a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a>make<span class="w"> </span>test-malicious
-<a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a>
-<a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a><span class="c1"># Run tests inside container (as CI does)</span>
-<a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a>make<span class="w"> </span>test-container
-<a id="__codelineno-23-15" name="__codelineno-23-15" href="#__codelineno-23-15"></a>
-<a id="__codelineno-23-16" name="__codelineno-23-16" href="#__codelineno-23-16"></a><span class="c1"># CI splits tests into three parallel jobs by format family:</span>
-<a id="__codelineno-23-17" name="__codelineno-23-17" href="#__codelineno-23-17"></a>make<span class="w"> </span>test-container-core<span class="w">              </span><span class="c1"># info, check, security, oslo-crossval</span>
-<a id="__codelineno-23-18" name="__codelineno-23-18" href="#__codelineno-23-18"></a>make<span class="w"> </span>test-container-convert-qcow2<span class="w">    </span><span class="c1"># QCOW2/VMDK/RAW convert + compare</span>
-<a id="__codelineno-23-19" name="__codelineno-23-19" href="#__codelineno-23-19"></a>make<span class="w"> </span>test-container-convert-vhd<span class="w">      </span><span class="c1"># VHD/VHDX convert (slowest)</span>
-<a id="__codelineno-23-20" name="__codelineno-23-20" href="#__codelineno-23-20"></a>
-<a id="__codelineno-23-21" name="__codelineno-23-21" href="#__codelineno-23-21"></a><span class="c1"># Clean test artifacts</span>
-<a id="__codelineno-23-22" name="__codelineno-23-22" href="#__codelineno-23-22"></a>make<span class="w"> </span>clean-tests
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="c1"># Set up test environment</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>make<span class="w"> </span>test-venv
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="c1"># Run safe integration tests</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>make<span class="w"> </span><span class="nb">test</span>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="c1"># Run tests with verbose output (shows diffs on failure)</span>
+<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>make<span class="w"> </span>test-report
+<a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a>
+<a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a><span class="c1"># Run all tests including malicious images (use with caution)</span>
+<a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a>make<span class="w"> </span>test-malicious
+<a id="__codelineno-25-12" name="__codelineno-25-12" href="#__codelineno-25-12"></a>
+<a id="__codelineno-25-13" name="__codelineno-25-13" href="#__codelineno-25-13"></a><span class="c1"># Run tests inside container (as CI does)</span>
+<a id="__codelineno-25-14" name="__codelineno-25-14" href="#__codelineno-25-14"></a>make<span class="w"> </span>test-container
+<a id="__codelineno-25-15" name="__codelineno-25-15" href="#__codelineno-25-15"></a>
+<a id="__codelineno-25-16" name="__codelineno-25-16" href="#__codelineno-25-16"></a><span class="c1"># CI splits tests into three parallel jobs by format family:</span>
+<a id="__codelineno-25-17" name="__codelineno-25-17" href="#__codelineno-25-17"></a>make<span class="w"> </span>test-container-core<span class="w">              </span><span class="c1"># info, check, security, oslo-crossval</span>
+<a id="__codelineno-25-18" name="__codelineno-25-18" href="#__codelineno-25-18"></a>make<span class="w"> </span>test-container-convert-qcow2<span class="w">    </span><span class="c1"># QCOW2/VMDK/RAW convert + compare</span>
+<a id="__codelineno-25-19" name="__codelineno-25-19" href="#__codelineno-25-19"></a>make<span class="w"> </span>test-container-convert-vhd<span class="w">      </span><span class="c1"># VHD/VHDX convert (slowest)</span>
+<a id="__codelineno-25-20" name="__codelineno-25-20" href="#__codelineno-25-20"></a>
+<a id="__codelineno-25-21" name="__codelineno-25-21" href="#__codelineno-25-21"></a><span class="c1"># Clean test artifacts</span>
+<a id="__codelineno-25-22" name="__codelineno-25-22" href="#__codelineno-25-22"></a>make<span class="w"> </span>clean-tests
 </code></pre></div>
 <p><strong>Test structure:</strong>
 - <code>tests/manifest.json</code> - Defines test images and their safety levels
@@ -18929,19 +18992,19 @@ since qemu-img cannot inspect inside LUKS without a secret object.</p>
 <h2 id="testing-prototypes">Testing Prototypes<a class="headerlink" href="#testing-prototypes" title="Permanent link">&para;</a></h2>
 <p>Each prototype has its own devcontainer with the required toolchain. Use the
 Makefile for building and testing:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># Build a specific prototype</span>
-<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>make<span class="w"> </span>build-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
-<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>
-<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="c1"># Build the devcontainer for a prototype</span>
-<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a>make<span class="w"> </span>build-prototype-devcontainer<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
-<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a>
-<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="c1"># View run instructions</span>
-<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>make<span class="w"> </span>run-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="c1"># Build a specific prototype</span>
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>make<span class="w"> </span>build-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="c1"># Build the devcontainer for a prototype</span>
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>make<span class="w"> </span>build-prototype-devcontainer<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>
+<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="c1"># View run instructions</span>
+<a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a>make<span class="w"> </span>run-prototype<span class="w"> </span><span class="nv">PROTOTYPE</span><span class="o">=</span>virtio-block5
 </code></pre></div>
 <p>For manual testing without the Makefile:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="nb">cd</span><span class="w"> </span>prototypes/&lt;prototype-name&gt;
-<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>./build.sh<span class="w">                           </span><span class="c1"># Build the prototype</span>
-<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>sudo<span class="w"> </span>./target/release/vmm<span class="w"> </span>guest.bin<span class="w">  </span><span class="c1"># Run (requires KVM)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="nb">cd</span><span class="w"> </span>prototypes/&lt;prototype-name&gt;
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>./build.sh<span class="w">                           </span><span class="c1"># Build the prototype</span>
+<a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a>sudo<span class="w"> </span>./target/release/vmm<span class="w"> </span>guest.bin<span class="w">  </span><span class="c1"># Run (requires KVM)</span>
 </code></pre></div>
 <h2 id="testing-considerations">Testing Considerations<a class="headerlink" href="#testing-considerations" title="Permanent link">&para;</a></h2>
 <ul>

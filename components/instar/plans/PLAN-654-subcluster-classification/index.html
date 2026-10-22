@@ -6057,6 +6057,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLAN-bat-population/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15376,6 +15404,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#status-in-progress" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status: In progress
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prompt" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15447,6 +15486,7 @@
 
 
 <h1 id="plan-654-one-subcluster-classification-for-qcow2">PLAN-654: One subcluster classification for qcow2<a class="headerlink" href="#plan-654-one-subcluster-classification-for-qcow2" title="Permanent link">&para;</a></h1>
+<h2 id="status-in-progress">Status: In progress<a class="headerlink" href="#status-in-progress" title="Permanent link">&para;</a></h2>
 <h2 id="prompt">Prompt<a class="headerlink" href="#prompt" title="Permanent link">&para;</a></h2>
 <p>Before responding to questions or discussion points in this
 document, explore the instar codebase thoroughly. Read relevant
@@ -15727,20 +15767,27 @@ the failure #654 measured.</p>
    whether <code>INVALID</code> gets the same treatment. The error-handling skill
    argues it should, since the user should be able to tell a corrupt
    image from an I/O fault. #665 is a reminder that a raiser needs a
-   matching renderer.</li>
+   matching renderer.
+   <em>Answered in phase 1:</em> it gets a named refusal, rendered by the VMM
+   with qemu's wording "Invalid cluster entry found".</li>
 <li><strong>Write paths.</strong> snapshot, commit, rebase, resize, bench <code>-w</code> and
    <code>qcow2-write</code> also read L2 entries. <code>docs/quirks.md:2208</code> says write
    operations refuse external data files. Step 1a lists every write
    path that can meet an extended-L2 entry and says whether any of them
    interprets host offset 0. Paths that refuse data files and only
    meet entries they have already validated are out of scope, and the
-   plan records which ones they are.</li>
+   plan records which ones they are.
+   <em>Answered in phase 1:</em> the table is in its "Write paths" section.
+   commit and resize interpret host offset 0 wrongly on classic L2,
+   filed as #795 and #794.</li>
 <li><strong>A silent bitmap read failure.</strong> <code>cluster_lookup</code> reads the bitmap
    with <code>.unwrap_or(0)</code> (<code>lib.rs:2279</code>), so a failed read becomes
    "nothing allocated" and the cluster reads from the backing file or
    as zeros. That is the same kind of quiet wrong answer, in the
    function this phase rewrites, so phase 1 propagates the failure
-   rather than leaving it.</li>
+   rather than leaving it.
+   <em>Answered in phase 1:</em> the fallback is gone and a failed bitmap
+   read fails the lookup.</li>
 </ol>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <table>
@@ -15762,13 +15809,13 @@ the failure #654 measured.</p>
 <tr>
 <td>2. The data device is not a chain layer (#792, #803)</td>
 <td><a href="/components/instar/plans/PLAN-654-subcluster-classification-phase-02-data-device/">PLAN-654-subcluster-classification-phase-02-data-device.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td><code>d42af1f</code> (#810)</td>
 </tr>
 <tr>
 <td>3. Push audit</td>
-<td>-</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-654-subcluster-classification-phase-03-push-audit/">PLAN-654-subcluster-classification-phase-03-push-audit.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 </tbody>
@@ -16244,15 +16291,54 @@ chosen to defer to here, so that we do not forget them.</p>
   reachability probe so it cannot pass vacuously, is the follow-up
   #654's comment argues for. It also touches the three fuzz-target
   lists that #651 says nothing cross-checks.</li>
-<li><strong>check's allocation count on data-file images.</strong> On row C's image
+<li><strong>check's total cluster count</strong> (#814). On row C's image
   <code>instar check</code> reports <code>3/4097</code> clusters allocated where
-  <code>qemu-img check</code> reports <code>3/16</code>. That is unrelated to classification,
-  so it is not fixed here.</li>
-<li><strong>qemu's data-file offset check.</strong> qemu refuses a data-file entry
-  whose host offset differs from its guest offset
-  (<code>block/qcow2-cluster.c:696-704</code>), and a compressed entry in a
-  data-file image. Phase 1 filed both as #803, and phase 2 takes it
-  (that phase's D5).</li>
+  <code>qemu-img check</code> reports <code>3/16</code>. The push audit found the denominator
+  is one higher than qemu's on every qcow2 image, not only data-file
+  ones (<code>2/8193</code> against <code>1/8192</code> on a plain image). That is unrelated
+  to classification, so it is not fixed here.</li>
+<li><strong>Write paths that misread host offset 0 on classic L2.</strong> Phase 1's
+  step 1a measured two, both on qemu-written images and both exiting
+  0: <code>resize --shrink</code> zeroes the header cluster's refcount when a
+  zero-flag entry lies above the new size (#794), and <code>commit</code> ignores
+  <code>QCOW_OFLAG_ZERO</code> and copies stale overlay bytes into the base
+  (#795). Neither is an extended-L2 entry, so the classifier does not
+  change them.</li>
+<li><strong>check counts L2 tables as allocated clusters</strong> (#804). qemu counts
+  only guest clusters with a host cluster behind them, so instar's
+  <code>allocated-clusters</code> is one higher per L2 table on every qcow2
+  image. This is the numerator; the entry above is the denominator.</li>
+<li><strong>Subclusters under 512 bytes</strong> (#805). qemu refuses an extended-L2
+  image whose cluster size is under 16K; instar opens and reads one.</li>
+<li><strong>Data files on backing images</strong> (#806). The VMM discovers only the
+  top image's data file, so a read through a backing image that owns
+  one fails closed. When this is fixed, the data-file refusal should
+  name the device it came from: today it always says "input", which
+  costs nothing only because the top image is the only possible owner
+  (#810's review, item 2).</li>
+<li><strong>compare reports a read failure as a content mismatch</strong> (#807),
+  printing "Content mismatch at offset 0!" and exiting 1, the code for
+  "images differ".</li>
+<li><strong>check --chain and raw backing files</strong> (#808). Every raw backing
+  file draws a format-mismatch chain error. Related to #629.</li>
+<li><strong>An integration test for the parent-hint flat VMDK.</strong> Step 2a
+  measured a flat descriptor with <code>parentFileNameHint</code>, used as the
+  backing file of a larger qcow2, serving the parent's raw bytes. The
+  extent-walk bound that fixes it has a crate test and a mutation case,
+  but no fixture drives it end to end (#810's review, item 6).</li>
+<li><strong>qemu's other host-offset checks</strong> (#812). qemu refuses an
+  unaligned host cluster offset in any image
+  (<code>block/qcow2-cluster.c:686-694</code>) and a zero flag in a pre-v3 image
+  (<code>:657-664</code>). Both checks sit in <code>qcow2_get_host_offset()</code>, not in the
+  classifier this plan transcribed. instar reads both: <code>map</code> reports
+  the unaligned cluster as data, and <code>convert</code> serves zeros for the v2
+  one. Found by the push audit.</li>
+<li><strong>The ZSTD backing-chain tests never run</strong> (#813). Their capability
+  probe writes to <code>/dev/null</code>, which fails whatever qemu supports.</li>
+<li><strong>commit's data-file refusal blames the overlay</strong> (#815) when it is
+  the backing file that owns the data file.</li>
+<li><strong>map renders an unknown extent state from the guest as data</strong>
+  (#816), the guest's own <code>"unknown"</code> fallback included.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>This section should list any bugs we encounter during development
@@ -16260,9 +16346,9 @@ that we fixed. You should also scan the project's issue tracker,
 where one exists, for directly related issues that we should
 either resolve as part of this master plan or at least be aware of
 while planning it.</p>
-<p>Phase 1 is planned to close #653 and #654, and to fix rows C and D of
-Situation for read, map, measure and check. Phase 2 is planned to close</p>
-<h1 id="792-and-803-650-fixed-in-652-is-related-d2-reverses-its-zero-fill-policy">792 and #803. #650, fixed in #652, is related: D2 reverses its zero-fill policy.<a class="headerlink" href="#792-and-803-650-fixed-in-652-is-related-d2-reverses-its-zero-fill-policy" title="Permanent link">&para;</a></h1>
+<p>Phase 1 closed #653 and #654, fixed rows C and D of Situation for
+read, map, measure and check, and closed #800, a compare defect found
+during the phase. Phase 2 closed #792 and #803. #650, fixed in #652, is related: D2 reverses its zero-fill policy.</p>
 <h3 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h3>
 <p>Before executing any step of this plan, please back brief the
 operator as to your understanding of the plan and how the work you

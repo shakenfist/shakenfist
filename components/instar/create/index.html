@@ -6289,6 +6289,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/PLAN-bat-population/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16200,7 +16228,12 @@ through <code>instar check</code> and match <code>qemu-img</code> (instar #365).
 <li>Multi-file VMDK subformats (<code>monolithicFlat</code>, <code>twoGbMaxExtentSparse</code>,
   <code>twoGbMaxExtentFlat</code>) — needs multi-output-device support in the
   call table.</li>
-<li>VHDX <code>subformat=fixed</code> (not emitted by qemu-img either).</li>
+<li>VHDX <code>subformat=fixed</code>. instar refuses it today, but qemu-img does emit it:
+  <code>qemu-img create -f vhdx -o subformat=fixed</code> sets the <code>LeaveBlocksAllocated</code>
+  file parameter, writes a BAT entry for every payload block
+  (<code>PAYLOAD_BLOCK_ZERO</code> by default, <code>PAYLOAD_BLOCK_FULLY_PRESENT</code> at
+  sequential offsets with <code>-o block_state_zero=off</code>) and extends the file
+  sparsely to the end of its data region.</li>
 <li><code>--object OBJDEF</code> and <code>encrypt.*</code> for LUKS-encrypted create —
   pair with the existing convert-side passphrase plumbing.</li>
 <li>Atomic-rename safety: write to <code>FILENAME.tmp</code> and <code>rename()</code> on

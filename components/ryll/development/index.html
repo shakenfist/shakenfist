@@ -6063,6 +6063,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../instar/plans/PLAN-bat-population/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -11867,6 +11895,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#verifying-rdp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verifying --rdp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#inspecting-a-capture-pcap" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15859,6 +15898,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#verifying-rdp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verifying --rdp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#inspecting-a-capture-pcap" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15999,8 +16049,8 @@ the C/C++ compiler for the same two crates. See
 <a href="/components/ryll/development-macos/">development-macos.md</a> for full setup
 instructions.</p>
 <h2 id="cargo-features">Cargo features<a class="headerlink" href="#cargo-features" title="Permanent link">&para;</a></h2>
-<p>ryll ships several default-on Cargo features that can be opted
-out at build time:</p>
+<p>ryll ships several Cargo features, most of them default-on and
+able to be opted out of at build time:</p>
 <ul>
 <li><strong><code>gui</code></strong> (default-on) — eframe, egui, arboard, rfd, and the
   whole interactive UI.  Disabling it produces a <code>--headless</code>
@@ -16026,6 +16076,12 @@ out at build time:</p>
   QR-encoded visual digest and emits a <code>digest_updated</code>
   control-socket event on each frame counter change.  Built
   only for the kerbside test harness; not in production ryll.</li>
+<li><strong><code>rdp</code></strong> (default-off) — the <code>--rdp</code> mode, which serves the
+  SPICE session to stock RDP clients through the
+  shakenfist-spice-rdp crate and IronRDP.  <code>make lint</code> and
+  <code>make test</code> build it; release builds leave it out.  Running a
+  binary built without it with <code>--rdp</code> exits with a clear "this
+  ryll binary was built without the <code>rdp</code> feature" message.</li>
 </ul>
 <p>The slim test-harness binary is built with
 <code>cargo build --release --no-default-features -p ryll</code>.  See
@@ -16460,13 +16516,38 @@ test.</p>
 which makes it the browser to reach for when deciding whether a
 problem is ryll's — and the control to run the probe against when
 deciding whether the probe itself is telling the truth.</p>
+<h3 id="verifying-rdp">Verifying <code>--rdp</code><a class="headerlink" href="#verifying-rdp" title="Permanent link">&para;</a></h3>
+<p><code>--rdp</code> needs a binary built with the <code>rdp</code> feature. The Makefile's
+<code>lint</code> and <code>test</code> targets build it, but <code>make build</code> and <code>make release</code>
+do not, so run <code>make -n build</code> to see the docker line and add
+<code>--features rdp</code> to its cargo command; that leaves the binary at
+<code>target/debug/ryll</code> (or <code>target/release/ryll</code> from the <code>release</code>
+target's line). Then start the desktop guest and point ryll at it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>make<span class="w"> </span>test-qemu-desktop
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>target/debug/ryll<span class="w"> </span>--rdp<span class="w"> </span>--direct<span class="w"> </span>localhost:5900
+</code></pre></div>
+<p>ryll prints the address, port, username, password and certificate
+fingerprint. If another RDP server already holds 3389 it falls back to an
+ephemeral port and prints that one. Connect with FreeRDP (3.15.0 from
+Debian 13's <code>freerdp3-x11</code> works):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>xfreerdp3<span class="w"> </span>/v:127.0.0.1:PORT<span class="w"> </span>/u:ryll<span class="w"> </span>/p:PASSWORD<span class="w"> </span>/cert:tofu
+</code></pre></div>
+<p>Use <code>/sec:nla</code> against a server started with <code>--rdp-security nla</code>. Check
+that typing, left, right and middle buttons, and the wheel all reach the
+guest. To measure what the extra hop costs, run <code>tools/rdp-measure.sh
+--pid PID --port PORT --seconds 30</code> against the ryll process while the
+guest is idle and during each of the three workloads: typing in a
+terminal, scrolling a long page and playing a video. It reports CPU and
+bytes sent. Video is expensive
+because the client receives RemoteFX bitmaps of a region that changes
+about 28 times a second.</p>
 <h3 id="inspecting-a-capture-pcap">Inspecting a <code>--capture</code> pcap<a class="headerlink" href="#inspecting-a-capture-pcap" title="Permanent link">&para;</a></h3>
 <p><code>tools/pcap-inspect.py</code> is a pure-Python helper (no tshark
 or scapy dependency) for sifting through a ryll capture.
 Three subcommands:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>tools/pcap-inspect.py opcodes   &lt;path&gt;                 # histogram of SPICE message types
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>tools/pcap-inspect.py draw-copy &lt;path&gt;                 # DRAW_COPY breakdown by surface / image type
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>tools/pcap-inspect.py timeline  &lt;path&gt; [--since-last N]  # server-side messages in order
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>tools/pcap-inspect.py opcodes   &lt;path&gt;                 # histogram of SPICE message types
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>tools/pcap-inspect.py draw-copy &lt;path&gt;                 # DRAW_COPY breakdown by surface / image type
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>tools/pcap-inspect.py timeline  &lt;path&gt; [--since-last N]  # server-side messages in order
 </code></pre></div>
 <p>Typical use: when investigating a rendering artefact,
 <code>opcodes</code> tells you whether the problem window even
@@ -16483,7 +16564,7 @@ stream. The helper handles that without any extra flags.</p>
 <p><code>tools/web-smoke.sh</code> verifies that <code>ryll --web</code> starts,
 binds the HTTP server, and shuts down cleanly on SIGTERM.
 Usage:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>tools/web-smoke.sh [path-to-ryll-binary]
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>tools/web-smoke.sh [path-to-ryll-binary]
 </code></pre></div>
 <p>Defaults to <code>target/release/ryll</code>; <code>WEB_PORT</code> env var
 overrides the port (default <code>18080</code>). The script creates a

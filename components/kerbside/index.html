@@ -6063,6 +6063,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../instar/plans/PLAN-bat-population/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16192,13 +16220,13 @@ deployed in front of the clouds rather than by one of them, because
 <td>By hand: pip, venv and systemd</td>
 <td>The package installed into a venv, with the REST API (gunicorn) and the daemon run as services; the pieces are listed in <a href="/components/kerbside/installation/">installation.md</a></td>
 <td>Any</td>
-<td>Every lane, but by CI scripts rather than as a documented procedure</td>
+<td>Every lane except <code>sf-e2e</code>, by CI scripts rather than as a documented procedure</td>
 </tr>
 <tr>
 <td>Ansible role</td>
 <td>The <code>kerbside</code> role in Kerbside's own <code>shakenfist.kerbside</code> ansible collection (<code>ansible/</code>, published to Ansible Galaxy with each release), on co-located or dedicated hosts, for any source type, with a bring-your-own-Kerbside path for a Kerbside it does not deploy</td>
 <td>Any</td>
-<td>A rootless test of the role's entry points (<code>tools/ci-test-ansible-role.sh</code>) and a lint, release-build and <code>galaxy-importer</code> check in the sanity job. <code>sf-e2e</code>, smoke tier and nightly, still deploys through <code>tools/sf-e2e/deploy-kerbside.sh</code> rather than the role</td>
+<td>A rootless test of the role's entry points (<code>tools/ci-test-ansible-role.sh</code>) and a lint, release-build and <code>galaxy-importer</code> check in the sanity job. <code>sf-e2e</code>, smoke tier and nightly, deploys a pull request's Kerbside through its own role, co-located on a Shaken Fist node, and checks a second deploy restarts nothing</td>
 </tr>
 <tr>
 <td>Kolla-Ansible (kerbside-patches)</td>

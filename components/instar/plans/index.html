@@ -6125,6 +6125,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="PLAN-bat-population/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15703,7 +15731,14 @@ at the repo root).</p>
 <td><a href="/components/instar/plans/PLAN-654-subcluster-classification/">One subcluster classification for qcow2</a></td>
 <td>Replace the ad hoc readings of "host offset zero" across the qcow2 chain reader, map, measure and check with one classifier that mirrors qemu's seven subcluster types, including the external-data-file rule, and refuse what qemu calls an invalid entry. Fixes extended-L2 reads that skip the backing file (#654), a crafted entry that serves the image header as data (#653), and data-file images whose cluster 0 reads as zeros; then stops treating the data device as a chain layer (#792) and refuses the data-file entries qemu refuses (#803)</td>
 <td>In progress</td>
-<td><a href="/components/instar/plans/PLAN-654-subcluster-classification-phase-01-classifier/">1: classifier</a> ✓, <a href="/components/instar/plans/PLAN-654-subcluster-classification-phase-02-data-device/">2: data device</a> (also takes #803, qemu's data-file host-offset refusals; the survey found the chain config documents the data device as a layer behind its owner, and that the crate harness never used the layout the VMM writes, which is why #792 had no crate test), 3: push audit</td>
+<td><a href="/components/instar/plans/PLAN-654-subcluster-classification-phase-01-classifier/">1: classifier</a> ✓, <a href="/components/instar/plans/PLAN-654-subcluster-classification-phase-02-data-device/">2: data device</a> ✓ (also takes #803, qemu's data-file host-offset refusals; the survey found the chain config documents the data device as a layer behind its owner, and that the crate harness never used the layout the VMM writes, which is why #792 had no crate test), <a href="/components/instar/plans/PLAN-654-subcluster-classification-phase-03-push-audit/">3: push audit</a> (the survey found the audit tooling already repaired and resolving the two merges to 21 files; it found seven open issues this plan filed recorded only in phase plans, now in Future work, and that phase 2 moved the crate harness phase 1's mutation cases run against, so the audit re-runs all 23 of the plan's mutation cases on the merged tree; the audit then found eighteen defects this plan introduced or made true, four of them blocking documentation, which land as a follow-up pull request, and filed #812 to #816)</td>
+</tr>
+<tr>
+<td>2026-10-20</td>
+<td><a href="/components/instar/plans/PLAN-bat-population/">Populated BAT output: fixed VHDX and non-qcow2 preallocation</a></td>
+<td>Emit fixed VHDX from <code>create</code> and <code>convert</code> (and answer it in <code>measure</code>) the way qemu-img does -- <code>LeaveBlocksAllocated</code> set and every payload BAT entry written, <code>PAYLOAD_BLOCK_ZERO</code> by default or <code>FULLY_PRESENT</code> at sequential offsets with <code>block_state_zero=off</code> -- through a streaming BAT emitter that never holds the table in guest memory; accept <code>-o preallocation=falloc|full</code> on vmdk / vpc / vhdx as the no-op qemu-img makes it (and refuse <code>metadata</code>); add host-only <code>create -f vmdk -o subformat=monolithicFlat</code>. Fixes the VHDX read and geometry defects fixed output would expose first: the BAT entry count (#626, which makes instar refuse some well-formed qemu images), qemu's size-scaled default block size (#645), <code>check</code> rejecting a partial last block, <code>resize</code> turning a fixed VHDX into a hybrid, and the 64 TiB ceiling. Multi-extent VMDK output is out of scope</td>
+<td>In progress</td>
+<td><a href="/components/instar/plans/PLAN-bat-population-phase-01-pin/">1: pin</a>, 2: fixtures, 3: host create, 4: read side, 5: geometry, 6: emitter, 7: create, 8: convert, 9: measure, 10: matrix, 11: fuzz, 12: docs, 13: push audit</td>
 </tr>
 </tbody>
 </table>

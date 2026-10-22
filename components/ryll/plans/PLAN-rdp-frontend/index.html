@@ -6063,6 +6063,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-bat-population/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16182,8 +16210,9 @@ closest prior art is <code>qemu-rdp</code>, which lives inside
 <code>gitlab.com/marcandre.lureau/qemu-display</code> (the standalone
 <code>qemu-rdp</code> URL needs a login) and serves RDP from qemu's D-Bus
 display. IronRDP moves quickly: the claims below were read on
-2026-10-19 against the 0.13.0 release and <code>main</code> at <code>62246b3</code>,
-and differ between the two. Re-check each one before building
+2026-10-19 against the 0.13.0 release and its <code>master</code> branch
+(its development branch; there is no <code>main</code>) at <code>62246b3</code>, and
+differ between the two. Re-check each one before building
 on it, against the version we have actually pinned. The
 Microsoft protocol specifications are MS-RDPBCGR (core),
 MS-RDPEGFX (graphics pipeline), MS-RDPEDISP (display control),
@@ -16329,9 +16358,11 @@ Kerbside spike</em> below).</p>
    fix that benefits every mode.</li>
 </ol>
 <h3 id="the-rdp-side-ironrdp-as-of-2026-10-19">The RDP side: IronRDP as of 2026-10-19<a class="headerlink" href="#the-rdp-side-ironrdp-as-of-2026-10-19" title="Permanent link">&para;</a></h3>
-<p>Read from 0.13.0 (released 2026-07-10) and <code>main</code> <code>62246b3</code>.
-<code>main</code> is roughly 700 PRs ahead of the release and has no
-newer release; items marked <em>(main)</em> are not in 0.13.0.</p>
+<p>Read from 0.13.0 (released 2026-07-10) and <code>master</code> <code>62246b3</code>,
+re-checked by phase 2's survey on 2026-10-21 against <code>master</code>
+<code>66bfd60e</code> (502 commits past the 0.13.0 tag, still no newer
+release); items marked <em>(main)</em> are on <code>master</code> and not in
+0.13.0. Phase 2's plan lists the corrections it made here.</p>
 <ul>
 <li><strong>Shape.</strong> <code>RdpServer::builder()</code> is a typestate chain:
   address, security (<code>with_no_security</code> / <code>with_tls</code> /
@@ -16372,17 +16403,29 @@ newer release; items marked <em>(main)</em> are not in 0.13.0.</p>
   (<code>keyboard</code>, <code>mouse</code>). Keyboard is <code>Pressed</code>/<code>Released
   { code, extended }</code>, <code>UnicodePressed/Released(u16)</code> and
   <code>Synchronize</code> (lock-key state). Mouse in 0.13.0 is flat
-  per-button variants plus move and vertical wheel; main
-  reshaped it into <code>Move</code>, <code>Button</code>, <code>VerticalScroll</code>,
-  <code>HorizontalScroll</code>, <code>RelMove</code> and friends.</li>
+  per-button variants (left, right, middle, buttons 4 and 5)
+  plus <code>Move</code>, <code>VerticalScroll</code>, <code>Scroll { x, y }</code> and
+  <code>RelMove</code>, and the server advertises relative mouse input;
+  but its conversion from the standard mouse PDU matches only
+  the left and right buttons and the vertical wheel, so a
+  middle click or a horizontal wheel on that PDU arrives as a
+  move. <code>master</code> fixes that and reshapes the enum into <code>Move</code>,
+  <code>Button { x, y, button, pressed }</code>, <code>ButtonRel</code>, scroll
+  variants and <code>RelMove</code>.</li>
 <li><strong>Security.</strong> TLS (enhanced RDP security, credentials in the
   Client Info PDU inside TLS) and Hybrid/HybridEx CredSSP
-  (NLA) are both implemented. NLA is NTLM-only and checks one
-  preconfigured plaintext username and password; a pluggable
-  <code>CredentialValidator</code> can only add authorisation on top.
-  Per-user password checking against PAM or LDAP is therefore
-  possible only without NLA. A client that requires NLA
-  against a TLS-only server is refused cleanly.</li>
+  (NLA) are both implemented, but a server is built for one or
+  the other: a TLS server advertises only <code>SSL</code>, a hybrid
+  server only <code>HYBRID | HYBRID_EX</code>, and the acceptor refuses a
+  TLS-only client of a hybrid server. NLA is NTLM-only and
+  checks one preconfigured plaintext username and password.
+  In TLS mode a pluggable <code>CredentialValidator</code> is the
+  credential check itself (it sees the Client Info PDU's
+  username, password and domain), so per-user checking against
+  PAM or LDAP is possible only without NLA. Without a
+  validator, the acceptor compares the whole credential struct,
+  domain included. A client that requires NLA against a
+  TLS-only server is refused cleanly.</li>
 <li><strong>Resize.</strong> The display-control channel (MS-RDPEDISP) is
   offered by default; client layouts arrive in
   <code>request_layout</code>, and we complete a resize by emitting
@@ -16404,8 +16447,11 @@ newer release; items marked <em>(main)</em> are not in 0.13.0.</p>
   handing a replaying stream to <code>RdpServer::run_connection</code>.</li>
 <li><strong>No RD Gateway.</strong> <code>ironrdp-mstsgu</code> is client-only.</li>
 <li><strong>Concurrency.</strong> <code>RdpServer::run</code> serves one connection at
-  a time. On main <code>RdpServer</code> is <code>!Send</code>, so it needs a
-  <code>LocalSet</code> or its own thread; check 0.13.0.</li>
+  a time; a second TCP connection waits in the listen backlog
+  until the first ends. <code>RdpServer</code> is <code>!Send</code> in 0.13.0 as
+  well as on <code>master</code> (its sound and clipboard factory traits
+  carry no <code>Send</code> bound), so it needs a <code>LocalSet</code> or its own
+  thread; IronRDP's own tests use a <code>LocalSet</code>.</li>
 <li><strong>Metadata.</strong> MIT OR Apache-2.0. Edition 2024. MSRV 1.89
   for 0.13.0 and 1.94 on main; ryll's workspace declares
   1.88. Nearly every minor release has broken the server API
@@ -16471,9 +16517,8 @@ competing with it:</p>
   stream decode (MJPEG decode must remain). Step 3a keeps its
   Kerbside-only parts: server-role display serialisers, the
   LZ4 and JPEG encoders (both since landed in ryll), and a
-  configurable display channel. Kerbside's phase 3 plan is
-  updated to match in kerbside PR #581, which was still open
-  on 2026-10-20.</li>
+  configurable display channel. Kerbside's phase 3 plan was
+  updated to match in kerbside PR #581, merged on 2026-10-19.</li>
 <li><strong>Damage accumulation goes in the renderer</strong>, not in either
   consumer, so the spike's step 3b uses phase 1's accumulator
   instead of writing its own in Kerbside.</li>
@@ -16614,36 +16659,60 @@ cursor, resize, text clipboard and audio playback. Specifically:</p>
 <li><strong>Which IronRDP?</strong></li>
 <li>0.13.0 from crates.io is publishable (crates.io crates
      cannot depend on git revisions) and needs MSRV 1.89.</li>
-<li><code>main</code> has things we would like (the reshaped mouse
-     events with horizontal scroll and relative moves, the
-     credential-origin validator, <code>LargePointer</code>, the EGFX
-     H.264 encoder trait) but needs MSRV 1.94, a git pin, and
-     <code>publish = false</code> on our crate until IronRDP releases.</li>
+<li><code>master</code> has things we would like (the middle button and
+     horizontal wheel on the standard mouse PDU, the reshaped
+     mouse events, <code>LargePointer</code>, the EGFX H.264 encoder
+     trait) but needs MSRV 1.94, a git pin that <code>deny.toml</code>
+     forbids, and <code>publish = false</code> on our crate until IronRDP
+     releases. Relative mouse motion and a credential validator
+     are already in 0.13.0.</li>
 <li>Either way, expect to absorb breaking changes on every
      IronRDP release; keep the IronRDP-facing code in one
      crate so the churn stays there.</li>
-<li><strong>Recommendation:</strong> start on 0.13.0, raise the RDP
-     crate's <code>rust-version</code> to 1.89 (per crate, leaving the
-     workspace default alone if possible), and move to the
+<li><strong>Recommendation:</strong> start on 0.13.0, raise the workspace
+     <code>rust-version</code> to 1.89 (a binary whose <code>rdp</code> feature pulls
+     a 1.89 crate cannot honestly claim 1.88), and move to the
      next release when it ships. Phase 2 confirms 0.13.0 is
      enough for the MVP; if it is not, it says which <code>main</code>
      feature forced the switch.</li>
+<li><strong>Answer (phase 2):</strong> 0.13.0 from crates.io, with its
+     default features off (the <code>qoi</code> and <code>qoiz</code> codecs no stock
+     client negotiates) and <code>rayon</code> and <code>helper</code> on, was enough
+     for the display and input MVP, and the workspace
+     <code>rust-version</code> is 1.89. The
+     one gap met is the middle button, which IronRDP 0.13.0
+     drops on the standard mouse PDU; it is tracked in #604.
+     FreeRDP sends the middle button through its Advanced
+     Input channel, which 0.13.0 maps, so middle click worked
+     in the manual test. No <code>main</code> feature forced a switch.</li>
 <li><strong>Security default.</strong></li>
 <li>Both TLS and NLA work, against one credential pair.</li>
 <li>Ryll's <code>--web</code> already mints a per-launch token and
      prints it. The natural equivalent is a generated
      password (and a fixed username such as <code>ryll</code>), printed
      at startup, with flags to set them explicitly.</li>
-<li><strong>Recommendation:</strong> offer Hybrid (NLA) and TLS together
-     so the client chooses, which is what mstsc expects;
-     <code>--rdp-security tls</code> forces TLS-only for clients that
-     mishandle CredSSP. Reuse <code>--web</code>'s <code>--web-tls-cert</code> /
-     <code>--web-tls-key</code> handling. Unlike <code>--web</code>, which can serve
+<li><strong>Recommendation (revised by phase 2's survey):</strong> IronRDP
+     0.13.0 cannot offer both, so default to TLS-only, which
+     every client speaks and which is the only mode where a
+     validator sees the password; <code>--rdp-security nla</code> selects
+     Hybrid for operators who want CredSSP, at the cost of
+     refusing TLS-only clients. Reuse <code>--web</code>'s certificate
+     loading behind RDP-named flags. Unlike <code>--web</code>, which can serve
      plaintext HTTP, RDP always needs TLS, so with no
      certificate given <code>--rdp</code> generates a self-signed one at
      startup (<code>rcgen</code>, today a test-only dependency of the
      binary) and prints its fingerprint. Phase 2 tests what
      mstsc does with it.</li>
+<li><strong>Answer (phase 2):</strong> the default is TLS-only, because
+     IronRDP 0.13.0 cannot offer both and TLS is the mode every
+     client speaks. FreeRDP 3.15.0 requested SSL and HYBRID and
+     the server selected SSL; FreeRDP showed its trust-on-first-use
+     warning with the fingerprint ryll printed. <code>--rdp-security
+     nla</code> was tested with FreeRDP (<code>/sec:nla</code>): it negotiated
+     HYBRID, completed CredSSP and showed the desktop. A wrong
+     password was refused and logged. mstsc was not tested, as no
+     Windows machine was available, so its behaviour with the
+     self-signed certificate is still unknown.</li>
 <li><strong>Server mouse mode.</strong></li>
 <li>RDP pointers are absolute. SPICE absolute input needs
      client mouse mode, which the server grants only with
@@ -16654,8 +16723,19 @@ cursor, resize, text clipboard and audio playback. Specifically:</p>
      cursors" experience unless we hide the client's cursor.</li>
 <li><strong>Recommendation:</strong> support it degraded rather than
      refuse it, using the shared pointer translator from
-     phase 1, and say so in the docs. If the pinned IronRDP
-     offers relative-mouse input, try it in phase 2.</li>
+     phase 1, and say so in the docs. IronRDP 0.13.0
+     advertises relative-mouse input, so phase 2 tries it with
+     a client that sends it (FreeRDP 3 has an option for it).</li>
+<li><strong>Answer (phase 2):</strong> server mouse mode works through the
+     translator's deltas. With the guest in server mode, a
+     scripted pointer sweep to the corner followed by a click
+     opened the Applications menu. The guest-side acceleration
+     drift that phase 1 noted still applies. FreeRDP's
+     <code>/mouse:relative:on</code> (with and without <code>grab:on</code>) kept
+     sending absolute moves under a scripted pointer, so the
+     relative-mouse PDU was never observed and that half is
+     unanswered; the server logs once when a client does send
+     it, so a physical mouse under a grab can settle it.</li>
 <li><strong>One client at a time, or takeover?</strong> <code>RdpServer::run</code>
    serves one connection at a time, and one SPICE session can
    only sensibly have one driver. <strong>Recommendation:</strong> a new
@@ -16680,12 +16760,58 @@ cursor, resize, text clipboard and audio playback. Specifically:</p>
    session, a scrolling page and a video), and promote EGFX
    H.264 from Future work to a phase only if the numbers say
    users need it.</li>
-<li><strong>Packaging.</strong> Should the <code>rdp</code> feature be on in release
+<li>
+<p><strong>Answer (phase 2):</strong> FreeRDP 3.15.0 negotiated RemoteFX.
+     Measured with <code>tools/rdp-measure.sh</code> on a release build
+     with the <code>rdp</code> feature, on 2026-10-21, ryll process CPU
+     (100% is one core) and bytes sent over 30 s:</p>
+<table>
+<thead>
+<tr>
+<th>Workload</th>
+<th>Avg CPU</th>
+<th>Peak CPU</th>
+<th>Avg rate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Idle (20 s)</td>
+<td>0.3%</td>
+<td>1.0%</td>
+<td>0.6 kbit/s</td>
+</tr>
+<tr>
+<td>Typing in a terminal</td>
+<td>8.5%</td>
+<td>12.8%</td>
+<td>294 kbit/s</td>
+</tr>
+<tr>
+<td>Scrolling a Wikipedia article</td>
+<td>84.6%</td>
+<td>131.1%</td>
+<td>1.12 Mbit/s</td>
+</tr>
+<tr>
+<td>Video (480p VP9, 853x480 region)</td>
+<td>248.2%</td>
+<td>298.8%</td>
+<td>109 Mbit/s</td>
+</tr>
+</tbody>
+</table>
+<p>Typing and idle are cheap, and scrolling costs most of a
+ core. Video is the cost of RemoteFX on a region that
+ changes entirely about 28 times a second. H.264 through
+ EGFX remains the answer if video matters.
+8. <strong>Packaging.</strong> Should the <code>rdp</code> feature be on in release
    builds (deb, rpm, Homebrew, the PyPI wheel)?
    <strong>Recommendation:</strong> off by default until the CI lane in
    phase 5 is green and stable, then on for Linux builds.
    macOS and Windows builds follow once someone has tried
-   them.</li>
+   them.</p>
+</li>
 </ol>
 <h2 id="execution">Execution<a class="headerlink" href="#execution" title="Permanent link">&para;</a></h2>
 <table>
@@ -16701,13 +16827,13 @@ cursor, resize, text clipboard and audio playback. Specifically:</p>
 <tr>
 <td>1. Renderer prep: damage, pointer translation, slim build, device-free audio</td>
 <td><a href="/components/ryll/plans/PLAN-rdp-frontend-phase-01-renderer-prep/">PLAN-rdp-frontend-phase-01-renderer-prep.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>4696a95</td>
 </tr>
 <tr>
 <td>2. RDP skeleton: <code>shakenfist-spice-rdp</code>, <code>--rdp</code>, display, keyboard, mouse, security</td>
-<td>-</td>
-<td>Not started</td>
+<td><a href="/components/ryll/plans/PLAN-rdp-frontend-phase-02-rdp-skeleton/">PLAN-rdp-frontend-phase-02-rdp-skeleton.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -16743,7 +16869,7 @@ cursor, resize, text clipboard and audio playback. Specifically:</p>
 </tbody>
 </table>
 <p>Phase plans are written one at a time with <code>/next-phase</code>.
-Phase 1 can start now; Kerbside spike step 3b waits for it
+Phase 1 has merged, so Kerbside spike step 3b can build on it
 (see <em>Coordination with the Kerbside spike</em>). Phases 3 and 4
 can run in parallel once phase 2 has merged. Phase 5 can start
 once phase 2 has merged and should, so that phases 3 and 4
@@ -16797,22 +16923,35 @@ with no behaviour change.</p>
   <code>RdpServerDisplay</code> over the mirror and phase 1's damage,
   and <code>RdpServerInputHandler</code> over the renderer's input
   sender and pointer translator.</li>
-<li><strong>A bounded, coalescing update queue</strong> between the mirror
-  and IronRDP, as qemu-rdp has, paced by the client: damage
-  accumulates while the client is behind, and superseded
-  pixels are never sent. A slow RDP client must not back up
-  the SPICE side.</li>
-<li><strong>A session seam:</strong> a trait that turns an accepted,
-  authenticated connection into the session to serve. Ryll's
-  implementation returns the one session it started with.</li>
+<li><strong>Client-paced, coalescing display updates</strong> between the
+  mirror and IronRDP, with the effect qemu-rdp's bounded queue
+  has: damage accumulates in the mirror while the client is
+  behind, and superseded pixels are never sent, because
+  IronRDP asks for the next update only after it has encoded
+  and written the last one and the adapter reads pixels from
+  the mirror at that moment. A slow RDP client must not back
+  up the SPICE side. The first update after connect and after
+  a resize is the whole surface, which seeds IronRDP's own
+  framebuffer, and a guest-driven resolution change becomes
+  <code>DisplayUpdate::Resize</code> here rather than in phase 3.</li>
+<li><strong>A session seam:</strong> a trait that turns a connection's
+  credentials into the session to serve, plus a slot the
+  display and input adapters read. Ryll's implementation
+  returns the one session it started with. IronRDP 0.13.0
+  asks the display for its size before it sees any credential,
+  so a provider with sessions of different sizes must resize
+  after choosing or run one process per session.</li>
 <li><code>ryll --rdp</code> in the binary behind an <code>rdp</code> cargo feature:
   <code>--rdp-host</code>, <code>--rdp-port</code> (default 3389, falling back to
   ephemeral if it cannot bind), the credential and security
-  flags from open question 2, and <code>--web</code>'s TLS flags. It
-  prints the address and credentials like <code>--web</code> prints its
-  URL.</li>
-<li>Keyboard with the extended flag, lock-key <code>Synchronize</code>,
-  mouse buttons and vertical wheel, in both mouse modes.</li>
+  flags from open question 2, and TLS flags of its own over
+  <code>--web</code>'s certificate loading. It prints the address and
+  credentials like <code>--web</code> prints its URL.</li>
+<li>Keyboard with the extended flag, lock-key <code>Synchronize</code>
+  (which needs a new renderer <code>InputEvent</code>), mouse buttons and
+  vertical wheel in both mouse modes, and relative motion
+  where the client sends it. The middle button arrives only
+  through relative-mouse input until IronRDP's next release.</li>
 <li>A manual test against the local QEMU test server with
   FreeRDP and, if one is available, mstsc. <strong>Record the
   results in this plan:</strong> negotiated security, negotiated
@@ -16835,8 +16974,9 @@ evidence-based answers in the plan.</p>
   <code>request_initial_size</code>, then display-control layouts via
   <code>request_layout</code>, both mapped to <code>DisplaySize::Requested</code>
   (aligned as the GUI aligns them). The guest's answer, a
-  <code>SurfaceCreated</code> of a new size, becomes
-  <code>DisplayUpdate::Resize</code>. Without an agent, the client gets
+  <code>SurfaceCreated</code> of a new size, already becomes
+  <code>DisplayUpdate::Resize</code> in phase 2, which needs it for
+  guest-driven changes. Without an agent, the client gets
   the guest's fixed size.</li>
 </ul>
 <h3 id="phase-4-clipboard-and-audio">Phase 4: Clipboard and audio<a class="headerlink" href="#phase-4-clipboard-and-audio" title="Permanent link">&para;</a></h3>

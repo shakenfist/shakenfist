@@ -6063,6 +6063,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-bat-population/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15741,7 +15769,7 @@ a lane.</p>
 <tbody>
 <tr>
 <td>No CI lane runs two Kerbsides</td>
-<td>Every lane deploys exactly one. <code>tools/sf-e2e/deploy-kerbside.sh</code> co-locates a single Kerbside on the Shaken Fist primary node, and <code>tools/ovirt-e2e/deploy-kerbside.sh</code> deploys a single one on the CI runner pointed at the lane's engine. Nothing anywhere stands up two instances, so this topology is untested end to end.</td>
+<td>Every lane deploys exactly one. <code>sf-e2e</code> co-locates a single Kerbside on the Shaken Fist primary node, through the <code>kerbside</code> role, and <code>tools/ovirt-e2e/deploy-kerbside.sh</code> deploys a single one on the CI runner pointed at the lane's engine. Nothing anywhere stands up two instances, so this topology is untested end to end.</td>
 </tr>
 <tr>
 <td>OpenStack per-office placement needs routing Kerbside does not provide</td>

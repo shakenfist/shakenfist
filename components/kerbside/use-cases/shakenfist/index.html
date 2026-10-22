@@ -6063,6 +6063,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../instar/plans/PLAN-bat-population/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -15950,27 +15978,33 @@ ports and CA, are in <a href="/components/kerbside/configuration/">configuration
 single-node Shaken Fist, deploys this checkout's Kerbside
 against it, and drives the whole flow — mint, offline
 verification, exchange, and a proxied SPICE session against a
-guest booted inside the Shaken Fist instance. The driver scripts
-are in <code>tools/sf-e2e/</code> (see <code>tools/sf-e2e/README.md</code>):
-<code>provision-sf.sh</code> sets <code>KERBSIDE_URL</code> and the signing key on the
-cluster side, <code>gen-sources.py</code> writes the <code>sources.yaml</code> above
-— fetching the cluster CA so the equality check passes by
-construction — <code>deploy-kerbside.sh</code> installs and starts
-Kerbside, <code>drive-happy-path.py</code> exchanges a token and drives a
-session, and <code>drive-adversarial.py</code> asserts five rejections
-across the joined flow — four at Kerbside's exchange endpoint,
-and one at the Shaken Fist mint, where a namespace asking for
-another namespace's instance is refused a token at all.</p>
+guest booted inside the Shaken Fist instance. Kerbside is
+deployed the way an operator would deploy it: Shaken Fist's own
+deploy playbook runs the <code>kerbside</code> role from this checkout's
+<code>shakenfist.kerbside</code> collection, installing this checkout's
+Kerbside and proxy wheels. The playbook sets <code>KERBSIDE_URL</code>,
+mints the signing key and a dedicated <code>kerbside</code> system key on
+the cluster side, and writes the <code>sources.yaml</code> above — with the
+cluster CA, so the equality check passes by construction. The
+lane's files are in <code>tools/sf-e2e/</code> (see
+<code>tools/sf-e2e/README.md</code>): <code>deploy-profile.yml.j2</code> sets the
+deploy's Kerbside variables, <code>drive-happy-path.py</code> exchanges a
+token and drives a session, and <code>drive-adversarial.py</code> asserts
+five rejections across the joined flow — four at Kerbside's
+exchange endpoint, and one at the Shaken Fist mint, where a
+namespace asking for another namespace's instance is refused a
+token at all.</p>
 <p>This is a stronger worked example than the oVirt lane's. It is a
 <strong>smoke-tier gate</strong>, so it runs on every pull request as well as
 nightly, rather than only on entry to the merge queue; see
 <a href="/components/kerbside/testing/#the-shaken-fist-end-to-end-lane-sf-e2e">testing.md</a>.</p>
 <p>Two differences from a real deployment, both CI expedients
 rather than recommendations. Kerbside runs co-located on the
-Shaken Fist primary node as plain processes, where a real
-deployment would put it on a host of its own. And the audience
-contract is exercised over a loopback <code>http://</code> URL, not the
-public HTTPS name a deployment would use.</p>
+Shaken Fist primary node, as the role's <code>kerbside-api</code> and
+<code>kerbside-daemon</code> systemd units, where a real deployment would
+usually put it on a host of its own. And the audience contract
+is exercised over a loopback <code>http://</code> URL, not the public HTTPS
+name a deployment would use.</p>
 <h2 id="user-interaction-model">User interaction model<a class="headerlink" href="#user-interaction-model" title="Permanent link">&para;</a></h2>
 <p>Kerbside is a proxy, not a portal. Something has to ask it for a
 console on the user's behalf and deliver the resulting <code>.vv</code>

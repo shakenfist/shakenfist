@@ -6063,6 +6063,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../instar/plans/PLAN-bat-population/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Populated BAT output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -16543,11 +16571,14 @@ daemon and no database.</p>
 <h2 id="the-shaken-fist-end-to-end-lane-sf-e2e">The Shaken Fist end-to-end lane (<code>sf-e2e</code>)<a class="headerlink" href="#the-shaken-fist-end-to-end-lane-sf-e2e" title="Permanent link">&para;</a></h2>
 <p><code>.github/workflows/sf-e2e-functional.yml</code> is the only lane that
 exercises the <code>type: shakenfist</code> console source against a real
-cluster. It stands up a single-node Shaken Fist (via
-<code>shakenfist/actions/build-smoke-cluster</code>), provisions <code>KERBSIDE_URL</code>
-and a signing key, deploys a co-located Kerbside with a
-<code>type: shakenfist</code> source (via
-<code>shakenfist/actions/deploy-kerbside-on-shakenfist</code>), and drives an
+cluster. It stands up a single-node Shaken Fist with
+<code>shakenfist/actions/build-smoke-cluster</code>, whose deploy also deploys a
+co-located Kerbside with a <code>type: shakenfist</code> source: the deploy
+profile <code>tools/sf-e2e/deploy-profile.yml.j2</code> installs this pull
+request's <code>ansible/</code> collection and hands its <code>kerbside</code> role this
+pull request's Kerbside and proxy wheels. The cluster is deployed
+twice, and the second deploy must restart no <code>sf-*</code> or <code>kerbside-*</code>
+unit. The lane then drives an
 SF-minted token through offline verification, exchange, and a
 proxied SPICE session against the Sextant guest booted inside the SF
 instance — followed by an adversarial matrix covering replay,
@@ -16555,8 +16586,9 @@ expiry, wrong audience, unknown kid, and cross-namespace mint.</p>
 <p>Driver scripts live in <code>tools/sf-e2e/</code> (see
 <code>tools/sf-e2e/README.md</code>). It is a smoke-tier PR gate, and also runs
 nightly and on dispatch. Every run uploads an artifact bundle with the
-kerbside, ryll, SF daemon and libvirt logs, redacted before upload;
-the README's Security section lists what is collected.</p>
+Kerbside unit journals and the ryll, SF daemon and libvirt logs,
+redacted before upload; the README's Security section lists what is
+collected.</p>
 <h2 id="the-ovirt-end-to-end-kerbside-lane">The oVirt end-to-end kerbside lane<a class="headerlink" href="#the-ovirt-end-to-end-kerbside-lane" title="Permanent link">&para;</a></h2>
 <p>The <code>ovirt_matrix</code> job in <code>.github/workflows/functional-tests.yml</code>
 does more than build and
