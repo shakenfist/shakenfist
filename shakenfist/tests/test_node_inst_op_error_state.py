@@ -57,11 +57,11 @@ class DispatchTaskErrorStateTestCase(base.ShakenFistTestCase):
         self.mock_mariadb = MockMariaDB(self, node_count=1)
         self.mock_mariadb.setup()
 
-    def _dispatch_failing_delete(self, inst):
+    def _dispatch_failing_task(self, inst, task):
         _, op_uuid = create_and_enqueue(
             node_uuid=str(uuid4()),
             instance_uuid=str(uuid4()),
-            tasks=[model_tasks.instance_delete],
+            tasks=[task],
             priority=PRIORITY.user_facing,
         )
         op = NodeInstOp.from_db(op_uuid)
@@ -76,10 +76,13 @@ class DispatchTaskErrorStateTestCase(base.ShakenFistTestCase):
                     return_value=inst):
                 with mock.patch(
                         'shakenfist.operations.node_inst_op.NodeInstOp.'
-                        '_instance_delete',
+                        f'_{task.name}',
                         side_effect=RuntimeError('boom')):
-                    op.dispatch_task(model_tasks.instance_delete)
+                    op.dispatch_task(task)
         return op
+
+    def _dispatch_failing_delete(self, inst):
+        return self._dispatch_failing_task(inst, model_tasks.instance_delete)
 
     def test_delete_wait_failure_sets_delete_wait_error(self):
         inst = FakeInstance('delete-wait', reject=('error',))
@@ -104,3 +107,26 @@ class DispatchTaskErrorStateTestCase(base.ShakenFistTestCase):
 
         self.assertEqual(NodeInstOp.STATE_ERROR, op.state.value)
         self.assertEqual([], inst.state_sets)
+
+    def test_failed_observational_task_leaves_instance_alone(self):
+        # The cluster daemon measures every created instance on every
+        # sweep. A failure to measure one, here anything the task does not
+        # catch itself, must fail the operation without erroring a healthy
+        # guest (issue 4585).
+        for task in (model_tasks.collect_billing_statistics,
+                     model_tasks.health_check_kvm_process):
+            with self.subTest(task=task.name):
+                inst = FakeInstance('created')
+                op = self._dispatch_failing_task(inst, task)
+
+                self.assertEqual(NodeInstOp.STATE_ERROR, op.state.value)
+                self.assertEqual([], inst.state_sets)
+
+    def test_failed_mutating_task_from_created_errors_instance(self):
+        # The counterpart of the test above: a mutating task which fails
+        # from created still errors its instance.
+        inst = FakeInstance('created')
+        op = self._dispatch_failing_delete(inst)
+
+        self.assertEqual(NodeInstOp.STATE_ERROR, op.state.value)
+        self.assertEqual(['created-error'], inst.state_sets)

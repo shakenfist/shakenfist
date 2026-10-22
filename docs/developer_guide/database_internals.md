@@ -325,10 +325,13 @@ Two practical traps:
   the attribute into a model field, and `is_observational()` silently sees an
   empty set, so every operation of the model is stored as mutating with no
   error anywhere.
-- Marking a task observational changes what the flag says, not what a failing
-  task does. A billing or health check task which raises still moves its
-  instance to an error state (see
-  [issue 4585](https://github.com/shakenfist/shakenfist/issues/4585)).
+- Marking a task observational also changes what a failing task does. When
+  a `node_inst_op` task raises, `NodeInstOp.dispatch_task()` marks the
+  operation errored, and for a mutating task it moves the instance to an
+  error state too. For an observational task it leaves the instance alone,
+  because a failure to measure a guest says nothing about the guest. So a
+  mutating task marked observational would also stop erroring its instance
+  when it fails.
 
 The classification of every task is pinned by
 `shakenfist/tests/schema/operations/test_observational_tasks.py`. It holds a
