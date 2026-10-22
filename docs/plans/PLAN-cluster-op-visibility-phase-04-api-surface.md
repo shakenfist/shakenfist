@@ -385,6 +385,15 @@ which its instance and network twins have, is filed as #4604.
    reviewer who wants the old reach back would have to argue for
    cancelling shared network work, which is the case against it.
 
+   *(Corrected during step 4d.)* One instance-scoped op does not
+   target the instance: the agent operation preflight
+   (`node_aop_op`, enqueued by `InstanceAgentPutEndpoint` in
+   `external_api/instance.py`) targets only its
+   `AGENTOPERATION`. Neither the old walk nor the new one cancels
+   it, since it never becomes the instance's pointer and nothing
+   depends on it, so this is not a regression. It is recorded as
+   Future work rather than fixed here.
+
 7. **The delete waits for what it chose not to cancel.** The
    `instance_delete` op's `runs_after` becomes every protected
    snapshot op the walk left running, plus the pointer re-read at
@@ -593,3 +602,7 @@ commit, not a migration.
   opened once steps 4a to 4e are committed and the Definition of
   done passes. Steps run one at a time in this worktree, as the step
   plan says.
+* Step 4d found the agent preflight exception to decision 6's
+  premise, corrected at the decision. Every other instance enqueue
+  site in `instance.py` and `external_api/instance.py` targets the
+  instance, as `target_fields` shows.

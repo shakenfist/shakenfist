@@ -727,6 +727,9 @@ because the following statements will be true:
   seconds, when that is only eligibility and the sweep runs
   every fifteen minutes. Several of those sentences were
   written by phases 2 and 3. Found by the phase 4 survey.
+* An agent operation's preflight (`node_aop_op`) targets only the
+  agent operation, not its instance, so an instance delete never
+  cancels a pending one. Found in phase 4; it predates this plan.
 * Issue #3278 (CI and test coverage backlog) may want a note
   about the deflaked helper pattern.
 

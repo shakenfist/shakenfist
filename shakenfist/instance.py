@@ -28,7 +28,6 @@ from shakenfist import artifact
 from shakenfist import baseobject
 from shakenfist import blob
 from shakenfist import constants
-from shakenfist.constants import get_object_class
 from shakenfist import locks
 from shakenfist import mariadb
 from shakenfist.schema.instance_attributes import InstanceAttributesData
@@ -181,30 +180,6 @@ def select_ovmf_firmware(secure_boot, nvram_path, ovmf_dir=None):
     raise exceptions.UEFIFirmwareUnavailable(
         f'NVRAM {nvram_path} is {nvram_size} bytes, which matches no '
         f'installed OVMF firmware ({sizes})')
-
-
-def traverse_cluster_operations_tree(op, only_incomplete=True):
-    # Walk the tree of ops from a starting point and yield all ops.
-    if not op:
-        return
-
-    if only_incomplete and op.state.value not in [
-        bco.STATE_QUEUED,
-        bco.STATE_EXECUTING
-    ]:
-        return
-
-    for dep in op.depends_on:
-        dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
-        for thing in traverse_cluster_operations_tree(dep_op):
-            yield thing
-
-    for dep in op.runs_after:
-        dep_op = get_object_class(dep['op_type']).from_db(dep['op_uuid'])
-        for thing in traverse_cluster_operations_tree(dep_op):
-            yield thing
-
-    yield op
 
 
 class ConnectedVSockChannel():
@@ -2766,39 +2741,40 @@ class Instance(dbowo):
                 'and local node UUID is not configured')
             return
 
-        # Determine which outstanding cluster operations should be cancelled
-        # for this instance. I don't love this approach, but I cannot think
-        # of something which isn't terrible in some other way right now either.
-        ops = []
+        # Cancel every outstanding operation which targets this instance,
+        # observational sweeps included, so that none of them runs against
+        # an instance being deleted. Snapshots are protected, because their
+        # artifact outlives the instance, and the delete waits for them
+        # instead. So does the newest mutating operation, re-read here in
+        # case one was enqueued after the walk. Operations which only target
+        # other objects, such as the network reconcile work an instance's
+        # start or hot-plug depends on, are left alone: other instances
+        # share them.
+        survivors = []
+        for t in self.get_cluster_operations(outstanding_only=True):
+            op = t.op
+            if niso_tasks.instance_snapshot in op.tasks:
+                survivors.append(op)
+                continue
 
-        lco = self.last_cluster_operation
-        if lco:
-            lco_op = get_object_class(lco['op_type']).from_db(
-                lco['op_uuid'], suppress_failure_audit=True)
-            if lco_op:
-                ops = traverse_cluster_operations_tree(lco_op)
-
-        for op in ops:
-            has_protected_task = False
-            for task in op.tasks:
-                if task in [niso_tasks.instance_snapshot]:
-                    has_protected_task = True
-
-            if not has_protected_task:
-                add_event_multi(
-                    EVENT_TYPE_AUDIT, [self, op],
-                    'task aborted due to enqueued delete request')
-                try:
-                    op.state = bco.STATE_ABORT
-                except exceptions.InvalidStateException:
-                    op.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
+            add_event_multi(
+                EVENT_TYPE_AUDIT, [self, op],
+                'task aborted due to enqueued delete request')
+            try:
+                op.state = bco.STATE_ABORT
+            except exceptions.InvalidStateException:
+                # The operation has already reached a terminal state.
+                op.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
 
         nio_create_and_enqueue(
             node,
             self.uuid,
             [nio_tasks.instance_delete],
             PRIORITY.user_facing,
-            runs_after=[self.last_cluster_operation],
+            runs_after=[
+                {'op_type': op.object_type, 'op_uuid': str(op.uuid)}
+                for op in survivors
+            ] + [self.last_cluster_operation],
             request_id=util_general.get_request_id())
 
     def enqueue_delete_due_error(self, error_msg):
