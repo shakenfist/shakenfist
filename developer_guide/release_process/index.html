@@ -14690,6 +14690,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-ci-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The CI gate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-gets-released" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -14750,6 +14761,17 @@
   
     <nav class="md-nav" aria-label="Troubleshooting">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ci-gate-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ci-gate fails
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#workflow-doesnt-trigger" class="md-nav__link">
@@ -15728,6 +15750,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-ci-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The CI gate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#what-gets-released" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15788,6 +15821,17 @@
   
     <nav class="md-nav" aria-label="Troubleshooting">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ci-gate-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ci-gate fails
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#workflow-doesnt-trigger" class="md-nav__link">
@@ -15895,15 +15939,19 @@ completed (see <code>RELEASE-SETUP.md</code> in the repository root for details)
 </ol>
 <h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
 <p>We only release things which have passed CI testing, and preferably have had a
-period running as the underlying cloud for the CI cluster as well. Sometimes in
-an emergency we will bend the rules for a hotfix, but we should try and avoid
-doing that.</p>
+period running as the underlying cloud for the CI cluster as well. The first
+half of that is enforced: the release workflow's <code>ci-gate</code> job refuses a tag
+unless <code>functional-tests.yml</code> succeeded on the tagged commit (see
+<a href="#the-ci-gate">The CI gate</a> below). A hotfix goes through the merge queue like
+any other change.</p>
 <h2 id="triggering-a-release">Triggering a release<a class="headerlink" href="#triggering-a-release" title="Permanent link">&para;</a></h2>
 <h3 id="step-1-determine-the-version-number">Step 1: Determine the version number<a class="headerlink" href="#step-1-determine-the-version-number" title="Permanent link">&para;</a></h3>
 <p>Check the existing tags to find the previous version:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>tag<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">"^v"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-V<span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-5
 </code></pre></div>
 <h3 id="step-2-create-and-push-the-version-tag">Step 2: Create and push the version tag<a class="headerlink" href="#step-2-create-and-push-the-version-tag" title="Permanent link">&para;</a></h3>
+<p>Tag a commit that is on <code>develop</code> and went through the merge queue, and wait
+for its <code>functional-tests.yml</code> run in the queue to finish first.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>checkout<span class="w"> </span>develop<span class="w">  </span><span class="c1"># or the appropriate branch</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>git<span class="w"> </span>pull
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>git<span class="w"> </span>tag<span class="w"> </span>v0.X.Y<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Release v0.X.Y"</span>
@@ -15921,22 +15969,50 @@ doing that.</p>
 <h3 id="step-4-monitor-the-release">Step 4: Monitor the release<a class="headerlink" href="#step-4-monitor-the-release" title="Permanent link">&para;</a></h3>
 <p>The workflow will:</p>
 <ol>
-<li>Build the Python package and archives (deploy.tgz, docs.tgz)</li>
+<li>Check that CI passed on the tagged commit (<code>ci-gate</code>)</li>
+<li>Build the Python package, run <code>twine check</code> and the wheel contents check
+   on it, and build the Ansible collection</li>
 <li>Sign the release tag using Sigstore/gitsign</li>
 <li>Generate attestations for the built artifacts</li>
-<li>Publish to PyPI</li>
-<li>Create a GitHub Release with all artifacts attached</li>
+<li>Publish the package to PyPI and the collection to Ansible Galaxy</li>
+<li>Create a GitHub Release with the package files attached</li>
 </ol>
 <p>You can monitor progress in the Actions tab. If any step fails, the workflow
 stops and you can investigate the logs.</p>
+<h2 id="the-ci-gate">The CI gate<a class="headerlink" href="#the-ci-gate" title="Permanent link">&para;</a></h2>
+<p><code>ci-gate</code> is the first job in <code>release.yml</code>, and both build jobs need it. It
+uses
+<a href="https://github.com/shakenfist/actions/blob/main/docs/actions.md#require-ci-success"><code>require-ci-success</code></a>
+to check that <code>functional-tests.yml</code> succeeded on the tagged commit. The run
+that counts is the commit's merge queue run: a run started by hand, as
+<code>pr-retest.yml</code> does with <code>workflow_dispatch</code>, does not. So a change merged
+around the queue, by an administrator bypassing it, cannot be released until
+a later commit has gone through the queue. How the gate decides is documented
+with the action, and it has no override.</p>
+<p>A gate failure means nothing was built, signed or published, so every failure
+is recoverable. The release automation template's
+<a href="https://github.com/shakenfist/development/blob/main/templates/release-automation/README.md#recovering-from-a-gate-failure">recovery table</a>
+says what to do for each cause. Usually that is moving the tag to a commit
+that went through the queue. A queue run that fails, flaky or not, ejects its
+entry, so the commit it built never reaches <code>develop</code> and re-running that run
+cannot make any tag pass: re-queue the pull request and tag the commit that
+merges. Re-running a queue run helps only when the tagged commit's run was
+re-run after it merged and that later attempt failed, because the gate judges
+each run at its latest attempt; then use "Re-run jobs" on it and re-run the
+<code>ci-gate</code> job.</p>
+<p>The wheel contents check in <code>build</code> is
+<a href="https://github.com/shakenfist/actions/blob/main/docs/actions.md#check-dist"><code>check-dist</code></a>.
+It fails if the wheel holds a test directory or nothing at all. The wheel
+ships the <code>shakenfist</code> packages and <code>shakenfist/data/*.yaml</code>, and nothing
+under <code>shakenfist/tests/</code> or <code>shakenfist/deploy/</code>: the unit tests, the Ansible
+collection and the functional CI suites are all used from a checkout.</p>
+<p>Running <code>release.yml</code> by hand with <code>workflow_dispatch</code> skips the gate and the
+publishing jobs, and only builds and checks the packages.</p>
 <h2 id="what-gets-released">What gets released<a class="headerlink" href="#what-gets-released" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>PyPI</strong>: The <code>shakenfist</code> Python package</li>
-<li><strong>GitHub Releases</strong>: The package files plus:<ul>
-<li><code>deploy.tgz</code> - Deployment tooling archive</li>
-<li><code>docs.tgz</code> - Documentation archive</li>
-</ul>
-</li>
+<li><strong>Ansible Galaxy</strong>: The <code>shakenfist.shakenfist</code> collection</li>
+<li><strong>GitHub Releases</strong>: The package files</li>
 </ul>
 <h2 id="verifying-a-release">Verifying a release<a class="headerlink" href="#verifying-a-release" title="Permanent link">&para;</a></h2>
 <h3 id="verify-the-signed-tag">Verify the signed tag<a class="headerlink" href="#verify-the-signed-tag" title="Permanent link">&para;</a></h3>
@@ -15957,6 +16033,11 @@ section. You can also verify locally:</p>
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span>shakenfist-0.X.Y.tar.gz
 </code></pre></div>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="ci-gate-fails"><code>ci-gate</code> fails<a class="headerlink" href="#ci-gate-fails" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Nothing was published. Follow the recovery table linked from
+  <a href="#the-ci-gate">The CI gate</a> above.</li>
+</ul>
 <h3 id="workflow-doesnt-trigger">Workflow doesn't trigger<a class="headerlink" href="#workflow-doesnt-trigger" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Ensure the tag matches the pattern <code>v*</code> (e.g., <code>v0.8.0</code>, not <code>0.8.0</code>)</li>

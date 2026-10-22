@@ -16196,6 +16196,10 @@ a required check.</p>
 <p>A failed <code>Can merge</code> ejects the pull request from the queue, and
 <a href="#merge-failure-triage">merge failure triage</a> then classifies the failure
 automatically.</p>
+<p>The queue run is also the one a release counts: <code>release.yml</code>'s <code>ci-gate</code>
+job accepts a tag only on a commit whose merge queue run of
+<code>functional-tests.yml</code> succeeded. So merge through the queue, never around
+it; see <a href="../release_process/#the-ci-gate">the release process</a>.</p>
 <h3 id="the-issue-link-check">The issue link check<a class="headerlink" href="#the-issue-link-check" title="Permanent link">&para;</a></h3>
 <p><code>Can enqueue</code> also needs the <code>Issue links</code> job, which calls the reusable
 <code>issue-link-check.yml</code> in <code>shakenfist/actions</code>. It compares what a pull
@@ -16239,7 +16243,9 @@ entire functional matrix on every description tweak.</p>
 <code>concurrency:</code> block whose key is merge-group aware — the four
 <code>functional_matrix_merge_collection</code> entries and <code>ansible_modules_collection</code>
 through the shared <code>smoke-cluster.yml</code>, and <code>node_lifecycle_collection</code>,
-<code>schema_enum_widening</code> and <code>automated_delinter</code> in this repository.</p>
+<code>schema_enum_widening</code> and <code>automated_delinter</code> in this repository.
+<code>sanity_checks</code> holds only a static runner, but is keyed the same way so that
+a superseded queue run does not finish its lint and unit tests either.</p>
 <p><code>github.ref</code> is the obvious key and is right on every other event. On
 <code>merge_group</code> it is the per-attempt queue branch
 <code>gh-readonly-queue/develop/pr-&lt;N&gt;-&lt;SHA&gt;</code>, and GitHub mints a fresh SHA every
@@ -16283,6 +16289,13 @@ on, which is no worse than before the check existed. A run judged superseded
 whose self-cancellation does not land exits non-zero instead, skipping every
 queue job and failing <code>Can merge</code> on a commit the queue has already
 abandoned.</p>
+<p>Only a run's first attempt uses the base-branch key; the keys in this
+repository, and the one <code>smoke-cluster.yml</code> in <code>shakenfist/actions</code> gives the
+collection jobs, test <code>github.run_attempt == '1'</code> as well as the event. A
+re-run is not a queue build: it keeps its original <code>merge_group</code> event, so
+with the base-branch key a "Re-run jobs" on an old queue run would cancel the
+live queue entry or be cancelled by it. A re-run therefore keeps its own queue
+branch's group.</p>
 <p>Raising <code>max_entries_to_build</code> breaks both halves: the key would cancel live
 queue entries building in parallel, and a parallel entry is not built on the
 base branch's head, so the check would cancel it too. They have to move
