@@ -43,7 +43,7 @@ texture is re-uploaded each frame when dirty.
 Each pass's `process_events` drains the `ChannelEvent`
 channel and dispatches image / fill / copy-bits /
 invert / chroma / alpha events into the corresponding
-`DisplaySurface` helper. All three modes apply these draw ops through
+`DisplaySurface` helper. Every mode applies these draw ops through
 `SurfaceMirror::apply_event`; the GUI reacts to the `DrawOutcome` it
 returns for auto-fit, frame counting and texture invalidation. See the [draw-op coverage
 table](/components/ryll/spice-protocol/#draw-op-coverage) for the full

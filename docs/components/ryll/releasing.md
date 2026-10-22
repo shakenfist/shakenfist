@@ -48,7 +48,7 @@ which:
   [tools/publish-crates.sh](https://github.com/shakenfist/ryll/blob/develop/tools/publish-crates.sh)):
   `shakenfist-spice-protocol` → `shakenfist-spice-compression` →
   `shakenfist-spice-usbredir` → `shakenfist-spice-renderer` →
-  `shakenfist-spice-webrtc` → `ryll`.
+  `shakenfist-spice-webrtc` → `shakenfist-spice-rdp` → `ryll`.
 - Creates a GitHub Release with auto-generated notes and all
   artifacts attached.
 - Publishes the `ryll` wheels straight to PyPI via an OIDC
@@ -330,7 +330,7 @@ has the full table.
 | Fedora/RHEL | `ryll-{version}-1.x86_64.rpm`, `ryll-{version}-1.aarch64.rpm` | Binary + auto-detected deps |
 | macOS (Apple Silicon) | `ryll-{version}-aarch64-apple-darwin.tar.gz` | Binary |
 | Windows | `ryll-{version}-x86_64-pc-windows-msvc.zip`, `ryll-{version}-aarch64-pc-windows-msvc.zip` | GUI binary (no `--capture`) |
-| crates.io | `shakenfist-spice-protocol`, `shakenfist-spice-compression`, `shakenfist-spice-usbredir`, `shakenfist-spice-renderer`, `shakenfist-spice-webrtc`, `ryll` | Source crates |
+| crates.io | `shakenfist-spice-protocol`, `shakenfist-spice-compression`, `shakenfist-spice-usbredir`, `shakenfist-spice-renderer`, `shakenfist-spice-webrtc`, `shakenfist-spice-rdp`, `ryll` | Source crates |
 | PyPI | `ryll-{version}-py3-none-manylinux_2_28_x86_64.whl`, `ryll-{version}-py3-none-manylinux_2_28_aarch64.whl` | Embedded GUI binary (maturin `bindings = "bin"`); Linux `x86_64`/`aarch64`, glibc >= 2.28 |
 
 ## The PyPI wheel's platform tag

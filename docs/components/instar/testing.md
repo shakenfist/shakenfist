@@ -2753,6 +2753,52 @@ header-id) prevent dedup from collapsing duplicate-output
 versions, so each version gets its own profile; the comparison logic excludes those random fields from the
 field-equivalence check.
 
+### qemu-img create pins
+
+`tests/golden/qemu-create-pins.json` records what every static
+`qemu-img` build in `instar-testdata/qemu-img-binaries/x86_64/`
+writes for the commands in `tests/helpers/qemu_pins.py` (`CASES`):
+VHDX create and convert (as a structural summary from
+`tests/helpers/vhdx_structure.py`, including the BAT), what
+preallocation changes for vpc, vmdk and vhdx, and the vmdk
+monolithicFlat descriptor. Results are grouped by outcome, so a
+version boundary shows up as a case with more than one group.
+
+Each preallocation mode records whether its image has the same bytes
+(`same_bytes_as_off`) and the same allocation
+(`same_allocation_as_off`) as a `preallocation=off` image. The `off`
+entry compares two `off` images, and the bytes that differ between
+those images are masked out, so its `same_bytes_as_off` is true by
+construction. Only its allocation comparison is measured. The `falloc`
+and `full` entries are the ones that carry evidence.
+
+`tests/test_qemu_create_pins.py` keeps it honest. It fails when a
+build is present that the pin does not list, when 6.0.0, 6.2.0,
+8.2.0, 10.2.0 or the host `qemu-img` no longer produce what the pin
+says, and when a VHDX create case gains a second group.
+
+When instar-testdata gains a qemu build, re-pin every version and
+case (about six minutes at `--jobs 2`):
+
+```bash
+tools/sweep-qemu-create.py --write tests/golden/qemu-create-pins.json --jobs 2
+```
+
+To replay a suspected boundary on its own, check a few versions and
+cases against the committed pin; it exits 1 and names each differing
+field:
+
+```bash
+tools/sweep-qemu-create.py --check tests/golden/qemu-create-pins.json \
+    --versions 8.1.5,8.2.0 --cases vhdx-fixed-64M
+```
+
+Host load has made qemu commands fail spuriously here before, so
+replay any new boundary before believing it. A new boundary is a
+finding, not a re-pin: a VHDX create case with two groups means
+instar has to decide which behaviour it matches, and that needs a
+human decision before the pin is committed.
+
 ## Integration Testing
 
 Integration tests compare `instar info` output against `qemu-img info` to verify

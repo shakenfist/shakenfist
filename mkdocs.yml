@@ -263,6 +263,7 @@ nav:
                 - "qcow2 write infrastructure": components/instar/plans/PLAN-qcow2-write-infrastructure.md
                 - "Format coverage expansion": components/instar/plans/PLAN-format-coverage.md
                 - "VHD and VHDX differencing output": components/instar/plans/PLAN-differencing.md
+                - "Populated BAT output": components/instar/plans/PLAN-bat-population.md
             - Prototypes:
                 - "Building Prototypes with Docker": components/instar/prototypes/building-with-docker.md
                 - "Data Transfer Mechanisms: Comparison": components/instar/prototypes/data-transfer-comparison.md

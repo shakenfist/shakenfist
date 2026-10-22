@@ -72,6 +72,26 @@ window. The operator guide, including reverse-proxy and TLS setup, is
 | `--web-media-port <PORT>` | 0 (ephemeral) | UDP port for the media sockets. Pin it so a firewall rule can name one port instead of the OS's whole ephemeral range. Applies to every bound address; a port already in use fails loudly rather than falling back to an ephemeral one, since a silent fallback would no longer match the firewall rule |
 | `--web-ice-server <URL>` | none | STUN or TURN server URL (`stun:host:port`, `turn:host:port`). Repeatable. Empty by default: ryll assumes browser and host share a LAN, so ICE host candidates are usually enough. The scheme must be `stun:`, `stuns:`, `turn:` or `turns:` and is checked at startup, so a URL with the scheme left off fails the launch rather than producing an ICE server that silently does nothing |
 
+### RDP Mode
+
+`--rdp` runs ryll as a SPICE-to-RDP server instead of opening a GUI window,
+so a stock RDP client (FreeRDP, mstsc, Remmina) can drive the guest. The
+binary must be built with the `rdp` feature (see
+[development.md](/components/ryll/development/)); one built without it refuses `--rdp` with
+a clear message. An operator guide is to come; this table is the flag
+reference.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--rdp` | false | Run as a SPICE → RDP server. A reachability fallback for users with no SPICE client: it loses SPICE features such as USB redirection and folder sharing. Serves one client at a time; a second client waits until the first disconnects. Prints the address, username, password and certificate fingerprint at launch. Mutually exclusive with `--web` and `--headless`; `--control-socket` works with it |
+| `--rdp-host <ADDR>` | `127.0.0.1` | Bind address for the RDP listener. Use `0.0.0.0` for LAN access |
+| `--rdp-port <PORT>` | 3389, or an ephemeral port if 3389 is taken | TCP port to listen on. The port actually bound is printed at launch. A port given explicitly is used or the launch fails; `0` asks for an ephemeral port |
+| `--rdp-user <NAME>` | `ryll` | Username RDP clients log in with |
+| `--rdp-password <PASSWORD>` | generated | Password RDP clients log in with. When absent, a random password is generated and printed at each launch. A password on the command line is visible to other users of the host in the process list, so prefer the generated one on a shared machine |
+| `--rdp-security <MODE>` | `tls` | How clients authenticate: `tls` (TLS with the credentials checked by ryll; every client speaks it) or `nla` (CredSSP, which refuses clients that cannot do it) |
+| `--rdp-tls-cert <PATH>` | self-signed, generated at launch | PEM-encoded TLS certificate chain. Requires `--rdp-tls-key` as well |
+| `--rdp-tls-key <PATH>` | none | PEM-encoded TLS private key. Required with `--rdp-tls-cert` |
+
 ### Capture and Debugging
 
 | Option | Default | Description |

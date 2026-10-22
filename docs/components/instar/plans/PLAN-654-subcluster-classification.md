@@ -1,5 +1,7 @@
 # PLAN-654: One subcluster classification for qcow2
 
+## Status: In progress
+
 ## Prompt
 
 Before responding to questions or discussion points in this
@@ -213,6 +215,8 @@ the failure #654 measured.
    argues it should, since the user should be able to tell a corrupt
    image from an I/O fault. #665 is a reminder that a raiser needs a
    matching renderer.
+   *Answered in phase 1:* it gets a named refusal, rendered by the VMM
+   with qemu's wording "Invalid cluster entry found".
 2. **Write paths.** snapshot, commit, rebase, resize, bench `-w` and
    `qcow2-write` also read L2 entries. `docs/quirks.md:2208` says write
    operations refuse external data files. Step 1a lists every write
@@ -220,20 +224,25 @@ the failure #654 measured.
    interprets host offset 0. Paths that refuse data files and only
    meet entries they have already validated are out of scope, and the
    plan records which ones they are.
+   *Answered in phase 1:* the table is in its "Write paths" section.
+   commit and resize interpret host offset 0 wrongly on classic L2,
+   filed as #795 and #794.
 3. **A silent bitmap read failure.** `cluster_lookup` reads the bitmap
    with `.unwrap_or(0)` (`lib.rs:2279`), so a failed read becomes
    "nothing allocated" and the cluster reads from the backing file or
    as zeros. That is the same kind of quiet wrong answer, in the
    function this phase rewrites, so phase 1 propagates the failure
    rather than leaving it.
+   *Answered in phase 1:* the fallback is gone and a failed bitmap
+   read fails the lookup.
 
 ## Execution
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. One subcluster classifier (#653, #654, rows C and D) | [PLAN-654-subcluster-classification-phase-01-classifier.md](/components/instar/plans/PLAN-654-subcluster-classification-phase-01-classifier/) | Complete | `d08841e` (#801) |
-| 2. The data device is not a chain layer (#792, #803) | [PLAN-654-subcluster-classification-phase-02-data-device.md](/components/instar/plans/PLAN-654-subcluster-classification-phase-02-data-device/) | In progress | |
-| 3. Push audit | - | Not started | |
+| 2. The data device is not a chain layer (#792, #803) | [PLAN-654-subcluster-classification-phase-02-data-device.md](/components/instar/plans/PLAN-654-subcluster-classification-phase-02-data-device/) | Complete | `d42af1f` (#810) |
+| 3. Push audit | [PLAN-654-subcluster-classification-phase-03-push-audit.md](/components/instar/plans/PLAN-654-subcluster-classification-phase-03-push-audit/) | In progress | |
 
 Phase 2's plan is written by `/next-phase` once phase 1 has merged,
 because its premises depend on how phase 1 lands.
@@ -710,15 +719,54 @@ chosen to defer to here, so that we do not forget them.
   reachability probe so it cannot pass vacuously, is the follow-up
   #654's comment argues for. It also touches the three fuzz-target
   lists that #651 says nothing cross-checks.
-* **check's allocation count on data-file images.** On row C's image
+* **check's total cluster count** (#814). On row C's image
   `instar check` reports `3/4097` clusters allocated where
-  `qemu-img check` reports `3/16`. That is unrelated to classification,
-  so it is not fixed here.
-* **qemu's data-file offset check.** qemu refuses a data-file entry
-  whose host offset differs from its guest offset
-  (`block/qcow2-cluster.c:696-704`), and a compressed entry in a
-  data-file image. Phase 1 filed both as #803, and phase 2 takes it
-  (that phase's D5).
+  `qemu-img check` reports `3/16`. The push audit found the denominator
+  is one higher than qemu's on every qcow2 image, not only data-file
+  ones (`2/8193` against `1/8192` on a plain image). That is unrelated
+  to classification, so it is not fixed here.
+* **Write paths that misread host offset 0 on classic L2.** Phase 1's
+  step 1a measured two, both on qemu-written images and both exiting
+  0: `resize --shrink` zeroes the header cluster's refcount when a
+  zero-flag entry lies above the new size (#794), and `commit` ignores
+  `QCOW_OFLAG_ZERO` and copies stale overlay bytes into the base
+  (#795). Neither is an extended-L2 entry, so the classifier does not
+  change them.
+* **check counts L2 tables as allocated clusters** (#804). qemu counts
+  only guest clusters with a host cluster behind them, so instar's
+  `allocated-clusters` is one higher per L2 table on every qcow2
+  image. This is the numerator; the entry above is the denominator.
+* **Subclusters under 512 bytes** (#805). qemu refuses an extended-L2
+  image whose cluster size is under 16K; instar opens and reads one.
+* **Data files on backing images** (#806). The VMM discovers only the
+  top image's data file, so a read through a backing image that owns
+  one fails closed. When this is fixed, the data-file refusal should
+  name the device it came from: today it always says "input", which
+  costs nothing only because the top image is the only possible owner
+  (#810's review, item 2).
+* **compare reports a read failure as a content mismatch** (#807),
+  printing "Content mismatch at offset 0!" and exiting 1, the code for
+  "images differ".
+* **check --chain and raw backing files** (#808). Every raw backing
+  file draws a format-mismatch chain error. Related to #629.
+* **An integration test for the parent-hint flat VMDK.** Step 2a
+  measured a flat descriptor with `parentFileNameHint`, used as the
+  backing file of a larger qcow2, serving the parent's raw bytes. The
+  extent-walk bound that fixes it has a crate test and a mutation case,
+  but no fixture drives it end to end (#810's review, item 6).
+* **qemu's other host-offset checks** (#812). qemu refuses an
+  unaligned host cluster offset in any image
+  (`block/qcow2-cluster.c:686-694`) and a zero flag in a pre-v3 image
+  (`:657-664`). Both checks sit in `qcow2_get_host_offset()`, not in the
+  classifier this plan transcribed. instar reads both: `map` reports
+  the unaligned cluster as data, and `convert` serves zeros for the v2
+  one. Found by the push audit.
+* **The ZSTD backing-chain tests never run** (#813). Their capability
+  probe writes to `/dev/null`, which fails whatever qemu supports.
+* **commit's data-file refusal blames the overlay** (#815) when it is
+  the backing file that owns the data file.
+* **map renders an unknown extent state from the guest as data**
+  (#816), the guest's own `"unknown"` fallback included.
 
 ### Bugs fixed during this work
 
@@ -728,9 +776,9 @@ where one exists, for directly related issues that we should
 either resolve as part of this master plan or at least be aware of
 while planning it.
 
-Phase 1 is planned to close #653 and #654, and to fix rows C and D of
-Situation for read, map, measure and check. Phase 2 is planned to close
-#792 and #803. #650, fixed in #652, is related: D2 reverses its zero-fill policy.
+Phase 1 closed #653 and #654, fixed rows C and D of Situation for
+read, map, measure and check, and closed #800, a compare defect found
+during the phase. Phase 2 closed #792 and #803. #650, fixed in #652, is related: D2 reverses its zero-fill policy.
 
 ### Back brief
 

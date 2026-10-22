@@ -286,17 +286,22 @@ ports and CA, are in [configuration.md](/components/kerbside/configuration/).
 single-node Shaken Fist, deploys this checkout's Kerbside
 against it, and drives the whole flow — mint, offline
 verification, exchange, and a proxied SPICE session against a
-guest booted inside the Shaken Fist instance. The driver scripts
-are in `tools/sf-e2e/` (see `tools/sf-e2e/README.md`):
-`provision-sf.sh` sets `KERBSIDE_URL` and the signing key on the
-cluster side, `gen-sources.py` writes the `sources.yaml` above
-— fetching the cluster CA so the equality check passes by
-construction — `deploy-kerbside.sh` installs and starts
-Kerbside, `drive-happy-path.py` exchanges a token and drives a
-session, and `drive-adversarial.py` asserts five rejections
-across the joined flow — four at Kerbside's exchange endpoint,
-and one at the Shaken Fist mint, where a namespace asking for
-another namespace's instance is refused a token at all.
+guest booted inside the Shaken Fist instance. Kerbside is
+deployed the way an operator would deploy it: Shaken Fist's own
+deploy playbook runs the `kerbside` role from this checkout's
+`shakenfist.kerbside` collection, installing this checkout's
+Kerbside and proxy wheels. The playbook sets `KERBSIDE_URL`,
+mints the signing key and a dedicated `kerbside` system key on
+the cluster side, and writes the `sources.yaml` above — with the
+cluster CA, so the equality check passes by construction. The
+lane's files are in `tools/sf-e2e/` (see
+`tools/sf-e2e/README.md`): `deploy-profile.yml.j2` sets the
+deploy's Kerbside variables, `drive-happy-path.py` exchanges a
+token and drives a session, and `drive-adversarial.py` asserts
+five rejections across the joined flow — four at Kerbside's
+exchange endpoint, and one at the Shaken Fist mint, where a
+namespace asking for another namespace's instance is refused a
+token at all.
 
 This is a stronger worked example than the oVirt lane's. It is a
 **smoke-tier gate**, so it runs on every pull request as well as
@@ -305,10 +310,11 @@ nightly, rather than only on entry to the merge queue; see
 
 Two differences from a real deployment, both CI expedients
 rather than recommendations. Kerbside runs co-located on the
-Shaken Fist primary node as plain processes, where a real
-deployment would put it on a host of its own. And the audience
-contract is exercised over a loopback `http://` URL, not the
-public HTTPS name a deployment would use.
+Shaken Fist primary node, as the role's `kerbside-api` and
+`kerbside-daemon` systemd units, where a real deployment would
+usually put it on a host of its own. And the audience contract
+is exercised over a loopback `http://` URL, not the public HTTPS
+name a deployment would use.
 
 ## User interaction model
 
