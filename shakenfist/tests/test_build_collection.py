@@ -6,10 +6,14 @@ The script must never modify the checkout it builds from. galaxy.yml is a
 tracked file, and rewriting its version in place left the tree dirty: every
 later setuptools_scm version gained a .dYYYYMMDD suffix, including the server
 wheel a CI deploy builds straight afterwards, and the rewritten galaxy.yml
-shipped inside that wheel because package-data takes deploy/**. A second
+shipped inside that wheel because package-data then took deploy/**. A second
 deploy of the same commit then installed different files, and the node role's
 restart-on-change signature restarted every daemon. The kerbside-slim-tier
 deploy profile's redeploy check is what found it.
+
+deploy/ no longer ships in the wheel, but a dirty tree still gives every
+version built from it the .dYYYYMMDD suffix, so these tests still guard the
+version a deploy installs.
 """
 
 import importlib.util

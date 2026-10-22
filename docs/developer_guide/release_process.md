@@ -96,10 +96,13 @@ each run at its latest attempt; then use "Re-run jobs" on it and re-run the
 
 The wheel contents check in `build` is
 [`check-dist`](https://github.com/shakenfist/actions/blob/main/docs/actions.md#check-dist).
-It fails if the wheel holds a test directory or nothing at all. The wheel
-ships the `shakenfist` packages and `shakenfist/data/*.yaml`, and nothing
-under `shakenfist/tests/` or `shakenfist/deploy/`: the unit tests, the Ansible
-collection and the functional CI suites are all used from a checkout.
+It fails if the wheel holds a test directory, anything under
+`shakenfist/deploy/`, or nothing at all. The step after it,
+`tools/check-wheel-data.py`, fails if the wheel lacks any
+`shakenfist/data/*.yaml` file, which a deployed node reads at runtime. The
+wheel ships the `shakenfist` packages and `shakenfist/data/*.yaml`, and
+nothing under `shakenfist/tests/` or `shakenfist/deploy/`: the unit tests, the
+Ansible collection and the functional CI suites are all used from a checkout.
 
 Running `release.yml` by hand with `workflow_dispatch` skips the gate and the
 publishing jobs, and only builds and checks the packages.

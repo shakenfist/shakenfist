@@ -98,6 +98,15 @@ jobs:
       - name: Check the wheel contents
         timeout-minutes: 2
         uses: shakenfist/actions/check-dist@main
+        with:
+          # The ansible collection and the functional CI suites are used
+          # from a checkout, never from an installed wheel.
+          forbid: |
+            shakenfist/deploy/*
+
+      - name: Check the wheel carries its runtime data
+        timeout-minutes: 2
+        run: python3 -I tools/check-wheel-data.py dist/
 
       - name: Upload distribution artifacts
         uses: actions/upload-artifact@v7
