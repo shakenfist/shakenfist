@@ -15996,6 +15996,14 @@ to be distinguishable from a complete one.</p>
 </ul>
 <h2 id="dependencies-on-other-plans">Dependencies on other plans<a class="headerlink" href="#dependencies-on-other-plans" title="Permanent link">&para;</a></h2>
 <ul>
+<li><strong><a href="../PLAN-deleted-object-sweep/">Keep the deleted-object sweep ahead</a>
+  phase 2 pages <code>GetObjectsByState</code> first.</strong> It adds <code>page_size</code> and
+  <code>after_uuid</code> to <code>GetObjectsByStateRequest</code> and <code>more_available</code> to
+  its reply, in the shape this plan's worked brief describes, and
+  converts the deleted-object sweep to read one primary-key page per
+  type. <code>page_size</code> 0 keeps today's unbounded reply, so every other
+  caller is unchanged. This plan's phase 2 should treat that caller as
+  done and reuse the fields for the rest.</li>
 <li><strong><code>PLAN-eventlog-direct-mariadb</code> is complete and is where this came
   from.</strong> Its Future work section listed cursor pagination for
   <code>GetObjectEvents</code> as deferred; issue 3638 is that deferral coming due.

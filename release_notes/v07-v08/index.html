@@ -16892,6 +16892,14 @@ own is refreshed exactly as it always was.</p>
   via <code>cluster_op_reaper_requeued_total</code> and
   <code>cluster_op_reaper_rejected_total</code> on <code>CLUSTER_METRICS_PORT</code> (default
   13007).</li>
+<li>The cluster daemon's deleted-object sweep now runs every minute rather
+  than every 15, within a time budget set by the new
+  <code>DELETED_OBJECT_SWEEP_SECONDS</code> option (default 20). It reads a page of
+  work per object type and takes one object from each type in turn, so a
+  large backlog in one type no longer delays the others. Upgrade
+  <code>sf-database</code> before <code>sf-cluster</code>: until it is upgraded, an older
+  <code>sf-database</code> ignores the paging and the sweep reads each type's whole
+  list as it did before.</li>
 <li>The floating network now uses a well-known UUID (<code>f10a7f10-a7f1-4a7f-a10a-7f10a7f10a7f</code>)
   instead of the invalid string "floating". Existing deployments must run
   <code>sf-ctl migrate-floating-network-uuid</code> after stopping services to migrate.
@@ -17174,10 +17182,11 @@ daemon process:</p>
   maintainer, and dropped entirely when that node loses the election.
   Zero in steady state; see <a href="/operator_guide/database/">the operator guide on the
   database</a> for a sample alert.</li>
-<li><code>cluster_deleted_object_queue_depth{object_type}</code> — gauge,
-  sf-cluster: entries waiting in the deleted-object sweep's queue. The
-  value after a queue fill is the per-type backlog. Published only by
-  the elected cluster maintainer.</li>
+<li><code>cluster_deleted_object_backlog{object_type}</code> — gauge, sf-cluster:
+  objects in a final state, counted hourly with no age filter, so it
+  includes objects still inside their grace period. Published for every
+  type, zeros included, by the elected cluster maintainer only, and
+  dropped when that node loses the election.</li>
 <li><code>cluster_deleted_object_seconds{object_type,outcome}</code> — histogram,
   sf-cluster: wall time spent on each entry of the deleted-object
   queue, by how the entry ended (<code>gone</code>, <code>not_final</code>, <code>too_young</code>,
@@ -17185,7 +17194,8 @@ daemon process:</p>
 <li><code>database_client_rpc_seconds{sweep,object_type,operation}</code> —
   histogram, database client: wall time of database RPCs (including
   retries) made inside a timing scope, which today is only the
-  deleted-object sweep. Other daemons export no samples for it.</li>
+  deleted-object sweep, including its page reads, its hourly count and
+  <code>DeleteObjectEvents</code>. Other daemons export no samples for it.</li>
 </ul>
 <p>See <a href="/operator_guide/events/">the operator guide on events</a> for alert
 recommendations and the full metrics reference.</p>

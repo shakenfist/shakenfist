@@ -15916,11 +15916,13 @@ dedup independently refuses to return a rowless op, so a caller's
 <code>CLUSTER_METRICS_PORT</code> on the cluster daemon.</p>
 <p>The cluster daemon also runs two other reaping sweeps from
 <code>daemons/cluster/scheduled_tasks.py</code>. <code>per_deleted_object_checks()</code>
-(every 15 minutes) hard deletes objects that have been in a final
-state (<code>deleted</code>, <code>complete</code>, <code>abort</code>) for longer than their grace
-period; its work queue holds <code>(object_type, uuid)</code> tuples fetched
-with the age filter pushed down to SQL, and objects are hydrated one
-at a time at processing time inside a per-item exception guard.
+(every minute, within <code>DELETED_OBJECT_SWEEP_SECONDS</code>) hard deletes
+objects that have been in a final state (<code>deleted</code>, <code>complete</code>,
+<code>abort</code>) for longer than their grace period; it holds a list of
+uuids per object type, filled a page at a time with the age filter
+pushed down to SQL, and takes one object from each type in turn.
+Objects are hydrated one at a time at processing time inside a
+per-item exception guard.
 <code>reconcile_orphaned_objects()</code> (hourly) removes "phantom"
 <code>object_states</code> rows whose static-values row is gone (with an age
 guard so mid-creation objects are never raced) and repairs "zombie"
