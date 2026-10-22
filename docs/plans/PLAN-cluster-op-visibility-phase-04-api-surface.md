@@ -549,7 +549,7 @@ below was run at planning time, and gave the "now" result noted.
       `3`).
 - [ ] `grep -rn "CLEANER_DELAY seconds" docs/developer_guide/api_reference/ | wc -l`
       prints `0` (now `3`).
-- [ ] `grep -rn "queued_cluster_operations" docs shakenfist | wc -l`
+- [ ] `grep -rn "queued_cluster_operations" docs shakenfist --exclude-dir=plans | wc -l`
       prints `0` (now `6`).
 - [ ] `grep -n "no longer cancels a queued billing" docs/release_notes/v07-v08.md`
       prints nothing (now line 1403), and the file has a section
@@ -606,3 +606,10 @@ commit, not a migration.
   premise, corrected at the decision. Every other instance enqueue
   site in `instance.py` and `external_api/instance.py` targets the
   instance, as `target_fields` shows.
+* Steps 4a to 4e ran in order, one sub-agent each, and each was
+  committed after the management session re-ran its mutations: 4a
+  two (added by review), 4b two (one added), 4c three, 4d three.
+* The Definition of done's `queued_cluster_operations` grep
+  counted `docs/plans/`, where the plans describe the old names and
+  the check quotes itself, so it could never print `0`. It now
+  excludes `docs/plans/`, and prints `0`.
