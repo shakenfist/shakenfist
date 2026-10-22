@@ -16427,8 +16427,8 @@ returned in a dictionary element called <code>meta</code>. An example returned d
 <td>Force placement of the instance onto a named node.</td>
 </tr>
 <tr>
-<td>video<br/><em>string</em></td>
-<td>The video model to use.</td>
+<td>video<br/><em>dictionary</em></td>
+<td>The instance's video card and console, as a <a href="/developer_guide/api_reference/instances/#videospec">videospec</a>: <code>model</code> (default <code>cirrus</code>), <code>memory</code> in KiB (default <code>16384</code>) and <code>vdi</code>, which is one of <code>vnc</code>, <code>spice</code>, <code>spiceconcurrent</code> or <code>spicedebug</code> (default <code>spice</code>). A key left out takes its default, so <code>video: {model: vga}</code> asks for a vga card with 16384 KiB of memory and a SPICE console. Like the other specifications it may also be written as a <code>key=value</code> string, for example <code>model=qxl,memory=65536</code>. Unset, the server applies its default videospec, and an existing instance's video is not compared.</td>
 </tr>
 <tr>
 <td>nvram_template<br/><em>string</em></td>
