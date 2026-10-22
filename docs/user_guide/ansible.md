@@ -272,7 +272,7 @@ Delete a network:
 | ssh_key<br/>*string* | An ssh public key to place into the instance's config drive. |
 | user_data<br/>*string* | Base64-encoded user data to place into the instance's config drive. |
 | placement<br/>*string* | Force placement of the instance onto a named node. |
-| video<br/>*string* | The video model to use. |
+| video<br/>*dictionary* | The instance's video card and console, as a [videospec](/developer_guide/api_reference/instances/#videospec): `model` (default `cirrus`), `memory` in KiB (default `16384`) and `vdi`, which is one of `vnc`, `spice`, `spiceconcurrent` or `spicedebug` (default `spice`). A key left out takes its default, so `video: {model: vga}` asks for a vga card with 16384 KiB of memory and a SPICE console. Like the other specifications it may also be written as a `key=value` string, for example `model=qxl,memory=65536`. Unset, the server applies its default videospec, and an existing instance's video is not compared. |
 | nvram_template<br/>*string* | The NVRAM template to use (for UEFI / secure boot). |
 | configdrive<br/>*string* | The config drive style to use. |
 | side_channels<br/>*list of strings* | A list of side channel names to expose to the instance. |

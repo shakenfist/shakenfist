@@ -620,14 +620,18 @@ why it is not.
   the hotplug escape, are each caught.
 * **[#4236](https://github.com/shakenfist/shakenfist/issues/4236)
   — the ansible collection's `sf_instance` sends `video` as a
-  string. Still open, and the only live defect in this list.** A
+  string. Fixed.** A
   consequence of phase 7 typing the videospec: the
-  module builds a string where the API now requires an object, so
-  the collection's own `video` parameter no longer works against
+  module built a string where the API now requires an object, so
+  the collection's own `video` parameter no longer worked against
   an `enforce`-mode cluster. It is a collection defect rather than
   an API one and phase 7 left it for its own fix.
   [#4227](https://github.com/shakenfist/shakenfist/issues/4227) is
-  the same defect filed separately and the two should be merged.
+  the same defect filed separately, and one change closed both:
+  `video` is now a dict parameter whose suboptions are the
+  videospec's keys, with the server's defaults, and the dirtiness
+  comparison compares it as a dict. `ansible_module_ci/004.yml`
+  sets it on a create and on the idempotent re-run.
 * **[#4223](https://github.com/shakenfist/shakenfist/issues/4223)
   — a null object reference resolves to an arbitrary object.
   Fixed.** The reachable path through the API was closed twice
