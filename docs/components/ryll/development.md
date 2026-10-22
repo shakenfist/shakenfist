@@ -97,8 +97,8 @@ instructions.
 
 ## Cargo features
 
-ryll ships several default-on Cargo features that can be opted
-out at build time:
+ryll ships several Cargo features, most of them default-on and
+able to be opted out of at build time:
 
 - **`gui`** (default-on) — eframe, egui, arboard, rfd, and the
   whole interactive UI.  Disabling it produces a `--headless`
@@ -124,6 +124,12 @@ out at build time:
   QR-encoded visual digest and emits a `digest_updated`
   control-socket event on each frame counter change.  Built
   only for the kerbside test harness; not in production ryll.
+- **`rdp`** (default-off) — the `--rdp` mode, which serves the
+  SPICE session to stock RDP clients through the
+  shakenfist-spice-rdp crate and IronRDP.  `make lint` and
+  `make test` build it; release builds leave it out.  Running a
+  binary built without it with `--rdp` exits with a clear "this
+  ryll binary was built without the `rdp` feature" message.
 
 The slim test-harness binary is built with
 `cargo build --release --no-default-features -p ryll`.  See
@@ -570,6 +576,39 @@ Chromium carries H.264 in-tree and does not have this failure mode,
 which makes it the browser to reach for when deciding whether a
 problem is ryll's — and the control to run the probe against when
 deciding whether the probe itself is telling the truth.
+
+### Verifying `--rdp`
+
+`--rdp` needs a binary built with the `rdp` feature. The Makefile's
+`lint` and `test` targets build it, but `make build` and `make release`
+do not, so run `make -n build` to see the docker line and add
+`--features rdp` to its cargo command; that leaves the binary at
+`target/debug/ryll` (or `target/release/ryll` from the `release`
+target's line). Then start the desktop guest and point ryll at it:
+
+```bash
+make test-qemu-desktop
+target/debug/ryll --rdp --direct localhost:5900
+```
+
+ryll prints the address, port, username, password and certificate
+fingerprint. If another RDP server already holds 3389 it falls back to an
+ephemeral port and prints that one. Connect with FreeRDP (3.15.0 from
+Debian 13's `freerdp3-x11` works):
+
+```bash
+xfreerdp3 /v:127.0.0.1:PORT /u:ryll /p:PASSWORD /cert:tofu
+```
+
+Use `/sec:nla` against a server started with `--rdp-security nla`. Check
+that typing, left, right and middle buttons, and the wheel all reach the
+guest. To measure what the extra hop costs, run `tools/rdp-measure.sh
+--pid PID --port PORT --seconds 30` against the ryll process while the
+guest is idle and during each of the three workloads: typing in a
+terminal, scrolling a long page and playing a video. It reports CPU and
+bytes sent. Video is expensive
+because the client receives RemoteFX bitmaps of a region that changes
+about 28 times a second.
 
 ### Inspecting a `--capture` pcap
 

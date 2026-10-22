@@ -392,7 +392,12 @@ through `instar check` and match `qemu-img` (instar #365).
 - Multi-file VMDK subformats (`monolithicFlat`, `twoGbMaxExtentSparse`,
   `twoGbMaxExtentFlat`) — needs multi-output-device support in the
   call table.
-- VHDX `subformat=fixed` (not emitted by qemu-img either).
+- VHDX `subformat=fixed`. instar refuses it today, but qemu-img does emit it:
+  `qemu-img create -f vhdx -o subformat=fixed` sets the `LeaveBlocksAllocated`
+  file parameter, writes a BAT entry for every payload block
+  (`PAYLOAD_BLOCK_ZERO` by default, `PAYLOAD_BLOCK_FULLY_PRESENT` at
+  sequential offsets with `-o block_state_zero=off`) and extends the file
+  sparsely to the end of its data region.
 - `--object OBJDEF` and `encrypt.*` for LUKS-encrypted create —
   pair with the existing convert-side passphrase plumbing.
 - Atomic-rename safety: write to `FILENAME.tmp` and `rename()` on

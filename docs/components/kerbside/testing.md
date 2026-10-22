@@ -506,11 +506,14 @@ daemon and no database.
 
 `.github/workflows/sf-e2e-functional.yml` is the only lane that
 exercises the `type: shakenfist` console source against a real
-cluster. It stands up a single-node Shaken Fist (via
-`shakenfist/actions/build-smoke-cluster`), provisions `KERBSIDE_URL`
-and a signing key, deploys a co-located Kerbside with a
-`type: shakenfist` source (via
-`shakenfist/actions/deploy-kerbside-on-shakenfist`), and drives an
+cluster. It stands up a single-node Shaken Fist with
+`shakenfist/actions/build-smoke-cluster`, whose deploy also deploys a
+co-located Kerbside with a `type: shakenfist` source: the deploy
+profile `tools/sf-e2e/deploy-profile.yml.j2` installs this pull
+request's `ansible/` collection and hands its `kerbside` role this
+pull request's Kerbside and proxy wheels. The cluster is deployed
+twice, and the second deploy must restart no `sf-*` or `kerbside-*`
+unit. The lane then drives an
 SF-minted token through offline verification, exchange, and a
 proxied SPICE session against the Sextant guest booted inside the SF
 instance — followed by an adversarial matrix covering replay,
@@ -519,8 +522,9 @@ expiry, wrong audience, unknown kid, and cross-namespace mint.
 Driver scripts live in `tools/sf-e2e/` (see
 `tools/sf-e2e/README.md`). It is a smoke-tier PR gate, and also runs
 nightly and on dispatch. Every run uploads an artifact bundle with the
-kerbside, ryll, SF daemon and libvirt logs, redacted before upload;
-the README's Security section lists what is collected.
+Kerbside unit journals and the ryll, SF daemon and libvirt logs,
+redacted before upload; the README's Security section lists what is
+collected.
 
 ## The oVirt end-to-end kerbside lane
 
