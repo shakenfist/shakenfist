@@ -14,6 +14,7 @@ import threading
 import time
 from unittest import mock
 
+from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.daemons.cluster import main as cluster_main
 from shakenfist.tests import base
 
@@ -85,7 +86,7 @@ class ClusterBlobReaperTestCase(base.ShakenFistTestCase):
         self._run_pass(
             mock_mariadb, mock_ipam, mock_network, mock_artifact,
             mock_instance, mock_blob, mock_low_disk, mock_nodes, b)
-        b.cascading_delete.assert_not_called()
+        self.assertNotEqual(dbo.STATE_DELETED, b.state)
 
     @mock.patch('shakenfist.daemons.cluster.main.Nodes')
     @mock.patch('shakenfist.daemons.cluster.main.nodes_by_free_disk_descending')
@@ -107,7 +108,7 @@ class ClusterBlobReaperTestCase(base.ShakenFistTestCase):
         self._run_pass(
             mock_mariadb, mock_ipam, mock_network, mock_artifact,
             mock_instance, mock_blob, mock_low_disk, mock_nodes, b)
-        b.cascading_delete.assert_called_once()
+        self.assertEqual(dbo.STATE_DELETED, b.state)
 
     @mock.patch('shakenfist.daemons.cluster.main.Nodes')
     @mock.patch('shakenfist.daemons.cluster.main.nodes_by_free_disk_descending')
@@ -128,4 +129,4 @@ class ClusterBlobReaperTestCase(base.ShakenFistTestCase):
         self._run_pass(
             mock_mariadb, mock_ipam, mock_network, mock_artifact,
             mock_instance, mock_blob, mock_low_disk, mock_nodes, b)
-        b.cascading_delete.assert_not_called()
+        self.assertNotEqual(dbo.STATE_DELETED, b.state)

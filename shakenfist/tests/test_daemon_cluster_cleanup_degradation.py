@@ -75,8 +75,9 @@ class ClusterCleanupBlobReadFailureTestCase(base.ShakenFistTestCase):
         m._cluster_wide_cleanup(last_loop_run=0)
 
         # The blob reaping and replication section degraded to a no-op:
-        # nothing was reaped, dropped or replicated.
-        expired.cascading_delete.assert_not_called()
+        # nothing was reaped, dropped or replicated. Expiry deletes the
+        # same blob below, so the reaper not running shows as its audit
+        # event being absent (add_event is called once, by expiry).
         expired.drop_node_location.assert_not_called()
         expired.request_replication.assert_not_called()
 
