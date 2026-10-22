@@ -508,9 +508,13 @@ is available [in the user guide](/user_guide/metadata/).
 
 Since v0.8, [cluster operations](/developer_guide/api_reference/clusteroperations)
 for a given artifact have been exposed. This lists the various pieces of queued
-work that Shaken Fist has executed on a given object, with the limitation that
-completed cluster operations are hard deleted after CLEANER_DELAY seconds
-(which defaults to one hour).
+work that Shaken Fist has queued against a given object, newest first. By
+default only operations which are still queued, in preflight or executing are
+listed.
+[Looking up cluster operations](/developer_guide/api_reference/clusteroperations#looking-up-cluster-operations)
+says how long finished operations remain visible, and
+[waiting for an object to settle](/developer_guide/api_reference/clusteroperations#waiting-for-an-object-to-settle)
+describes the `has_pending_operations` field.
 
 ???+ tip "REST API calls"
 
@@ -523,8 +527,8 @@ completed cluster operations are hard deleted after CLEANER_DELAY seconds
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
-    md = sf_client.get_artifact_queued_cluster_operations(img_uuid)
-    print(json.dumps(md, indent=4, sort_keys=True))
+    ops = sf_client.get_artifact_clusteroperations(art_uuid)
+    print(json.dumps(ops, indent=4, sort_keys=True))
     ```
 
 ??? example "Python API client: get all cluster operations for an artifact"
@@ -534,6 +538,6 @@ completed cluster operations are hard deleted after CLEANER_DELAY seconds
     from shakenfist_client import apiclient
 
     sf_client = apiclient.Client()
-    md = sf_client.get_artifact_queued_cluster_operations(img_uuid, all=True)
-    print(json.dumps(md, indent=4, sort_keys=True))
+    ops = sf_client.get_artifact_clusteroperations(art_uuid, all=True)
+    print(json.dumps(ops, indent=4, sort_keys=True))
     ```

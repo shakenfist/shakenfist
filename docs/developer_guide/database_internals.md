@@ -339,7 +339,7 @@ it is observational. The reasoning for each existing task is in the
 [audit table](../plans/PLAN-cluster-op-visibility-phase-03-mark-observational.md#audit-table)
 of the plan which classified them.
 
-`DatabaseBackedObjectWithOperations` exposes two read shapes over the
+`DatabaseBackedObjectWithOperations` exposes three read shapes over the
 history:
 
 - **`last_cluster_operation` (property)**: returns the most recent
@@ -353,6 +353,17 @@ history:
   any future history-aware gate. The query
   joins `cluster_operation_targets` against `object_states`, so a later
   terminal operation cannot mask an earlier in-flight one.
+  `external_view()` on instances, networks and artifacts renders this as
+  `has_pending_operations`. It is false for an in-memory object and true when
+  the database cannot answer.
+- **`get_cluster_operations()` (method)**: returns the target rows for the
+  object, newest first by sequence number, each hydrated into its operation and
+  paired with the `observational` flag stored on its row. By default the rows
+  are filtered in SQL to operations which are pending, using the same join as
+  `has_pending_cluster_operation()`, so a listing and the pending field agree.
+  It does not follow `depends_on` or `runs_after`, so operations on other
+  objects are not included. The per-object `/clusteroperations` endpoints
+  render it, and `Instance.enqueue_delete()` walks it to decide what to abort.
 
 As a backstop for rows that outlive their operation, the table is bounded by
 a periodic prune in the cluster daemon, alongside the existing
