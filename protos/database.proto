@@ -2490,6 +2490,10 @@ message GetClusterOperationTargetReply {
 message GetClusterOperationTargetsForObjectRequest {
   ObjectType target_object_type = 1;
   string target_uuid = 2;
+  // Return only targets whose operation is in flight. An older sf-database
+  // ignores this field and returns every row, so callers must still check
+  // each operation's state.
+  bool pending_only = 3;
 }
 
 message GetClusterOperationTargetsForObjectReply {

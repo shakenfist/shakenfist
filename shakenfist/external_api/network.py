@@ -101,6 +101,7 @@ def _delete_network(network_from_db, wait_interfaces=None):
 
 network_get_example = """{
     "floating_gateway": "192.168.10.16",
+    "has_pending_operations": false,
     "last_cluster_operation": {
         "op_type": "net_iface_op",
         "op_uuid": "48a40459-a813-491f-81d6-a68536122e07"
@@ -1040,17 +1041,16 @@ class NetworkDNSAddressEndpoint(api_base.Resource):
 
 
 network_outstanding_operations_example = """[
-    [
-        {
-            "network_uuid": "7c822e61-a5cc-45ed-9ffa-086568aa7ade",
-            "operation_type": "net_op",
-            "state": "complete",
-            "tasks": [
-                "network_deploy"
-            ],
-            "uuid": "22b757ae-41d1-456b-84a4-edca694ceb6d"
-        }
-    ]
+    {
+        "network_uuid": "7c822e61-a5cc-45ed-9ffa-086568aa7ade",
+        "observational": false,
+        "operation_type": "net_op",
+        "state": "complete",
+        "tasks": [
+            "network_deploy"
+        ],
+        "uuid": "22b757ae-41d1-456b-84a4-edca694ceb6d"
+    }
 ]"""
 
 
@@ -1069,11 +1069,13 @@ class NetworkOutstandingOperationsEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.NETWORK_REF_NAMESPACE_DESCRIPTION, False),
          ('all', 'query', 'boolean',
-          'Include operations which have already completed, rather than '
-          'only those still in flight.', False)],
+          'Also include finished operations which have not yet been removed. '
+          'Finished operations are normally removed within about fifteen '
+          'minutes, and errored ones are kept for up to seven days, so this '
+          'is not a history.', False)],
         [(
             200,
-            'A list of the cluster operations not yet executed for this network.',
+            'The cluster operations targeting this network, newest first.',
             network_outstanding_operations_example),
          (404, 'Network not found.', None)]))
     @use_kwargs(get_args, location='json_or_query')
@@ -1081,9 +1083,4 @@ class NetworkOutstandingOperationsEndpoint(api_base.Resource):
     @api_base.requires_network_ownership
     @api_base.log_token_use
     def get(self, network_ref=None, all=False, network_from_db=None):
-        retval = []
-        for op in network_from_db.get_cluster_operations(
-            outstanding_only=(not all)
-        ):
-            retval.append(op.external_view())
-        return retval
+        return network_from_db.cluster_operation_views(outstanding_only=(not all))

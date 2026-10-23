@@ -594,7 +594,8 @@ class Artifact(dbowo):
             'namespace': self.namespace,
             'shared': self.shared,
             'error_message': self.error,
-            'last_cluster_operation': self.last_cluster_operation
+            'last_cluster_operation': self.last_cluster_operation,
+            'has_pending_operations': self.has_pending_cluster_operation()
         })
         return out
 

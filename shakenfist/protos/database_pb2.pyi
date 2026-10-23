@@ -8257,17 +8257,24 @@ class GetClusterOperationTargetsForObjectRequest(_message.Message):
 
     TARGET_OBJECT_TYPE_FIELD_NUMBER: _builtins.int
     TARGET_UUID_FIELD_NUMBER: _builtins.int
+    PENDING_ONLY_FIELD_NUMBER: _builtins.int
     target_object_type: _shakenfist_enums_pb2.ObjectType.ValueType
     target_uuid: _builtins.str
+    pending_only: _builtins.bool
+    """Return only targets whose operation is in flight. An older sf-database
+    ignores this field and returns every row, so callers must still check
+    each operation's state.
+    """
     def __init__(
         self,
         *,
         target_object_type: _shakenfist_enums_pb2.ObjectType.ValueType = ...,
         target_uuid: _builtins.str = ...,
+        pending_only: _builtins.bool = ...,
     ) -> None: ...
     _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
     def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
-    _ClearFieldArgType: _TypeAlias = _typing.Literal["target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]  # noqa: Y015
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["pending_only", b"pending_only", "target_object_type", b"target_object_type", "target_uuid", b"target_uuid"]  # noqa: Y015
     def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
     def WhichOneof(self, oneof_group: _Never) -> None: ...
 

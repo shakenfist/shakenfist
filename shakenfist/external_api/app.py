@@ -429,7 +429,12 @@ API_CAPABILITIES = {
         'blob-events', 'blob-checksums', 'blob-single-checksum'],
     'cluster-operations': [
         'get-cluster-operations', 'cluster-operation-chain',
-        'cluster-operations-by-target'],
+        'cluster-operations-by-target',
+        # object-pending-operations advertises both the has_pending_operations
+        # field on object views and that the per-object /clusteroperations
+        # listings report every op targeting the object, each with an
+        # observational key.
+        'object-pending-operations'],
     'events': ['events-by-type'],
     'instances': [
         'pure-affinity', 'spice-vdi-console', 'vdi-console-helper',

@@ -5679,7 +5679,8 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 mariadb
                 ._direct_get_cluster_operation_targets_for_object(
                     target_object_type,
-                    request.target_uuid))
+                    request.target_uuid,
+                    request.pending_only))
             return database_pb2.GetClusterOperationTargetsForObjectReply(
                 targets=[
                     self._target_to_proto(d)

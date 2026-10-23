@@ -118,6 +118,7 @@ instance_get_example = """{
     ],
     "disks": [],
     "error_message": null,
+    "has_pending_operations": false,
     "interfaces": [],
     "last_cluster_operation": {
         "op_type": "node_inst_snap_op",
@@ -2477,40 +2478,52 @@ class InstanceScreenshotEndpoint(api_base.Resource):
 
 
 instance_outstanding_operations_example = """[
-    [
-        {
-            "instance_uuid": "5d6810b9-cef5-4c88-9406-b4c11e830de1",
-            "net_desc": [
-                {
-                    "address": "10.0.13.109",
-                    "float": true,
-                    "iface_uuid": "2e5fa696-2cee-40b1-9f6b-61c45e5a9027",
-                    "macaddress": "02:00:00:9a:4d:5e",
-                    "model": "virtio",
-                    "network_uuid": "7c822e61-a5cc-45ed-9ffa-086568aa7ade"
-                }
-            ],
-            "node_uuid": "localhost",
-            "operation_type": "node_inst_netdesc_op",
-            "state": "complete",
-            "tasks": [
-                "instance_preflight",
-                "instance_start"
-            ],
-            "uuid": "5dd7a116-37e3-474e-aeaa-fb003e5f5c60"
-        },
-        {
-            "instance_uuid": "5d6810b9-cef5-4c88-9406-b4c11e830de1",
-            "namespace": "system",
-            "operation_type": "artifact_fetch_op",
-            "state": "complete",
-            "tasks": [
-                "image_fetch"
-            ],
-            "url": "debian:12",
-            "uuid": "c3615ff7-228b-44e5-ab32-0fe668389528"
-        }
-    ]
+    {
+        "instance_uuid": "5d6810b9-cef5-4c88-9406-b4c11e830de1",
+        "node_uuid": "localhost",
+        "observational": true,
+        "operation_type": "node_inst_op",
+        "state": "queued",
+        "tasks": [
+            "collect_billing_statistics",
+            "health_check_kvm_process"
+        ],
+        "uuid": "9a0b3c1e-6f2d-4b8a-9e71-3d5c2f4a8b06"
+    },
+    {
+        "instance_uuid": "5d6810b9-cef5-4c88-9406-b4c11e830de1",
+        "net_desc": [
+            {
+                "address": "10.0.13.109",
+                "float": true,
+                "iface_uuid": "2e5fa696-2cee-40b1-9f6b-61c45e5a9027",
+                "macaddress": "02:00:00:9a:4d:5e",
+                "model": "virtio",
+                "network_uuid": "7c822e61-a5cc-45ed-9ffa-086568aa7ade"
+            }
+        ],
+        "node_uuid": "localhost",
+        "observational": false,
+        "operation_type": "node_inst_netdesc_op",
+        "state": "complete",
+        "tasks": [
+            "instance_preflight",
+            "instance_start"
+        ],
+        "uuid": "5dd7a116-37e3-474e-aeaa-fb003e5f5c60"
+    },
+    {
+        "instance_uuid": "5d6810b9-cef5-4c88-9406-b4c11e830de1",
+        "namespace": "system",
+        "observational": false,
+        "operation_type": "artifact_fetch_op",
+        "state": "complete",
+        "tasks": [
+            "image_fetch"
+        ],
+        "url": "debian:12",
+        "uuid": "c3615ff7-228b-44e5-ab32-0fe668389528"
+    }
 ]"""
 
 
@@ -2529,11 +2542,13 @@ class InstanceOutstandingOperationsEndpoint(api_base.Resource):
          ('namespace', 'body', 'namespace',
           api_base.INSTANCE_REF_NAMESPACE_DESCRIPTION, False),
          ('all', 'query', 'boolean',
-          'Include operations which have already completed, rather than '
-          'only those still in flight.', False)],
+          'Also include finished operations which have not yet been removed. '
+          'Finished operations are normally removed within about fifteen '
+          'minutes, and errored ones are kept for up to seven days, so this '
+          'is not a history.', False)],
         [(
             200,
-            'A list of the cluster operations not yet executed for this instance.',
+            'The cluster operations targeting this instance, newest first.',
             instance_outstanding_operations_example),
          (404, 'Instance not found.', None)]))
     @use_kwargs(get_args, location='json_or_query')
@@ -2541,9 +2556,4 @@ class InstanceOutstandingOperationsEndpoint(api_base.Resource):
     @api_base.requires_instance_ownership
     @api_base.log_token_use
     def get(self, instance_ref=None, all=False, instance_from_db=None):
-        retval = []
-        for op in instance_from_db.get_cluster_operations(
-            outstanding_only=(not all)
-        ):
-            retval.append(op.external_view())
-        return retval
+        return instance_from_db.cluster_operation_views(outstanding_only=(not all))

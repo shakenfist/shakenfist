@@ -22,6 +22,7 @@ import sys
 from unittest import mock
 
 from shakenfist.artifact import Artifact
+from shakenfist.baseobject import TargetedOperation
 from shakenfist.config import SFConfig
 from shakenfist.external_api import app as external_api
 from shakenfist.tests import base
@@ -82,7 +83,7 @@ class OutstandingOperationsAllTestCase(base.ShakenFistTestCase):
         self.get_ops = mock.patch(
             'shakenfist.baseobject.DatabaseBackedObjectWithOperations'
             '.get_cluster_operations',
-            return_value=[fake_op])
+            return_value=[TargetedOperation(fake_op, False)])
         self.mock_get_ops = self.get_ops.start()
         self.addCleanup(self.get_ops.stop)
 
@@ -102,7 +103,8 @@ class OutstandingOperationsAllTestCase(base.ShakenFistTestCase):
 
     def _assert_outstanding_only(self, resp, expected):
         self.assertEqual(200, resp.status_code)
-        self.assertEqual([{'uuid': 'fake-op'}], resp.get_json())
+        self.assertEqual(
+            [{'uuid': 'fake-op', 'observational': False}], resp.get_json())
         self.mock_get_ops.assert_called_once_with(outstanding_only=expected)
         self.mock_get_ops.reset_mock()
 

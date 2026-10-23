@@ -27,6 +27,21 @@ chain ending at a given op. They are also accessible as sub-resources of the
 objects they act upon, currently exposed for artifacts, instances, and
 networks.
 
+The per-object sub-resources are `/artifacts/{artifact_ref}/clusteroperations`,
+`/instances/{instance_ref}/clusteroperations` and
+`/networks/{network_ref}/clusteroperations`. Each lists the operations which
+target that object, newest first. An operation which only targets another
+object is not listed, even if one of this object's operations waits for it: a
+network reconcile an instance start waits on appears in the network's list, not
+the instance's, and `GET /clusteroperations/{op_uuid}/chain` traces what an
+operation waits on. Every entry carries an `observational` boolean, as
+described below. By default only operations which are queued, in preflight or
+executing are listed. With `all=true` the list also includes finished
+operations which have not yet been removed. Finished operations are normally
+removed within about fifteen minutes, and errored operations are kept for up
+to `CLUSTER_OPERATION_TARGET_RETENTION`, seven days by default, so `all=true`
+is a bounded window onto recent work and not a history.
+
 ???+ tip "REST API calls"
 
     * [GET /clusteroperations/{operation_type}/{operation_uuid}](https://openapi.shakenfist.com/#/clusteroperations/get_clusteroperations__operation_type___operation_uuid_):
@@ -48,6 +63,40 @@ networks.
       health check) rather than changing it. Observational ops are
       listed here but do not count towards the object's
       `last_cluster_operation` or its pending operations.
+
+## Waiting for an object to settle
+
+Instance, network and artifact views carry a `has_pending_operations` boolean
+beside `last_cluster_operation`. It is true while any non-observational
+cluster operation targeting the object is queued, in preflight or executing,
+and it is true when the server cannot tell, so a transient database problem
+makes an object look busy rather than idle. Unlike `last_cluster_operation`,
+it is not masked by a later operation which has already finished. It is also
+present on the objects returned by the list endpoints. The field is
+advertised by the `object-pending-operations` capability.
+
+Observational operations never make an object pending. A background sweep, or
+a checksum verification requested through
+`GET /blobs/{blob_uuid}/checksum/{algorithm}`, is listed with
+`observational: true` but leaves `has_pending_operations` false. A caller
+waiting for a requested blob hash therefore cannot use this field: it polls
+`GET /blobs/{blob_uuid}/checksum/{algorithm}` instead, which returns the hash
+once it has been recorded and null until then, and queues a verification
+if the hash is not yet known.
+
+??? example "Python API client: wait for an instance to settle"
+
+    ```python
+    import time
+    from shakenfist_client import apiclient
+
+    sf_client = apiclient.Client()
+    if not sf_client.check_capability('object-pending-operations'):
+        raise Exception('this cluster does not report pending operations')
+
+    while sf_client.get_instance(instance_uuid)['has_pending_operations']:
+        time.sleep(1)
+    ```
 
 ## Polling an asynchronous operation
 

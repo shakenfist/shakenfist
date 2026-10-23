@@ -107,9 +107,12 @@ class _SqliteUpsert:
             set_=kwargs)
 
 
-class ObservationalCurrentStateTestCase(
-        dbfixture.MariaDBTableFixture, base.ShakenFistTestCase):
-    """Decision 8's behaviour test, against real SQL."""
+class ClusterOperationTablesFixture(dbfixture.MariaDBTableFixture):
+    """The real enqueue path and readers over sqlite cluster operation tables.
+
+    Mix in ahead of base.ShakenFistTestCase. Also used by
+    test_object_cluster_operations.
+    """
 
     def setUp(self):
         super().setUp()
@@ -136,6 +139,27 @@ class ObservationalCurrentStateTestCase(
             p.start()
         self.addCleanup(mock.patch.stopall)
 
+    def _set_op_state(self, op_uuid, state_value):
+        states = mariadb._get_object_states_table()
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                sa.update(states)
+                .where(states.c.object_uuid == op_uuid)
+                .values(state_value=state_value))
+        self.assertEqual(1, result.rowcount)
+
+    def _op_state(self, op_uuid):
+        states = mariadb._get_object_states_table()
+        with self.engine.connect() as conn:
+            return conn.execute(
+                sa.select(states.c.state_value)
+                .where(states.c.object_uuid == op_uuid)).scalar()
+
+
+class ObservationalCurrentStateTestCase(
+        ClusterOperationTablesFixture, base.ShakenFistTestCase):
+    """Decision 8's behaviour test, against real SQL."""
+
     def _enqueue(self, op_uuid, tasks, model_class=_ObservingModel,
                  op_type='NODE_INST_OP', target_field='instance_uuid',
                  target_uuid=INSTANCE_UUID):
@@ -161,22 +185,6 @@ class ObservationalCurrentStateTestCase(
                       model_class=node_blob_op.model,
                       op_type='NODE_BLOB_OP', target_field='blob_uuid',
                       target_uuid=BLOB_UUID)
-
-    def _set_op_state(self, op_uuid, state_value):
-        states = mariadb._get_object_states_table()
-        with self.engine.begin() as conn:
-            result = conn.execute(
-                sa.update(states)
-                .where(states.c.object_uuid == op_uuid)
-                .values(state_value=state_value))
-        self.assertEqual(1, result.rowcount)
-
-    def _op_state(self, op_uuid):
-        states = mariadb._get_object_states_table()
-        with self.engine.connect() as conn:
-            return conn.execute(
-                sa.select(states.c.state_value)
-                .where(states.c.object_uuid == op_uuid)).scalar()
 
     def _latest(self):
         latest = mariadb.get_latest_cluster_operation_target(
@@ -242,6 +250,41 @@ class ObservationalCurrentStateTestCase(
         self.assertEqual(
             {MUTATING_OP: False, OBSERVING_OP: True, MIXED_OP: False},
             {op['uuid']: op['observational'] for op in ops})
+
+    def test_pending_only_listing_filters_on_state_in_sql(self):
+        ops = {
+            'queued': '11112222-2222-4222-8222-000000000011',
+            'executing': '11112222-2222-4222-8222-000000000012',
+            'complete': '11112222-2222-4222-8222-000000000013',
+            'error': '11112222-2222-4222-8222-000000000014',
+        }
+        for state, op_uuid in ops.items():
+            self._enqueue(op_uuid, ['mutate'])
+            if state != 'queued':
+                self._set_op_state(op_uuid, state)
+
+        everything = mariadb.get_cluster_operation_targets_for_object(
+            ObjectType.INSTANCE, INSTANCE_UUID)
+        self.assertEqual(list(ops.values()),
+                         [r.operation_uuid for r in everything])
+
+        pending = mariadb.get_cluster_operation_targets_for_object(
+            ObjectType.INSTANCE, INSTANCE_UUID, pending_only=True)
+        self.assertEqual([ops['queued'], ops['executing']],
+                         [r.operation_uuid for r in pending])
+        self.assertEqual(
+            sorted(r.sequence_number for r in pending),
+            [r.sequence_number for r in pending])
+
+    def test_pending_only_listing_keeps_observational_ops(self):
+        self._enqueue(OBSERVING_OP, ['check'])
+        self.assertEqual('queued', self._op_state(OBSERVING_OP))
+
+        rows = mariadb.get_cluster_operation_targets_for_object(
+            ObjectType.INSTANCE, INSTANCE_UUID, pending_only=True)
+        self.assertEqual(
+            [(OBSERVING_OP, True)],
+            [(r.operation_uuid, r.observational) for r in rows])
 
     # The tests below use the production models, so they fail if a
     # declaration is dropped or reclassified without this being noticed.
@@ -412,3 +455,37 @@ class ObservationalOnTheWireTestCase(base.ShakenFistTestCase):
         self.assertEqual(1, len(ops))
         self.assertIs(True, ops[0]['observational'])
         self.assertEqual(MUTATING_OP, str(UUID(ops[0]['uuid'])))
+
+    def test_targets_wrapper_sends_pending_only(self):
+        reply = database_pb2.GetClusterOperationTargetsForObjectReply()
+        for pending_only in (True, False):
+            with mock.patch('shakenfist.mariadb._get_database_stub'), \
+                    mock.patch('shakenfist.mariadb._grpc_call',
+                               return_value=reply) as call:
+                mariadb._grpc_get_cluster_operation_targets_for_object(
+                    ObjectType.INSTANCE, INSTANCE_UUID, pending_only)
+            request = call.call_args.args[1]
+            self.assertIs(pending_only, request.pending_only)
+            self.assertEqual(INSTANCE_UUID, request.target_uuid)
+
+    def test_targets_handler_forwards_pending_only(self):
+        for pending_only in (True, False):
+            with mock.patch(
+                    'shakenfist.mariadb'
+                    '._direct_get_cluster_operation_targets_for_object',
+                    return_value=[self._target(False)]) as direct:
+                reply = self._servicer().GetClusterOperationTargetsForObject(
+                    database_pb2.GetClusterOperationTargetsForObjectRequest(
+                        target_object_type=ObjectType.INSTANCE.proto_id,
+                        target_uuid=INSTANCE_UUID,
+                        pending_only=pending_only),
+                    mock.MagicMock())
+            direct.assert_called_once_with(
+                ObjectType.INSTANCE, INSTANCE_UUID, pending_only)
+            self.assertEqual(1, len(reply.targets))
+
+    def test_targets_request_from_older_client_is_unfiltered(self):
+        request = database_pb2.GetClusterOperationTargetsForObjectRequest(
+            target_object_type=ObjectType.INSTANCE.proto_id,
+            target_uuid=INSTANCE_UUID)
+        self.assertFalse(request.pending_only)

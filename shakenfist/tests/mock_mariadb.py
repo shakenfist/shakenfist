@@ -995,6 +995,13 @@ class MockMariaDB():
         self.test_obj.addCleanup(
             self.mariadb_get_latest_cluster_operation_target.stop)
 
+        self.mariadb_has_pending_cluster_operation_target = mock.patch(
+            'shakenfist.mariadb.has_pending_cluster_operation_target',
+            side_effect=self._mariadb_has_pending_cluster_operation_target)
+        self.mariadb_has_pending_cluster_operation_target.start()
+        self.test_obj.addCleanup(
+            self.mariadb_has_pending_cluster_operation_target.stop)
+
         self.mariadb_delete_cluster_operation_target = mock.patch(
             'shakenfist.mariadb.delete_cluster_operation_target',
             side_effect=self._mariadb_delete_cluster_operation_target)
@@ -3465,13 +3472,22 @@ class MockMariaDB():
             f'{"found" if data else "not found"}')
         return data
 
+    def _cot_is_pending(self, d):
+        """True if the operation behind a target row is queued, in preflight
+        or executing, as the real query's object_states join does."""
+        state = self.mariadb_states.get(
+            f'{d.operation_type}/{d.operation_uuid}')
+        return bool(state and state['state_value'] in (
+            'queued', 'preflight', 'executing'))
+
     def _mariadb_get_cluster_operation_targets_for_object(
-            self, target_object_type, target_uuid):
+            self, target_object_type, target_uuid, pending_only=False):
         """Mock implementation of mariadb.get_cluster_operation_targets_for_object()"""
         results = [
             d for d in self.cluster_operation_targets.values()
             if (d.target_object_type == str(target_object_type)
-                and d.target_uuid == target_uuid)
+                and d.target_uuid == target_uuid
+                and (not pending_only or self._cot_is_pending(d)))
         ]
         results.sort(key=lambda d: d.sequence_number or 0)
         self._trace(
@@ -3494,6 +3510,19 @@ class MockMariaDB():
         if not results:
             return None
         return results[-1]
+
+    def _mariadb_has_pending_cluster_operation_target(
+            self, target_object_type, target_uuid):
+        """Mock implementation of mariadb.has_pending_cluster_operation_target()
+
+        True if a non-observational op targeting the object is queued,
+        in preflight or executing, as the real query's state join does.
+        """
+        for d in self._mariadb_get_cluster_operation_targets_for_object(
+                target_object_type, target_uuid):
+            if not d.observational and self._cot_is_pending(d):
+                return True
+        return False
 
     def _mariadb_delete_cluster_operation_target(
             self, operation_uuid):

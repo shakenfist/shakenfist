@@ -7,7 +7,9 @@ from math import inf
 import re
 from typing import Any
 from typing import ClassVar
+from typing import NamedTuple
 from typing import Optional
+from typing import TYPE_CHECKING
 from typing import TypeVar
 from typing import Union
 
@@ -19,6 +21,7 @@ from shakenfist.constants import get_object_class
 from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_MUTATE
 from shakenfist.constants import NODE_ACTIVE_STATES
+from shakenfist.constants import NoSuchObject
 from shakenfist import eventlog
 from shakenfist import exceptions
 from shakenfist import locks
@@ -29,6 +32,9 @@ from shakenfist.util import callstack as util_callstack
 from shakenfist.util import concurrency as util_concurrency
 from shakenfist.util import general as util_general
 from shakenfist.util import json as util_json
+
+if TYPE_CHECKING:
+    from shakenfist.operations.baseoperation import BaseClusterOperation
 
 
 LOG, _ = logs.setup(__name__)
@@ -763,6 +769,16 @@ class DatabaseBackedObject:
         self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')
 
 
+class TargetedOperation(NamedTuple):
+    """A cluster operation which targets an object.
+
+    ``observational`` is the flag stored on the operation's target row:
+    true when every task of the operation only observes the target.
+    """
+    op: 'BaseClusterOperation'
+    observational: bool
+
+
 class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
     @property
     def last_cluster_operation(self):
@@ -790,47 +806,54 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
         return mariadb.has_pending_cluster_operation_target(
             self.object_type, str(self.uuid))
 
-    def get_cluster_operations(self, outstanding_only=True):
+    def get_cluster_operations(
+            self, outstanding_only: bool = True) -> list[TargetedOperation]:
+        """Every cluster operation which targets this object, newest first.
+
+        Each operation is paired with the observational flag stored on its
+        target row. Only operations which target this object are returned:
+        what they depend on or run after is not followed, so an op on a
+        network that an instance op waits for is in the network's list and
+        not the instance's.
+        """
+        if self.in_memory_only:
+            return []
+
+        rows = mariadb.get_cluster_operation_targets_for_object(
+            self.object_type, str(self.uuid), pending_only=outstanding_only)
+
         # All ``from_db`` lookups here are best-effort: an op can be
-        # hard-deleted between when we read its target row (or its
-        # depends_on / runs_after reference) and when we try to load
-        # it. The "non-existent object" audit event is therefore
-        # suppressed for these lookups — treating the absent op as
-        # not-outstanding is the correct behaviour.
-        last_op = self.last_cluster_operation
-        if not last_op:
-            return []
-        if not last_op.get('op_type'):
-            return []
-
-        op = get_object_class(last_op.get('op_type')).from_db(
-            last_op.get('op_uuid'), suppress_failure_audit=True)
-        if not op:
-            return []
-        if outstanding_only and not op.is_outstanding():
-            return []
-
-        outstanding = [op]
-
-        for dep in op.depends_on:
-            dep_op = get_object_class(dep['op_type']).from_db(
-                dep['op_uuid'], suppress_failure_audit=True)
-            if not dep_op:
+        # hard-deleted between when we read its target row and when we
+        # try to load it. The "non-existent object" audit event is
+        # therefore suppressed for these lookups -- treating the absent op
+        # as not-outstanding is the correct behaviour. The state filter in
+        # the query is repeated here because an op can finish between the
+        # two reads, and because a database service which predates the
+        # filter ignores it.
+        targeted = []
+        for row in sorted(rows, key=lambda r: r.sequence_number or 0,
+                          reverse=True):
+            try:
+                op_class = get_object_class(row.operation_type)
+            except NoSuchObject:
                 continue
-            if outstanding_only and not dep_op.is_outstanding():
+            op = op_class.from_db(
+                row.operation_uuid, suppress_failure_audit=True)
+            if not op:
                 continue
-            outstanding.append(dep_op)
+            if outstanding_only and not op.is_outstanding():
+                continue
+            targeted.append(TargetedOperation(op, row.observational))
+        return targeted
 
-        for dep in op.runs_after:
-            dep_op = get_object_class(dep['op_type']).from_db(
-                dep['op_uuid'], suppress_failure_audit=True)
-            if not dep_op:
-                continue
-            if outstanding_only and not dep_op.is_outstanding():
-                continue
-            outstanding.append(dep_op)
-
-        return outstanding
+    def cluster_operation_views(
+            self, outstanding_only: bool = True) -> list[dict[str, Any]]:
+        """External views of get_cluster_operations(), each with its flag."""
+        return [
+            {**t.op.external_view(), 'observational': t.observational}
+            for t in self.get_cluster_operations(
+                outstanding_only=outstanding_only)
+        ]
 
     def hard_delete(self):
         mariadb.delete_cluster_operation_targets_for_object(
