@@ -15,6 +15,7 @@ ryll [OPTIONS]
 | `--url <URL>` | Fetch .vv configuration file from HTTP URL |
 | `--file <PATH>` | Load .vv configuration from local file |
 | `--direct <CONN>` | Direct connection: `HOST:PORT` or `HOST:PORT:TLS_PORT` |
+| `--password-file <PATH>` | With `--direct`, read the SPICE password from a file. One trailing newline is stripped, so a server's ticket file (andris's `~/.config/andris/ticket`, for example) works as-is. An empty or unreadable file fails the launch. A `.vv` file carries its own `password`, so this is refused with `--url` and `--file` |
 
 ### Operating Modes
 
@@ -116,6 +117,9 @@ ryll --direct 192.168.1.100:5900
 
 # Direct connection with TLS
 ryll --direct 192.168.1.100:5900:5901
+
+# Direct connection to a server that wants a password
+ryll --direct 192.168.1.100:5900 --password-file ~/.config/andris/ticket
 
 # Headless mode for automated testing
 ryll --file test.vv --headless

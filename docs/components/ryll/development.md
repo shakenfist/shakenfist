@@ -126,10 +126,17 @@ able to be opted out of at build time:
   only for the kerbside test harness; not in production ryll.
 - **`rdp`** (default-off) — the `--rdp` mode, which serves the
   SPICE session to stock RDP clients through the
-  shakenfist-spice-rdp crate and IronRDP.  `make lint` and
-  `make test` build it; release builds leave it out.  Running a
-  binary built without it with `--rdp` exits with a clear "this
-  ryll binary was built without the `rdp` feature" message.
+  shakenfist-spice-rdp crate and IronRDP.  It is a heavy
+  feature: IronRDP brings `sspi` and `picky` for CredSSP, its
+  own copy of `reqwest`, separate from the one ryll uses, and
+  `libz-sys`, which links the system zlib or compiles a bundled
+  copy with the C compiler where pkg-config finds none.  Any
+  build that enables it, and any workspace-wide build, moves
+  `flate2` onto that C zlib backend.  `make lint` and `make
+  test` build it; release builds leave it out.  Running a
+  binary built without it with `--rdp` exits with a clear
+  "this ryll binary was built without the `rdp` feature"
+  message.
 
 The slim test-harness binary is built with
 `cargo build --release --no-default-features -p ryll`.  See

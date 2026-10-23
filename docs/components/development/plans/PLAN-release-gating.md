@@ -942,6 +942,30 @@ section has been rewritten rather than patched:
     == 'push' && github.sha || github.ref }}-<job>`.
   - Keep cancelling on pull requests and merge groups, where a
     newer run really does supersede the older one.
+  - On a merge group, `github.ref` is a queue branch minted for each
+    entry, so a group keyed on it never cancels a superseded queue
+    run. A group a `merge_group` event can reach keys on the base
+    branch on a run's first attempt, and on `github.ref` otherwise:
+
+    ```yaml
+    group: >-
+      ${{ github.workflow }}-<job>-${{
+      github.event_name == 'merge_group' && github.run_attempt == '1'
+      && format('merge_group-{0}', github.event.merge_group.base_ref)
+      || github.ref }}
+    ```
+
+    A re-run keeps its original event, so without the attempt guard a
+    "Re-run jobs" on an old queue run would cancel the live entry or
+    be cancelled by it. On a re-run the fallback, `github.ref`, is
+    that old entry's own queue branch, which nothing else shares.
+    client-python-ova commit 349b417 carries the comment every
+    repository copied.
+  - A path filter that filters merge groups diffs against
+    `github.event.merge_group.base_sha`, never the branch name. Once
+    the entry has merged the branch contains it, so a re-run would
+    find no changes and pass untested (client-python-k3s commit
+    e3b93a0).
 
   This is what makes a tag on any merged commit releasable, rather
   than only a tag on the tip.
@@ -960,7 +984,14 @@ section has been rewritten rather than patched:
     enqueue" and "Can merge" aggregator jobs in the shape of
     client-python-k3s's (`functional-tests.yml:266-310`). Each
     aggregator's `needs:` lists that repository's own jobs, and the
-    automated reviewer stays out of it.
+    automated reviewer stays out of it. "Can enqueue" runs under
+    `${{ always() && github.event_name != 'merge_group' }}` and "Can
+    merge" under `${{ always() && github.event_name == 'merge_group'
+    }}`, each with `permissions: {}` (client-python-ova's
+    `ci.yml:309-350`). Under `!cancelled()`, a cancelled queue run
+    would skip "Can merge", and a skipped required check reads as a
+    pass. These are CI workflows; the Definition of done's ban on
+    `always()` covers `release.yml` only.
   - Every workflow that `ci-gate` names must be required by the queue.
     A job's `needs:` cannot reach across workflows, so a repository
     that names two workflows gives each its own suffixed pair of
@@ -976,14 +1007,20 @@ section has been rewritten rather than patched:
     - hunkydory already has a ruleset (23805020), so 3h edits that
       one instead. Its four required checks must then report on a
       merge group, or move into its aggregators.
+    - Once the ruleset is on, bring every open pull request up to
+      date with the default branch. A pull request run uses the
+      workflows of the merge ref it started on, so one whose CI ran
+      before the conversion merged reports the old check names and is
+      blocked for ever; a re-run reuses the same merge ref. The
+      template's `RELEASE-SETUP.md` has this as a step.
     - Copying the ruleset copies its bypass team too.
       `PLAN-bot-bypass-identity.md` owns that bypass. A bypass merge
       here fails the gate as it does everywhere else.
   - The gated workflow's push trigger, where it has one, is removed in
     the same pull request.
     - With a queue, every commit that lands on `develop` is one a
-      `merge_group` run tested, so a push run would only test it a
-      third time, after the pull request and the merge group.
+      `merge_group` run tested, so a push run would only test the
+      exact commit its merge queue run already tested.
     - Decision 3.1's re-keying then has nothing left to protect in
       these repositories, and is not made.
     - The cost is a short window between the merge and step 3h's
@@ -1031,7 +1068,12 @@ section has been rewritten rather than patched:
   - A bypass merge, or a tag off the first-parent history: move the
     tag to a commit that went through the queue.
   - A docs-only commit that `paths-ignore` skipped: move the tag.
-  - A flaky run: re-run CI, then re-run the gate job.
+  - A flaky queue run: it ejects its entry, so the commit it built
+    never reaches `develop` and no tag can be on it. Re-queue the
+    pull request and tag the commit that merges.
+  - A merged commit whose run was re-run later, and whose later
+    attempt failed: the gate judges each run at its latest attempt,
+    so re-run that run until it passes, then re-run the gate job.
 
   The gate does not change.
 * **3.7. check-dist runs wherever a wheel is built for publishing, and
@@ -1200,7 +1242,8 @@ verdicts.
   `ci-gate` job that uses `shakenfist/actions/require-ci-success@main`,
   and every job naming an environment is downstream of it.
   `!cancelled()` appears only in the guard for a job that needs
-  `ci-gate`, and `always()` appears nowhere. The script below checks
+  `ci-gate`, directly or through another job as the Rust template's
+  build jobs do, and `always()` appears nowhere. The script below checks
   the gate's presence and the absence of `always()`, and lists every
   `!cancelled()` line. Each listed line is then read against its
   job's `needs:`, and the downstream property is read from the job
@@ -1316,6 +1359,87 @@ Started on 2026-10-19 (AEDT).
 * **3b** sonnet at medium effort, as actions#184. Directory-only
   entries do not count as payload. That is stricter than
   client-python-k3s's script, and was kept.
+* **Three corrections from the pilot, made in every later wave.**
+  Each is now in decisions 3.1, 3.2 and 3.6, and the waves' briefs
+  carried them:
+  - On a merge group `github.ref` is minted for each entry, so the
+    pilot's concurrency groups never cancelled a superseded queue
+    run. They key on the base branch, on a run's first attempt only
+    (client-python-ova#30, 3b40144; the same guard reached the shared
+    `smoke-cluster.yml` as actions#185, e1e2c85).
+  - A path filter on a merge group diffs against
+    `merge_group.base_sha`, not the branch name, or a re-run after
+    the merge passes untested (client-python-k3s commit e3b93a0).
+  - The aggregators run under `always()`, because a cancelled run
+    would otherwise skip "Can merge" into a pass
+    (client-python-ova#31, 4b1764d).
+
+  The recovery advice was wrong in the same way everywhere: a failed
+  queue run never puts its commit on `develop`, so the answer is to
+  re-queue and tag the commit that merges, not to re-run. The
+  template README's recovery table and every wave's docs were
+  corrected.
+* **3d**, wave 1, as library-utilities#74 (0940cbe), divergulent#132
+  (70ae4c3) and occystrap#163 (e9e66d9). occystrap's gate names two
+  workflows, so its ruleset requires four checks: "Can enqueue",
+  "Can merge" and their `: unit` pair.
+* **3e**, wave 2, as client-python-k3s#154 (6d40cee), clingwrap#145
+  (f4966df), hunkydory#103 (b421cef), agent-python#155 (65a1778),
+  client-python#432 (d789e0b), kerbside#582 (d30ff34) and
+  shakenfist#4581 (6a3f307). shakenfist's merged two days after the
+  rest. Its queue runs failed three times, all on the cluster smoke
+  test in shakenfist#4394, which had been failing about half of all
+  shakenfist queue runs since 2026-10-01. The cause was in
+  `sf-resources`: it published on a change in the running-domain set,
+  and a poll during `create()` saw the new domain before the start
+  returned, so the one publish carried a timestamp the test rejected.
+  shakenfist#4597 (b3dc0c6) fixed it with a follow-up publish on the
+  next poll, and #4581 merged on the next attempt. Its follow-up,
+  shakenfist#4607, adds the release check that the wheel carries
+  `shakenfist/data/*.yaml`, and forbids `shakenfist/deploy/*` in
+  check-dist.
+* **3f**, the Rust wave, as ryll#591 (d70ff4d), instar#796 (a31e0d1)
+  and andris#34 (288aba3). A `workflow_dispatch` dry run on instar's
+  branch (run 39346550167) found a defect in the template: on a dry
+  run `ci-gate` is skipped, and a build job with no `if:` takes the
+  implicit `success()`, which fails when any upstream job was skipped,
+  so every build was skipped too. Each build job now carries the
+  build-job guard, `!cancelled()` and one `result == 'success'`
+  clause per need (development#299, 10e3145, which also made it the
+  README's invariant 6; ryll#599, 20e3cd4; instar and andris in their
+  own pull requests). A dry run on instar's merged `develop` (run
+  39476356008) then built its binaries and skipped every publishing
+  job.
+* **3h**, with the operator's approval for each repository. Rulesets:
+  client-python-ova 25425412, divergulent 25434544, clingwrap
+  25434545, library-utilities 25434755, occystrap 25443422,
+  agent-python 25443431, client-python 25444487, and hunkydory's
+  23805020 edited in place. Each read back identical, and
+  `merge-queue-config`, `merge-group-cancellation` and
+  `release-environment-protection` pass on all of them.
+  client-python's nine other audit failures predate this work.
+
+  Adding a ruleset left every open pull request whose CI ran before
+  the conversion blocked for ever: it reports the old check names,
+  and a re-run reuses the same merge ref. Five Renovate pull requests
+  were unblocked by ticking their rebase checkbox, and the template's
+  `RELEASE-SETUP.md` now has the step (development#300, d668b98).
+* **3g**, read-only, on 2026-10-23 (AEDT). The gate passes on
+  `develop` in client-python, client-python-ova, divergulent,
+  hunkydory, instar, andris, ryll and shakenfist. ryll's passed
+  across one review-mark commit, as designed. It fails on six tips,
+  each a merge that went around the queue, which the gate refuses as
+  designed: library-utilities#76, clingwrap#146, agent-python#157 and
+  occystrap#165 (daily `export-repo-config` pull requests merged
+  directly), client-python-k3s#155 (dequeued by hand, then merged),
+  and kerbside#588, which `sfconductor` merged after its queue run
+  failed. A release from any of them tags the last commit the queue
+  merged.
+* **A queue entry can wait out the check timeout.** shakenfist#4581's
+  first queue run (39361900921) failed its smoke test at 06:07, but
+  "Can merge" waits for every need, and two lanes only got runners at
+  08:50 and 08:59, so the entry hit the 360-minute timeout instead of
+  ejecting. See Future work.
 
 ### Phase 4: release-flow and merge-queue criteria
 
@@ -1693,6 +1817,30 @@ chosen to defer to here, so that we do not forget them.
 * **Re-publishing the affected packages** without their tests is not
   worth a version bump on its own. The next ordinary release of each
   carries the fix.
+* **A failed lane should eject a queue entry quickly.** "Can merge"
+  runs under `always()` and waits for every need, so one failed lane
+  holds the entry until the slowest lane gets a runner, or until the
+  check timeout. A fail-fast aggregator, or per-lane timeouts, would
+  free the queue sooner. It matters most for shakenfist, whose lanes
+  share the under-cloud.
+* **Merges around the queue are routine.** Phase 3's gate checks
+  found six develop tips merged directly: daily `export-repo-config`
+  pull requests, a hand-dequeued Renovate update, and a kerbside
+  update that `sfconductor` merged after its queue run failed. None of
+  those can be released. Either the `export-repo-config` and Renovate
+  pull requests go through the queue, or the gate learns to cross a
+  merge commit that changed no gated file, as hunkydory's review marks
+  need too (above). The conductor merging past a failed queue run is
+  `PLAN-bot-bypass-identity.md`'s to close.
+* **Phase 4 should check the build-job guard** in Rust releases
+  (template invariant 6), and that a path filter on a merge group
+  diffs against `merge_group.base_sha`. Neither is a rule yet, and the
+  closest, `release_dispatch_guard_issues`, skips build jobs.
+* **CodeQL on merge groups.** `codeql-analysis.yml` runs on push
+  only. It only needs `merge_group` if it becomes a required check.
+* **shakenfist's "Can merge" does not require `sanity_checks`**
+  (shakenfist#4582), found while reviewing wave 2. It predates this
+  plan, so phase 3 left it alone.
 
 ### Bugs fixed during this work
 

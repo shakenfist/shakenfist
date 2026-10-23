@@ -50,10 +50,10 @@ Offset          Length          Mapped to       File
 ```
 
 Four fixed-width 16-character columns plus a trailing filename
-column. Holes (unallocated regions) are elided — only `Data` and
-`ZeroAllocated` extents emit a row. Offsets use lowercase `0x` hex,
-except a literal `0` for zero values. The trailing newline after the
-last row matches qemu-img.
+column. Only extents with `data: true` emit a row; holes and
+zero-reading extents are elided, as `qemu-img map` elides them.
+Offsets use lowercase `0x` hex, except a literal `0` for zero
+values. The trailing newline after the last row matches qemu-img.
 
 ### JSON (`--output=json`)
 
@@ -78,7 +78,7 @@ JSON mode. Field semantics:
 | `zero`       | The extent reads as zero.                                 |
 | `data`       | The extent contains data (not unconditional zero-fill).   |
 | `compressed` | The extent is backed by a compressed cluster. Always `false` in v1 — see "Known divergences" below. |
-| `offset`     | File offset of the extent's first byte. Omitted (not `null`) when `present == false`. |
+| `offset`     | File offset of the extent's first byte. Emitted when the state names a host location (`data`, `zero-at` and `hole-at` below), and omitted (not `null`) otherwise, so a `present: false` extent can carry one. |
 
 #### The `compressed` field is version-dependent
 
@@ -97,14 +97,24 @@ Use `--qemu-version` to emulate a specific version explicitly; without
 it instar detects the installed qemu-img, exactly as `instar info`
 does.
 
-The combination `(present, zero, data)` distinguishes the three
-underlying states the parser emits:
+The parser emits one of five states per extent. The combination
+`(present, zero, data)` and whether `offset` is emitted distinguish
+them:
 
-| State              | `present` | `zero` | `data` |
-|--------------------|-----------|--------|--------|
-| `Data`             | `true`    | `false`| `true` |
-| `ZeroAllocated`    | `true`    | `true` | `false`|
-| `Hole`             | `false`   | `true` | `false`|
+| State     | Meaning                                                    | `present` | `zero` | `data` | `offset` |
+|-----------|------------------------------------------------------------|-----------|--------|--------|----------|
+| `data`    | Backed by bytes in the source file                         | `true`    | `false`| `true` | yes      |
+| `zero`    | Recorded as zero in the metadata                           | `true`    | `true` | `false`| no       |
+| `zero-at` | As `zero`, but the metadata also names a host cluster      | `true`    | `true` | `false`| yes      |
+| `hole`    | Unallocated                                                | `false`   | `true` | `false`| no       |
+| `hole-at` | As `hole`, but the metadata names a host cluster the extent does not use | `false` | `true` | `false`| yes |
+
+Only qcow2 produces `zero-at` and `hole-at`; they are qemu's
+`ZERO_ALLOC` and `UNALLOCATED_ALLOC` subcluster types, for which
+`qemu-img map` also prints an `offset`. The parser's state names are
+`MapExtentState`'s variants in `src/shared/src/lib.rs` (`Data`,
+`ZeroAllocated`, `ZeroAllocatedAt`, `Hole`, `HoleAt`), and the
+sections below use them.
 
 ## Per-format extent classification
 
@@ -115,29 +125,38 @@ implementation lives in `<format>::map_extents` in
 
 ### qcow2
 
-L1 table → L2 tables walk. Per L2 entry:
+L1 table → L2 tables walk. Each L2 entry, or with extended L2 each
+run of same-typed subclusters, is classified by `subcluster_type()`,
+the same transcription of qemu's `qcow2_get_subcluster_type` that the
+read path uses, and maps to the state `qemu-img map` reports for that
+type:
 
-- Zero/unallocated entry (`0`): `Hole`.
-- `QCOW2_CLUSTER_ZERO_PLAIN` / `QCOW2_CLUSTER_ZERO_ALLOC`
-  (extended-L2 subcluster bitmap only): `ZeroAllocated`. On
-  *standard* L2 tables instar does not honour the qcow2 v3
-  `QCOW_OFLAG_ZERO` bit and reports such clusters as `Data`
-  (or `Hole` when `host_offset == 0`). See the "Known
-  divergences" section below.
-- Allocated cluster: `Data` with the L2 host-cluster offset as the
-  `file_offset`.
-- Compressed cluster: `Data` with the compressed-payload file
-  offset (see compressed-cluster divergence below).
+- `NORMAL`: `Data` at the host offset. With an external data file the
+  offset is into the data file, and an entry of `QCOW_OFLAG_COPIED`
+  at host offset 0 is a normal cluster at offset 0.
+- `ZERO_ALLOC` (the standard-L2 `QCOW_OFLAG_ZERO` bit, or an
+  extended-L2 zero bit, in an entry with a host offset):
+  `ZeroAllocatedAt` the host offset.
+- `ZERO_PLAIN` (the same without a host offset): `ZeroAllocated`.
+- `UNALLOCATED_ALLOC` (extended L2 only: a subcluster with neither
+  bitmap bit set, in an entry with a host offset): `HoleAt` the host
+  offset.
+- `UNALLOCATED_PLAIN` (no host offset): `Hole`.
+- `COMPRESSED`: `Data` with the compressed-payload file offset (see
+  the compressed-cluster divergence below).
+- `INVALID`: refused; see "Refused qcow2 L2 entries" below.
 
-Consecutive same-state clusters merge when their file offsets are
-contiguous, matching qemu-img.
+With extended L2 a run's offset is the entry's host offset plus the
+run's offset into the cluster. Consecutive same-state clusters merge
+when their file offsets are contiguous, matching qemu-img.
 
 ### vmdk
 
 Grain directory → grain table walk. Per grain-table entry:
 
 - Allocated grain: `Data` with the grain's file offset.
-- Zero-grain sentinel (`0xFFFFFFFE`): `ZeroAllocated`.
+- Zero-grain sentinel (`0xFFFFFFFE`), or `1` when the header sets
+  the zeroed-grain flag: `ZeroAllocated`.
 - Unallocated entry: `Hole`.
 
 Single-extent monolithic layouts only — descriptor-driven
@@ -166,7 +185,9 @@ BAT walk, skipping interleaved sector-bitmap entries by the
   metadata region. See "Malformed block tables" below.
 - `PAYLOAD_BLOCK_PARTIALLY_PRESENT`: treated as `Data` (per-sector
   bitmap walk is future work; see below).
-- `PAYLOAD_BLOCK_ZERO` / `PAYLOAD_BLOCK_UNMAPPED`: `Hole`.
+- `PAYLOAD_BLOCK_ZERO`: `ZeroAllocated`.
+- `PAYLOAD_BLOCK_NOT_PRESENT` / `PAYLOAD_BLOCK_UNDEFINED` /
+  `PAYLOAD_BLOCK_UNMAPPED`, and any reserved state: `Hole`.
 
 ### raw
 
@@ -202,6 +223,37 @@ still maps normally. See
 [docs/format-internals.md § vhdx](/components/instar/format-internals/#vhdx) for the
 predicate both the readers and this walk share.
 
+## Refused qcow2 L2 entries
+
+`map` refuses a qcow2 image whose L2 table holds an entry `qemu-img
+map` fails on with `EIO`, rather than mapping it. There are two
+kinds, and the message for each keeps qemu's wording:
+
+- An entry `subcluster_type()` classifies as invalid: an extended-L2
+  bitmap with an allocation bit set in an entry with no host cluster,
+  or a subcluster both allocated and zero.
+
+  ```
+  map: Invalid cluster entry found at virtual offset 65536 (0x10000): corrupt qcow2 L2 entry
+  ```
+
+- In an image with an external data file, an entry that breaks one of
+  qemu's data-file rules: a compressed entry, or one whose host cluster
+  offset is not its guest cluster offset (qemu maps a data file one to
+  one, and applies this to zero and unallocated entries that name a
+  host cluster as well).
+
+  ```
+  map: Compressed cluster entry found in image with external data file at virtual offset N (0x...)
+  map: External data file host cluster offset does not match guest cluster offset at virtual offset N (0x...)
+  ```
+
+The offset is the virtual offset of the cluster the entry describes.
+Exit 1; as on any other failure, the extents before the refused entry
+stay on stdout. `measure` refuses the same entries, and the reading
+operations refuse them when a read reaches one. See
+[docs/quirks.md § Invalid qcow2 subcluster entries are refused, as in qemu-img](/components/instar/quirks/#invalid-qcow2-subcluster-entries-are-refused-as-in-qemu-img).
+
 ## Known divergences from qemu-img
 
 Each entry is documented in [quirks.md](/components/instar/quirks/) with the
@@ -225,13 +277,6 @@ rationale and the future-work pointer.
   (monolithicFlat, 2GbMaxExtent…) sources fail host-side via
   `peek_is_vmdk_descriptor`. Use `qemu-img map` as the workaround.
   See [docs/quirks.md § VMDK multi-extent sources are refused](/components/instar/quirks/#vmdk-multi-extent-sources-are-refused).
-- **qcow2 v3 standard-L2 `QCOW_OFLAG_ZERO` not honoured** — for
-  qcow2 v3 (compat=1.1) images that use standard 8-byte L2
-  entries, instar reports `QCOW2_CLUSTER_ZERO_PLAIN` /
-  `_ZERO_ALLOC` clusters as `Data` (or `Hole` when
-  `host_offset == 0`) rather than `ZeroAllocated`. Extended-L2
-  subcluster bitmaps are unaffected. See
-  [docs/quirks.md § qcow2 v3 standard-L2 `QCOW_OFLAG_ZERO` not honoured](/components/instar/quirks/#qcow2-v3-standard-l2-qcow_oflag_zero-not-honoured).
 - **qcow2 compressed clusters report `compressed: false`** —
   instar's renderer always emits `false`; qemu-img emits `true`
   for compressed-cluster extents. The `file_offset` field for
@@ -274,10 +319,6 @@ sources for the same VHD-unallocated reason.
   compressed bit through the FFI and renderer; strip the
   `nb_sectors-1` bits from the file offset to match qemu-img's
   high-bit-set marker convention.
-- **qcow2 v3 standard-L2 `QCOW_OFLAG_ZERO` honouring** — branch
-  on the bit in `classify_qcow2_l2_standard` and emit
-  `ZeroAllocated`. A matching `cluster_lookup` change is the
-  prerequisite so the parser stays consistent across operations.
 - **`-l SNAPSHOT` snapshot-targeted mapping** — reuses convert's
   snapshot machinery.
 - **`--image-opts` parsing** — deferred until a real user requests

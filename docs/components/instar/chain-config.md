@@ -319,5 +319,5 @@ CHAIN_CONFIG_MAX_SIZE  = 1024 bytes
 MAX_CHAIN_DEVICES      = 16
 MAX_CHAIN_SEGMENTS     = 16
 ChainConfig::MAGIC     = 0x4348414E ("CHAN")
-ChainConfig::VERSION   = 3
+ChainConfig::VERSION   = 4
 ```

@@ -27,8 +27,11 @@ For QCOW2 images, check validates:
 - Header integrity (version, cluster_bits, virtual_size)
 - Incompatible feature bit validation (rejects unknown bits per spec)
 - Full L1/L2 table consistency (all sectors, including extended L2)
-- Extended L2 subcluster bitmap validation (alloc/zero overlap,
-  alloc-without-host, host-without-ref, compressed non-zero bitmap)
+- Extended L2 subcluster bitmap validation, reporting what `qemu-img
+  check` reports: alloc/zero overlap, alloc-without-host, and a
+  compressed entry with a non-zero bitmap. A host cluster with an empty
+  bitmap is not reported, because qemu reads it as unallocated
+  subclusters and accepts it
 - Overlap detection (two L2 entries referencing same host cluster)
 - Refcount validation for all widths (1/2/4/8/16/32/64-bit refcounts)
 - Leak detection (clusters with refcount > 0 but no L2 reference),

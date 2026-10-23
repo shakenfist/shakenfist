@@ -535,3 +535,13 @@ Step 2 ran each case by name on HEAD `29bd35e2`. Each was killed, meaning its na
     `In progress`, and the follow-up pull request carries D1 to D8, C1
     to C8, T1 and T2. That pull request records this phase's merge
     commit and sets `Complete`.
+* 2026-10-22 (AEDT), after this phase merged as `2679929` (#817).
+  * The follow-up pull request fixed all eighteen findings, and the
+    plan is `Complete`.
+  * C5 added `MapExtentState::advanced_by` beside `file_offset`,
+    because a getter cannot rebuild a state.
+  * C1 moved the code two mutation cases patch; both were retargeted,
+    and the harness still holds 126 cases.
+  * T2 found that rebase onto a raw backing file fails as an
+    unparseable overlay header. That is #632, so T2's tests use qcow2
+    backing files.

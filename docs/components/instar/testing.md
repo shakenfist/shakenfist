@@ -2353,8 +2353,8 @@ binary, by `TestAdversarialChainDeviceCount` in `tests/test_adversarial.py`
 -- the same test module that builds the fixture, since no static
 `instar-testdata` image has this shape.
 
-Then **3 subcluster cases**, the first of the two groups not about a
-differencing format at all. It is here because the defect it
+Then **3 subcluster cases**, the first of the three groups not about
+a differencing format at all. It is here because the defect it
 guards is the same class as the rest -- a span the reader never wrote,
 returned to the caller under a successful read -- and because the
 differencing work's own fuzz target is what found it. An extended-L2
@@ -2472,7 +2472,7 @@ report a clean run; it warns once up front when it is missing.
 A full run took **4m59s** on a warm tree with `vhdiinfo` present and
 everything passing, and 4m43s when it held 57 cases; an earlier run
 of the same tree took 9m38s because it also had to build a docker
-image. Before the reader cases existed the 26 writer cases alone took
+image. Before the reader cases existed the writer cases alone took
 2m32s, 2m44s and 3m35s on three measured runs. Those are observations rather than estimates:
 an earlier "about two minutes" here was a guess, and an understated
 figure invites the reader to assume a run has hung. Expect a spread,
@@ -2663,7 +2663,8 @@ one.
 ## Test Image Generation
 
 Synthetic test images that cannot be created by `qemu-img` are built
-by scripts in `scripts/`:
+by scripts in `scripts/`, as are a few small `qemu-img` images whose
+structure or contents the tests need to be exactly known:
 
 - `create-vhd-testdata.sh` — Fixed VHD (disk_type=2); differencing
   VHD (disk_type=4) and differencing VHDX (HasParent) as type-only
@@ -2676,29 +2677,52 @@ by scripts in `scripts/`:
   parent-locator VHDs (absolute path, relative traversal, UNC, URL,
   an over-long unterminated parent name, and mutually conflicting
   locator entries) that are structurally valid and hostile only in a
-  path string. It takes two output directories,
-  `create-vhd-testdata.sh [output-dir] [audit-dir]`, because the six
-  adversarial fixtures belong in `custom/audit/` and everything else
-  in `custom/format-coverage/`. Given one argument the audit
-  directory becomes `<output-dir>/audit`, so a scratch run writes
-  everything under the directory it was given rather than sending
-  sixteen files to the scratch tree and six into the real testdata
-  checkout. Every file it writes is byte-reproducible except the four
-  VHDX ones, where `qemu-img` stamps fresh GUIDs on each run; each is
-  therefore skipped when it already exists, and rebuilding any of
-  them needs `REGEN_VHDX=1`. The parent, the child and the
-  grandchild must be committed together when they are rebuilt: each
-  of the upper two records the DataWriteGuid of the one below it, so
-  a regenerated parent invalidates both images above it. The
+  path string; and five images written by the host `qemu-img`: fixed
+  VHDX of 16M (two whole 8 MiB blocks) and 17M (a partial final
+  block), each with the default `block_state_zero` and with
+  `block_state_zero=off`, where the `off` ones carry known data
+  written with `qemu-io` (0x11 at 0 and 0x22 at 12M; 0x33 at 0 and
+  0x44 in the last 64 KiB), and a dynamic VHDX of 131041M with 1 MiB
+  blocks, whose BAT exactly fills its region and which reproduces #626
+  in 8 MiB on disk. Each of the five must keep the structure of its
+  case in `tests/helpers/qemu_pins.py`, which
+  `tests/test_vhdx_fixed_fixtures.py` checks. It takes two output
+  directories, `create-vhd-testdata.sh [output-dir] [audit-dir]`,
+  because the six adversarial fixtures belong in `custom/audit/` and
+  everything else in `custom/format-coverage/`. Given one argument the
+  audit directory becomes `<output-dir>/audit`, so a scratch run
+  writes everything under the directory it was given rather than
+  sending twenty files to the scratch tree and six into the real
+  testdata checkout. Every file it writes is byte-reproducible except
+  the nine VHDX ones, where `qemu-img` stamps fresh GUIDs on each run;
+  each is therefore skipped when it already exists, and rebuilding any
+  of them needs `REGEN_VHDX=1`. The five qemu-written images are
+  independent of each other and of the chains. The parent, the child
+  and the grandchild must be committed together when they are rebuilt:
+  each of the upper two records the DataWriteGuid of the one below it,
+  so a regenerated parent invalidates both images above it. The
   generator re-checks both of those links on every run, including the
   runs that rebuild nothing, so a half-finished regeneration fails
-  there rather than in the test suite
+  there rather than in the test suite.
 - `create-vmdk-testdata.sh` — Binary VMDK4 with multi-extent descriptor
 - `create-luks-testdata.sh` — LUKS v1 containers with inner formats
 - `create-native-luks-testdata.py` — LUKS v1/v2 with known encrypted
   content (v1 raw, v2 Argon2id, v1 wrapping QCOW2)
 - `create-qcow2-luks-testdata.sh` — QCOW2 with LUKS encryption (crypt_method=2)
 - `create-check-testdata.sh` — QCOW2 images with specific corruptions
+
+`tests/test_vhdx_fixed_fixtures.py` checks each of the five
+qemu-written fixtures against the structure pin, reads the four fixed
+ones through their BAT to check they hold exactly the data the
+generator wrote (needing neither qemu nor instar, since both would
+agree on an image whose writes never landed), then runs instar's
+read operations on them (and on some fixed and convert-built images
+made at test time) against `qemu-img`'s answers. Images at the 131041M
+geometry get only `info`, `check` and `map`, since a convert or compare
+would read 128 GiB. Its `KNOWN_READ_FAILURES` table lists the known
+failures by issue (#626, #797); a listed entry must still fail with its
+recorded message, and one that starts passing fails the test, asking
+for the entry to be removed.
 
 Most adversarial and CVE-reproducer image generation scripts live in
 `instar-testdata/scripts/` (the private testdata repository), not in

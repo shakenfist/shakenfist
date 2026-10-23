@@ -461,6 +461,7 @@ nav:
             - "Multi-mode feature parity": components/ryll/multi-mode-parity.md
             - "Releasing": components/ryll/releasing.md
             - "Rendering and audio pipeline": components/ryll/rendering-pipeline.md
+            - "Running ryll as a Kasm workspace": components/ryll/kasm-workspace.md
             - "ryll --web operator guide": components/ryll/web-frontend.md
             - "Session lifecycle": components/ryll/session-lifecycle.md
             - "SPICE protocol handling": components/ryll/spice-protocol.md

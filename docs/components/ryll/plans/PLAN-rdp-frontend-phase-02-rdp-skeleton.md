@@ -18,14 +18,12 @@ applies. For this phase in particular:
 - The RDP side is IronRDP **0.13.0** from crates.io
   (`ironrdp-server` 0.13.0, `ironrdp-acceptor` 0.10.0,
   `ironrdp-pdu` 0.9.0, released 2026-07-10). Its source is
-  checked out read-only at
-  `/tmp/claude-1000/-srv-kasm-profiles-mikal-vscode-src-shakenfist-ryll/793812ef-4636-4d6e-8442-0c0e9eb5896b/scratchpad/p02/untrusted/ironrdp-0.13.0`
-  (a git worktree of `github.com/Devolutions/IronRDP` at tag
-  `ironrdp-server-v0.13.0`; the full clone with `master` is
-  beside it). It is downloaded code: read it, never run its
-  build scripts or examples from inside it. Every claim below
-  about IronRDP names a file in that tree; re-read the file
-  before building on the claim.
+  `github.com/Devolutions/IronRDP` at tag
+  `ironrdp-server-v0.13.0`, and every file and line cited below
+  for IronRDP is relative to that tree. Check it out read-only,
+  in a directory of its own: it is downloaded code, so read it,
+  never run its build scripts or examples from inside it.
+  Re-read the cited file before building on a claim.
 - Read `ryll/src/main.rs` `run_web` (`:514-990`) end to end: it
   is the shape `run_rdp` copies, with a different transport.
 - The renderer pieces this phase drives are the ones phase 1
@@ -963,8 +961,8 @@ stated. Each step is one commit, with the subject given.
   Windows build of the crate as phase 6 work.
 - **Port 5900 is held by andris, so `make test-qemu-desktop`
   cannot be used as is.** Phase 1's workaround
-  (`tools/start-desktop-qemu.sh --spice-port 5910`, QMP socket
-  under `/tmp/claude-1000/`) is reused.
+  (`tools/start-desktop-qemu.sh --spice-port 5910`, with the QMP
+  socket on a short path under `/tmp`) is reused.
 
 ## Definition of done
 
@@ -1254,8 +1252,8 @@ window 1024x768, which is the guest's resolution.
 - **The guest image was downloaded again** (`make
   testdata/debian-xfce-13.qcow2`, 747 MiB) because phase 1's
   worktree had taken its copy with it; the QMP socket had to
-  live directly under `/tmp/claude-1000/` because the
-  scratchpad path exceeds a Unix socket's 108-byte limit.
+  live directly under `/tmp` because the session's scratch
+  directory path exceeds a Unix socket's 108-byte limit.
 - **Definition of done, checked 2026-10-21 12:40 AEDT** on the
   final tree (`b2db689`): `make build`, `make lint`, `make
   check-windows` and `make package-check` all exit 0 (the

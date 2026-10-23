@@ -101,7 +101,7 @@ by the payload:
 | Cursor (4) | Pointer | cursor_set, cursor_move, cursor_hide |
 | Playback (5) | Audio playback | playback_start, playback_data, playback_mode, playback_stop |
 | Usbredir (9) | USB redirection | vmc_data, vmc_compressed_data (SpiceVMC transport) |
-| WebDAV (11) | Folder sharing | vmc_data, vmc_compressed_data (SpiceVMC transport) |
+| WebDAV (11) | Folder sharing | vmc_data, vmc_compressed_data (SpiceVMC transport), port_init, port_event |
 
 ### Mouse-Mode Negotiation
 
