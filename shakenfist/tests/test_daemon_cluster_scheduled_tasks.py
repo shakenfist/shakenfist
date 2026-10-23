@@ -10,9 +10,11 @@ from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.blob import Blob
 from shakenfist.config import config
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist.constants import FINAL_OBJECT_STATES
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.daemons.cluster import scheduled_tasks as st
 from shakenfist.exceptions import DatabaseUnavailable
+from shakenfist.exceptions import HardDeleteBatchUnavailable
 from shakenfist.exceptions import InvalidStateException
 from shakenfist.schema.cluster_operation_target import ClusterOperationTargetData
 from shakenfist.schema.namespace_key_attributes import NamespaceKeyAttributesData
@@ -801,30 +803,46 @@ class HardDeleteExpiredNamespaceKeyTestCase(base.ShakenFistTestCase):
         _reset_deleted_object_sweep_state()
         self.addCleanup(_reset_deleted_object_sweep_state)
 
-    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.hard_delete_objects')
     def test_hard_deletes_a_soft_deleted_key_after_cleaner_delay(
-            self, mock_get_class):
-        # State last changed at the epoch, so it is comfortably older
-        # than CLEANER_DELAY.
-        key = FakeNamespaceKey('stale', state=dbo.STATE_DELETED,
-                               update_time=0.0)
-        mock_get_class.return_value.from_db.return_value = key
+            self, mock_batch, mock_event):
+        # Keys are hard deleted in batches, and the database deletes only
+        # those whose state is still final and older than updated_before.
+        mock_batch.return_value = [KEY_UUID_1]
         _hold_deleted_object_work('namespace_key', KEY_UUID_1)
 
+        before = time.time()
         st._drain_deleted_object_work(execution_limit=5)
+        after = time.time()
 
-        self.assertTrue(key.hard_deleted)
+        mock_batch.assert_called_once()
+        args, kwargs = mock_batch.call_args
+        self.assertEqual((ObjectType.NAMESPACE_KEY, [KEY_UUID_1]), args)
+        self.assertEqual(FINAL_OBJECT_STATES, kwargs['state_values'])
+        self.assertLessEqual(before - config.CLEANER_DELAY,
+                             kwargs['updated_before'])
+        self.assertLessEqual(kwargs['updated_before'],
+                             after - config.CLEANER_DELAY)
+        mock_event.assert_called_once_with(
+            EVENT_TYPE_AUDIT, 'namespace_key', KEY_UUID_1,
+            'hard deleted object')
 
-    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
-    def test_leaves_a_recently_deleted_key_alone(self, mock_get_class):
-        key = FakeNamespaceKey('fresh', state=dbo.STATE_DELETED,
-                               update_time=time.time())
-        mock_get_class.return_value.from_db.return_value = key
+    @mock.patch('shakenfist.eventlog.add_event')
+    @mock.patch('shakenfist.mariadb.hard_delete_objects', return_value=[])
+    def test_leaves_a_recently_deleted_key_alone(self, mock_batch, mock_event):
+        # A key deleted as the pass runs is younger than the batch's
+        # updated_before, so the database leaves it and says so.
+        deleted_at = time.time()
         _hold_deleted_object_work('namespace_key', KEY_UUID_1)
 
-        st._drain_deleted_object_work(execution_limit=5)
+        outcomes = collections.Counter()
+        st._drain_deleted_object_work(execution_limit=5, outcomes=outcomes)
 
-        self.assertFalse(key.hard_deleted)
+        self.assertLess(mock_batch.call_args.kwargs['updated_before'],
+                        deleted_at)
+        self.assertEqual({'skipped': 1}, dict(outcomes))
+        mock_event.assert_not_called()
 
     def test_the_reaper_enumerates_namespace_keys_at_all(self):
         # The sweep only ever soft deletes. If NamespaceKey were not
@@ -847,7 +865,11 @@ class HardDeleteExpiredNamespaceKeyTestCase(base.ShakenFistTestCase):
 
 class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
     """The deleted-object sweep fills with uuids per type and only
-    hydrates at processing time, one object per try/except (issue 3533)."""
+    hydrates at processing time, one object per try/except (issue 3533).
+
+    The processing tests use instances, which are still hard deleted one
+    object at a time.
+    """
 
     def setUp(self):
         super().setUp()
@@ -913,24 +935,24 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
     def test_unavailable_database_stops_the_sweep_after_one_budget(
             self, mock_page):
-        """A tier outage must cost one retry budget, not 28 of them.
+        """A tier outage must cost one retry budget, not 29 of them.
 
         DatabaseUnavailable is only raised once _grpc_call has spent its
         whole budget, which is split by cost: GRPC_UNAVAILABLE_RETRIES
         fast-failing attempts for the common shape (a dead tier, or the
         servicer's own UNAVAILABLE for a transient MariaDB error), and up
         to GRPC_RETRIES full GRPC_TIMEOUT deadlines for the slow one,
-        plus escalating sleeps in both. There are 28 object types in
+        plus escalating sleeps in both. There are 29 object types in
         this loop and
         _run_due_scheduled_jobs() pets the watchdog only *between* jobs,
         so continuing past a tier-wide failure multiplies this job's
-        worst case by 28 and takes it past sf-cluster's WatchdogSec.
+        worst case by 29 and takes it past sf-cluster's WatchdogSec.
         That SIGABRTs the elected maintainer and costs a lock failover,
         where previously the first DatabaseUnavailable merely ended the
         pass. This function has blown the watchdog window once already
         (issue 3533).
 
-        A dead tier does not become reachable on the 28th ask, so the
+        A dead tier does not become reachable on the 29th ask, so the
         bound is the property worth pinning: one read attempt, then stop.
         """
         mock_page.side_effect = DatabaseUnavailable('tier is down')
@@ -1097,7 +1119,7 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
     def test_process_hard_deletes_old_final_objects(self, mock_get_class):
         obj = FakeFinalStateObject()
         mock_get_class.return_value.from_db.return_value = obj
-        _hold_deleted_object_work('network', BLOB_UUID_1)
+        _hold_deleted_object_work('instance', BLOB_UUID_1)
 
         processed = st._drain_deleted_object_work(execution_limit=10)
 
@@ -1117,7 +1139,7 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
             return good
         mock_get_class.return_value.from_db.side_effect = from_db
 
-        _hold_deleted_object_work('network', BLOB_UUID_1, BLOB_UUID_2)
+        _hold_deleted_object_work('instance', BLOB_UUID_1, BLOB_UUID_2)
 
         processed = st._drain_deleted_object_work(execution_limit=10)
 
@@ -1137,7 +1159,7 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
             return resurrected
         mock_get_class.return_value.from_db.side_effect = from_db
 
-        _hold_deleted_object_work('network', BLOB_UUID_1, BLOB_UUID_2)
+        _hold_deleted_object_work('instance', BLOB_UUID_1, BLOB_UUID_2)
 
         processed = st._drain_deleted_object_work(execution_limit=10)
 
@@ -1151,7 +1173,7 @@ class PerDeletedObjectQueueTestCase(base.ShakenFistTestCase):
         # and objects can be re-deleted in the interim).
         young = FakeFinalStateObject(age=1.0)
         mock_get_class.return_value.from_db.return_value = young
-        _hold_deleted_object_work('network', BLOB_UUID_1)
+        _hold_deleted_object_work('instance', BLOB_UUID_1)
 
         processed = st._drain_deleted_object_work(execution_limit=10)
 
@@ -1167,7 +1189,11 @@ UUID_FAILED = 'a0000000-0000-4000-8000-000000000005'
 
 
 class DeletedObjectSweepMixedQueueTestCase(base.ShakenFistTestCase):
-    """One work entry for each way a deleted-object entry can end."""
+    """One work entry for each way an object hard deleted on its own can end.
+
+    Instances are still hard deleted one object at a time, so they take
+    every outcome but 'skipped', which only a batch can give.
+    """
 
     def setUp(self):
         super().setUp()
@@ -1204,7 +1230,7 @@ class DeletedObjectSweepMixedQueueTestCase(base.ShakenFistTestCase):
 
     def _queue_mixed(self):
         _hold_deleted_object_work(
-            'network', UUID_GONE, UUID_NOT_FINAL, UUID_TOO_YOUNG,
+            'instance', UUID_GONE, UUID_NOT_FINAL, UUID_TOO_YOUNG,
             UUID_HARD_DELETED, UUID_FAILED)
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
@@ -1228,14 +1254,14 @@ class DeletedObjectSweepMixedQueueTestCase(base.ShakenFistTestCase):
              ('from_db', UUID_FAILED, True)],
             calls)
         self.assertEqual(
-            [('network',)] * 5,
+            [('instance',)] * 5,
             [(c.args[0],) for c in mock_get_class.call_args_list])
 
     def _sample_counts(self):
         return {
             outcome: REGISTRY.get_sample_value(
                 'cluster_deleted_object_seconds_count',
-                {'object_type': 'network', 'outcome': outcome}) or 0
+                {'object_type': 'instance', 'outcome': outcome}) or 0
             for outcome in st.DELETED_OBJECT_OUTCOMES}
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
@@ -1252,9 +1278,10 @@ class DeletedObjectSweepMixedQueueTestCase(base.ShakenFistTestCase):
 
         after = self._sample_counts()
         self.assertEqual(5, processed)
-        self.assertEqual({outcome: 1 for outcome in st.DELETED_OBJECT_OUTCOMES},
-                         {o: after[o] - before[o] for o in after})
-        self.assertEqual({outcome: 1 for outcome in st.DELETED_OBJECT_OUTCOMES},
+        expected = {outcome: 0 if outcome == 'skipped' else 1
+                    for outcome in st.DELETED_OBJECT_OUTCOMES}
+        self.assertEqual(expected, {o: after[o] - before[o] for o in after})
+        self.assertEqual({o: n for o, n in expected.items() if n},
                          dict(outcomes))
         self.assertEqual({}, _held_deleted_object_work())
 
@@ -1280,7 +1307,7 @@ class DeletedObjectSweepMixedQueueTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
     def test_pass_summary_tracks_fill_and_drain(
             self, mock_page, mock_get_class, mock_log):
-        store = FakeDeletedObjectStore({'network': 2, 'blob': 1})
+        store = FakeDeletedObjectStore({'namespace': 2, 'instance': 1})
         mock_page.side_effect = store.page
         clock = FakeClock()
         spend = [10.0]
@@ -1375,7 +1402,7 @@ class DeletedObjectSweepMixedQueueTestCase(base.ShakenFistTestCase):
                     uuids=[], more_available=False))
     def test_next_pass_after_demotion_carries_on(
             self, mock_page, mock_get_class):
-        _hold_deleted_object_work('network', BLOB_UUID_1)
+        _hold_deleted_object_work('instance', BLOB_UUID_1)
         st.clear_deleted_object_metrics()
         mock_get_class.return_value.from_db.return_value = None
 
@@ -1404,8 +1431,9 @@ class DeletedObjectSweepFairnessTestCase(base.ShakenFistTestCase):
             self.addCleanup(_reset_deleted_object_sweep_state)
 
     def test_a_small_type_is_served_behind_a_large_one(self):
-        types = list(OBJECT_NAMES_TO_CLASSES)
-        first, last = types[0], types[-1]
+        # Both types are hard deleted one object at a time, so every entry
+        # costs the same and the budget, not the entry cap, ends the pass.
+        first, last = 'instance', 'node'
         store = FakeDeletedObjectStore({first: 5000, last: 3})
         clock = FakeClock()
         deleted = []
@@ -1468,11 +1496,10 @@ class DeletedObjectSweepPagedWorkTestCase(base.ShakenFistTestCase):
 
     def test_rotation_survives_a_budget_cut(self):
         # Each entry takes a second against a budget of one and a half, so
-        # every drain takes two entries. If each pass started from the top
-        # of the order, the first two types would get every entry until
-        # they ran out.
-        types = list(OBJECT_NAMES_TO_CLASSES)
-        served = [types[0], types[5], types[10], types[15]]
+        # with a turn of one entry every drain takes two entries. If each
+        # pass started from the top of the order, the first two types would
+        # get every entry until they ran out.
+        served = ['instance', 'namespace', 'namespace_claim', 'node']
         for objtype in served:
             _hold_deleted_object_work(objtype, f'{objtype}-1', f'{objtype}-2')
         clock = FakeClock()
@@ -1491,7 +1518,8 @@ class DeletedObjectSweepPagedWorkTestCase(base.ShakenFistTestCase):
         with mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
                         'get_object_class', side_effect=object_class), \
                 mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
-                           'time') as fake_time:
+                           'time') as fake_time, \
+                mock.patch.object(config, 'DELETED_OBJECT_BATCH_SIZE', 1):
             fake_time.time.side_effect = clock
             fake_time.monotonic.side_effect = clock
 
@@ -1617,7 +1645,7 @@ class DeletedObjectSweepPagedWorkTestCase(base.ShakenFistTestCase):
         mock_page.side_effect = (
             lambda objtype, states, page_size, after_uuid='',
             updated_before=None: _page(
-                [BLOB_UUID_1] if objtype == ObjectType.NETWORK else []))
+                [BLOB_UUID_1] if objtype == ObjectType.INSTANCE else []))
         mock_get_class.return_value.from_db.side_effect = Exception('broken')
         clock = FakeClock()
 
@@ -1729,7 +1757,7 @@ class DeletedObjectSweepPagedWorkTestCase(base.ShakenFistTestCase):
                     updated_before=None):
             if objtype == ObjectType.NETWORK:
                 return None
-            if objtype in (ObjectType.BLOB, ObjectType.UPLOAD):
+            if objtype in (ObjectType.INSTANCE, ObjectType.NODE):
                 return _page([f'{str(objtype)}-1'])
             return _page([])
         mock_page.side_effect = by_page
@@ -1739,7 +1767,7 @@ class DeletedObjectSweepPagedWorkTestCase(base.ShakenFistTestCase):
 
         # Types on both sides of the failed one are filled and drained.
         self.assertEqual(
-            ['blob-1', 'upload-1'],
+            ['instance-1', 'node-1'],
             [c.args[0] for c in
              mock_get_class.return_value.from_db.call_args_list])
         self.assertEqual(
@@ -1768,6 +1796,405 @@ class DeletedObjectSweepPagedWorkTestCase(base.ShakenFistTestCase):
         self.assertEqual(
             {objtype: before[objtype] + 1 for objtype in types},
             {objtype: count(objtype) for objtype in types})
+
+
+def _uuids(objtype, count):
+    return [f'{objtype}-{i:04d}' for i in range(count)]
+
+
+class DeletedObjectSweepBatchTestCase(base.ShakenFistTestCase):
+    """Most types are hard deleted a batch at a time, within the pass's cap.
+
+    hard_delete_objects() is mocked here: its eligibility check and what
+    it deletes are tested against MariaDB itself.
+    """
+
+    def setUp(self):
+        super().setUp()
+        _reset_sweep_failure_state()
+        _reset_deleted_object_sweep_state()
+        self.addCleanup(_reset_deleted_object_sweep_state)
+
+        patcher = mock.patch('shakenfist.mariadb.hard_delete_objects')
+        self.mock_batch = patcher.start()
+        self.addCleanup(patcher.stop)
+        # Every uuid offered is eligible unless a test says otherwise.
+        self.mock_batch.side_effect = (
+            lambda object_type, object_uuids, **kwargs: list(object_uuids))
+
+        patcher = mock.patch('shakenfist.eventlog.add_event')
+        self.mock_event = patcher.start()
+        self.addCleanup(patcher.stop)
+
+        patcher = mock.patch(
+            'shakenfist.daemons.cluster.scheduled_tasks.get_object_class')
+        self.mock_get_class = patcher.start()
+        self.addCleanup(patcher.stop)
+        self.from_db = self.mock_get_class.return_value.from_db
+        self.from_db.side_effect = (
+            lambda obj_uuid, suppress_failure_audit=False:
+            FakeFinalStateObject())
+
+    def _batches(self):
+        """Each batch call's type and uuids, in order."""
+        return [(str(c.args[0]), list(c.args[1]))
+                for c in self.mock_batch.call_args_list]
+
+    def _audited(self):
+        return [c.args for c in self.mock_event.call_args_list]
+
+    def _entry_count(self, objtype, outcome):
+        return REGISTRY.get_sample_value(
+            'cluster_deleted_object_seconds_count',
+            {'object_type': objtype, 'outcome': outcome}) or 0
+
+    def _batch_count(self, objtype):
+        return REGISTRY.get_sample_value(
+            'cluster_deleted_object_batch_seconds_count',
+            {'object_type': objtype}) or 0
+
+    def test_a_turn_is_one_call_of_up_to_the_batch_size(self):
+        uuids = _uuids('network', 30)
+        _hold_deleted_object_work('network', *uuids)
+
+        before = time.time()
+        processed = st._drain_deleted_object_work(execution_limit=10)
+        after = time.time()
+
+        self.assertEqual(30, processed)
+        self.assertEqual([('network', uuids[:25]), ('network', uuids[25:])],
+                         self._batches())
+        for c in self.mock_batch.call_args_list:
+            self.assertEqual(FINAL_OBJECT_STATES, c.kwargs['state_values'])
+            self.assertLessEqual(before - config.CLEANER_DELAY,
+                                 c.kwargs['updated_before'])
+            self.assertLessEqual(c.kwargs['updated_before'],
+                                 after - config.CLEANER_DELAY)
+            self.assertNotIn('unconditional', c.kwargs)
+        # The eligibility check is the database's, in the delete itself.
+        self.mock_get_class.assert_not_called()
+        self.assertEqual(
+            [(EVENT_TYPE_AUDIT, 'network', u, 'hard deleted object')
+             for u in uuids],
+            self._audited())
+        self.assertEqual({}, _held_deleted_object_work())
+
+    def test_an_operation_batch_uses_the_operation_delay(self):
+        _hold_deleted_object_work('net_op', OP_UUID_1)
+
+        before = time.time()
+        st._drain_deleted_object_work(execution_limit=10)
+
+        updated_before = self.mock_batch.call_args.kwargs['updated_before']
+        self.assertLessEqual(before - 30, updated_before)
+        self.assertLessEqual(updated_before, time.time() - 30)
+
+    def test_a_per_object_type_is_hard_deleted_one_at_a_time(self):
+        objs = {u: FakeFinalStateObject() for u in _uuids('instance', 3)}
+        self.from_db.side_effect = (
+            lambda obj_uuid, suppress_failure_audit=False: objs[obj_uuid])
+        _hold_deleted_object_work('instance', *objs)
+
+        outcomes = collections.Counter()
+        processed = st._drain_deleted_object_work(
+            execution_limit=10, outcomes=outcomes)
+
+        self.assertEqual(3, processed)
+        self.mock_batch.assert_not_called()
+        self.assertEqual(
+            [mock.call(u, suppress_failure_audit=True) for u in objs],
+            self.from_db.call_args_list)
+        self.assertTrue(all(obj.hard_deleted for obj in objs.values()))
+        self.assertEqual({'hard_deleted': 3}, dict(outcomes))
+
+    def test_skipped_and_hard_deleted_are_counted_from_the_reply(self):
+        uuids = _uuids('upload', 4)
+        eligible = [uuids[1], uuids[3]]
+        self.mock_batch.side_effect = None
+        self.mock_batch.return_value = eligible
+        _hold_deleted_object_work('upload', *uuids)
+        before = {o: self._entry_count('upload', o)
+                  for o in ('hard_deleted', 'skipped', 'failed')}
+        batches_before = self._batch_count('upload')
+
+        outcomes = collections.Counter()
+        processed = st._drain_deleted_object_work(
+            execution_limit=10, outcomes=outcomes)
+
+        self.assertEqual(4, processed)
+        self.assertEqual({'hard_deleted': 2, 'skipped': 2}, dict(outcomes))
+        self.assertEqual(
+            {'hard_deleted': 2, 'skipped': 2, 'failed': 0},
+            {o: self._entry_count('upload', o) - before[o] for o in before})
+        self.assertEqual(batches_before + 1, self._batch_count('upload'))
+        # Only what the database deleted is audited.
+        self.assertEqual(
+            [(EVENT_TYPE_AUDIT, 'upload', u, 'hard deleted object')
+             for u in eligible],
+            self._audited())
+
+    def test_each_entry_gets_an_equal_share_of_the_batch(self):
+        clock = FakeClock()
+
+        def batch(object_type, object_uuids, **kwargs):
+            clock.now += 2.0
+            return list(object_uuids)
+        self.mock_batch.side_effect = batch
+        _hold_deleted_object_work('dhcp', *_uuids('dhcp', 4))
+
+        entry = {'object_type': 'dhcp', 'outcome': 'hard_deleted'}
+
+        def samples():
+            def value(name, labels):
+                return REGISTRY.get_sample_value(name, labels) or 0
+            return {
+                'entry_sum': value('cluster_deleted_object_seconds_sum', entry),
+                # Entries of more than a quarter and at most half a second.
+                'entry_half': (
+                    value('cluster_deleted_object_seconds_bucket',
+                          dict(entry, le='0.5'))
+                    - value('cluster_deleted_object_seconds_bucket',
+                            dict(entry, le='0.25'))),
+                'batch_sum': value('cluster_deleted_object_batch_seconds_sum',
+                                   {'object_type': 'dhcp'})}
+        before = samples()
+
+        with mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
+                        'time') as fake_time:
+            fake_time.time.side_effect = clock
+            fake_time.monotonic.side_effect = clock
+            st._drain_deleted_object_work(execution_limit=10)
+
+        after = samples()
+        # One two second batch of four is four entries of half a second.
+        self.assertAlmostEqual(2.0, after['batch_sum'] - before['batch_sum'])
+        self.assertAlmostEqual(2.0, after['entry_sum'] - before['entry_sum'])
+        self.assertEqual(4, after['entry_half'] - before['entry_half'])
+
+    def test_the_cap_ends_the_pass(self):
+        _hold_deleted_object_work('network', *_uuids('network', 40))
+        _hold_deleted_object_work('upload', *_uuids('upload', 40))
+
+        with mock.patch.object(config, 'DELETED_OBJECT_SWEEP_MAX_OBJECTS', 30):
+            processed = st._drain_deleted_object_work(execution_limit=10)
+
+        # The second turn takes only the five the cap has left.
+        self.assertEqual(30, processed)
+        self.assertEqual(
+            [('network', _uuids('network', 25)),
+             ('upload', _uuids('upload', 5))],
+            self._batches())
+        self.assertEqual(15, len(_held_deleted_object_work()['network']))
+        self.assertEqual(35, len(_held_deleted_object_work()['upload']))
+
+    def test_a_per_object_turn_takes_only_what_the_cap_has_left(self):
+        # agentoperation is batched and comes before instance.
+        _hold_deleted_object_work('agentoperation', *_uuids('agentoperation', 5))
+        _hold_deleted_object_work('instance', *_uuids('instance', 10))
+
+        with mock.patch.object(config, 'DELETED_OBJECT_SWEEP_MAX_OBJECTS', 8):
+            processed = st._drain_deleted_object_work(execution_limit=10)
+
+        self.assertEqual(8, processed)
+        self.assertEqual(
+            _uuids('instance', 3),
+            [c.args[0] for c in self.from_db.call_args_list])
+        self.assertEqual(7, len(_held_deleted_object_work()['instance']))
+
+    def test_a_per_object_turn_stops_at_the_deadline(self):
+        clock = FakeClock()
+
+        def from_db(obj_uuid, suppress_failure_audit=False):
+            clock.now += 1.0
+            return None
+        self.from_db.side_effect = from_db
+        _hold_deleted_object_work('instance', *_uuids('instance', 5))
+
+        with mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
+                        'time') as fake_time:
+            fake_time.time.side_effect = clock
+            fake_time.monotonic.side_effect = clock
+            processed = st._drain_deleted_object_work(execution_limit=1.5)
+
+        # Entries start at 0 and 1 seconds; the third would start at 2.
+        self.assertEqual(2, processed)
+        self.assertEqual(_uuids('instance', 5)[2:],
+                         _held_deleted_object_work()['instance'])
+
+    def test_a_per_object_type_is_served_between_batches(self):
+        # agentoperation and upload are batched, instance is not and sits
+        # between them. Fairness is by entries, so the instance turn takes
+        # as many as a batch even though each costs a call of its own.
+        _hold_deleted_object_work('agentoperation', *_uuids('agentoperation', 200))
+        _hold_deleted_object_work('instance', *_uuids('instance', 30))
+        _hold_deleted_object_work('upload', *_uuids('upload', 200))
+        turns = []
+        self.mock_batch.side_effect = (
+            lambda object_type, object_uuids, **kwargs:
+            turns.append((str(object_type), len(object_uuids))) or
+            list(object_uuids))
+
+        def from_db(obj_uuid, suppress_failure_audit=False):
+            if turns and turns[-1][0] == 'instance':
+                turns[-1] = ('instance', turns[-1][1] + 1)
+            else:
+                turns.append(('instance', 1))
+            return FakeFinalStateObject()
+        self.from_db.side_effect = from_db
+
+        processed = st._drain_deleted_object_work(execution_limit=10)
+
+        self.assertEqual(100, processed)
+        self.assertEqual(
+            [('agentoperation', 25), ('instance', 25), ('upload', 25),
+             ('agentoperation', 25)],
+            turns)
+
+        # The next pass carries on from the rotation, so instance's last
+        # five are taken in its next turn.
+        turns.clear()
+        st._drain_deleted_object_work(execution_limit=10)
+        self.assertEqual(
+            [('instance', 5), ('upload', 25), ('agentoperation', 25),
+             ('upload', 25), ('agentoperation', 20)],
+            turns)
+
+    def test_a_failed_batch_is_dropped(self):
+        self.mock_batch.side_effect = None
+        self.mock_batch.return_value = None
+        _hold_deleted_object_work('network', *_uuids('network', 3))
+        _hold_deleted_object_work('upload', *_uuids('upload', 2))
+        failed_before = self._entry_count('network', 'failed')
+
+        outcomes = collections.Counter()
+        processed = st._drain_deleted_object_work(
+            execution_limit=10, outcomes=outcomes)
+
+        # Both turns are tried, and the next walk of each type finds them
+        # again after its recheck.
+        self.assertEqual(5, processed)
+        self.assertEqual({'failed': 5}, dict(outcomes))
+        self.assertEqual(3, self._entry_count('network', 'failed')
+                         - failed_before)
+        self.assertEqual({}, _held_deleted_object_work())
+        self.mock_event.assert_not_called()
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
+                'util_exceptions.ignore_exception')
+    def test_a_batch_which_raises_is_failed(self, mock_ignore):
+        self.mock_batch.side_effect = ValueError('not a uuid')
+        _hold_deleted_object_work('network', *_uuids('network', 3))
+
+        outcomes = collections.Counter()
+        processed = st._drain_deleted_object_work(
+            execution_limit=10, outcomes=outcomes)
+
+        self.assertEqual(3, processed)
+        self.assertEqual({'failed': 3}, dict(outcomes))
+        mock_ignore.assert_called_once()
+        self.mock_event.assert_not_called()
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.LOG')
+    def test_an_unavailable_tier_puts_the_batch_back(self, mock_log):
+        network = _uuids('network', 30)
+        _hold_deleted_object_work('network', *network)
+        _hold_deleted_object_work('upload', *_uuids('upload', 3))
+        _hold_deleted_object_work('node', *_uuids('node', 3))
+        self.mock_batch.side_effect = DatabaseUnavailable('tier is down')
+
+        outcomes = collections.Counter()
+        processed = st._drain_deleted_object_work(
+            execution_limit=10, outcomes=outcomes)
+
+        # One call, then the pass ends, with the batch back where it was.
+        self.assertEqual(0, processed)
+        self.assertEqual({}, dict(outcomes))
+        self.assertEqual(1, self.mock_batch.call_count)
+        self.from_db.assert_not_called()
+        self.assertEqual(
+            {'network': network, 'upload': _uuids('upload', 3),
+             'node': _uuids('node', 3)},
+            _held_deleted_object_work())
+        mock_log.with_fields.return_value.warning.assert_called_once()
+
+        # And the next pass resumes after the type that stopped it.
+        self.mock_batch.side_effect = (
+            lambda object_type, object_uuids, **kwargs: list(object_uuids))
+        st._drain_deleted_object_work(execution_limit=10)
+        self.assertEqual('upload', self._batches()[1][0])
+        self.assertEqual(('network', network[:25]), self._batches()[2])
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.LOG')
+    def test_an_old_database_is_hard_deleted_one_at_a_time(self, mock_log):
+        network = _uuids('network', 3)
+        upload = _uuids('upload', 2)
+        _hold_deleted_object_work('network', *network)
+        _hold_deleted_object_work('upload', *upload)
+        self.mock_batch.side_effect = HardDeleteBatchUnavailable('too old')
+        objs = {u: FakeFinalStateObject() for u in network + upload}
+        self.from_db.side_effect = (
+            lambda obj_uuid, suppress_failure_audit=False: objs[obj_uuid])
+
+        outcomes = collections.Counter()
+        processed = st._drain_deleted_object_work(
+            execution_limit=10, outcomes=outcomes)
+
+        # Asked once, then every turn of the pass goes one object at a time,
+        # through each object's own hard delete, in the order held.
+        self.assertEqual(5, processed)
+        self.assertEqual(1, self.mock_batch.call_count)
+        self.assertEqual(network + upload,
+                         [c.args[0] for c in self.from_db.call_args_list])
+        self.assertTrue(all(obj.hard_deleted for obj in objs.values()))
+        self.assertEqual({'hard_deleted': 5}, dict(outcomes))
+        self.assertEqual(1, mock_log.warning.call_count)
+
+        # A later pass asks again, in case the database has been upgraded.
+        _hold_deleted_object_work('network', *_uuids('network', 2))
+        self.mock_batch.side_effect = (
+            lambda object_type, object_uuids, **kwargs: list(object_uuids))
+        st._drain_deleted_object_work(execution_limit=10)
+        self.assertEqual(2, self.mock_batch.call_count)
+
+    def test_an_old_database_turn_keeps_what_it_did_not_reach(self):
+        clock = FakeClock()
+
+        def from_db(obj_uuid, suppress_failure_audit=False):
+            clock.now += 1.0
+            return None
+        self.from_db.side_effect = from_db
+        self.mock_batch.side_effect = HardDeleteBatchUnavailable('too old')
+        network = _uuids('network', 5)
+        _hold_deleted_object_work('network', *network)
+
+        with mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
+                        'time') as fake_time:
+            fake_time.time.side_effect = clock
+            fake_time.monotonic.side_effect = clock
+            processed = st._drain_deleted_object_work(execution_limit=1.5)
+
+        self.assertEqual(2, processed)
+        self.assertEqual({'network': network[2:]},
+                         _held_deleted_object_work())
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.LOG')
+    @mock.patch('shakenfist.mariadb.get_objects_by_state_page')
+    def test_the_pass_summary_counts_skipped(self, mock_page, mock_log):
+        uuids = _uuids('network', 3)
+        mock_page.side_effect = (
+            lambda objtype, states, page_size, after_uuid='',
+            updated_before=None: _page(
+                uuids if objtype == ObjectType.NETWORK else []))
+        self.mock_batch.side_effect = None
+        self.mock_batch.return_value = uuids[:1]
+
+        st.per_deleted_object_checks()
+
+        fields = [c.args[0] for c in mock_log.with_fields.call_args_list
+                  if 'total' in c.args[0]][0]
+        self.assertEqual(3, fields['total'])
+        self.assertEqual(1, fields['hard_deleted'])
+        self.assertEqual(2, fields['skipped'])
 
 
 class DeletedObjectBacklogTestCase(base.ShakenFistTestCase):
