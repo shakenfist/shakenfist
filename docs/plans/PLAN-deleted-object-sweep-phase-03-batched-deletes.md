@@ -690,10 +690,12 @@ and sets phase 4's drain rate from them.
   phase 1. Mitigation: the default batch is 25, the server refuses
   more than 1,000, `_retry_transaction()` retries a deadlock, and 3g
   reads batch latency per type. Blobs number in the tens.
-- **CI runs MariaDB 10.11 and sfcbr 11.8.** `DELETE ... RETURNING`
-  exists in both, but the live tests run locally on 11.8 and in CI on
-  10.11. Mitigation: 3b's live tests run in both places before merge;
-  the PR records the CI run.
+- **Shaken Fist supports MariaDB 10.11, and sfcbr runs 11.8.**
+  `DELETE ... RETURNING` exists in both. CI's live lane (the "Schema
+  ENUM widening" job) runs only in the merge queue, on Debian 13's
+  11.8, so no CI run covers 10.11. Mitigation: 3b's live tests run
+  locally against throwaway 11.8 and 10.11 containers before merge,
+  and the execution notes record both runs.
 - **Snapshot isolation.** MariaDB 11.6.2 and later can raise
   `ER_CHECKREAD` for a transaction that reads before it writes.
   Mitigation: the transaction opens with the guarded `DELETE`, as the
@@ -717,7 +719,7 @@ and sets phase 4's drain rate from them.
 1. `pre-commit run --all-files` passes.
 2. 3a's cadence test fails with `every(1).minutes` and passes with the
    change.
-3. 3b's live tests pass against MariaDB 11.8 locally and 10.11 in CI,
+3. 3b's live tests pass against MariaDB 11.8 and 10.11 locally,
    including the rollback test.
 4. 3c's parity test fails for each of its three mutations, and every
    type in `OBJECT_NAMES_TO_CLASSES` is classified.
@@ -784,6 +786,18 @@ and sets phase 4's drain rate from them.
   options, `skipped` and the batch histogram. Item 3's 11.8 half passed
   in 3b; its 10.11 half is the pull request's CI run. Item 9 waits for
   deploy.
+- **Review round 1, 2026-10-24 (UTC).** Item 3 as first written
+  expected CI to run the live tests on 10.11. It cannot: the pull
+  request's sanity job skipped all eight for want of
+  `SF_MARIADB_TEST_DSN`, and the live lane runs only in the merge
+  queue, on 11.8. The risk and item 3 are corrected above. The eight
+  live tests then passed locally against a throwaway `mariadb:10.11`
+  container (10.11.19), which completes item 3. The review also asked
+  for three changes to the sweep's failure handling: the client now
+  remembers an `UNIMPLEMENTED` answer for five minutes; a batch refused
+  whole, such as one naming a malformed uuid, is retried that turn one
+  object at a time; and a comment says what `skipped` can include
+  after a retried call. Five mutants, all killed.
 
 ## Back brief
 

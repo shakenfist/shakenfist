@@ -31,8 +31,9 @@ class FakeClock:
 class DeletedObjectSweepCadenceTestCase(base.ShakenFistTestCase):
     def test_sweep_runs_on_consecutive_maintenance_passes(self):
         clock = FakeClock()
+        now = mock.Mock(side_effect=clock.now)
         fake_datetime = types.SimpleNamespace(
-            datetime=mock.Mock(now=clock.now), time=datetime.time,
+            datetime=mock.Mock(now=now), time=datetime.time,
             timedelta=datetime.timedelta, date=datetime.date)
 
         runs = []
@@ -55,3 +56,7 @@ class DeletedObjectSweepCadenceTestCase(base.ShakenFistTestCase):
                 sched.run_pending()
 
         self.assertEqual(3, len(runs))
+        # The fake clock is what schedule read. If schedule reads the time
+        # some other way this fails, rather than the test passing or
+        # failing against the real clock.
+        self.assertTrue(now.called)

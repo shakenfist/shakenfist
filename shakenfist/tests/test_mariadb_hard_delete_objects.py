@@ -227,6 +227,15 @@ class CacheEvictionTestCase(base.ShakenFistTestCase):
 
 
 class GrpcWrapperTestCase(base.ShakenFistTestCase):
+    def setUp(self):
+        super().setUp()
+        # Each test starts with no remembered UNIMPLEMENTED answer, and
+        # leaves none behind for the next.
+        patcher = mock.patch.object(
+            mariadb, '_HARD_DELETE_BATCH_UNAVAILABLE_UNTIL', 0.0)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def _call(self, *args, reply=None, side_effect=None):
         with mock.patch('shakenfist.mariadb._get_database_stub'), \
                 mock.patch('shakenfist.mariadb._grpc_call', return_value=reply,
@@ -274,6 +283,44 @@ class GrpcWrapperTestCase(base.ShakenFistTestCase):
             ObjectType.NET_OP, _uuids(1), FINAL_STATES, 1000.0, False,
             side_effect=FakeRpcError(grpc.StatusCode.UNIMPLEMENTED))
         mock_log.warning.assert_called_once()
+
+    @mock.patch('shakenfist.mariadb.LOG')
+    def test_unimplemented_is_not_asked_again_for_a_while(self, mock_log):
+        args = (ObjectType.NET_OP, _uuids(1), [], None, True)
+        with mock.patch('shakenfist.mariadb.time.monotonic', return_value=1000.0):
+            self.assertRaises(
+                exceptions.HardDeleteBatchUnavailable, self._call, *args,
+                side_effect=FakeRpcError(grpc.StatusCode.UNIMPLEMENTED))
+
+        recheck = 1000.0 + mariadb.HARD_DELETE_BATCH_RECHECK_SECONDS
+        with mock.patch('shakenfist.mariadb.time.monotonic',
+                        return_value=recheck - 1):
+            with mock.patch('shakenfist.mariadb._get_database_stub'), \
+                    mock.patch('shakenfist.mariadb._grpc_call') as mock_call:
+                self.assertRaises(
+                    exceptions.HardDeleteBatchUnavailable,
+                    mariadb._grpc_hard_delete_objects, *args)
+            mock_call.assert_not_called()
+        mock_log.warning.assert_called_once()
+
+        # Once the window has passed the RPC is asked again, and an upgraded
+        # database service is used.
+        with mock.patch('shakenfist.mariadb.time.monotonic', return_value=recheck):
+            result, mock_call = self._call(
+                *args, reply=database_pb2.HardDeleteObjectsReply(
+                    deleted_uuids=args[1]))
+        mock_call.assert_called_once()
+        self.assertEqual(args[1], result)
+
+    @mock.patch('shakenfist.mariadb.LOG')
+    def test_other_rpc_errors_are_not_remembered(self, mock_log):
+        args = (ObjectType.NET_OP, _uuids(1), [], None, True)
+        self._call(*args, side_effect=FakeRpcError(grpc.StatusCode.ABORTED))
+        result, mock_call = self._call(
+            *args, reply=database_pb2.HardDeleteObjectsReply(
+                deleted_uuids=args[1]))
+        mock_call.assert_called_once()
+        self.assertEqual(args[1], result)
 
     @mock.patch('shakenfist.mariadb.LOG')
     def test_other_rpc_errors_are_a_failed_call(self, mock_log):

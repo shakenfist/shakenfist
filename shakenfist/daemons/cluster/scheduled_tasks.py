@@ -1172,7 +1172,8 @@ def _hard_delete_deleted_object_batch(
     outcome of each entry -- 'hard_deleted', 'skipped' or 'failed' -- is
     counted in it.
 
-    Raises DatabaseUnavailable and HardDeleteBatchUnavailable having
+    Raises DatabaseUnavailable, HardDeleteBatchUnavailable and ValueError
+    (a request refused whole, such as one naming a malformed uuid) having
     deleted nothing and counted nothing, for the caller to put the batch
     back or hard delete it another way.
     """
@@ -1185,7 +1186,7 @@ def _hard_delete_deleted_object_batch(
                 updated_before=time.time() - _deleted_object_delay(objtype))
         CLUSTER_DELETED_OBJECT_BATCH_SECONDS.labels(objtype).observe(
             time.monotonic() - batch_start)
-    except (DatabaseUnavailable, HardDeleteBatchUnavailable):
+    except (DatabaseUnavailable, HardDeleteBatchUnavailable, ValueError):
         raise
     except Exception as e:
         deleted = None
@@ -1204,6 +1205,10 @@ def _hard_delete_deleted_object_batch(
             eventlog.add_event(
                 EVENT_TYPE_AUDIT, objtype, obj_uuid, 'hard deleted object')
         else:
+            # No longer final, or not yet old enough. An entry the database
+            # deleted on an earlier attempt whose reply was lost, such as one
+            # _grpc_call() retried after a deadline, also lands here, and
+            # its audit event is never written.
             outcome = 'skipped'
         CLUSTER_DELETED_OBJECT_SECONDS.labels(objtype, outcome).observe(share)
         if outcomes is not None:
@@ -1295,9 +1300,9 @@ def _drain_deleted_object_work(
             return processed
         except HardDeleteBatchUnavailable:
             # An sf-database which predates the batch. Each object's own
-            # hard delete falls back to one delete at a time against it, so
-            # this and every later turn of the pass go that way rather than
-            # asking again.
+            # hard delete falls back to one delete at a time against it, and
+            # the client remembers the answer for a while, so this and every
+            # later turn of the pass go that way rather than asking again.
             work.extendleft(reversed(batch))
             LOG.warning(
                 'Database service cannot hard delete in batches, hard '
@@ -1305,6 +1310,18 @@ def _drain_deleted_object_work(
             batch_unavailable = True
             processed += _hard_delete_deleted_objects_singly(
                 objtype, work, count, deadline, outcomes)
+            continue
+        except ValueError as e:
+            # The request was refused whole, most likely for one malformed
+            # uuid. Left as a batch it would fail every entry in it on every
+            # walk, so this turn goes one object at a time and only the bad
+            # entry fails.
+            work.extendleft(reversed(batch))
+            LOG.with_fields({'object_type': objtype}).warning(
+                f'Batch hard delete refused, hard deleting this turn one '
+                f'object at a time: {e}')
+            processed += _hard_delete_deleted_objects_singly(
+                objtype, work, len(batch), deadline, outcomes)
             continue
         processed += len(batch)
 

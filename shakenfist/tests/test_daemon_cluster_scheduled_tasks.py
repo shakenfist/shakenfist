@@ -2082,7 +2082,7 @@ class DeletedObjectSweepBatchTestCase(base.ShakenFistTestCase):
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
                 'util_exceptions.ignore_exception')
     def test_a_batch_which_raises_is_failed(self, mock_ignore):
-        self.mock_batch.side_effect = ValueError('not a uuid')
+        self.mock_batch.side_effect = RuntimeError('lost the channel')
         _hold_deleted_object_work('network', *_uuids('network', 3))
 
         outcomes = collections.Counter()
@@ -2093,6 +2093,46 @@ class DeletedObjectSweepBatchTestCase(base.ShakenFistTestCase):
         self.assertEqual({'failed': 3}, dict(outcomes))
         mock_ignore.assert_called_once()
         self.mock_event.assert_not_called()
+
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.'
+                'util_exceptions.ignore_exception')
+    @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.LOG')
+    def test_a_refused_batch_is_taken_one_object_at_a_time(
+            self, mock_log, mock_ignore):
+        network = _uuids('network', 4)
+        bad = network[1]
+        upload = _uuids('upload', 2)
+        _hold_deleted_object_work('network', *network)
+        _hold_deleted_object_work('upload', *upload)
+
+        def batch(object_type, object_uuids, **kwargs):
+            if bad in object_uuids:
+                raise ValueError(f'{bad!r} is not a uuid')
+            return list(object_uuids)
+        self.mock_batch.side_effect = batch
+
+        objs = {u: FakeFinalStateObject() for u in network}
+
+        def from_db(obj_uuid, suppress_failure_audit=False):
+            if obj_uuid == bad:
+                raise ValueError(f'{bad!r} is not a uuid')
+            return objs[obj_uuid]
+        self.from_db.side_effect = from_db
+
+        outcomes = collections.Counter()
+        processed = st._drain_deleted_object_work(
+            execution_limit=10, outcomes=outcomes)
+
+        # Only the malformed entry fails; the rest of its turn is hard
+        # deleted one at a time, and the next type is still batched.
+        self.assertEqual(6, processed)
+        self.assertEqual({'hard_deleted': 5, 'failed': 1}, dict(outcomes))
+        self.assertEqual(network, [c.args[0] for c in self.from_db.call_args_list])
+        self.assertEqual(
+            [u != bad for u in network], [objs[u].hard_deleted for u in network])
+        self.assertEqual([('network', network), ('upload', upload)], self._batches())
+        self.assertEqual({}, _held_deleted_object_work())
+        mock_log.with_fields.return_value.warning.assert_called_once()
 
     @mock.patch('shakenfist.daemons.cluster.scheduled_tasks.LOG')
     def test_an_unavailable_tier_puts_the_batch_back(self, mock_log):

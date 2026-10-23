@@ -25895,6 +25895,15 @@ def _direct_hard_delete_objects(object_type: ObjectType,
 # one object at a time, with hard_delete_objects_per_call() against the
 # same server. Returning None for both would leave every hard delete of a
 # batchable type failing for the length of a rolling upgrade.
+#
+# The answer is remembered for a while, as a time.monotonic() reading until
+# which the RPC is not asked again. Without that every hard delete of a
+# batchable type would pay a refused round trip, and log a warning, before
+# its per-call fallback for as long as the upgrade window lasts.
+HARD_DELETE_BATCH_RECHECK_SECONDS = 300
+_HARD_DELETE_BATCH_UNAVAILABLE_UNTIL = 0.0
+
+
 def _grpc_hard_delete_objects(object_type: ObjectType,
                               object_uuids: list[str],
                               state_values: list[str],
@@ -25904,8 +25913,15 @@ def _grpc_hard_delete_objects(object_type: ObjectType,
     """Hard delete a batch of one type's objects via the database microservice.
 
     Returns the uuids deleted, or None on error. Raises
-    HardDeleteBatchUnavailable if the database service predates the RPC.
+    HardDeleteBatchUnavailable if the database service predates the RPC,
+    or answered so within the last HARD_DELETE_BATCH_RECHECK_SECONDS.
     """
+    global _HARD_DELETE_BATCH_UNAVAILABLE_UNTIL
+
+    if time.monotonic() < _HARD_DELETE_BATCH_UNAVAILABLE_UNTIL:
+        raise exceptions.HardDeleteBatchUnavailable(
+            'HardDeleteObjects was recently not implemented by this '
+            'database service')
     try:
         stub = _get_database_stub()
         request = database_pb2.HardDeleteObjectsRequest(
@@ -25920,10 +25936,12 @@ def _grpc_hard_delete_objects(object_type: ObjectType,
         return list(reply.deleted_uuids)
     except grpc.RpcError as e:
         if e.code() == grpc.StatusCode.UNIMPLEMENTED:
+            _HARD_DELETE_BATCH_UNAVAILABLE_UNTIL = (
+                time.monotonic() + HARD_DELETE_BATCH_RECHECK_SECONDS)
             LOG.warning(
                 f'gRPC HardDeleteObjects is not implemented by this database '
-                f'service, {object_type} objects are hard deleted one at a '
-                f'time')
+                f'service, objects are hard deleted one at a time for the '
+                f'next {HARD_DELETE_BATCH_RECHECK_SECONDS} seconds')
             raise exceptions.HardDeleteBatchUnavailable(
                 'HardDeleteObjects is not implemented by this database '
                 'service')
