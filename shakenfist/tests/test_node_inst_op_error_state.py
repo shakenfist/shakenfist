@@ -10,6 +10,9 @@ in CI as test_interface_delete timing out after a slow DHCP-lease-
 removal op). The handler must use the same suffix-then-fallback
 pattern as ``Instance.enqueue_delete_due_error`` and must not touch
 instances that are already deleted.
+
+Observational tasks (see ``model.observational_tasks``) must fail their
+operation without changing the instance's state at all (issue 4585).
 """
 
 from unittest import mock
