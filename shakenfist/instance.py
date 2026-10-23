@@ -2766,15 +2766,23 @@ class Instance(dbowo):
                 # The operation has already reached a terminal state.
                 op.add_event(EVENT_TYPE_AUDIT, 'failed to abort operation')
 
+        runs_after = [
+            {'op_type': op.object_type, 'op_uuid': str(op.uuid)}
+            for op in survivors
+        ]
+        # The newest mutating operation is often a snapshot already listed
+        # above, and the delete would otherwise check it twice per deferral.
+        pointer = self.last_cluster_operation
+        if pointer is None or str(pointer['op_uuid']) not in {
+                r['op_uuid'] for r in runs_after}:
+            runs_after.append(pointer)
+
         nio_create_and_enqueue(
             node,
             self.uuid,
             [nio_tasks.instance_delete],
             PRIORITY.user_facing,
-            runs_after=[
-                {'op_type': op.object_type, 'op_uuid': str(op.uuid)}
-                for op in survivors
-            ] + [self.last_cluster_operation],
+            runs_after=runs_after,
             request_id=util_general.get_request_id())
 
     def enqueue_delete_due_error(self, error_msg):

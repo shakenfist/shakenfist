@@ -731,6 +731,12 @@ because the following statements will be true:
 * An agent operation's preflight (`node_aop_op`) targets only the
   agent operation, not its instance, so an instance delete never
   cancels a pending one. Found in phase 4; it predates this plan.
+* `Instance.enqueue_delete()` fails open: the target listing it
+  walks returns `[]` on a database error, so the delete aborts
+  nothing and waits for no snapshot. A variant of the listing which
+  raises, so the delete is refused or retried instead, would make
+  the snapshot guarantee hold. Found by the automated review of
+  phase 4; the pointer walk it replaced failed the same way.
 * Issue #3278 (CI and test coverage backlog) may want a note
   about the deflaked helper pattern.
 

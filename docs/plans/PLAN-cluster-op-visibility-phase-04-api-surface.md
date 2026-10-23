@@ -509,6 +509,14 @@ request in client-python.
   error. *Mitigation:* the docs point waiting clients at
   `has_pending_operations`, which fails closed. The listing is a
   view, not a gate.
+* **The delete walk fails open.** The delete walk reads the same
+  listing, so on a database error it aborts nothing and waits for no
+  snapshot, and a delete can run under a snapshot in progress. The
+  old pointer walk failed the same way, so this is not a regression,
+  but the guarantee that a delete waits for snapshots is only as
+  strong as this read. *Mitigation:* none in this phase. A walk that
+  refuses or retries the delete when it cannot read is recorded in the
+  master plan's Future work. Found by the automated review of #4606.
 * **A whole-view test breaks on the new key.** *Mitigation:* step 4a
   greps for tests that render these views and runs the full suite
   before committing.
@@ -613,3 +621,18 @@ commit, not a migration.
   counted `docs/plans/`, where the plans describe the old names and
   the check quotes itself, so it could never print `0`. It now
   excludes `docs/plans/`, and prints `0`.
+* 2026-10-23 (AEDT): the automated review of #4606 raised no fix or
+  document items. Two consider items were real and concerned this
+  phase's delete walk. The walk listed a spared snapshot twice in
+  `runs_after` when it was also the pointer, and it fails open on a
+  database error. #4606 was already in the merge queue, so Michael
+  chose a follow-up pull request: it removes the duplicate and records
+  the fail-open case as a risk above and in the master plan's Future
+  work.
+* The first merge queue run
+  ([39847969049](https://github.com/shakenfist/shakenfist/actions/runs/39847969049))
+  failed `test_no_unbudgeted_fixed_rate_database_polling` on
+  `(SetObjectState, api)`, the known false positive #4021. The
+  delete walk's aborts were 2 of about 230 such writes in the test's
+  window; the rest were object creates and deletes by the suite.
+  #4606 merged on 2026-10-23 as `3642e7a75a`.
