@@ -424,7 +424,7 @@ shape of phases 2 and 3, so only their scope is fixed here.
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
 | 1. Measure the sweep | [PLAN-deleted-object-sweep-phase-01-measure.md](PLAN-deleted-object-sweep-phase-01-measure.md) | Complete | 6537966c00 |
-| 2. A fair, bounded drain | [PLAN-deleted-object-sweep-phase-02-fair-drain.md](PLAN-deleted-object-sweep-phase-02-fair-drain.md) | In progress | — |
+| 2. A fair, bounded drain | [PLAN-deleted-object-sweep-phase-02-fair-drain.md](PLAN-deleted-object-sweep-phase-02-fair-drain.md) | Complete | dd5723c3db |
 | 3. Cheaper hard deletes | PLAN-deleted-object-sweep-phase-03-throughput.md | Not started | — |
 | 4. Drain sfcbr and keep it drained | PLAN-deleted-object-sweep-phase-04-drain.md | Not started | — |
 | 5. Push audit | - | Not started | — |
