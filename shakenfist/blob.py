@@ -654,15 +654,36 @@ class Blob(dbo):
             mariadb.update_blob_attributes(new_attrs, fields=['info'])
             self.__attributes = new_attrs
 
-    def cascading_delete(self) -> None:
-        self.state = self.STATE_DELETED
+    def _state_update(self, new_value: Optional[str],
+                      skip_transition_validation: bool = False,
+                      state_attribute_name: str = 'state',
+                      message: Optional[str] = None) -> None:
+        """Update state, removing the references a deleted blob holds.
 
-        # Remove all transcode references from this blob
-        self.remove_transcodes()
+        A deleted blob must not hold references: ref_count counts them, so
+        a leftover transcode or depends_on reference keeps its target alive
+        forever (issue 4558). Several paths delete a blob by assigning
+        STATE_DELETED directly, so the references are removed here, on the
+        transition, rather than in a delete method those paths would have
+        to remember to call. The state is written first, so that a failed
+        state write never leaves a live blob without its dependencies.
+        Setting deleted again repeats the (idempotent) removal, which
+        retries one that failed.
+        """
+        super()._state_update(
+            new_value, skip_transition_validation=skip_transition_validation,
+            state_attribute_name=state_attribute_name, message=message)
 
-        # Remove depends_on reference from this blob to its dependency
-        mariadb.remove_all_references_from(
-            ObjectType.BLOB, self.uuid, RelationshipType.DEPENDS_ON)
+        if (state_attribute_name == 'state' and new_value == self.STATE_DELETED
+                and not self.in_memory_only):
+            self._remove_references_held()
+
+    def _remove_references_held(self) -> None:
+        # A blob is only ever the source of blob to blob references
+        # (depends_on and transcode today). Node locations are references
+        # to the blob, not from it, so they are untouched and the replicas
+        # are still found and removed.
+        mariadb.remove_all_references_from(ObjectType.BLOB, self.uuid)
 
     def ensure_local(
             self, instance_object: Any = None, wait_for_other_transfers: bool = True
@@ -1027,6 +1048,9 @@ class Blob(dbo):
         return True
 
     def hard_delete(self) -> None:
+        # Backstop for blobs deleted before references were removed on the
+        # transition to deleted, or whose removal failed then (issue 4558).
+        self._remove_references_held()
         mariadb.delete_blob_hashes(str(self.uuid))
         mariadb.delete_blob_transfers_for_blob(str(self.uuid))
         mariadb.delete_blob_attributes(self.uuid)

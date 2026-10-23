@@ -489,6 +489,99 @@ class BlobAddLocationTestCase(base.ShakenFistTestCase):
             ObjectType.BLOB, self.blob.uuid)
 
 
+class BlobDeleteReferencesTestCase(base.ShakenFistTestCase):
+    """A deleted blob holds no references, however it was deleted (issue 4558).
+
+    The cluster pass, the per-blob task, expiry, the transcode race and the
+    snapshot abort paths all delete a blob by assigning STATE_DELETED, so
+    the transition itself must remove what the blob points at. Otherwise
+    the targets' ref_count never reaches zero and they are never reaped.
+    """
+
+    @mock.patch('shakenfist.baseobject.get_minimum_object_version',
+                return_value=blob.Blob.current_version)
+    def setUp(self, mock_get_min):
+        super().setUp()
+        self.blob = blob.Blob(BlobData(
+            uuid='12345678-1234-4321-8234-123456789012',
+            modified=1234567890.0,
+            fetched_at=1234567891.0,
+            version=blob.Blob.current_version
+        ))
+
+        self.db = mock.MagicMock()
+        self.db.set_state.return_value = True
+        self.db.get_state.return_value = State(
+            value='created', update_time=1234567890.0)
+        for name in ('get_state', 'set_state', 'remove_all_references_from'):
+            patcher = mock.patch(
+                f'shakenfist.mariadb.{name}', getattr(self.db, name))
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        patcher = mock.patch('shakenfist.blob.Blob._log_attribute_mutation')
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_delete_removes_every_reference_held(self):
+        self.blob.state = blob.Blob.STATE_DELETED
+
+        # Unfiltered by relationship: a filter would leave whichever
+        # blob to blob relationship it did not name behind.
+        self.db.remove_all_references_from.assert_called_once_with(
+            ObjectType.BLOB, self.blob.uuid)
+
+    def test_references_are_removed_after_the_state_is_written(self):
+        self.blob.state = blob.Blob.STATE_DELETED
+
+        names = [c[0] for c in self.db.mock_calls
+                 if c[0] in ('set_state', 'remove_all_references_from')]
+        self.assertEqual(['set_state', 'remove_all_references_from'], names)
+
+    def test_failed_state_write_keeps_references(self):
+        # A blob whose deletion was not recorded is still live, and still
+        # needs the blob it depends on.
+        self.db.set_state.return_value = False
+
+        self.assertRaises(
+            exceptions.StateWriteFailed,
+            setattr, self.blob, 'state', blob.Blob.STATE_DELETED)
+        self.db.remove_all_references_from.assert_not_called()
+
+    def test_other_transitions_keep_references(self):
+        self.blob.state = blob.Blob.STATE_ERROR
+
+        self.db.remove_all_references_from.assert_not_called()
+
+    def test_deleting_again_retries_the_removal(self):
+        # remove_all_references_from() returns 0 rather than raising on a
+        # database error, so a repeated delete is a free, idempotent retry.
+        self.db.get_state.return_value = State(
+            value='deleted', update_time=1234567890.0)
+
+        self.blob.state = blob.Blob.STATE_DELETED
+
+        self.db.set_state.assert_not_called()
+        self.db.remove_all_references_from.assert_called_once_with(
+            ObjectType.BLOB, self.blob.uuid)
+
+    @mock.patch('shakenfist.baseobject.DatabaseBackedObject.hard_delete')
+    @mock.patch('shakenfist.mariadb.delete_blob')
+    @mock.patch('shakenfist.mariadb.delete_blob_attributes')
+    @mock.patch('shakenfist.mariadb.delete_blob_transfers_for_blob')
+    @mock.patch('shakenfist.mariadb.delete_blob_hashes')
+    def test_hard_delete_removes_references_held(
+            self, mock_hashes, mock_transfers, mock_attributes, mock_delete,
+            mock_super_hard_delete):
+        # The backstop for blobs deleted before the transition removed
+        # references, which the deleted-object sweep reaches eventually.
+        self.blob.hard_delete()
+
+        self.db.remove_all_references_from.assert_called_once_with(
+            ObjectType.BLOB, self.blob.uuid)
+        mock_delete.assert_called_once_with(self.blob.uuid)
+
+
 class BlobFromDbMalformedUuidTestCase(base.ShakenFistTestCase):
     """A lookup by a non-UUID name is a miss, not a ValueError.
 

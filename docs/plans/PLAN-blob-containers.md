@@ -120,7 +120,9 @@ Surveyed at 33be36b8aa on 2026-10-17. These facts constrain the design.
   `cascading_delete` removes references a deleted blob holds, and only
   `TRANSCODE` and `DEPENDS_ON` (`blob.py:657-665`). The per-blob task and the
   expiry path set `STATE_DELETED` directly, and `hard_delete` removes nothing
-  ([#4558](https://github.com/shakenfist/shakenfist/issues/4558)).
+  ([#4558](https://github.com/shakenfist/shakenfist/issues/4558)). Since
+  fixed: the transition to `STATE_DELETED` and `hard_delete` now both remove
+  everything a blob holds, through `Blob._remove_references_held()`.
 * **A failed reference count reads as "unreferenced".** `count_references_to`
   returns 0 on error (`mariadb.py:9254-9277`). Artifact-backed blobs survive
   that, because the cluster pass refreshes their `last_used` every time
@@ -226,11 +228,12 @@ decisions pass confirms or overturns them.
    OVA before its owner does, because it can only claim it in its own
    view. The member blob itself may be shared between namespaces, since
    identical ranges give identical bytes.
-6. **Every deletion path clears entries.** `cascading_delete`, the per-blob
-   `STATE_DELETED` path, the expiry path and `hard_delete` all remove the
-   entries a deleted container holds. The fix for
+6. **Every deletion path clears entries.** Every path that deletes a
+   blob, and `hard_delete`, removes the entries a deleted container holds.
+   The fix for
    [#4558](https://github.com/shakenfist/shakenfist/issues/4558) is the
-   natural home for that. Deleting a namespace removes that namespace's
+   natural home for that: clearing entries in
+   `Blob._remove_references_held()` covers every path. Deleting a namespace removes that namespace's
    entries too. Otherwise a deleted namespace's entries would keep
    members, and their storage, alive for as long as somebody else's
    container lives.

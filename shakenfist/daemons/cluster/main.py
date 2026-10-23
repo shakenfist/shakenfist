@@ -392,7 +392,7 @@ class Monitor(daemon.Daemon):
                         'reference count is zero and unused for >300s, '
                         'cascading delete initiated',
                         extra={'last_used': last_used, 'age': age})
-                    b.cascading_delete()
+                    b.state = dbo.STATE_DELETED
                 continue
 
             # Each locations read is a database round trip, so read once
