@@ -772,6 +772,18 @@ and sets phase 4's drain rate from them.
   batch histogram observes only calls that returned. Tests that drained
   network, blob, upload and namespace key objects through `from_db()`
   now use the four per-object types, since those types are batched.
+- **Definition of done, 2026-10-23 (UTC), before the push.** Items 2,
+  4, 5, 6 and 7 pass: the cadence mutant and a mapping-drop parity
+  mutant were re-run by the management session and killed, the four
+  per-object classes are unchanged against the merge base, only the
+  expected `hard_delete` overrides remain, 3d's 8 and 3e's 19 mutants
+  were all killed, and `tox -e genprotos` leaves no diff. Item 8's grep
+  as written matches 5,659 existing lines in `docs/`, so it cannot show
+  what this phase added; run over the phase's added lines outside
+  `docs/plans` it matches none, and the operator guide names both new
+  options, `skipped` and the batch histogram. Item 3's 11.8 half passed
+  in 3b; its 10.11 half is the pull request's CI run. Item 9 waits for
+  deploy.
 
 ## Back brief
 
