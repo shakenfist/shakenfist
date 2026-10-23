@@ -75,6 +75,13 @@ trips **zero** firewall verdicts proves the compiled allowlist and size
 caps cover real traffic. No Rust flags are involved — the mock is the
 policy source.
 
+`start-qemu.sh` gives qemu a WebDAV spiceport, so sessions include a
+port-type channel. In CI, the match mode of `run-host-subject-checks.sh`
+runs ryll with a share directory in the default enforce mode. It then
+requires the proxy to have relayed a webdav channel and runs
+`assert-firewall`. That catches port-channel traffic the allowlist does
+not model, which is how #570 went unnoticed.
+
 ### The knobs the mock delivers
 
 `mock-grpc-server.py` attaches a `FirewallPolicy` to every SUCCESS
