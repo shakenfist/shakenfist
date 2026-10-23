@@ -613,6 +613,14 @@ their existing unit tests must still pass unchanged.
 - Phase 3 adds a cap on objects per pass and defaults it near today's
   rate, so that this phase changes what a hard delete costs and phase
   4 changes how fast the backlog drains (D18).
+- The batchable classes' own `hard_delete()` moves onto the batch as
+  well, so each type's table list exists once and every caller's hard
+  delete of those types is one commit (phase 3's D15, decided at its
+  back brief). The capacity cascades keep their code. Where a
+  namespace cascade test asserted a batchable child's individual
+  deletes, it now asserts the child's batch call, so "their existing
+  unit tests must still pass unchanged" holds for the cascades' own
+  behaviour and not for those assertions.
 
 ### Phase 4: drain sfcbr and keep it drained
 
@@ -1142,14 +1150,12 @@ chosen to defer to here, so that we do not forget them.
   claims carry the same argument and are not released until
   `Namespace.hard_delete()`. A faster sweep shortens that window but
   does not remove it. File it as its own issue.
-- **Move `hard_delete()` itself onto the batch delete.** Phase 3
-  keeps each class's `hard_delete()` and a second copy of its table
-  list beside the batch RPC, pinned by a parity test (phase 3's D15).
-  Once the batch has run in production, every class's own row deletes
-  could become one call to it with a list of one, leaving one copy and
-  making every caller's hard delete one commit. It changes every
-  caller, including the namespace cascade, so it is its own piece of
-  work.
+- **Drop `hard_delete()`'s per-call fallback.** Phase 3 moves the
+  batchable classes' `hard_delete()` onto the batch RPC and keeps a
+  fallback that calls the old per-table functions when sf-database
+  does not serve it (phase 3's D15). Once every supported
+  sf-database serves the RPC, the fallback and the per-table public
+  functions it alone calls can go.
 - **Retention policy.** If phase 1 shows the 30 second `*_op` delay
   or the hour for everything else is itself a cost, record it here
   rather than changing it in this plan.

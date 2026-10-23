@@ -21,8 +21,10 @@ In:
   nothing but row deletes keyed on the object: one RPC, one
   transaction per batch, with the state and age re-check moved into
   the transaction (D14).
-- A test that pins the batch's table list to each of those classes'
-  own `hard_delete()`, so the two cannot drift (D15).
+- Those classes' own `hard_delete()` moving onto the batch, so each
+  type's table list exists once and every caller's hard delete of
+  them is one commit, with a test that proves the move deletes exactly
+  what the old code deleted (D15).
 - The sweep using the batch for those types, and the existing
   per-object path for the rest (D16, D17).
 - A cap on objects hard deleted per pass, so this phase changes the
@@ -35,13 +37,11 @@ In:
 
 Out:
 
-- **Any change to a class's own `hard_delete()`.** Every other caller
-  (namespace cascades, superseded issuers and mapping rules, upload
-  cleanup, CI) keeps exactly the code it has today. D15 explains why
-  the batch does not replace it.
-- **Instance, namespace and namespace claim cascades.** They keep
-  their per-object semantics, and their unit tests must pass
-  unchanged (the master plan's phase 3 constraint).
+- **Instance, namespace, namespace claim and node.** Their own
+  `hard_delete()` code is unchanged and keeps its per-object
+  semantics. Where a namespace cascade test asserted a batchable
+  child's individual deletes, it now asserts the child's one batch
+  call (D15).
 - **Draining sfcbr's backlog at a planned rate, and the regression
   guard.** Phase 4. This phase ships the knob (D18) with a default
   close to today's rate.
@@ -68,7 +68,7 @@ source in this planning commit, so a later step need not redo it.
    shape of a redo log flush per commit under
    `innodb_flush_log_at_trx_commit=1`. Phase 1's 50 to 250 ms spread
    came from a different mix and a busier tier; the floor is the same.
-   The batch's own latency against its size (3f) is the last word.
+   The batch's own latency against its size (3g) is the last word.
 
 2. **An operation's hard delete is three such commits, about 135 ms.**
    `node_inst_op` costs 0.138 s, `net_op` 0.139 s, and the other
@@ -83,7 +83,7 @@ source in this planning commit, so a later step need not redo it.
    | Types | Class | Own deletes |
    |---|---|---|
    | the 14 `*_op` types | `BaseOperation.hard_delete` (`operations/baseoperation.py:268`) | `delete_cluster_operation_target`, `delete_cluster_operation_error`, `delete_cluster_operation` |
-   | `agentoperation` | `agentoperation.py:553` | `delete_agent_operation_attributes`, `delete_agent_operation`, `remove_all_references_from`, then `BaseOperation`'s three |
+   | `agentoperation` | `operations/agentoperation.py:553` | `delete_agent_operation_attributes`, `delete_agent_operation`, `remove_all_references_from`, then `BaseOperation`'s three |
    | `artifact` | `artifact.py:747` | `delete_all_artifact_indexes`, `delete_artifact_attributes`, `delete_artifact`, then `delete_cluster_operation_targets_for_object` (`baseobject.py:835`) |
    | `network` | `network/network.py:813` | `delete_network_attributes`, `delete_network`, then `delete_cluster_operation_targets_for_object` |
    | `blob` | `blob.py:1029` | `delete_blob_hashes`, `delete_blob_transfers_for_blob`, `delete_blob_attributes`, `delete_blob` |
@@ -163,7 +163,7 @@ source in this planning commit, so a later step need not redo it.
     phase 1's and phase 2's plans, two comments in
     `scheduled_tasks.py` and a test docstring say 28. The plans are
     corrected in this planning commit; the code comments are corrected
-    by step 3d, which edits that file anyway.
+    by step 3e, which edits that file anyway.
 
 12. **An equal share leaves the two busiest types growing.** Every
     type with a backlog got about 5,100 objects a day. `namespace`
@@ -200,34 +200,63 @@ a candidate" for these types, for survey finding 9's reason: the reads
 are cheap per call and expensive in aggregate. On the batch path the
 sweep makes one request per batch instead of six to ten per object.
 
+A second mode serves `hard_delete()` itself (D15): `unconditional`
+set, with no states and no age. It deletes the state rows and every
+mapped row for every uuid it is given, without keying the later
+statements on what the first returned, because a caller of
+`hard_delete()` has already decided and an object can lack a state
+row. It returns the uuids it was given. The request must name one mode
+or the other; the server refuses a guarded request without states or
+an age, and an unconditional one with either, so a caller mistake
+cannot turn the sweep's guard off.
+
 The server rejects more than 1,000 uuids in one call, so a caller
 mistake cannot build an unbounded transaction.
 
-### D15 -- The table list lives once, beside the SQL, and a test pins it to the classes
+### D15 -- Each batchable class's `hard_delete()` moves onto the batch
 
 The batch needs, for each batchable type, the statements its
-`hard_delete()` runs. Two ways to keep one copy:
+`hard_delete()` runs. Planning weighed two ways to keep them:
 
-- **Rewrite every `hard_delete()` onto the batch delete**, so each
-  class's own deletes become one call with a list of one. One copy,
-  and every caller's hard delete becomes one commit. But it changes
-  every caller at once, including the namespace cascade and its tests,
-  which the master plan says must pass unchanged, and it makes this
-  phase's measurement a measurement of everything.
-- **Keep `hard_delete()` as it is and declare the batch's list in
-  `mariadb.py`, beside the SQL**, with a unit test that runs each
-  batchable class's real `hard_delete()` against recording mocks and
-  asserts that the `mariadb` delete functions it calls are exactly the
-  ones the list says the batch replaces. Two copies, but a drift in
-  either fails the build.
+- **Rewrite every batchable `hard_delete()` onto the batch delete**,
+  so each class's own deletes become one call with a list of one. One
+  copy, and every caller's hard delete becomes one commit. But it
+  changes every caller at once, including the namespace cascade and
+  its tests, and it makes this phase's measurement a measurement of
+  every daemon's hard deletes.
+- **Keep `hard_delete()` as it is and declare a second copy of the
+  list beside the SQL**, with a test between the two.
 
-**The second.** The list maps each type to the names of the public
-`mariadb` delete functions it replaces, and each name to one SQL
-statement that mirrors that function's `_direct_` implementation. A
-live test then checks each statement deletes what its function
-deletes. Moving `hard_delete()` itself onto the batch is recorded as
-future work in the master plan, to be taken once the batch has run in
-production.
+The plan first chose the second, for the cascade tests and a cleaner
+measurement. Michael chose the first at the back brief (2026-10-23).
+What follows from it:
+
+- The list lives once, in `mariadb.py` beside the SQL. It maps each
+  batchable type to the ordered names of the public `mariadb` delete
+  functions its `hard_delete()` calls today, excluding the base three,
+  and each name to one SQL statement that mirrors that function's
+  `_direct_` implementation, and to a call of the public function for
+  one uuid.
+- `DatabaseBackedObject.hard_delete()` sends a batchable type to
+  `hard_delete_objects(type, [uuid], unconditional=True)` (D14's
+  second mode), then writes the audit event. The subclasses' own row
+  deletes go. `IPAM`'s early return for an in-memory IPAM stays, and
+  `Instance` keeps the cluster operation targets delete it inherits.
+- Against an sf-database without the RPC, `hard_delete()` falls back
+  to calling the mapped public functions one at a time and then the
+  base three, which is what today's code does. The fallback can go
+  once every supported sf-database serves the RPC; the master plan's
+  Future work records that.
+- Step 3c pins the list against today's classes *before* they change,
+  so the move is proven to delete exactly what the old code deleted.
+  Step 3d moves the classes and keeps that pinned list as a literal in
+  the test, so a later change to a type's deletes is made twice, on
+  purpose.
+- Instance, namespace, namespace claim and node keep their code
+  (D16). The namespace cascade's hard delete of its keys and mapping
+  rules becomes one call each.
+- This phase's 24 hours measure every daemon's hard deletes changing,
+  not only the sweep's. Brief 3g reads them per daemon.
 
 ### D16 -- Instance, namespace, namespace claim and node stay per object
 
@@ -302,7 +331,7 @@ wall time. A new outcome, `skipped`, counts batch entries the guard
 did not return (gone, no longer final, or too young; the batch cannot
 tell which). A new histogram, `cluster_deleted_object_batch_seconds`
 by `object_type`, observes each batch call, which with the entry
-counts gives batch latency against batch size (3f).
+counts gives batch latency against batch size (3g).
 
 ### D22 -- An older sf-database falls back to the per-object path
 
@@ -310,8 +339,9 @@ A new sf-cluster calling an sf-database without the RPC gets
 `UNIMPLEMENTED`. The client wrapper raises a distinct exception for it,
 as the coalescing wrappers do with `CoalescingUnavailable`, and the
 sweep hard deletes that turn's entries one at a time as phase 2 does,
-logging once per pass. The operator guide already says to upgrade
-`sf-database` first.
+logging once per pass. `hard_delete()` has its own fallback (D15),
+so the per-object path works against an old sf-database too. The
+operator guide already says to upgrade `sf-database` first.
 
 ### D23 -- No load-budget entries in this phase
 
@@ -320,7 +350,7 @@ phase 2's execution notes found above the unbudgeted ceiling, and
 adds one pair, `HardDeleteObjects` from sf-cluster, at most a few
 calls a minute at D18's default. A budget entry should be derived
 from a measured rate, and the rate is set by D18's cap, which phase 4
-moves. Brief 3f checks every sf-cluster pair against the budget after
+moves. Brief 3g checks every sf-cluster pair against the budget after
 deploy, and phase 4 adds the entries once it has settled the rate.
 
 ## Step plan
@@ -329,15 +359,17 @@ deploy, and phase 4 adds the entries once it has settled the rate.
 |------|--------|-------|-----------|---------------------|
 | 3a | low | sonnet | none | Run the sweep on every maintenance pass (D19). See brief 3a. |
 | 3b | high | opus | none | Add `HardDeleteObjects` (D14, D15's list). See brief 3b. |
-| 3c | high | opus | none | Pin the list to the classes (D15). See brief 3c. |
-| 3d | high | opus | none | Batch the sweep, with its throttle (D16-D18, D20-D22). See brief 3d. |
-| 3e | low | sonnet | none | Document the changes. See brief 3e. |
-| 3f | — | management session | — | After merge and deploy, measure and record. See brief 3f. |
+| 3c | high | opus | none | Pin the list to today's classes (D15). See brief 3c. |
+| 3d | high | opus | none | Move the batchable classes' `hard_delete()` onto the batch (D15). See brief 3d. |
+| 3e | high | opus | none | Batch the sweep, with its throttle (D16-D18, D20-D22). See brief 3e. |
+| 3f | low | sonnet | none | Document the changes. See brief 3f. |
+| 3g | — | management session | — | After merge and deploy, measure and record. See brief 3g. |
 
-Run the steps in order, one at a time, in this worktree. 3a and 3d
-both touch sf-cluster's scheduling and tests, 3b and 3c both edit
-`mariadb.py`'s neighbourhood, and two agents in one tree can undo each
-other through pre-commit's stash.
+Run the steps in order, one at a time, in this worktree. 3a and 3e
+both touch sf-cluster's scheduling and tests, 3b, 3c and 3d all edit
+`mariadb.py`'s neighbourhood or the classes it maps, 3c must read the
+classes before 3d changes them, and two agents in one tree can undo
+each other through pre-commit's stash.
 
 ### Brief 3a: run the sweep on every maintenance pass
 
@@ -376,25 +408,29 @@ phase 2) as the nearest worked example in each file.
 (HardDeleteObjectsRequest) returns (HardDeleteObjectsReply)`, with
 `HardDeleteObjectsRequest{ObjectType object_type = 1; repeated string
 object_uuids = 2; repeated string state_values = 3; double
-updated_before = 4;}` and `HardDeleteObjectsReply{repeated string
+updated_before = 4; bool unconditional = 5;}` and `HardDeleteObjectsReply{repeated string
 deleted_uuids = 1;}`. Use leading comments, one per field, so the
 generated `.pyi` attaches them to the right fields. Regenerate with
 `tox -e genprotos`.
 
 `shakenfist/mariadb.py`, the three-layer trio
 `_direct_hard_delete_objects`, `_grpc_hard_delete_objects` and
-public `hard_delete_objects(object_type, object_uuids, state_values,
-updated_before) -> Optional[list[str]]`:
+public `hard_delete_objects(object_type, object_uuids,
+state_values=None, updated_before=None, unconditional=False) ->
+Optional[list[str]]`:
 
-- The public function raises `ValueError` for an empty
-  `state_values`, an `updated_before` of 0 or None, more than
+- The public function raises `ValueError` for a guarded call with an
+  empty `state_values` or an `updated_before` of 0 or None, an
+  unconditional call with either, more than
   `HARD_DELETE_OBJECTS_MAX` (1,000) uuids, or a type with no entry in
   the list below. An empty uuid list returns `[]` without a call.
 - The list: a module-level mapping from `ObjectType` to the ordered
   names of the public `mariadb` delete functions that type's
-  `hard_delete()` calls, *excluding* the base three, and a second
-  mapping from each function name to a builder of one SQLAlchemy
-  `DELETE` statement for a list of uuids. Each builder mirrors the
+  `hard_delete()` calls today, *excluding* the base three, and a
+  second mapping from each function name to a builder of one
+  SQLAlchemy `DELETE` statement for a list of uuids and a call of the
+  public function for one uuid (some take the type as well as the
+  uuid). Each builder mirrors the
   WHERE clause of that function's `_direct_` implementation exactly,
   with `IN` in place of `=`, and cites it. Survey finding 3's table is
   the starting point; read every `_direct_` function you map rather
@@ -414,6 +450,14 @@ updated_before) -> Optional[list[str]]`:
   plain `SELECT` before the first statement (see the comment at
   `_direct_release_instance_placement`). An `OperationalError` that
   `_retry_transaction()` does not retry is logged and returns None.
+  In unconditional mode, the mapped statements run for every
+  requested uuid whatever the first statement returned, and the reply
+  is the requested uuids.
+- `hard_delete_objects_per_call(object_type, object_uuid)`, the
+  fallback (D15): for a type in the mapping, call each mapped public
+  function for the uuid in order, then `delete_state`,
+  `delete_object_metadata` and `delete_object_events`, which is the
+  order today's `hard_delete()` uses. No batch call.
 - The gRPC wrapper goes through `_grpc_call()`, so it is timed and
   retried like any other call; it returns None on `grpc.RpcError`,
   except that `UNIMPLEMENTED` raises a new
@@ -437,15 +481,18 @@ phase 2's execution notes for the setup):
   across every table, and the reply names only it;
 - a uuid shared with another object type is not touched in that
   type's tables;
+- unconditional mode deletes every mapped row of a non-final object,
+  a too-young object, and an object with no `object_states` row;
 - a statement that fails part way (inject one by patching a builder)
   leaves every table as it was: the transaction rolled back;
 - 1,001 uuids is refused.
 
 Commit subject: "Add a batch hard delete RPC."
 
-### Brief 3c: pin the list to the classes
+### Brief 3c: pin the list to today's classes
 
-A unit test module, `shakenfist/tests/test_hard_delete_batch_parity.py`.
+This step reads the classes before 3d changes them. A unit test
+module, `shakenfist/tests/test_hard_delete_batch_parity.py`.
 For each type in 3b's mapping, build an instance of that type's class
 without the database (look at how existing unit tests construct these
 objects; most have a helper or accept a static-values dict), patch
@@ -457,7 +504,13 @@ mocks, call the real `hard_delete()`, and assert:
   equals the mapping's list for that type;
 - the base three were called;
 - nothing outside the allowed set was called (a new side effect in a
-  class's `hard_delete()` must fail this test, not pass silently).
+  class's `hard_delete()` must fail this test, not pass silently);
+- `hard_delete_objects_per_call()` for that type calls the same
+  sequence, base three included, as the class's `hard_delete()`.
+
+Write each type's expected sequence into the test as a literal,
+recorded from today's `hard_delete()`; 3d keeps those literals when it
+moves the classes.
 
 Also assert that every type in `OBJECT_NAMES_TO_CLASSES` is either in
 the mapping or in an explicit per-object set (`instance`, `namespace`,
@@ -471,7 +524,48 @@ fail the right test. Report the script's path.
 
 Commit subject: "Pin the batch hard delete to each class."
 
-### Brief 3d: batch the sweep
+### Brief 3d: move the batchable classes onto the batch
+
+- `DatabaseBackedObject.hard_delete()` (`baseobject.py:759`): for a
+  type in 3b's mapping, call `mariadb.hard_delete_objects(type,
+  [uuid], unconditional=True)`; on `HardDeleteBatchUnavailable`, call
+  `mariadb.hard_delete_objects_per_call(type, uuid)`. Write the audit
+  event only when the delete succeeded; a None reply logs an error and
+  writes no event. Types not in the mapping keep today's three calls.
+- `DatabaseBackedObjectWithOperations.hard_delete()`
+  (`baseobject.py:835`): its targets delete is in the mapping for
+  `artifact` and `network`, so it runs only for a type not in the
+  mapping, which today is `instance`.
+- Remove the row deletes from every batchable class's override:
+  `BaseOperation` (`operations/baseoperation.py:268`, and move its
+  comment's reasoning about delete order to the mapping, noting that
+  one transaction makes the order invisible to readers),
+  `AgentOperation`, `Artifact`, `Network`, `Blob`, `DnsMasq`,
+  `NetworkInterface`, `IPAM` (keep the in-memory early return),
+  `NamespaceKey`, `TrustedIssuer`, `MappingRule`, `Upload`. Remove an
+  override that is left empty.
+- Do not touch `instance.py`, `namespace.py`, `namespace_claim.py` or
+  `node.py`.
+- Convert 3c's test. For each batchable class it now asserts that the
+  real `hard_delete()` makes exactly one `hard_delete_objects` call,
+  unconditional, with that type and uuid, one audit event, and no
+  other `mariadb` call; that on `HardDeleteBatchUnavailable` the calls
+  equal 3c's literal sequence; and that a None reply writes no audit
+  event. Keep the classification test.
+- Update the existing unit tests that asserted a batchable class's
+  individual deletes, including the namespace cascade's, to assert the
+  batch call with the right type and uuid. Do not weaken an assertion
+  to make it pass: each one that named a delete must still name what
+  is deleted. Report every test file changed and why.
+
+Mutation-test with the `mutation-check` skill: a batchable type takes
+the old three-call path; the fallback is skipped; the audit event is
+written on a None reply; `Instance` loses its targets delete; one
+class keeps a now-duplicated row delete. Report the script's path.
+
+Commit subject: "Hard delete through the batch RPC."
+
+### Brief 3e: batch the sweep
 
 In `shakenfist/daemons/cluster/scheduled_tasks.py`:
 
@@ -531,7 +625,7 @@ per-object type; skip the audit event; drop the requeue on
 
 Commit subject: "Hard delete most types in batches."
 
-### Brief 3e: document the changes
+### Brief 3f: document the changes
 
 - `docs/operator_guide/database.md`, the deleted-object sweep section:
   bullets for `DELETED_OBJECT_BATCH_SIZE` and
@@ -544,15 +638,15 @@ Commit subject: "Hard delete most types in batches."
 - `docs/release_notes/v07-v08.md`: extend the deleted-object sweep
   entry.
 - `docs/developer_guide/database_internals.md`: one paragraph on the
-  batch RPC, the mapping in `mariadb.py`, and the parity test that
-  must be updated with any change to a batchable class's
-  `hard_delete()`.
+  batch RPC and its two modes, the mapping in `mariadb.py` as the one
+  place a batchable type's deletes are declared, the per-call
+  fallback, and the parity test whose literal must change with it.
 
 No plan, phase or decision citations outside `docs/plans`.
 
 Commit subject: "Document batched hard deletes."
 
-### Brief 3f: measure (management session, after deploy)
+### Brief 3g: measure (management session, after deploy)
 
 Once sfcbr runs a build containing this phase
 (`cluster_deleted_object_batch_seconds_count` exists), wait 24 hours
@@ -570,6 +664,9 @@ sum by (object_type) (increase(cluster_deleted_object_seconds_count{outcome=~"ha
 sum(rate(database_requests_total[24h]))
 sum(rate(mysql_global_status_commands_total{command="commit"}[24h]))
 sort_desc(sum by (operation) (rate(database_requests_total{caller_daemon="cluster"}[24h])))
+
+# Every daemon's hard deletes now go through the batch (D15)
+sum by (caller_daemon) (rate(database_requests_total{operation="HardDeleteObjects"}[24h]))
 ```
 
 The per-commit reading holds if a batch of n costs about one commit
@@ -591,7 +688,7 @@ and sets phase 4's drain rate from them.
 - **A batch's transaction is large or contends.** `event_objects` is
   the widest table; a blob had 3.4 s of event-reference deletes in
   phase 1. Mitigation: the default batch is 25, the server refuses
-  more than 1,000, `_retry_transaction()` retries a deadlock, and 3f
+  more than 1,000, `_retry_transaction()` retries a deadlock, and 3g
   reads batch latency per type. Blobs number in the tens.
 - **CI runs MariaDB 10.11 and sfcbr 11.8.** `DELETE ... RETURNING`
   exists in both, but the live tests run locally on 11.8 and in CI on
@@ -608,8 +705,12 @@ and sets phase 4's drain rate from them.
 - **The batch path's events are lost.** The audit events go through
   the same spool as every other event, with its existing drop counter.
   Losing one loses an audit line, not data.
-- **Mixed versions during the deploy.** Mitigation: D22's fallback,
-  tested in 3d.
+- **Mixed versions during the deploy.** Every daemon's
+  `hard_delete()` now needs the RPC. Mitigation: D15's per-call
+  fallback, tested in 3d, and D22's for the sweep, tested in 3e.
+- **A rewritten cascade test loses what it checked.** Mitigation: 3d
+  reports every test file it changes, and the management session
+  reads each changed assertion against the one it replaced.
 
 ## Definition of done
 
@@ -620,24 +721,32 @@ and sets phase 4's drain rate from them.
    including the rollback test.
 4. 3c's parity test fails for each of its three mutations, and every
    type in `OBJECT_NAMES_TO_CLASSES` is classified.
-5. No class's `hard_delete()` changed, and their tests are unchanged:
-   `git diff origin/develop --stat -- shakenfist/instance.py
-   shakenfist/namespace.py shakenfist/namespace_claim.py
-   shakenfist/node.py shakenfist/baseobject.py shakenfist/operations/
-   shakenfist/blob.py shakenfist/artifact.py shakenfist/network/
-   shakenfist/ipam.py shakenfist/namespace_key.py
-   shakenfist/trusted_issuer.py shakenfist/mapping_rule.py
-   shakenfist/upload.py shakenfist/agentoperation.py
-   shakenfist/managed_executables/` is empty.
-6. 3d's tests fail for each of its four mutations.
+5. The per-object classes are untouched: `git diff origin/develop
+   --stat -- shakenfist/instance.py shakenfist/namespace.py
+   shakenfist/namespace_claim.py shakenfist/node.py` is empty. No
+   batchable class deletes rows itself: `grep -rn "def hard_delete"
+   shakenfist --include=*.py | grep -v /tests/` lists only
+   `baseobject.py` (twice), `ipam.py`, `instance.py`, `namespace.py`,
+   `namespace_claim.py` and `node.py`.
+6. 3d's tests fail for each of its five mutations, and 3e's for each
+   of its four.
 7. `tox -e genprotos` leaves no diff.
 8. The docs name both new options, the `skipped` outcome and the batch
    histogram, and `grep -rn "phase [0-9]\|D1[4-9]\|D2[0-3]" docs
    --include=*.md | grep -v docs/plans` finds nothing this phase added.
-9. After deploy, 3f's numbers are recorded by phase 4's planning
+9. After deploy, 3g's numbers are recorded by phase 4's planning
    commit.
 
 ## Execution notes
+
+- **Back brief, 2026-10-23 (UTC).** Michael kept D18's default of 100
+  objects a pass. He chose to move the batchable classes'
+  `hard_delete()` onto the batch rather than keep a second copy of
+  the table list, so D15 changed before any step ran: D14 gained the
+  unconditional mode, a new step 3d moves the classes, and the later
+  steps became 3e to 3g. The live tests may run against a throwaway
+  local `mariadb:11.8` container. This session may push and open the
+  pull request once the definition of done passes.
 
 ## Back brief
 
@@ -645,10 +754,10 @@ Before starting, confirm with Michael:
 
 - **D18's default of 100 objects a pass.** It holds the drain near
   today's rate on purpose. If he would rather phase 3 start the drain,
-  the number to agree is the default, and 3f then measures load at
+  the number to agree is the default, and 3g then measures load at
   that rate instead.
-- **D15's choice to leave `hard_delete()` alone**, and so to carry two
-  copies of each batchable type's table list with a test between them.
+- **D15**, which planning wrote as leaving `hard_delete()` alone and
+  carrying two copies of each batchable type's table list.
 - Whether this session may push and open the pull request once the
   definition of done passes.
 - The live tests run locally against a throwaway MariaDB container, as
