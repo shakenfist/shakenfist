@@ -719,7 +719,10 @@ a call of the public function. Instances, namespaces, namespace claims and
 nodes are absent because their hard delete does more than delete rows. An
 `sf-database` which predates the RPC makes `hard_delete_objects()` raise
 `HardDeleteBatchUnavailable`, and callers fall back to
-`hard_delete_objects_per_call()`, the same deletes as separate commits.
+`hard_delete_objects_per_call()`, the same deletes as separate commits. The
+client remembers that answer for `HARD_DELETE_BATCH_RECHECK_SECONDS` (five
+minutes) and raises without asking again until then, so a rolling upgrade
+does not cost every hard delete a refused round trip and a warning.
 `shakenfist/tests/test_hard_delete_batch_parity.py` checks the mapping
 against each class's own deletes, so its `EXPECTED_DELETES` literal must
 change whenever the mapping does.

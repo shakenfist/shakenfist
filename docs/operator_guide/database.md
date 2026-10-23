@@ -993,13 +993,14 @@ maintenance pass, once a minute.
 Twenty-five object types are hard deleted in batches, many to a single
 database transaction. The same RPC carries every other hard delete of
 those types too, such as a namespace's keys going with it, one
-transaction per object rather than one commit per table. Instances, namespaces, namespace claims and nodes
-are hard deleted one at a time, because their hard delete does more than
-remove rows keyed on the object (an instance releases its placement, and a
-namespace cascades to what it owns). An older `sf-database` which does not
-have the batch RPC still works: the sweep notices, and hard deletes every
-object one at a time for the rest of that pass. That is slower, which is
-why `sf-database` should be upgraded before `sf-cluster`.
+transaction per object rather than one commit per table. Instances,
+namespaces, namespace claims and nodes are hard deleted one at a time,
+because their hard delete does more than remove rows keyed on the object
+(an instance releases its placement, and a namespace cascades to what it
+owns). An older `sf-database` which does not have the batch RPC still
+works: each daemon notices, logs a warning, and hard deletes one object
+at a time, asking again every five minutes. That is slower, which is why
+`sf-database` should be upgraded before `sf-cluster`.
 
 The sweep's work is a list of uuids per object type. Each list is a page
 of up to 500 uuids, read in primary key order with the age filter applied
