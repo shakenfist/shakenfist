@@ -337,7 +337,8 @@ class ClusterOperationsEndpoint(api_base.Resource):
             object_type_enum = ObjectType(target_object_type)
         except ValueError:
             return sf_api.error(
-                400, f'invalid target_object_type: {target_object_type!r}')
+                400, f'invalid target_object_type: {target_object_type!r}',
+                suppress_traceback=True)
 
         # Resolve the target object to validate access. If the type has
         # no Python class registered (e.g. ``api-requests``, ``unknown``),
@@ -346,7 +347,8 @@ class ClusterOperationsEndpoint(api_base.Resource):
             cls = get_object_class(target_object_type)
         except NoSuchObject:
             return sf_api.error(
-                400, f'unsupported target_object_type: {target_object_type!r}')
+                400, f'unsupported target_object_type: {target_object_type!r}',
+                suppress_traceback=True)
 
         try:
             target_obj = cls.from_db(target_uuid)

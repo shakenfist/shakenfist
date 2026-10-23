@@ -691,7 +691,8 @@ class NetworkPingEndpoint(api_base.Resource):
         try:
             ipaddress.ip_address(address)
         except ValueError:
-            return sf_api.error(400, 'invalid address')
+            return sf_api.error(400, 'invalid address',
+                                suppress_traceback=True)
 
         if not network_from_db.ipam.is_in_range(address):
             return sf_api.error(400, 'ping request for address outside network block')
@@ -767,7 +768,8 @@ class NetworkAddressEndpoint(api_base.Resource):
         try:
             ipaddress.ip_address(address)
         except ValueError:
-            return sf_api.error(400, 'invalid address')
+            return sf_api.error(400, 'invalid address',
+                                suppress_traceback=True)
 
         if not network_from_db.ipam.is_in_range(address):
             return sf_api.error(
@@ -840,7 +842,8 @@ class NetworkAddressEndpoint(api_base.Resource):
         try:
             ipaddress.ip_address(address)
         except ValueError:
-            return sf_api.error(400, 'invalid address')
+            return sf_api.error(400, 'invalid address',
+                                suppress_traceback=True)
 
         if not network_from_db.ipam.is_in_range(address):
             return sf_api.error(
@@ -1003,7 +1006,8 @@ class NetworkDNSAddressEndpoint(api_base.Resource):
         try:
             ipaddress.ip_address(value)
         except ValueError:
-            return sf_api.error(406, 'invalid DNS value')
+            return sf_api.error(406, 'invalid DNS value',
+                                suppress_traceback=True)
 
         op = network_from_db.update_dns_entry(name, value)
         if op is not None:

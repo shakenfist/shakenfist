@@ -842,7 +842,7 @@ class ArtifactVersionsEndpoint(api_base.Resource):
         try:
             mv = validated_max_versions(max_versions)
         except exceptions.InvalidMaxVersions as e:
-            return sf_api.error(400, str(e))
+            return sf_api.error(400, str(e), suppress_traceback=True)
         artifact_from_db.add_event(
             EVENT_TYPE_AUDIT, 'max versions set from REST API')
         artifact_from_db.max_versions = mv
@@ -871,7 +871,8 @@ class ArtifactVersionEndpoint(api_base.Resource):
         try:
             ver_index = int(version_id)
         except ValueError:
-            return sf_api.error(400, 'version index is not an integer')
+            return sf_api.error(400, 'version index is not an integer',
+                                suppress_traceback=True)
 
         indexes = list(artifact_from_db.get_all_indexes())
         for idx in indexes:

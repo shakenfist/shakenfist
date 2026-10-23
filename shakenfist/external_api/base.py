@@ -450,7 +450,8 @@ def _timing_seconds(name, value, maximum=None):
         seconds = float(value)
     except (TypeError, ValueError):
         return None, sf_api.error(
-            400, '%s must be a number of seconds' % name)
+            400, '%s must be a number of seconds' % name,
+            suppress_traceback=True)
 
     # Neither infinity nor NaN is a duration, and both arrive easily:
     # the JSON string "inf" converts, and json.loads() accepts the

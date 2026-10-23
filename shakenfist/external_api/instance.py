@@ -1550,7 +1550,8 @@ class InstanceRebootSoftEndpoint(api_base.Resource):
                                            global_scope=False):
                 return instance_from_db.reboot(hard=False)
         except exceptions.InvalidLifecycleState as e:
-            return sf_api.error(409, f'Invalid lifecycle state: {e}')
+            return sf_api.error(409, f'Invalid lifecycle state: {e}',
+                                suppress_traceback=True)
 
 
 class InstanceRebootHardEndpoint(api_base.Resource):
@@ -1576,7 +1577,8 @@ class InstanceRebootHardEndpoint(api_base.Resource):
                                            global_scope=False):
                 return instance_from_db.reboot(hard=True)
         except exceptions.InvalidLifecycleState as e:
-            return sf_api.error(409, f'Invalid lifecycle state: {e}')
+            return sf_api.error(409, f'Invalid lifecycle state: {e}',
+                                suppress_traceback=True)
 
 
 class InstancePowerOffEndpoint(api_base.Resource):
@@ -1603,7 +1605,8 @@ class InstancePowerOffEndpoint(api_base.Resource):
                                            global_scope=False):
                 return instance_from_db.power_off()
         except exceptions.InvalidLifecycleState as e:
-            return sf_api.error(409, f'Invalid lifecycle state: {e}')
+            return sf_api.error(409, f'Invalid lifecycle state: {e}',
+                                suppress_traceback=True)
         except exceptions.InstancePowerOffFailed as e:
             # libvirt's error can name host paths, so it goes in the event
             # and not the response. This event carries destroy()'s error
@@ -1643,13 +1646,15 @@ class InstancePowerOnEndpoint(api_base.Resource):
                                            global_scope=False):
                 return instance_from_db.power_on()
         except exceptions.InvalidLifecycleState as e:
-            return sf_api.error(409, f'Invalid lifecycle state: {e}')
+            return sf_api.error(409, f'Invalid lifecycle state: {e}',
+                                suppress_traceback=True)
         except (exceptions.NVRAMTemplateMissing,
                 exceptions.UEFIFirmwareUnavailable) as e:
             instance_from_db.add_event(
                 EVENT_TYPE_AUDIT, 'power on failed: UEFI boot unavailable',
                 extra={'error': str(e)})
-            return sf_api.error(409, f'UEFI boot unavailable: {e}')
+            return sf_api.error(409, f'UEFI boot unavailable: {e}',
+                                suppress_traceback=True)
         except exceptions.InstancePowerOnFailed as e:
             # libvirt's error can name host paths (disks, nvram, the qemu
             # binary), so it goes in the event and not the response.
@@ -1685,7 +1690,8 @@ class InstancePauseEndpoint(api_base.Resource):
                                            global_scope=False):
                 return instance_from_db.pause()
         except exceptions.InvalidLifecycleState as e:
-            return sf_api.error(409, f'Invalid lifecycle state: {e}')
+            return sf_api.error(409, f'Invalid lifecycle state: {e}',
+                                suppress_traceback=True)
 
 
 class InstanceUnpauseEndpoint(api_base.Resource):
@@ -1711,7 +1717,8 @@ class InstanceUnpauseEndpoint(api_base.Resource):
                                            global_scope=False):
                 return instance_from_db.unpause()
         except exceptions.InvalidLifecycleState as e:
-            return sf_api.error(409, f'Invalid lifecycle state: {e}')
+            return sf_api.error(409, f'Invalid lifecycle state: {e}',
+                                suppress_traceback=True)
 
 
 class InstanceMetadatasEndpoint(api_base.Resource):
@@ -1879,7 +1886,8 @@ def _validate_instance_metadata(key, value):
             try:
                 int(dv)
             except (TypeError, ValueError, OverflowError):
-                return sf_api.error(400, 'affinity dictionary values should be integers')
+                return sf_api.error(400, 'affinity dictionary values should be integers',
+                                    suppress_traceback=True)
 
 
 class InstanceMetadataEndpoint(api_base.Resource):
@@ -2210,7 +2218,8 @@ class InstanceVDIProxyConsoleHelperEndpoint(api_base.Resource):
             return sf_api.error(
                 500,
                 f'kerbside signing key is not usable ({e}), run sf-ctl '
-                'ensure-kerbside-signing-key')
+                'ensure-kerbside-signing-key',
+                suppress_traceback=True)
 
         url = f'{base}/sf-console.vv?token={minted["token"]}'
 
@@ -2289,7 +2298,8 @@ class InstanceAgentPutEndpoint(api_base.Resource):
             try:
                 symbolicmode.symbolic_to_numeric_permissions(mode)
             except ValueError as e:
-                return sf_api.error(406, 'invalid mode: %s' % e)
+                return sf_api.error(406, 'invalid mode: %s' % e,
+                                    suppress_traceback=True)
 
         b = Blob.from_db(blob_uuid)
         if not b:

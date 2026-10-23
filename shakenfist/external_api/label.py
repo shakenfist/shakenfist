@@ -68,7 +68,8 @@ def _label_url_or_error(label_name):
         namespace, label_url = _label_url(label_name)
     except LabelHierarchyTooDeep:
         return (None, None, sf_api.error(
-            400, 'label names may contain at most one /'))
+            400, 'label names may contain at most one /',
+            suppress_traceback=True))
     return (namespace, label_url, None)
 
 
@@ -127,7 +128,7 @@ class LabelEndpoint(api_base.Resource):
         try:
             max_versions = validated_max_versions(max_versions)
         except InvalidMaxVersions as e:
-            return sf_api.error(400, str(e))
+            return sf_api.error(400, str(e), suppress_traceback=True)
 
         # Resolve by ownership and then authorise creating and modifying
         # apart, exactly as the artifact upload route does. The

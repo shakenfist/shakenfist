@@ -97,7 +97,8 @@ class AdminVDITokenPublicKeyEndpoint(api_base.Resource):
             return vdi_tokens.public_view(material)
         except vdi_tokens.SigningKeyError as e:
             return sf_api.error(
-                500, f'stored Kerbside VDI token signing key is corrupt: {e}')
+                500, f'stored Kerbside VDI token signing key is corrupt: {e}',
+                suppress_traceback=True)
 
 
 admin_resources_get_example = """{
