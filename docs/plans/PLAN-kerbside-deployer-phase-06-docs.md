@@ -601,7 +601,57 @@ and documenting affinity.
 
 ## Execution notes
 
-None yet.
+**Back brief (2026-10-23, Australia/Sydney).** The operator:
+* kept D4's two unrelated navigation entries;
+* allowed this session to close kerbside#579;
+* allowed this session to push and open both pull requests.
+
+**D8.** kerbside#579 was closed with a comment linking the four green
+nightlies.
+
+**Steps 1 and 3 ran in parallel, then step 2.** Step 2 links step 1's
+anchors, so it waited for step 1.
+
+**Step 1, `39ab2f2415`.** D2's gate passed. The exchange stores the
+console's session token in Kerbside's database. The proxy authorises
+every channel through `AuthorizeConnection`, which calls
+`db.get_token_by_token` (`kerbside/rpc/servicer.py:93-96`,
+`kerbside/db.py:551-560`). That filters on the token and its expiry
+alone, so a console file from one host is redeemable at any host that
+shares the database. The management session re-read these claims:
+* the redemption path above;
+* that gunicorn serves plain HTTP, with no `--certfile` in the role's
+  unit;
+* that nothing in Kerbside reads the PROXY protocol;
+* the certificate request at `site.yml:981-1013`.
+
+It corrected one row of the network table: users exchange tokens at
+`kerbside_url`, not at `kerbside_public_fqdn`'s API port.
+
+The agent found one thing the plan had not. The deploy allows
+`api_url` to differ between Kerbside hosts, and hosts that differ
+rewrite the shared source row on every 60-second pass. The page tells
+operators to give every host the same routable `api_url`.
+
+It also flagged `PUBLIC_FQDN`'s description in Kerbside's
+`config.py:134`, "could be a load balancer with backend affinity". That
+is permissive rather than wrong, so it was left alone.
+
+**Step 2, `527ab15bd2`.** The management session moved the collection
+README's pointer to the end of the paragraph on the role's variables,
+and made the release note's link relative, like its others.
+
+**Step 3, Kerbside `a0dea40`,** on branch `kerbside-deployer-docs`.
+* The verification grep found no gRPC client outside the tests.
+* The class sweep found no wrong co-location claim beyond S8's four.
+* The management session rewrapped the edited paragraphs and
+  shortened the `installation.md` heading to "Two processes."
+
+**Definition of done.** Every item passed on these commits. The second
+Kerbside grep in the Definition of done still matches
+`demo/entrypoint.sh:140`. That line is the correct daemon-and-proxy
+statement, which the pattern catches because `API_SOCKET_PATH`
+contains "API", so the pattern was written too broadly.
 
 ## Future work
 
