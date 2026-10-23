@@ -21,6 +21,7 @@ import time
 
 import requests
 from testtools import content
+from testtools import matchers
 
 from shakenfist_ci import base
 from shakenfist_ci import load_budget as lb
@@ -675,6 +676,7 @@ class DatabaseTierTestsMixin:
         over = []
         unbudgeted = []
         harness = []
+        requested = []
         reported = []
         for key, measured in sorted(metronomic.items()):
             entry = entries.get(key)
@@ -689,6 +691,11 @@ class DatabaseTierTestsMixin:
                 # in the run detail is an exemption nobody will revisit.
                 if lb.harness_driven(key):
                     harness.append((key, measured))
+                # The same argument made for a whole caller rather than a
+                # pair, because sf-api has no loop of its own which could
+                # be the poll. See lb.REQUEST_DRIVEN_CALLERS.
+                elif lb.request_driven(key):
+                    requested.append((key, measured))
                 else:
                     unbudgeted.append((key, measured))
                 continue
@@ -701,6 +708,21 @@ class DatabaseTierTestsMixin:
                 over.append((key, measured, modelled, ceiling))
             else:
                 reported.append((key, measured, modelled, ceiling))
+
+        # Every pair named below carries its rate in each window, not only
+        # the lowest one fixed_rate() keyed it to. Whether a pair was a poll
+        # or a test is a question about how its rate moved, and for most of
+        # issue 4021 the only number anybody had was the one which could
+        # not answer it. A real poll holds its count to within an event or
+        # two per window; see poll_positive_control for what that looks like
+        # on the same run.
+        def _pair(key, measured, **extra):
+            pair = {'operation': key[0], 'caller_daemon': key[1],
+                    'measured': measured,
+                    'measured_qps_per_window': [
+                        round(w.get(key, 0.0), 3) for w in windows]}
+            pair.update(extra)
+            return pair
 
         summary = {
             'nodes': node_count,
@@ -725,17 +747,13 @@ class DatabaseTierTestsMixin:
             'activity_spread_required': lb.ACTIVITY_DISCRIMINATION_SPREAD,
             'known_polls_recognised': recognised,
             'over_budget': [
-                {'operation': k[0], 'caller_daemon': k[1], 'measured': m,
-                 'modelled': mod, 'ceiling': c} for k, m, mod, c in over],
-            'unbudgeted': [
-                {'operation': k[0], 'caller_daemon': k[1], 'measured': m}
-                for k, m in unbudgeted],
-            'harness_driven': [
-                {'operation': k[0], 'caller_daemon': k[1], 'measured': m}
-                for k, m in harness],
+                _pair(k, m, modelled=mod, ceiling=c)
+                for k, m, mod, c in over],
+            'unbudgeted': [_pair(k, m) for k, m in unbudgeted],
+            'harness_driven': [_pair(k, m) for k, m in harness],
+            'request_driven': [_pair(k, m) for k, m in requested],
             'over_budget_but_not_enforced': [
-                {'operation': k[0], 'caller_daemon': k[1], 'measured': m,
-                 'modelled': mod} for k, m, mod, _ in reported],
+                _pair(k, m, modelled=mod) for k, m, mod, _ in reported],
         }
         self.addDetail('database_load', content.text_content(
             json.dumps(summary, indent=2, sort_keys=True)))
@@ -788,8 +806,14 @@ class DatabaseTierTestsMixin:
                 'below proves nothing. summary=%s'
                 % json.dumps(summary, sort_keys=True))
 
-        self.assertEqual(
-            [], unbudgeted,
+        # Expected rather than asserted, both of them. They are two
+        # independent findings about one measurement, and a plain assertion
+        # on the first ended the test before the second was looked at --
+        # which is how issue 4021's run hid an over budget pair behind its
+        # unbudgeted ones (issue 4177 has another). testtools reports
+        # every failed expectation together once the test returns.
+        self.expectThat(
+            unbudgeted, matchers.Equals([]),
             'These (operation, caller_daemon) pairs are not in '
             'shakenfist/data/database_load_budget.yaml, and ran above '
             '%.2f/s at the same rate in every measurement window without '
@@ -802,8 +826,8 @@ class DatabaseTierTestsMixin:
             'an entry has to argue. summary=%s'
             % (unbudgeted_ceiling, json.dumps(summary, sort_keys=True)))
 
-        self.assertEqual(
-            [], over,
+        self.expectThat(
+            over, matchers.Equals([]),
             'These pairs are budgeted and ran steadily well above what the '
             'model predicts for a cluster of this shape. Do not raise the '
             'budget to make this pass: either the load is a regression '

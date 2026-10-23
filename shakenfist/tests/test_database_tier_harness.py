@@ -266,6 +266,94 @@ class DatabaseTierHarnessTestCase(base.ShakenFistTestCase):
         self.assertFalse(harness.harness_driven(('GetObjectEvents', 'net')))
         self.assertFalse(harness.harness_driven(('GetNodeDaemonState', 'net')))
 
+    def test_request_driven_reads_the_caller_not_the_operation(self):
+        self.assertTrue(harness.request_driven(('SetObjectState', 'api')))
+        self.assertTrue(harness.request_driven(['FindNetworks', 'api']))
+        self.assertFalse(harness.request_driven(('SetObjectState', 'queues')))
+        self.assertFalse(harness.request_driven(('FindNetworks', 'net')))
+
+    def test_request_driven_callers_run_no_daemon_loop(self):
+        # The exemption's premise is that the caller has no loop of its
+        # own. A caller which ran Daemon.idle() would have one, and its
+        # pairs are exactly the ones the unbudgeted assertion is for.
+        polls = _daemons_which_poll()
+        self.assertEqual(
+            [], sorted(harness.REQUEST_DRIVEN_CALLERS & polls),
+            'These callers are exempted as only ever serving requests, '
+            'but they run the Daemon base class loop: %s'
+            % json.dumps(sorted(polls)))
+        self.assertLessEqual(
+            harness.REQUEST_DRIVEN_CALLERS,
+            set(harness.NON_POLLING_DAEMONS))
+
+    def test_sf_api_starts_only_the_threads_it_is_known_to_start(self):
+        # REQUEST_DRIVEN_CALLERS exempts every api pair on the grounds
+        # that sf-api has no timer loop which reaches the database. Derived
+        # from external_api rather than asserted about it, so that a thread
+        # added there -- a cache refresher, a background sweep -- fails
+        # here and has to argue for itself, rather than polling unseen by
+        # the CI check that was told it could not.
+        #
+        # The readiness checker is the one loop, and it is allowed because
+        # its only call is the gRPC health service, which the tier's
+        # interceptor does not count (test_database_attribution.py holds
+        # that half up). The drain timer fires once, at shutdown.
+        started = set()
+        root = os.path.join(_repository_root(), 'shakenfist', 'external_api')
+        for dirpath, _, filenames in os.walk(root):
+            for filename in sorted(filenames):
+                if not filename.endswith('.py'):
+                    continue
+                path = os.path.join(dirpath, filename)
+                with open(path, encoding='utf-8') as f:
+                    tree = ast.parse(f.read())
+                for node in ast.walk(tree):
+                    if not isinstance(node, ast.Call):
+                        continue
+                    func = node.func
+                    name = (func.attr if isinstance(func, ast.Attribute)
+                            else getattr(func, 'id', None))
+                    if name not in ('Thread', 'Timer'):
+                        continue
+                    target = None
+                    for kw in node.keywords:
+                        if kw.arg in ('target', 'function'):
+                            target = kw.value
+                    if target is None and name == 'Timer' and len(node.args) > 1:
+                        target = node.args[1]
+                    started.add((os.path.relpath(path, root), name,
+                                 getattr(target, 'id', None)))
+
+        self.assertEqual(
+            {('health.py', 'Thread', '_checker_loop'),
+             ('gunicorn_config.py', 'Timer', '_invoke_orig')},
+            started,
+            'sf-api starts a thread this check does not know about. Every '
+            'api pair is exempt from the unbudgeted polling assertion '
+            'because sf-api has no loop of its own (see '
+            'REQUEST_DRIVEN_CALLERS in load_budget.py); if the new thread '
+            'reads or writes the database on a timer, that is no longer '
+            'true and the exemption must be narrowed.')
+
+    def test_the_readiness_checker_reaches_only_the_health_service(self):
+        # The other half of the allowance above: the checker's thread is a
+        # loop, and is harmless only while it calls nothing the tier's
+        # interceptor counts.
+        tree = _parse('shakenfist', 'external_api', 'health.py')
+        imported = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                imported.update('%s.%s' % (node.module, a.name)
+                                for a in node.names)
+            elif isinstance(node, ast.Import):
+                imported.update(a.name for a in node.names)
+        self.assertEqual(
+            [], sorted(i for i in imported if 'mariadb' in i),
+            'external_api/health.py now imports a database client, so the '
+            'readiness checker thread can reach the tier through something '
+            'other than the health service.')
+        self.assertIn('grpc_health.v1.health_pb2_grpc', imported)
+
     def test_the_suite_still_polls_an_events_endpoint(self):
         # The whole argument for exempting GetObjectEvents/api is that this
         # suite's own await helpers read an events endpoint on a timer. If
