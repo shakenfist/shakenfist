@@ -721,7 +721,8 @@ because the following statements will be true:
   healthy instance to `created-error`, because
   `NodeInstOp.dispatch_task()` errors the instance on any task
   exception. Found by the phase 3 survey. Its natural fix keys off
-  the `observational_tasks` declarations phase 3 adds.
+  the `observational_tasks` declarations phase 3 adds. Fixed in
+  #4608, which does exactly that.
 * #4603: pages and code comments outside this plan's API
   reference say terminal ops are removed after about thirty
   seconds, when that is only eligibility and the sweep runs

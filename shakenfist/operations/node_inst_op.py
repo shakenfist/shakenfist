@@ -96,6 +96,17 @@ class NodeInstOp(BaseClusterOperation):
         except Exception as e:
             util_exceptions.ignore_exception('node_inst_op', e)
             self.state = NodeInstOp.STATE_ERROR
+
+            # An observational task only measures the instance, so failing
+            # to measure it says nothing about the guest. The cluster daemon
+            # enqueues these for every created instance on every sweep, and
+            # a transient database error while recording a usage event would
+            # otherwise error a healthy instance.
+            if task in schema.model.observational_tasks:
+                self.log.with_fields({'task': task.name}).warning(
+                    'Observational task failed, instance state unchanged')
+                return
+
             if inst and inst.state.value not in (Instance.STATE_DELETED,
                                                  Instance.STATE_HARD_DELETED):
                 # A blind STATE_ERROR is an invalid transition from states
@@ -112,8 +123,8 @@ class NodeInstOp(BaseClusterOperation):
     def _collect_billing_statistics(self, inst):
         # The sweep enqueues this only for created instances, but a queued
         # sweep is not cancelled by a later delete, so the instance may have
-        # moved on. A failed task errors its instance, so measuring a guest
-        # that is being deleted could error the delete.
+        # moved on. There is nothing useful to measure on a guest that is
+        # being deleted, and its disks may vanish while we stat them.
         if inst.state.value != Instance.STATE_CREATED:
             return
 
