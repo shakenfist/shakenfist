@@ -14332,6 +14332,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#waiting-for-an-object-to-settle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Waiting for an object to settle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#polling-an-asynchronous-operation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15520,6 +15531,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#waiting-for-an-object-to-settle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Waiting for an object to settle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#polling-an-asynchronous-operation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15575,6 +15597,20 @@ list scoped to a specific target object, or as the transitive <code>depends_on</
 chain ending at a given op. They are also accessible as sub-resources of the
 objects they act upon, currently exposed for artifacts, instances, and
 networks.</p>
+<p>The per-object sub-resources are <code>/artifacts/{artifact_ref}/clusteroperations</code>,
+<code>/instances/{instance_ref}/clusteroperations</code> and
+<code>/networks/{network_ref}/clusteroperations</code>. Each lists the operations which
+target that object, newest first. An operation which only targets another
+object is not listed, even if one of this object's operations waits for it: a
+network reconcile an instance start waits on appears in the network's list, not
+the instance's, and <code>GET /clusteroperations/{op_uuid}/chain</code> traces what an
+operation waits on. Every entry carries an <code>observational</code> boolean, as
+described below. By default only operations which are queued, in preflight or
+executing are listed. With <code>all=true</code> the list also includes finished
+operations which have not yet been removed. Finished operations are normally
+removed within about fifteen minutes, and errored operations are kept for up
+to <code>CLUSTER_OPERATION_TARGET_RETENTION</code>, seven days by default, so <code>all=true</code>
+is a bounded window onto recent work and not a history.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
@@ -15599,6 +15635,36 @@ networks.</p>
   <code>last_cluster_operation</code> or its pending operations.</li>
 </ul>
 </details>
+<h2 id="waiting-for-an-object-to-settle">Waiting for an object to settle<a class="headerlink" href="#waiting-for-an-object-to-settle" title="Permanent link">&para;</a></h2>
+<p>Instance, network and artifact views carry a <code>has_pending_operations</code> boolean
+beside <code>last_cluster_operation</code>. It is true while any non-observational
+cluster operation targeting the object is queued, in preflight or executing,
+and it is true when the server cannot tell, so a transient database problem
+makes an object look busy rather than idle. Unlike <code>last_cluster_operation</code>,
+it is not masked by a later operation which has already finished. It is also
+present on the objects returned by the list endpoints. The field is
+advertised by the <code>object-pending-operations</code> capability.</p>
+<p>Observational operations never make an object pending. A background sweep, or
+a checksum verification requested through
+<code>GET /blobs/{blob_uuid}/checksum/{algorithm}</code>, is listed with
+<code>observational: true</code> but leaves <code>has_pending_operations</code> false. A caller
+waiting for a requested blob hash therefore cannot use this field: it polls
+<code>GET /blobs/{blob_uuid}/checksum/{algorithm}</code> instead, which returns the hash
+once it has been recorded and null until then, and queues a verification
+if the hash is not yet known.</p>
+<details class="example">
+<summary>Python API client: wait for an instance to settle</summary>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">check_capability</span><span class="p">(</span><span class="s1">'object-pending-operations'</span><span class="p">):</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s1">'this cluster does not report pending operations'</span><span class="p">)</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="k">while</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance</span><span class="p">(</span><span class="n">instance_uuid</span><span class="p">)[</span><span class="s1">'has_pending_operations'</span><span class="p">]:</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</code></pre></div>
+</details>
 <h2 id="polling-an-asynchronous-operation">Polling an asynchronous operation<a class="headerlink" href="#polling-an-asynchronous-operation" title="Permanent link">&para;</a></h2>
 <p>Some REST endpoints (currently <code>DELETE /networks/{network_ref}</code> and
 <code>DELETE /networks</code>) return HTTP 202 (Accepted) with an op handle in the
@@ -15616,24 +15682,24 @@ controlling whether the client polls until terminal or returns the op
 handle immediately.</p>
 <details class="example">
 <summary>Python API client: trace the chain that spawned an op</summary>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">chain</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_cluster_operation_chain</span><span class="p">(</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s1">'22b757ae-41d1-456b-84a4-edca694ceb6d'</span><span class="p">)</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">:</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">op</span><span class="p">[</span><span class="s1">'uuid'</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="s1">'state'</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="s1">'tasks'</span><span class="p">])</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">chain</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_cluster_operation_chain</span><span class="p">(</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="s1">'22b757ae-41d1-456b-84a4-edca694ceb6d'</span><span class="p">)</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">:</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">op</span><span class="p">[</span><span class="s1">'uuid'</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="s1">'state'</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="s1">'tasks'</span><span class="p">])</span>
 </code></pre></div>
 </details>
 <details class="example">
 <summary>Python API client: list ops targeting a network</summary>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">ops</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">list_cluster_operations_for_target</span><span class="p">(</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="s1">'network'</span><span class="p">,</span> <span class="s1">'6a663ac7-620f-417c-b197-3004d8c84bc7'</span><span class="p">)</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">ops</span><span class="p">:</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">op</span><span class="p">[</span><span class="s1">'uuid'</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="s1">'operation_type'</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="s1">'state'</span><span class="p">])</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">ops</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">list_cluster_operations_for_target</span><span class="p">(</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="s1">'network'</span><span class="p">,</span> <span class="s1">'6a663ac7-620f-417c-b197-3004d8c84bc7'</span><span class="p">)</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">ops</span><span class="p">:</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">op</span><span class="p">[</span><span class="s1">'uuid'</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="s1">'operation_type'</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="s1">'state'</span><span class="p">])</span>
 </code></pre></div>
 </details>
 

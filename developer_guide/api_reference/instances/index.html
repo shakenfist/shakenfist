@@ -16810,9 +16810,13 @@ future instances.</p>
 <h2 id="cluster-operations">Cluster operations<a class="headerlink" href="#cluster-operations" title="Permanent link">&para;</a></h2>
 <p>Since v0.8, <a href="/developer_guide/api_reference/clusteroperations">cluster operations</a>
 for a given instance have been exposed. This lists the various pieces of queued
-work that Shaken Fist has executed on a given object, with the limitation that
-completed cluster operations are hard deleted after CLEANER_DELAY seconds
-(which defaults to one hour).</p>
+work that Shaken Fist has queued against a given object, newest first. By
+default only operations which are still queued, in preflight or executing are
+listed.
+<a href="/developer_guide/api_reference/clusteroperations#looking-up-cluster-operations">Looking up cluster operations</a>
+says how long finished operations remain visible, and
+<a href="/developer_guide/api_reference/clusteroperations#waiting-for-an-object-to-settle">waiting for an object to settle</a>
+describes the <code>has_pending_operations</code> field.</p>
 <details class="tip" open="open">
 <summary>REST API calls</summary>
 <ul>
@@ -16825,8 +16829,8 @@ completed cluster operations are hard deleted after CLEANER_DELAY seconds
 <a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
 <a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>
 <a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a><span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_queued_cluster_operations</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">)</span>
-<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a><span class="n">ops</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_clusteroperations</span><span class="p">(</span><span class="n">inst_uuid</span><span class="p">)</span>
+<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ops</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
 </details>
 <details class="example">
@@ -16835,8 +16839,8 @@ completed cluster operations are hard deleted after CLEANER_DELAY seconds
 <a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">shakenfist_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">apiclient</span>
 <a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a>
 <a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="n">sf_client</span> <span class="o">=</span> <span class="n">apiclient</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a><span class="n">md</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_queued_cluster_operations</span><span class="p">(</span><span class="n">img_uuid</span><span class="p">,</span> <span class="nb">all</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">md</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a><span class="n">ops</span> <span class="o">=</span> <span class="n">sf_client</span><span class="o">.</span><span class="n">get_instance_clusteroperations</span><span class="p">(</span><span class="n">inst_uuid</span><span class="p">,</span> <span class="nb">all</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ops</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
 </code></pre></div>
 </details>
 

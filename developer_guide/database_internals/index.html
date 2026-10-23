@@ -15902,7 +15902,7 @@ change that adds the task, and add the task to <code>observational_tasks</code> 
 it is observational. The reasoning for each existing task is in the
 <a href="../../plans/PLAN-cluster-op-visibility-phase-03-mark-observational/#audit-table">audit table</a>
 of the plan which classified them.</p>
-<p><code>DatabaseBackedObjectWithOperations</code> exposes two read shapes over the
+<p><code>DatabaseBackedObjectWithOperations</code> exposes three read shapes over the
 history:</p>
 <ul>
 <li><strong><code>last_cluster_operation</code> (property)</strong>: returns the most recent
@@ -15915,7 +15915,18 @@ history:</p>
   <code>{queued, preflight, executing}</code>. Consumed by <code>Network.is_okay()</code> and
   any future history-aware gate. The query
   joins <code>cluster_operation_targets</code> against <code>object_states</code>, so a later
-  terminal operation cannot mask an earlier in-flight one.</li>
+  terminal operation cannot mask an earlier in-flight one.
+  <code>external_view()</code> on instances, networks and artifacts renders this as
+  <code>has_pending_operations</code>. It is false for an in-memory object and true when
+  the database cannot answer.</li>
+<li><strong><code>get_cluster_operations()</code> (method)</strong>: returns the target rows for the
+  object, newest first by sequence number, each hydrated into its operation and
+  paired with the <code>observational</code> flag stored on its row. By default the rows
+  are filtered in SQL to operations which are pending, using the same join as
+  <code>has_pending_cluster_operation()</code>, so a listing and the pending field agree.
+  It does not follow <code>depends_on</code> or <code>runs_after</code>, so operations on other
+  objects are not included. The per-object <code>/clusteroperations</code> endpoints
+  render it, and <code>Instance.enqueue_delete()</code> walks it to decide what to abort.</li>
 </ul>
 <p>As a backstop for rows that outlive their operation, the table is bounded by
 a periodic prune in the cluster daemon, alongside the existing

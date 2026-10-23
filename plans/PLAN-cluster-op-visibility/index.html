@@ -15784,7 +15784,8 @@ pointer:</p>
    poll <code>last_cluster_operation</code> and inspect only that op's
    state.</li>
 <li><strong>The "outstanding operations" REST endpoints.</strong>
-   <code>GET /instances/&lt;ref&gt;/operations</code>
+   <code>GET /instances/&lt;ref&gt;/clusteroperations</code>
+   <em>(path corrected in phase 4; the plan first said <code>/operations</code>)</em>
    (<code>external_api/instance.py</code>,
    <code>InstanceOutstandingOperationsEndpoint</code>, plus network and
    artifact twins) are built on
@@ -15876,19 +15877,26 @@ corrected inline.</p>
   <code>baseobject._set_last_cluster_operation()</code>. Phase 2 deletes
   both.</li>
 <li><em>(Added in phase 2.)</em> Terminal operations are hard-deleted
-  about thirty seconds after going terminal (#3864), and their
-  target rows go with them
+  (#3864), and their target rows go with them
   (<code>BaseClusterOperation.hard_delete()</code>). The table holds
   in-flight ops plus recently terminal ones, not a full
-  history.</li>
+  history. <em>(Corrected in phase 4.)</em> "About thirty seconds after
+  going terminal" is when an op becomes eligible. The sweep that
+  deletes it runs every fifteen minutes, so a finished op
+  normally lingers for up to about fifteen minutes. Errored ops
+  are never hard deleted (#3922), and their target rows go only
+  when the seven-day <code>CLUSTER_OPERATION_TARGET_RETENTION</code> prune
+  removes them. See survey finding 6 of
+  <a href="../PLAN-cluster-op-visibility-phase-04-api-surface/">the phase 4 plan</a>.</li>
 <li>The pending query joins <code>object_states</code> and filters on
   <code>_ACTIVE_OPERATION_STATES</code> (<code>mariadb.py:3682</code>); it fails
   closed (returns True) on DB errors.</li>
 <li>API capabilities are advertised in <code>external_api/app.py</code>
   (see the list around line 215) and checked client-side via
   <code>check_capability()</code> in
-  <code>client-python/shakenfist_client/apiclient.py:246</code>. Client
-  changes land in the sibling <code>client-python</code> repository.</li>
+  <code>client-python/shakenfist_client/apiclient.py</code> (line 350 as of
+  phase 4). Client changes land in the sibling <code>client-python</code>
+  repository.</li>
 </ul>
 <h2 id="mission-and-problem-statement">Mission and problem statement<a class="headerlink" href="#mission-and-problem-statement" title="Permanent link">&para;</a></h2>
 <p>Make cluster operation visibility truthful and cheap for
@@ -15903,7 +15911,7 @@ every consumer, so that:</p>
   intended semantics of the six <code>runs_after</code> serialisation
   chains and stops background sweeps from reordering user
   mutations;</li>
-<li>the <code>/instances/&lt;ref&gt;/operations</code> family of endpoints
+<li>the <code>/instances/&lt;ref&gt;/clusteroperations</code> family of endpoints
   reports every outstanding operation targeting the object,
   not just the ones reachable from the newest target row; and</li>
 <li>the functional CI await helpers stop flaking on background
@@ -15928,16 +15936,19 @@ every consumer, so that:</p>
   observational only if every one of its tasks is. The result
   is stored per row in a column on <code>cluster_operation_targets</code>.
   See decision 1 of the phase 2 plan.</li>
-<li><strong>Capability naming.</strong> Proposed: <code>object-pending-operations</code>
-  for the <code>has_pending_operations</code> field, following the
-  existing kebab-case convention.</li>
+<li><strong>Capability naming.</strong> <em>Resolved in phase 4.</em>
+  <code>object-pending-operations</code>, in the <code>cluster-operations</code>
+  family, advertising both the field and the truthful
+  per-object listings. See decision 2 of the phase 4 plan.</li>
 <li><strong><code>all=true</code> semantics.</strong> <em>Resolved by the phase 2
-  survey.</em> Since #3864, terminal ops are hard-deleted about
-  thirty seconds after going terminal, so <code>/operations?all=true</code>
-  can only ever return in-flight and recently terminal ops. It
-  is not a full history and cannot grow without bound. No
-  limit parameter is needed, but phase 4 must not document it
-  as history.</li>
+  survey, and corrected by the phase 4 survey.</em> Since #3864,
+  terminal ops are hard-deleted, so <code>/clusteroperations?all=true</code>
+  returns in-flight ops, finished ops from about the last fifteen
+  minutes (the deleted-object sweep's cadence, not thirty
+  seconds), and errored ops for up to the seven-day target-row
+  retention (#3922). It is not a full history and is bounded by
+  that retention. No limit parameter is needed, and phase 4
+  documents it as what it is.</li>
 <li><strong>Should <code>hard_delete</code> of ops prune target rows?</strong> <em>Resolved
   by the phase 2 survey.</em> It already does:
   <code>BaseClusterOperation.hard_delete()</code> deletes the op's target
@@ -15977,13 +15988,13 @@ every consumer, so that:</p>
 <tr>
 <td>3. Classify and mark observational tasks</td>
 <td><a href="../PLAN-cluster-op-visibility-phase-03-mark-observational/">PLAN-cluster-op-visibility-phase-03-mark-observational.md</a></td>
-<td>In progress</td>
-<td>—</td>
+<td>Complete</td>
+<td><code>27ea18202</code> (#4588)</td>
 </tr>
 <tr>
 <td>4. API surface: has_pending_operations and truthful outstanding ops</td>
-<td>PLAN-cluster-op-visibility-phase-04-api-surface.md</td>
-<td>Not started</td>
+<td><a href="../PLAN-cluster-op-visibility-phase-04-api-surface/">PLAN-cluster-op-visibility-phase-04-api-surface.md</a></td>
+<td>In progress</td>
 <td>—</td>
 </tr>
 <tr>
@@ -16134,6 +16145,16 @@ does nothing. The phase 2 inertness test checks
 <code>model.model_fields</code> for this, and its replacement must keep an
 equivalent check.</p>
 <h3 id="phase-4-api-surface-plan-at-high-effort">Phase 4: API surface (plan at high effort)<a class="headerlink" href="#phase-4-api-surface-plan-at-high-effort" title="Permanent link">&para;</a></h3>
+<p>See <a href="../PLAN-cluster-op-visibility-phase-04-api-surface/">the phase 4
+plan</a>. Its
+survey corrected this section in five places, marked inline: the endpoints are
+<code>/&lt;type&gt;/&lt;ref&gt;/clusteroperations</code>, not <code>/operations</code>; the
+current listing is not newest-first; the delete walk also
+aborts other objects' ops it reaches through dependencies; the
+client has no per-object accessors at all; and finished ops
+live for up to about fifteen minutes, not thirty seconds. It
+also adds a <code>pending_only</code> request field, so the default
+listing filters on state in SQL. The original outline follows.</p>
 <ul>
 <li>Add <code>has_pending_operations</code> to <code>external_view()</code> for
   <code>DatabaseBackedObjectWithOperations</code> subclasses that
@@ -16143,15 +16164,22 @@ equivalent check.</p>
   verify the views that render lists of objects (e.g.
   instance list endpoints) do not multiply this into a
   hot-path problem -- if they do, restrict the field to
-  single-object GETs.</li>
+  single-object GETs. <em>(Phase 4: exactly those three views,
+  plus the artifact view the snapshot listing uses. Lists
+  already pay one target query per object for the pointer, so
+  the field goes everywhere the pointer does.)</em></li>
 <li>Advertise a new capability string (proposed
   <code>object-pending-operations</code>) in <code>external_api/app.py</code>.</li>
 <li>Reimplement <code>baseobject.get_cluster_operations()</code> over
   <code>mariadb.get_cluster_operation_targets_for_object()</code> +
   per-op state checks so the
-  <code>/instances|networks|artifacts/&lt;ref&gt;/operations</code> endpoints
-  report all outstanding ops, not just the latest chain.
-  Keep newest-first ordering.</li>
+  <code>/instances|networks|artifacts/&lt;ref&gt;/clusteroperations</code>
+  endpoints report all outstanding ops, not just the latest
+  chain. Keep newest-first ordering. <em>(Phase 4: today's order
+  is the pointer, then one level of its <code>depends_on</code> and
+  <code>runs_after</code>, which also pulls in other objects' ops. The
+  rebuilt listing orders by target sequence number, newest
+  first, and lists only ops that target the object.)</em></li>
 <li><em>(Added by the phase 2 survey.)</em> The instance delete path
   (<code>Instance</code> around <code>instance.py:2773</code>) picks which
   outstanding ops to cancel by walking the dependency tree of
@@ -16164,12 +16192,22 @@ equivalent check.</p>
   harmless by assumption: both sweep tasks now return early
   for an instance that is not <code>created</code>, and the billing
   task no longer raises when a delete removes a file it is
-  measuring. It is still a behaviour change, so state it.</li>
+  measuring. It is still a behaviour change, so state it.
+  <em>(Phase 4: the walk is recursive through <code>depends_on</code> and
+  <code>runs_after</code>, so it also aborts network reconcile ops that
+  target only the network, and the delete waits only for the
+  pointer, so a snapshot that is not the pointer can be
+  overtaken. Both are fixed by the rebuild. Delete cancels
+  observational ops too; see decisions 6 and 7.)</em></li>
 <li>client-python (sibling repo): add
   <code>get_instance()</code>-adjacent accessors as needed, a
   <code>has_pending_operations</code>-aware helper, and capability
   checks mirroring <code>list_cluster_operations_for_target()</code>.
-  Update the OpenAPI examples/swagger helpers touched.</li>
+  Update the OpenAPI examples/swagger helpers touched.
+  <em>(Phase 4: the client has no accessor for the per-object
+  listings at all, although the API reference pages show
+  examples calling <code>get_instance_queued_cluster_operations()</code>
+  and its twins, which have never existed.)</em></li>
 </ul>
 <h3 id="phase-5-ci-helper-simplification-functional-coverage-documentation-plan-at-medium-effort">Phase 5: CI helper simplification, functional coverage, documentation (plan at medium effort)<a class="headerlink" href="#phase-5-ci-helper-simplification-functional-coverage-documentation-plan-at-medium-effort" title="Permanent link">&para;</a></h3>
 <ul>
@@ -16177,6 +16215,16 @@ equivalent check.</p>
   <code>has_pending_operations</code> (cheaper, single GET) once the
   deployed server advertises the capability; keep the
   by-target fallback for older servers.</li>
+<li><em>(Added by the phase 4 survey.)</em> The helpers can do this with
+  <code>check_capability('object-pending-operations')</code>,
+  <code>get_instance()</code> and <code>get_network()</code>, which the client already
+  has, so this phase does not wait on phase 4's client-python
+  pull request. Once that pull request has merged,
+  <code>TestOutstandingOperationsBodyAll</code>
+  (<code>cluster_ci_tests/test_api.py</code>) can use the new
+  <code>get_network_clusteroperations()</code> wrapper instead of
+  <code>_request_url</code>, though it must keep one raw call, because the
+  raw body path is what it tests.</li>
 <li><em>(Added by the phase 3 survey.)</em> <code>_await_object_operations_complete()</code>
   (<code>deploy/shakenfist_ci/base.py</code>) fails a test when any op it
   watched go in flight ends in <code>error</code>, and its by-target listing
@@ -16311,9 +16359,9 @@ because the following statements will be true:</p>
   neither <code>last_cluster_operation</code> nor
   <code>has_pending_operations</code> for that object, and a unit test
   proves it.</li>
-<li><code>GET /instances/&lt;ref&gt;/operations</code> returns a queued op even
-  when a later terminal op targets the same instance, and a
-  test proves it.</li>
+<li><code>GET /instances/&lt;ref&gt;/clusteroperations</code> returns a queued
+  op even when a later terminal op targets the same instance,
+  and a test proves it.</li>
 <li><code>test_interface_plug_and_exec_reboot</code> no longer races the
   hot-plug: the await helper blocks until the attach lands.</li>
 <li>gRPC proto changes have been regenerated with
@@ -16336,9 +16384,29 @@ because the following statements will be true:</p>
   consult <code>has_pending_operations</code> instead of any remaining
   last-op reads (audit for other legacy readers of
   <code>last_cluster_operation</code> beyond the six <code>runs_after</code>
-  sites).</li>
-<li><code>/operations?all=true</code> pagination if history size becomes
-  a practical problem.</li>
+  sites). <em>(Audited in phase 4: nothing in the scheduler or
+  cleaner reads the pointer. Its readers are the three views
+  and the six <code>runs_after</code> sites, one of which, in
+  <code>Network.new()</code>, always sees <code>None</code>. The four that phase 4
+  leaves alone serialise behind the newest mutating op, which
+  skips older pending ops that were enqueued without
+  <code>runs_after</code>: disk fetches, redirected starts and
+  <code>instance_create</code>. Whether each should wait on every pending
+  mutating op is its own question. See survey finding 8 of the
+  phase 4 plan.)</em></li>
+<li><code>/clusteroperations?all=true</code> pagination if history size
+  becomes a practical problem. It is bounded by the seven-day
+  target-row retention, mostly by errored ops (#3922).</li>
+<li>If <code>HasPendingClusterOperationTarget</code> from sf-api becomes a
+  real load problem, one RPC answering both latest and pending
+  for an object would keep each view at today's query count.
+  Phase 4 measured the field at about 2.5 requests a second on
+  sfcbr.</li>
+<li>Interfaces are targets of hot-plug ops but carry neither
+  <code>last_cluster_operation</code> nor <code>has_pending_operations</code>.</li>
+<li>The per-blob sweep's duplicate guard could pass
+  <code>pending_only=True</code> (added in phase 4) instead of hydrating
+  every target row. Its load is negligible today.</li>
 <li>The 15-second enqueue-to-execution latency observed for the
   <code>user_waiting</code> hot-plug chain in CI (dependency deferral
   polling cadence) is worth a separate look — it is latency,
@@ -16349,6 +16417,15 @@ because the following statements will be true:</p>
   <code>NodeInstOp.dispatch_task()</code> errors the instance on any task
   exception. Found by the phase 3 survey. Its natural fix keys off
   the <code>observational_tasks</code> declarations phase 3 adds.</li>
+<li>
+<h1 id="4603-pages-and-code-comments-outside-this-plans-api">4603: pages and code comments outside this plan's API<a class="headerlink" href="#4603-pages-and-code-comments-outside-this-plans-api" title="Permanent link">&para;</a></h1>
+  reference say terminal ops are removed after about thirty
+  seconds, when that is only eligibility and the sweep runs
+  every fifteen minutes. Several of those sentences were
+  written by phases 2 and 3. Found by the phase 4 survey.</li>
+<li>An agent operation's preflight (<code>node_aop_op</code>) targets only the
+  agent operation, not its instance, so an instance delete never
+  cancels a pending one. Found in phase 4; it predates this plan.</li>
 <li>Issue #3278 (CI and test coverage backlog) may want a note
   about the deflaked helper pattern.</li>
 </ul>

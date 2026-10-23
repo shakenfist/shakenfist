@@ -13998,6 +13998,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#objects-report-whether-operations-are-pending" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Objects report whether operations are pending
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -16104,6 +16115,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#objects-report-whether-operations-are-pending" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Objects report whether operations are pending
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -17517,11 +17539,12 @@ observational only if all of its tasks are. The tasks classified this way are
   reports every operation for the object, with <code>observational: true</code> on the
   sweeps. A client that polls this listing to wait for an object to settle
   should ignore those entries.</li>
-<li>A delete no longer cancels a queued billing and health sweep for the
-  instance, because the sweep is no longer the operation it walks from. The
-  sweep's two tasks now do nothing for an instance that is not <code>created</code>,
-  and the billing task treats a disk or console log removed mid-measurement
-  as absent, so a sweep that outlives a delete cannot error it.</li>
+<li>A delete cancels a queued billing and health sweep along with every other
+  outstanding operation for the instance, so the sweep does not run against an
+  instance being deleted. The sweep's two tasks also do nothing for an
+  instance that is not <code>created</code>, and the billing task treats a disk or
+  console log removed mid-measurement as absent, so a sweep that is already
+  executing when the delete arrives cannot error the instance.</li>
 </ul>
 <p>No migration is needed. The flag is stored per row at enqueue time, so rows
 written before the upgrade stay mutating until their operation is removed.
@@ -17529,6 +17552,46 @@ During a rolling upgrade, an older daemon or database gateway writes the
 flag as false, which is the safe direction.</p>
 <p>A billing or health check task that fails for any other reason still moves
 its instance to an error state, as it did before (<a href="https://github.com/shakenfist/shakenfist/issues/4585">issue 4585</a>).</p>
+<h2 id="objects-report-whether-operations-are-pending">Objects report whether operations are pending<a class="headerlink" href="#objects-report-whether-operations-are-pending" title="Permanent link">&para;</a></h2>
+<p>Instance, network and artifact views, including the list endpoints, now carry
+a <code>has_pending_operations</code> boolean beside <code>last_cluster_operation</code>. It is true
+while any non-observational operation targeting the object is queued, in
+preflight or executing, true when the server cannot tell, and false for an
+object which is not stored. Operations marked observational, such as the
+billing and health sweep or a checksum verification, never make an object
+pending. A client which requested a blob hash waits by polling
+<code>GET /blobs/{blob_uuid}/checksum/{algorithm}</code>. The field is advertised by the
+new <code>object-pending-operations</code> capability in the <code>cluster-operations</code> family.</p>
+<p>What you will see:</p>
+<ul>
+<li><code>GET /instances/{instance_ref}/clusteroperations</code>, and the network and
+  artifact equivalents, now list every operation which targets the object,
+  newest first, and each entry carries an <code>observational</code> key. Previously the
+  list started from <code>last_cluster_operation</code> and added one level of the
+  operations it depended on or ran after, so an operation the pointer did not
+  reach was missed.</li>
+<li>An instance's list no longer shows operations which only target other
+  objects. The network reconcile work an instance start waits for is in the
+  network's list; <code>GET /clusteroperations/{op_uuid}/chain</code> traces what an
+  operation waits on.</li>
+<li>By default only queued, preflight and executing operations are listed.
+  <code>all=true</code> adds finished operations which have not yet been removed:
+  normally those from the last fifteen minutes or so, and errored ones for up
+  to seven days. It is not a history.</li>
+<li>Deleting an instance cancels every outstanding operation which targets it,
+  billing and health sweeps included, except snapshots. It no longer cancels
+  network reconcile work which an instance operation depended on, because
+  other instances share it. The agent operation preflight targets only its
+  agent operation, so a delete does not cancel it.</li>
+<li>The delete now waits for any snapshot it did not cancel, not only the
+  newest operation, so a running snapshot is no longer overtaken and its disks
+  deleted.</li>
+<li>The sf-database service accepts a new <code>pending_only</code> field on the request
+  which lists an object's operation targets. An older service ignores it and
+  returns every row, which is correct but slower during a rolling upgrade.</li>
+</ul>
+<p>The infra report will show a new <code>HasPendingClusterOperationTarget</code> caller
+from the API, because every object view now makes one more indexed query.</p>
 
 
 
