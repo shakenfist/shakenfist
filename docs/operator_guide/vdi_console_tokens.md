@@ -78,8 +78,9 @@ Shaken Fist (see [The Kerbside credential](#the-kerbside-credential)).
 
 To have the collection deploy Kerbside as well, put hosts in the optional
 `kerbside` inventory group and set the further variables described in
-[Installation](installation.md); the manual Kerbside setup described later on
-this page is then only for a Kerbside you deploy some other way.
+[Installation](installation.md). For a Kerbside you deploy some other way, see
+[Running Kerbside beside a cluster](kerbside.md#bring-your-own) and Kerbside's
+[console sources page](/components/kerbside/console-sources/#shaken-fist).
 
 For a cluster not deployed with the collection, use `sf-ctl` instead (a
 `cluster_config` value overrides the rendered file at process start):
@@ -237,7 +238,7 @@ sf-ctl bootstrap-system-key --key-from-stdin kerbside < kerbside-key-file
 ## Publishing the public keys
 
 Kerbside verifies tokens with the **public** half of the signing key, which
-Shaken Fist serves to admin callers at
+Shaken Fist serves to any authenticated caller at
 [`GET /admin/vditokenpubkey`](https://openapi.shakenfist.com/#/admin/get_admin_vditokenpubkey).
 The response is the active key id and every currently published public key:
 
@@ -344,6 +345,8 @@ node logs `empty subject`.
   proxied console.
 * [Installation](installation.md) — where `extra_config` and cluster
   variables are set.
+* [Running Kerbside beside a cluster](kerbside.md) — where to place Kerbside,
+  the network it needs, and load balancing.
 * [Kerbside component documentation](/components/kerbside/) — the proxy,
   its console sources, and its own configuration.
 * [`GET /admin/vditokenpubkey`](https://openapi.shakenfist.com/#/admin/get_admin_vditokenpubkey)

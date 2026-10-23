@@ -52,6 +52,16 @@ Shaken Fist runs several daemons on each cluster node:
 | `sf-transfers` | Blob transfers | - |
 | `sf-privexec` | Privileged execution | - |
 
+### Optional components
+
+Kerbside, the VDI console proxy, is a separate project and an optional
+component. `site.yml` deploys it onto the `kerbside` inventory group through
+Kerbside's `shakenfist.kerbside` collection. `sf-api` mints console tokens
+which Kerbside exchanges, and Kerbside scrapes the cluster with its own key in
+the `system` namespace. See [Running Kerbside beside a
+cluster](docs/operator_guide/kerbside.md) and [VDI console
+tokens](docs/operator_guide/vdi_console_tokens.md).
+
 ### Database layer
 
 Object state, cluster operations and work queues all live in MariaDB,

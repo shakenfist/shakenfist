@@ -253,7 +253,9 @@ The role's own variables, its checks on them (including the ports it listens
 on, its database, its certificate and its package) and what a redeploy does
 are documented in the
 [collection's README](https://github.com/shakenfist/kerbside/tree/develop/ansible)
-in the Kerbside repository, not here.
+in the Kerbside repository, not here. For where to place Kerbside, the
+network it needs and load balancing, see
+[Running Kerbside beside a cluster](https://github.com/shakenfist/shakenfist/blob/develop/docs/operator_guide/kerbside.md).
 
 `kerbside_url` and `kerbside_system_key` must be visible to both the `allsf`
 and the `kerbside` hosts, for example in `group_vars/all`: the deploy refuses a
