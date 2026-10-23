@@ -16058,10 +16058,13 @@ each run at its latest attempt; then use "Re-run jobs" on it and re-run the
 <code>ci-gate</code> job.</p>
 <p>The wheel contents check in <code>build</code> is
 <a href="https://github.com/shakenfist/actions/blob/main/docs/actions.md#check-dist"><code>check-dist</code></a>.
-It fails if the wheel holds a test directory or nothing at all. The wheel
-ships the <code>shakenfist</code> packages and <code>shakenfist/data/*.yaml</code>, and nothing
-under <code>shakenfist/tests/</code> or <code>shakenfist/deploy/</code>: the unit tests, the Ansible
-collection and the functional CI suites are all used from a checkout.</p>
+It fails if the wheel holds a test directory, anything under
+<code>shakenfist/deploy/</code>, or nothing at all. The step after it,
+<code>tools/check-wheel-data.py</code>, fails if the wheel lacks any
+<code>shakenfist/data/*.yaml</code> file, which a deployed node reads at runtime. The
+wheel ships the <code>shakenfist</code> packages and <code>shakenfist/data/*.yaml</code>, and
+nothing under <code>shakenfist/tests/</code> or <code>shakenfist/deploy/</code>: the unit tests, the
+Ansible collection and the functional CI suites are all used from a checkout.</p>
 <p>Running <code>release.yml</code> by hand with <code>workflow_dispatch</code> skips the gate and the
 publishing jobs, and only builds and checks the packages.</p>
 <h2 id="what-gets-released">What gets released<a class="headerlink" href="#what-gets-released" title="Permanent link">&para;</a></h2>
