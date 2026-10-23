@@ -16,7 +16,8 @@
 # source checkout resolves shakenfist.data as a namespace package whatever
 # packaging says. load_budget() still reads through importlib.resources,
 # because that is how a deployed process finds it, but the thing which
-# keeps it in the wheel is the declaration.
+# keeps it in the wheel is the declaration, and what checks it is
+# tools/check-wheel-data.py, run on the built wheel by the release.
 
 import functools
 from importlib import resources
