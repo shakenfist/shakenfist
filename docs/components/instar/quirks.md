@@ -993,36 +993,28 @@ map` as the workaround.
 
 ### qcow2 v3 standard-L2 `QCOW_OFLAG_ZERO` honoured (fixed)
 
-In qcow2 v3 (compat=1.1) images that use *standard* L2 tables
-(8-byte entries, not extended L2), the `QCOW_OFLAG_ZERO` bit
-(bit 0) on an L2 entry signals `QCOW2_CLUSTER_ZERO_PLAIN`
-(when `host_offset == 0`) or `QCOW2_CLUSTER_ZERO_ALLOC` (when
-`host_offset != 0`) — both of which qemu-img reports as
-`present: true, zero: true, data: false` (`ZeroAllocated`).
-Historically instar's `classify_qcow2_l2_standard` ignored
-the bit and treated any non-zero L2 entry without
-`OFLAG_COMPRESSED` as `Data` (reporting `Hole` when
-`host_offset == 0`) — a pre-existing gap in the qcow2 parser
-(`cluster_lookup` had no `OFLAG_ZERO` branch either) inherited
-by map for consistency.
+**No divergence from qemu-img.** In qcow2 v3 (compat=1.1) images that
+use *standard* L2 tables (8-byte entries, not extended L2), the
+`QCOW_OFLAG_ZERO` bit (bit 0) on an L2 entry makes the cluster
+`QCOW2_CLUSTER_ZERO_PLAIN` when `host_offset == 0` and
+`QCOW2_CLUSTER_ZERO_ALLOC` when it is not. `qemu-img map` reports both
+as `present: true, zero: true, data: false`, and prints an `"offset"`
+for `ZERO_ALLOC` only (measured on qemu-img 10.0.13 with `qemu-io
+write -z`).
 
-**Fixed** as step 7z of PLAN-qcow2-write-infrastructure
-(alongside the chain-reader fix for
-[#432](https://github.com/shakenfist/instar/issues/432)):
-`classify_qcow2_l2_standard` now reports a zero-flag standard
-entry as `ZeroAllocated` for both `host_offset == 0` and
-`host_offset != 0`, and `cluster_lookup` gained a matching
-`ClusterLookup::Zero` verdict. Extended-L2 subcluster-bitmap
-`ZeroAllocated` reporting was always correct — instar walks
-the bitmap and classifies subclusters directly.
+instar's `classify_qcow2_l2_standard` takes the cluster type from the
+same `subcluster_type()` classifier the read path uses, so it reports
+a zero-flag entry as `zero` without a host offset and as `zero-at`,
+carrying the `"offset"`, with one. The chain reader's `cluster_lookup`
+returns `ClusterLookup::Zero` for both and zero-fills the cluster.
+Extended-L2 zero bits go through the same classifier and map the same
+way, and a subcluster with neither bitmap bit set in a cluster with a
+host offset maps as `hole-at`, also carrying the `"offset"`, as
+`qemu-img map` reports it. With an external data file, cluster 0
+maps as data at offset 0.
 
-`map --output json` now also carries qemu's `"offset"` on
-zero-allocated runs and on unallocated-allocated runs, as `qemu-img
-map` does; before, a zero-flag cluster with a non-zero host offset
-omitted it. Data-file cluster 0 maps as data at offset 0. `measure`
-no longer counts zero-flag clusters as allocated, matching `qemu-img
-measure` (a 1M image with zeroed clusters reported 589824 bytes
-required, qemu reports 458752).
+`measure` does not count zero-flag clusters as allocated, matching
+`qemu-img measure`.
 
 ### qcow2 compressed clusters report `compressed: false`
 
@@ -4855,10 +4847,11 @@ rather than fixed, because none of them was that change's job to close:
 
 ## Invalid qcow2 subcluster entries are refused, as in qemu-img
 
-**Classification: no divergence from qemu-img for the entries qemu
-classifies as invalid; two related data-file shapes still diverge (see
-the end of this entry). Recorded because instar used to zero-fill these
-entries, and the reason it stopped is worth keeping.**
+**Classification: no divergence from qemu-img, either for the entries
+qemu classifies as invalid or for the two data-file shapes qemu refuses
+after classification (see the end of this entry). Recorded because
+instar used to zero-fill these entries, and the reason it stopped is
+worth keeping.**
 
 ### Observed Behavior
 

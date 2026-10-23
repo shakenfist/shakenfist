@@ -201,18 +201,18 @@ version sampled (7.0.0, 7.2.0, 8.0.0, 8.1.0, 8.2.0, 10.0.13).
 ### What instar does today
 
 * **create refuses fixed VHDX** at the `-o` parser
-  (`src/vmm/src/main.rs:15166-15181`, "create: -O vhdx -o
+  (`src/vmm/src/main.rs:15435-15441`, "create: -O vhdx -o
   subformat=fixed is not yet supported"), and `--subformat fixed`
   never reaches it because `validate_create_args` only admits
-  `--subformat` for vmdk and vpc (`:19217-19225`). `-o
-  block_state_zero` and `-o log_size` are accept-ignored (`:15185`).
+  `--subformat` for vmdk and vpc (`:19486-19492`). `-o
+  block_state_zero` and `-o log_size` are accept-ignored (`:15454-15456`).
   `plan_vhdx` has no subformat field at all
   (`src/crates/create/src/lib.rs:336-360`).
 * **create refuses every non-`off` preallocation for vmdk, vpc and
-  vhdx**, in the `-o` parser (`main.rs:15189-15206`) and again in
-  `validate_create_args` (`:19244-19251`), with "is not yet supported
+  vhdx**, in the `-o` parser (`main.rs:15458-15476`) and again in
+  `validate_create_args` (`:19513-19520`), with "is not yet supported
   ... (preallocation is implemented for raw and qcow2 only)".
-* **create refuses monolithicFlat** (`main.rs:19201-19205`, "multi-file
+* **create refuses monolithicFlat** (`main.rs:19470-19474`, "multi-file
   subformats are not implemented; use instar convert -O vmdk for
   now"), and `docs/create.md:392-394` gives the reason as needing
   multi-output-device support in the call table.
@@ -345,7 +345,7 @@ all succeed and agree with qemu. Three things do not:
 * **Default block size (#645).** qemu scales the default with size,
   and instar always uses 32 MiB (`src/operations/create/src/main.rs:566-570`,
   `:664-668`; the convert host's capacity estimate assumes it too,
-  `main.rs:13624`). Measured on 6.0.0, 8.2.0 and 10.2.0 at both sides
+  `src/vmm/src/main.rs:13893`). Measured on 6.0.0, 8.2.0 and 10.2.0 at both sides
   of every boundary: 1024 MiB gives 8 MiB, 1025 MiB gives 16 MiB,
   102400 MiB gives 16 MiB, 102401 MiB gives 32 MiB, 33554432 MiB
   (32 TiB) gives 32 MiB and one MiB more gives 64 MiB. The source is
@@ -709,8 +709,8 @@ rather than merge requests.
 
 | Phase | Plan | Status | Merged |
 |-------|------|--------|--------|
-| 1. Pin qemu's behaviour across the 80 static builds, build the structural VHDX comparator, correct `docs/create.md` | [PLAN-bat-population-phase-01-pin.md](/components/instar/plans/PLAN-bat-population-phase-01-pin/) | In progress | |
-| 2. Fixed VHDX fixtures and baselines (instar-testdata + instar) | PLAN-bat-population-phase-02-fixtures.md | Not started | |
+| 1. Pin qemu's behaviour across the 80 static builds, build the structural VHDX comparator, correct `docs/create.md` | [PLAN-bat-population-phase-01-pin.md](/components/instar/plans/PLAN-bat-population-phase-01-pin/) | Complete | `fef62417` (#809) |
+| 2. Fixed VHDX fixtures (instar-testdata + instar) | [PLAN-bat-population-phase-02-fixtures.md](/components/instar/plans/PLAN-bat-population-phase-02-fixtures/) | In progress | |
 | 3. Host-only create: non-qcow2 preallocation parity and monolithicFlat | PLAN-bat-population-phase-03-host-create.md | Not started | |
 | 4. Read side: BAT entry count (#626), partial last block, `LeaveBlocksAllocated` and `resize` | PLAN-bat-population-phase-04-read-side.md | Not started | |
 | 5. VHDX geometry: default block size (#645), 64 TiB ceiling, one shared layout | PLAN-bat-population-phase-05-geometry.md | Not started | |
@@ -754,16 +754,20 @@ defects the survey found are already filed (#797, #798, #799), so
 later phases have numbers to close.
 
 **Phase 2** precedes any code because a reader with no fixed input
-is a reader with no test. It generates qemu-written fixed VHDX
-fixtures (both `block_state_zero` modes; a block-multiple size and a
-partial-final-block size; one at the #626 region-crossing geometry,
-which is sparse and so cheap in bytes if not in BAT) with a generator
-script in instar-testdata, registers them in `tests/manifest.json`,
-and adds `vhdx` fixed cases to `generate-baselines.py`'s
-`CREATE_CASES`. The generator follows the house pattern from
-`PLAN-differencing` phase 2, which found that pattern rather than
-assuming it. Like that phase it spans both repositories, so its
-`Merged` cell carries a record from each.
+is a reader with no test. It commits five small qemu-written fixtures
+to instar-testdata: fixed VHDX at a block multiple and at a partial
+final block, each in both `block_state_zero` modes (the `off` pair
+carrying data, because qemu turns an `on` image into a hybrid when it
+writes to it), and the 8 MiB dynamic image at the #626 geometry,
+which reproduces the miscount without the 128 GiB a fixed one would
+cost through git-LFS. Each fixture's structure must equal a phase 1
+pin case. The generator is `scripts/create-vhd-testdata.sh` in instar,
+the house pattern from `PLAN-differencing` phase 2. A new test module
+pins what instar's readers do with each fixture today, including the
+#626 and #797 failures, in a form that fails once phase 4 fixes them.
+Like `PLAN-differencing` phase 2 it spans both repositories, so its
+`Merged` cell carries a record from each. Its survey moved the
+`CREATE_CASES` work to phase 10 (see the phase 2 plan).
 
 **Phase 3** is independent of every other code phase and is
 host-only, so it goes early as the cheapest closure of most of the
@@ -846,7 +850,12 @@ They are separate phases because they are separate operations with
 separate test suites and reviewers, and measure is small.
 
 **Phase 10** is the cross-version matrix for everything above:
-create and convert fixed cases across every profile, the
+create and convert fixed cases across every profile (including the
+vhdx fixed cases in `generate-baselines.py`'s `CREATE_CASES` and
+instar's mirror of it, which phase 2's survey moved here because
+adding them before instar can create fixed VHDX breaks
+`test_create_cases_match_baselines` and they cannot see fixed-ness),
+per-image cross-version baselines for phase 2's fixtures, the
 preallocation cases, and the derived-profile validation the
 Situation warns about. It is separate from the feature phases because
 regenerating baselines in instar-testdata and validating `profiles/`
@@ -1459,6 +1468,10 @@ chosen to defer to here, so that we do not forget them.
   BAT, and so its data region, by the log's size.
 * `convert -O vpc` fixed output. instar converts to dynamic VHD only;
   qemu converts to either.
+* A failed `instar convert` leaves a zero-byte output file (seen on the
+  #626 geometry). Measure what qemu-img leaves behind on the same
+  failure before calling it a defect; if qemu removes or never creates
+  the file, instar should match.
 * `block_state_zero` on `convert`, if a user needs qemu's default
   (appended-data) convert-to-fixed layout rather than the in-place one
   (open question 3).

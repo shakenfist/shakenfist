@@ -869,10 +869,14 @@ qcow2-luks).
     path, which is reported in both human and JSON output. Chain discovery
     validates the data file path against the allowlist (CVE-2024-32498
     prevention) and opens it as a separate virtio-block device. Standard
-    cluster reads dispatch to the data device; compressed clusters and
-    metadata (L1/L2/refcounts) remain in the metadata device. The check
-    operation skips bounds/overlap/refcount validation for data clusters
-    when the external data bit is set.
+    cluster reads dispatch to the data device; metadata (L1/L2/refcounts)
+    remains in the metadata device. As in qemu, a data-file image has no
+    compressed clusters: a compressed L2 entry, or one whose host cluster
+    offset differs from its guest offset, is refused by name by the
+    reading operations, `map` and `measure`, and `check` reports a
+    compressed entry as a corruption. The check operation skips
+    overlap/refcount validation for data clusters when the external data
+    bit is set, and bounds-checks them against the data file's size.
 
 18. **VDI Input Support** - Convert, compare, and dd support VDI
     (VirtualBox Disk Image) as read-only input, both dynamic and

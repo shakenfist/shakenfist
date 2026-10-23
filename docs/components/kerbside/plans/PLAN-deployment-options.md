@@ -283,9 +283,9 @@ Fist's operator guide for the parts Shaken Fist owns. It also
 covers the bring-your-own-Kerbside path, which is how a Shaken
 Fist cluster joins a front-door Kerbside. The role move was
 accepted, so this phase documents a Kerbside-owned role that
-accepts several sources. **Blocked on** that move landing, which
-needs the deployer plan's phase 4 to merge and a Kerbside
-release after v0.6.0. Planned at medium effort once unblocked.
+accepts several sources. The move has landed (see Dependencies
+on other plans), so this phase is unblocked. Planned at medium
+effort.
 
 **Phase 6: installation hand-off and closeout.**
 `installation.md`'s "Deploying for real" becomes a pointer to
@@ -400,6 +400,19 @@ copy lives in shakenfist/development at
   cost is a collection dependency across repositories and a
   release step for it, which that phase has to design. This
   plan's phase 5 waits on the move.
+
+  **The move landed on 2026-10-22.**
+  - Release: v0.8.0 published the role on Galaxy as the
+    `shakenfist.kerbside` collection.
+  - Shaken Fist: it deploys Kerbside from that collection since
+    shakenfist#4591 (merge commit 48849831), as a soft dependency
+    pinned in `examples/_shared/requirements.yml`.
+  - This repository: the sf-e2e lane deploys through the role
+    since #587 (merge commit 89f1994).
+  - Actions: shakenfist/actions#195 (merge commit 31139125)
+    removed `deploy-kerbside-on-shakenfist`.
+
+  Phase 5 can start.
 
 - **`PLAN-use-case-docs.md`** (Complete) set the page format,
   the planned-row index convention, and the backend-TLS claim

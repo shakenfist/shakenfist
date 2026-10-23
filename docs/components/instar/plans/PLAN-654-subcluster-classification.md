@@ -1,6 +1,6 @@
 # PLAN-654: One subcluster classification for qcow2
 
-## Status: In progress
+## Status: Complete
 
 ## Prompt
 
@@ -242,7 +242,7 @@ the failure #654 measured.
 |-------|------|--------|--------|
 | 1. One subcluster classifier (#653, #654, rows C and D) | [PLAN-654-subcluster-classification-phase-01-classifier.md](/components/instar/plans/PLAN-654-subcluster-classification-phase-01-classifier/) | Complete | `d08841e` (#801) |
 | 2. The data device is not a chain layer (#792, #803) | [PLAN-654-subcluster-classification-phase-02-data-device.md](/components/instar/plans/PLAN-654-subcluster-classification-phase-02-data-device/) | Complete | `d42af1f` (#810) |
-| 3. Push audit | [PLAN-654-subcluster-classification-phase-03-push-audit.md](/components/instar/plans/PLAN-654-subcluster-classification-phase-03-push-audit/) | In progress | |
+| 3. Push audit | [PLAN-654-subcluster-classification-phase-03-push-audit.md](/components/instar/plans/PLAN-654-subcluster-classification-phase-03-push-audit/) | Complete | `2679929` (#817) |
 
 Phase 2's plan is written by `/next-phase` once phase 1 has merged,
 because its premises depend on how phase 1 lands.

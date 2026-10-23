@@ -113,29 +113,50 @@ For guest offset 0x12345678:
 
 ## Cluster Type Determination
 
+This follows qemu's `qcow2_get_cluster_type` (`block/qcow2.h` at
+v10.0.0), which instar transcribes as `cluster_type()` in
+`src/crates/qcow2/src/lib.rs`:
+
 ```c
 typedef enum QCow2ClusterType {
-    QCOW2_CLUSTER_UNALLOCATED,  // offset=0, zero=0: read from backing
-    QCOW2_CLUSTER_ZERO_PLAIN,   // offset=0, zero=1: reads as zeros
-    QCOW2_CLUSTER_ZERO_ALLOC,   // offset!=0, zero=1: allocated but zeros
-    QCOW2_CLUSTER_NORMAL,       // offset!=0, compressed=0: standard data
+    QCOW2_CLUSTER_UNALLOCATED,  // offset=0: read from backing
+    QCOW2_CLUSTER_ZERO_PLAIN,   // offset=0, zero=1, standard L2 only: reads as zeros
+    QCOW2_CLUSTER_ZERO_ALLOC,   // offset!=0, zero=1, standard L2 only: allocated but zeros
+    QCOW2_CLUSTER_NORMAL,       // offset!=0 (or COPIED at offset 0 with a data file)
     QCOW2_CLUSTER_COMPRESSED,   // compressed=1: compressed data
 } QCow2ClusterType;
 
-QCow2ClusterType get_cluster_type(uint64_t l2_entry) {
+QCow2ClusterType get_cluster_type(uint64_t l2_entry, bool extended_l2,
+                                  bool has_data_file) {
     if (l2_entry & QCOW_OFLAG_COMPRESSED) {
         return QCOW2_CLUSTER_COMPRESSED;
     }
 
     uint64_t offset = l2_entry & L2E_OFFSET_MASK;
 
-    if (l2_entry & QCOW_OFLAG_ZERO) {
+    // With extended L2 the zero bit is unused: the subcluster
+    // bitmap says which subclusters read as zeros.
+    if ((l2_entry & QCOW_OFLAG_ZERO) && !extended_l2) {
         return offset ? QCOW2_CLUSTER_ZERO_ALLOC : QCOW2_CLUSTER_ZERO_PLAIN;
     }
 
-    return offset ? QCOW2_CLUSTER_NORMAL : QCOW2_CLUSTER_UNALLOCATED;
+    if (offset == 0) {
+        // Offset 0 is a real offset in an external data file, and
+        // every data-file cluster has refcount 1, so COPIED tells a
+        // cluster at offset 0 from an unallocated one.
+        if (has_data_file && (l2_entry & QCOW_OFLAG_COPIED)) {
+            return QCOW2_CLUSTER_NORMAL;
+        }
+        return QCOW2_CLUSTER_UNALLOCATED;
+    }
+
+    return QCOW2_CLUSTER_NORMAL;
 }
 ```
+
+Without extended L2 each cluster type maps directly to the subcluster
+type of the same name (`UNALLOCATED` becomes `UNALLOCATED_PLAIN`). With
+extended L2 the bitmap refines it; see [Subcluster Types](#subcluster-types).
 
 ## Compressed Cluster Descriptor
 
@@ -230,6 +251,36 @@ typedef enum QCow2SubclusterType {
     QCOW2_SUBCLUSTER_INVALID,            // Invalid state
 } QCow2SubclusterType;
 ```
+
+With extended L2, qemu's `qcow2_get_subcluster_type` (`block/qcow2.h`
+at v10.0.0), transcribed as `subcluster_type()` in
+`src/crates/qcow2/src/lib.rs`, refines the cluster type with the
+bitmap. The `INVALID` tests look at the whole bitmap, not only
+subcluster `sc`'s bits, so one contradiction makes every subcluster of
+the entry invalid:
+
+```c
+uint32_t alloc = bitmap, zero = bitmap >> 32, bit = 1u << sc;
+
+switch (get_cluster_type(l2_entry, true, has_data_file)) {
+case QCOW2_CLUSTER_COMPRESSED:      // bitmap not consulted
+    return QCOW2_SUBCLUSTER_COMPRESSED;
+case QCOW2_CLUSTER_NORMAL:          // includes COPIED at offset 0 with a data file
+    if (zero & alloc)  return QCOW2_SUBCLUSTER_INVALID;
+    if (zero & bit)    return QCOW2_SUBCLUSTER_ZERO_ALLOC;
+    if (alloc & bit)   return QCOW2_SUBCLUSTER_NORMAL;
+    return QCOW2_SUBCLUSTER_UNALLOCATED_ALLOC;
+case QCOW2_CLUSTER_UNALLOCATED:
+    if (alloc)         return QCOW2_SUBCLUSTER_INVALID;
+    if (zero & bit)    return QCOW2_SUBCLUSTER_ZERO_PLAIN;
+    return QCOW2_SUBCLUSTER_UNALLOCATED_PLAIN;
+default:                            // ZERO_* cannot occur with extended L2
+    return QCOW2_SUBCLUSTER_INVALID;
+}
+```
+
+qemu asserts on the last case; instar classifies it `INVALID` so a
+guest read fails closed instead of panicking.
 
 **Important constraints:**
 - Compressed clusters cannot use subclusters (bitmap must be 0)
@@ -331,7 +382,8 @@ When a cluster is unallocated:
 
 ```
 1. Check local L2 entry
-2. If unallocated (offset=0, zero=0):
+2. If unallocated (UNALLOCATED_PLAIN, or with extended L2 also
+   UNALLOCATED_ALLOC):
    a. If backing file exists: recurse into backing file
    b. If no backing file: return zeros
 3. Continue until allocated cluster found or chain ends

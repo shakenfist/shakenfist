@@ -236,29 +236,38 @@ qemu-img create -f vmdk -o subformat=streamOptimized disk.vmdk 20G
 
 ## instar support
 
-instar recognises three VMDK input variants:
+instar recognises these VMDK input variants:
 
 - **monolithicSparse / streamOptimized** (single-file,
   binary KDMV header at offset 0): parsed entirely in the
   guest via the grain directory / grain table two-level
   lookup in `crates/vmdk`.
-- **monolithicFlat** (text descriptor + separate flat extent
-  file): the descriptor has no binary magic and starts with
-  `# Disk DescriptorFile`. The VMM detects the prefix on the
-  host, parses the descriptor via `vmdk::parse_descriptor_extents`
-  (strict single-extent / non-zero offset rejection), validates
-  the flat extent path against the backing-file allowlist,
-  and then opens the flat extent as a second virtio-block
-  device. `ChainConfig` on device 0 carries
-  `format = VmdkDescriptor` and `data_device_idx = 1`, and
-  the guest reads content from device 1 through the existing
-  QCOW2 external-data-file redirect in
-  `qcow2::read_chain_virtual_cluster`.
-- **twoGbMaxExtentFlat / twoGbMaxExtentSparse** (multi-file
-  split extents) and **monolithicFlat with
-  `parentFileNameHint=`** are rejected with a clear error
-  message. These remain known gaps; see
-  `PLAN-convert.md`.
+- **monolithicFlat and twoGbMaxExtentFlat** (text descriptor
+  plus one or more flat extent files): the descriptor has no
+  binary magic and starts with `# Disk DescriptorFile`. The VMM
+  detects the prefix on the host and resolves it with
+  `resolve_vmdk_flat_descriptor` in `src/vmm/src/chain.rs`: it
+  parses the extent lines with `vmdk::parse_descriptor_extents`,
+  requires every extent to be `FLAT` with offset 0, validates
+  each extent path against the backing-file allowlist, and opens
+  each extent as its own virtio-block device. `ChainConfig` on
+  device 0 carries `format = VmdkDescriptor` and
+  `data_device_idx = 1`; the extents follow it in order, each
+  marked `FLAG_DATA_DEVICE`, and the guest reads through
+  `qcow2::read_chain_virtual_cluster`, dispatching each read to
+  the extent that covers its offset and stopping at the end of
+  the descriptor's run of marked devices.
+- **A flat descriptor with `parentFileNameHint=`** is followed as
+  a backing chain: the hint is validated against the allowlist
+  like any backing path, and chain discovery continues with the
+  parent, whose devices follow the descriptor's extents.
+
+**twoGbMaxExtentSparse** (multi-file split extents whose
+extents are themselves sparse VMDKs) is refused, because host
+descriptor resolution accepts only `FLAT` extents: `instar info`
+fails with "only FLAT extents are supported". `map` refuses every
+descriptor-driven source; see
+[quirks.md](/components/instar/quirks/#vmdk-multi-extent-sources-are-refused).
 
 ## References
 
