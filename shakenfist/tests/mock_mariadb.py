@@ -988,6 +988,17 @@ class MockMariaDB():
         self.test_obj.addCleanup(
             self.mariadb_delete_object_events.stop)
 
+        # DatabaseBackedObject.hard_delete() sends a batchable type to the
+        # batch. An unconditional batch deletes exactly what
+        # hard_delete_objects_per_call() deletes, which the parity tests
+        # pin, so the double deletes through it and so through the
+        # doubles above.
+        self.mariadb_hard_delete_objects = mock.patch(
+            'shakenfist.mariadb.hard_delete_objects',
+            side_effect=self._mariadb_hard_delete_objects)
+        self.mariadb_hard_delete_objects.start()
+        self.test_obj.addCleanup(self.mariadb_hard_delete_objects.stop)
+
         # Mock MariaDB functions for cluster operation targets
         self.mariadb_get_cluster_operation_target = mock.patch(
             'shakenfist.mariadb.get_cluster_operation_target',
@@ -3458,6 +3469,28 @@ class MockMariaDB():
             f'MockMariaDB.delete_object_events('
             f'{object_type}/{object_uuid}): ignored')
         return 0
+
+    def _mariadb_hard_delete_objects(self, object_type, object_uuids,
+                                     state_values=None, updated_before=None,
+                                     unconditional=False):
+        """Mock implementation of mariadb.hard_delete_objects()
+
+        Only the unconditional mode is modelled: a guarded batch's
+        state and age check has no in-memory equivalent here yet.
+        """
+        error = mariadb.hard_delete_objects_request_error(
+            object_type, object_uuids, state_values or [], updated_before,
+            unconditional)
+        if error:
+            raise ValueError(error)
+        if not unconditional:
+            raise NotImplementedError(
+                'MockMariaDB models only an unconditional hard_delete_objects()')
+        self._trace(
+            f'MockMariaDB.hard_delete_objects({object_type}, {object_uuids})')
+        for object_uuid in object_uuids:
+            mariadb.hard_delete_objects_per_call(object_type, object_uuid)
+        return list(object_uuids)
 
     def seed_cluster_operation_target(
             self, operation_uuid, operation_type,

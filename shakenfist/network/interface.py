@@ -299,11 +299,6 @@ class NetworkInterface(dbo):
 
         self.state = dbo.STATE_DELETED
 
-    def hard_delete(self):
-        mariadb.delete_network_interface_attributes(self.uuid)
-        mariadb.delete_network_interface(self.uuid)
-        super().hard_delete()
-
 
 class NetworkInterfaces(dbo_iter):
     base_object = NetworkInterface

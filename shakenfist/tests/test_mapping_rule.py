@@ -20,7 +20,10 @@ from shakenfist.mapping_rule import rules_in_namespace
 from shakenfist.mapping_rule import validate_bound_claims
 from shakenfist.mapping_rule import validate_key_ttl
 from shakenfist.mapping_rule import validate_scopes
+from shakenfist import mariadb
 from shakenfist.namespace import Namespace
+from shakenfist.namespace_key import NamespaceKey
+from shakenfist.schema.object_types import ObjectType
 from shakenfist.tests import base
 from shakenfist.tests.mock_mariadb import MockMariaDB
 from shakenfist.trusted_issuer import TrustedIssuer
@@ -490,3 +493,24 @@ class NamespaceCascadeTestCase(base.ShakenFistTestCase):
 
         self.assertEqual([], rules_in_namespace('ci'))
         self.assertEqual(1, len(rules_in_namespace('staging')))
+
+    def test_each_key_and_rule_goes_in_one_batch(self):
+        # The cascade hard deletes each key and rule through the batch,
+        # one call apiece, naming the object and nothing else.
+        rule = MappingRule.new('ci', 'ryll', 'github', dict(CLAIMS),
+                               list(SCOPES), 3600, 'ryll-ci')
+        key = NamespaceKey.new('ci', 'deploy', 'sekrit')
+
+        with mock.patch('shakenfist.mariadb.hard_delete_objects',
+                        wraps=mariadb.hard_delete_objects) as mock_batch:
+            Namespace.from_db('ci').hard_delete()
+
+        mock_batch.assert_has_calls([
+            mock.call(ObjectType.NAMESPACE_KEY, [str(key.uuid)],
+                      unconditional=True),
+            mock.call(ObjectType.MAPPING_RULE, [str(rule.uuid)],
+                      unconditional=True),
+        ])
+        self.assertEqual(2, mock_batch.call_count)
+        self.assertEqual([], rules_in_namespace('ci'))
+        self.assertNotIn(str(key.uuid), self.mock_mariadb.namespace_key_objects)

@@ -550,18 +550,6 @@ class AgentOperation(BaseOperation):
         mariadb.update_agent_operation_attributes(
             attrs, fields=['last_progress'])
 
-    def hard_delete(self):
-        _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)
-        mariadb.delete_agent_operation_attributes(_uuid)
-        mariadb.delete_agent_operation(_uuid)
-
-        # Symmetric with delete(). Adding expired to FINAL_OBJECT_STATES
-        # routes a new class of operation into the cluster's hard delete
-        # sweep, and a reference row left behind here would leak
-        # forever. It is a no-op when there are none.
-        mariadb.remove_all_references_from(ObjectType.AGENTOPERATION, self.uuid)
-        super().hard_delete()
-
     def delete(self):
         # Remove MariaDB records
         _uuid = self.uuid if isinstance(self.uuid, UUID) else UUID(self.uuid)

@@ -721,8 +721,8 @@ and sets phase 4's drain rate from them.
    including the rollback test.
 4. 3c's parity test fails for each of its three mutations, and every
    type in `OBJECT_NAMES_TO_CLASSES` is classified.
-5. The per-object classes are untouched: `git diff origin/develop
-   --stat -- shakenfist/instance.py shakenfist/namespace.py
+5. The per-object classes are untouched: `git diff $(git merge-base
+   origin/develop HEAD) --stat -- shakenfist/instance.py shakenfist/namespace.py
    shakenfist/namespace_claim.py shakenfist/node.py` is empty. No
    batchable class deletes rows itself: `grep -rn "def hard_delete"
    shakenfist --include=*.py | grep -v /tests/` lists only
@@ -757,6 +757,14 @@ and sets phase 4's drain rate from them.
   `UNAVAILABLE`, and the client and servicer share one request check.
   Live tests ran against MariaDB 11.8.9 with snapshot isolation on;
   12 mutants, all killed.
+- **3d, 2026-10-23 (UTC).** An unconditional batch reply that omits
+  the object is treated as a failure, like None: an error is logged
+  and no audit event written. `MockMariaDB` stands in for
+  `hard_delete_objects()` in unconditional mode only, deleting through
+  the per-call fallback and so through its existing doubles. The
+  definition of done's item 5 compared against `origin/develop`, which
+  has since gained two commits to `instance.py`; it now compares
+  against the merge base.
 
 ## Back brief
 

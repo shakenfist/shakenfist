@@ -289,12 +289,6 @@ class TrustedIssuer(dbo):
         """Soft delete. The standard reaper hard deletes later."""
         self.state = self.STATE_DELETED
 
-    def hard_delete(self) -> None:
-        _uuid = _as_uuid(self.uuid)
-        mariadb.delete_trusted_issuer_attributes(_uuid)
-        mariadb.delete_trusted_issuer(_uuid)
-        super().hard_delete()
-
 
 class TrustedIssuers(dbo_iter):
     base_object = TrustedIssuer

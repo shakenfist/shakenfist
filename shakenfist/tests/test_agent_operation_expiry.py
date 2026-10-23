@@ -8,6 +8,7 @@ from shakenfist import exceptions
 from shakenfist.baseobject import DatabaseBackedObject as dbo
 from shakenfist.config import SFConfig
 from shakenfist.constants import EVENT_TYPE_AUDIT
+from shakenfist import mariadb
 from shakenfist.operations.agentoperation import AgentOperation
 from shakenfist.schema.object_state import State
 from shakenfist.schema.object_types import ObjectType
@@ -378,13 +379,21 @@ class AgentOperationExpiryTestCase(base.ShakenFistTestCase):
         op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)
         op.expire('deadline passed', AgentOperation.EXPIRY_REASON_DEADLINE)
 
+        # The references go in the batch hard delete, which MockMariaDB
+        # runs through the same public deletes the batch's statements
+        # mirror.
         with mock.patch(
+                'shakenfist.mariadb.hard_delete_objects',
+                wraps=mariadb.hard_delete_objects) as mock_batch, \
+            mock.patch(
                 'shakenfist.operations.agentoperation.mariadb'
                 '.remove_all_references_from') as mock_remove:
             op.hard_delete()
 
+        mock_batch.assert_called_once_with(
+            ObjectType.AGENTOPERATION, [str(op.uuid)], unconditional=True)
         mock_remove.assert_called_once_with(
-            ObjectType.AGENTOPERATION, op.uuid)
+            ObjectType.AGENTOPERATION, str(op.uuid))
 
     def test_record_progress_round_trips(self):
         op = self._make_agentop(state=AgentOperation.STATE_EXECUTING)

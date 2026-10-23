@@ -4,19 +4,20 @@
 
 mariadb.HARD_DELETE_BATCH_FUNCTIONS declares, for each object type whose
 hard delete is nothing but row deletes keyed on the object, the public
-delete functions that type's hard_delete() calls. These tests run each
-such class's real hard_delete() with every function on the mariadb
-module, the event log, the lock primitives and the file removal calls
-replaced by recorders, and compare what it called with three things: a
-literal sequence per type written here from the class, the declaration,
-and what hard_delete_objects_per_call() calls for the same object. A
-delete added to or dropped from either side, or any other database
-call, lock, event or file removal added to a hard_delete(), fails here.
+delete functions that type's hard delete runs. These tests run each such
+class's real hard_delete() with every function on the mariadb module,
+the event log, the lock primitives and the file removal calls replaced
+by recorders. With the batch, a class must make one unconditional
+hard_delete_objects() call for itself and write one audit event, and
+nothing else. Without it, the calls must equal a literal sequence per
+type written here: the deletes the class made before the batch existed.
+A delete added to or dropped from the declaration, a row delete left in
+a class beside the batch, or any other database call, lock, event or
+file removal added to a hard_delete(), fails here.
 
 The literals are deliberately a second copy. A change to what a type's
 hard delete removes has to be made here as well as in mariadb.py.
 """
-
 from contextlib import ExitStack
 import importlib
 import inspect
@@ -35,6 +36,8 @@ from shakenfist.constants import get_object_class
 from shakenfist.constants import OBJECT_NAMES_TO_CLASSES
 from shakenfist.constants import OPERATION_NAMES_TO_CLASSES
 from shakenfist import eventlog
+from shakenfist import exceptions
+from shakenfist.instance import Instance
 from shakenfist import ipam
 from shakenfist.ipam import IPAM
 from shakenfist import locks
@@ -71,8 +74,9 @@ CLUSTER_OPERATION_DELETES = (
     'delete_cluster_operation',
 )
 
-# For each batchable type, the deletes its hard_delete() calls before
-# BASE_DELETES, in order, as read from the class.
+# For each batchable type, the deletes its hard delete runs before
+# BASE_DELETES, in order, as read from each class before it moved onto the
+# batch.
 EXPECTED_DELETES = {
     ObjectType.ARTIFACT_FETCH_OP: CLUSTER_OPERATION_DELETES,
     ObjectType.IMGCACHE_OP: CLUSTER_OPERATION_DELETES,
@@ -155,6 +159,7 @@ PER_OBJECT_TYPES = {
 }
 
 AUDIT_EVENT = 'eventlog.add_event'
+BATCH = 'hard_delete_objects'
 
 
 def _normalise(value):
@@ -174,8 +179,11 @@ class _Recorder:
     (name, args, kwargs) with uuids as strings.
     """
 
-    def __init__(self):
+    def __init__(self, replies=None):
+        # replies maps a name to a callable which answers its calls in
+        # place of the default MagicMock, and may raise.
         self.calls = []
+        self.replies = replies or {}
 
     def _stub(self, name):
         def record(*args, **kwargs):
@@ -183,6 +191,8 @@ class _Recorder:
                 name,
                 tuple(_normalise(a) for a in args),
                 {k: _normalise(v) for k, v in kwargs.items()}))
+            if name in self.replies:
+                return self.replies[name](*args, **kwargs)
             return mock.MagicMock()
         return record
 
@@ -340,6 +350,14 @@ class ClassificationTestCase(base.ShakenFistTestCase):
         self.assertEqual(set(EXPECTED_DELETES), set(BUILDERS))
 
 
+def _batch_deletes_all(object_type, object_uuids, **kwargs):
+    return list(object_uuids)
+
+
+def _batch_unavailable(*args, **kwargs):
+    raise exceptions.HardDeleteBatchUnavailable('too old')
+
+
 class HardDeleteParityTestCase(base.ShakenFistTestCase):
     def _build(self, object_type):
         """Construct the type's object with no database behind it."""
@@ -353,54 +371,71 @@ class HardDeleteParityTestCase(base.ShakenFistTestCase):
         self.assertFalse(obj.in_memory_only, object_type)
         return obj
 
-    def _class_hard_delete(self, object_type):
+    def _class_hard_delete(self, object_type, batch, keep=()):
+        """Run the class's hard_delete() with ``batch`` answering the batch."""
         obj = self._build(object_type)
-        recorder = _Recorder()
+        recorder = _Recorder(replies={BATCH: batch})
         with ExitStack() as stack:
-            recorder.install(stack)
+            recorder.install(stack, keep=keep)
             obj.hard_delete()
         return str(obj.uuid), recorder
 
-    def _per_call(self, object_type, object_uuid):
-        recorder = _Recorder()
-        with ExitStack() as stack:
-            recorder.install(stack, keep=('hard_delete_objects_per_call',))
-            mariadb.hard_delete_objects_per_call(object_type, object_uuid)
-        return recorder
+    def _assert_audit_event(self, object_type, object_uuid, call):
+        self.assertEqual(
+            (AUDIT_EVENT,
+             (EVENT_TYPE_AUDIT, object_type, object_uuid,
+              'hard deleted object')),
+            call[:2], object_type)
 
-    def test_class_calls_its_literal_deletes(self):
-        for object_type, expected in EXPECTED_DELETES.items():
-            _, recorder = self._class_hard_delete(object_type)
-            names = [name for name in recorder.names()
-                     if name not in BASE_DELETES and name != AUDIT_EVENT]
-            self.assertEqual(list(expected), names, object_type)
-
-    def test_class_calls_the_base_deletes(self):
+    def test_class_makes_one_batch_call(self):
+        # The complete record: one unconditional batch for this object,
+        # then one audit event. A row delete left in the class, the
+        # targets delete run twice, or any other call breaks the equality.
         for object_type in EXPECTED_DELETES:
-            _, recorder = self._class_hard_delete(object_type)
-            names = recorder.names()
-            for name in BASE_DELETES:
-                self.assertEqual(1, names.count(name), (object_type, name))
-
-    def test_class_calls_nothing_else(self):
-        # The complete record: the type's own deletes, the base three, then
-        # one audit event. Anything else -- another database call, a lock,
-        # a file removal, a second event -- breaks the equality.
-        for object_type, expected in EXPECTED_DELETES.items():
-            object_uuid, recorder = self._class_hard_delete(object_type)
+            object_uuid, recorder = self._class_hard_delete(
+                object_type, _batch_deletes_all)
+            self.assertEqual([BATCH, AUDIT_EVENT], recorder.names(),
+                             object_type)
+            batch, event = recorder.calls
             self.assertEqual(
-                list(expected) + list(BASE_DELETES) + [AUDIT_EVENT],
+                (BATCH, (object_type, [object_uuid]),
+                 {'unconditional': True}),
+                batch, object_type)
+            self._assert_audit_event(object_type, object_uuid, event)
+
+    def test_without_the_batch_calls_the_literal(self):
+        # Against a database service which predates the batch, the class
+        # falls back to hard_delete_objects_per_call(), which must make
+        # exactly the calls the class made before the batch.
+        for object_type, expected in EXPECTED_DELETES.items():
+            object_uuid, recorder = self._class_hard_delete(
+                object_type, _batch_unavailable,
+                keep=('hard_delete_objects_per_call',))
+            self.assertEqual(
+                [BATCH] + list(expected) + list(BASE_DELETES) + [AUDIT_EVENT],
                 recorder.names(), object_type)
 
-            *deletes, event = recorder.calls
+            _, *deletes, event = recorder.calls
             for name, args, kwargs in deletes:
                 self.assertIn(object_uuid, args, (object_type, name))
                 self.assertEqual({}, kwargs, (object_type, name))
-            self.assertEqual(
-                (AUDIT_EVENT,
-                 (EVENT_TYPE_AUDIT, object_type, object_uuid,
-                  'hard deleted object')),
-                event[:2], object_type)
+            self._assert_audit_event(object_type, object_uuid, event)
+
+    def test_failed_batch_writes_no_audit_event(self):
+        # None is a batch which rolled back. The object is still there,
+        # so neither an audit event nor a per-call retry follows.
+        for object_type in EXPECTED_DELETES:
+            _, recorder = self._class_hard_delete(
+                object_type, lambda *args, **kwargs: None)
+            self.assertEqual([BATCH], recorder.names(), object_type)
+
+    def test_batch_omitting_the_object_writes_no_audit_event(self):
+        # An unconditional batch returns every uuid it was given. One
+        # which does not has broken that contract, and is not trusted.
+        for object_type in EXPECTED_DELETES:
+            _, recorder = self._class_hard_delete(
+                object_type, lambda *args, **kwargs: [str(uuid4())])
+            self.assertEqual([BATCH], recorder.names(), object_type)
 
     def test_literal_matches_the_mapping(self):
         for object_type, expected in EXPECTED_DELETES.items():
@@ -409,14 +444,31 @@ class HardDeleteParityTestCase(base.ShakenFistTestCase):
                 tuple(mariadb.HARD_DELETE_BATCH_FUNCTIONS.get(object_type, ())),
                 object_type)
 
-    def test_per_call_matches_the_class(self):
-        # Names, order and arguments: the fallback must make exactly the
-        # calls the class makes, base three included.
-        for object_type in EXPECTED_DELETES:
-            object_uuid, class_recorder = self._class_hard_delete(object_type)
-            per_call = self._per_call(object_type, object_uuid)
-            self.assertEqual(
-                class_recorder.database_calls(), per_call.calls, object_type)
+    def test_instance_keeps_its_targets_delete(self):
+        # Instance is not batched, so the cluster operation targets delete
+        # it inherits still runs, once, between its own deletes and the
+        # three every type runs. Its placement release is not under test.
+        object_uuid = str(uuid4())
+        # Built without its constructor, which would need a database;
+        # hard_delete() reads only the uuid and whether it is in memory.
+        inst = Instance.__new__(Instance)
+        inst._DatabaseBackedObject__uuid = object_uuid
+        inst._DatabaseBackedObject__in_memory_only = False
+        recorder = _Recorder()
+        with ExitStack() as stack:
+            recorder.install(stack)
+            stack.enter_context(
+                mock.patch.object(Instance, '_release_placement'))
+            inst.hard_delete()
+        self.assertEqual(
+            ['delete_instance_attributes', 'delete_instance',
+             'delete_cluster_operation_targets_for_object']
+            + list(BASE_DELETES) + [AUDIT_EVENT],
+            recorder.names())
+        self.assertEqual(
+            ('delete_cluster_operation_targets_for_object',
+             (ObjectType.INSTANCE, object_uuid), {}),
+            recorder.calls[2])
 
     def test_in_memory_ipam_deletes_nothing(self):
         with ExitStack() as stack:
