@@ -59,7 +59,8 @@ playbook still reaches it, probes it, and validates it with its own
 variables. Kerbside fetches the console token signing key from `api_url`, so
 on this host `api_url` must name an address of the Shaken Fist API which it
 can reach. The deploy refuses a loopback `api_url` here, before it changes
-any host.
+any host. Every port from 30000 up is still reserved here, as on a
+hypervisor, so Kerbside's ports must stay below 30000 wherever it runs.
 
 ### Bring your own
 
@@ -244,7 +245,8 @@ stream {
         listen 5900;
         proxy_pass kerbside_spice_tls;
         # nginx closes a stream after 10 minutes without data by
-        # default. Kerbside allows 15, so do not cut sessions sooner.
+        # default. Kerbside's proxy allows 15 (IDLE_READ_TIMEOUT, fixed
+        # in its code), so do not cut sessions sooner.
         proxy_timeout 15m;
     }
 

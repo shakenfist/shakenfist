@@ -941,8 +941,10 @@ database. The release note has its Kerbside bullets. What remains:
 - `ARCHITECTURE.md` names Kerbside as an optional component.
 - In the Kerbside repository, `docs/use-cases/shakenfist.md` points
   at the collection as the supported path. The co-location claim is
-  corrected in all four places it appears: `installation.md`
-  twice, `network-ports.md` and `demo/README.md`. Both are edited
+  corrected in all five places it appears: `installation.md`
+  twice, `network-ports.md`, `demo/README.md` and
+  `demo/entrypoint.sh`, the last found by kerbside#592's review
+  rather than the survey. Both are edited
   there, never in `docs/components/kerbside/` here (`AGENTS.md`).
 - kerbside#579 is closed, since the nightly has been green since
   2026-10-19.

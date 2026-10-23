@@ -142,7 +142,7 @@ the Shaken Fist side. The other covers deploying Kerbside, and phase 5
 updated it. No Shaken Fist release has been tagged since, so the note
 is still the current one. It needs only the new page's link.
 
-### S8 -- Kerbside's co-location claim is wrong in four places
+### S8 -- Kerbside's co-location claim is wrong in five places
 
 In Kerbside's code, only the daemon and its Rust proxy use
 `API_SOCKET_PATH`:
