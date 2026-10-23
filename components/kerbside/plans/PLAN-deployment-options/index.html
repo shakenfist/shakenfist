@@ -12213,6 +12213,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../ryll/kasm-workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running ryll as a Kasm workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../ryll/web-frontend/" class="md-nav__link">
         
   
@@ -12361,10 +12389,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_24" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_25" >
         
           
-          <label class="md-nav__link" for="__nav_3_10_24" id="__nav_3_10_24_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_10_25" id="__nav_3_10_25_label" tabindex="0">
             
   
   
@@ -12382,8 +12410,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_24_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_10_24">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_25_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10_25">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -16240,9 +16268,9 @@ Fist's operator guide for the parts Shaken Fist owns. It also
 covers the bring-your-own-Kerbside path, which is how a Shaken
 Fist cluster joins a front-door Kerbside. The role move was
 accepted, so this phase documents a Kerbside-owned role that
-accepts several sources. <strong>Blocked on</strong> that move landing, which
-needs the deployer plan's phase 4 to merge and a Kerbside
-release after v0.6.0. Planned at medium effort once unblocked.</p>
+accepts several sources. The move has landed (see Dependencies
+on other plans), so this phase is unblocked. Planned at medium
+effort.</p>
 <p><strong>Phase 6: installation hand-off and closeout.</strong>
 <code>installation.md</code>'s "Deploying for real" becomes a pointer to
 <code>docs/deployment/</code> rather than a table keyed by cloud. Reconcile
@@ -16355,6 +16383,17 @@ copy lives in shakenfist/development at
   cost is a collection dependency across repositories and a
   release step for it, which that phase has to design. This
   plan's phase 5 waits on the move.</p>
+<p><strong>The move landed on 2026-10-22.</strong>
+  - Release: v0.8.0 published the role on Galaxy as the
+    <code>shakenfist.kerbside</code> collection.
+  - Shaken Fist: it deploys Kerbside from that collection since
+    <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4591" title="GitHub Issue: shakenfist/shakenfist #4591">shakenfist#4591</a> (merge commit 48849831), as a soft dependency
+    pinned in <code>examples/_shared/requirements.yml</code>.
+  - This repository: the sf-e2e lane deploys through the role
+    since #587 (merge commit 89f1994).
+  - Actions: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/195" title="GitHub Issue: shakenfist/actions #195">actions#195</a> (merge commit 31139125)
+    removed <code>deploy-kerbside-on-shakenfist</code>.</p>
+<p>Phase 5 can start.</p>
 <ul>
 <li><strong><code>PLAN-use-case-docs.md</code></strong> (Complete) set the page format,
   the planned-row index convention, and the backend-TLS claim

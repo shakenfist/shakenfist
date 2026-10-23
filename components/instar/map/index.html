@@ -4334,6 +4334,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#refused-qcow2-l2-entries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refused qcow2 L2 entries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#known-divergences-from-qemu-img" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12178,6 +12189,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ryll/kasm-workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running ryll as a Kasm workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../ryll/web-frontend/" class="md-nav__link">
         
   
@@ -12326,10 +12365,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_24" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_25" >
         
           
-          <label class="md-nav__link" for="__nav_3_10_24" id="__nav_3_10_24_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_10_25" id="__nav_3_10_25_label" tabindex="0">
             
   
   
@@ -12347,8 +12386,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_24_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_10_24">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_25_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10_25">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -15792,6 +15831,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#refused-qcow2-l2-entries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refused qcow2 L2 entries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#known-divergences-from-qemu-img" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -15881,10 +15931,10 @@ divergences below).</p>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>0x80000         0x10000         0x60000         fragmented.qcow2
 </code></pre></div>
 <p>Four fixed-width 16-character columns plus a trailing filename
-column. Holes (unallocated regions) are elided — only <code>Data</code> and
-<code>ZeroAllocated</code> extents emit a row. Offsets use lowercase <code>0x</code> hex,
-except a literal <code>0</code> for zero values. The trailing newline after the
-last row matches qemu-img.</p>
+column. Only extents with <code>data: true</code> emit a row; holes and
+zero-reading extents are elided, as <code>qemu-img map</code> elides them.
+Offsets use lowercase <code>0x</code> hex, except a literal <code>0</code> for zero
+values. The trailing newline after the last row matches qemu-img.</p>
 <h3 id="json-outputjson">JSON (<code>--output=json</code>)<a class="headerlink" href="#json-outputjson" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>$ instar map --output=json fragmented.qcow2
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>[{ "start": 0, "length": 65536, "depth": 0, "present": true, "zero": false, "data": true, "compressed": false, "offset": 327680},
@@ -15933,7 +15983,7 @@ JSON mode. Field semantics:</p>
 </tr>
 <tr>
 <td><code>offset</code></td>
-<td>File offset of the extent's first byte. Omitted (not <code>null</code>) when <code>present == false</code>.</td>
+<td>File offset of the extent's first byte. Emitted when the state names a host location (<code>data</code>, <code>zero-at</code> and <code>hole-at</code> below), and omitted (not <code>null</code>) otherwise, so a <code>present: false</code> extent can carry one.</td>
 </tr>
 </tbody>
 </table>
@@ -15949,65 +15999,105 @@ output above has no <code>compressed</code> key at all:</p>
 <p>Use <code>--qemu-version</code> to emulate a specific version explicitly; without
 it instar detects the installed qemu-img, exactly as <code>instar info</code>
 does.</p>
-<p>The combination <code>(present, zero, data)</code> distinguishes the three
-underlying states the parser emits:</p>
+<p>The parser emits one of five states per extent. The combination
+<code>(present, zero, data)</code> and whether <code>offset</code> is emitted distinguish
+them:</p>
 <table>
 <thead>
 <tr>
 <th>State</th>
+<th>Meaning</th>
 <th><code>present</code></th>
 <th><code>zero</code></th>
 <th><code>data</code></th>
+<th><code>offset</code></th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>Data</code></td>
+<td><code>data</code></td>
+<td>Backed by bytes in the source file</td>
 <td><code>true</code></td>
 <td><code>false</code></td>
 <td><code>true</code></td>
+<td>yes</td>
 </tr>
 <tr>
-<td><code>ZeroAllocated</code></td>
+<td><code>zero</code></td>
+<td>Recorded as zero in the metadata</td>
 <td><code>true</code></td>
 <td><code>true</code></td>
 <td><code>false</code></td>
+<td>no</td>
 </tr>
 <tr>
-<td><code>Hole</code></td>
+<td><code>zero-at</code></td>
+<td>As <code>zero</code>, but the metadata also names a host cluster</td>
+<td><code>true</code></td>
+<td><code>true</code></td>
+<td><code>false</code></td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>hole</code></td>
+<td>Unallocated</td>
 <td><code>false</code></td>
 <td><code>true</code></td>
 <td><code>false</code></td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>hole-at</code></td>
+<td>As <code>hole</code>, but the metadata names a host cluster the extent does not use</td>
+<td><code>false</code></td>
+<td><code>true</code></td>
+<td><code>false</code></td>
+<td>yes</td>
 </tr>
 </tbody>
 </table>
+<p>Only qcow2 produces <code>zero-at</code> and <code>hole-at</code>; they are qemu's
+<code>ZERO_ALLOC</code> and <code>UNALLOCATED_ALLOC</code> subcluster types, for which
+<code>qemu-img map</code> also prints an <code>offset</code>. The parser's state names are
+<code>MapExtentState</code>'s variants in <code>src/shared/src/lib.rs</code> (<code>Data</code>,
+<code>ZeroAllocated</code>, <code>ZeroAllocatedAt</code>, <code>Hole</code>, <code>HoleAt</code>), and the
+sections below use them.</p>
 <h2 id="per-format-extent-classification">Per-format extent classification<a class="headerlink" href="#per-format-extent-classification" title="Permanent link">&para;</a></h2>
 <p>Each parser walks the format's on-disk allocation metadata and emits
 one extent per coalesced run of same-state clusters. The canonical
 implementation lives in <code>&lt;format&gt;::map_extents</code> in
 <code>src/crates/&lt;format&gt;/src/lib.rs</code>.</p>
 <h3 id="qcow2">qcow2<a class="headerlink" href="#qcow2" title="Permanent link">&para;</a></h3>
-<p>L1 table → L2 tables walk. Per L2 entry:</p>
+<p>L1 table → L2 tables walk. Each L2 entry, or with extended L2 each
+run of same-typed subclusters, is classified by <code>subcluster_type()</code>,
+the same transcription of qemu's <code>qcow2_get_subcluster_type</code> that the
+read path uses, and maps to the state <code>qemu-img map</code> reports for that
+type:</p>
 <ul>
-<li>Zero/unallocated entry (<code>0</code>): <code>Hole</code>.</li>
-<li><code>QCOW2_CLUSTER_ZERO_PLAIN</code> / <code>QCOW2_CLUSTER_ZERO_ALLOC</code>
-  (extended-L2 subcluster bitmap only): <code>ZeroAllocated</code>. On
-  <em>standard</em> L2 tables instar does not honour the qcow2 v3
-  <code>QCOW_OFLAG_ZERO</code> bit and reports such clusters as <code>Data</code>
-  (or <code>Hole</code> when <code>host_offset == 0</code>). See the "Known
-  divergences" section below.</li>
-<li>Allocated cluster: <code>Data</code> with the L2 host-cluster offset as the
-  <code>file_offset</code>.</li>
-<li>Compressed cluster: <code>Data</code> with the compressed-payload file
-  offset (see compressed-cluster divergence below).</li>
+<li><code>NORMAL</code>: <code>Data</code> at the host offset. With an external data file the
+  offset is into the data file, and an entry of <code>QCOW_OFLAG_COPIED</code>
+  at host offset 0 is a normal cluster at offset 0.</li>
+<li><code>ZERO_ALLOC</code> (the standard-L2 <code>QCOW_OFLAG_ZERO</code> bit, or an
+  extended-L2 zero bit, in an entry with a host offset):
+  <code>ZeroAllocatedAt</code> the host offset.</li>
+<li><code>ZERO_PLAIN</code> (the same without a host offset): <code>ZeroAllocated</code>.</li>
+<li><code>UNALLOCATED_ALLOC</code> (extended L2 only: a subcluster with neither
+  bitmap bit set, in an entry with a host offset): <code>HoleAt</code> the host
+  offset.</li>
+<li><code>UNALLOCATED_PLAIN</code> (no host offset): <code>Hole</code>.</li>
+<li><code>COMPRESSED</code>: <code>Data</code> with the compressed-payload file offset (see
+  the compressed-cluster divergence below).</li>
+<li><code>INVALID</code>: refused; see "Refused qcow2 L2 entries" below.</li>
 </ul>
-<p>Consecutive same-state clusters merge when their file offsets are
-contiguous, matching qemu-img.</p>
+<p>With extended L2 a run's offset is the entry's host offset plus the
+run's offset into the cluster. Consecutive same-state clusters merge
+when their file offsets are contiguous, matching qemu-img.</p>
 <h3 id="vmdk">vmdk<a class="headerlink" href="#vmdk" title="Permanent link">&para;</a></h3>
 <p>Grain directory → grain table walk. Per grain-table entry:</p>
 <ul>
 <li>Allocated grain: <code>Data</code> with the grain's file offset.</li>
-<li>Zero-grain sentinel (<code>0xFFFFFFFE</code>): <code>ZeroAllocated</code>.</li>
+<li>Zero-grain sentinel (<code>0xFFFFFFFE</code>), or <code>1</code> when the header sets
+  the zeroed-grain flag: <code>ZeroAllocated</code>.</li>
 <li>Unallocated entry: <code>Hole</code>.</li>
 </ul>
 <p>Single-extent monolithic layouts only — descriptor-driven
@@ -16032,7 +16122,9 @@ multi-extent sources are refused host-side (see below).</p>
   metadata region. See "Malformed block tables" below.</li>
 <li><code>PAYLOAD_BLOCK_PARTIALLY_PRESENT</code>: treated as <code>Data</code> (per-sector
   bitmap walk is future work; see below).</li>
-<li><code>PAYLOAD_BLOCK_ZERO</code> / <code>PAYLOAD_BLOCK_UNMAPPED</code>: <code>Hole</code>.</li>
+<li><code>PAYLOAD_BLOCK_ZERO</code>: <code>ZeroAllocated</code>.</li>
+<li><code>PAYLOAD_BLOCK_NOT_PRESENT</code> / <code>PAYLOAD_BLOCK_UNDEFINED</code> /
+  <code>PAYLOAD_BLOCK_UNMAPPED</code>, and any reserved state: <code>Hole</code>.</li>
 </ul>
 <h3 id="raw">raw<a class="headerlink" href="#raw" title="Permanent link">&para;</a></h3>
 <p>Single fully-allocated extent covering the virtual size. The no_std
@@ -16061,6 +16153,32 @@ immediately past the last region in the table is unaffected and
 still maps normally. See
 <a href="/components/instar/format-internals/#vhdx">docs/format-internals.md § vhdx</a> for the
 predicate both the readers and this walk share.</p>
+<h2 id="refused-qcow2-l2-entries">Refused qcow2 L2 entries<a class="headerlink" href="#refused-qcow2-l2-entries" title="Permanent link">&para;</a></h2>
+<p><code>map</code> refuses a qcow2 image whose L2 table holds an entry <code>qemu-img
+map</code> fails on with <code>EIO</code>, rather than mapping it. There are two
+kinds, and the message for each keeps qemu's wording:</p>
+<ul>
+<li>An entry <code>subcluster_type()</code> classifies as invalid: an extended-L2
+  bitmap with an allocation bit set in an entry with no host cluster,
+  or a subcluster both allocated and zero.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>map: Invalid cluster entry found at virtual offset 65536 (0x10000): corrupt qcow2 L2 entry
+</code></pre></div>
+<ul>
+<li>In an image with an external data file, an entry that breaks one of
+  qemu's data-file rules: a compressed entry, or one whose host cluster
+  offset is not its guest cluster offset (qemu maps a data file one to
+  one, and applies this to zero and unallocated entries that name a
+  host cluster as well).</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>map: Compressed cluster entry found in image with external data file at virtual offset N (0x...)
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>map: External data file host cluster offset does not match guest cluster offset at virtual offset N (0x...)
+</code></pre></div>
+<p>The offset is the virtual offset of the cluster the entry describes.
+Exit 1; as on any other failure, the extents before the refused entry
+stay on stdout. <code>measure</code> refuses the same entries, and the reading
+operations refuse them when a read reaches one. See
+<a href="/components/instar/quirks/#invalid-qcow2-subcluster-entries-are-refused-as-in-qemu-img">docs/quirks.md § Invalid qcow2 subcluster entries are refused, as in qemu-img</a>.</p>
 <h2 id="known-divergences-from-qemu-img">Known divergences from qemu-img<a class="headerlink" href="#known-divergences-from-qemu-img" title="Permanent link">&para;</a></h2>
 <p>Each entry is documented in <a href="/components/instar/quirks/">quirks.md</a> with the
 rationale and the future-work pointer.</p>
@@ -16083,13 +16201,6 @@ rationale and the future-work pointer.</p>
   (monolithicFlat, 2GbMaxExtent…) sources fail host-side via
   <code>peek_is_vmdk_descriptor</code>. Use <code>qemu-img map</code> as the workaround.
   See <a href="/components/instar/quirks/#vmdk-multi-extent-sources-are-refused">docs/quirks.md § VMDK multi-extent sources are refused</a>.</li>
-<li><strong>qcow2 v3 standard-L2 <code>QCOW_OFLAG_ZERO</code> not honoured</strong> — for
-  qcow2 v3 (compat=1.1) images that use standard 8-byte L2
-  entries, instar reports <code>QCOW2_CLUSTER_ZERO_PLAIN</code> /
-  <code>_ZERO_ALLOC</code> clusters as <code>Data</code> (or <code>Hole</code> when
-  <code>host_offset == 0</code>) rather than <code>ZeroAllocated</code>. Extended-L2
-  subcluster bitmaps are unaffected. See
-  <a href="/components/instar/quirks/#qcow2-v3-standard-l2-qcow_oflag_zero-not-honoured">docs/quirks.md § qcow2 v3 standard-L2 <code>QCOW_OFLAG_ZERO</code> not honoured</a>.</li>
 <li><strong>qcow2 compressed clusters report <code>compressed: false</code></strong> —
   instar's renderer always emits <code>false</code>; qemu-img emits <code>true</code>
   for compressed-cluster extents. The <code>file_offset</code> field for
@@ -16131,10 +16242,6 @@ sources for the same VHD-unallocated reason.</p>
   compressed bit through the FFI and renderer; strip the
   <code>nb_sectors-1</code> bits from the file offset to match qemu-img's
   high-bit-set marker convention.</li>
-<li><strong>qcow2 v3 standard-L2 <code>QCOW_OFLAG_ZERO</code> honouring</strong> — branch
-  on the bit in <code>classify_qcow2_l2_standard</code> and emit
-  <code>ZeroAllocated</code>. A matching <code>cluster_lookup</code> change is the
-  prerequisite so the parser stays consistent across operations.</li>
 <li><strong><code>-l SNAPSHOT</code> snapshot-targeted mapping</strong> — reuses convert's
   snapshot machinery.</li>
 <li><strong><code>--image-opts</code> parsing</strong> — deferred until a real user requests
@@ -16142,19 +16249,19 @@ sources for the same VHD-unallocated reason.</p>
 </ul>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
 <p>Default human output:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>instar map disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar map disk.qcow2
 </code></pre></div>
 <p>JSON for scripting:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>instar map --output=json disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar map --output=json disk.qcow2
 </code></pre></div>
 <p>Window slice — emit only the extents covering bytes <code>[1 MiB, 5 MiB)</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instar map --start-offset=1M --max-length=4M disk.qcow2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar map --start-offset=1M --max-length=4M disk.qcow2
 </code></pre></div>
 <p>Format hint (skip auto-detection):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>instar map -f vmdk disk.vmdk
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>instar map -f vmdk disk.vmdk
 </code></pre></div>
 <p>Stream into <code>jq</code> to extract just the data extents:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>instar map --output=json disk.qcow2 | jq '.[] | select(.data == true)'
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>instar map --output=json disk.qcow2 | jq '.[] | select(.data == true)'
 </code></pre></div>
 
 

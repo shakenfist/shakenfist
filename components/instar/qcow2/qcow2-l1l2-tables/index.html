@@ -12185,6 +12185,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../ryll/kasm-workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running ryll as a Kasm workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../ryll/web-frontend/" class="md-nav__link">
         
   
@@ -12333,10 +12361,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_24" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_25" >
         
           
-          <label class="md-nav__link" for="__nav_3_10_24" id="__nav_3_10_24_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_10_25" id="__nav_3_10_25_label" tabindex="0">
             
   
   
@@ -12354,8 +12382,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_24_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_10_24">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_25_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10_25">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -16003,28 +16031,47 @@ efficient copy-on-write operations.</p>
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="cp">#define QCOW_OFLAG_ZERO         (1ULL &lt;&lt; 0)</span>
 </code></pre></div></p>
 <h2 id="cluster-type-determination">Cluster Type Determination<a class="headerlink" href="#cluster-type-determination" title="Permanent link">&para;</a></h2>
+<p>This follows qemu's <code>qcow2_get_cluster_type</code> (<code>block/qcow2.h</code> at
+v10.0.0), which instar transcribes as <code>cluster_type()</code> in
+<code>src/crates/qcow2/src/lib.rs</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="n">QCow2ClusterType</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_UNALLOCATED</span><span class="p">,</span><span class="w">  </span><span class="c1">// offset=0, zero=0: read from backing</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_ZERO_PLAIN</span><span class="p">,</span><span class="w">   </span><span class="c1">// offset=0, zero=1: reads as zeros</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_ZERO_ALLOC</span><span class="p">,</span><span class="w">   </span><span class="c1">// offset!=0, zero=1: allocated but zeros</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_NORMAL</span><span class="p">,</span><span class="w">       </span><span class="c1">// offset!=0, compressed=0: standard data</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_UNALLOCATED</span><span class="p">,</span><span class="w">  </span><span class="c1">// offset=0: read from backing</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_ZERO_PLAIN</span><span class="p">,</span><span class="w">   </span><span class="c1">// offset=0, zero=1, standard L2 only: reads as zeros</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_ZERO_ALLOC</span><span class="p">,</span><span class="w">   </span><span class="c1">// offset!=0, zero=1, standard L2 only: allocated but zeros</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_NORMAL</span><span class="p">,</span><span class="w">       </span><span class="c1">// offset!=0 (or COPIED at offset 0 with a data file)</span>
 <a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">    </span><span class="n">QCOW2_CLUSTER_COMPRESSED</span><span class="p">,</span><span class="w">   </span><span class="c1">// compressed=1: compressed data</span>
 <a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="p">}</span><span class="w"> </span><span class="n">QCow2ClusterType</span><span class="p">;</span>
 <a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">QCow2ClusterType</span><span class="w"> </span><span class="nf">get_cluster_type</span><span class="p">(</span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">l2_entry</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">QCOW_OFLAG_COMPRESSED</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_COMPRESSED</span><span class="p">;</span>
-<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>
-<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">L2E_OFFSET_MASK</span><span class="p">;</span>
-<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>
-<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">QCOW_OFLAG_ZERO</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_ZERO_ALLOC</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_ZERO_PLAIN</span><span class="p">;</span>
-<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>
-<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_NORMAL</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_UNALLOCATED</span><span class="p">;</span>
-<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a><span class="p">}</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">QCow2ClusterType</span><span class="w"> </span><span class="nf">get_cluster_type</span><span class="p">(</span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">l2_entry</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">extended_l2</span><span class="p">,</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">                                  </span><span class="kt">bool</span><span class="w"> </span><span class="n">has_data_file</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">QCOW_OFLAG_COMPRESSED</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_COMPRESSED</span><span class="p">;</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">L2E_OFFSET_MASK</span><span class="p">;</span>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="w">    </span><span class="c1">// With extended L2 the zero bit is unused: the subcluster</span>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="w">    </span><span class="c1">// bitmap says which subclusters read as zeros.</span>
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">((</span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">QCOW_OFLAG_ZERO</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="o">!</span><span class="n">extended_l2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_ZERO_ALLOC</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_ZERO_PLAIN</span><span class="p">;</span>
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>
+<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">offset</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a><span class="w">        </span><span class="c1">// Offset 0 is a real offset in an external data file, and</span>
+<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a><span class="w">        </span><span class="c1">// every data-file cluster has refcount 1, so COPIED tells a</span>
+<a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a><span class="w">        </span><span class="c1">// cluster at offset 0 from an unallocated one.</span>
+<a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a><span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">has_data_file</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="p">(</span><span class="n">l2_entry</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">QCOW_OFLAG_COPIED</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a><span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_NORMAL</span><span class="p">;</span>
+<a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a><span class="w">        </span><span class="p">}</span>
+<a id="__codelineno-6-30" name="__codelineno-6-30" href="#__codelineno-6-30"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_UNALLOCATED</span><span class="p">;</span>
+<a id="__codelineno-6-31" name="__codelineno-6-31" href="#__codelineno-6-31"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-6-32" name="__codelineno-6-32" href="#__codelineno-6-32"></a>
+<a id="__codelineno-6-33" name="__codelineno-6-33" href="#__codelineno-6-33"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">QCOW2_CLUSTER_NORMAL</span><span class="p">;</span>
+<a id="__codelineno-6-34" name="__codelineno-6-34" href="#__codelineno-6-34"></a><span class="p">}</span>
 </code></pre></div>
+<p>Without extended L2 each cluster type maps directly to the subcluster
+type of the same name (<code>UNALLOCATED</code> becomes <code>UNALLOCATED_PLAIN</code>). With
+extended L2 the bitmap refines it; see <a href="#subcluster-types">Subcluster Types</a>.</p>
 <h2 id="compressed-cluster-descriptor">Compressed Cluster Descriptor<a class="headerlink" href="#compressed-cluster-descriptor" title="Permanent link">&para;</a></h2>
 <p>When bit 62 (COMPRESSED) is set, the entry format changes:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a> 63  62  61                        csize_shift                    0
@@ -16097,6 +16144,32 @@ efficient copy-on-write operations.</p>
 <a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">    </span><span class="n">QCOW2_SUBCLUSTER_INVALID</span><span class="p">,</span><span class="w">            </span><span class="c1">// Invalid state</span>
 <a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="p">}</span><span class="w"> </span><span class="n">QCow2SubclusterType</span><span class="p">;</span>
 </code></pre></div>
+<p>With extended L2, qemu's <code>qcow2_get_subcluster_type</code> (<code>block/qcow2.h</code>
+at v10.0.0), transcribed as <code>subcluster_type()</code> in
+<code>src/crates/qcow2/src/lib.rs</code>, refines the cluster type with the
+bitmap. The <code>INVALID</code> tests look at the whole bitmap, not only
+subcluster <code>sc</code>'s bits, so one contradiction makes every subcluster of
+the entry invalid:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kt">uint32_t</span><span class="w"> </span><span class="n">alloc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bitmap</span><span class="p">,</span><span class="w"> </span><span class="n">zero</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">bitmap</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="n">bit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1u</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">sc</span><span class="p">;</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">get_cluster_type</span><span class="p">(</span><span class="n">l2_entry</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">has_data_file</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="k">case</span><span class="w"> </span><span class="no">QCOW2_CLUSTER_COMPRESSED</span><span class="p">:</span><span class="w">      </span><span class="c1">// bitmap not consulted</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">QCOW2_SUBCLUSTER_COMPRESSED</span><span class="p">;</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="k">case</span><span class="w"> </span><span class="no">QCOW2_CLUSTER_NORMAL</span><span class="p">:</span><span class="w">          </span><span class="c1">// includes COPIED at offset 0 with a data file</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">zero</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">alloc</span><span class="p">)</span><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">QCOW2_SUBCLUSTER_INVALID</span><span class="p">;</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">zero</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">bit</span><span class="p">)</span><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">QCOW2_SUBCLUSTER_ZERO_ALLOC</span><span class="p">;</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">alloc</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">bit</span><span class="p">)</span><span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="n">QCOW2_SUBCLUSTER_NORMAL</span><span class="p">;</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">QCOW2_SUBCLUSTER_UNALLOCATED_ALLOC</span><span class="p">;</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="k">case</span><span class="w"> </span><span class="no">QCOW2_CLUSTER_UNALLOCATED</span><span class="p">:</span>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">alloc</span><span class="p">)</span><span class="w">         </span><span class="k">return</span><span class="w"> </span><span class="n">QCOW2_SUBCLUSTER_INVALID</span><span class="p">;</span>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">zero</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">bit</span><span class="p">)</span><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">QCOW2_SUBCLUSTER_ZERO_PLAIN</span><span class="p">;</span>
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">QCOW2_SUBCLUSTER_UNALLOCATED_PLAIN</span><span class="p">;</span>
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a><span class="k">default</span><span class="o">:</span><span class="w">                            </span><span class="c1">// ZERO_* cannot occur with extended L2</span>
+<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">QCOW2_SUBCLUSTER_INVALID</span><span class="p">;</span>
+<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a><span class="p">}</span>
+</code></pre></div>
+<p>qemu asserts on the last case; instar classifies it <code>INVALID</code> so a
+guest read fails closed instead of panicking.</p>
 <p><strong>Important constraints:</strong>
 - Compressed clusters cannot use subclusters (bitmap must be 0)
 - Extended L2 requires cluster_bits &gt;= 14 (minimum 16 KB clusters)
@@ -16158,11 +16231,11 @@ the L2 walk in the check operation.</p>
 4. When refcount drops to 1, COPIED should be set</p>
 <h2 id="l2-table-caching">L2 Table Caching<a class="headerlink" href="#l2-table-caching" title="Permanent link">&para;</a></h2>
 <p>qemu loads L2 tables on demand and caches them:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1">// L2 cache sizing formula</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">l2_cache_max_disk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">l2_cache_size</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">cluster_size</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">l2_entry_size</span><span class="p">;</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1">// For 1 MB cache, 64 KB clusters, standard entries:</span>
-<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="c1">// 1 MB * 64 KB / 8 = 8 GB of disk addressable</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1">// L2 cache sizing formula</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">l2_cache_max_disk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">l2_cache_size</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">cluster_size</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">l2_entry_size</span><span class="p">;</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1">// For 1 MB cache, 64 KB clusters, standard entries:</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="c1">// 1 MB * 64 KB / 8 = 8 GB of disk addressable</span>
 </code></pre></div>
 <p>L2 tables are loaded in "slices" (typically 4 KB) rather than full clusters
 for memory efficiency.</p>
@@ -16196,11 +16269,12 @@ divergence. If a future divergence appears the behaviour becomes a
 candidate for <code>docs/quirks.md</code>.</p>
 <h2 id="backing-file-chain-resolution">Backing File Chain Resolution<a class="headerlink" href="#backing-file-chain-resolution" title="Permanent link">&para;</a></h2>
 <p>When a cluster is unallocated:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>1. Check local L2 entry
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>2. If unallocated (offset=0, zero=0):
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>   a. If backing file exists: recurse into backing file
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>   b. If no backing file: return zeros
-<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>3. Continue until allocated cluster found or chain ends
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>1. Check local L2 entry
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>2. If unallocated (UNALLOCATED_PLAIN, or with extended L2 also
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>   UNALLOCATED_ALLOC):
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>   a. If backing file exists: recurse into backing file
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>   b. If no backing file: return zeros
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>3. Continue until allocated cluster found or chain ends
 </code></pre></div>
 <p>The backing file path is stored after the header (see backing_file_offset).</p>
 

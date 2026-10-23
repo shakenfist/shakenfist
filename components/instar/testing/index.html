@@ -12200,6 +12200,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ryll/kasm-workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running ryll as a Kasm workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../ryll/web-frontend/" class="md-nav__link">
         
   
@@ -12348,10 +12376,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_24" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_25" >
         
           
-          <label class="md-nav__link" for="__nav_3_10_24" id="__nav_3_10_24_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_10_25" id="__nav_3_10_25_label" tabindex="0">
             
   
   
@@ -12369,8 +12397,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_24_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_10_24">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_25_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10_25">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -18365,8 +18393,8 @@ disable the guard with <code>if false</code> and are caught, through the real
 binary, by <code>TestAdversarialChainDeviceCount</code> in <code>tests/test_adversarial.py</code>
 -- the same test module that builds the fixture, since no static
 <code>instar-testdata</code> image has this shape.</p>
-<p>Then <strong>3 subcluster cases</strong>, the first of the two groups not about a
-differencing format at all. It is here because the defect it
+<p>Then <strong>3 subcluster cases</strong>, the first of the three groups not about
+a differencing format at all. It is here because the defect it
 guards is the same class as the rest -- a span the reader never wrote,
 returned to the caller under a successful read -- and because the
 differencing work's own fuzz target is what found it. An extended-L2
@@ -18476,7 +18504,7 @@ report a clean run; it warns once up front when it is missing.</p>
 <p>A full run took <strong>4m59s</strong> on a warm tree with <code>vhdiinfo</code> present and
 everything passing, and 4m43s when it held 57 cases; an earlier run
 of the same tree took 9m38s because it also had to build a docker
-image. Before the reader cases existed the 26 writer cases alone took
+image. Before the reader cases existed the writer cases alone took
 2m32s, 2m44s and 3m35s on three measured runs. Those are observations rather than estimates:
 an earlier "about two minutes" here was a guess, and an understated
 figure invites the reader to assume a run has hung. Expect a spread,
@@ -18682,7 +18710,8 @@ one.</p>
 </ul>
 <h2 id="test-image-generation">Test Image Generation<a class="headerlink" href="#test-image-generation" title="Permanent link">&para;</a></h2>
 <p>Synthetic test images that cannot be created by <code>qemu-img</code> are built
-by scripts in <code>scripts/</code>:</p>
+by scripts in <code>scripts/</code>, as are a few small <code>qemu-img</code> images whose
+structure or contents the tests need to be exactly known:</p>
 <ul>
 <li><code>create-vhd-testdata.sh</code> — Fixed VHD (disk_type=2); differencing
   VHD (disk_type=4) and differencing VHDX (HasParent) as type-only
@@ -18695,23 +18724,33 @@ by scripts in <code>scripts/</code>:</p>
   parent-locator VHDs (absolute path, relative traversal, UNC, URL,
   an over-long unterminated parent name, and mutually conflicting
   locator entries) that are structurally valid and hostile only in a
-  path string. It takes two output directories,
-  <code>create-vhd-testdata.sh [output-dir] [audit-dir]</code>, because the six
-  adversarial fixtures belong in <code>custom/audit/</code> and everything else
-  in <code>custom/format-coverage/</code>. Given one argument the audit
-  directory becomes <code>&lt;output-dir&gt;/audit</code>, so a scratch run writes
-  everything under the directory it was given rather than sending
-  sixteen files to the scratch tree and six into the real testdata
-  checkout. Every file it writes is byte-reproducible except the four
-  VHDX ones, where <code>qemu-img</code> stamps fresh GUIDs on each run; each is
-  therefore skipped when it already exists, and rebuilding any of
-  them needs <code>REGEN_VHDX=1</code>. The parent, the child and the
-  grandchild must be committed together when they are rebuilt: each
-  of the upper two records the DataWriteGuid of the one below it, so
-  a regenerated parent invalidates both images above it. The
+  path string; and five images written by the host <code>qemu-img</code>: fixed
+  VHDX of 16M (two whole 8 MiB blocks) and 17M (a partial final
+  block), each with the default <code>block_state_zero</code> and with
+  <code>block_state_zero=off</code>, where the <code>off</code> ones carry known data
+  written with <code>qemu-io</code> (0x11 at 0 and 0x22 at 12M; 0x33 at 0 and
+  0x44 in the last 64 KiB), and a dynamic VHDX of 131041M with 1 MiB
+  blocks, whose BAT exactly fills its region and which reproduces #626
+  in 8 MiB on disk. Each of the five must keep the structure of its
+  case in <code>tests/helpers/qemu_pins.py</code>, which
+  <code>tests/test_vhdx_fixed_fixtures.py</code> checks. It takes two output
+  directories, <code>create-vhd-testdata.sh [output-dir] [audit-dir]</code>,
+  because the six adversarial fixtures belong in <code>custom/audit/</code> and
+  everything else in <code>custom/format-coverage/</code>. Given one argument the
+  audit directory becomes <code>&lt;output-dir&gt;/audit</code>, so a scratch run
+  writes everything under the directory it was given rather than
+  sending twenty files to the scratch tree and six into the real
+  testdata checkout. Every file it writes is byte-reproducible except
+  the nine VHDX ones, where <code>qemu-img</code> stamps fresh GUIDs on each run;
+  each is therefore skipped when it already exists, and rebuilding any
+  of them needs <code>REGEN_VHDX=1</code>. The five qemu-written images are
+  independent of each other and of the chains. The parent, the child
+  and the grandchild must be committed together when they are rebuilt:
+  each of the upper two records the DataWriteGuid of the one below it,
+  so a regenerated parent invalidates both images above it. The
   generator re-checks both of those links on every run, including the
   runs that rebuild nothing, so a half-finished regeneration fails
-  there rather than in the test suite</li>
+  there rather than in the test suite.</li>
 <li><code>create-vmdk-testdata.sh</code> — Binary VMDK4 with multi-extent descriptor</li>
 <li><code>create-luks-testdata.sh</code> — LUKS v1 containers with inner formats</li>
 <li><code>create-native-luks-testdata.py</code> — LUKS v1/v2 with known encrypted
@@ -18719,6 +18758,18 @@ by scripts in <code>scripts/</code>:</p>
 <li><code>create-qcow2-luks-testdata.sh</code> — QCOW2 with LUKS encryption (crypt_method=2)</li>
 <li><code>create-check-testdata.sh</code> — QCOW2 images with specific corruptions</li>
 </ul>
+<p><code>tests/test_vhdx_fixed_fixtures.py</code> checks each of the five
+qemu-written fixtures against the structure pin, reads the four fixed
+ones through their BAT to check they hold exactly the data the
+generator wrote (needing neither qemu nor instar, since both would
+agree on an image whose writes never landed), then runs instar's
+read operations on them (and on some fixed and convert-built images
+made at test time) against <code>qemu-img</code>'s answers. Images at the 131041M
+geometry get only <code>info</code>, <code>check</code> and <code>map</code>, since a convert or compare
+would read 128 GiB. Its <code>KNOWN_READ_FAILURES</code> table lists the known
+failures by issue (#626, #797); a listed entry must still fail with its
+recorded message, and one that starts passing fails the test, asking
+for the entry to be removed.</p>
 <p>Most adversarial and CVE-reproducer image generation scripts live in
 <code>instar-testdata/scripts/</code> (the private testdata repository), not in
 the public <code>instar/scripts/</code> directory, and include scripts for

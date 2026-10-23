@@ -15911,6 +15911,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../ryll/kasm-workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running ryll as a Kasm workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../ryll/web-frontend/" class="md-nav__link">
         
   
@@ -16059,10 +16087,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_24" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_25" >
         
           
-          <label class="md-nav__link" for="__nav_3_10_24" id="__nav_3_10_24_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_10_25" id="__nav_3_10_25_label" tabindex="0">
             
   
   
@@ -16080,8 +16108,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_24_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_10_24">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_25_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10_25">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -24265,34 +24293,26 @@ host CLI also refuses them via <code>peek_is_vmdk_descriptor</code>
 before launching the guest, pointing the user at <code>qemu-img
 map</code> as the workaround.</p>
 <h3 id="qcow2-v3-standard-l2-qcow_oflag_zero-honoured-fixed">qcow2 v3 standard-L2 <code>QCOW_OFLAG_ZERO</code> honoured (fixed)<a class="headerlink" href="#qcow2-v3-standard-l2-qcow_oflag_zero-honoured-fixed" title="Permanent link">&para;</a></h3>
-<p>In qcow2 v3 (compat=1.1) images that use <em>standard</em> L2 tables
-(8-byte entries, not extended L2), the <code>QCOW_OFLAG_ZERO</code> bit
-(bit 0) on an L2 entry signals <code>QCOW2_CLUSTER_ZERO_PLAIN</code>
-(when <code>host_offset == 0</code>) or <code>QCOW2_CLUSTER_ZERO_ALLOC</code> (when
-<code>host_offset != 0</code>) — both of which qemu-img reports as
-<code>present: true, zero: true, data: false</code> (<code>ZeroAllocated</code>).
-Historically instar's <code>classify_qcow2_l2_standard</code> ignored
-the bit and treated any non-zero L2 entry without
-<code>OFLAG_COMPRESSED</code> as <code>Data</code> (reporting <code>Hole</code> when
-<code>host_offset == 0</code>) — a pre-existing gap in the qcow2 parser
-(<code>cluster_lookup</code> had no <code>OFLAG_ZERO</code> branch either) inherited
-by map for consistency.</p>
-<p><strong>Fixed</strong> as step 7z of PLAN-qcow2-write-infrastructure
-(alongside the chain-reader fix for
-<a href="https://github.com/shakenfist/instar/issues/432">#432</a>):
-<code>classify_qcow2_l2_standard</code> now reports a zero-flag standard
-entry as <code>ZeroAllocated</code> for both <code>host_offset == 0</code> and
-<code>host_offset != 0</code>, and <code>cluster_lookup</code> gained a matching
-<code>ClusterLookup::Zero</code> verdict. Extended-L2 subcluster-bitmap
-<code>ZeroAllocated</code> reporting was always correct — instar walks
-the bitmap and classifies subclusters directly.</p>
-<p><code>map --output json</code> now also carries qemu's <code>"offset"</code> on
-zero-allocated runs and on unallocated-allocated runs, as <code>qemu-img
-map</code> does; before, a zero-flag cluster with a non-zero host offset
-omitted it. Data-file cluster 0 maps as data at offset 0. <code>measure</code>
-no longer counts zero-flag clusters as allocated, matching <code>qemu-img
-measure</code> (a 1M image with zeroed clusters reported 589824 bytes
-required, qemu reports 458752).</p>
+<p><strong>No divergence from qemu-img.</strong> In qcow2 v3 (compat=1.1) images that
+use <em>standard</em> L2 tables (8-byte entries, not extended L2), the
+<code>QCOW_OFLAG_ZERO</code> bit (bit 0) on an L2 entry makes the cluster
+<code>QCOW2_CLUSTER_ZERO_PLAIN</code> when <code>host_offset == 0</code> and
+<code>QCOW2_CLUSTER_ZERO_ALLOC</code> when it is not. <code>qemu-img map</code> reports both
+as <code>present: true, zero: true, data: false</code>, and prints an <code>"offset"</code>
+for <code>ZERO_ALLOC</code> only (measured on qemu-img 10.0.13 with <code>qemu-io
+write -z</code>).</p>
+<p>instar's <code>classify_qcow2_l2_standard</code> takes the cluster type from the
+same <code>subcluster_type()</code> classifier the read path uses, so it reports
+a zero-flag entry as <code>zero</code> without a host offset and as <code>zero-at</code>,
+carrying the <code>"offset"</code>, with one. The chain reader's <code>cluster_lookup</code>
+returns <code>ClusterLookup::Zero</code> for both and zero-fills the cluster.
+Extended-L2 zero bits go through the same classifier and map the same
+way, and a subcluster with neither bitmap bit set in a cluster with a
+host offset maps as <code>hole-at</code>, also carrying the <code>"offset"</code>, as
+<code>qemu-img map</code> reports it. With an external data file, cluster 0
+maps as data at offset 0.</p>
+<p><code>measure</code> does not count zero-flag clusters as allocated, matching
+<code>qemu-img measure</code>.</p>
 <h3 id="qcow2-compressed-clusters-report-compressed-false">qcow2 compressed clusters report <code>compressed: false</code><a class="headerlink" href="#qcow2-compressed-clusters-report-compressed-false" title="Permanent link">&para;</a></h3>
 <p><code>qemu-img map</code> emits <code>compressed: true</code> for extents that
 back compressed-cluster L2 entries. instar's qcow2
@@ -27752,10 +27772,11 @@ rather than fixed, because none of them was that change's job to close:</p>
    (<a href="https://github.com/shakenfist/instar/issues/565">issue #565</a>).</li>
 </ol>
 <h2 id="invalid-qcow2-subcluster-entries-are-refused-as-in-qemu-img">Invalid qcow2 subcluster entries are refused, as in qemu-img<a class="headerlink" href="#invalid-qcow2-subcluster-entries-are-refused-as-in-qemu-img" title="Permanent link">&para;</a></h2>
-<p><strong>Classification: no divergence from qemu-img for the entries qemu
-classifies as invalid; two related data-file shapes still diverge (see
-the end of this entry). Recorded because instar used to zero-fill these
-entries, and the reason it stopped is worth keeping.</strong></p>
+<p><strong>Classification: no divergence from qemu-img, either for the entries
+qemu classifies as invalid or for the two data-file shapes qemu refuses
+after classification (see the end of this entry). Recorded because
+instar used to zero-fill these entries, and the reason it stopped is
+worth keeping.</strong></p>
 <h3 id="observed-behavior_55">Observed Behavior<a class="headerlink" href="#observed-behavior_55" title="Permanent link">&para;</a></h3>
 <p>An extended-L2 qcow2 image can carry an L2 entry whose subcluster
 bitmap contradicts itself or the host offset: a subcluster marked

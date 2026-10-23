@@ -12396,6 +12396,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../ryll/kasm-workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running ryll as a Kasm workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../ryll/web-frontend/" class="md-nav__link">
         
   
@@ -12544,10 +12572,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_24" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_25" >
         
           
-          <label class="md-nav__link" for="__nav_3_10_24" id="__nav_3_10_24_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_10_25" id="__nav_3_10_25_label" tabindex="0">
             
   
   
@@ -12565,8 +12593,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_24_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_10_24">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_25_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10_25">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -17462,6 +17490,29 @@ section has been rewritten rather than patched:</p>
     == 'push' &amp;&amp; github.sha || github.ref }}-&lt;job&gt;</code>.</li>
 <li>Keep cancelling on pull requests and merge groups, where a
     newer run really does supersede the older one.</li>
+<li>
+<p>On a merge group, <code>github.ref</code> is a queue branch minted for each
+    entry, so a group keyed on it never cancels a superseded queue
+    run. A group a <code>merge_group</code> event can reach keys on the base
+    branch on a run's first attempt, and on <code>github.ref</code> otherwise:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;-</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="no">${{ github.workflow }}-&lt;job&gt;-${{</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="no">github.event_name == 'merge_group' &amp;&amp; github.run_attempt == '1'</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="no">&amp;&amp; format('merge_group-{0}', github.event.merge_group.base_ref)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="no">|| github.ref }}</span>
+</code></pre></div>
+<p>A re-run keeps its original event, so without the attempt guard a
+"Re-run jobs" on an old queue run would cancel the live entry or
+be cancelled by it. On a re-run the fallback, <code>github.ref</code>, is
+that old entry's own queue branch, which nothing else shares.
+client-python-ova commit 349b417 carries the comment every
+repository copied.
+  - A path filter that filters merge groups diffs against
+<code>github.event.merge_group.base_sha</code>, never the branch name. Once
+the entry has merged the branch contains it, so a re-run would
+find no changes and pass untested (client-python-k3s commit
+e3b93a0).</p>
+</li>
 </ul>
 <p>This is what makes a tag on any merged commit releasable, rather
   than only a tag on the tip.
@@ -17480,7 +17531,14 @@ section has been rewritten rather than patched:</p>
     enqueue" and "Can merge" aggregator jobs in the shape of
     client-python-k3s's (<code>functional-tests.yml:266-310</code>). Each
     aggregator's <code>needs:</code> lists that repository's own jobs, and the
-    automated reviewer stays out of it.
+    automated reviewer stays out of it. "Can enqueue" runs under
+    <code>${{ always() &amp;&amp; github.event_name != 'merge_group' }}</code> and "Can
+    merge" under <code>${{ always() &amp;&amp; github.event_name == 'merge_group'
+    }}</code>, each with <code>permissions: {}</code> (client-python-ova's
+    <code>ci.yml:309-350</code>). Under <code>!cancelled()</code>, a cancelled queue run
+    would skip "Can merge", and a skipped required check reads as a
+    pass. These are CI workflows; the Definition of done's ban on
+    <code>always()</code> covers <code>release.yml</code> only.
   - Every workflow that <code>ci-gate</code> names must be required by the queue.
     A job's <code>needs:</code> cannot reach across workflows, so a repository
     that names two workflows gives each its own suffixed pair of
@@ -17496,14 +17554,20 @@ section has been rewritten rather than patched:</p>
     - hunkydory already has a ruleset (23805020), so 3h edits that
       one instead. Its four required checks must then report on a
       merge group, or move into its aggregators.
+    - Once the ruleset is on, bring every open pull request up to
+      date with the default branch. A pull request run uses the
+      workflows of the merge ref it started on, so one whose CI ran
+      before the conversion merged reports the old check names and is
+      blocked for ever; a re-run reuses the same merge ref. The
+      template's <code>RELEASE-SETUP.md</code> has this as a step.
     - Copying the ruleset copies its bypass team too.
       <code>PLAN-bot-bypass-identity.md</code> owns that bypass. A bypass merge
       here fails the gate as it does everywhere else.
   - The gated workflow's push trigger, where it has one, is removed in
     the same pull request.
     - With a queue, every commit that lands on <code>develop</code> is one a
-      <code>merge_group</code> run tested, so a push run would only test it a
-      third time, after the pull request and the merge group.
+      <code>merge_group</code> run tested, so a push run would only test the
+      exact commit its merge queue run already tested.
     - Decision 3.1's re-keying then has nothing left to protect in
       these repositories, and is not made.
     - The cost is a short window between the merge and step 3h's
@@ -17551,7 +17615,12 @@ section has been rewritten rather than patched:</p>
   - A bypass merge, or a tag off the first-parent history: move the
     tag to a commit that went through the queue.
   - A docs-only commit that <code>paths-ignore</code> skipped: move the tag.
-  - A flaky run: re-run CI, then re-run the gate job.</p>
+  - A flaky queue run: it ejects its entry, so the commit it built
+    never reaches <code>develop</code> and no tag can be on it. Re-queue the
+    pull request and tag the commit that merges.
+  - A merged commit whose run was re-run later, and whose later
+    attempt failed: the gate judges each run at its latest attempt,
+    so re-run that run until it passes, then re-run the gate job.</p>
 <p>The gate does not change.
 * <strong>3.7. check-dist runs wherever a wheel is built for publishing, and
   in CI only where a CI job already builds one.</strong>
@@ -17889,17 +17958,18 @@ verdicts.</p>
   <code>ci-gate</code> job that uses <code>shakenfist/actions/require-ci-success@main</code>,
   and every job naming an environment is downstream of it.
   <code>!cancelled()</code> appears only in the guard for a job that needs
-  <code>ci-gate</code>, and <code>always()</code> appears nowhere. The script below checks
+  <code>ci-gate</code>, directly or through another job as the Rust template's
+  build jobs do, and <code>always()</code> appears nowhere. The script below checks
   the gate's presence and the absence of <code>always()</code>, and lists every
   <code>!cancelled()</code> line. Each listed line is then read against its
   job's <code>needs:</code>, and the downstream property is read from the job
   graph, until phase 4's helper checks it mechanically. Run it from a
   directory of fresh clones:</li>
 </ul>
-<p><div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">for</span><span class="w"> </span>r<span class="w"> </span><span class="k">in</span><span class="w"> </span>*/<span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span><span class="nv">f</span><span class="o">=</span><span class="s2">"</span><span class="nv">$r</span><span class="s2">.github/workflows/release.yml"</span><span class="p">;</span><span class="w"> </span><span class="o">[</span><span class="w"> </span>-f<span class="w"> </span><span class="s2">"</span><span class="nv">$f</span><span class="s2">"</span><span class="w"> </span><span class="o">]</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="k">continue</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>grep<span class="w"> </span>-q<span class="w"> </span><span class="s1">'require-ci-success@main'</span><span class="w"> </span><span class="s2">"</span><span class="nv">$f</span><span class="s2">"</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"</span><span class="nv">$r</span><span class="s2">: no ci-gate"</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>grep<span class="w"> </span>-n<span class="w"> </span><span class="s1">'always()'</span><span class="w"> </span><span class="s2">"</span><span class="nv">$f</span><span class="s2">"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span><span class="s2">"s|^|</span><span class="nv">$r</span><span class="s2">: |"</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>grep<span class="w"> </span>-n<span class="w"> </span><span class="s1">'!cancelled()'</span><span class="w"> </span><span class="s2">"</span><span class="nv">$f</span><span class="s2">"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span><span class="s2">"s|^|</span><span class="nv">$r</span><span class="s2">: cancelled guard: |"</span><span class="p">;</span><span class="w"> </span><span class="k">done</span>
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">for</span><span class="w"> </span>r<span class="w"> </span><span class="k">in</span><span class="w"> </span>*/<span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span><span class="nv">f</span><span class="o">=</span><span class="s2">"</span><span class="nv">$r</span><span class="s2">.github/workflows/release.yml"</span><span class="p">;</span><span class="w"> </span><span class="o">[</span><span class="w"> </span>-f<span class="w"> </span><span class="s2">"</span><span class="nv">$f</span><span class="s2">"</span><span class="w"> </span><span class="o">]</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="k">continue</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>grep<span class="w"> </span>-q<span class="w"> </span><span class="s1">'require-ci-success@main'</span><span class="w"> </span><span class="s2">"</span><span class="nv">$f</span><span class="s2">"</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"</span><span class="nv">$r</span><span class="s2">: no ci-gate"</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>grep<span class="w"> </span>-n<span class="w"> </span><span class="s1">'always()'</span><span class="w"> </span><span class="s2">"</span><span class="nv">$f</span><span class="s2">"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span><span class="s2">"s|^|</span><span class="nv">$r</span><span class="s2">: |"</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>grep<span class="w"> </span>-n<span class="w"> </span><span class="s1">'!cancelled()'</span><span class="w"> </span><span class="s2">"</span><span class="nv">$f</span><span class="s2">"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span><span class="s2">"s|^|</span><span class="nv">$r</span><span class="s2">: cancelled guard: |"</span><span class="p">;</span><span class="w"> </span><span class="k">done</span>
 </code></pre></div>
 * Every repository that publishes a wheel calls <code>check-dist</code> in each
   release job that builds one. A wheel built through the sdist from
@@ -17910,9 +17980,9 @@ verdicts.</p>
   <code>concurrency</code> group keys it by sha on a push.
 * The merged gate passes against each repository's <code>develop</code> tip, or
   the plan's execution notes name the failing tip and why:</p>
-<p><div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nv">GH_TOKEN</span><span class="o">=</span><span class="k">$(</span>gh<span class="w"> </span>auth<span class="w"> </span>token<span class="k">)</span><span class="w"> </span><span class="nv">GITHUB_REPOSITORY</span><span class="o">=</span>shakenfist/&lt;r&gt;<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nv">WORKFLOWS</span><span class="o">=</span><span class="s1">$'&lt;files&gt;'</span><span class="w"> </span><span class="nv">COMMIT_SHA</span><span class="o">=</span><span class="k">$(</span>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/&lt;r&gt;/commits/develop<span class="w"> </span>--jq<span class="w"> </span>.sha<span class="k">)</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>python3<span class="w"> </span>-I<span class="w"> </span>&lt;actions-clone&gt;/tools/require-ci-success.py
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nv">GH_TOKEN</span><span class="o">=</span><span class="k">$(</span>gh<span class="w"> </span>auth<span class="w"> </span>token<span class="k">)</span><span class="w"> </span><span class="nv">GITHUB_REPOSITORY</span><span class="o">=</span>shakenfist/&lt;r&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nv">WORKFLOWS</span><span class="o">=</span><span class="s1">$'&lt;files&gt;'</span><span class="w"> </span><span class="nv">COMMIT_SHA</span><span class="o">=</span><span class="k">$(</span>gh<span class="w"> </span>api<span class="w"> </span>repos/shakenfist/&lt;r&gt;/commits/develop<span class="w"> </span>--jq<span class="w"> </span>.sha<span class="k">)</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>python3<span class="w"> </span>-I<span class="w"> </span>&lt;actions-clone&gt;/tools/require-ci-success.py
 </code></pre></div>
 * <code>merge-queue-config</code> passes for all fourteen release repositories,
   and each of the eight that gained a queue has merged at least one
@@ -17996,7 +18066,86 @@ verdicts.</p>
   paragraphs.
 * <strong>3b</strong> sonnet at medium effort, as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/184" title="GitHub Issue: shakenfist/actions #184">actions#184</a>. Directory-only
   entries do not count as payload. That is stricter than
-  client-python-k3s's script, and was kept.</p>
+  client-python-k3s's script, and was kept.
+* <strong>Three corrections from the pilot, made in every later wave.</strong>
+  Each is now in decisions 3.1, 3.2 and 3.6, and the waves' briefs
+  carried them:
+  - On a merge group <code>github.ref</code> is minted for each entry, so the
+    pilot's concurrency groups never cancelled a superseded queue
+    run. They key on the base branch, on a run's first attempt only
+    (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python-ova/issues/30" title="GitHub Issue: shakenfist/client-python-ova #30">client-python-ova#30</a>, 3b40144; the same guard reached the shared
+    <code>smoke-cluster.yml</code> as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/actions/issues/185" title="GitHub Issue: shakenfist/actions #185">actions#185</a>, e1e2c85).
+  - A path filter on a merge group diffs against
+    <code>merge_group.base_sha</code>, not the branch name, or a re-run after
+    the merge passes untested (client-python-k3s commit e3b93a0).
+  - The aggregators run under <code>always()</code>, because a cancelled run
+    would otherwise skip "Can merge" into a pass
+    (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python-ova/issues/31" title="GitHub Issue: shakenfist/client-python-ova #31">client-python-ova#31</a>, 4b1764d).</p>
+<p>The recovery advice was wrong in the same way everywhere: a failed
+  queue run never puts its commit on <code>develop</code>, so the answer is to
+  re-queue and tag the commit that merges, not to re-run. The
+  template README's recovery table and every wave's docs were
+  corrected.
+* <strong>3d</strong>, wave 1, as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/library-utilities/issues/74" title="GitHub Issue: shakenfist/library-utilities #74">library-utilities#74</a> (0940cbe), <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/divergulent/issues/132" title="GitHub Issue: shakenfist/divergulent #132">divergulent#132</a>
+  (70ae4c3) and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/occystrap/issues/163" title="GitHub Issue: shakenfist/occystrap #163">occystrap#163</a> (e9e66d9). occystrap's gate names two
+  workflows, so its ruleset requires four checks: "Can enqueue",
+  "Can merge" and their <code>: unit</code> pair.
+* <strong>3e</strong>, wave 2, as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python-k3s/issues/154" title="GitHub Issue: shakenfist/client-python-k3s #154">client-python-k3s#154</a> (6d40cee), <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/clingwrap/issues/145" title="GitHub Issue: shakenfist/clingwrap #145">clingwrap#145</a>
+  (f4966df), <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/hunkydory/issues/103" title="GitHub Issue: shakenfist/hunkydory #103">hunkydory#103</a> (b421cef), <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/agent-python/issues/155" title="GitHub Issue: shakenfist/agent-python #155">agent-python#155</a> (65a1778),
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python/issues/432" title="GitHub Issue: shakenfist/client-python #432">client-python#432</a> (d789e0b), <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/582" title="GitHub Issue: shakenfist/kerbside #582">kerbside#582</a> (d30ff34) and
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4581" title="GitHub Issue: shakenfist/shakenfist #4581">shakenfist#4581</a> (6a3f307). shakenfist's merged two days after the
+  rest. Its queue runs failed three times, all on the cluster smoke
+  test in <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4394" title="GitHub Issue: shakenfist/shakenfist #4394">shakenfist#4394</a>, which had been failing about half of all
+  shakenfist queue runs since 2026-10-01. The cause was in
+  <code>sf-resources</code>: it published on a change in the running-domain set,
+  and a poll during <code>create()</code> saw the new domain before the start
+  returned, so the one publish carried a timestamp the test rejected.
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4597" title="GitHub Issue: shakenfist/shakenfist #4597">shakenfist#4597</a> (b3dc0c6) fixed it with a follow-up publish on the
+  next poll, and #4581 merged on the next attempt. Its follow-up,
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4607" title="GitHub Issue: shakenfist/shakenfist #4607">shakenfist#4607</a>, adds the release check that the wheel carries
+  <code>shakenfist/data/*.yaml</code>, and forbids <code>shakenfist/deploy/*</code> in
+  check-dist.
+* <strong>3f</strong>, the Rust wave, as <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/591" title="GitHub Issue: shakenfist/ryll #591">ryll#591</a> (d70ff4d), <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/instar/issues/796" title="GitHub Issue: shakenfist/instar #796">instar#796</a> (a31e0d1)
+  and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/andris/issues/34" title="GitHub Issue: shakenfist/andris #34">andris#34</a> (288aba3). A <code>workflow_dispatch</code> dry run on instar's
+  branch (run 39346550167) found a defect in the template: on a dry
+  run <code>ci-gate</code> is skipped, and a build job with no <code>if:</code> takes the
+  implicit <code>success()</code>, which fails when any upstream job was skipped,
+  so every build was skipped too. Each build job now carries the
+  build-job guard, <code>!cancelled()</code> and one <code>result == 'success'</code>
+  clause per need (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/299" title="GitHub Issue: shakenfist/development #299">development#299</a>, 10e3145, which also made it the
+  README's invariant 6; <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/ryll/issues/599" title="GitHub Issue: shakenfist/ryll #599">ryll#599</a>, 20e3cd4; instar and andris in their
+  own pull requests). A dry run on instar's merged <code>develop</code> (run
+  39476356008) then built its binaries and skipped every publishing
+  job.
+* <strong>3h</strong>, with the operator's approval for each repository. Rulesets:
+  client-python-ova 25425412, divergulent 25434544, clingwrap
+  25434545, library-utilities 25434755, occystrap 25443422,
+  agent-python 25443431, client-python 25444487, and hunkydory's
+  23805020 edited in place. Each read back identical, and
+  <code>merge-queue-config</code>, <code>merge-group-cancellation</code> and
+  <code>release-environment-protection</code> pass on all of them.
+  client-python's nine other audit failures predate this work.</p>
+<p>Adding a ruleset left every open pull request whose CI ran before
+  the conversion blocked for ever: it reports the old check names,
+  and a re-run reuses the same merge ref. Five Renovate pull requests
+  were unblocked by ticking their rebase checkbox, and the template's
+  <code>RELEASE-SETUP.md</code> now has the step (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/development/issues/300" title="GitHub Issue: shakenfist/development #300">development#300</a>, d668b98).
+* <strong>3g</strong>, read-only, on 2026-10-23 (AEDT). The gate passes on
+  <code>develop</code> in client-python, client-python-ova, divergulent,
+  hunkydory, instar, andris, ryll and shakenfist. ryll's passed
+  across one review-mark commit, as designed. It fails on six tips,
+  each a merge that went around the queue, which the gate refuses as
+  designed: <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/library-utilities/issues/76" title="GitHub Issue: shakenfist/library-utilities #76">library-utilities#76</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/clingwrap/issues/146" title="GitHub Issue: shakenfist/clingwrap #146">clingwrap#146</a>, <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/agent-python/issues/157" title="GitHub Issue: shakenfist/agent-python #157">agent-python#157</a> and
+  <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/occystrap/issues/165" title="GitHub Issue: shakenfist/occystrap #165">occystrap#165</a> (daily <code>export-repo-config</code> pull requests merged
+  directly), <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/client-python-k3s/issues/155" title="GitHub Issue: shakenfist/client-python-k3s #155">client-python-k3s#155</a> (dequeued by hand, then merged),
+  and <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/kerbside/issues/588" title="GitHub Issue: shakenfist/kerbside #588">kerbside#588</a>, which <code>sfconductor</code> merged after its queue run
+  failed. A release from any of them tags the last commit the queue
+  merged.
+* <strong>A queue entry can wait out the check timeout.</strong> <a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4581" title="GitHub Issue: shakenfist/shakenfist #4581">shakenfist#4581</a>'s
+  first queue run (39361900921) failed its smoke test at 06:07, but
+  "Can merge" waits for every need, and two lanes only got runners at
+  08:50 and 08:59, so the entry hit the 360-minute timeout instead of
+  ejecting. See Future work.</p>
 <h3 id="phase-4-release-flow-and-merge-queue-criteria">Phase 4: release-flow and merge-queue criteria<a class="headerlink" href="#phase-4-release-flow-and-merge-queue-criteria" title="Permanent link">&para;</a></h3>
 <p>Planning effort: high, because this phase now includes a new
 criterion and the Rust release-flow rules, which decide what fourteen
@@ -18394,6 +18543,30 @@ chosen to defer to here, so that we do not forget them.</p>
 <li><strong>Re-publishing the affected packages</strong> without their tests is not
   worth a version bump on its own. The next ordinary release of each
   carries the fix.</li>
+<li><strong>A failed lane should eject a queue entry quickly.</strong> "Can merge"
+  runs under <code>always()</code> and waits for every need, so one failed lane
+  holds the entry until the slowest lane gets a runner, or until the
+  check timeout. A fail-fast aggregator, or per-lane timeouts, would
+  free the queue sooner. It matters most for shakenfist, whose lanes
+  share the under-cloud.</li>
+<li><strong>Merges around the queue are routine.</strong> Phase 3's gate checks
+  found six develop tips merged directly: daily <code>export-repo-config</code>
+  pull requests, a hand-dequeued Renovate update, and a kerbside
+  update that <code>sfconductor</code> merged after its queue run failed. None of
+  those can be released. Either the <code>export-repo-config</code> and Renovate
+  pull requests go through the queue, or the gate learns to cross a
+  merge commit that changed no gated file, as hunkydory's review marks
+  need too (above). The conductor merging past a failed queue run is
+  <code>PLAN-bot-bypass-identity.md</code>'s to close.</li>
+<li><strong>Phase 4 should check the build-job guard</strong> in Rust releases
+  (template invariant 6), and that a path filter on a merge group
+  diffs against <code>merge_group.base_sha</code>. Neither is a rule yet, and the
+  closest, <code>release_dispatch_guard_issues</code>, skips build jobs.</li>
+<li><strong>CodeQL on merge groups.</strong> <code>codeql-analysis.yml</code> runs on push
+  only. It only needs <code>merge_group</code> if it becomes a required check.</li>
+<li><strong>shakenfist's "Can merge" does not require <code>sanity_checks</code></strong>
+  (<a class="magiclink magiclink-github magiclink-issue" href="https://github.com/shakenfist/shakenfist/issues/4582" title="GitHub Issue: shakenfist/shakenfist #4582">shakenfist#4582</a>), found while reviewing wave 2. It predates this
+  plan, so phase 3 left it alone.</li>
 </ul>
 <h3 id="bugs-fixed-during-this-work">Bugs fixed during this work<a class="headerlink" href="#bugs-fixed-during-this-work" title="Permanent link">&para;</a></h3>
 <p>This section should list any bugs we encounter during development

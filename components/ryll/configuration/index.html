@@ -12349,6 +12349,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../kasm-workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running ryll as a Kasm workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../web-frontend/" class="md-nav__link">
         
   
@@ -12497,10 +12525,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_24" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_25" >
         
           
-          <label class="md-nav__link" for="__nav_3_10_24" id="__nav_3_10_24_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_10_25" id="__nav_3_10_25_label" tabindex="0">
             
   
   
@@ -12518,8 +12546,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_24_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_10_24">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_25_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10_25">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -16213,6 +16241,10 @@
 <td><code>--direct &lt;CONN&gt;</code></td>
 <td>Direct connection: <code>HOST:PORT</code> or <code>HOST:PORT:TLS_PORT</code></td>
 </tr>
+<tr>
+<td><code>--password-file &lt;PATH&gt;</code></td>
+<td>With <code>--direct</code>, read the SPICE password from a file. One trailing newline is stripped, so a server's ticket file (andris's <code>~/.config/andris/ticket</code>, for example) works as-is. An empty or unreadable file fails the launch. A <code>.vv</code> file carries its own <code>password</code>, so this is refused with <code>--url</code> and <code>--file</code></td>
+</tr>
 </tbody>
 </table>
 <h3 id="operating-modes">Operating Modes<a class="headerlink" href="#operating-modes" title="Permanent link">&para;</a></h3>
@@ -16500,46 +16532,49 @@ reference.</p>
 <a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># Direct connection with TLS</span>
 <a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>ryll<span class="w"> </span>--direct<span class="w"> </span><span class="m">192</span>.168.1.100:5900:5901
 <a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># Headless mode for automated testing</span>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># Direct connection to a server that wants a password</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>ryll<span class="w"> </span>--direct<span class="w"> </span><span class="m">192</span>.168.1.100:5900<span class="w"> </span>--password-file<span class="w"> </span>~/.config/andris/ticket
 <a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="c1"># Performance testing with latency tracking</span>
-<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--cadence<span class="w"> </span>--latency-file<span class="w"> </span>latency.csv
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="c1"># Headless mode for automated testing</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless
 <a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
-<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="c1"># Capture protocol traffic and display video</span>
-<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--capture<span class="w"> </span>/tmp/capture
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="c1"># Performance testing with latency tracking</span>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--cadence<span class="w"> </span>--latency-file<span class="w"> </span>latency.csv
 <a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>
-<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="c1"># Verbose output for debugging</span>
-<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>-v
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="c1"># Capture protocol traffic and display video</span>
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--capture<span class="w"> </span>/tmp/capture
 <a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>
-<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="c1"># Attach a RAW disk image as a USB flash drive</span>
-<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--usb-disk<span class="w"> </span>/path/to/image.raw
+<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="c1"># Verbose output for debugging</span>
+<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>-v
 <a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>
-<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="c1"># Attach a read-only USB disk</span>
-<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--usb-disk-ro<span class="w"> </span>/path/to/image.raw
+<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="c1"># Attach a RAW disk image as a USB flash drive</span>
+<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--usb-disk<span class="w"> </span>/path/to/image.raw
 <a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>
-<a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="c1"># Headless mode with USB disk</span>
-<a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless<span class="w"> </span>--usb-disk<span class="w"> </span>/tmp/test.raw
+<a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="c1"># Attach a read-only USB disk</span>
+<a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--usb-disk-ro<span class="w"> </span>/path/to/image.raw
 <a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>
-<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a><span class="c1"># Share a local directory with the guest</span>
-<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--share-dir<span class="w"> </span>/home/user/documents
+<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a><span class="c1"># Headless mode with USB disk</span>
+<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless<span class="w"> </span>--usb-disk<span class="w"> </span>/tmp/test.raw
 <a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a>
-<a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a><span class="c1"># Share a directory read-only</span>
-<a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--share-dir<span class="w"> </span>/home/user/documents<span class="w"> </span>--share-dir-ro
+<a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a><span class="c1"># Share a local directory with the guest</span>
+<a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--share-dir<span class="w"> </span>/home/user/documents
 <a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a>
-<a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a><span class="c1"># Headless mode with folder sharing</span>
-<a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless<span class="w"> </span>--share-dir<span class="w"> </span>/tmp/test-share
+<a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a><span class="c1"># Share a directory read-only</span>
+<a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--share-dir<span class="w"> </span>/home/user/documents<span class="w"> </span>--share-dir-ro
 <a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a>
-<a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a><span class="c1"># Enable auto-snapshot mode: fire a bug report every 30 seconds, keep last 20</span>
-<a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a><span class="c1"># (or fewer, if 20 of them would exceed the 512 MiB directory budget)</span>
-<a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--auto-snapshot-interval<span class="w"> </span><span class="m">30</span>
-<a id="__codelineno-1-46" name="__codelineno-1-46" href="#__codelineno-1-46"></a>
-<a id="__codelineno-1-47" name="__codelineno-1-47" href="#__codelineno-1-47"></a><span class="c1"># Custom output directory and rolling cap</span>
-<a id="__codelineno-1-48" name="__codelineno-1-48" href="#__codelineno-1-48"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--auto-snapshot-interval<span class="w"> </span><span class="m">30</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-49" name="__codelineno-1-49" href="#__codelineno-1-49"></a><span class="w">     </span>--auto-snapshot-cap<span class="w"> </span><span class="m">10</span><span class="w"> </span>--bug-report-dir<span class="w"> </span>/tmp/session-debug
-<a id="__codelineno-1-50" name="__codelineno-1-50" href="#__codelineno-1-50"></a>
-<a id="__codelineno-1-51" name="__codelineno-1-51" href="#__codelineno-1-51"></a><span class="c1"># Pedantic mode: report on protocol gaps</span>
-<a id="__codelineno-1-52" name="__codelineno-1-52" href="#__codelineno-1-52"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--pedantic
+<a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a><span class="c1"># Headless mode with folder sharing</span>
+<a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--headless<span class="w"> </span>--share-dir<span class="w"> </span>/tmp/test-share
+<a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a>
+<a id="__codelineno-1-46" name="__codelineno-1-46" href="#__codelineno-1-46"></a><span class="c1"># Enable auto-snapshot mode: fire a bug report every 30 seconds, keep last 20</span>
+<a id="__codelineno-1-47" name="__codelineno-1-47" href="#__codelineno-1-47"></a><span class="c1"># (or fewer, if 20 of them would exceed the 512 MiB directory budget)</span>
+<a id="__codelineno-1-48" name="__codelineno-1-48" href="#__codelineno-1-48"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--auto-snapshot-interval<span class="w"> </span><span class="m">30</span>
+<a id="__codelineno-1-49" name="__codelineno-1-49" href="#__codelineno-1-49"></a>
+<a id="__codelineno-1-50" name="__codelineno-1-50" href="#__codelineno-1-50"></a><span class="c1"># Custom output directory and rolling cap</span>
+<a id="__codelineno-1-51" name="__codelineno-1-51" href="#__codelineno-1-51"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--auto-snapshot-interval<span class="w"> </span><span class="m">30</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-52" name="__codelineno-1-52" href="#__codelineno-1-52"></a><span class="w">     </span>--auto-snapshot-cap<span class="w"> </span><span class="m">10</span><span class="w"> </span>--bug-report-dir<span class="w"> </span>/tmp/session-debug
+<a id="__codelineno-1-53" name="__codelineno-1-53" href="#__codelineno-1-53"></a>
+<a id="__codelineno-1-54" name="__codelineno-1-54" href="#__codelineno-1-54"></a><span class="c1"># Pedantic mode: report on protocol gaps</span>
+<a id="__codelineno-1-55" name="__codelineno-1-55" href="#__codelineno-1-55"></a>ryll<span class="w"> </span>--file<span class="w"> </span>test.vv<span class="w"> </span>--pedantic
 </code></pre></div>
 <h2 id="vv-file-format">.vv File Format<a class="headerlink" href="#vv-file-format" title="Permanent link">&para;</a></h2>
 <p>The .vv (virt-viewer) file is an INI-format configuration file. Ryll supports

@@ -12286,6 +12286,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../ryll/kasm-workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running ryll as a Kasm workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../ryll/web-frontend/" class="md-nav__link">
         
   
@@ -12434,10 +12462,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_24" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_25" >
         
           
-          <label class="md-nav__link" for="__nav_3_10_24" id="__nav_3_10_24_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_10_25" id="__nav_3_10_25_label" tabindex="0">
             
   
   
@@ -12455,8 +12483,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_24_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_10_24">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_25_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10_25">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -16390,30 +16418,38 @@ characteristics. The descriptor file ties them together.</p>
 <a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>qemu-img<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>vmdk<span class="w"> </span>-o<span class="w"> </span><span class="nv">subformat</span><span class="o">=</span>streamOptimized<span class="w"> </span>disk.vmdk<span class="w"> </span>20G
 </code></pre></div>
 <h2 id="instar-support">instar support<a class="headerlink" href="#instar-support" title="Permanent link">&para;</a></h2>
-<p>instar recognises three VMDK input variants:</p>
+<p>instar recognises these VMDK input variants:</p>
 <ul>
 <li><strong>monolithicSparse / streamOptimized</strong> (single-file,
   binary KDMV header at offset 0): parsed entirely in the
   guest via the grain directory / grain table two-level
   lookup in <code>crates/vmdk</code>.</li>
-<li><strong>monolithicFlat</strong> (text descriptor + separate flat extent
-  file): the descriptor has no binary magic and starts with
-  <code># Disk DescriptorFile</code>. The VMM detects the prefix on the
-  host, parses the descriptor via <code>vmdk::parse_descriptor_extents</code>
-  (strict single-extent / non-zero offset rejection), validates
-  the flat extent path against the backing-file allowlist,
-  and then opens the flat extent as a second virtio-block
-  device. <code>ChainConfig</code> on device 0 carries
-  <code>format = VmdkDescriptor</code> and <code>data_device_idx = 1</code>, and
-  the guest reads content from device 1 through the existing
-  QCOW2 external-data-file redirect in
-  <code>qcow2::read_chain_virtual_cluster</code>.</li>
-<li><strong>twoGbMaxExtentFlat / twoGbMaxExtentSparse</strong> (multi-file
-  split extents) and <strong>monolithicFlat with
-  <code>parentFileNameHint=</code></strong> are rejected with a clear error
-  message. These remain known gaps; see
-  <code>PLAN-convert.md</code>.</li>
+<li><strong>monolithicFlat and twoGbMaxExtentFlat</strong> (text descriptor
+  plus one or more flat extent files): the descriptor has no
+  binary magic and starts with <code># Disk DescriptorFile</code>. The VMM
+  detects the prefix on the host and resolves it with
+  <code>resolve_vmdk_flat_descriptor</code> in <code>src/vmm/src/chain.rs</code>: it
+  parses the extent lines with <code>vmdk::parse_descriptor_extents</code>,
+  requires every extent to be <code>FLAT</code> with offset 0, validates
+  each extent path against the backing-file allowlist, and opens
+  each extent as its own virtio-block device. <code>ChainConfig</code> on
+  device 0 carries <code>format = VmdkDescriptor</code> and
+  <code>data_device_idx = 1</code>; the extents follow it in order, each
+  marked <code>FLAG_DATA_DEVICE</code>, and the guest reads through
+  <code>qcow2::read_chain_virtual_cluster</code>, dispatching each read to
+  the extent that covers its offset and stopping at the end of
+  the descriptor's run of marked devices.</li>
+<li><strong>A flat descriptor with <code>parentFileNameHint=</code></strong> is followed as
+  a backing chain: the hint is validated against the allowlist
+  like any backing path, and chain discovery continues with the
+  parent, whose devices follow the descriptor's extents.</li>
 </ul>
+<p><strong>twoGbMaxExtentSparse</strong> (multi-file split extents whose
+extents are themselves sparse VMDKs) is refused, because host
+descriptor resolution accepts only <code>FLAT</code> extents: <code>instar info</code>
+fails with "only FLAT extents are supported". <code>map</code> refuses every
+descriptor-driven source; see
+<a href="/components/instar/quirks/#vmdk-multi-extent-sources-are-refused">quirks.md</a>.</p>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
 <li>qemu source: <code>block/vmdk.c</code></li>

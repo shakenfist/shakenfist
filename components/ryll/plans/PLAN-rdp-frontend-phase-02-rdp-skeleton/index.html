@@ -11940,6 +11940,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../kasm-workspace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running ryll as a Kasm workspace
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../web-frontend/" class="md-nav__link">
         
   
@@ -12088,10 +12116,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_24" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_10_25" >
         
           
-          <label class="md-nav__link" for="__nav_3_10_24" id="__nav_3_10_24_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_10_25" id="__nav_3_10_25_label" tabindex="0">
             
   
   
@@ -12109,8 +12137,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_24_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_10_24">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_10_25_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_10_25">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -15694,14 +15722,12 @@ applies. For this phase in particular:</p>
 <li>The RDP side is IronRDP <strong>0.13.0</strong> from crates.io
   (<code>ironrdp-server</code> 0.13.0, <code>ironrdp-acceptor</code> 0.10.0,
   <code>ironrdp-pdu</code> 0.9.0, released 2026-07-10). Its source is
-  checked out read-only at
-  <code>/tmp/claude-1000/-srv-kasm-profiles-mikal-vscode-src-shakenfist-ryll/793812ef-4636-4d6e-8442-0c0e9eb5896b/scratchpad/p02/untrusted/ironrdp-0.13.0</code>
-  (a git worktree of <code>github.com/Devolutions/IronRDP</code> at tag
-  <code>ironrdp-server-v0.13.0</code>; the full clone with <code>master</code> is
-  beside it). It is downloaded code: read it, never run its
-  build scripts or examples from inside it. Every claim below
-  about IronRDP names a file in that tree; re-read the file
-  before building on the claim.</li>
+  <code>github.com/Devolutions/IronRDP</code> at tag
+  <code>ironrdp-server-v0.13.0</code>, and every file and line cited below
+  for IronRDP is relative to that tree. Check it out read-only,
+  in a directory of its own: it is downloaded code, so read it,
+  never run its build scripts or examples from inside it.
+  Re-read the cited file before building on a claim.</li>
 <li>Read <code>ryll/src/main.rs</code> <code>run_web</code> (<code>:514-990</code>) end to end: it
   is the shape <code>run_rdp</code> copies, with a different transport.</li>
 <li>The renderer pieces this phase drives are the ones phase 1
@@ -16698,8 +16724,8 @@ stated. Each step is one commit, with the subject given.</p>
   Windows build of the crate as phase 6 work.</li>
 <li><strong>Port 5900 is held by andris, so <code>make test-qemu-desktop</code>
   cannot be used as is.</strong> Phase 1's workaround
-  (<code>tools/start-desktop-qemu.sh --spice-port 5910</code>, QMP socket
-  under <code>/tmp/claude-1000/</code>) is reused.</li>
+  (<code>tools/start-desktop-qemu.sh --spice-port 5910</code>, with the QMP
+  socket on a short path under <code>/tmp</code>) is reused.</li>
 </ul>
 <h2 id="definition-of-done">Definition of done<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
 <ul class="task-list">
@@ -17019,8 +17045,8 @@ window 1024x768, which is the guest's resolution.</p>
 <li><strong>The guest image was downloaded again</strong> (<code>make
   testdata/debian-xfce-13.qcow2</code>, 747 MiB) because phase 1's
   worktree had taken its copy with it; the QMP socket had to
-  live directly under <code>/tmp/claude-1000/</code> because the
-  scratchpad path exceeds a Unix socket's 108-byte limit.</li>
+  live directly under <code>/tmp</code> because the session's scratch
+  directory path exceeds a Unix socket's 108-byte limit.</li>
 <li><strong>Definition of done, checked 2026-10-21 12:40 AEDT</strong> on the
   final tree (<code>b2db689</code>): <code>make build</code>, <code>make lint</code>, <code>make
   check-windows</code> and <code>make package-check</code> all exit 0 (the
