@@ -149,6 +149,21 @@ class OutstandingOperationsAllTestCase(base.ShakenFistTestCase):
                       query='?banana=1'),
             False)
 
+    def test_token_use_is_audited(self):
+        # Issue 4604: the artifact endpoint was missing
+        # @api_base.log_token_use while its instance and network twins
+        # carried it, so a request to the artifact listing left no
+        # token-use event in the namespace's audit trail.
+        for path in self._paths():
+            with mock.patch(
+                    'shakenfist.external_api.base._token_use_event') as m:
+                resp = self._get(path)
+                self.assertEqual(200, resp.status_code)
+                self.assertEqual(
+                    ['token used to authenticate request'],
+                    [c.args[2] for c in m.call_args_list],
+                    'token use not audited exactly once for %s' % path)
+
     def test_invalid_all_is_rejected(self):
         # A value marshmallow cannot load as a boolean is a validation
         # failure whichever way it arrives, not a silently ignored or

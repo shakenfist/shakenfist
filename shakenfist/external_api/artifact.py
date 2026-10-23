@@ -1073,5 +1073,6 @@ class ArtifactOutstandingOperationsEndpoint(api_base.Resource):
     @use_kwargs(get_args, location='json_or_query')
     @arg_is_visible_artifact_ref
     @requires_artifact_access
+    @api_base.log_token_use
     def get(self, artifact_ref=None, all=False, artifact_from_db=None):
         return artifact_from_db.cluster_operation_views(outstanding_only=(not all))
