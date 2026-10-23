@@ -10448,7 +10448,7 @@ def delete_stale_transfers(max_age: float) -> int:
 def delete_blob_transfers_for_blob(blob_uuid: str) -> bool:
     """Delete all transfer records for a blob.
 
-    Used by Blob.hard_delete() to clean up any pending transfers.
+    Used by a blob's hard delete to clean up any pending transfers.
     Uses bulk SQL DELETE for efficiency.
 
     Args:
@@ -25318,9 +25318,11 @@ def delete_orphaned_artifact_attributes() -> Optional[int]:
 # transaction, and so pays for one.
 #
 # HARD_DELETE_BATCH_FUNCTIONS is the one place a batchable type's deletes are
-# declared. It maps each type to the ordered names of the public delete
-# functions its hard_delete() runs, before the three every type runs
-# (delete_state, delete_object_metadata and delete_object_events), and
+# declared: DatabaseBackedObject.hard_delete() sends a type listed here to the
+# batch, and the classes add no deletes of their own. It maps each type to
+# the ordered names of the public delete functions run for it, before the
+# three every type runs (delete_state, delete_object_metadata and
+# delete_object_events), and
 # HARD_DELETE_STATEMENTS maps each name to the same delete as one statement
 # for many objects, and to a call of the public function for one object.
 # The calls are for an sf-database which predates the batch RPC.
@@ -25328,7 +25330,10 @@ def delete_orphaned_artifact_attributes() -> Optional[int]:
 # A cluster operation's deletes are ordered targets first, so that a reader
 # of cluster_operation_targets which runs between the calls finds no target
 # rather than a target whose operation has gone. In one transaction the
-# order is invisible to readers, and is kept so the two paths match.
+# order is invisible to readers, and is kept so the two paths match. On the
+# per-call path a reader must still tolerate a torn read, which is why
+# scheduled_tasks._process_per_blob_queue() passes suppress_failure_audit;
+# the order only removes the easy half of that race.
 #
 # Instance, namespace, namespace claim and node are absent on purpose: each
 # hard_delete() does more than delete rows keyed on the object, so they keep
@@ -25347,7 +25352,7 @@ class HardDeleteStatement(NamedTuple):
     every object in ``uuids`` of ``object_type``. Its WHERE clause is
     that of the function's ``_direct_`` implementation, with ``IN`` in
     place of ``=``. ``call`` runs the public function for one object, as
-    the type's hard_delete() calls it. ``evicts`` is the object cache
+    hard_delete_objects_per_call() calls it. ``evicts`` is the object cache
     type the public function evicts, if it evicts one.
     """
     build: Callable[[ObjectType, list[str]], sa.Delete]
@@ -25547,7 +25552,7 @@ _CLUSTER_OPERATION_HARD_DELETES = (
 )
 
 HARD_DELETE_BATCH_FUNCTIONS: dict[ObjectType, tuple[str, ...]] = {
-    # BaseClusterOperation.hard_delete()
+    # Every cluster operation
     ObjectType.ARTIFACT_FETCH_OP: _CLUSTER_OPERATION_HARD_DELETES,
     ObjectType.IMGCACHE_OP: _CLUSTER_OPERATION_HARD_DELETES,
     ObjectType.NET_IFACE_IP_OP: _CLUSTER_OPERATION_HARD_DELETES,
@@ -25562,63 +25567,58 @@ HARD_DELETE_BATCH_FUNCTIONS: dict[ObjectType, tuple[str, ...]] = {
     ObjectType.NODE_INST_OP: _CLUSTER_OPERATION_HARD_DELETES,
     ObjectType.NODE_INST_SNAP_OP: _CLUSTER_OPERATION_HARD_DELETES,
     ObjectType.NODE_NET_OP: _CLUSTER_OPERATION_HARD_DELETES,
-    # AgentOperation.hard_delete(). An agent operation is not a cluster
-    # operation and has no cluster operation rows.
+    # An agent operation is not a cluster operation and has no cluster
+    # operation rows. Its references go as delete() removes them: an
+    # expired agent operation is swept here too, and a reference row left
+    # behind would leak forever.
     ObjectType.AGENTOPERATION: (
         'delete_agent_operation_attributes',
         'delete_agent_operation',
         'remove_all_references_from',
     ),
-    # Artifact.hard_delete(), then
-    # DatabaseBackedObjectWithOperations.hard_delete()
+    # Artifact's rows, then the targets every
+    # DatabaseBackedObjectWithOperations has
     ObjectType.ARTIFACT: (
         'delete_all_artifact_indexes',
         'delete_artifact_attributes',
         'delete_artifact',
         'delete_cluster_operation_targets_for_object',
     ),
-    # Network.hard_delete(), then
-    # DatabaseBackedObjectWithOperations.hard_delete()
+    # Network's rows, then the targets every
+    # DatabaseBackedObjectWithOperations has
     ObjectType.NETWORK: (
         'delete_network_attributes',
         'delete_network',
         'delete_cluster_operation_targets_for_object',
     ),
-    # Blob.hard_delete()
     ObjectType.BLOB: (
         'delete_blob_hashes',
         'delete_blob_transfers_for_blob',
         'delete_blob_attributes',
         'delete_blob',
     ),
-    # DnsMasq.hard_delete()
     ObjectType.DHCP: ('delete_dnsmasq',),
-    # NetworkInterface.hard_delete()
     ObjectType.INTERFACE: (
         'delete_network_interface_attributes',
         'delete_network_interface',
     ),
-    # IPAM.hard_delete(), for an IPAM which is not in memory only
+    # An IPAM which is in memory only has no rows, and deletes nothing
     ObjectType.IPAM: (
         'delete_reservations_for_ipam',
         'delete_ipam',
     ),
-    # NamespaceKey.hard_delete()
     ObjectType.NAMESPACE_KEY: (
         'delete_namespace_key_attributes',
         'delete_namespace_key',
     ),
-    # TrustedIssuer.hard_delete()
     ObjectType.TRUSTED_ISSUER: (
         'delete_trusted_issuer_attributes',
         'delete_trusted_issuer',
     ),
-    # MappingRule.hard_delete()
     ObjectType.MAPPING_RULE: (
         'delete_mapping_rule_attributes',
         'delete_mapping_rule',
     ),
-    # Upload.hard_delete()
     ObjectType.UPLOAD: ('delete_upload',),
 }
 
@@ -25848,11 +25848,10 @@ def hard_delete_objects_per_call(object_type: ObjectType,
     """Hard delete one object of a batchable type, one delete at a time.
 
     Calls each public function HARD_DELETE_BATCH_FUNCTIONS names for the
-    type, then delete_state(), delete_object_metadata() and
-    delete_object_events(), in the order the type's hard_delete() calls
-    them. Each is its own commit. This is for an sf-database which
-    predates the batch, where hard_delete_objects() raises
-    HardDeleteBatchUnavailable.
+    type, in that order, then delete_state(), delete_object_metadata() and
+    delete_object_events(). Each is its own commit, so unlike the batch the
+    object's state row goes last. This is for an sf-database which predates
+    the batch, where hard_delete_objects() raises HardDeleteBatchUnavailable.
     """
     if object_type not in HARD_DELETE_BATCH_FUNCTIONS:
         raise ValueError(

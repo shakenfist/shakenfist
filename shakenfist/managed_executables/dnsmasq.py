@@ -122,10 +122,6 @@ class DnsMasq(managedexecutable.ManagedExecutable):
 
         return cls(data)
 
-    def hard_delete(self) -> None:
-        mariadb.delete_dnsmasq(self.uuid)
-        super().hard_delete()
-
     # Static values (runtime, not persisted)
     @property
     def interface(self) -> Optional[str]:

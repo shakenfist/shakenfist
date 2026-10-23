@@ -811,11 +811,6 @@ class Network(dbowo):
         )
         return get_object_class(op_type).from_db(op_uuid)
 
-    def hard_delete(self):
-        mariadb.delete_network_attributes(UUID(str(self.uuid)))
-        mariadb.delete_network(UUID(str(self.uuid)))
-        super().hard_delete()
-
     def _get_dnsmasq_object(self):
         return dnsmasq.DnsMasq.new(self, provide_dhcp=self.provide_dhcp,
                                    provide_nat=self.provide_nat,
