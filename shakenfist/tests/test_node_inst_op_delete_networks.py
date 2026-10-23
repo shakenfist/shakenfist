@@ -33,6 +33,7 @@ class FakeInstance:
         self.uuid = str(uuid4())
         self.power_off = mock.Mock()
         self.delete = mock.Mock()
+        self.add_event = mock.Mock()
         lock = mock.MagicMock()
         lock.__enter__ = mock.Mock(return_value=None)
         lock.__exit__ = mock.Mock(return_value=False)
@@ -65,16 +66,16 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
 
         # Two interfaces, one per network, so instance_networks has two
         # entries in a deterministic order.
-        interfaces = []
+        self.interfaces = []
         for u in self.network_uuids:
             ni = mock.MagicMock()
             ni.network_uuid = u
-            interfaces.append(ni)
+            self.interfaces.append(ni)
 
         for target, kwargs in [
                 ('shakenfist.operations.node_inst_op.'
                  'interfaces_for_instance',
-                 {'side_effect': lambda inst: iter(interfaces)}),
+                 {'side_effect': lambda inst: iter(self.interfaces)}),
                 ('shakenfist.operations.node_inst_op.Instances',
                  {'return_value': []}),
                 ('shakenfist.operations.node_inst_op.Network.from_db',
@@ -160,21 +161,52 @@ class InstanceDeleteNetworkCleanupTestCase(base.ShakenFistTestCase):
         self.mock_bvn.return_value.\
             _apply_delete_on_hypervisor.assert_called_once()
 
-    def test_failed_power_off_does_not_abandon_the_delete(self):
-        # power_off() raises when destroy() leaves the domain running.
-        # Delete behaved the same before that, so it must carry on: the
-        # instance is still deleted and its networks still cleaned up.
-        inst = FakeInstance()
+    def _delete_whose_power_off_fails(self, state_value):
+        """Run a delete whose power off leaves the domain running."""
+        inst = FakeInstance(state_value)
         inst.power_off.side_effect = InstancePowerOffFailed(
             'internal error: something else entirely')
 
         op = self._make_op()
         op._instance_delete(inst)
+        return inst
 
+    def _assert_deferred(self, inst):
+        """Nothing beyond the power off happened: no interface, network or
+        disk was removed, and placement was not released (delete() does
+        both), so the cleaner's re-enqueued delete finds them all."""
         inst.power_off.assert_called_once_with()
-        inst.delete.assert_called_once_with()
+        inst.delete.assert_not_called()
+        for ni in self.interfaces:
+            ni.delete.assert_not_called()
         for n in self.networks.values():
-            n.update_dnsmasq.assert_called_once_with()
-        self.assertEqual(
-            2, self.mock_bvn.return_value.
-            _apply_delete_on_hypervisor.call_count)
+            n.update_dnsmasq.assert_not_called()
+        self.mock_bvn.assert_not_called()
+        inst.add_event.assert_called_once_with(
+            'audit', 'delete deferred, domain still running',
+            extra={'message': 'internal error: something else entirely'})
+
+    def test_failed_power_off_defers_the_delete(self):
+        # power_off() raises when destroy() leaves the domain running. The
+        # delete then stops, without raising, leaving the instance in
+        # delete-wait for the cleaner (issue #4486). Raising would move it
+        # to delete-wait-error, which the cleaner does not escalate.
+        inst = self._delete_whose_power_off_fails('created')
+
+        self._assert_deferred(inst)
+        self.assertEqual('delete-wait', inst.state.value)
+
+    def test_failed_power_off_moves_an_errored_instance_to_delete_wait(self):
+        # A delete from an error state skips delete-wait, but the cleaner
+        # only escalates delete-wait instances.
+        inst = self._delete_whose_power_off_fails('created-error')
+
+        self._assert_deferred(inst)
+        self.assertEqual('delete-wait', inst.state.value)
+
+    def test_failed_power_off_leaves_delete_wait_error_alone(self):
+        # delete-wait-error has no transition to delete-wait.
+        inst = self._delete_whose_power_off_fails('delete-wait-error')
+
+        self._assert_deferred(inst)
+        self.assertEqual('delete-wait-error', inst.state.value)

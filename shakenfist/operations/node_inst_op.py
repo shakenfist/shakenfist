@@ -6,6 +6,7 @@ from shakenfist_utilities import logs  # noreorder
 
 from shakenfist import exceptions
 from shakenfist.config import config
+from shakenfist.constants import EVENT_TYPE_AUDIT
 from shakenfist.constants import EVENT_TYPE_USAGE
 from shakenfist.schema.operations import node_inst_op as schema
 from shakenfist.instance import Instance
@@ -216,6 +217,28 @@ class NodeInstOp(BaseClusterOperation):
             except (psutil.NoSuchProcess, FileNotFoundError):
                 inst.kvm_pid = None
 
+    def _defer_delete(self, inst, error):
+        """Leave a delete whose domain would not stop to the cleaner.
+
+        An instance deleted from an error state skipped delete-wait above,
+        so it is moved there now: delete-wait is what the cleaner looks
+        for. delete-wait-error has no transition to delete-wait, so that
+        instance stays as it is, still errored, with its disks and
+        placement, for the operator to delete again.
+        """
+        self.log.with_fields({
+            'instance': inst,
+            'error': str(error),
+        }).warning('Instance power off failed during delete, deferring '
+                   'the delete to the cleaner')
+        if (inst.state.value != Instance.STATE_DELETE_WAIT and
+                Instance.STATE_DELETE_WAIT in
+                (Instance.state_targets.get(inst.state.value) or ())):
+            inst.state = Instance.STATE_DELETE_WAIT
+        inst.add_event(
+            EVENT_TYPE_AUDIT, 'delete deferred, domain still running',
+            extra={'message': str(error)})
+
     def _instance_delete(self, inst):
         with inst.get_lock(op='Instance delete', global_scope=False):
             # There are two delete state flows:
@@ -247,17 +270,20 @@ class NodeInstOp(BaseClusterOperation):
                 'networks': instance_networks
             }).debug('Instance networking before delete')
 
-            # Stop the instance. A power off which leaves the domain running
-            # does not stop the delete: the rest of it, and
-            # _delete_on_hypervisor()'s own power off and undefine, still
-            # need to happen.
+            # Stop the instance. A domain which is still running after this
+            # must keep its disks, interfaces and placement, so the delete
+            # stops here and leaves the instance in delete-wait. The
+            # cleaner escalates a delete-wait instance's running domain and
+            # enqueues the delete again once it has stopped, and that
+            # delete then finds the interfaces and networks this one would
+            # have cleaned up. Returning rather than raising matters: a
+            # failed task moves the instance to delete-wait-error, which
+            # the cleaner does not escalate.
             try:
                 inst.power_off()
             except exceptions.InstancePowerOffFailed as e:
-                self.log.with_fields({
-                    'instance': inst,
-                    'error': str(e),
-                }).warning('Instance power off failed during delete, continuing')
+                self._defer_delete(inst, e)
+                return
 
             # Delete the instance's interfaces
             for ni in interfaces:
