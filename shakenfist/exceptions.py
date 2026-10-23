@@ -707,6 +707,22 @@ class CoalescingUnavailable(Exception):
     ...
 
 
+class HardDeleteBatchUnavailable(Exception):
+    """Raised when the database service cannot hard delete in batches.
+
+    As with ``CoalescingUnavailable``, that means a rolling upgrade in
+    which the ``sf-database`` on the other end predates the
+    ``HardDeleteObjects`` RPC and answers ``UNIMPLEMENTED``. It is a
+    distinct exception rather than the ``None`` every other failure
+    returns because it calls for a different response: a failed batch
+    deleted nothing and is tried again later, while an unavailable one
+    can be done now, one object at a time, with
+    ``mariadb.hard_delete_objects_per_call()`` against the same server.
+
+    Callers catch it. It never propagates to a user."""
+    ...
+
+
 class NetworkOperationFailed(Exception):
     """Raised by ``op.raise_for_error()`` when a cluster operation
     reached ``STATE_ERROR``. Carries the persisted ``ErrorReport`` as
