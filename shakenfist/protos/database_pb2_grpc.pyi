@@ -78,6 +78,8 @@ class DatabaseServiceStub:
     DeleteObjectState: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteObjectStateRequest, _database_pb2.StatusReply]
     GetObjectsByState: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetObjectsByStateRequest, _database_pb2.GetObjectsByStateReply]
     CountObjectsByState: _grpc.UnaryUnaryMultiCallable[_database_pb2.CountObjectsByStateRequest, _database_pb2.CountObjectsByStateReply]
+    HardDeleteObjects: _grpc.UnaryUnaryMultiCallable[_database_pb2.HardDeleteObjectsRequest, _database_pb2.HardDeleteObjectsReply]
+    """Hard deletes a batch of one type's objects in one transaction."""
     DeleteOrphanedObjectStates: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteOrphanedObjectStatesRequest, _database_pb2.DeleteOrphanedObjectStatesReply]
     GetStatelessObjectUuids: _grpc.UnaryUnaryMultiCallable[_database_pb2.GetStatelessObjectUuidsRequest, _database_pb2.GetStatelessObjectUuidsReply]
     DeleteOrphanedArtifactAttributes: _grpc.UnaryUnaryMultiCallable[_database_pb2.DeleteOrphanedArtifactAttributesRequest, _database_pb2.DeleteOrphanedArtifactAttributesReply]
@@ -491,6 +493,8 @@ class DatabaseServiceAsyncStub(DatabaseServiceStub):
     DeleteObjectState: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteObjectStateRequest, _database_pb2.StatusReply]  # type: ignore[assignment]
     GetObjectsByState: _aio.UnaryUnaryMultiCallable[_database_pb2.GetObjectsByStateRequest, _database_pb2.GetObjectsByStateReply]  # type: ignore[assignment]
     CountObjectsByState: _aio.UnaryUnaryMultiCallable[_database_pb2.CountObjectsByStateRequest, _database_pb2.CountObjectsByStateReply]  # type: ignore[assignment]
+    HardDeleteObjects: _aio.UnaryUnaryMultiCallable[_database_pb2.HardDeleteObjectsRequest, _database_pb2.HardDeleteObjectsReply]  # type: ignore[assignment]
+    """Hard deletes a batch of one type's objects in one transaction."""
     DeleteOrphanedObjectStates: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteOrphanedObjectStatesRequest, _database_pb2.DeleteOrphanedObjectStatesReply]  # type: ignore[assignment]
     GetStatelessObjectUuids: _aio.UnaryUnaryMultiCallable[_database_pb2.GetStatelessObjectUuidsRequest, _database_pb2.GetStatelessObjectUuidsReply]  # type: ignore[assignment]
     DeleteOrphanedArtifactAttributes: _aio.UnaryUnaryMultiCallable[_database_pb2.DeleteOrphanedArtifactAttributesRequest, _database_pb2.DeleteOrphanedArtifactAttributesReply]  # type: ignore[assignment]
@@ -1087,6 +1091,14 @@ class DatabaseServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _database_pb2.CountObjectsByStateRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_database_pb2.CountObjectsByStateReply, _abc.Awaitable[_database_pb2.CountObjectsByStateReply]]: ...
+
+    @_abc_1.abstractmethod
+    def HardDeleteObjects(
+        self,
+        request: _database_pb2.HardDeleteObjectsRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_database_pb2.HardDeleteObjectsReply, _abc.Awaitable[_database_pb2.HardDeleteObjectsReply]]:
+        """Hard deletes a batch of one type's objects in one transaction."""
 
     @_abc_1.abstractmethod
     def DeleteOrphanedObjectStates(

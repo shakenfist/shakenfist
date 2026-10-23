@@ -82,8 +82,8 @@ source in this planning commit, so a later step need not redo it.
 
    | Types | Class | Own deletes |
    |---|---|---|
-   | the 14 `*_op` types | `BaseOperation.hard_delete` (`operations/baseoperation.py:268`) | `delete_cluster_operation_target`, `delete_cluster_operation_error`, `delete_cluster_operation` |
-   | `agentoperation` | `operations/agentoperation.py:553` | `delete_agent_operation_attributes`, `delete_agent_operation`, `remove_all_references_from`, then `BaseOperation`'s three |
+   | the 14 `*_op` types | `BaseClusterOperation.hard_delete` (`operations/baseoperation.py:268`) | `delete_cluster_operation_target`, `delete_cluster_operation_error`, `delete_cluster_operation` |
+   | `agentoperation` | `operations/agentoperation.py:553` | `delete_agent_operation_attributes`, `delete_agent_operation`, `remove_all_references_from` (it derives from `BaseOperation`, which has no override, so not the cluster operation three) |
    | `artifact` | `artifact.py:747` | `delete_all_artifact_indexes`, `delete_artifact_attributes`, `delete_artifact`, then `delete_cluster_operation_targets_for_object` (`baseobject.py:835`) |
    | `network` | `network/network.py:813` | `delete_network_attributes`, `delete_network`, then `delete_cluster_operation_targets_for_object` |
    | `blob` | `blob.py:1029` | `delete_blob_hashes`, `delete_blob_transfers_for_blob`, `delete_blob_attributes`, `delete_blob` |
@@ -747,6 +747,16 @@ and sets phase 4's drain rate from them.
   steps became 3e to 3g. The live tests may run against a throwaway
   local `mariadb:11.8` container. This session may push and open the
   pull request once the definition of done passes.
+- **3b, 2026-10-23 (UTC).** The survey table said `agentoperation`
+  also ran the three cluster operation deletes. It does not:
+  `AgentOperation` derives from `BaseOperation`, and the override at
+  `baseoperation.py:268` belongs to `BaseClusterOperation`. The table
+  is corrected above. The batch also evicts the object cache entries
+  the mapped public functions evict, a failed transaction is answered
+  `ABORTED` (which `_grpc_call()` does not retry) rather than
+  `UNAVAILABLE`, and the client and servicer share one request check.
+  Live tests ran against MariaDB 11.8.9 with snapshot isolation on;
+  12 mutants, all killed.
 
 ## Back brief
 
