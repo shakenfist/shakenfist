@@ -765,6 +765,13 @@ and sets phase 4's drain rate from them.
   definition of done's item 5 compared against `origin/develop`, which
   has since gained two commits to `instance.py`; it now compares
   against the merge base.
+- **3e, 2026-10-23 (UTC).** After `HardDeleteBatchUnavailable` the
+  rest of the pass, not only that turn, runs one object at a time, so
+  the warning is logged once a pass; the next pass asks again. A batch
+  call that raises anything else is counted like a None reply, and the
+  batch histogram observes only calls that returned. Tests that drained
+  network, blob, upload and namespace key objects through `from_db()`
+  now use the four per-object types, since those types are batched.
 
 ## Back brief
 
