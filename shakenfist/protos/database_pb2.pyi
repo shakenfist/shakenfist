@@ -1484,6 +1484,82 @@ class CountObjectsByStateReply(_message.Message):
 Global___CountObjectsByStateReply: _TypeAlias = CountObjectsByStateReply  # noqa: Y015
 
 @_typing.final
+class HardDeleteObjectsRequest(_message.Message):
+    """Hard deletes objects of one type: their object_states, object_metadata
+    and event_objects rows, and every row of the type's own tables, in one
+    transaction. A guarded request deletes only the objects whose state is
+    one of state_values and whose state is older than updated_before, and
+    decides that in the same transaction as the delete. An unconditional
+    request deletes every object it names. A request must be one or the
+    other: a guarded request without states or an age, or an unconditional
+    one with either, is refused.
+    """
+
+    DESCRIPTOR: _descriptor.Descriptor
+
+    OBJECT_TYPE_FIELD_NUMBER: _builtins.int
+    OBJECT_UUIDS_FIELD_NUMBER: _builtins.int
+    STATE_VALUES_FIELD_NUMBER: _builtins.int
+    UPDATED_BEFORE_FIELD_NUMBER: _builtins.int
+    UNCONDITIONAL_FIELD_NUMBER: _builtins.int
+    object_type: _shakenfist_enums_pb2.ObjectType.ValueType
+    """The type of every object named; it must be one deleted in batches."""
+    updated_before: _builtins.float
+    """Guarded only: an object's state must be older than this unix time."""
+    unconditional: _builtins.bool
+    """Delete every object named, whatever its state or age, including one
+    with no object_states row.
+    """
+    @_builtins.property
+    def object_uuids(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
+        """The objects to delete, at most 1,000."""
+
+    @_builtins.property
+    def state_values(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
+        """Guarded only: the states an object must be in to be deleted."""
+
+    def __init__(
+        self,
+        *,
+        object_type: _shakenfist_enums_pb2.ObjectType.ValueType = ...,
+        object_uuids: _abc.Iterable[_builtins.str] | None = ...,
+        state_values: _abc.Iterable[_builtins.str] | None = ...,
+        updated_before: _builtins.float = ...,
+        unconditional: _builtins.bool = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["object_type", b"object_type", "object_uuids", b"object_uuids", "state_values", b"state_values", "unconditional", b"unconditional", "updated_before", b"updated_before"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___HardDeleteObjectsRequest: _TypeAlias = HardDeleteObjectsRequest  # noqa: Y015
+
+@_typing.final
+class HardDeleteObjectsReply(_message.Message):
+    DESCRIPTOR: _descriptor.Descriptor
+
+    DELETED_UUIDS_FIELD_NUMBER: _builtins.int
+    @_builtins.property
+    def deleted_uuids(self) -> _containers.RepeatedScalarFieldContainer[_builtins.str]:
+        """The objects deleted: for a guarded request those which were eligible,
+        and for an unconditional one every object named.
+        """
+
+    def __init__(
+        self,
+        *,
+        deleted_uuids: _abc.Iterable[_builtins.str] | None = ...,
+    ) -> None: ...
+    _HasFieldArgType: _TypeAlias = _Never  # noqa: Y015
+    def HasField(self, field_name: _HasFieldArgType) -> _builtins.bool: ...
+    _ClearFieldArgType: _TypeAlias = _typing.Literal["deleted_uuids", b"deleted_uuids"]  # noqa: Y015
+    def ClearField(self, field_name: _ClearFieldArgType) -> None: ...
+    def WhichOneof(self, oneof_group: _Never) -> None: ...
+
+Global___HardDeleteObjectsReply: _TypeAlias = HardDeleteObjectsReply  # noqa: Y015
+
+@_typing.final
 class DeleteOrphanedObjectStatesRequest(_message.Message):
     """Orphan reconciliation (issue 3534). Phantoms are object_states rows
     whose static-values row is gone; zombies are static rows with no

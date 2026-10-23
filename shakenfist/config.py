@@ -784,8 +784,38 @@ class SFConfig(BaseSettings):
             'longer than CLEANER_DELAY. Reading the sweep\'s work from the '
             'database counts against the budget. It caps the work rather '
             'than spending it: a pass with nothing to delete finishes at '
-            'once. Lower it to reduce the load the sweep puts on the '
-            'database tier, at the cost of a slower drain.'
+            'once. A pass usually stops at DELETED_OBJECT_SWEEP_MAX_OBJECTS '
+            'first, so this is a ceiling for a slow database tier rather '
+            'than the way to set the drain rate.'
+        )
+    )
+    DELETED_OBJECT_SWEEP_MAX_OBJECTS: int = Field(
+        100,
+        ge=1,
+        description=(
+            'The most deleted objects one pass of the cluster daemon\'s '
+            'deleted-object sweep takes, which with a pass every minute '
+            'sets how fast a backlog of deleted objects drains. Each '
+            'object taken is either hard deleted or found no longer '
+            'eligible. Raise it to drain a large backlog faster, watching '
+            'the load on the database tier as you do; lower it to reduce '
+            'that load. DELETED_OBJECT_SWEEP_SECONDS still ends a pass '
+            'which runs out of time first.'
+        )
+    )
+    DELETED_OBJECT_BATCH_SIZE: int = Field(
+        25,
+        ge=1,
+        le=1000,
+        description=(
+            'How many objects of one type the deleted-object sweep takes '
+            'at a time. Most types are hard deleted that many to a '
+            'database transaction; instances, namespaces, namespace '
+            'claims and nodes are still hard deleted one at a time. '
+            'Larger batches mean fewer commits for the same number of '
+            'objects but longer transactions. The sweep moves on to the '
+            'next type with work after each batch, so this is also how '
+            'many objects one type can take before another is served.'
         )
     )
     CLUSTER_OPERATION_TARGET_RETENTION: int = Field(

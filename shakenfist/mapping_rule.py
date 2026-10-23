@@ -602,12 +602,6 @@ class MappingRule(dbo):
         """Soft delete. The standard reaper hard deletes later."""
         self.state = self.STATE_DELETED
 
-    def hard_delete(self) -> None:
-        _uuid = _as_uuid(self.uuid)
-        mariadb.delete_mapping_rule_attributes(_uuid)
-        mariadb.delete_mapping_rule(_uuid)
-        super().hard_delete()
-
 
 class MappingRules(dbo_iter):
     base_object = MappingRule

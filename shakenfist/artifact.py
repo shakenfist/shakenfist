@@ -745,12 +745,6 @@ class Artifact(dbowo):
         if not self.in_memory_only:
             mariadb.remove_all_references_from(ObjectType.ARTIFACT, self.uuid)
 
-    def hard_delete(self):
-        mariadb.delete_all_artifact_indexes(self.uuid)
-        mariadb.delete_artifact_attributes(self.uuid)
-        mariadb.delete_artifact(self.uuid)
-        super().hard_delete()
-
     def resolve_to_blob(self):
         mri = self.most_recent_index
 

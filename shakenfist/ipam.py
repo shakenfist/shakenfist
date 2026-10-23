@@ -426,11 +426,9 @@ class IPAM(dbo):
         return r.reserved_at
 
     def hard_delete(self) -> None:
+        # An in-memory IPAM has no rows to delete.
         if self._in_memory_only:
             return
-
-        mariadb.delete_reservations_for_ipam(self.uuid)
-        mariadb.delete_ipam(self.uuid)
         super().hard_delete()
 
 

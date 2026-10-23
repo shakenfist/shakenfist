@@ -763,9 +763,34 @@ class DatabaseBackedObject:
         return out
 
     def hard_delete(self):
-        mariadb.delete_state(self.object_type, str(self.uuid))
-        mariadb.delete_object_metadata(self.object_type, str(self.uuid))
-        mariadb.delete_object_events(self.object_type, str(self.uuid))
+        object_uuid = str(self.uuid)
+        if self.object_type not in mariadb.HARD_DELETE_BATCH_FUNCTIONS:
+            mariadb.delete_state(self.object_type, object_uuid)
+            mariadb.delete_object_metadata(self.object_type, object_uuid)
+            mariadb.delete_object_events(self.object_type, object_uuid)
+            self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')
+            return
+
+        # A type whose hard delete is nothing but row deletes keyed on the
+        # object deletes them all in one transaction. The batch names
+        # every row this type's hard delete removes, so a subclass adds
+        # no deletes of its own.
+        try:
+            deleted = mariadb.hard_delete_objects(
+                self.object_type, [object_uuid], unconditional=True)
+        except exceptions.HardDeleteBatchUnavailable:
+            # An sf-database which predates the batch: the same deletes,
+            # one call at a time.
+            mariadb.hard_delete_objects_per_call(self.object_type, object_uuid)
+        else:
+            # None is a batch which rolled back, leaving the object for a
+            # later attempt. An unconditional batch returns every uuid it
+            # was given, so one which omits ours has broken that contract
+            # and is not trusted to have deleted it either.
+            if deleted is None or object_uuid not in deleted:
+                self.log.with_fields({'deleted': deleted}).error(
+                    'Hard delete failed, not recording it')
+                return
         self.add_event(EVENT_TYPE_AUDIT, 'hard deleted object')
 
 
@@ -856,8 +881,10 @@ class DatabaseBackedObjectWithOperations(DatabaseBackedObject):
         ]
 
     def hard_delete(self):
-        mariadb.delete_cluster_operation_targets_for_object(
-            self.object_type, str(self.uuid))
+        # The batch deletes a batchable type's targets itself.
+        if self.object_type not in mariadb.HARD_DELETE_BATCH_FUNCTIONS:
+            mariadb.delete_cluster_operation_targets_for_object(
+                self.object_type, str(self.uuid))
         super().hard_delete()
 
 

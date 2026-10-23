@@ -421,12 +421,6 @@ class NamespaceKey(dbo):
         """Soft delete. The reaper hard deletes later."""
         self.state = self.STATE_DELETED
 
-    def hard_delete(self) -> None:
-        _uuid = _as_uuid(self.uuid)
-        mariadb.delete_namespace_key_attributes(_uuid)
-        mariadb.delete_namespace_key(_uuid)
-        super().hard_delete()
-
 
 def keys_with_attributes(
         namespace: str, include_expired: bool = False,
