@@ -1434,15 +1434,78 @@ passed every job:
 * 147 tests passed and 0 failed, the Kerbside exchange and console
   tests among them. None of the 4 skipped tests is a Kerbside test.
 
-**Steps 8 and 9 have not started.** Step 8 needs C merged, and step 9
-needs D merged and one nightly pass (back-brief gate 3).
+**C merged** as `48849831c` (#4591).
+
+**Step 8: pull request D, shakenfist/kerbside#587.** The operator
+approved pushing and opening D, with its own run as the first trial.
+Committed as `0778191`.
+[Pull request run 39680016813](https://github.com/shakenfist/kerbside/actions/runs/39680016813)
+passed. The redeploy check covered the `sf-*` and `kerbside-*` units.
+The collection deployed from the checkout reports version `0.0.0`, and
+`site.yml` accepts it with its warning about an unreleased collection.
+
+One automated review round followed, at 1 fix and 7 consider. The
+next round found 0 fix and 5 consider. `0d75081` took the fix and five
+of the consider items:
+* **The fix.** `drive-adversarial.py` called the source password the
+  CI system key. It is the dedicated `kerbside` key the deploy mints.
+* **A real leak, raised as a consider item.** The artifact redaction
+  caught `KEY = value` secrets, but not a password in a URL's
+  userinfo, such as `kerbside_sql_url`'s in a traceback. So the old
+  pipeline uploaded it, as mutation M4 of four shows.
+  `gather-artifacts.sh` now redacts `scheme://user:password@`, and its
+  leak check looks for that shape.
+* The journal names `kerbside-api` and `kerbside-daemon` beside the
+  glob, so a unit that failed to load is still collected.
+* The checkout is staged with `tar`, excluding `.git`, `target` and
+  `kerbside/dist`.
+* The deploy profile pins `kerbside_venv` and `kerbside_config_dir`,
+  which the drivers read. The drivers' comments say they run as root.
+
+The artifact bundle gains only the redacted `kerbside-*` journals.
+Configuration and credential files are never gathered.
+[Dispatch run 39687744662](https://github.com/shakenfist/kerbside/actions/runs/39687744662),
+which matches the nightly trigger, passed on `0d75081`. Its artifacts
+were clean: the only `REDACTED` was Shaken Fist's own
+`MARIADB_PASSWORD`. D merged as Kerbside `89f199456`. The first nightly
+to include it,
+[run 39743016396](https://github.com/shakenfist/kerbside/actions/runs/39743016396)
+(2026-10-22 07:47 UTC), passed, which met gate 3.
+
+**Step 9: pull request E, shakenfist/actions#195.** Committed as
+`0ae201c`. It deletes `deploy-kerbside-on-shakenfist/` and removes the
+action from `README.md`, `ARCHITECTURE.md`, `docs/actions.md` and
+`docs/ci.md`. Its review's one fix item asked for proof that no
+caller remained. No code changed, and the reply showed no caller
+remained:
+* Kerbside's only branch, `develop`, stopped using the action at
+  `89f199456`;
+* none of kerbside-patches' six branches uses it;
+* code search across the organisation finds only plan files.
+
+The `REVIEWS.md` and `.vscode` review marks that still name the file
+are generated, so they were left to their tooling. E merged as actions
+`31139125c`.
+
+**Issues and plans.**
+* #4097 gained
+  [a comment](https://github.com/shakenfist/shakenfist/issues/4097#issuecomment-6349025513)
+  closing item 4's Kerbside side.
+* #4367 gained
+  [a comment](https://github.com/shakenfist/shakenfist/issues/4367#issuecomment-6349026043)
+  saying why the lane stays on `build-smoke-cluster`.
+* shakenfist/kerbside#589, merged as `829c636b2`, tells Kerbside's
+  deployment options plan which commits landed the move, which
+  unblocks its phase 5.
+
+Every pull request in this phase has merged, and its worktrees and
+branches are deleted.
 
 ## Future work
 
 * **Publish `shakenfist.shakenfist` to Galaxy.** `release.yml`'s
   publish job has never run (S3). Once it does, D2 can add a name
-  dependency if that ever becomes wanted. File an issue when this phase
-  merges.
+  dependency if that ever becomes wanted. Filed as #4613.
 * **A second live source in CI**, for example a static source beside
   Shaken Fist. This belongs to Kerbside's deployment options plan,
   whose gaps already note it.

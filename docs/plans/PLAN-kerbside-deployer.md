@@ -565,7 +565,7 @@ spelling above is the one to write.
 | 2. Shaken Fist side: signing key, Kerbside credential, token duration, shadow guard | [PLAN-kerbside-deployer-phase-02-sf-side.md](PLAN-kerbside-deployer-phase-02-sf-side.md) | Complete | `80292df08` (#4442) |
 | 3. A `kerbside` role and the `kerbside` group in `site.yml` | [PLAN-kerbside-deployer-phase-03-kerbside-role.md](PLAN-kerbside-deployer-phase-03-kerbside-role.md) | Complete | `b85005f0e` (#4465) |
 | 4. A merge-queue lane with the feature on | [PLAN-kerbside-deployer-phase-04-ci.md](PLAN-kerbside-deployer-phase-04-ci.md) | Complete | `0016c5dad` (#4479) |
-| 5. The `kerbside` role moves into Kerbside, and Kerbside's sf-e2e lane deploys through it | [PLAN-kerbside-deployer-phase-05-role-to-kerbside.md](PLAN-kerbside-deployer-phase-05-role-to-kerbside.md) | In progress | — |
+| 5. The `kerbside` role moves into Kerbside, and Kerbside's sf-e2e lane deploys through it | [PLAN-kerbside-deployer-phase-05-role-to-kerbside.md](PLAN-kerbside-deployer-phase-05-role-to-kerbside.md) | Complete | `48849831c` (#4591); kerbside `2093f2ed5` (#580), `89f199456` (#587); actions `17ea1889e` (#181), `31139125c` (#195) |
 | 6. Documentation and close-out | PLAN-kerbside-deployer-phase-06-docs.md | Proposed | — |
 | 7. Push audit | PLAN-kerbside-deployer-phase-07-push-audit.md | Proposed | — |
 
