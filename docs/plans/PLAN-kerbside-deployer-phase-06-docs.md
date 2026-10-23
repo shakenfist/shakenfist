@@ -162,12 +162,14 @@ These pages are wrong, on Kerbside `origin/develop` at `829c636`:
 * `docs/network-ports.md:16`, "it is why the API, daemon and proxy
   must be co-located";
 * `demo/README.md:61-65`, "The REST API and the SPICE proxy daemon
-  share a unix socket".
+  share a unix socket";
+* `demo/entrypoint.sh:138-142`, which says the API and the daemon
+  "share API_SOCKET_PATH". The survey missed this one; kerbside#592's
+  review found it.
 
-These are right and stay as they are:
+This is right and stays as it is:
 * `docs/configuration.md:91`, "The proxy must be co-located with the
-  daemon";
-* `demo/entrypoint.sh:140`.
+  daemon".
 
 ### S9 -- Kerbside's Shaken Fist use case predates the collection
 
@@ -644,14 +646,19 @@ and made the release note's link relative, like its others.
 **Step 3, Kerbside `a0dea40`,** on branch `kerbside-deployer-docs`.
 * The verification grep found no gRPC client outside the tests.
 * The class sweep found no wrong co-location claim beyond S8's four.
+  It was wrong: kerbside#592's review found a fifth, in
+  `demo/entrypoint.sh`, and that the new `installation.md` wording
+  offered two containers sharing the socket, although `daemon run`
+  always launches the proxy as its own child. Both were fixed on
+  that pull request.
 * The management session rewrapped the edited paragraphs and
   shortened the `installation.md` heading to "Two processes."
 
-**Definition of done.** Every item passed on these commits. The second
-Kerbside grep in the Definition of done still matches
-`demo/entrypoint.sh:140`. That line is the correct daemon-and-proxy
-statement, which the pattern catches because `API_SOCKET_PATH`
-contains "API", so the pattern was written too broadly.
+**Definition of done.** Every item passed on these commits except
+the second Kerbside grep, which still matched `demo/entrypoint.sh:140`.
+The management session misread that hit as a correct daemon-and-proxy
+statement caught by a too-broad pattern. It was the old claim, and
+kerbside#592's review fixed it.
 
 ## Future work
 
