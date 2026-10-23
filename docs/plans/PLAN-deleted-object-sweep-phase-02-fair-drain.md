@@ -202,7 +202,7 @@ cursor to its last uuid. A page without it resets the cursor to `''`,
 so the next walk picks up anything that arrived behind it. A type
 whose page came back empty is not read again for
 `DELETED_OBJECT_EMPTY_RECHECK` (300 seconds), so an idle cluster
-costs at most 28 small reads every five minutes. A restart is no
+costs at most 29 small reads every five minutes. A restart is no
 longer what refills the sweep.
 
 *Revised in review:* any completed walk backs off, not only an empty
@@ -632,7 +632,7 @@ Commit subject: `Document the paged deleted-object sweep.`
 ### Brief 2g: measure (management session, after deploy)
 
 Run this once sfcbr runs a build containing this phase, which
-`count(cluster_deleted_object_backlog)` confirms by answering 28.
+`count(cluster_deleted_object_backlog)` confirms by answering 29.
 Wait 24 hours. Then query `http://maui.home.stillhq.com:9099/api/v1/query`:
 
 ```
@@ -687,7 +687,7 @@ plan, under "What phase 2 measured".
   after. The memory note on labqnap's buffer pool (sf-database
   watchdog stalls) is the failure mode to watch for. If it reappears,
   lower the budget first and investigate second.
-- **The backlog count is a new hourly scan.** 28 index-only range
+- **The backlog count is a new hourly scan.** 29 index-only range
   counts covering about 1.7M index entries. Mitigation: the
   `deleted_object_backlog` scope publishes each count's latency, and
   brief 2g reports the worst type. If one count exceeds a few seconds,
