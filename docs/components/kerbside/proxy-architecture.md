@@ -294,8 +294,9 @@ For every framed message the relay's `pump` runs:
    `shakenfist-spice-protocol` name tables unioned with the SPICE
    common-base opcodes (server `SPICE_MSG_*` 1..=7, client `SPICE_MSGC_*`
    1..=6, valid on every channel). Main, display, inputs, cursor, and
-   playback have their own tables; usbredir/port/webdav ride the spicevmc
-   table. **Record, smartcard, and tunnel have no modeled grammar** — they
+   playback have their own tables; usbredir rides the spicevmc table, and
+   port/webdav ride the port table (the spicevmc set plus `PORT_INIT` and
+   `PORT_EVENT`). **Record, smartcard, and tunnel have no modeled grammar** — they
    classify as `ChannelUnmodeled` and get L0-only enforcement plus
    observe-only handling for their message types (never a type-based
    terminate), rather than treating every type on those channels as a
