@@ -121,7 +121,9 @@ class InstanceEnqueueDeleteTestCase(base.ShakenFistTestCase):
 
         self.assertEqual([], snap.states)
         self.assertEqual([], self._aborted_ops())
-        self.assertEqual([_pointer(snap), _pointer(snap)], runs_after)
+        # The snapshot is both a survivor and the pointer, so it is listed
+        # once.
+        self.assertEqual([_pointer(snap)], runs_after)
 
     def test_snapshot_behind_newer_hot_plug_is_waited_for(self):
         # The pointer is the hot-plug, so waiting only for the pointer would
