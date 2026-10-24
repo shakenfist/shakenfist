@@ -2823,6 +2823,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -17064,6 +17092,17 @@ window 1024x768, which is the guest's resolution.</p>
   items are recorded above. <code>origin/develop</code> had moved on by
   five commits (#587, #599); the merge preview shows no
   conflicting hunks, so the branch was not rebased.</li>
+<li><strong>Landed in two pull requests.</strong> #605 merged as <code>7b389b1</code> on
+  2026-10-22 with the automated review's first round still
+  open, because it was already in the merge queue; that round
+  landed as #607 (<code>c314094</code>, 2026-10-22). #607 releases the
+  keys and buttons a vanished client left held (including a
+  release the full input queue dropped), resets the pointer
+  for each new client of the same session, leaves a wildcard
+  bind address out of the self-signed certificate's names,
+  and warns once about Advanced Input wheel values that are
+  not in FreeRDP's encoding. Both merge commits are recorded
+  in the master plan's <code>Merged</code> cell for the push audit.</li>
 </ul>
 <h2 id="future-work">Future work<a class="headerlink" href="#future-work" title="Permanent link">&para;</a></h2>
 <ul>
@@ -17093,6 +17132,18 @@ window 1024x768, which is the guest's resolution.</p>
 <li><strong><code>--web</code> and <code>--headless</code> exclusivity</strong> (#601).</li>
 <li><strong>Headless audio</strong> and the <code>ryll/Cargo.toml</code> pruning carried
   over from phase 1's <em>Future work</em>.</li>
+<li><strong>Releases the input queue is still too full to take at
+  disconnect</strong> are counted as dropped and logged, not retried.
+  If that shows up in practice, send them from a short-lived
+  task with <code>send().await</code> under a timeout, holding its own
+  clone of the session's handles (#607's review, declined
+  there as a new delivery mechanism).</li>
+<li><strong>Wheel clicks split by a full input queue.</strong> <code>wheel()</code>
+  sends each notch as a button 4 or 5 press and release; if
+  the queue takes the press and drops the release, nothing
+  releases it at disconnect, unlike the other buttons. Send
+  the pair one event at a time and record a press whose
+  release was dropped in the held record (#607's review).</li>
 </ul>
 <h2 id="back-brief">Back brief<a class="headerlink" href="#back-brief" title="Permanent link">&para;</a></h2>
 <p>Before executing any step of this plan, back brief the

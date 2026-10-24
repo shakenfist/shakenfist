@@ -2833,6 +2833,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -3159,6 +3187,17 @@
     <span class="md-ellipsis">
       
         Review marks excluded from pre-commit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#review-scope-changes-are-reviewed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review scope changes are reviewed
       
     </span>
   </a>
@@ -15804,6 +15843,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#review-scope-changes-are-reviewed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review scope changes are reviewed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#pypi-caching" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -16099,14 +16149,55 @@ rewriting hooks rather than the whole file --
 a blanket exclude is worse than none.</p>
 <p>The check applies only where a rewriting hook (<code>end-of-file-fixer</code>,
 <code>trailing-whitespace</code>, <code>mixed-line-ending</code>, <code>pretty-format-json</code>,
-<code>file-contents-sorter</code>) is configured. It tries each <code>exclude:</code> value
-as the regex pre-commit would apply and passes if any one matches both
-<code>.vscode/&lt;user&gt;.weaudit</code> and <code>.vscode/&lt;user&gt;.weaudit-shas.json</code>, so a
-top-level exclude still counts. A value that does not compile, or
-whose search does not finish within a few seconds, counts as no
-exclude: pre-commit would fail or hang on it too. Repositories without the tooling,
-without a <code>.pre-commit-config.yaml</code>, or running no rewriting hook are
-not applicable.</p>
+<code>file-contents-sorter</code>) is configured, and requires every such hook
+to be protected: by an <code>exclude:</code> on its own entry or by the top-level
+<code>exclude:</code>, since an exclude on any other hook (gitleaks, say) does
+nothing for it. An exclude protects the hook if, tried as the regex
+pre-commit would apply, it matches both <code>.vscode/&lt;user&gt;.weaudit</code> and
+<code>.vscode/&lt;user&gt;.weaudit-shas.json</code>. A YAML block scalar
+(<code>exclude: |</code>) is read as the text it holds, not its indicator. A
+value that does not compile, or whose search does not finish within a
+few seconds, counts as no exclude: pre-commit would fail or hang on it
+too. Repositories without the tooling, without a
+<code>.pre-commit-config.yaml</code>, or running no rewriting hook are not
+applicable.</p>
+<h3 id="review-scope-changes-are-reviewed">Review scope changes are reviewed<a class="headerlink" href="#review-scope-changes-are-reviewed" title="Permanent link">&para;</a></h3>
+<p><strong>Measured</strong> by <code>review-scope-ci</code>. In repositories with human review
+tracking deployed, a pull request that changes only
+<code>.vscode/review-scope.toml</code> must still reach the automated reviewer.
+The review state (<code>REVIEWS.md</code>, <code>.vscode/*.weaudit</code> and
+<code>.vscode/*.weaudit-shas.json</code>) may skip CI, as step 8 of
+<a href="/components/development/code-review-tracking/#adopting-a-repository">adopting a repository</a>
+describes. The scope config may not. It is policy: it decides which
+files are subject to review at all, so a pull request that narrows it
+needs the same lint and review as one that changes code.</p>
+<p>The check reads every workflow that runs the automated reviewer on
+<code>pull_request</code>, or that calls a reusable reviewer workflow by a local
+path. That is also where the fleet runs lint. A workflow run only by
+the merge queue reviews nothing before it, and does not count. A
+workflow fails if a pull request changing only the scope config would
+skip it, in any of three ways:</p>
+<ul>
+<li>the <code>pull_request</code> trigger's <code>paths-ignore</code> names it;</li>
+<li>the trigger's <code>paths</code> does not name it;</li>
+<li>a <code>dorny/paths-filter</code> job in the workflow excludes it with a <code>!</code>
+  pattern.</li>
+</ul>
+<p>Both lists are read as GitHub reads them: the last pattern that
+matches wins, and a <code>!</code> pattern takes back what an earlier one named.</p>
+<p>Patterns are matched with <code>**</code> crossing directories and <code>*</code> not.
+Every <code>!</code> list item in a workflow that uses <code>dorny/paths-filter</code> counts
+as a filter exclusion. So an inclusion-style filter (one that lists
+<code>src/**</code> and excludes nothing) is not seen, and a <code>!</code> re-inclusion in
+that workflow's trigger <code>paths-ignore</code> is misread as an exclusion. No
+repository in the fleet has either shape. Repositories without review
+tracking, or with no automated reviewer workflow, are not applicable.</p>
+<p><strong>Reviewed, not measured:</strong> the other workflows. The adoption
+procedure drops the scope config from every pull request filter except
+the CodeQL template's, which skips it along with <code>docs/**</code> because
+CodeQL analyses neither. A workflow that runs only after a merge, such
+as a canary on push to the default branch, may still skip it: by then
+the change has been linted and reviewed.</p>
 <h3 id="pypi-caching">PyPI caching<a class="headerlink" href="#pypi-caching" title="Permanent link">&para;</a></h3>
 <p><strong>Reviewed, not measured:</strong> self-hosted runners should use the devpi
 PyPI cache at <code>http://192.168.1.15:3141</code>. No check asks whether a job

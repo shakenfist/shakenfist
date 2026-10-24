@@ -2829,6 +2829,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -15929,7 +15957,15 @@ values are overridden by matching <code>-o</code> keys when both are specified.<
 - <code>backing_file</code>, <code>backing_fmt</code>, <code>data_file</code>, <code>data_file_raw</code>, <code>encrypt.*</code></p>
 <h3 id="vmdk">vmdk<a class="headerlink" href="#vmdk" title="Permanent link">&para;</a></h3>
 <p>Honoured:
-- <code>subformat</code> (monolithicSparse|streamOptimized|monolithicFlat), <code>grain_size</code></p>
+- <code>subformat</code> (monolithicSparse|streamOptimized|monolithicFlat), <code>grain_size</code>
+- <code>preallocation</code> (off|falloc|full) — accepted for vmdk, vpc and vhdx
+  alike, and the answer is the one <code>off</code> gives. <code>preallocation=metadata</code>
+  is refused (<code>measure: preallocation=metadata is not supported for
+  FORMAT</code>), through <code>-o</code> and through <code>--preallocation</code>. qemu-img refuses
+  metadata preallocation for these formats when it creates them
+  (<code>block/file-posix.c:2024-2026</code>, qemu 7.0.0), and measure predicts what
+  instar's own writer produces. qemu-img cannot measure these formats at
+  all, so there is no qemu-img answer to compare with.</p>
 <p>Accepted but no size effect:
 - <code>adapter_type</code>, <code>hwversion</code>, <code>toolsversion</code>, <code>zeroed_grain</code></p>
 <h3 id="vpc-vhd">vpc (VHD)<a class="headerlink" href="#vpc-vhd" title="Permanent link">&para;</a></h3>

@@ -2829,6 +2829,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -17281,7 +17309,10 @@ instar-testdata fixtures; those measurements are recorded in
 <p>The convert-output / <code>create</code> / <code>dd</code>-output roster is unchanged by the
 format-coverage programme: instar writes <strong>raw, qcow2, vmdk, vpc (VHD), and
 vhdx</strong> only. qemu-img can additionally <em>create</em> vdi / parallels / qcow (v1) /
-qed images; instar refuses those by scope, not by inability (note 15).</p>
+qed images; instar refuses those by scope, not by inability (note 15).
+For vmdk, <code>create</code> and convert output write monolithicSparse,
+streamOptimized and monolithicFlat; neither writes the split
+twoGbMaxExtent subformats.</p>
 <table>
 <thead>
 <tr>
@@ -17512,7 +17543,7 @@ above.</p>
 <tr>
 <td><strong>vmdk</strong></td>
 <td>Supported</td>
-<td>monolithicSparse (default), streamOptimized with <code>-c</code>, monolithicFlat with <code>--subformat monolithicFlat</code>, configurable grain size (4KB-64KB via <code>--grain-size</code>) for sparse/streamOptimized</td>
+<td>monolithicSparse (default), streamOptimized with <code>-c</code>, monolithicFlat with <code>--subformat monolithicFlat</code> (also from <code>instar create</code>, written on the host; the extent is named as qemu-img names it), configurable grain size (4KB-64KB via <code>--grain-size</code>) for sparse/streamOptimized</td>
 </tr>
 <tr>
 <td><strong>vpc</strong> (VHD)</td>

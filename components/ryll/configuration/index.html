@@ -2829,6 +2829,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -16431,6 +16459,16 @@ binary must be built with the <code>rdp</code> feature (see
 <a href="/components/ryll/development/">development.md</a>); one built without it refuses <code>--rdp</code> with
 a clear message. An operator guide is to come; this table is the flag
 reference.</p>
+<p>The RDP client sees the guest's display and can send keyboard and mouse
+input. It also gets the guest's cursor shape, which is sent as an RDP
+pointer (scaled down to fit 96x96 when larger) and hidden and shown with the
+guest's; the guest's cursor position is not sent, because the client draws
+the pointer where its own mouse is. ryll asks the guest to use the RDP
+client's desktop size: the size the client connects with, and the size its
+window changes to (FreeRDP needs <code>/dynamic-resolution</code> to send window
+changes). The guest only adopts a requested size if it runs vdagent. A
+connection whose size differs from the guest's sees a blank desktop for up to
+about 2 seconds at connect, before the client is resized to the guest's size.</p>
 <table>
 <thead>
 <tr>

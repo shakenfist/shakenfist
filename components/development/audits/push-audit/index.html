@@ -2963,6 +2963,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -15714,7 +15742,13 @@
 <li>be <strong>referenced from <code>AGENTS.md</code></strong>, so a session can discover it.</li>
 </ul>
 <p>Repositories with no pre-push audit file are N/A: whether every project
-should have one is a separate decision, not smuggled in here.</p>
+should have one is a separate decision, not smuggled in here. A file
+that is there but cannot be read -- over the 2 MB read limit, or a
+symlink out of the repository -- fails rather than being treated as
+absent, because standing down would close an open issue about a file
+nobody could check. Only the file that would be audited counts: a
+readable <code>PUSH-AUDIT.md</code> is audited even beside an unreadable legacy
+<code>PUSH-TEMPLATE.md</code>, which is still flagged as a legacy name.</p>
 <h3 id="why-the-reference-is-checked">Why the reference is checked<a class="headerlink" href="#why-the-reference-is-checked" title="Permanent link">&para;</a></h3>
 <p>Checking only the file's contents is how the runbook went untriggered.
 In August 2026 the audit was current and correct in eight repositories
@@ -15749,8 +15783,17 @@ shared wording for a sub-agent brief rather than a check in
 repositories between <code>&lt;!-- shared-block: &lt;name&gt; v&lt;N&gt; --&gt;</code> and
 <code>&lt;!-- shared-block-end --&gt;</code> markers; the canonical copies live in
 <code>templates/shared-blocks/</code>, whose <code>README.md</code> describes the
-mechanism. The check fails when a required block is missing, stale,
-drifted from the canonical wording, unknown, or missing its end marker.</p>
+mechanism. The check fails when a required block is missing, and
+when any embedded block is stale, has drifted from the canonical
+wording, is unknown, is embedded more than once, or has no end marker
+of its own. Each begin marker pairs with the first end marker after
+it, so a block left open when the next one begins -- never closed, or
+with another block nested inside it -- is reported as having no end
+marker rather than being measured against the next block's. Each
+problem names the one block it is about, and a stale, drifted or
+missing block's names the canonical file to copy. A version of more
+than six digits is not read as a marker, so a block carrying one is
+reported missing.</p>
 <p>This audit exists because the pre-push audit files drifted
 independently in each repository -- several still told the
 documentation reviewer that "<code>README.md</code> reflects any new features",

@@ -2829,6 +2829,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -15837,21 +15865,27 @@ escape hatch that downgrades the refusal to a logged warning. See
 section is the mental model: what has to exist before a console works.
 <a href="/components/kerbside/configuration/">configuration.md</a> is the reference for every
 setting; this is the short list of things you cannot skip.</p>
-<p><strong>Two processes, co-located.</strong> The REST API is a WSGI application
-served by gunicorn, and the SPICE proxy is a daemon that supervises
+<p><strong>Two processes.</strong> The REST API is a WSGI application served by
+gunicorn, and the SPICE proxy is a daemon that supervises
 the Rust binary:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>gunicorn<span class="w"> </span>--bind<span class="w"> </span><span class="m">0</span>.0.0.0:13002<span class="w"> </span>--workers<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="s1">'kerbside.api:app'</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>kerbside<span class="w"> </span>daemon<span class="w"> </span>run
 </code></pre></div>
 <p>Neither is optional and they are not interchangeable: the API is where
 brokers and users ask for consoles, and <code>daemon run</code> is what discovers
-consoles and moves SPICE traffic. They talk to each other over a unix
-socket (<code>API_SOCKET_PATH</code>, default <code>/run/kerbside/api.sock</code>), so <strong>they
-must be co-located</strong> — the same host, the same container, or two
-containers sharing that path. Note that the API's port is a gunicorn
-argument rather than a Kerbside setting; <code>PUBLIC_FQDN</code> is how Kerbside
-tells clients where to find it. Every port the two processes listen on
-or dial is listed in <a href="/components/kerbside/network-ports/">network-ports.md</a>.</p>
+consoles and moves SPICE traffic. <code>daemon run</code> launches the Rust
+proxy as its own child process, and the two talk over a unix socket
+(<code>API_SOCKET_PATH</code>, default <code>/run/kerbside/api.sock</code>), so <strong>the daemon
+and its proxy always run together</strong> on one host or in one container.
+The API never dials that socket. It reaches the daemon only through
+the database, so it may run on another host. That host still needs
+the same <code>sources.yaml</code> (<code>SOURCES_PATH</code>) and CA certificate
+(<code>CACERT_PATH</code>) as the daemon's, because the API reads both from disk:
+the sources for token exchange, and the CA for the console files it
+issues. Note that the API's port is a gunicorn argument rather than a
+Kerbside setting; <code>PUBLIC_FQDN</code> is how Kerbside tells clients where to
+find it. Every port the two processes listen on or dial is listed in
+<a href="/components/kerbside/network-ports/">network-ports.md</a>.</p>
 <p>That gunicorn line is the demo's shape, not a recommendation: it
 serves plain HTTP on every interface, and the API carries bearer
 tokens and Keystone credentials. A real deployment binds it to an
@@ -16069,7 +16103,7 @@ genuinely wrong.</p>
 </tr>
 <tr>
 <td>Two processes in one container</td>
-<td>The shortest way to co-locate them for a demo, not a shape to copy. Real deployments run them as separate units sharing the socket</td>
+<td>The shortest way to a working demo, not a shape to copy. Real deployments run the daemon and its proxy on one host, and the API may run elsewhere</td>
 </tr>
 <tr>
 <td>A plaintext backend leg</td>

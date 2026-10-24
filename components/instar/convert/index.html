@@ -2829,6 +2829,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -15629,7 +15657,15 @@ The default can also be set via <code>convert.sparse</code> in the config file.<
 <li><strong>vmdk</strong> - VMDK monolithicSparse output (default), streamOptimized
   with <code>-c</code>, or monolithicFlat with <code>--subformat monolithicFlat</code>.
   Configurable grain size (4KB-64KB, default 64KB via <code>--grain-size</code>)
-  for sparse/streamOptimized output</li>
+  for sparse/streamOptimized output.
+  A monolithicFlat extent is named the way <code>qemu-img</code> names it: the output's
+  basename is split at its last <code>.</code> and the extent is <code>&lt;prefix&gt;-flat&lt;postfix&gt;</code>
+  in the same directory, and the descriptor records that name. <code>out.vmdk</code>
+  gives <code>out-flat.vmdk</code>, <code>out.img</code> gives <code>out-flat.img</code>, <code>out</code> gives
+  <code>out-flat</code>, <code>a.b.c</code> gives <code>a.b-flat.c</code>, and <code>.hid</code> gives <code>-flat.hid</code>.
+  An extent name that holds <code>"</code>, CR or LF is refused before anything is
+  written (see
+  <a href="/components/instar/quirks/#vmdk-flat-extent-names-must-fit-the-descriptor">quirks.md</a>).</li>
 <li><strong>vpc</strong> - VHD dynamic output, configurable block size (512KB+,
   default 2MB via <code>--block-size</code>)</li>
 <li><strong>vhdx</strong> - VHDX dynamic output, configurable block size (1MB-256MB,

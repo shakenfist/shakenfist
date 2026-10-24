@@ -317,6 +317,10 @@
          <lastmod>2026-10-24</lastmod>
     </url>
     <url>
+         <loc>https://shakenfist.com/components/development/audits/review-tracking-templates/</loc>
+         <lastmod>2026-10-24</lastmod>
+    </url>
+    <url>
          <loc>https://shakenfist.com/components/development/audits/rust-unwrap-lint/</loc>
          <lastmod>2026-10-24</lastmod>
     </url>
@@ -714,6 +718,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/instar/plans/PLAN-bat-population-phase-02-fixtures/</loc>
+         <lastmod>2026-10-24</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/instar/plans/PLAN-bat-population-phase-03-host-create/</loc>
          <lastmod>2026-10-24</lastmod>
     </url>
     <url>
@@ -2658,6 +2666,10 @@
     </url>
     <url>
          <loc>https://shakenfist.com/components/ryll/plans/PLAN-rdp-frontend-phase-02-rdp-skeleton/</loc>
+         <lastmod>2026-10-24</lastmod>
+    </url>
+    <url>
+         <loc>https://shakenfist.com/components/ryll/plans/PLAN-rdp-frontend-phase-03-cursor-resize/</loc>
          <lastmod>2026-10-24</lastmod>
     </url>
     <url>

@@ -2829,6 +2829,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -16666,13 +16694,13 @@ rather than merge requests.</p>
 <tr>
 <td>2. Fixed VHDX fixtures (instar-testdata + instar)</td>
 <td><a href="/components/instar/plans/PLAN-bat-population-phase-02-fixtures/">PLAN-bat-population-phase-02-fixtures.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>instar-testdata <code>d2f9467719</code> (direct to <code>main</code>); instar <code>5c5bba75</code> (#819)</td>
 </tr>
 <tr>
 <td>3. Host-only create: non-qcow2 preallocation parity and monolithicFlat</td>
-<td>PLAN-bat-population-phase-03-host-create.md</td>
-<td>Not started</td>
+<td><a href="/components/instar/plans/PLAN-bat-population-phase-03-host-create/">PLAN-bat-population-phase-03-host-create.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -16784,10 +16812,18 @@ host-only, so it goes early as the cheapest closure of most of the
 preallocation leaf: accept <code>falloc</code> and <code>full</code> for vmdk, vpc and vhdx
 in both the <code>-o</code> parser and <code>validate_create_args</code>, produce the <code>off</code>
 image, refuse <code>metadata</code>, and do the same for <code>measure</code>'s <code>-o</code>
-parser; plus monolithicFlat create (open question 2). It must not touch the qcow2 or raw preallocation paths,
-which really allocate. Its tests are cross-version info baselines for
-the new cases (qemu's output is byte-stable here, Situation) and a
-<code>stat</code> assertion that the file is as sparse as <code>off</code>'s.</p>
+parser; plus monolithicFlat create (open question 2). It must not
+touch the qcow2 or raw preallocation paths, which really allocate.
+Its oracle is the phase 1 pin: every mode's exit status, bytes and
+allocation must relate to <code>off</code> as qemu's do, with lengths taken from
+instar's own <code>off</code> image, because #645 and the VHD CHS rounding make
+instar's absolute lengths differ from qemu's. The cross-version info
+baselines for the new cases join phase 10's, for the reason phase 2
+moved the fixed VHDX ones there. Its survey found that convert names
+a monolithicFlat extent <code>&lt;stem&gt;-flat.vmdk</code> whatever the output's
+extension, where qemu keeps the extension (#820); the naming rule
+create shares with convert is qemu's, so the phase fixes #820 (see
+the phase 3 plan).</p>
 <p><strong>Phase 4</strong> fixes what instar reads before instar writes anything
 new, for the reason <code>PLAN-differencing</code> phase 4 gave: the tree should
 never be in a state where instar writes a file its own <code>check</code> calls
@@ -16862,8 +16898,8 @@ instar's mirror of it, which phase 2's survey moved here because
 adding them before instar can create fixed VHDX breaks
 <code>test_create_cases_match_baselines</code> and they cannot see fixed-ness),
 per-image cross-version baselines for phase 2's fixtures, the
-preallocation cases, and the derived-profile validation the
-Situation warns about. It is separate from the feature phases because
+preallocation and monolithicFlat create cases, and the
+derived-profile validation the Situation warns about. It is separate from the feature phases because
 regenerating baselines in instar-testdata and validating <code>profiles/</code>
 against <code>raw/</code> is its own procedure, and because each feature phase
 already carries the host-version tests that prove it works.</p>
@@ -17486,6 +17522,12 @@ chosen to defer to here, so that we do not forget them.</p>
   large dynamic BAT at a small block size is still refused with no
   message. Worth an issue of its own if phase 8's survey confirms the
   silent path is reachable from the CLI.</li>
+<li>qemu's DDB lines in instar's VMDK descriptors. Both the sparse
+  writer and <code>build_flat_descriptor</code> omit <code>ddb.virtualHWVersion</code>,
+  <code>ddb.geometry.*</code>, <code>ddb.adapterType</code> and (from qemu 6.2.0)
+  <code>ddb.toolsVersion</code>, and accept-ignore <code>adapter_type</code>, <code>hwversion</code>
+  and <code>toolsversion</code>. No reader uses them, but a byte comparison
+  with qemu's descriptor sees the difference.</li>
 <li>Four test modules carry their own partial VHDX parsers
   (<code>tests/test_create.py:111-176</code>, <code>tests/test_info_safe.py:360-415</code>,
   <code>tests/test_differencing.py:2384-2530</code>, and a CRC-32C in

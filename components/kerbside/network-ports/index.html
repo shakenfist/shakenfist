@@ -2829,6 +2829,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -15701,7 +15729,7 @@ exists.</p>
 <td><code>API_SOCKET_PATH</code></td>
 <td>daemon</td>
 <td>Rust proxy only</td>
-<td>Control-plane gRPC between the daemon and its proxy. It is not a TCP port, but it is listed because it is why the API, daemon and proxy must be co-located.</td>
+<td>Control-plane gRPC between the daemon and its proxy. It is not a TCP port, but it is listed because it is why the daemon and its proxy must share a host. The API never dials it and may run elsewhere, since it reaches the daemon only through the database, though it reads the same <code>sources.yaml</code> and CA certificate from disk.</td>
 </tr>
 </tbody>
 </table>

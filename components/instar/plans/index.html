@@ -2829,6 +2829,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -15766,7 +15794,7 @@ at the repo root).</p>
 <td><a href="/components/instar/plans/PLAN-bat-population/">Populated BAT output: fixed VHDX and non-qcow2 preallocation</a></td>
 <td>Emit fixed VHDX from <code>create</code> and <code>convert</code> (and answer it in <code>measure</code>) the way qemu-img does -- <code>LeaveBlocksAllocated</code> set and every payload BAT entry written, <code>PAYLOAD_BLOCK_ZERO</code> by default or <code>FULLY_PRESENT</code> at sequential offsets with <code>block_state_zero=off</code> -- through a streaming BAT emitter that never holds the table in guest memory; accept <code>-o preallocation=falloc|full</code> on vmdk / vpc / vhdx as the no-op qemu-img makes it (and refuse <code>metadata</code>); add host-only <code>create -f vmdk -o subformat=monolithicFlat</code>. Fixes the VHDX read and geometry defects fixed output would expose first: the BAT entry count (#626, which makes instar refuse some well-formed qemu images), qemu's size-scaled default block size (#645), <code>check</code> rejecting a partial last block, <code>resize</code> turning a fixed VHDX into a hybrid, and the 64 TiB ceiling. Multi-extent VMDK output is out of scope</td>
 <td>In progress</td>
-<td><a href="/components/instar/plans/PLAN-bat-population-phase-01-pin/">1: pin</a> ✓, <a href="/components/instar/plans/PLAN-bat-population-phase-02-fixtures/">2: fixtures</a> (five small fixtures rather than the 128 GiB one the master plan assumed -- git-LFS stores sparse files fully allocated, and an 8 MiB dynamic image reproduces #626; the generator joins <code>scripts/create-vhd-testdata.sh</code> in instar, and the create baselines move to phase 10), 3: host create, 4: read side, 5: geometry, 6: emitter, 7: create, 8: convert, 9: measure, 10: matrix, 11: fuzz, 12: docs, 13: push audit</td>
+<td><a href="/components/instar/plans/PLAN-bat-population-phase-01-pin/">1: pin</a> ✓, <a href="/components/instar/plans/PLAN-bat-population-phase-02-fixtures/">2: fixtures</a> ✓ (five small fixtures rather than the 128 GiB one the master plan assumed -- git-LFS stores sparse files fully allocated, and an 8 MiB dynamic image reproduces #626; the generator joins <code>scripts/create-vhd-testdata.sh</code> in instar, and the create baselines move to phase 10), <a href="/components/instar/plans/PLAN-bat-population-phase-03-host-create/">3: host create</a> (no-op preallocation for vmdk / vpc / vhdx and host-only monolithicFlat create, tested against the phase 1 pin; fixes #820, convert's flat extent name), 4: read side, 5: geometry, 6: emitter, 7: create, 8: convert, 9: measure, 10: matrix, 11: fuzz, 12: docs, 13: push audit</td>
 </tr>
 </tbody>
 </table>

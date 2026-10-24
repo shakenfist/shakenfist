@@ -2829,6 +2829,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -15912,6 +15940,16 @@ token signed by a key Kerbside has not cached, which is what a
 signing-key rotation produces; <code>console-sources.md</code> describes how
 that is handled.</p>
 <h2 id="how-to-set-it-up">How to set it up<a class="headerlink" href="#how-to-set-it-up" title="Permanent link">&para;</a></h2>
+<p>The supported path is Shaken Fist's own deploy. Add hosts to the
+<code>kerbside</code> group in the inventory and set the <code>kerbside_*</code> variables,
+and Shaken Fist's <code>site.yml</code> deploys Kerbside through the
+<code>shakenfist.kerbside</code> collection. It does each step below for you:
+it sets <code>KERBSIDE_URL</code>, creates the signing key and a dedicated
+<code>kerbside</code> system key, and writes Kerbside's <code>sources.yaml</code> with the
+cluster CA. Shaken Fist's
+<a href="https://shakenfist.com/operator_guide/kerbside/">Kerbside guide</a>
+describes that path. The steps below are what the deploy does, and
+the path for a Kerbside deployed another way.</p>
 <h3 id="shaken-fist-side">Shaken Fist side<a class="headerlink" href="#shaken-fist-side" title="Permanent link">&para;</a></h3>
 <p><strong>Cluster configuration.</strong> Two cluster-wide settings turn the
 integration on: <code>KERBSIDE_URL</code>, the base of the exchange URL,
@@ -15925,7 +15963,8 @@ the value.</p>
 <p><strong>Signing keys.</strong> Shaken Fist signs console tokens with a VDI
 token signing key, and the cluster must have one before any
 token can be minted or verified; Kerbside caches only its public
-half. Creating the key is an explicit operator step, and
+half. Shaken Fist's deploy creates the key for you. Otherwise
+creating the key is an explicit operator step, and
 <a href="/components/kerbside/console-sources/#shaken-fist">console-sources.md</a> has the
 command and describes exactly what Kerbside does when a cluster
 has no key yet.</p>
@@ -16088,7 +16127,7 @@ termination, and an adversarial matrix of rejections.</p>
 </tr>
 <tr>
 <td>Non-<code>system</code> namespaces</td>
-<td>A source configured with any other namespace is untested and is not expected to work: only the instance listing uses the configured namespace, while the CA fetch, the signing-key fetch and the node listing are always made as <code>system</code> with the same key. The unit tests cover the branch with a namespace-to-mock map, which proves the branch and not that a non-<code>system</code> credential works against a real cluster. Tracked as #444.</td>
+<td>A source configured with any other namespace is untested and is not expected to work: only the instance listing uses the configured namespace, while the CA fetch, the signing-key fetch and the node listing are always made as <code>system</code> with the same key. The unit tests cover the branch with a namespace-to-mock map, which proves the branch and not that a non-<code>system</code> credential works against a real cluster.</td>
 </tr>
 <tr>
 <td>Shaken Fist client version</td>

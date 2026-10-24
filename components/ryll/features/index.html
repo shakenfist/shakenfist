@@ -2829,6 +2829,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -15839,7 +15867,7 @@ for how each subsystem works internally see
 <li><strong>Image decompression</strong> - LZ, GLZ, ZLIB_GLZ_RGB, LZ4, JPEG, QUIC, and Pixmap image types; MJPEG via SPICE streaming with hardware-accelerated decoding where available (ImageIO on macOS, WIC on Windows, VA-API on Linux) and automatic fallback to software decoders.</li>
 <li><strong>Multi-monitor support</strong> - Connect multiple display channels with <code>--monitors N</code> for multi-head configurations.</li>
 <li><strong>Window auto-fit</strong> - The ryll window tracks the guest's display surface size: every primary <code>SURFACE_CREATE</code> resizes the window to match (modulo an 8-pixel alignment that mirrors what we send the guest via <code>VDAgentMonitorsConfig</code>). Maximised or fullscreen windows are left alone, and the surface renders at native size inside them. Toggle <code>Obey guest size hints</code> in the hamburger menu (or launch with <code>--no-obey-guest-size</code>) to pin the window — useful for fixed-size capture or for guests that flap between resolutions on their own. The toggle is a session-level preference and survives reconnect. Resolution changes are also surfaced as Info notifications ("Display resolution: WxH"), debounced over 500 ms so a boot-time mode probe storm or a drag-resize through many sizes collapses to a single entry rather than spamming the panel.</li>
-<li><strong>Cursor rendering</strong> - Server cursor shapes with fallback default arrow.</li>
+<li><strong>Cursor rendering</strong> - Server cursor shapes with fallback default arrow. Alpha, mono, 4-bit, 16-bit and masked 32-bit cursors are decoded, with inverting pixels approximated as spice-gtk does; 8-bit cursors are refused. Only alpha cursors have been seen from a real guest so far; the other formats are tested against data built to spice-gtk's rules. The same decoder feeds <code>--web</code> and <code>--rdp</code>.</li>
 <li><strong>Display channel capabilities</strong> - Advertises COMPOSITE, MONITORS_CONFIG, SIZED_STREAM, and A8_SURFACE so the guest QXL driver uses efficient rendering paths instead of falling back to slow software blits.</li>
 <li><strong>Window persistence</strong> - Window size and position are restored across launches via eframe's <code>persistence</code> feature, which writes the egui memory snapshot to the platform's per-app config directory (<code>~/.local/share/ryll/</code> on Linux, <code>~/Library/Application Support/ryll/</code> on macOS, <code>%APPDATA%\ryll\</code> on Windows).</li>
 </ul>

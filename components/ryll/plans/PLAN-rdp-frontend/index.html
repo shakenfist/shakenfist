@@ -2829,6 +2829,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../development/audits/review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../development/audits/rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -16379,11 +16407,14 @@ Kerbside spike</em> below).</p>
    <code>primary_key()</code>, and the main channel's monitors config
    sends N identical side-by-side heads. Not needed for the
    MVP; recorded so nobody assumes multi-monitor is close.</li>
-<li><strong>Mono and 4-bit cursors are refused</strong>, not decoded
-   (<code>channels/cursor.rs</code>). Guests that use them show no
-   cursor shape in any mode. RDP's <code>ColorPointer</code> carries
-   AND/XOR masks, so this is solvable, but it is a renderer
-   fix that benefits every mode.</li>
+<li><strong>Mono, 4-bit, 8-bit and 16-bit cursors are refused</strong>, not
+   decoded (<code>channels/cursor.rs</code>), and <code>COLOR32</code> ignores the
+   AND mask that follows its pixels, so its transparent area
+   shows as an opaque block (phase 3's survey). Guests that use
+   them show no cursor shape in any mode. spice-gtk decodes all
+   but 8-bit into RGBA, approximating inverting pixels, so this
+   is a renderer fix that benefits every mode. Phase 3 made it,
+   decoding every format but 8-bit as spice-gtk does.</li>
 </ol>
 <h3 id="the-rdp-side-ironrdp-as-of-2026-10-19">The RDP side: IronRDP as of 2026-10-19<a class="headerlink" href="#the-rdp-side-ironrdp-as-of-2026-10-19" title="Permanent link">&para;</a></h3>
 <p>Read from 0.13.0 (released 2026-07-10) and <code>master</code> <code>62246b3</code>,
@@ -16861,13 +16892,13 @@ cursor, resize, text clipboard and audio playback. Specifically:</p>
 <tr>
 <td>2. RDP skeleton: <code>shakenfist-spice-rdp</code>, <code>--rdp</code>, display, keyboard, mouse, security</td>
 <td><a href="/components/ryll/plans/PLAN-rdp-frontend-phase-02-rdp-skeleton/">PLAN-rdp-frontend-phase-02-rdp-skeleton.md</a></td>
-<td>In progress</td>
-<td></td>
+<td>Complete</td>
+<td>7b389b1, c314094</td>
 </tr>
 <tr>
 <td>3. Cursor and resize</td>
-<td>-</td>
-<td>Not started</td>
+<td><a href="/components/ryll/plans/PLAN-rdp-frontend-phase-03-cursor-resize/">PLAN-rdp-frontend-phase-03-cursor-resize.md</a></td>
+<td>In progress</td>
 <td></td>
 </tr>
 <tr>
@@ -16992,20 +17023,27 @@ above are recorded; open questions 1, 2, 3 and 7 have
 evidence-based answers in the plan.</p>
 <h3 id="phase-3-cursor-and-resize">Phase 3: Cursor and resize<a class="headerlink" href="#phase-3-cursor-and-resize" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Cursor shapes as <code>RGBAPointer</code> (larger than 96x96 needs
-  <code>LargePointer</code> or scaling), hide as <code>HidePointer</code>. Leave
+<li>Cursor shapes as <code>RGBAPointer</code>, hide as <code>HidePointer</code>.
+  IronRDP 0.13.0 sends <code>RGBAPointer</code> as a 32 bpp pointer
+  (bottom-up BGRA) and never sends <code>LargePointer</code>, and a
+  pointer too big for the wire format drops the client, so
+  shapes larger than 96x96 are scaled down. Leave
   <code>PointerPosition</code> out unless testing shows a reason, per
   qemu-rdp's experience.</li>
-<li>Decode mono and 4-bit SPICE cursors in the renderer (gap 6),
-  which also fixes them in the other modes.</li>
-<li>Resize: the client's initial desktop size via
-  <code>request_initial_size</code>, then display-control layouts via
-  <code>request_layout</code>, both mapped to <code>DisplaySize::Requested</code>
-  (aligned as the GUI aligns them). The guest's answer, a
-  <code>SurfaceCreated</code> of a new size, already becomes
-  <code>DisplayUpdate::Resize</code> in phase 2, which needs it for
-  guest-driven changes. Without an agent, the client gets
-  the guest's fixed size.</li>
+<li>Decode mono, 4-bit and 16-bit SPICE cursors in the renderer,
+  and honour <code>COLOR32</code>'s AND mask (gap 6), which also fixes
+  them in the other modes.</li>
+<li>Resize: the client's initial desktop size, which only the
+  Client Core Data carries, so the server must set
+  <code>with_honor_client_desktop_size(true)</code> for
+  <code>request_initial_size</code> to see it, then display-control
+  layouts via <code>request_layout</code>, both mapped to
+  <code>DisplaySize::Requested</code> (aligned as the GUI aligns them).
+  The guest's answer, a <code>SurfaceCreated</code> of a new size,
+  already becomes <code>DisplayUpdate::Resize</code> in phase 2, which
+  needs it for guest-driven changes. Without an agent, the
+  client gets the guest's fixed size after one extra
+  reactivation.</li>
 </ul>
 <h3 id="phase-4-clipboard-and-audio">Phase 4: Clipboard and audio<a class="headerlink" href="#phase-4-clipboard-and-audio" title="Permanent link">&para;</a></h3>
 <ul>

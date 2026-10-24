@@ -2941,6 +2941,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -15663,6 +15691,13 @@ here.</p>
 like is documenting its own conventions rather than listing a plan, so
 the example's columns are not judged as a table and its links do not
 register the plans they name.</p>
+<p>A plan is listed when a link in the index names its filename. A link
+to a plan under a subdirectory, such as <code>completed/PLAN-a.md</code>, counts,
+because finished plans are filed there. A link carrying a URL scheme
+does not: it names a plan in another repository, whatever its
+filename. Links written with a title (<code>[a](PLAN-a.md "title")</code>) or with
+the destination in angle brackets (<code>[a](&lt;PLAN-a.md&gt;)</code>) are read like
+any other.</p>
 <h3 id="the-status-vocabulary">The status vocabulary<a class="headerlink" href="#the-status-vocabulary" title="Permanent link">&para;</a></h3>
 <p>A status cell holds exactly one of <code>Proposed</code>, <code>Not started</code>,
 <code>In progress</code>, <code>Blocked</code>, <code>Complete</code>, <code>Abandoned</code> or <code>Superseded</code>, and
@@ -15691,9 +15726,10 @@ turns a persistent gap into a tracked issue. Format, ordering and
 vocabulary are the audit's alone -- the hook only reads the index, it
 does not police it.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
-<p>No template. <code>templates/shared-blocks/plan-status-vocabulary.md</code> holds
-the canonical status vocabulary; copy it verbatim, markers included,
-into the repository's <code>PLAN-TEMPLATE.md</code>.</p>
+<p>Every issue links <code>templates/shared-blocks/</code>, the directory of shared
+blocks. <code>templates/shared-blocks/plan-status-vocabulary.md</code> holds the
+canonical status vocabulary; copy it verbatim, markers included, into
+the repository's <code>PLAN-TEMPLATE.md</code>.</p>
 <p>To convert an index to the canonical layout, move the date to the first
 column, sort each table oldest first, and move everything that is not a
 vocabulary term out of the status column -- into <code>Intent</code> if it is a

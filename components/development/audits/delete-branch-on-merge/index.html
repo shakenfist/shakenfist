@@ -2913,6 +2913,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -15581,11 +15609,14 @@
 branches" enabled (Settings &gt; General &gt; Pull Requests), so that a
 pull request's source branch is deleted automatically when the PR
 merges. This keeps repositories free of stale merged branches.</p>
-<p>The check queries the <code>delete_branch_on_merge</code> repository setting
-via the GitHub API. Note that the API only exposes this setting to
-tokens with push access to the repository: to any other it answers
-null, which the check reports as <code>error</code> rather than as a failure,
-because it says nothing about the setting.</p>
+<p>The check queries the repository's <code>deleteBranchOnMerge</code> setting
+through the GitHub GraphQL API. Not the REST API's
+<code>delete_branch_on_merge</code>: the REST repository answer leaves that
+field out for a fine-grained token with read-only Administration,
+which is what the audit runs with, while GraphQL answers it. A null
+answer, from a token that cannot see the repository's administration
+settings, is reported as <code>error</code> rather than as a failure, because it
+says nothing about the setting.</p>
 <h2 id="template">Template<a class="headerlink" href="#template" title="Permanent link">&para;</a></h2>
 <p>No template -- this is a one-time configuration change.</p>
 <p>To enable via the CLI:</p>

@@ -2989,6 +2989,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../audits/review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../audits/rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -15839,7 +15867,7 @@ checks read files the audited repositories control, and some run
 programs over them, so the legs hold <code>AUDIT_READ_TOKEN</code>, a
 fine-grained personal access token that can read every repository in
 the organisation and write to none. <code>AUDIT_TOKEN</code>, which files and
-closes issues and pushes the compliance page, appears only in
+closes issues across the organisation, appears only in
 <code>manage-issues</code> and <code>update-docs</code>. <code>AUDIT_READ_TOKEN</code> is minted with
 the <code>shakenfist</code> organisation as its resource owner, access to all
 repositories, no organisation permissions, and these repository
@@ -15850,26 +15878,50 @@ permissions, each read-only:</p>
 <li><strong>Contents</strong> -- cloning the private repositories.</li>
 <li><strong>Actions</strong> -- the workflows and their runs, which
   <code>scheduled-workflow-health</code> reads.</li>
-<li><strong>Administration</strong> -- <code>delete_branch_on_merge</code> and
-  <code>security_and_analysis</code>, which GitHub leaves out of the repository
-  for a caller without admin access.</li>
+<li><strong>Administration</strong> -- <code>security_and_analysis</code>, which GitHub leaves
+  out of the REST repository answer for a caller without admin access,
+  and <code>deleteBranchOnMerge</code>. The REST answer leaves that one, and every
+  other merge setting, out even for this token, so
+  <code>delete-branch-on-merge</code> reads it through GraphQL, which answers it.</li>
 </ul>
+<p>The token's resource owner must be the <code>shakenfist</code> organisation, not
+the account that creates it. Created under the account, "All
+repositories" means that account's own repositories: the token still
+reads the organisation's public ones, as any token can, but its
+Administration permission does not reach them, and the probe below
+fails with "cannot see repository settings". The organisation also
+refuses a fine-grained token whose lifetime is over 366 days.</p>
 <p>These are enough for <code>release-environment-protection</code> too: the token
 was confirmed on 2026-10-19 to read both
 <code>environments/&lt;name&gt;</code> and its <code>deployment-branch-policies</code> without a
 separate Environments permission.</p>
-<p>Each leg checks first that the read token is set -- an unset secret
-is an empty string, and <code>gh</code> with an empty <code>GH_TOKEN</code> falls back to
-whatever login the runner's user holds -- and that it can see those
-last two fields. Without them <code>delete-branch-on-merge</code> would fail
-every repository, and <code>github-security</code> would stop checking secret
-scanning without saying so, so a token that cannot see them fails
-every leg instead.</p>
+<p>Each leg checks first, with <code>tools/check-audit-read-token.sh</code>, that
+the read token is set -- an unset secret is an empty string, and <code>gh</code>
+with an empty <code>GH_TOKEN</code> falls back to whatever login the runner's
+user holds -- and that it can see those last two settings, each the
+way its check reads it. Without them <code>delete-branch-on-merge</code> would
+report <code>error</code> for every repository, and <code>github-security</code> would
+stop checking secret scanning without saying so, so a token that
+cannot see them fails every leg instead.</p>
 <p><code>AUDIT_READ_TOKEN</code> is a repository secret on this repository, and a
 fine-grained token always has an expiry date. When it lapses, every leg
 fails at "Check the read token" and <code>report-failure</code> files its issue
 pointing at the run. Mint a replacement with the permissions above and
 replace the secret, then dispatch a run of <code>main</code> to confirm it.</p>
+<p><code>AUDIT_TOKEN</code> is also a fine-grained personal access token, with the
+<code>shakenfist</code> organisation as its resource owner, access to all
+repositories and no organisation permissions. It needs one repository
+permission beyond the Metadata every token gets: <strong>Issues</strong>, read and
+write, which covers listing, filing, editing, commenting on and
+closing issues, and creating the <code>consistency</code> label. It needs no
+Contents permission. <code>update-docs</code> uses it only to look up the open
+issues the page links to; the page itself is pushed by
+<code>scripts/commit-audit-docs.sh</code> with the job's own <code>GITHUB_TOKEN</code>,
+which <code>actions/checkout</code> leaves in the clone and the job's
+<code>contents: write</code> permission lets push to this repository alone. The
+same lifetime limit applies. When it lapses, <code>manage-issues</code> fails
+and <code>report-failure</code> files its issue, and <code>update-docs</code> still pushes
+the page but renders each issue link it could not look up as <code>?</code>.</p>
 <p><code>AUDIT_TOKEN</code> is not a repository secret. It is an environment secret
 in the <code>audit-write</code> environment, whose deployment branch policy
 allows only <code>main</code>, and <code>manage-issues</code> and <code>update-docs</code> are the only

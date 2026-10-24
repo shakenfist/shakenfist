@@ -2829,6 +2829,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/audits/review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/audits/rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -5963,6 +5991,28 @@
     <span class="md-ellipsis">
       
         Preallocation accept set
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vmdk-descriptors-omit-qemus-ddb-lines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VMDK descriptors omit qemu's DDB lines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vmdk-flat-extent-names-must-fit-the-descriptor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VMDK flat extent names must fit the descriptor
       
     </span>
   </a>
@@ -20545,6 +20595,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#vmdk-descriptors-omit-qemus-ddb-lines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VMDK descriptors omit qemu's DDB lines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vmdk-flat-extent-names-must-fit-the-descriptor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VMDK flat extent names must fit the descriptor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#vhd-virtual_size-diverges-from-qemu-img-by-chs-rounding" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -24404,27 +24476,66 @@ recurse, matching qemu-img.</p>
 <td><code>metadata</code></td>
 <td>rejected</td>
 <td>yes</td>
-<td>rejected (future work)</td>
+<td>rejected</td>
 </tr>
 <tr>
 <td><code>falloc</code></td>
 <td>yes</td>
 <td>yes</td>
-<td>rejected (future work)</td>
+<td>accepted, same as <code>off</code></td>
 </tr>
 <tr>
 <td><code>full</code></td>
 <td>yes</td>
 <td>yes</td>
-<td>rejected (future work)</td>
+<td>accepted, same as <code>off</code></td>
 </tr>
 </tbody>
 </table>
 <p><code>raw + metadata</code> is rejected because raw has no metadata to
-preallocate. Non-qcow2 sparse formats reject non-<code>off</code>
-preallocation with a "future work" pointer — each format needs
-its own BAT-population pattern plus the same host
-<code>apply_preallocation</code> post-pass qcow2 already uses.</p>
+preallocate.</p>
+<p>For vmdk, vpc and vhdx, <code>falloc</code> and <code>full</code> are accepted and write
+exactly the image <code>off</code> writes, because qemu-img does: none of those
+drivers has a <code>preallocation</code> create option (<code>block/vpc.c:1194</code>, qemu
+7.0.0), and the file protocol that consumes the key preallocates the
+file while it is still empty. <code>tests/golden/qemu-create-pins.json</code>
+records that content and allocation match <code>off</code> on all 80 pinned
+builds. <code>metadata</code> is refused, as qemu refuses it ("Unsupported
+preallocation mode: metadata", <code>block/file-posix.c:2024-2026</code>), with
+<code>create: preallocation=metadata is not supported for FORMAT</code>. The host
+always tells the guest <code>off</code> for these formats, so the result does not
+depend on the guest ignoring the preallocation bits. <code>instar measure</code>
+takes the same modes and refuses <code>metadata</code> the same way. This is
+create only: <code>instar resize --preallocation falloc|full</code> on these
+formats does allocate the appended region (see
+<a href="/components/instar/format-coverage/">format-coverage.md</a>).</p>
+<h3 id="vmdk-descriptors-omit-qemus-ddb-lines">VMDK descriptors omit qemu's DDB lines<a class="headerlink" href="#vmdk-descriptors-omit-qemus-ddb-lines" title="Permanent link">&para;</a></h3>
+<p>A VMDK descriptor written by <code>qemu-img create</code> ends with a Disk Data
+Base: <code>ddb.virtualHWVersion</code>, <code>ddb.geometry.cylinders</code>, <code>.heads</code> and
+<code>.sectors</code>, <code>ddb.adapterType</code>, and from qemu 6.2.0 <code>ddb.toolsVersion</code>
+(<code>tests/golden/qemu-create-pins.json</code> has the two groups either side of
+that boundary). instar's descriptors stop at the <code>#DDB</code> comment, for
+monolithicFlat (from <code>create</code> and <code>convert</code>) and for the sparse
+subformats alike. So <code>-o adapter_type</code>, <code>hwversion</code> and <code>toolsversion</code>
+are accepted and change nothing. <code>qemu-img info</code> reports the same image
+either way: the tests compare its JSON for instar's and qemu's
+monolithicFlat images, ignoring only the CID and allocation.</p>
+<p>Every instar VMDK also carries the constant <code>CID=fffffffe</code> where qemu
+writes a random one. That is the same missing identity source as the
+all-zero VHD unique id (#566).</p>
+<h3 id="vmdk-flat-extent-names-must-fit-the-descriptor">VMDK flat extent names must fit the descriptor<a class="headerlink" href="#vmdk-flat-extent-names-must-fit-the-descriptor" title="Permanent link">&para;</a></h3>
+<p>A monolithicFlat descriptor names its extent on a line of text, as
+<code>RW &lt;sectors&gt; FLAT "&lt;name&gt;" 0</code>. qemu-img writes the name verbatim
+(measured with qemu-img 10.0.13): a <code>"</code>, CR or LF in the output's
+basename ends the quoted string or the line, so the descriptor names a
+different file or gains lines of its own, and a non-UTF-8 name is
+written as raw bytes. instar refuses the quote, CR and LF in <code>create</code>
+and <code>convert</code>, before any file is opened, with <code>&lt;op&gt;: vmdk monolithicFlat
+cannot record the extent name "..." in its descriptor</code>. It never sees a
+non-UTF-8 name: its command line takes only UTF-8 arguments, and exits 2
+with <code>invalid UTF-8 was detected in one or more arguments</code>. Its
+descriptor reader requires UTF-8 too, so such an image could not be read
+back.</p>
 <h3 id="vhd-virtual_size-diverges-from-qemu-img-by-chs-rounding">VHD <code>virtual_size</code> diverges from qemu-img by CHS rounding<a class="headerlink" href="#vhd-virtual_size-diverges-from-qemu-img-by-chs-rounding" title="Permanent link">&para;</a></h3>
 <p><code>qemu-img create -f vpc</code> rounds the requested <code>virtual_size</code> up
 to the next CHS-aligned multiple (legacy VHD geometry layout);

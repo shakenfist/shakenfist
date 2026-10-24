@@ -2972,6 +2972,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../audits/review-tracking-templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Audit: Review tracking templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../audits/rust-unwrap-lint/" class="md-nav__link">
         
   
@@ -15774,6 +15802,25 @@ repository and passes through to the script.</p>
   marked reviewed by import (see "Importing reviews from this
   repository" under "Steady state").</li>
 </ul>
+<p>Every one of these files must be a regular file inside the
+repository and no larger than 2 MiB (the audit's own read cap), and
+none may be a symlink when the tooling writes it. Anything else --
+a link out of the checkout, a link to a device, a directory, an
+oversized file -- stops the subcommand with exit status 2 and a
+<code>review-tracking: ERROR:</code> line naming the file, rather than being
+read, written through or treated as absent; the <code>review-coverage</code>
+and <code>review-scope-completeness</code> audits report that as an error.</p>
+<p>So does a state file that would put a line of its own in the
+generated <code>REVIEWS.md</code>, since <code>prune</code> commits that file. That covers
+every value which reaches one of its table cells: a state file whose
+name (the reviewer), marked path, or sidecar stamp date or sha
+contains a control or format character or a Unicode line or paragraph
+separator, a weAudit mark that is not an object with a path, and a
+partial mark whose line numbers are not integers. A reviewer can
+clear it by un-marking the file in weAudit. An entry in the imports
+file with such a value in any of its fields is not refused but
+dropped, with a warning, as that file treats every entry <code>import</code>
+did not write.</p>
 <h2 id="adopting-a-repository">Adopting a repository<a class="headerlink" href="#adopting-a-repository" title="Permanent link">&para;</a></h2>
 <ol>
 <li>Ensure the review state files are committable. If <code>.gitignore</code>
@@ -15987,6 +16034,17 @@ repository and passes through to the script.</p>
    place secrets or Unicode smuggling could land.</p>
 </li>
 </ol>
+<p>Skip the review state only: <code>REVIEWS.md</code> and the two weAudit
+   files. Leave <code>.vscode/review-scope.toml</code> out of every pull
+   request filter but CodeQL's. It is policy rather than review
+   state, since it decides which files are reviewed at all, so a pull
+   request that narrows it needs lint and the automated reviewer like
+   any other change. The <code>review-scope-ci</code> audit checks this for the
+   workflow that runs the automated reviewer. A scope-only pull
+   request therefore pays for a full CI run, which happens a few
+   times a year in a repository. A workflow that runs only after a
+   merge, such as a canary on push to the default branch, may still
+   skip it: by then the change has been linted and reviewed.</p>
 <p>For a workflow whose checks are <strong>not</strong> required, a trigger-level
    <code>paths-ignore</code> is the simple answer:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">on</span><span class="p">:</span>
@@ -15996,7 +16054,6 @@ repository and passes through to the script.</p>
 <a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'REVIEWS.md'</span>
 <a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'.vscode/*.weaudit'</span>
 <a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'.vscode/*.weaudit-shas.json'</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'.vscode/review-scope.toml'</span>
 </code></pre></div>
 <p>That form is unsafe once a workflow backs a <strong>required</strong> status
    check, and the two failure modes look similar but are not the
@@ -16019,10 +16076,10 @@ repository and passes through to the script.</p>
    <code>Analyze</code> is a required check on hunkydory's default branch, so
    pull requests skip it at the job level rather than with a
    trigger-level filter, while <code>push</code> carries no required check and
-   keeps <code>paths-ignore</code> directly. Besides the review paths it skips
-   <code>docs/**</code>, and it does not analyse fork pull requests at all
-   (trimmed; the template's comments say why each condition is
-   there):</p>
+   keeps <code>paths-ignore</code> directly. Besides the review state it skips
+   the scope config and <code>docs/**</code>, since CodeQL analyses neither, and
+   it does not analyse fork pull requests at all (trimmed; the
+   template's comments say why each condition is there):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">on</span><span class="p">:</span>
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">push</span><span class="p">:</span>
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">main</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">develop</span><span class="p p-Indicator">]</span>
@@ -16676,6 +16733,17 @@ for as long as the <code>include</code> list had no JSON pattern, because JSON
 had simply never come up. No issue could have been filed about it:
 from <code>review-coverage</code>'s perspective the repository was fully
 measured.</p>
+<p><strong>Deployment drift.</strong> Two more checks cover the deployment rather
+than the review. <code>review-tracking-templates</code>
+(<code>docs/audits/review-tracking-templates.md</code>) fails a repository
+whose three CI copies are not byte-identical to
+<code>templates/review-tracking/</code>. A template change therefore shows up
+as one failure per adopter until each is re-synced. Without the
+check, two adopters had fallen eleven template commits behind and
+nobody noticed. <code>review-scope-ci</code> (in
+<code>docs/audits/workflow-standards.md</code>) fails a repository where a pull
+request changing only the scope config skips the automated
+reviewer, for the reason step 8 gives.</p>
 <p><code>status</code> and <code>scope-orphans</code> are also useful interactively: run
 <code>./tools/review-tracking.sh status</code> in any clone to see effective
 coverage at that clone's HEAD, or
