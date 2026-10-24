@@ -507,6 +507,79 @@ class NamespaceClaimCrudLiveTestCase(_LiveClaimFixture):
         self.assertTrue(result['created'], result['error'])
         self.assertEqual(70, self._cluster().claimed_cpus)
 
+    def test_the_published_headroom_is_what_the_claim_guard_admits(self):
+        # The singleton read publishes unallocated_* as the one headroom
+        # figure, computed in Python beside the read. The claim guard
+        # computes the same thing in SQL. If the two disagreed by even
+        # one unit, an operator sizing a claim from the published figure
+        # would be refused, or the figure would understate what fits.
+        # Every counter is non-zero so a term dropped or swapped in the
+        # Python copy moves the boundary. The unclaimed placement guard
+        # is pinned to the same figure in
+        # test_mariadb_capacity_admission_live.py.
+        self._set_cluster(total_cpus=100, total_memory_mb=102400,
+                          total_disk_gb=1000, claimed_cpus=20,
+                          claimed_memory_mb=10000, claimed_disk_gb=100,
+                          unclaimed_used_cpus=30,
+                          unclaimed_used_memory_mb=20000,
+                          unclaimed_used_disk_gb=200)
+        read = mariadb._direct_get_cluster_capacity()
+        self.assertFalse(read.degraded)
+        self.assertIsNotNone(read.row)
+        headroom = {dim: read.row[f'unallocated_{dim}']
+                    for dim in ('cpus', 'memory_mb', 'disk_gb')}
+        self.assertEqual(
+            {'cpus': 50, 'memory_mb': 72400, 'disk_gb': 700}, headroom)
+
+        # One more than the published headroom, in any one dimension, is
+        # refused. Each is tried alone so a refusal names its dimension.
+        for dimension in headroom:
+            request = {'limit_cpus': 0, 'limit_memory_mb': 0,
+                       'limit_disk_gb': 0}
+            request[f'limit_{dimension}'] = headroom[dimension] + 1
+            result = self._create(**request)
+            self.assertTrue(result['success'], result['error'])
+            self.assertFalse(
+                result['created'],
+                f'a {dimension} claim of the published headroom plus one '
+                f'was created')
+            self.assertEqual('capacity', result['refused_reason'])
+        self.assertEqual([], self._claim_rows())
+
+        # Exactly the published headroom, in every dimension at once,
+        # is created.
+        result = self._create(limit_cpus=headroom['cpus'],
+                              limit_memory_mb=headroom['memory_mb'],
+                              limit_disk_gb=headroom['disk_gb'])
+        self.assertTrue(
+            result['created'],
+            f'{result["refused_reason"]}: {result["dimensions"]}')
+
+        # And the ledger now has nothing left, which the read agrees on.
+        after = mariadb._direct_get_cluster_capacity().row
+        self.assertIsNotNone(after)
+        self.assertEqual(0, after['unallocated_cpus'])
+        self.assertEqual(0, after['unallocated_memory_mb'])
+        self.assertEqual(0, after['unallocated_disk_gb'])
+
+    def test_the_singleton_read_reports_absence_and_its_write_time(self):
+        before = time.time()
+        self._set_cluster()
+        read = mariadb._direct_get_cluster_capacity()
+        self.assertFalse(read.degraded)
+        # Epoch seconds from the server's clock, so close to ours on a
+        # test database running beside the suite.
+        self.assertGreater(read.row['updated_at'], before - 60)
+        self.assertLess(read.row['updated_at'], time.time() + 60)
+
+        table = mariadb._get_cluster_capacity_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.delete(table))
+            conn.commit()
+        self.assertEqual(
+            mariadb.ClusterCapacityRead(row=None, degraded=False),
+            mariadb._direct_get_cluster_capacity())
+
     def test_memory_and_disk_bind_as_well_as_cpu(self):
         for dimension, total, over in (
                 ('memory_mb', 'total_memory_mb', 102401),

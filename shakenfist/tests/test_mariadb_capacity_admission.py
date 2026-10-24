@@ -2173,6 +2173,216 @@ class GetSchedulerNodeCapacityTestCase(base.ShakenFistTestCase):
         self.assertIn('get_scheduler_node_capacity', monitor.counters)
 
 
+def _singleton_row(updated_at=1761350400.0, **overrides):
+    """A cluster_capacity row as the singleton read's projection returns it."""
+    values = {
+        'total_cpus': 144, 'total_memory_mb': 393216, 'total_disk_gb': 1000,
+        'claimed_cpus': 16, 'claimed_memory_mb': 16384,
+        'claimed_disk_gb': 100, 'unclaimed_used_cpus': 8,
+        'unclaimed_used_memory_mb': 8192, 'unclaimed_used_disk_gb': 64,
+        'updated_at': updated_at,
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values)
+
+
+class GetClusterCapacityTestCase(base.ShakenFistTestCase):
+    """Reading the cluster_capacity singleton both cluster-wide guards use.
+
+    The guards are UPDATEs which never read the row back, so this read is
+    the only way an operator sees the ledger they test against. A reader
+    which dropped a column, or published an absent or unreadable row as a
+    ledger of zeroes, would report headroom neither guard agrees with.
+    """
+
+    EXPECTED = {
+        'total_cpus': 144,
+        'total_memory_mb': 393216,
+        'total_disk_gb': 1000,
+        'claimed_cpus': 16,
+        'claimed_memory_mb': 16384,
+        'claimed_disk_gb': 100,
+        'unclaimed_used_cpus': 8,
+        'unclaimed_used_memory_mb': 8192,
+        'unclaimed_used_disk_gb': 64,
+        'updated_at': 1761350400.0,
+        'unallocated_cpus': 120,
+        'unallocated_memory_mb': 368640,
+        'unallocated_disk_gb': 836,
+    }
+
+    def _run_direct(self, row=None, error=None):
+        engine = mock.MagicMock()
+        conn = mock.MagicMock()
+        if error is not None:
+            conn.execute.side_effect = error
+        else:
+            conn.execute.return_value.first.return_value = row
+        engine.connect.return_value.__enter__.return_value = conn
+        with mock.patch('shakenfist.mariadb._get_engine',
+                        return_value=engine):
+            return mariadb._direct_get_cluster_capacity(), conn
+
+    def test_every_counter_is_read_and_typed(self):
+        read, conn = self._run_direct(row=_singleton_row())
+        self.assertEqual(self.EXPECTED, read.row)
+        self.assertFalse(read.degraded)
+        text, params = _compiled(conn.execute.call_args.args[0])
+        self.assertTrue(text.startswith('SELECT'))
+        self.assertIn('FROM cluster_capacity', text)
+        self.assertIn('WHERE cluster_capacity.id = %s', text)
+        self.assertEqual([1], list(params.values()))
+        # Converted server side, as the claims read converts its own
+        # DATETIMEs: the column is written from the server's clock.
+        self.assertIn('unix_timestamp(cluster_capacity.updated_at)', text)
+        for name in mariadb.CLUSTER_CAPACITY_COUNTERS:
+            self.assertIn(f'cluster_capacity.{name}', text)
+
+    def test_an_absent_row_is_not_a_ledger_of_zeroes(self):
+        # The normal state of a cluster that has never reconciled, so it
+        # is not degraded -- but the counters are unknown, not zero.
+        read, _ = self._run_direct(row=None)
+        self.assertIsNone(read.row)
+        self.assertFalse(read.degraded)
+
+    def test_a_database_error_reads_as_degraded(self):
+        read, _ = self._run_direct(error=_operational_error(2006))
+        self.assertIsNone(read.row)
+        self.assertTrue(read.degraded)
+
+    def test_unallocated_is_total_less_claimed_less_unclaimed_used(self):
+        self.assertEqual(
+            {'unallocated_cpus': 120, 'unallocated_memory_mb': 368640,
+             'unallocated_disk_gb': 836},
+            mariadb._cluster_unallocated(self.EXPECTED))
+
+    def test_an_over_promised_cluster_publishes_a_negative_headroom(self):
+        # The reconciler rebuilds claimed_* from every active claim's
+        # limits whether or not they fit, so a cluster which shrank
+        # under its claims is over-promised. Clamping would hide it.
+        read, _ = self._run_direct(row=_singleton_row(
+            total_cpus=20, claimed_cpus=16, unclaimed_used_cpus=8))
+        self.assertEqual(-4, read.row['unallocated_cpus'])
+
+    def _servicer(self):
+        servicer = database_main.DatabaseService.__new__(
+            database_main.DatabaseService)
+        servicer.monitor = mock.MagicMock()
+        return servicer
+
+    def _unpack(self, reply):
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=mock.MagicMock()), \
+                mock.patch('shakenfist.mariadb._grpc_call',
+                           return_value=reply):
+            return mariadb._grpc_get_cluster_capacity()
+
+    def test_round_trip_through_the_rpc(self):
+        with mock.patch(
+                'shakenfist.mariadb._direct_get_cluster_capacity',
+                return_value=mariadb.ClusterCapacityRead(
+                    row=dict(self.EXPECTED), degraded=False)):
+            reply = self._servicer().GetClusterCapacity(
+                database_pb2.GetClusterCapacityRequest(), mock.MagicMock())
+        self.assertTrue(reply.present)
+        self.assertFalse(reply.degraded)
+
+        unpacked = self._unpack(reply)
+        self.assertEqual(self.EXPECTED, unpacked.row)
+        self.assertFalse(unpacked.degraded)
+
+    def test_an_absent_row_crosses_the_wire_as_absent(self):
+        with mock.patch(
+                'shakenfist.mariadb._direct_get_cluster_capacity',
+                return_value=mariadb.ClusterCapacityRead(
+                    row=None, degraded=False)):
+            reply = self._servicer().GetClusterCapacity(
+                database_pb2.GetClusterCapacityRequest(), mock.MagicMock())
+        self.assertFalse(reply.present)
+        self.assertFalse(reply.degraded)
+
+        unpacked = self._unpack(reply)
+        self.assertIsNone(unpacked.row)
+        self.assertFalse(unpacked.degraded)
+
+    def test_a_degraded_daemon_read_crosses_the_wire(self):
+        # Every daemon except sf-database reaches the row over gRPC, so
+        # a MariaDB-side failure inside the database tier has to be
+        # forwarded or it arrives as an absent row -- a normal state,
+        # which would be published as one.
+        with mock.patch(
+                'shakenfist.mariadb._direct_get_cluster_capacity',
+                return_value=mariadb.ClusterCapacityRead(
+                    row=None, degraded=True)):
+            reply = self._servicer().GetClusterCapacity(
+                database_pb2.GetClusterCapacityRequest(), mock.MagicMock())
+        self.assertTrue(reply.degraded)
+
+        unpacked = self._unpack(reply)
+        self.assertIsNone(unpacked.row)
+        self.assertTrue(unpacked.degraded)
+
+    def test_a_failed_rpc_reads_as_degraded(self):
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=mock.MagicMock()), \
+                mock.patch(
+                    'shakenfist.mariadb._grpc_call',
+                    side_effect=exceptions.DatabaseUnavailable('nope')):
+            read = mariadb._grpc_get_cluster_capacity()
+        self.assertIsNone(read.row)
+        self.assertTrue(read.degraded)
+
+    def test_the_singleton_read_uses_the_bounded_budget(self):
+        # The admin summary reads this beside the per-node counters, and
+        # both have to give up the same way.
+        with mock.patch('shakenfist.mariadb._get_database_stub',
+                        return_value=mock.MagicMock()), \
+                mock.patch('shakenfist.mariadb._grpc_call') as mock_call:
+            mock_call.return_value = database_pb2.GetClusterCapacityReply()
+            mariadb._grpc_get_cluster_capacity()
+        self.assertEqual(mariadb.BOUNDED_QUERY_TIMEOUT,
+                         mock_call.call_args.kwargs['timeout'])
+        self.assertEqual(1, mock_call.call_args.kwargs['max_slow_failures'])
+
+    def test_servicer_swallows_an_unexpected_exception(self):
+        with mock.patch(
+                'shakenfist.mariadb._direct_get_cluster_capacity',
+                side_effect=ValueError('boom')):
+            reply = self._servicer().GetClusterCapacity(
+                database_pb2.GetClusterCapacityRequest(), mock.MagicMock())
+        self.assertFalse(reply.present)
+        self.assertTrue(reply.degraded)
+
+    def test_the_rpc_has_a_prometheus_counter(self):
+        with mock.patch.object(database_main.daemon.WorkerPoolDaemon,
+                               '__init__', return_value=None), \
+                mock.patch.object(database_main, 'start_http_server'), \
+                mock.patch.object(database_main, 'Gauge'), \
+                mock.patch.object(database_main, 'Counter'):
+            monitor = database_main.Monitor('test')
+        self.assertIn('get_cluster_capacity', monitor.counters)
+
+    @mock.patch('shakenfist.mariadb._grpc_get_cluster_capacity')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=True)
+    def test_get_cluster_capacity_routes_to_grpc(self, _use, mock_grpc):
+        mock_grpc.return_value = mariadb.ClusterCapacityRead(
+            row=None, degraded=False)
+        self.assertEqual(mock_grpc.return_value,
+                         mariadb.get_cluster_capacity())
+        mock_grpc.assert_called_once_with()
+
+    @mock.patch('shakenfist.mariadb._direct_get_cluster_capacity')
+    @mock.patch('shakenfist.mariadb._use_database_service',
+                return_value=False)
+    def test_get_cluster_capacity_routes_to_direct(self, _use, mock_direct):
+        mock_direct.return_value = mariadb.ClusterCapacityRead(
+            row=None, degraded=False)
+        self.assertEqual(mock_direct.return_value,
+                         mariadb.get_cluster_capacity())
+        mock_direct.assert_called_once_with()
+
+
 class DemandOnlyDenialTestCase(base.ShakenFistTestCase):
     """CapacityAdmissionDenied.demand_only decides waiver eligibility.
 

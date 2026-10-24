@@ -26595,6 +26595,119 @@ class SchedulerNodeCapacityRead(NamedTuple):
     degraded: bool
 
 
+# The cluster_capacity singleton's counters, in the order the
+# ClusterCapacity proto message declares them. Every reader converts the
+# same nine, so they are listed once.
+CLUSTER_CAPACITY_COUNTERS = (
+    'total_cpus', 'total_memory_mb', 'total_disk_gb',
+    'claimed_cpus', 'claimed_memory_mb', 'claimed_disk_gb',
+    'unclaimed_used_cpus', 'unclaimed_used_memory_mb',
+    'unclaimed_used_disk_gb',
+)
+
+
+class ClusterCapacityDict(TypedDict):
+    """The cluster_capacity singleton, as readers of the counters see it.
+
+    The nine counters are the row's own columns, never re-derived from
+    claim or placement rows. ``updated_at`` is epoch seconds, and is the
+    row's last write -- an admission, a release, a claim change or a
+    reconcile pass all write it -- so it is not the time of the last
+    reconcile. The three ``unallocated_*`` figures are the one derived
+    value, computed by ``_cluster_unallocated()``.
+    """
+
+    total_cpus: int
+    total_memory_mb: int
+    total_disk_gb: int
+    claimed_cpus: int
+    claimed_memory_mb: int
+    claimed_disk_gb: int
+    unclaimed_used_cpus: int
+    unclaimed_used_memory_mb: int
+    unclaimed_used_disk_gb: int
+    updated_at: float
+    unallocated_cpus: int
+    unallocated_memory_mb: int
+    unallocated_disk_gb: int
+
+
+class ClusterCapacityRead(NamedTuple):
+    """The cluster_capacity singleton, plus whether the read failed.
+
+    ``row`` is None both for a singleton the reconciler has not written
+    yet and for one which could not be read, so the two are told apart
+    by ``degraded``, exactly as for ``SchedulerNodeCapacityRead``. The
+    first is the normal state of a cluster that has never reconciled,
+    in which unclaimed placements admit unguarded and claim creation is
+    refused; the second means this process knows nothing about the
+    ledger. Neither is a ledger of zeroes, and a caller must not publish
+    one as if it were.
+    """
+
+    row: Optional[ClusterCapacityDict]
+    degraded: bool
+
+
+def _cluster_unallocated(counters: dict[str, int]) -> dict[str, int]:
+    """What is left for either a claim or an unclaimed placement, per dimension.
+
+    ``unallocated_<dim> = total - claimed - unclaimed_used``. This is the
+    one Python copy of the arithmetic the two cluster-wide guarded
+    UPDATEs evaluate in SQL, and it mirrors both:
+
+    * the unclaimed placement guard in
+      ``_direct_admit_instance_placement()``,
+      ``unclaimed_used + requested <= total - claimed``, admits exactly
+      when ``requested <= unallocated``;
+    * the claim guard, ``_claim_capacity_guard()``,
+      ``claimed + requested + GREATEST(0, unclaimed_used - migrated) <=
+      total``, admits exactly when ``requested <= unallocated`` for a
+      namespace with nothing to migrate. Its migration term only ever
+      adds the requesting namespace's own drawdown back to that
+      namespace's headroom, so it is not a second cluster-wide figure.
+
+    The result is published unclamped and can be negative. Admission
+    cannot drive it below zero, but the reconciler rebuilds
+    ``claimed_*`` from the limits of every active claim whether or not
+    they fit, so a cluster that shrank under its claims is
+    over-promised. Clamping that to zero would hide exactly the state an
+    operator reading the ledger needs to see.
+
+    A test against a real MariaDB pins this function to both guards: a
+    request of exactly ``unallocated`` is admitted by each, and one more
+    is refused.
+    """
+    return {
+        f'unallocated_{dim}': (
+            int(counters[f'total_{dim}'])
+            - int(counters[f'claimed_{dim}'])
+            - int(counters[f'unclaimed_used_{dim}']))
+        for dim in CAPACITY_DIMENSIONS
+    }
+
+
+def _cluster_capacity_dict(
+        counters: dict[str, int], updated_at: float) -> ClusterCapacityDict:
+    """Build the reader's view of the singleton from its nine counters."""
+    unallocated = _cluster_unallocated(counters)
+    return {
+        'total_cpus': int(counters['total_cpus']),
+        'total_memory_mb': int(counters['total_memory_mb']),
+        'total_disk_gb': int(counters['total_disk_gb']),
+        'claimed_cpus': int(counters['claimed_cpus']),
+        'claimed_memory_mb': int(counters['claimed_memory_mb']),
+        'claimed_disk_gb': int(counters['claimed_disk_gb']),
+        'unclaimed_used_cpus': int(counters['unclaimed_used_cpus']),
+        'unclaimed_used_memory_mb': int(counters['unclaimed_used_memory_mb']),
+        'unclaimed_used_disk_gb': int(counters['unclaimed_used_disk_gb']),
+        'updated_at': float(updated_at),
+        'unallocated_cpus': unallocated['unallocated_cpus'],
+        'unallocated_memory_mb': unallocated['unallocated_memory_mb'],
+        'unallocated_disk_gb': unallocated['unallocated_disk_gb'],
+    }
+
+
 class _AdmissionDenied(Exception):
     """A guarded UPDATE matched no row, so the transaction must abort.
 
@@ -27960,6 +28073,43 @@ def _direct_get_scheduler_node_capacity() -> SchedulerNodeCapacityRead:
         return SchedulerNodeCapacityRead(rows=[], degraded=True)
 
 
+def _direct_get_cluster_capacity() -> ClusterCapacityRead:
+    """Read the cluster_capacity singleton.
+
+    A primary-key read outside a transaction, for the same reason as
+    ``_direct_get_scheduler_node_capacity()``: the ledger moves under
+    every admission, and holding a snapshot would only serialise this
+    read against them. ``updated_at`` is converted to epoch seconds
+    server side, as the claims read does, because it is a DATETIME
+    written from the server's clock.
+
+    An absent row returns ``row=None``; a failed query returns
+    ``row=None`` and ``degraded=True`` rather than raising, because the
+    caller is a summary which reports an unreadable ledger rather than
+    failing.
+    """
+    engine = _get_engine()
+    cluster = _get_cluster_capacity_table()
+
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(
+                sa.select(
+                    *[cluster.c[name] for name in CLUSTER_CAPACITY_COUNTERS],
+                    sa.func.unix_timestamp(
+                        cluster.c.updated_at).label('updated_at'))
+                .where(cluster.c.id == 1)).first()
+        if row is None:
+            return ClusterCapacityRead(row=None, degraded=False)
+        return ClusterCapacityRead(row=_cluster_capacity_dict(
+            {name: int(getattr(row, name))
+             for name in CLUSTER_CAPACITY_COUNTERS},
+            float(row.updated_at)), degraded=False)
+    except OperationalError as e:
+        LOG.warning(f'MariaDB query failed for cluster_capacity: {e}')
+        return ClusterCapacityRead(row=None, degraded=True)
+
+
 def _grpc_admit_instance_placement(
         instance_uuid: str, namespace: str, node_uuid: str,
         old_node_uuid: str, cpus: int, memory_mb: int, disk_gb: int,
@@ -28118,6 +28268,38 @@ def _grpc_get_scheduler_node_capacity() -> SchedulerNodeCapacityRead:
         return SchedulerNodeCapacityRead(rows=[], degraded=True)
 
 
+def _grpc_get_cluster_capacity() -> ClusterCapacityRead:
+    """Read the cluster_capacity singleton via the database microservice.
+
+    Bounded exactly as ``_grpc_get_scheduler_node_capacity()`` is. The
+    admin resources summary makes both reads in one response, and
+    cluster CI polls it throughout every job, so the two have to give up
+    the same way: a response in which one read degrades after the
+    bounded budget while the other waits out the full retry budget is
+    harder to reason about than one in which both degrade together.
+
+    A failed call swallows to ``degraded=True``, and the reply's own
+    ``degraded`` is carried through so a MariaDB failure inside the
+    database tier is not delivered as an absent row.
+    """
+    try:
+        stub = _get_database_stub()
+        request = database_pb2.GetClusterCapacityRequest()
+        reply = _grpc_call(
+            stub.GetClusterCapacity, request,
+            timeout=BOUNDED_QUERY_TIMEOUT, max_slow_failures=1)
+        if not reply.present:
+            return ClusterCapacityRead(
+                row=None, degraded=bool(reply.degraded))
+        return ClusterCapacityRead(row=_cluster_capacity_dict(
+            {name: int(getattr(reply.cluster, name))
+             for name in CLUSTER_CAPACITY_COUNTERS},
+            float(reply.updated_at)), degraded=bool(reply.degraded))
+    except (exceptions.DatabaseUnavailable, grpc.RpcError) as e:
+        LOG.warning(f'gRPC GetClusterCapacity failed: {e}')
+        return ClusterCapacityRead(row=None, degraded=True)
+
+
 def admit_instance_placement(
         instance_uuid: str, namespace: str, node_uuid: str, cpus: int,
         memory_mb: int, disk_gb: int, placement_json: str,
@@ -28252,6 +28434,21 @@ def get_scheduler_node_capacity() -> SchedulerNodeCapacityRead:
     if _use_database_service():
         return _grpc_get_scheduler_node_capacity()
     return _direct_get_scheduler_node_capacity()
+
+
+def get_cluster_capacity() -> ClusterCapacityRead:
+    """The cluster_capacity singleton, the ledger both cluster-wide guards use.
+
+    Returns ``(row, degraded)``. ``row`` carries the nine counters as
+    stored, ``updated_at`` and the derived ``unallocated_*`` headroom
+    (see ``_cluster_unallocated()``). It is None when the singleton has
+    not been written yet *or* could not be read, and ``degraded`` says
+    which. Both guards on this row are guarded UPDATEs that never read
+    it back, so this is the only way to see what they test against.
+    """
+    if _use_database_service():
+        return _grpc_get_cluster_capacity()
+    return _direct_get_cluster_capacity()
 
 
 # =============================================================================

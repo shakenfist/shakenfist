@@ -691,6 +691,57 @@ class PlacementAdmissionLiveTestCase(_LiveCapacityFixture):
         detail = {d['dimension']: d for d in result['dimensions']}
         self.assertEqual(8.0, detail['cpus']['limit'])
 
+    def test_the_published_headroom_is_what_the_unclaimed_guard_admits(self):
+        # The singleton read publishes unallocated_* as the one headroom
+        # figure both cluster-wide guards test against. This pins it to
+        # the unclaimed placement guard; the claim guard is pinned to the
+        # same figure in test_mariadb_capacity_claims_live.py. Every
+        # counter is non-zero, and the figure sits well inside node_b's
+        # own limits, so only the cluster stage can refuse here.
+        cluster_t = mariadb._get_cluster_capacity_table()
+        with self.engine.connect() as conn:
+            conn.execute(sa.update(cluster_t).where(
+                cluster_t.c.id == 1).values(
+                    claimed_cpus=10, claimed_memory_mb=20000,
+                    claimed_disk_gb=100))
+            conn.commit()
+        read = mariadb._direct_get_cluster_capacity()
+        self.assertFalse(read.degraded)
+        self.assertIsNotNone(read.row)
+        headroom = {dim: read.row[f'unallocated_{dim}']
+                    for dim in ('cpus', 'memory_mb', 'disk_gb')}
+        self.assertEqual(
+            {'cpus': 58, 'memory_mb': 49632, 'disk_gb': 940}, headroom)
+
+        # One more than the published headroom, in any one dimension, is
+        # refused at the cluster stage and moves nothing.
+        for dimension in headroom:
+            request = {'cpus': 0, 'memory_mb': 0, 'disk_gb': 0}
+            request[dimension] = headroom[dimension] + 1
+            result = self._admit(self.node_b, **request)
+            self.assertFalse(
+                result['admitted'],
+                f'an unclaimed {dimension} placement of the published '
+                f'headroom plus one was admitted')
+            self.assertEqual('cluster', result['failing_stage'])
+            detail = {d['dimension']: d for d in result['dimensions']}
+            self.assertTrue(detail[dimension]['exceeded'])
+        self.assertEqual(0, self._capacity(self.node_b).used_cpus)
+
+        # Exactly the published headroom, in every dimension at once,
+        # is admitted.
+        result = self._admit(self.node_b, cpus=headroom['cpus'],
+                             memory_mb=headroom['memory_mb'],
+                             disk_gb=headroom['disk_gb'])
+        self.assertTrue(result['admitted'],
+                        f'{result["failing_stage"]}: {result["dimensions"]}')
+
+        after = mariadb._direct_get_cluster_capacity().row
+        self.assertIsNotNone(after)
+        self.assertEqual(0, after['unallocated_cpus'])
+        self.assertEqual(0, after['unallocated_memory_mb'])
+        self.assertEqual(0, after['unallocated_disk_gb'])
+
     def test_zero_sized_admission_is_not_read_as_a_denial(self):
         # SQLAlchemy's mysqldb dialect sets CLIENT_FOUND_ROWS, so
         # rowcount is rows matched rather than rows changed. Without it a

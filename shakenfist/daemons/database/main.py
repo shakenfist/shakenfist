@@ -2921,6 +2921,50 @@ class DatabaseService(database_pb2_grpc.DatabaseServiceServicer):
                 'database GetSchedulerNodeCapacity failed', e)
             return database_pb2.GetSchedulerNodeCapacityReply(degraded=True)
 
+    def GetClusterCapacity(
+        self,
+        request: database_pb2.GetClusterCapacityRequest,
+        context: grpc.ServicerContext
+    ) -> database_pb2.GetClusterCapacityReply:
+        """Read the cluster_capacity singleton.
+
+        ``present`` is false for a singleton the reconciler has not
+        written yet, and the read's ``degraded`` flag is forwarded for
+        the same reason GetSchedulerNodeCapacity forwards its own:
+        every daemon except this one reaches the row over gRPC, so
+        without it a MariaDB-side failure here would arrive as an absent
+        row, which is a normal state and would be read as one. An
+        exception escaping the direct read is degraded too.
+
+        The derived ``unallocated_*`` figures are not sent. The client
+        recomputes them from the counters with the same helper, so the
+        wire carries only what the row stores.
+        """
+        try:
+            self.monitor.counters['get_cluster_capacity'].inc()
+            read = mariadb._direct_get_cluster_capacity()
+            reply = database_pb2.GetClusterCapacityReply(
+                degraded=read.degraded)
+            row = read.row
+            if row is not None:
+                reply.present = True
+                reply.updated_at = row['updated_at']
+                reply.cluster.CopyFrom(database_pb2.ClusterCapacity(
+                    total_cpus=row['total_cpus'],
+                    total_memory_mb=row['total_memory_mb'],
+                    total_disk_gb=row['total_disk_gb'],
+                    claimed_cpus=row['claimed_cpus'],
+                    claimed_memory_mb=row['claimed_memory_mb'],
+                    claimed_disk_gb=row['claimed_disk_gb'],
+                    unclaimed_used_cpus=row['unclaimed_used_cpus'],
+                    unclaimed_used_memory_mb=row['unclaimed_used_memory_mb'],
+                    unclaimed_used_disk_gb=row['unclaimed_used_disk_gb']))
+            return reply
+        except Exception as e:
+            util_exceptions.ignore_exception(
+                'database GetClusterCapacity failed', e)
+            return database_pb2.GetClusterCapacityReply(degraded=True)
+
     # =========================================================
     # Namespace Claim CRUD (MariaDB)
     #
@@ -6642,7 +6686,7 @@ class Monitor(daemon.WorkerPoolDaemon):
             # MariaDB scheduler capacity operations
             'reconcile_scheduler_capacity',
             'admit_instance_placement', 'release_instance_placement',
-            'get_scheduler_node_capacity',
+            'get_scheduler_node_capacity', 'get_cluster_capacity',
             # Placement admissions which ran without a capacity guard
             # (P7): a node or cluster with no capacity row fails open, so
             # this counter is how "the guard is working" is told apart
