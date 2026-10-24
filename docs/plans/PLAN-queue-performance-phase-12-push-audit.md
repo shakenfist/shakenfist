@@ -298,7 +298,7 @@ regeneration, not authorship.
 | Step | Effort | Model | Isolation | Brief for sub-agent |
 |------|--------|-------|-----------|---------------------|
 | 12a | medium | opus | none | **Done in the planning commit.** Write this plan, correct survey findings 3, 4, 5 and 9 at source, and add finding 2's `git diff` rule, in the master plan's Status and Phase 12 sections, link this file from the master plan's Execution table and from `docs/plans/index.md` with status In progress, run `tools/check-plan-status.py` and `pre-commit run --all-files`. Commit subject: "Plan the queue performance push audit." |
-| 12b | low | sonnet | none | Wave 1 and the wave 2 mechanical sweep, in `/srv/kasm_profiles/mikal/vscode/src/shakenfist/shakenfist-wt-qp-phase-12`. Run `pre-commit run --all-files`, then `tox`, then `tools/mermaid-lint.sh` (all five ranges touch markdown; check its exit status directly, never through a pipe), then `tox -e genprotos && git diff --exit-code shakenfist/protos` (#4007 and #4033 change `protos/database.proto`). Then, **for each of the five ranges in decision 1 separately**, run the four style greps from `PUSH-AUDIT.md`'s wave 1 and the five commands of its wave 2 mechanical sweep, substituting the range for `$RANGE` and using `git diff <sha>^1 <sha>`. Never use `git log` on these ranges (survey finding 2). Record every command and its literal output, or "no output", in a new `## Findings` → `### Wave 1` section of this plan, one sub-heading per range for the greps and sweep. If `pre-commit` or `tox` fails, record the failing test names, check with `git diff --name-only <sha>^1 <sha>` whether any range touched the failing module, and carry on (decision 9). Do not fix anything. Commit subject: "Record wave 1 of the phase 12 audit." |
+| 12b | low | sonnet | none | Wave 1 and the wave 2 mechanical sweep, in `/srv/kasm_profiles/mikal/vscode/src/shakenfist/shakenfist-wt-qp-phase-12`. Run `pre-commit run --all-files`, then `tox`, then `tools/mermaid-lint.sh` (all five ranges touch markdown; check its exit status directly, never through a pipe), then `tox -e genprotos && git diff --exit-code shakenfist/protos` (#4007 and #4033 change `protos/database.proto`). Then, **for each of the five ranges in decision 1 separately**, run the four style greps from `PUSH-AUDIT.md`'s wave 1 and the six commands of its wave 2 mechanical sweep, substituting the range for `$RANGE` and using `git diff <sha>^1 <sha>`. Never use `git log` on these ranges (survey finding 2). Record every command and its literal output, or "no output", in a new `## Findings` → `### Wave 1` section of this plan, one sub-heading per range for the greps and sweep. If `pre-commit` or `tox` fails, record the failing test names, check with `git diff --name-only <sha>^1 <sha>` whether any range touched the failing module, and carry on (decision 9). Do not fix anything. Commit subject: "Record wave 1 of the phase 12 audit." |
 | 12c | low | sonnet | none | Style conformance, judgment portion, read-only (decision 4). Apply `PUSH-AUDIT.md`'s "Style conformance — judgment portion" brief to all five ranges in decision 1, read with `git diff <sha>^1 <sha>`. Skip `shakenfist/protos/*_pb2*.py`. For each candidate, confirm it against the file at `$TIP` and classify it under decision 2. Pay particular attention to the field rename and unit-change rule: `coalesce_seconds` and `wait_seconds` are new event fields, and the outcome `not_cluster_wide` was renamed to `key_cannot_distinguish_queue` (with a mapping in `tools/queue-wait-report.py`'s `RETIRED_COALESCE_OUTCOMES`). Return a findings list with file, line, range and grade, or "Style checks passed" plus the files read. The management session records it. Commit subject: "Record the phase 12 style review." |
 | 12d | medium | opus | none | 2a code quality, read-only (decision 4). Apply `PUSH-AUDIT.md`'s 2a brief, including all four of its shared blocks, to the five ranges together (decision 2), taking 12b's mechanical sweep output from this plan's Findings section as input. Areas this plan knows are worth the time: `shakenfist/mariadb.py`'s coalescing helpers (`_coalescible_key_pairs` 22682, `_coalescible_preflight` 23480, `_coalescible_key_clause` 23595, `_direct_find_existing_coalescible_op` 23643, `_direct_claim_coalescible_siblings` 23767) check the three-layer pattern; V1 and V2 RPCs coexist in `shakenfist/daemons/database/main.py` at 276, 307, 340 and 381, so check for duplicated bodies and registered Monitor counters. `tools/operation-timeline.py` is 1,425 lines and over the `source-file-size` threshold, so say whether it has a seam. `baseoperation.py:418-640` has comment blocks far longer than the code they explain, so apply `comment-proportion` rather than assume they earn it. **The phase 8 question** is whether the change, beyond being correct on its own terms, switches anything on. #4033's `_reusable_priorities` (`schema/operations/net_op.py:156`) changes which pending ops enqueue dedup may adopt, so say what it now matches that it did not before. Check every candidate at `$TIP`, against the ten later commits in survey finding 6. Return findings with file, line, range, grade and decision 2 classification. Commit subject: "Record the phase 12 code quality review." |
 | 12e | medium | opus | none | 2b test review, read-only (decision 4). Apply `PUSH-AUDIT.md`'s 2b brief and its `functional-test-coverage` block to the five ranges together. Three questions are specific to this plan. (1) **Producer/consumer contract** (decision 6): for every event field `tools/queue-wait-report.py` and `tools/operation-timeline.py` read, establish whether the tests' fixtures are derived from what `shakenfist/operations/baseoperation.py` emits at `$TIP` (as `test_every_outcome_the_code_records_is_reported` is) or are hand-written dicts that can drift, and name each hand-written one. Check whether `3e18fe40b2`'s `DEPENDENCY_DEFER_BUDGET` gives an operation a terminal path the timeline tool misreads. (2) **The flake family** (decision 8): do `test_duplicate_network_work_is_coalesced` and `test_per_node_mesh_work_is_coalesced` in `shakenfist/deploy/shakenfist_ci/cluster_ci_tests/test_coalescing.py` assert that an opportunistic optimisation fired? Read #3928, #3929 and #4235 with `gh issue view`, say whether the tests' design guarantees the contention they assert, and suggest what a deterministic version would assert. (3) Is every new outcome branch in `baseoperation.py:562-630` (`key_column_missing`, `coalescing_unavailable`) covered by a unit test that reaches it through `execute()` rather than by setting the attribute? Do not refile #3948. Return findings grouped by file, with grades. Commit subject: "Record the phase 12 test review." |
@@ -350,18 +350,19 @@ claims against the file itself.
   coherence; and disposition. Every heading except disposition
   names the files or functions it examined.
 * Wave 1 records literal output for 20 style-grep runs (four greps
-  across five ranges) and 25 sweep runs (five commands across five
-  ranges). The check is that each range's sub-heading lists all nine
+  across five ranges) and 30 sweep runs (six commands across five
+  ranges). The check is that each range's sub-heading lists all ten
   commands:
 
   ```
-  for s in 30168f0dd 9e41f07c6 fea4af7bd 9aab98d94 ff65c622a; do
-    grep -c "$s" docs/plans/PLAN-queue-performance-phase-12-push-audit.md
-  done
+  awk '/^#### /{h=$2} /^`git diff \$R/{c[h]++}
+       END{for(k in c) print k, c[k]}' \
+    docs/plans/PLAN-queue-performance-phase-12-push-audit.md
   ```
 
-  This gives a non-zero count for every range. Reading the
-  sub-heading confirms the nine commands are there.
+  This prints 10 for every range. (As first written, this item said
+  five sweep commands and nine in all. `PUSH-AUDIT.md`'s sweep has
+  six, and the count was corrected once 12b's record showed it.)
 * `tox -e genprotos && git diff --exit-code shakenfist/protos` exits 0,
   with the result recorded, or the stale stubs are a recorded
   finding.
@@ -682,7 +683,7 @@ no output
 
 ### Wave 2 mechanical sweep
 
-The sweep's five commands are recorded per range under "Wave 1"
+The sweep's six commands are recorded per range under "Wave 1"
 above. In every range they report no new TODO, FIXME, HACK, XXX,
 `# noqa`, `# type: ignore`, `pragma: no cover` or subprocess call.
 New test functions per range: 30, 0, 33, 37 and 20. There was
@@ -997,7 +998,13 @@ Duplicate searches run before filing, with
 * "network workitem join timeout"
 
 They matched only the known flake issues, closed issues and the
-#3772 umbrella. Sub-agents ran further searches of their own
+#3772 umbrella.
+
+Under decision 2, every finding in the table is still true at
+`9efbff1481`. The "fixed since" results are the 72 plan references
+`70e9f2eeeb` removed (2c above). Two items fall outside this
+plan's code: F3 predates it, and R1's trigger lies in data written
+before #4007. Both are named as such. Sub-agents ran further searches of their own
 ("coalesce complete before", "rolling upgrade coalescing",
 "coalesced into sibling" and others), with the same result.
 
